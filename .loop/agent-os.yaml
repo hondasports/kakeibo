@@ -315,7 +315,7 @@ parallelism:
   rules:
     - writer競合を避けるためshared diffは1 writer
     - researcherを増やす場合も重複調査ではなく明確にsource/surfaceを分割する
-    - reviewer-to-reviewer_debateは禁止する
+    - reviewer-to-reviewer debateは禁止する
 
 compact_packets:
   researcher:
@@ -379,7 +379,7 @@ compatibility:
     - .loop/process.yaml finding_ledger
     - .loop/process.yaml verification_policy
     - .loop/process.yaml delivery_contract
-    - skills/*/SKILL.md conditional loading
+    - skills/*/SKILL.md conditional_loading
   non_goals:
     - new DSL introduction
     - model/vendor固定routing
