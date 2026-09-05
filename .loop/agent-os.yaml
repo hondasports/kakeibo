@@ -78,9 +78,22 @@ task_classifier:
   fields:
     task_type:
       values:
-        [investigation, docs, bugfix, feature, refactor, test, dependency, architecture, ops, process]
+        - investigation
+        - docs
+        - bugfix
+        - feature
+        - refactor
+        - test
+        - dependency
+        - architecture
+        - ops
+        - process
     complexity:
-      values: [tiny, small, medium, large]
+      values:
+        - tiny
+        - small
+        - medium
+        - large
       rules:
         tiny:
           - single_local_surface
@@ -122,19 +135,26 @@ roles:
       - read-only discovery
       - authoritative source / direct caller / direct test確認
       - material assumptionのcheap解消
-    allowed_effects: [ro_repository, ro_public]
+    allowed_effects:
+      - ro_repository
+      - ro_public
     writes_shared_diff: false
   planner:
     responsibilities:
       - Goal/In/Out・AC/IV・Coverage Map・Risk/ControlsのPREPARE補助
       - implementation sequenceの最小化
-    allowed_effects: [ro_repository, ro_public]
+    allowed_effects:
+      - ro_repository
+      - ro_public
     writes_shared_diff: false
   implementer:
     responsibilities:
       - compact contractに必要な最小差分を実装
       - behavior diffをAC/IV/design deviationへ逆引き
-    allowed_effects: [ro_repository, repo_write, git_write]
+    allowed_effects:
+      - ro_repository
+      - repo_write
+      - git_write
     writes_shared_diff: true
     cardinality: one_per_shared_diff
   verifier:
@@ -142,20 +162,25 @@ roles:
       - Coverage Mapに沿うtargeted verification
       - requirements_gap / test_gapの分類
       - Evidence記録
-    allowed_effects: [ro_repository, repo_write]
+    allowed_effects:
+      - ro_repository
+      - repo_write
     writes_shared_diff: false_unless_reassigned_for_test_fix
   reviewer:
     responsibilities:
       - omission-first independent review
       - behavior diff / contract / Evidence整合性確認
       - finding登録
-    allowed_effects: [ro_repository]
+    allowed_effects:
+      - ro_repository
     writes_shared_diff: false
     default_max: 1
   specialist:
     responsibilities:
       - materially distinctなRequired Controlに必要な専門reviewのみ
-    allowed_effects: [ro_repository, ro_public]
+    allowed_effects:
+      - ro_repository
+      - ro_public
     writes_shared_diff: false
     activation: required_control_only
 
@@ -164,35 +189,69 @@ routes:
     select_when:
       - task_type == investigation
       - required_effects subset_of [ro_repository, ro_public]
-    roles: [root_orchestrator, researcher_if_parallel_discovery_material]
-    loop_path: [prepare, verification, done]
+    roles:
+      - root_orchestrator
+    optional_roles:
+      researcher: parallel_discovery_material
+      reviewer: required_by_control
+    loop_path:
+      - prepare
+      - verification
+      - review_if_required
+      - done
     stage_overrides:
       implementation: not_required
       verification: only_when_claim_needs_evidence
-      review_if_required: not_required_unless_control_requires
+      review_if_required: only_when_control_requires
       delivery: not_required
       pr_aftercare: not_required
-    independent_review: false
+    independent_review: false_unless_control_requires
   fast:
     select_when:
       - complexity in [tiny, small]
       - risk in [r0_trivial, r1_low]
       - no_required_control_requires_independent_review
       - no_cross_cutting_unknown
-    roles: [root_orchestrator, implementer, verifier]
-    loop_path: [prepare, implementation, verification, delivery, pr_aftercare, done]
+    roles:
+      - root_orchestrator
+      - implementer
+      - verifier
+    optional_roles:
+      reviewer: required_by_control
+    loop_path:
+      - prepare
+      - implementation
+      - verification
+      - review_if_required
+      - delivery
+      - pr_aftercare
+      - done
     stage_overrides:
       prepare: minimal_contract
       verification: targeted
-      review_if_required: not_required_unless_control_requires
-    independent_review: false
+      review_if_required: only_when_control_requires
+    independent_review: false_unless_control_requires
   standard:
     select_when:
       - complexity == medium
       - or risk == r2_medium
       - or required_control_requires_independent_review
-    roles: [root_orchestrator, researcher_if_needed, planner_if_needed, implementer, verifier, reviewer_if_required]
-    loop_path: [prepare, implementation, verification, review_if_required, delivery, pr_aftercare, done]
+    roles:
+      - root_orchestrator
+      - implementer
+      - verifier
+    optional_roles:
+      researcher: discovery_needed
+      planner: planning_support_needed
+      reviewer: required_by_profile_or_control
+    loop_path:
+      - prepare
+      - implementation
+      - verification
+      - review_if_required
+      - delivery
+      - pr_aftercare
+      - done
     independent_review: once_if_required
   deep:
     select_when:
@@ -200,12 +259,26 @@ routes:
       - or risk in [r3_high, r4_critical]
       - or cross_cutting_impact_requires_parallel_discovery
       - or multiple_independent_workstreams
-    roles: [root_orchestrator, researcher, planner, implementer, verifier, reviewer]
-    loop_path: [prepare, implementation, verification, review_if_required, delivery, pr_aftercare, done]
+    roles:
+      - root_orchestrator
+      - researcher
+      - planner
+      - implementer
+      - verifier
+      - reviewer
+    optional_roles:
+      specialist: materially_distinct_required_control
+    loop_path:
+      - prepare
+      - implementation
+      - verification
+      - review_if_required
+      - delivery
+      - pr_aftercare
+      - done
     stage_overrides:
       review_if_required: required
     independent_review: once
-    specialist: only_when_materially_distinct_required_control
 
 route_selection:
   precedence:
@@ -242,19 +315,45 @@ parallelism:
   rules:
     - writer競合を避けるためshared diffは1 writer
     - researcherを増やす場合も重複調査ではなく明確にsource/surfaceを分割する
-    - reviewer-to-reviewer debateは禁止する
+    - reviewer-to-reviewer_debateは禁止する
 
 compact_packets:
   researcher:
-    [goal, exact_questions, authoritative_source_refs, known_scope, material_assumptions]
+    - goal
+    - exact_questions
+    - authoritative_source_refs
+    - known_scope
+    - material_assumptions
   planner:
-    [goal, in_scope, out_of_scope, known_contract, discovery_result, current_risk]
+    - goal
+    - in_scope
+    - out_of_scope
+    - known_contract
+    - discovery_result
+    - current_risk
   implementer:
-    [goal, ac_ids, iv_ids, implementation_surfaces, risk_and_controls, coverage_map]
+    - goal
+    - ac_ids
+    - iv_ids
+    - implementation_surfaces
+    - risk_and_controls
+    - coverage_map
   verifier:
-    [ac_iv_ids, relevant_dimensions, coverage_map, behavior_diff, required_controls, revision]
+    - ac_iv_ids
+    - relevant_dimensions
+    - coverage_map
+    - behavior_diff
+    - required_controls
+    - revision
   reviewer:
-    [ac_iv_ids, relevant_dimensions, material_assumptions, risk_and_controls, behavior_diff, coverage_and_evidence, open_finding_ids, revision]
+    - ac_iv_ids
+    - relevant_dimensions
+    - material_assumptions
+    - risk_and_controls
+    - behavior_diff
+    - coverage_and_evidence
+    - open_finding_ids
+    - revision
 
 state_contract:
   storage: .loop/state/<task-id>.yaml
