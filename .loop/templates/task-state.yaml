@@ -30,6 +30,25 @@ task:
   delivery_target: merge_ready
   current_state: prepare
 
+orchestration:
+  task_type: pending # investigation | docs | bugfix | feature | refactor | test | dependency | architecture | ops | process
+  complexity: pending # tiny | small | medium | large
+  required_effects: [] # values from .loop/agent-os.yaml effect_model.effects
+  selected_route: pending # read_only | fast | standard | deep
+  route_reasons: []
+  role_assignments: []
+  # - role: implementer
+  #   owner: root | subagent-id
+  #   responsibility: "shared diff writer"
+  #   write_ownership: true
+  gated_effects: []
+  gate_status: not_required # not_required | pending | approved | rejected
+  route_history: []
+  # - from: fast
+  #   to: standard
+  #   reason: "R2へescalate"
+  #   evidence: []
+
 prepare:
   status: pending
   workspace_preflight:
