@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { productUpdateDrafts } from "../src/content/product-updates.ts";
 import {
   fetchMergedPullRequests,
+  filterUnpublishedPullRequests,
   generateProductUpdateCandidates,
   toProductUpdateDrafts,
   type ProductUpdateGenerationStatus,
@@ -328,7 +329,7 @@ async function main(): Promise<void> {
     before ?? (sourceSha ? await fetchCommitTime(sourceSha, token) : undefined);
   const sourceRef = process.env.SOURCE_REF;
 
-  const pulls = await fetchMergedPullRequests({
+  const fetchedPulls = await fetchMergedPullRequests({
     owner,
     repo,
     base: searchBase,
@@ -336,6 +337,7 @@ async function main(): Promise<void> {
     before,
     token,
   });
+  const pulls = filterUnpublishedPullRequests(fetchedPulls, pastUpdates);
 
   const generationResult = await generateProductUpdateCandidates(pulls, {
     apiKey: openaiApiKey,

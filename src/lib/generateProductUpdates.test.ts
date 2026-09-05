@@ -3,12 +3,71 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   fetchMergedPullRequests,
+  filterUnpublishedPullRequests,
   generateProductUpdateCandidates,
+  getProductUpdateSourcePullRequestNumbers,
   sanitizeExternalText,
   toProductUpdateDrafts,
   type MergedPullRequest,
   type ProductUpdateGenerationDecision,
 } from "./generateProductUpdates";
+
+describe("filterUnpublishedPullRequests", () => {
+  const pulls: MergedPullRequest[] = [
+    {
+      number: 724,
+      title: "Published feature",
+      body: null,
+      labels: [],
+      mergedAt: "2026-09-05T00:00:00Z",
+    },
+    {
+      number: 726,
+      title: "New feature",
+      body: null,
+      labels: [],
+      mergedAt: "2026-09-05T01:00:00Z",
+    },
+    {
+      number: 727,
+      title: "Another new feature",
+      body: null,
+      labels: [],
+      mergedAt: "2026-09-05T02:00:00Z",
+    },
+  ];
+
+  test("filters a PR represented by a published product update id", () => {
+    expect(
+      filterUnpublishedPullRequests(pulls, [{ id: "pr-724" }]).map((pull) => pull.number),
+    ).toEqual([726, 727]);
+  });
+
+  test("filters every PR in a published grouped update and keeps unpublished PRs", () => {
+    expect(
+      filterUnpublishedPullRequests(pulls, [{ id: "prs-724-726" }]).map((pull) => pull.number),
+    ).toEqual([727]);
+  });
+
+  test("does not infer PR numbers from custom or malformed ids", () => {
+    expect(
+      filterUnpublishedPullRequests(pulls, [
+        { id: "manual-update-724" },
+        { id: "pr-not-a-number" },
+        { id: "prs-724" },
+      ]).map((pull) => pull.number),
+    ).toEqual([724, 726, 727]);
+  });
+
+  test("returns no pulls when every fetched PR was already published", () => {
+    expect(filterUnpublishedPullRequests(pulls, [{ id: "prs-724-726-727" }])).toEqual([]);
+  });
+
+  test("ignores PR ids that cannot be represented safely as numbers", () => {
+    expect(getProductUpdateSourcePullRequestNumbers("pr-999999999999999999999")).toEqual([]);
+    expect(getProductUpdateSourcePullRequestNumbers("manual-update")).toEqual([]);
+  });
+});
 
 describe("sanitizeExternalText", () => {
   test("removes zero-width and control characters", () => {

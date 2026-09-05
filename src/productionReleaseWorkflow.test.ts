@@ -132,6 +132,13 @@ describe("production-release workflow", () => {
     expect(yaml).toContain("Deploy Vercel Production");
   });
 
+  test("filters previously published PRs before generating product updates", () => {
+    const generator = readFileSync("scripts/generate-product-updates.ts", "utf8");
+
+    expect(generator).toContain("filterUnpublishedPullRequests");
+    expect(generator).toContain("filterUnpublishedPullRequests(fetchedPulls, pastUpdates)");
+  });
+
   test("preserves release_note workflow input and RELEASE_NOTE for GitHub releases", () => {
     const yaml = workflow();
 
