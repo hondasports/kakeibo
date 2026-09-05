@@ -106,7 +106,7 @@ task_classifier:
     - task_typeはユーザーの成果物で決め、実装手段だけで分類しない
     - complexityはchanged file予想数だけで決めず、impact surface・uncertainty・statefulness・controlを含める
     - Spec Confidence C0はrouteで隠さず、既存process contract通りPREPAREで解消する
-    - Riskは.agent-os側で再計算せず .loop/process.yaml のrisk_model結果を参照する
+    - RiskはAgent OS側で再計算せず .loop/process.yaml のrisk_model結果を参照する
 
 roles:
   root_orchestrator:
@@ -165,7 +165,13 @@ routes:
       - task_type == investigation
       - required_effects subset_of [ro_repository, ro_public]
     roles: [root_orchestrator, researcher_if_parallel_discovery_material]
-    loop_path: [prepare, verification_if_claim_needs_evidence, done]
+    loop_path: [prepare, verification, done]
+    stage_overrides:
+      implementation: not_required
+      verification: only_when_claim_needs_evidence
+      review_if_required: not_required_unless_control_requires
+      delivery: not_required
+      pr_aftercare: not_required
     independent_review: false
   fast:
     select_when:
@@ -174,7 +180,11 @@ routes:
       - no_required_control_requires_independent_review
       - no_cross_cutting_unknown
     roles: [root_orchestrator, implementer, verifier]
-    loop_path: [prepare_minimal, implementation, targeted_verification, delivery, pr_aftercare, done]
+    loop_path: [prepare, implementation, verification, delivery, pr_aftercare, done]
+    stage_overrides:
+      prepare: minimal_contract
+      verification: targeted
+      review_if_required: not_required_unless_control_requires
     independent_review: false
   standard:
     select_when:
@@ -191,7 +201,9 @@ routes:
       - or cross_cutting_impact_requires_parallel_discovery
       - or multiple_independent_workstreams
     roles: [root_orchestrator, researcher, planner, implementer, verifier, reviewer]
-    loop_path: [prepare, implementation, verification, review, delivery, pr_aftercare, done]
+    loop_path: [prepare, implementation, verification, review_if_required, delivery, pr_aftercare, done]
+    stage_overrides:
+      review_if_required: required
     independent_review: once
     specialist: only_when_materially_distinct_required_control
 
