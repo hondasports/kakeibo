@@ -1,4 +1,4 @@
-import type { ProductUpdateDraft } from "./productUpdates";
+import type { ProductUpdate, ProductUpdateDraft } from "./productUpdates";
 import { ProductUpdateValidationError } from "./productUpdates";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -52,6 +52,30 @@ export type GenerateProductUpdateCandidatesOptions = {
   apiKey?: string;
   model?: string;
 };
+
+export function getProductUpdateSourcePullRequestNumbers(id: string): number[] {
+  const singleMatch = /^pr-(\d+)$/.exec(id);
+  const groupedMatch = /^prs-(\d+(?:-\d+)+)$/.exec(id);
+  const numberPart = singleMatch?.[1] ?? groupedMatch?.[1];
+
+  if (!numberPart) {
+    return [];
+  }
+
+  const numbers = numberPart.split("-").map(Number);
+  return numbers.every((number) => Number.isSafeInteger(number) && number > 0) ? numbers : [];
+}
+
+export function filterUnpublishedPullRequests(
+  pulls: MergedPullRequest[],
+  publishedUpdates: Pick<ProductUpdate, "id">[],
+): MergedPullRequest[] {
+  const publishedPullRequestNumbers = new Set(
+    publishedUpdates.flatMap((update) => getProductUpdateSourcePullRequestNumbers(update.id)),
+  );
+
+  return pulls.filter((pull) => !publishedPullRequestNumbers.has(pull.number));
+}
 
 export function sanitizeExternalText(text: string): string {
   const normalized = text.normalize("NFC");

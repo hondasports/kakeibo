@@ -1,11 +1,13 @@
-# Suzumemo Agent Loop v12
+# Suzumemo Agent Loop v12 + Agent OS v1
 
 このファイルは**常時contextに置く最小の実行契約**だけを持つ。詳細をここへ重複させない。
 
 正本:
 
+- Agent decision / routing: `.loop/agent-os.yaml`
+- Agent OS overview / rationale: `.loop/AGENT_OS.md`
 - Machine-readable loop: `.loop/process.yaml`
-- Overview / rationale: `.loop/README.md`
+- Loop overview / rationale: `.loop/README.md`
 - Task-state schema/template: `.loop/templates/task-state.yaml`
 - Current task state (worktree-local, ignored): `.loop/state/<task-id>.yaml`
 - Current stage / conditional helper: `skills/*/SKILL.md`
@@ -20,13 +22,46 @@
 1. platform / non-bypassable safety
 2. current explicit user instruction
 3. latest explicitly approved task / spec / decision
-4. `AGENTS.md` / `.loop/process.yaml`
+4. `AGENTS.md` / `.loop/agent-os.yaml` / `.loop/process.yaml`
 5. current state / triggered `SKILL.md`
 6. workflow / explanatory docs
 
 Skillは、既にユーザーが許可したreversible / read-only / review / fix / PR作成等の作業を独自に狭める権限として扱わない。
 
 Skillの指示が原因でpermission確認、作業停止、未完了、またはユーザー意図からの逸脱が必要になる場合は、**どの `SKILL.md` のどの指示が原因か**を示し、明示要件とAgent解釈を分けて説明する。
+
+## Agent OS routing
+
+Default loopへ入る前に、`.loop/agent-os.yaml` で依頼を軽量分類する。
+
+```text
+Request
+  ↓
+Effect classification
+  ↓
+Task type / Complexity
+  ↓
+Existing Risk / Required Controls
+  ↓
+Route: read_only | fast | standard | deep
+  ↓
+Role assignment
+  ↓
+.loop/process.yaml
+```
+
+Agent OSは`.loop/process.yaml`を置き換えない。Risk / Required Controls / Finding / Verification / Deliveryは既存process contractを唯一の正本として再利用する。
+
+- tiny/small + R0/R1 + distinct controlなし → `fast`
+- medium / R2 / independent review control → `standard`
+- large / R3/R4 / cross-cutting / multiple workstreams → `deep`
+- write effectなしの調査 → `read_only`
+
+routeは必要最小を選び、新しいscope・Risk・Control・cross-cutting impactが出た時だけ上位routeへ昇格する。route変更でloop全体をrestartせず、affected stageだけ再実行する。
+
+Effectの`additional_human_gate: false`はscope外操作の自動許可を意味しない。current explicit user instructionまたは強く含意されたdelivery intentの範囲内だけ実行する。
+
+production / irreversible / credential / production DNS / money movement等のgate対象effectを含むtaskでも、read-only discovery、reversible repository work、test、review、PRは可能な限り先に完了し、**gate対象operationの直前だけHuman Gate**を要求する。
 
 ## Default loop
 
@@ -36,11 +71,14 @@ PREPARE → IMPLEMENT → VERIFY → REVIEW? → DELIVER → PR AFTERCARE → DO
 
 Human Gate / Incident / Process Learning は必要時だけのside path。
 
+`read_only` / `fast` routeでは`.loop/agent-os.yaml`に従って不要stageを短縮できる。ただしSpec C0、required Verification failure、blocking finding、Required Controlは迂回しない。
+
 ## Core invariants
 
 - `C0 unclear / conflicted` のままImplementationへ進まない。
 - repository変更は最初の編集前にWorkspace Preflightを通し、`main` / `preview`を直接編集しない。
 - same shared diffのwriterは原則1体。
+- Agent OSのTask complexityと`.loop/process.yaml`のRiskを混ぜず、Riskは既存risk_modelを正本とする。
 - Acceptance Criteriaは`ACxx`、Preserve / Invariantは`IVxx`、Verification caseは`TCxx`で短く参照する。
 - runtime behavior変更ではrelevant requirement dimensionを一度だけ分類し、必要なAC/IV/TCへ反映する。
 - **forward coverage**: 全AC/relevant IVにVerification caseまたは明示NOT_REQUIRED理由を持たせる。
@@ -75,17 +113,21 @@ branch作成、コード・docs修正、test/review、同一task PRの作成・�
 
 ## Context discipline
 
-常時ロードするのは原則:
+entryで原則ロードするのは:
 
 1. `AGENTS.md`
-2. `.loop/process.yaml`
-3. **current stateのSkill 1つ**
+2. `.loop/agent-os.yaml`
+3. `.loop/process.yaml`
+4. **current stateのSkill 1つ**
+
+route/effect/classificationをtask-stateへ記録した後は、route invalidationが無い限り`.loop/agent-os.yaml`全文をactive contextから外してよい。
 
 Issue全文、chat履歴、source本文、前stageのSkillを各stageで再読・再要約しない。
 
 PREPARE後は `task-state` のcompact contractを引き継ぐ。
 
 - Goal / scope
+- Task type / Complexity / selected route / required effects
 - AC / IV IDs
 - material assumptions
 - Risk / Controls
@@ -115,19 +157,21 @@ Conditional Skillはtrigger時だけ読む。
 
 1. 新しい指示を最優先sourceとして取り込む
 2. 影響するGoal / scope / AC / IV / TC / Risk / Controlsだけ更新する
-3. unaffected contractとsame-content Evidenceは保持する
-4. 変更deltaだけImplementation / Verification / Reviewへ戻す
-5. material choiceが新たに発生した場合だけPREPARE / Human Gateへ戻す
+3. affectedならTask type / Complexity / required effects / selected routeだけdelta更新する
+4. unaffected contractとsame-content Evidenceは保持する
+5. 変更deltaだけImplementation / Verification / Reviewへ戻す
+6. material choiceが新たに発生した場合だけPREPARE / Human Gateへ戻す
 
 ## Delegation
 
-subagentは人数を増やすためではなく、wall-clock短縮または独立coverage改善にmaterially効く時だけ使う。
+subagentは人数を増やすためではなく、wall-clock短縮または独立coverage改善にmaterially効く時だけ使う。role責務とrouteは`.loop/agent-os.yaml`を正本とする。
 
 - read-only discovery / independent review / path-disjoint analysisは並列化候補
 - same shared diffのwriterは原則1体
 - cheapな逐次作業、単純検索、同じ情報の再要約はdelegateしない
 - default independent reviewerは最大1体
 - reviewer-to-reviewer debateはしない。rootが1回統合する
+- fixedな「複数Agentチーム」を毎task起動せず、routeに必要なroleだけ割り当てる
 
 ## PREPARE
 
@@ -136,6 +180,7 @@ subagentは人数を増やすためではなく、wall-clock短縮または独�
 最低限決めるもの:
 
 - Goal / In / Out
+- Task type / Complexity / required effects / selected route
 - Spec Confidence
 - `ACxx` / relevant `IVxx`
 - material assumptions
@@ -151,7 +196,7 @@ subagentは人数を増やすためではなく、wall-clock短縮または独�
 
 compact contractに必要な最小差分だけ実装する。終了時にbehavior-changing diffをAC/IV/design deviationへ逆引きする。
 
-新しい仕様・caller・auth/data/financial impactを見つけたら暗黙にscope拡大せずPREPAREへ戻してcontractを更新する。
+新しい仕様・caller・auth/data/financial impactを見つけたら暗黙にscope拡大せずPREPAREへ戻してcontractを更新する。必要ならrouteも昇格する。
 
 R4でも、production / irreversible operationそのものに到達するまでは、許可済みの実装・test・reviewを進める。
 
@@ -213,6 +258,7 @@ Telemetryだけを理由にProcess Learningを起動しない。Learning Event�
 最低限:
 
 - C1/C2
+- Task type / Complexity / selected route / required effects記録
 - Risk / max observed Risk / Required Controls記録
 - relevant dimensions分類済み
 - forward / reverse coverage成立
