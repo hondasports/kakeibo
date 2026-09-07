@@ -1,96 +1,72 @@
-import { Button, DialogActions } from "@mui/material";
-import type { ReviewFormValues } from "../../types/types";
+import { Alert, Box, Button, DialogActions, Typography } from "@mui/material";
 
 export function ReviewDialogActions({
-  showSummaryView,
-  reviewSubmitting,
-  isSubmitDisabled,
-  canResetToAiInterpretation = false,
+  unavailable = false,
+  reviewError,
+  busy,
+  requiredCount,
+  recommendationCount,
+  totalOnly,
   onClose,
-  onEnterEditMode,
-  onExitEditMode,
-  onResetToAiInterpretation,
   onSubmit,
+  onReviewRequired,
 }: {
-  showSummaryView: boolean;
-  reviewSubmitting: boolean;
-  isSubmitDisabled: boolean;
-  canResetToAiInterpretation?: boolean;
+  unavailable?: boolean;
+  reviewError: string;
+  busy: boolean;
+  requiredCount: number;
+  recommendationCount: number;
+  totalOnly: boolean;
   onClose: () => void;
-  onEnterEditMode: () => void;
-  onExitEditMode: () => void;
-  onResetToAiInterpretation?: () => void;
-  onSubmit: (
-    registerAfterUpdate: boolean,
-    registrationModeOverride?: ReviewFormValues["registrationMode"],
-  ) => void;
+  onSubmit: () => void;
+  onReviewRequired: () => void;
 }) {
   return (
-    <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
-      <Button disabled={reviewSubmitting} onClick={onClose} type="button">
-        閉じる
-      </Button>
-      {canResetToAiInterpretation && onResetToAiInterpretation ? (
-        <Button
-          color="warning"
-          disabled={reviewSubmitting}
-          onClick={onResetToAiInterpretation}
-          type="button"
-          variant="text"
-        >
-          AI判定へ戻す
-        </Button>
-      ) : null}
-      {showSummaryView ? (
-        <>
-          <Button
-            disabled={isSubmitDisabled}
-            onClick={onEnterEditMode}
-            type="button"
-            variant="outlined"
-          >
-            修正する
-          </Button>
-          <Button
-            disabled={isSubmitDisabled}
-            onClick={() => onSubmit(false, "totalOnly")}
-            type="button"
-            variant="outlined"
-          >
-            レシート合計だけ保存
-          </Button>
-          <Button
-            disabled={isSubmitDisabled}
-            onClick={() => onSubmit(false, "detailed")}
-            type="button"
-            variant="contained"
-          >
-            この内容で保存
-          </Button>
-        </>
-      ) : (
-        <>
-          <Button disabled={reviewSubmitting} onClick={onExitEditMode} type="button" variant="text">
-            確認に戻る
-          </Button>
-          <Button
-            disabled={isSubmitDisabled}
-            onClick={() => onSubmit(false, "totalOnly")}
-            type="button"
-            variant="outlined"
-          >
-            レシート合計だけ保存
-          </Button>
-          <Button
-            disabled={isSubmitDisabled}
-            onClick={() => onSubmit(false, "detailed")}
-            type="button"
-            variant="contained"
-          >
-            この内容で保存
-          </Button>
-        </>
+    <Box
+      sx={{
+        borderTop: "1px solid",
+        borderColor: "divider",
+        bgcolor: "background.paper",
+        px: { xs: 2, sm: 3 },
+        pt: 1,
+        pb: "env(safe-area-inset-bottom)",
+      }}
+    >
+      {reviewError && (
+        <Alert severity="error" aria-live="assertive" sx={{ mb: 1 }}>
+          {reviewError} 入力は残っています。確認してもう一度保存してください。
+        </Alert>
       )}
-    </DialogActions>
+      <Typography
+        role="status"
+        variant="body2"
+        color={requiredCount ? "error.main" : "text.secondary"}
+      >
+        {busy
+          ? "処理中です。しばらくお待ちください。"
+          : requiredCount
+            ? `保存前に修正が必要：${requiredCount}件`
+            : recommendationCount
+              ? `確認推奨：${recommendationCount}件。確認事項を残したまま下書きを保存できます。`
+              : "入力項目はそろっています。保存内容を確認してください。"}
+      </Typography>
+      <DialogActions sx={{ px: 0, py: 1.5, gap: 1 }}>
+        <Button disabled={busy} onClick={onClose} type="button">
+          閉じる
+        </Button>
+        <Button
+          disabled={busy || unavailable}
+          onClick={requiredCount ? onReviewRequired : onSubmit}
+          type="button"
+          variant="contained"
+        >
+          {requiredCount
+            ? "修正が必要な項目へ"
+            : totalOnly
+              ? "レシート合計だけ保存"
+              : "この内容で保存"}
+        </Button>
+      </DialogActions>
+    </Box>
   );
 }

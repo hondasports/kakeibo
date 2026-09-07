@@ -1,3 +1,5 @@
+import type { Dispatch, SetStateAction } from "react";
+import { mergeReviewTaxItems } from "../../utils/reviewTaxItemMerge";
 import { useMutation } from "convex/react";
 import {
   applyReceiptTaxSettingsApi,
@@ -17,7 +19,7 @@ export function useReviewTaxOverrides({
   setReviewError,
 }: {
   selectedReviewDraftId: string | null;
-  setReviewItems: (items: ReviewItemValues[]) => void;
+  setReviewItems: Dispatch<SetStateAction<ReviewItemValues[]>>;
   setReviewDraftOverride: (draft: AiExpenseDraft) => void;
   setReviewError: (error: string) => void;
 }) {
@@ -50,7 +52,9 @@ export function useReviewTaxOverrides({
         return;
       }
       setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft));
-      setReviewItems(mapDraftItemsToReviewItems(result.items));
+      setReviewItems((current) =>
+        mergeReviewTaxItems(current, mapDraftItemsToReviewItems(result.items)),
+      );
     } catch (error) {
       if (requestId !== taxOverrideRequestIdRef.current) {
         return;
@@ -78,7 +82,9 @@ export function useReviewTaxOverrides({
         return;
       }
       setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft));
-      setReviewItems(mapDraftItemsToReviewItems(result.items));
+      setReviewItems((current) =>
+        mergeReviewTaxItems(current, mapDraftItemsToReviewItems(result.items)),
+      );
     } catch (error) {
       if (requestId !== taxOverrideRequestIdRef.current) {
         return;
