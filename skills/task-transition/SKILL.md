@@ -1,52 +1,17 @@
 ---
 name: task-transition
-description: 次taskへcontextを持ち越す必要がある時だけ使う軽量session cleanup helper。通常taskのcompletion Gateにはしない。
+description: 次タスクへ移るためのv13判断手順。
 license: Apache-2.0
 ---
 
-# Task Transition Helper
+# 次タスクへ移る
 
-## 方針
+実行条件とCLI操作は[Loop README](../../.loop/README.md)を正本とする。
 
-Task Transitionは通常のDONE条件ではない。
+## 入力・起動
 
-単発taskを閉じるためだけに独立reasoning phaseを追加しない。
+別Issueや別branchへ移る時だけ使う。
 
-## 使う時
+## 判断と出力
 
-- 同じsessionで次taskへ進む
-- 前taskの一部contextだけを安全にcarryする必要がある
-- branch / PR / Issue identityを切り替える必要がある
-
-## Closure packet
-
-必要最小限:
-
-```text
-Closing task:
-Delivery result:
-Branch / PR:
-Relevant unresolved follow-up:
-```
-
-## Next task packet
-
-```text
-Next task ID / source:
-Objective:
-Carry:
-Do not carry:
-```
-
-前taskのreview/CI/branch/PRを暗黙に新taskへ流用しない。
-
-新taskのrepository changeは改めてWorkspace Preflightを行う。
-
-## 出力
-
-```text
-TASK TRANSITION
-Closing task:
-Next task: none | bound
-Carried context:
-```
+前タスクの目的、結果、PR、必要な未解決事項だけ引き継ぐ。新しいtask IDと専用worktreeでinitする。前タスクの証拠や承認を流用しない。通常DONEの追加工程ではない。
