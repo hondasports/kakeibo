@@ -1,0 +1,7 @@
+{
+  "verdict": "fail",
+  "source_comparison": "元要求と契約の比較結果を記入",
+  "diff_assessment": "各挙動変更とAC/IVの対応・範囲外変更の確認結果",
+  "verification_assessment": "テストが実際に期待結果を確認している根拠",
+  "manual_results": []
+}
