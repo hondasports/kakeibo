@@ -72,6 +72,14 @@ function fixture() {
   return { cwd, dir, contract, set, review, call, git };
 }
 describe("task loop execution boundaries", () => {
+  it("rejects force-staged task state before accepting evidence or completion", () => {
+    const f = fixture();
+    f.call("check", "TC01");
+    f.review();
+    f.git("add", "-f", ".loop/state/test/state.json");
+    expect(() => f.call("status")).toThrow("ignored and untracked");
+    expect(() => f.call("finish")).toThrow("ignored and untracked");
+  });
   it("matches canonical repository identity without accepting neighboring names or hosts", () => {
     expect(matchesRepository("https://github.com/NewOwner/Repo/pull/1", "newowner/repo")).toBe(
       true,

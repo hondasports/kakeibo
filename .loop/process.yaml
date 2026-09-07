@@ -30,6 +30,7 @@ proof:
   review: current_key_self_review_pass
   manual: required_manual_results_have_pass_and_nonempty_evidence
   findings: no_open_findings
+  task_state: reject_tracked_or_staged_state_paths
   contract: no_unresolved_material_questions
   history: local_atomic_state_updates_not_tamperproof
 pr:
@@ -55,6 +56,3 @@ learning:
   completion_gate: false
   trigger: repeated_failure_or_clear_enforcement_gap_or_user_request
   findings: all_actionable_findings_require_disposition_independent_of_learning
-legacy:
-  check_loop_evidence: retained_for_legacy_consumers_not_v13_completion
-  learning_records: historical_evidence_not_current_instructions

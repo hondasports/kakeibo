@@ -21,6 +21,9 @@ function git(cwd, args) {
   return args.includes("-z") ? r.stdout : r.stdout.trim();
 }
 export function fingerprint(cwd) {
+  const tracked = git(cwd, ["ls-files", "-z", "--cached"]).split("\0");
+  if (tracked.some((file) => file.startsWith(".loop/state/")))
+    throw new Error("task state must remain ignored and untracked");
   const files = git(cwd, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"])
     .split("\0")
     .filter(Boolean);

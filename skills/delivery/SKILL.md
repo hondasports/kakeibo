@@ -14,4 +14,4 @@ license: Apache-2.0
 
 ## 判断と出力
 
-publish前にcheck-task-state-template.mjs --stagedを実行する。正当な旧schema/template更新時だけ理由付き例外を使う。PR本文は問題、結果、検証、制約を説明し、内部のGate一覧を転記しない。pr_createdなら公開後finishで終了。merge_readyならpr-aftercareへ進む。
+publish前にCLI statusとstaged diffを確認し、タスク状態や秘密値を含めない。PR本文は問題、結果、検証、制約を説明し、内部のGate一覧を転記しない。pr_createdなら公開後finishで終了。merge_readyならpr-aftercareへ進む。
