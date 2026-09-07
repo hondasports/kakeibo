@@ -12,14 +12,19 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+/** Hash bytes or text without exposing source content in evidence identifiers. */
 const hash = (value) => createHash("sha256").update(value).digest("hex");
+/** Read a local JSON input; malformed data aborts the command. */
 const json = (file) => JSON.parse(readFileSync(file, "utf8"));
+/** Require meaningful text for contract fields and manual evidence. */
 const nonempty = (value) => typeof value === "string" && value.trim().length > 0;
+/** Run Git without a shell, preserving NUL-delimited filename output. */
 function git(cwd, args) {
   const r = spawnSync("git", args, { cwd, encoding: "utf8" });
   if (r.status !== 0) throw new Error(`git ${args[0]} failed`);
   return args.includes("-z") ? r.stdout : r.stdout.trim();
 }
+/** Identify current tracked and nonignored content; reject tracked task state and unsupported submodules. */
 export function fingerprint(cwd) {
   const tracked = git(cwd, ["ls-files", "-z", "--cached"]).split("\0");
   if (tracked.some((file) => file.startsWith(".loop/state/")))
@@ -40,6 +45,7 @@ export function fingerprint(cwd) {
   });
   return hash(JSON.stringify(records));
 }
+/** Return contract shape and proof-reference errors without mutating the supplied contract. */
 export function validateContract(c) {
   const errors = [];
   if (!c || typeof c !== "object") return ["contract is required"];
@@ -79,14 +85,15 @@ export function validateContract(c) {
     if (!item || !nonempty(item.id) || ids.has(item.id) || !nonempty(item.expectation))
       errors.push("invalid/duplicate requirement or control");
     ids.add(item?.id);
-    const proofs = item?.checks;
-    if (!Array.isArray(proofs) || proofs.some((id) => !checks.has(id)))
-      errors.push("unknown verification check");
-    if (!proofs?.length && !nonempty(item?.manual))
+    const proofs = item?.checks === undefined ? [] : item.checks;
+    if (!Array.isArray(proofs)) errors.push("requirement checks must be an array");
+    else if (proofs.some((id) => !checks.has(id))) errors.push("unknown verification check");
+    if (Array.isArray(proofs) && !proofs.length && !nonempty(item?.manual))
       errors.push("requirement needs checks or an explicit manual verification method");
   }
   return errors;
 }
+/** Bind evidence to file content, the contract, and observable runtime identity. */
 export function evidenceKey(cwd, contract) {
   return hash(
     JSON.stringify({
@@ -98,6 +105,7 @@ export function evidenceKey(cwd, contract) {
     }),
   );
 }
+/** Compute missing current proof, manual judgments, and unresolved findings for completion. */
 export function blockers(state, key) {
   const errors = validateContract(state.contract);
   if (errors.length) return errors;
@@ -127,11 +135,13 @@ export function blockers(state, key) {
     if (finding.status === "open") errors.push(`open finding: ${finding.id}`);
   return errors;
 }
+/** Atomically replace local state for the single-writer loop; this is not tamper protection. */
 function save(file, state) {
   const temporary = `${file}.${randomUUID()}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`);
   renameSync(temporary, file);
 }
+/** Mask known environment credentials and common token formats in local logs; not a complete secret scanner. */
 function redact(text) {
   let value = String(text);
   for (const [key, secret] of Object.entries(process.env)) {
@@ -140,6 +150,7 @@ function redact(text) {
   }
   return value.replace(/\b(?:gh[pousr]_[\w]+|sk-[\w-]+)\b/g, "[REDACTED]");
 }
+/** Reject mismatched PR identity and enforce the requested delivery target conservatively. */
 export function validatePr(pr, { head, branch, base, target }) {
   if (
     pr.state !== "OPEN" ||
@@ -166,6 +177,7 @@ export function validatePr(pr, { head, branch, base, target }) {
   )
     throw new Error("checks incomplete or failing");
 }
+/** Compare a PR URL repository boundary against a resolved GitHub owner/name. */
 export function matchesRepository(url, repository) {
   return (
     typeof repository === "string" &&
@@ -174,6 +186,7 @@ export function matchesRepository(url, repository) {
     url.toLowerCase().startsWith(`https://github.com/${repository.toLowerCase()}/pull/`)
   );
 }
+/** Read canonical origin and PR identity through GitHub CLI, rejecting dirty or mismatched publication state. */
 function observePr(cwd, url) {
   if (!/^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/.test(url))
     throw new Error("expected a GitHub PR URL");
@@ -209,6 +222,7 @@ function observePr(cwd, url) {
     throw new Error("publish evidence requires a clean worktree");
   return pr;
 }
+/** Execute one task command, persisting actual check results or explicit judgments and rejecting incomplete delivery. */
 export function run(args, cwd = process.cwd()) {
   const [command, id, ...rest] = args;
   if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(id ?? ""))

@@ -72,6 +72,48 @@ function fixture() {
   return { cwd, dir, contract, set, review, call, git };
 }
 describe("task loop execution boundaries", () => {
+  it("accepts manual-only requirements without checks but still requires their evidence", () => {
+    const f = fixture();
+    f.contract.acceptance = [
+      { id: "AC01", expectation: "manual behavior", manual: "inspect result" },
+    ];
+    f.contract.preserve = [
+      { id: "IV01", expectation: "preserved behavior", manual: "inspect old path" },
+    ];
+    f.contract.controls = [{ id: "CTRL01", expectation: "boundary", manual: "inspect boundary" }];
+    f.contract.checks = [];
+    f.set();
+    f.review();
+    expect(() => f.call("finish")).toThrow("manual proof required");
+    f.review({
+      manual_results: ["AC01", "IV01", "CTRL01"].map((id) => ({
+        id,
+        status: "pass",
+        evidence: "observed expected result",
+      })),
+    });
+    expect(f.call("finish").status).toBe("complete");
+  });
+  it.each([null, "TC01", {}, 42])(
+    "rejects a non-array checks field even with manual evidence: %j",
+    (checks) => {
+      const f = fixture();
+      f.contract.acceptance = [
+        { id: "AC01", expectation: "manual behavior", manual: "inspect", checks },
+      ];
+      expect(validateContract(f.contract)).toContain("requirement checks must be an array");
+    },
+  );
+  it("does not accept omitted checks without a manual method or unknown check IDs", () => {
+    const f = fixture();
+    f.contract.acceptance = [{ id: "AC01", expectation: "behavior" }];
+    expect(validateContract(f.contract)).toContain(
+      "requirement needs checks or an explicit manual verification method",
+    );
+    f.contract.acceptance[0].checks = ["missing"];
+    f.contract.acceptance[0].manual = "inspect";
+    expect(validateContract(f.contract)).toContain("unknown verification check");
+  });
   it("rejects force-staged task state before accepting evidence or completion", () => {
     const f = fixture();
     f.call("check", "TC01");
