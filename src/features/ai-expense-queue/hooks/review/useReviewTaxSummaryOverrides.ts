@@ -1,3 +1,5 @@
+import type { Dispatch, SetStateAction } from "react";
+import { mergeReviewTaxItems } from "../../utils/reviewTaxItemMerge";
 import { useMutation } from "convex/react";
 import { updateSummaryTaxOverridesApi } from "../../../../lib/repositories/aiExpenseDrafts";
 import { useRef, useState } from "react";
@@ -24,7 +26,7 @@ export function useReviewTaxSummaryOverrides({
 }: {
   selectedReviewDraftId: string | null;
   setReviewDraftOverride: (draft: AiExpenseDraft) => void;
-  setReviewItems: (items: ReviewItemValues[]) => void;
+  setReviewItems: Dispatch<SetStateAction<ReviewItemValues[]>>;
   setReviewError: (error: string) => void;
 }) {
   const [taxSummaryUpdatingIndex, setTaxSummaryUpdatingIndex] = useState<number | null>(null);
@@ -52,7 +54,9 @@ export function useReviewTaxSummaryOverrides({
       }
       setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft));
       // Tax summary override may change item allocations, so we refresh review items too.
-      setReviewItems(mapDraftItemsToReviewItems(result.items));
+      setReviewItems((current) =>
+        mergeReviewTaxItems(current, mapDraftItemsToReviewItems(result.items)),
+      );
     } catch (error) {
       if (requestId !== taxSummaryOverrideRequestIdRef.current) {
         return;
