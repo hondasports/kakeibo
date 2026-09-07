@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { run, fingerprint, validateContract, validatePr } from "./task-loop.mjs";
+import { run, fingerprint, validateContract, validatePr, matchesRepository } from "./task-loop.mjs";
 
 const roots = [];
 afterEach(() => {
@@ -72,6 +72,19 @@ function fixture() {
   return { cwd, dir, contract, set, review, call, git };
 }
 describe("task loop execution boundaries", () => {
+  it("matches canonical repository identity without accepting neighboring names or hosts", () => {
+    expect(matchesRepository("https://github.com/NewOwner/Repo/pull/1", "newowner/repo")).toBe(
+      true,
+    );
+    expect(matchesRepository("https://github.com/Other/Repo/pull/1", "newowner/repo")).toBe(false);
+    expect(
+      matchesRepository("https://github.com/NewOwner/Repo-extra/pull/1", "newowner/repo"),
+    ).toBe(false);
+    expect(matchesRepository("https://example.com/NewOwner/Repo/pull/1", "newowner/repo")).toBe(
+      false,
+    );
+    expect(matchesRepository("https://github.com/NewOwner/Repo/pull/1", undefined)).toBe(false);
+  });
   it("distinguishes publish-only from merge-ready and rejects stale PR identity", () => {
     const identity = { head: "abc", branch: "codex/test", base: "preview", target: "merge_ready" };
     const pr = {
