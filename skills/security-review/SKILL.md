@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: セキュリティ観点ためのv13判断手順。
+description: セキュリティ観点を確認するためのv13判断手順。
 license: Apache-2.0
 ---
 
@@ -10,7 +10,12 @@ license: Apache-2.0
 
 ## 入力・起動
 
-認証・認可・所有権・ユーザー入力・secret・外部write境界を変える場合にセルフレビューへ追加する。
+次のいずれかを変更する場合にセルフレビューへ追加する。
+
+- 認証・認可・所有権、tenant / group / user間のデータ境界
+- 特権環境（privileged env）・secretの境界
+- ユーザー入力、ユーザー制御のHTML・URL・redirect・file / path・MIME
+- webhookの署名・送信元等の検証、外部write境界
 
 ## 判断と出力
 
