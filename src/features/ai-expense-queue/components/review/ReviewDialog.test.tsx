@@ -52,6 +52,12 @@ const props: ComponentProps<typeof ReviewDialog> = {
 };
 
 describe("下書きの修正導線", () => {
+  it("不正な明細金額の修正では金額欄へフォーカスする", async () => {
+    const user = userEvent.setup();
+    render(<ReviewDialog {...props} reviewItems={[{ ...props.reviewItems[0], amountYen: "0" }]} />);
+    await user.click(screen.getByRole("button", { name: "修正が必要な項目へ" }));
+    expect(screen.getByRole("textbox", { name: "レシートの金額" })).toHaveFocus();
+  });
   it("税内訳の矛盾から折りたたみ内の修正欄へ移動できる", async () => {
     const user = userEvent.setup();
     render(
