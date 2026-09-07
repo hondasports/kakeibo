@@ -15,7 +15,11 @@ import {
 } from "@mui/material";
 import { formatYen } from "../../../../utils/currency";
 import type { AiExpenseQueueCategory, AiExpenseDraft, ReviewItemValues } from "../../types/types";
-import { isDiscountLine, sanitizeSignedYenInput } from "../../utils/discountItems";
+import {
+  isDiscountLine,
+  isValidReviewItemAmount,
+  sanitizeSignedYenInput,
+} from "../../utils/discountItems";
 import { isLowConfidenceItem } from "../../utils/reviewDialogUtils";
 import {
   buildTaxContextFromReviewItem,
@@ -143,7 +147,10 @@ export function ReviewItemCard({
           <TextField
             disabled={disabled}
             label="レシートの金額"
-            error={!item.amountYen.trim() || !Number.isFinite(Number(item.amountYen))}
+            error={
+              !item.amountYen.trim() ||
+              !isValidReviewItemAmount(item.itemName, Number(item.amountYen), item.lineType)
+            }
             onChange={(event) =>
               onItemChange(
                 item.id,
@@ -205,7 +212,7 @@ export function ReviewItemCard({
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TaxRateSelect
               disabled={isTaxUpdating}
-              label={item.itemName + "の税率"}
+              label={`${item.itemName || `明細 ${index + 1}`}の税率`}
               value={item.taxRatePercent}
               onChange={(value) => onTaxRateChange?.(item.id, value)}
             />
@@ -213,7 +220,7 @@ export function ReviewItemCard({
               select
               fullWidth
               disabled={isTaxUpdating}
-              label={item.itemName + "の表示価格"}
+              label={`${item.itemName || `明細 ${index + 1}`}の表示価格`}
               value={item.amountBasis ?? "unknown"}
               onChange={(event) =>
                 onAmountBasisChange?.(item.id, event.target.value as AmountBasis)
