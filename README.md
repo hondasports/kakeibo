@@ -101,38 +101,18 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 | ------------------------------ | ------------------------------- |
 | Agent Loopの常時実行契約       | `AGENTS.md`                     |
 | Agent Loopの機械可読contract   | `.loop/process.yaml`            |
-| Agent Loop v12の設計意図       | `.loop/README.md`               |
+| Astra Loopの操作と設計意図       | `.loop/README.md`               |
 | 工程別Agent Skill              | `skills/*/SKILL.md`             |
-| 委譲prompt / model profile     | `workflows/delegation-prompts.md` |
 | 開発プロセス、PR、CI、レビュー | `docs/development-process.md`   |
 | 認証ガード設計                 | `docs/auth-guard.md`            |
 | 環境変数一覧                   | `docs/environment-variables.md` |
 | QAチェックリスト               | `docs/qa-checklist.md`          |
 
-## エージェントループ v12
+## Astraエージェントループ
 
-リポジトリ変更を伴うエージェント作業の正本は `AGENTS.md`、`.loop/process.yaml`、`skills/*/SKILL.md` です。`workflows/*` と `docs/development-process.md` は運用説明であり、矛盾する場合は正本を優先します。
+[AGENTS.md](AGENTS.md)を入口に、契約・変更・検証・セルフレビュー・引き渡しを進めます。実行記録と完了判定は scripts/task-loop.mjs が担います。[操作方法と保証の境界](.loop/README.md)を参照してください。
 
-Default path:
-
-```text
-PREPARE → IMPLEMENT → VERIFY → REVIEW? → DELIVER → PR AFTERCARE → DONE
-```
-
-主なv12原則:
-
-- current explicit user instructionをgeneral Skill guidanceより優先する（non-bypassable safetyを除く）
-- 質問や承認要求の前に、許可済みread-only / reversible作業を完了する
-- R4 classificationだけではHuman Gateを起動しない
-- Human Gateはproduction / irreversible operation等の具体的triggerへ束縛する
-- reversible / low-impact変更でimplementation detailを鏡写しするだけのtestを増やさない
-- subagentは速度または独立coverageへmaterialに効く場合だけ使う
-- 作業途中の新しい指示はaffected contractだけ更新し、unaffected work / Evidenceを維持する
-- Process Learningはevent-drivenで、Learning Eventがある時だけ起動する
-
-PR作成はcheckpointであり、通常はPR Aftercareでlatest contentをmerge-readyまで確認します。Process LearningはPRの後に常時実行する工程ではありません。
-
-具体的な委譲promptとGPT-6 Astraのmodel profileは `workflows/delegation-prompts.md` を参照してください。Loop本体はmodel非依存です。
+通常は単独Astraで作業し、ユーザー指定の完了地点を契約に記録します。旧ループや委譲用workflowは使用しません。
 
 ## ローカル状態とsecret
 

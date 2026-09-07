@@ -1,106 +1,17 @@
 ---
 name: delivery
-description: Verification/required Review済みcontentを現在taskの唯一のPRへpublishし、preview向けPR identityを固定する。PR作成はcheckpointでありcompletionではない。
+description: 引き渡すためのv13判断手順。
 license: Apache-2.0
 ---
 
-# Delivery
+# 引き渡す
 
-## 前提
+実行条件とCLI操作は[Loop README](../../.loop/README.md)を正本とする。
 
-- Spec Confidence C1/C2
-- Workspace Preflight PASS / documented exception
-- max observed Risk floorを満たすVerification
-- current taskのAcceptance CriteriaがPASS
-- Acceptance Criteriaに対応するVerification Evidence記録済み
-- required Controls実施済み
-- required REVIEW PASS / NOT_REQUIRED
-- blocking findingsなし
-- required Human Gate承認済み
-- scope integrity確認済み
+## 入力・起動
 
-## Suzumemo delivery
+契約のdelivery_targetと最新statusを読む。許可されたbranch/PRへ必要差分だけ公開する。
 
-default base:
+## 判断と出力
 
-```text
-preview
-```
-
-default target:
-
-```text
-merge_ready
-```
-
-`pr_created` はcheckpoint。
-
-## PR invariant
-
-- current taskにつきDelivery PRは最大1
-- 既存PRがあれば同じbranch / PRを更新
-- 他task差分を混ぜない
-
-## Publish前
-
-- intended diffのみ
-- secret / `.env.local` / local artifactなし
-- base `preview` との差分確認
-- published contentがVerification/Review対象contentと対応
-- open/fix_now findingなし
-- `node scripts/check-task-state-template.mjs --staged` PASS
-
-`.loop/templates/task-state.yaml` の変更はtask stateの混入と区別できないため、schema更新の場合だけ
-`--allow-schema-change --reason "..."` を明示する。current task instanceは`.loop/state/<task-id>.yaml`へ置き、stagingしない。
-
-## PR body
-
-最低限:
-
-- 変更内容 / 理由
-- Spec Confidence / Risk / Required Controls
-- Verification
-- required Review
-- Findings / follow-up
-- task source
-
-Gate名を埋めるためだけの長いEvidence転記はしない。
-
-## Revision evidence
-
-Verification / Review / Deliveryの各Evidenceはcommit SHAを必須とし、再利用判定ではtree SHAも必須とする。
-
-previous Verification / Reviewを再利用できるのは、次をすべて満たす場合だけ。
-
-- current contentのtree SHAが取得できる
-- previous verified/reviewed tree SHAが取得できる
-- 両tree SHAが一致する
-
-commit SHAだけが変わりtree SHAが一致する場合はsame contentとして再利用できる。
-
-tree SHAが欠落している、またはidentityを証明できない場合はsame contentとみなさず、delta Verification / Review、必要ならaffected-scope full rerunへ進む。
-
-## PASS
-
-- intended changes published
-- current taskのDelivery PRが1つ
-- base/headが正しい
-- Acceptance Criteria PASSとVerification Evidenceがpublished contentに束縛されている
-- blocking findingsなし
-- Aftercareへ進める
-
-CI / review / approval / mergeabilityのterminal判定はPR Aftercareが所有する。
-
-## 出力
-
-```text
-DELIVERY
-Status: PASS | BLOCKED
-Branch:
-Commit / tree:
-PR:
-Base: preview
-Delivery target:
-Acceptance Criteria verification:
-Evidence:
-```
+publish前にCLI statusとstaged diffを確認し、タスク状態や秘密値を含めない。PR本文は問題、結果、検証、制約を説明し、内部のGate一覧を転記しない。pr_createdなら公開後finishで終了。merge_readyならpr-aftercareへ進む。

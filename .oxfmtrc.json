@@ -1,11 +1,4 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": [
-    "dist/**",
-    ".agents/**",
-    "workflows/**",
-    "convex/_generated/**",
-    "node_modules/**",
-    "**/*.md"
-  ]
+  "ignorePatterns": ["dist/**", ".agents/**", "convex/_generated/**", "node_modules/**", "**/*.md"]
 }

@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "suzumemo-agent-loop",
-  "version": "0.2.0",
-  "description": "SuzumemoのPREPARE、実装、検証、条件付きレビュー、Delivery/AftercareをRisk + Required Controls + Finding Ledgerで回すportable Agent Plugin。",
+  "version": "0.3.0",
+  "description": "単独Astraの契約・差分・実行証拠に基づくIssue Loop。CLIで検証結果と完了地点を管理する。",
   "author": {
     "name": "hondasports"
   },

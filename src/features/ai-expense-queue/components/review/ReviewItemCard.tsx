@@ -1,3 +1,4 @@
+import type { AmountBasis } from "../../../../../lib/receiptTax/types";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -14,7 +15,11 @@ import {
 } from "@mui/material";
 import { formatYen } from "../../../../utils/currency";
 import type { AiExpenseQueueCategory, AiExpenseDraft, ReviewItemValues } from "../../types/types";
-import { isDiscountLine, sanitizeSignedYenInput } from "../../utils/discountItems";
+import {
+  isDiscountLine,
+  isValidReviewItemAmount,
+  sanitizeSignedYenInput,
+} from "../../utils/discountItems";
 import { isLowConfidenceItem } from "../../utils/reviewDialogUtils";
 import {
   buildTaxContextFromReviewItem,
@@ -36,6 +41,9 @@ export type ReviewItemCardProps = {
   isCategorySplit: boolean;
   isExpanded: boolean;
   enableItemTaxEditing?: boolean;
+  inlineTaxEditing?: boolean;
+  disabled?: boolean;
+  onAmountBasisChange?: (itemId: string, value: AmountBasis) => void;
   onItemChange: (
     itemId: string,
     field: keyof Pick<ReviewItemValues, "itemName" | "amountYen" | "categoryId" | "lineType">,
@@ -59,6 +67,9 @@ export function ReviewItemCard({
   isCategorySplit,
   isExpanded,
   enableItemTaxEditing = false,
+  inlineTaxEditing = false,
+  disabled = false,
+  onAmountBasisChange,
   onItemChange,
   onRemoveItem,
   onAssignCategoryToItems,
@@ -71,7 +82,7 @@ export function ReviewItemCard({
   const categoryName = categoryNamesById.get(item.categoryId);
   const taxContext = buildTaxContextFromReviewItem(item);
   const taxVm = toReceiptItemTaxViewModel(item);
-  const isTaxUpdating = taxUpdatingItemId === item.id;
+  const isTaxUpdating = disabled || taxUpdatingItemId === item.id;
   const showTaxRateSelect = enableItemTaxEditing && taxContext.status === "unresolved";
   const showRegistrationAmount =
     taxContext.status === "resolved" &&
@@ -107,6 +118,7 @@ export function ReviewItemCard({
             )}
           </Stack>
           <IconButton
+            disabled={disabled}
             aria-label={`${item.itemName || `明細 ${index + 1}`}を削除`}
             onClick={() => onRemoveItem(item.id)}
             size="small"
@@ -124,14 +136,21 @@ export function ReviewItemCard({
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <TextField
+            disabled={disabled}
             fullWidth
             label="明細名"
+            error={!item.itemName.trim()}
             onChange={(event) => onItemChange(item.id, "itemName", event.target.value)}
             slotProps={{ htmlInput: { autoComplete: "off", name: `item-name-${index}` } }}
             value={item.itemName}
           />
           <TextField
+            disabled={disabled}
             label="レシートの金額"
+            error={
+              !item.amountYen.trim() ||
+              !isValidReviewItemAmount(item.itemName, Number(item.amountYen), item.lineType)
+            }
             onChange={(event) =>
               onItemChange(
                 item.id,
@@ -163,6 +182,7 @@ export function ReviewItemCard({
 
         {Number(item.amountYen) < 0 && (
           <TextField
+            disabled={disabled}
             fullWidth
             label="この負額行の種類"
             onChange={(event) => onItemChange(item.id, "lineType", event.target.value)}
@@ -188,6 +208,30 @@ export function ReviewItemCard({
           </Typography>
         )}
 
+        {inlineTaxEditing && enableItemTaxEditing && (
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <TaxRateSelect
+              disabled={isTaxUpdating}
+              label={`${item.itemName || `明細 ${index + 1}`}の税率`}
+              value={item.taxRatePercent}
+              onChange={(value) => onTaxRateChange?.(item.id, value)}
+            />
+            <TextField
+              select
+              fullWidth
+              disabled={isTaxUpdating}
+              label={`${item.itemName || `明細 ${index + 1}`}の表示価格`}
+              value={item.amountBasis ?? "unknown"}
+              onChange={(event) =>
+                onAmountBasisChange?.(item.id, event.target.value as AmountBasis)
+              }
+            >
+              <MenuItem value="tax_included">税込</MenuItem>
+              <MenuItem value="tax_excluded">税抜</MenuItem>
+              <MenuItem value="unknown">不明</MenuItem>
+            </TextField>
+          </Stack>
+        )}
         <Button
           endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
           onClick={onToggleDetail}
@@ -199,7 +243,7 @@ export function ReviewItemCard({
         </Button>
         <Collapse in={isExpanded}>
           <Stack spacing={1} sx={{ pt: 0.5 }}>
-            {showTaxRateSelect && (
+            {showTaxRateSelect && !inlineTaxEditing && (
               <TaxRateSelect
                 disabled={isTaxUpdating}
                 onChange={(value) => onTaxRateChange?.(item.id, value)}
@@ -211,6 +255,7 @@ export function ReviewItemCard({
         </Collapse>
 
         <ReviewItemCategoryControl
+          disabled={disabled}
           item={item}
           categories={categories}
           categoryName={categoryName}

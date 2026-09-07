@@ -5,5 +5,5 @@
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn"
   },
-  "ignorePatterns": ["dist/**", ".agents/**", "workflows/**", "convex/_generated/**"]
+  "ignorePatterns": ["dist/**", ".agents/**", "convex/_generated/**"]
 }
