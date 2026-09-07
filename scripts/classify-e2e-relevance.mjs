@@ -4,8 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
-const PROCESS_ONLY_SCRIPT_PATTERN = /^scripts\/(?:check-loop|check-task)-[^/]+(?:\.test)?\.mjs$/;
-const PROCESS_ONLY_CLASSIFIER_TEST = "scripts/check-e2e-relevance.test.mjs";
+const PROCESS_ONLY_SCRIPT_PATTERN = /^scripts\/(?:task-loop|check-task-worktree)(?:\.test)?\.mjs$/;
 
 /** Normalize a Git path to a stable repository-relative form. */
 export function normalizeChangedPath(filePath) {
@@ -36,9 +35,7 @@ export function isProcessOnlyPath(filePath) {
     return true;
   }
 
-  return (
-    PROCESS_ONLY_SCRIPT_PATTERN.test(normalized) || normalized === PROCESS_ONLY_CLASSIFIER_TEST
-  );
+  return PROCESS_ONLY_SCRIPT_PATTERN.test(normalized);
 }
 
 /** Classify a changed-path set and return the machine-readable E2E decision. */

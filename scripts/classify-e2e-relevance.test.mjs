@@ -33,11 +33,9 @@ describe("E2E relevance path classification", () => {
       "skills/workspace-preflight/SKILL.md",
       ".husky/pre-commit",
       "plugin.json",
-      "scripts/check-loop-evidence.mjs",
-      "scripts/check-loop-evidence.test.mjs",
+      "scripts/task-loop.mjs",
+      "scripts/task-loop.test.mjs",
       "scripts/check-task-worktree.mjs",
-      "scripts/check-task-state-template.test.mjs",
-      "scripts/check-e2e-relevance.test.mjs",
     ];
 
     for (const filePath of processOnlyPaths) {

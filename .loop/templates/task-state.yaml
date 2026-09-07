@@ -1,5 +1,0 @@
-# Legacy v12 template retired. Do not copy for new tasks.
-# v13: node scripts/task-loop.mjs init <task-id>
-# Current state: .loop/state/<task-id>/state.json
-version: 13
-role: migration_pointer

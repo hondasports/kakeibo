@@ -63,12 +63,12 @@ PR作成・pushはCLIの外で許可範囲に従って実行する。finishはre
 
 状態はJSON、CLIがatomicに更新する。contractの入力形はvalidateContractで検査する。状態全体の改竄検出、並列writer、永続サービス、外部環境自動追跡は対象外。単独writerを前提とする。CLIのファイルをAstraが変更可能なため、迂回不能な安全境界ではない。
 
-CIは実テストとbranch protectionで外側の条件を保証する。ignoredな個人状態をCIへ持ち込まない。旧check-loop-evidence.mjsは既存consumerの互換性のため残すが、v13の完了には使用しない。旧YAML stateは履歴として残せるが自動変換しない。
+CIは実テストとbranch protectionで外側の条件を保証する。ignoredな個人状態をCIへ持ち込まない。タスク状態をforce-addした場合はCLIが証拠の取得・完了を拒否する。旧ループの実行ファイルとテンプレートは削除済みで、新タスクはinitから開始する。
 
-## 移行と評価
+## 評価と改善
 
 v12のRisk floor、独立review必須、全レビュー指摘のLearning候補化はv13では使わない。保持するのは受入条件と維持条件の証明、指摘の全件処理、最新PR確認、作業分離、本番操作の承認。
 
-.loop/learningsの過去事例は評価資料。pending CIでの誤完了、古い証拠、指摘脱落、rename、不要な再試行に対して試す。Learningは反復失敗・明確な制御不足・ユーザー依頼時に最大限具体化し、通常タスクのDONE条件にはしない。改善が依頼範囲外なら同じPRに混ぜない。
+過去の文書・学習記録はGit履歴で参照できる。pending CIでの誤完了、古い証拠、指摘脱落、rename、不要な再試行に対して試す。Learningは反復失敗・明確な制御不足・ユーザー依頼時に最大限具体化し、通常タスクのDONE条件にはしない。改善が依頼範囲外なら同じPRに混ぜない。
 
 Astraのmodel/effortは実行環境で設定する。文書では切り替えられない。ロード済みcontextを消せるとは仮定せず、再開時はstatusと契約を読む。元要求との照合に必要な再読は許す。

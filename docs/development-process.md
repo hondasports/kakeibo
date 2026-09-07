@@ -45,7 +45,7 @@ Production
 
 `PR created` はcheckpointであり完了ではない。ユーザーが明示的に「PR作成まで」と指定しない限り、latest PR contentのCI・review・conflict・mergeabilityを確認する。
 
-Task stateはCLI initで初期化する。現在値をtracked templateへ記入しない。公開前にtask-state template検査を実行する。
+Task stateはCLI initで初期化する。現在値をtracked templateへ記入しない。公開前にCLI statusとstaged diffを確認する。
 
 ---
 
