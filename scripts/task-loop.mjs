@@ -163,12 +163,28 @@ export function validatePr(pr, { head, branch, base, target }) {
   )
     throw new Error("checks incomplete or failing");
 }
+export function matchesRepository(url, repository) {
+  return (
+    typeof repository === "string" &&
+    /^[^/]+\/[^/]+$/.test(repository) &&
+    typeof url === "string" &&
+    url.toLowerCase().startsWith(`https://github.com/${repository.toLowerCase()}/pull/`)
+  );
+}
 function observePr(cwd, url) {
   if (!/^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/.test(url))
     throw new Error("expected a GitHub PR URL");
   const remote = git(cwd, ["remote", "get-url", "origin"]);
   const repo = remote.match(/(?:github\.com[/:])([^/]+\/[^/]+?)(?:\.git)?$/)?.[1];
-  if (!repo || !url.toLowerCase().startsWith(`https://github.com/${repo.toLowerCase()}/pull/`))
+  if (!repo) throw new Error("origin must be a GitHub repository");
+  const resolved = spawnSync("gh", ["repo", "view", repo, "--json", "nameWithOwner"], {
+    cwd,
+    encoding: "utf8",
+    timeout: 30000,
+  });
+  if (resolved.status !== 0) throw new Error("cannot resolve origin repository");
+  const canonical = JSON.parse(resolved.stdout).nameWithOwner;
+  if (!matchesRepository(url, repo) && !matchesRepository(url, canonical))
     throw new Error("PR repository does not match origin");
   const fields =
     "url,state,headRefOid,headRefName,baseRefName,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup";
@@ -179,6 +195,7 @@ function observePr(cwd, url) {
   });
   if (result.status !== 0) throw new Error("GitHub observation failed");
   const pr = JSON.parse(result.stdout);
+  if (!matchesRepository(pr.url, canonical)) throw new Error("observed PR repository mismatch");
   if (
     pr.state !== "OPEN" ||
     pr.headRefOid !== git(cwd, ["rev-parse", "HEAD"]) ||
