@@ -370,6 +370,25 @@ test.describe("Issue #321 AI支出下書きの明細確認・修正UI", () => {
 });
 
 test.describe("Issue #431 レシート税判定UI", () => {
+  test("全体確認と個別推奨を区別し、確認先でも理由を表示する", async ({ page }) => {
+    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1");
+    const queue = page.getByRole("region", { name: "レシート入力" });
+    await queue
+      .getByRole("region", { name: "確認待ち" })
+      .getByRole("button", { name: "確認する" })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "下書き確認" });
+    const guidance = dialog.getByRole("region", { name: "確認すること" });
+    await expect(guidance.getByText("レシート全体の確認")).toBeVisible();
+    await expect(guidance.getByText(/特定の誤りを検出したものではありません/)).toBeVisible();
+    await guidance.getByRole("button", { name: "商品一覧を見比べる" }).click();
+    await expect(
+      dialog.getByRole("region", { name: "商品と割引" }).getByText("レシート全体の確認"),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("region", { name: "レシート全体の税込・税率設定" }),
+    ).toContainText("登録額と税額を再計算");
+  });
   test("@smoke 下書き確認に分析ステータスと明細税率が表示される", async ({ page }) => {
     await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1");
 
