@@ -1044,7 +1044,11 @@ describe("AiExpenseQueuePanel", () => {
 
     expect(screen.getByRole("heading", { name: "下書き確認" })).toBeInTheDocument();
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText(/読み取り間違いがないか/)).toBeInTheDocument();
+    expect(
+      within(within(dialog).getByRole("region", { name: "確認すること" })).getByText(
+        /レシート全体の読み取り確認です/,
+      ),
+    ).toBeVisible();
     expect(within(dialog).getByRole("region", { name: "確認すること" })).toBeVisible();
 
     expect(within(dialog).queryByLabelText("支払場所")).not.toBeInTheDocument();
