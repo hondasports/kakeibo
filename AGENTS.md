@@ -6,7 +6,7 @@
 
 - 実行条件: [.loop/process.yaml](.loop/process.yaml)
 - 操作方法・保証の限界: [.loop/README.md](.loop/README.md)
-- 判断方法: 現在の行動に対応する skills/*/SKILL.md
+- 判断方法: [スキルの読込と適用](.loop/README.md#スキルの読込と適用)に従い、現在の工程・起動条件に対応する `skills/*/SKILL.md` を読む
 - 実行状態: .loop/state/<task-id>/state.json（ignored、CLIが更新）
 - リポジトリ固有の環境・公開手順: docs/development-process.md
 
@@ -14,6 +14,7 @@
 
 ## 常時守ること
 
+- 各工程の実行前に対応スキルを読み、その判断手順を適用する。契約時と作業対象の変更時には関連する専門スキルも選ぶ。読込済みの内容が利用できる場合は再読不要。対応表と条件付きスキルの起動条件はLoop READMEを正本とする。
 - 最初の編集前にworkspace-preflightを実施し、専用worktreeと非保護ブランチを使う。他人の差分を戻さない。
 - 実装結果を左右する未解決事項は調査する。残る選択だけを質問し、依存しない許可済み作業は進める。
 - 契約・現在の差分・有効な証拠を基準に進める。変更時は影響する契約と確認を更新する。
