@@ -6,6 +6,7 @@ export function ReviewDialogActions({
   busy,
   requiredCount,
   recommendationCount,
+  receiptReviewRecommended = false,
   totalOnly,
   onClose,
   onSubmit,
@@ -16,6 +17,7 @@ export function ReviewDialogActions({
   busy: boolean;
   requiredCount: number;
   recommendationCount: number;
+  receiptReviewRecommended?: boolean;
   totalOnly: boolean;
   onClose: () => void;
   onSubmit: () => void;
@@ -48,7 +50,9 @@ export function ReviewDialogActions({
             ? `保存前に修正が必要：${requiredCount}件`
             : recommendationCount
               ? `確認推奨：${recommendationCount}件。確認事項を残したまま下書きを保存できます。`
-              : "入力項目はそろっています。保存内容を確認してください。"}
+              : receiptReviewRecommended
+                ? "レシート全体の読み取り確認をおすすめします。下書きは保存できます。"
+                : "入力項目はそろっています。保存内容を確認してください。"}
       </Typography>
       <DialogActions sx={{ px: 0, py: 1.5, gap: 1 }}>
         <Button disabled={busy} onClick={onClose} type="button">

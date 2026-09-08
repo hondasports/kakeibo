@@ -52,6 +52,57 @@ const props: ComponentProps<typeof ReviewDialog> = {
 };
 
 describe("下書きの修正導線", () => {
+  it("全体の読み取り確認を個別推奨に数えず、商品一覧にも理由を表示する", async () => {
+    const user = userEvent.setup();
+    render(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={{ ...props.selectedReviewDraft!, reviewReasons: ["low_confidence"] }}
+        reviewForm={{ ...props.reviewForm, amountYen: "116" }}
+        reviewItems={[
+          {
+            ...props.reviewItems[0],
+            amountBasis: "tax_included",
+            taxResolutionStatus: "resolved",
+            taxResolutionSource: "item_explicit",
+            allocatedTaxYen: 8,
+          },
+        ]}
+      />,
+    );
+    const guidance = screen.getByRole("region", { name: "確認すること" });
+    expect(within(guidance).getByText("確認推奨 0件")).toBeVisible();
+    expect(within(guidance).getByText("レシート全体の確認")).toBeVisible();
+    expect(within(guidance).queryByRole("button", { name: "確認箇所へ" })).not.toBeInTheDocument();
+    await user.click(within(guidance).getByRole("button", { name: "商品一覧を見比べる" }));
+    const items = screen.getByRole("region", { name: "商品と割引" });
+    expect(within(items).getByText(/特定の誤りを検出したものではありません/)).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("レシート全体の読み取り確認");
+  });
+  it("金額差の推奨から商品一覧へ移動すると差額の理由が読める", async () => {
+    const user = userEvent.setup();
+    render(
+      <ReviewDialog
+        {...props}
+        reviewItems={[
+          {
+            ...props.reviewItems[0],
+            amountBasis: "tax_included",
+            taxResolutionStatus: "resolved",
+            taxResolutionSource: "item_explicit",
+          },
+        ]}
+      />,
+    );
+    const guidance = screen.getByRole("region", { name: "確認すること" });
+    await user.click(within(guidance).getByRole("button", { name: "確認箇所へ" }));
+    expect(
+      within(screen.getByRole("region", { name: "商品と割引" })).getByText(/24円の差/),
+    ).toBeVisible();
+    expect(screen.getByRole("region", { name: "レシート全体の税込・税率設定" })).toHaveTextContent(
+      "登録額と税額を再計算",
+    );
+  });
   it("不正な明細金額の修正では金額欄へフォーカスする", async () => {
     const user = userEvent.setup();
     render(<ReviewDialog {...props} reviewItems={[{ ...props.reviewItems[0], amountYen: "0" }]} />);
@@ -126,7 +177,7 @@ describe("下書きの修正導線", () => {
     await user.click(within(guidance).getByRole("button", { name: "修正箇所へ" }));
     expect(screen.getByRole("combobox", { name: "割引対象の商品" })).toBeVisible();
     expect(screen.getByRole("combobox", { name: "割引対象の商品" })).toHaveFocus();
-    const tax = screen.getByRole("region", { name: "価格ルール" });
+    const tax = screen.getByRole("region", { name: "レシート全体の税込・税率設定" });
     const details = screen.getByRole("region", { name: "商品と割引" });
     expect(tax.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

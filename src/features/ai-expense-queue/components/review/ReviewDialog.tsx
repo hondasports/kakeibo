@@ -97,7 +97,9 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const sections = useRef(new Map<string, HTMLElement>());
   const guidance = getReviewGuidance(form, items, draft);
   const required = guidance.filter((issue) => issue.required);
-  const recommendations = guidance.filter((issue) => !issue.required);
+  const recommendations = guidance.filter((issue) => !issue.required && issue.scope !== "receipt");
+  const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");
+  const specificGuidance = guidance.filter((issue) => issue.scope !== "receipt");
   const totalOnly = effectiveReviewMode(form) === "totalOnly";
   const summary = reviewSaveSummary(form, items);
   const busy =
@@ -254,9 +256,9 @@ export function ReviewDialog(props: ReviewDialogProps) {
                       label={`確認推奨 ${recommendations.length}件`}
                     />
                   </Stack>
-                  {guidance.length ? (
+                  {specificGuidance.length ? (
                     <Stack component="ul" spacing={1} sx={{ m: 0, pl: 2.5 }}>
-                      {guidance.map((issue) => (
+                      {specificGuidance.map((issue) => (
                         <Box component="li" key={issue.id}>
                           <Typography
                             variant="body2"
@@ -277,9 +279,20 @@ export function ReviewDialog(props: ReviewDialogProps) {
                     </Stack>
                   ) : (
                     <Typography variant="body2">
-                      入力項目はそろっています。保存内容を確認してください。
+                      個別の修正・確認が必要な項目はありません。
                     </Typography>
                   )}
+                  {receiptGuidance.map((issue) => (
+                    <Alert key={issue.id} severity="info" sx={{ mt: 1.5 }}>
+                      <Typography variant="subtitle2">レシート全体の確認</Typography>
+                      {issue.message}
+                      <Box>
+                        <Button disabled={busy} size="small" onClick={() => goTo(issue.target)}>
+                          商品一覧を見比べる
+                        </Button>
+                      </Box>
+                    </Alert>
+                  ))}
                 </Box>
                 <Box
                   component="fieldset"
@@ -393,14 +406,14 @@ export function ReviewDialog(props: ReviewDialogProps) {
                         component="section"
                         ref={register("tax")}
                         tabIndex={-1}
-                        aria-label="価格ルール"
+                        aria-label="レシート全体の税込・税率設定"
                         sx={{ scrollMarginTop: 16 }}
                       >
                         <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 700 }}>
-                          価格ルールを確認
+                          レシート全体の税込・税率設定
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          分かる場合だけ選択してください。商品ごとの税率と表示価格は、この下の各商品で確認できます。
+                          選択すると、各商品の税込／税抜・税率をもとに登録額と税額を再計算します。結果は下の「商品と割引」「保存内容を確認」に表示されます。分からない場合は合計だけ保存できます。
                         </Typography>
                         <Stack spacing={1.5}>
                           <FormControl>
@@ -477,6 +490,24 @@ export function ReviewDialog(props: ReviewDialogProps) {
                           明細を追加
                         </Button>
                       </Stack>
+                      {guidance
+                        .filter((issue) => issue.target === "items")
+                        .map((issue) => (
+                          <Alert
+                            key={issue.id}
+                            severity={issue.required ? "error" : "info"}
+                            sx={{ mb: 1.5 }}
+                          >
+                            <Typography variant="subtitle2">
+                              {issue.scope === "receipt"
+                                ? "レシート全体の確認"
+                                : issue.required
+                                  ? "修正必須"
+                                  : "確認推奨"}
+                            </Typography>
+                            {issue.message}
+                          </Alert>
+                        ))}
                       {totalOnly && (
                         <Alert severity="info" sx={{ mb: 1 }}>
                           合計だけ保存するため、商品明細は参考として残します。商品別のカテゴリ集計には使いません。
@@ -516,7 +547,9 @@ export function ReviewDialog(props: ReviewDialogProps) {
                                 border: "1px solid",
                                 borderColor: itemIssues.some((issue) => issue.required)
                                   ? "error.main"
-                                  : "divider",
+                                  : itemIssues.length
+                                    ? "warning.main"
+                                    : "divider",
                                 borderRadius: 1.5,
                                 p: 1.5,
                                 scrollMarginTop: 16,
@@ -602,7 +635,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                                 />
                                 {!canEditTax && context.status === "unresolved" && (
                                   <Typography variant="body2" color="text.secondary">
-                                    税内訳を読み取れていません。上の価格ルールで確認するか、合計だけ保存できます。
+                                    税内訳を読み取れていません。上の「レシート全体の税込・税率設定」で確認するか、合計だけ保存できます。
                                   </Typography>
                                 )}
                               </Stack>
@@ -742,6 +775,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
         unavailable={unavailable}
         requiredCount={required.length}
         recommendationCount={recommendations.length}
+        receiptReviewRecommended={receiptGuidance.length > 0}
         totalOnly={totalOnly}
         onClose={props.onClose}
         onSubmit={save}
