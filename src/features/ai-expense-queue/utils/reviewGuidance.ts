@@ -9,7 +9,13 @@ import {
 } from "./reviewValidation";
 import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
 
-export type ReviewGuidanceItem = { id: string; message: string; target: string; required: boolean };
+export type ReviewGuidanceItem = {
+  id: string;
+  message: string;
+  target: string;
+  required: boolean;
+  scope?: "receipt";
+};
 
 export function effectiveReviewMode(form: ReviewFormValues) {
   return form.priceTaxTreatment === "unknown" || form.taxRateComposition === "unknown"
@@ -93,12 +99,14 @@ export function getReviewGuidance(
       ["low_confidence", "user_confirmation_required", "parse_failed"].includes(reason),
     )
   ) {
-    add(
-      "reading",
-      "読み取り間違いがないか、画像と商品名・金額を見比べてください。",
-      "items",
-      false,
-    );
+    issues.push({
+      id: "reading",
+      message:
+        "レシート全体の読み取り確認です。特定の誤りを検出したものではありません。画像と商品名・金額を見比べてください。",
+      target: "items",
+      required: false,
+      scope: "receipt",
+    });
   }
   return issues;
 }
