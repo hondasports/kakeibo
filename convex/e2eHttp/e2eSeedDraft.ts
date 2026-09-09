@@ -275,3 +275,36 @@ export const e2eSeedPendingGroupInvitationHandler = httpAction(async (ctx, req) 
     headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
   });
 });
+
+export const e2eSeedUnallocatedTaxDraftHandler = httpAction(async (ctx, req) => {
+  const authError = requireE2eSecret(req, "E2E seeding is not enabled in this environment.");
+  if (authError) return authError;
+
+  const bodyResult = await readE2eJsonObject<{ userId?: string; email?: string; groupId?: string }>(
+    req,
+  );
+  if (bodyResult instanceof Response || !isSeedBody(bodyResult)) {
+    return bodyResult instanceof Response ? bodyResult : invalidJsonResponse();
+  }
+  const scope = await resolveE2eScope(ctx, bodyResult);
+  if (scope instanceof Response) return scope;
+
+  const categoryId = await ctx.runMutation(internal.categories.internal.ensureE2eCategoryByUser, {
+    groupId: scope.groupId,
+    name: "E2Eカテゴリ-税配分",
+    color: "#AAB7C4",
+  });
+  const draftId = await ctx.runMutation(
+    internal.aiExpenseDrafts.internal.createE2eUnallocatedTaxDraftForUser,
+    {
+      groupId: scope.groupId,
+      createdByUserId: scope.userId,
+      categoryId,
+    },
+  );
+
+  return new Response(JSON.stringify({ draftId, categoryId }), {
+    status: 200,
+    headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+  });
+});

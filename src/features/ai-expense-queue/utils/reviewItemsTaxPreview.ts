@@ -29,6 +29,7 @@ function reviewItemToDraftFields(item: ReviewItemValues): DraftItemTaxFields {
     markers: item.markers,
     taxMarker: item.taxMarker,
     allocatedTaxYen: item.allocatedTaxYen,
+    taxAllocationStatus: item.taxAllocationStatus,
     normalizedAmountYen: item.normalizedAmountYen,
     quantity: item.quantity,
     unitPriceYen: item.unitPriceYen,
@@ -55,13 +56,7 @@ export function applyReviewItemsTaxPreview(
   }
   if (
     (!args.taxSummaries || args.taxSummaries.length === 0) &&
-    args.priceTaxTreatment === undefined &&
-    args.taxRateComposition === undefined
-  ) {
-    return items;
-  }
-  if (
-    !items.some((item) => item.taxResolutionStatus === "resolved") &&
+    !items.some((item) => item.taxRatePercent != null || item.amountBasis != null) &&
     args.priceTaxTreatment === undefined &&
     args.taxRateComposition === undefined
   ) {
@@ -90,6 +85,7 @@ export function applyReviewItemsTaxPreview(
       amountBasis: fields.amountBasis,
       taxRatePercent: fields.taxRatePercent,
       allocatedTaxYen: fields.allocatedTaxYen,
+      taxAllocationStatus: fields.taxAllocationStatus,
       normalizedAmountYen: fields.normalizedAmountYen,
       taxResolutionStatus: fields.taxResolutionStatus,
       taxResolutionSource: fields.taxResolutionSource,

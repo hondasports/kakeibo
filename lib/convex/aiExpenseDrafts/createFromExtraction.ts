@@ -47,6 +47,7 @@ type AiExpenseDraftItemInput = {
   markers?: string[];
   taxMarker?: string;
   allocatedTaxYen?: number;
+  taxAllocationStatus?: "allocated" | "unallocated";
   normalizedAmountYen?: number;
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource;
@@ -141,6 +142,7 @@ async function insertDraftItems(
       markers: item.markers,
       taxMarker: item.taxMarker,
       allocatedTaxYen: item.allocatedTaxYen,
+      taxAllocationStatus: item.taxAllocationStatus,
       normalizedAmountYen: item.normalizedAmountYen,
       taxResolutionStatus: item.taxResolutionStatus,
       taxResolutionSource: item.taxResolutionSource,

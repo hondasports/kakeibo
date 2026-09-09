@@ -131,6 +131,7 @@ export async function persistDraftTaxInterpretation(
       amountBasis: fields.amountBasis,
       taxRatePercent: fields.taxRatePercent,
       allocatedTaxYen: fields.allocatedTaxYen,
+      taxAllocationStatus: fields.taxAllocationStatus,
       normalizedAmountYen: fields.normalizedAmountYen,
       taxResolutionStatus: fields.taxResolutionStatus,
       taxResolutionSource: fields.taxResolutionSource,

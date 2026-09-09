@@ -26,6 +26,7 @@ export type ReceiptDraftItemSnapshot<TCategoryId = string> = {
   markers?: string[];
   taxMarker?: string;
   allocatedTaxYen?: number;
+  taxAllocationStatus?: "allocated" | "unallocated";
   normalizedAmountYen?: number;
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource;

@@ -57,7 +57,21 @@ describe("下書きの修正導線", () => {
     render(
       <ReviewDialog
         {...props}
-        selectedReviewDraft={{ ...props.selectedReviewDraft!, reviewReasons: ["low_confidence"] }}
+        selectedReviewDraft={{
+          ...props.selectedReviewDraft!,
+          reviewReasons: ["low_confidence"],
+          taxSummaries: [
+            {
+              taxRatePercent: 8,
+              taxMode: "included",
+              taxableAmountYen: 116,
+              taxableAmountBasis: "tax_included",
+              taxYen: 8,
+              roundingMethod: "floor",
+              warnings: [],
+            },
+          ],
+        }}
         reviewForm={{ ...props.reviewForm, amountYen: "116" }}
         reviewItems={[
           {
@@ -88,6 +102,7 @@ describe("下書きの修正導線", () => {
           {
             ...props.reviewItems[0],
             amountBasis: "tax_included",
+            taxRatePercent: 0,
             taxResolutionStatus: "resolved",
             taxResolutionSource: "item_explicit",
           },
@@ -95,7 +110,13 @@ describe("下書きの修正導線", () => {
       />,
     );
     const guidance = screen.getByRole("region", { name: "確認すること" });
-    await user.click(within(guidance).getByRole("button", { name: "確認箇所へ" }));
+    await user.click(
+      within(
+        within(guidance)
+          .getByText(/24円の差/)
+          .closest("li")!,
+      ).getByRole("button", { name: "確認箇所へ" }),
+    );
     expect(
       within(screen.getByRole("region", { name: "商品と割引" })).getByText(/24円の差/),
     ).toBeVisible();
@@ -109,7 +130,7 @@ describe("下書きの修正導線", () => {
     await user.click(screen.getByRole("button", { name: "修正が必要な項目へ" }));
     expect(screen.getByRole("textbox", { name: "レシートの金額" })).toHaveFocus();
   });
-  it("税内訳の矛盾から折りたたみ内の修正欄へ移動できる", async () => {
+  it("税内訳の矛盾から常設の修正欄へ移動できる", async () => {
     const user = userEvent.setup();
     render(
       <ReviewDialog
@@ -135,7 +156,7 @@ describe("下書きの修正導線", () => {
         }}
       />,
     );
-    expect(screen.getByRole("spinbutton", { name: "対象額" })).not.toBeVisible();
+    expect(screen.getByRole("spinbutton", { name: "対象額" })).toBeVisible();
     await user.click(
       within(screen.getByRole("region", { name: "確認すること" })).getByRole("button", {
         name: "確認箇所へ",
@@ -192,4 +213,27 @@ describe("下書きの修正導線", () => {
     expect(screen.getByText(/入力は残っています/)).toBeVisible();
     expect(screen.getByRole("button", { name: "修正が必要な項目へ" })).toBeDisabled();
   });
+});
+
+it("全体設定の後の個別修正を再描画で上書きしない", () => {
+  render(
+    <ReviewDialog
+      {...props}
+      reviewForm={{ ...props.reviewForm, amountYen: "110", taxRateComposition: "rate8" }}
+      reviewItems={[
+        {
+          ...props.reviewItems[0],
+          amountYen: "100",
+          amountBasis: "tax_excluded",
+          taxRatePercent: 10,
+          taxResolutionStatus: "resolved",
+          taxResolutionSource: "item_explicit",
+          taxAllocationStatus: "allocated",
+          allocatedTaxYen: 10,
+          normalizedAmountYen: 110,
+        },
+      ]}
+    />,
+  );
+  expect(screen.getByRole("region", { name: "保存内容" })).toHaveTextContent("商品の税額：10円");
 });

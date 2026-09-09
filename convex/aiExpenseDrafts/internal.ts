@@ -1,3 +1,4 @@
+import { createE2eUnallocatedTaxDraftForUserHandler } from "../../lib/convex/aiExpenseDrafts/e2eDraftFixtures";
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import {
@@ -216,4 +217,9 @@ export const createE2eTaxSummaryConflictDraftForUser = internalMutation({
     secondaryCategoryId: v.optional(v.id("categories")),
   },
   handler: createE2eTaxSummaryConflictDraftForUserHandler,
+});
+
+export const createE2eUnallocatedTaxDraftForUser = internalMutation({
+  args: { groupId: v.id("groups"), createdByUserId: v.string(), categoryId: v.id("categories") },
+  handler: createE2eUnallocatedTaxDraftForUserHandler,
 });

@@ -39,6 +39,7 @@ export function snapshotReceiptDraftValues(
       markers: item.markers,
       taxMarker: item.taxMarker,
       allocatedTaxYen: item.allocatedTaxYen,
+      taxAllocationStatus: item.taxAllocationStatus,
       normalizedAmountYen: item.normalizedAmountYen,
       taxResolutionStatus: item.taxResolutionStatus,
       taxResolutionSource: item.taxResolutionSource,

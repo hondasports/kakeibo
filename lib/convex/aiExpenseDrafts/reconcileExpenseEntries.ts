@@ -1,3 +1,5 @@
+import { reinterpretDraftTax } from "../../receiptTax/reinterpretDraftTax";
+import { mapDraftItemToTaxFields } from "../../receiptTax/draftTaxMapping";
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../../convex/_generated/server";
@@ -44,6 +46,27 @@ export function buildDraftRegistrationItems(
         categoryId: draft.categoryId!,
       },
     ];
+  }
+  if (draft.taxSummaries?.length || items.some((item) => item.taxRatePercent != null)) {
+    const { itemFields, interpretation } = reinterpretDraftTax({
+      amountYen: draft.amountYen!,
+      items: items.map(mapDraftItemToTaxFields),
+      taxSummaries: draft.taxSummaries ?? [],
+      markerDefinitions: draft.markerDefinitions,
+    });
+    if (
+      interpretation.taxSummaries.some((summary) => summary.status !== "verified") ||
+      itemFields.some(
+        (item, index) =>
+          item.taxAllocationStatus !== "allocated" ||
+          item.normalizedAmountYen !== (items[index].normalizedAmountYen ?? items[index].amountYen),
+      ) ||
+      itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0) !== draft.amountYen
+    ) {
+      throw new ConvexError(
+        "税額または税込登録額が未確定です。税内訳と明細を確認して下書きを保存してください。",
+      );
+    }
   }
   return aggregateDraftItemsByCategory(draft, items);
 }

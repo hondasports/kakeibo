@@ -250,6 +250,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
               amountBasis: selectedBasis,
               taxRatePercent: selectedRate,
               allocatedTaxYen,
+              taxAllocationStatus: "allocated" as const,
               normalizedAmountYen:
                 selectedBasis === "tax_excluded"
                   ? item.printedAmountYen + allocatedTaxYen

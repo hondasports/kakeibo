@@ -1,3 +1,8 @@
+import { unallocatedTaxReceipt } from "../../domain/receipt/tax/fixtures/unallocatedTaxReceipt";
+import { updateSummaryTaxOverridesHandler } from "./updateSummaryTaxOverrides";
+import { persistDraftTaxInterpretation } from "./persistTaxInterpretation";
+import { buildDraftRegistrationItems } from "./reconcileExpenseEntries";
+import type { Doc } from "../../../convex/_generated/dataModel";
 import type { UserIdentity } from "convex/server";
 import { describe, expect, it, vi } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -959,4 +964,84 @@ describe("updateForReviewHandler tax reinterpretation", () => {
     expect(getItems()[0]?.printedAmountYen).toBe(100);
     expect(getDraft().reviewReasons).not.toContain("amount_mismatch");
   });
+});
+
+it("#748 旧0円下書きを保存・税内訳修正・割引修正して登録額を再現する", async () => {
+  const fixture = unallocatedTaxReceipt();
+  const { ctx, getDraft, getItems } = createInMemoryMutationCtx({
+    draft: {
+      _id: DRAFT_ID,
+      groupId: GROUP_ID,
+      status: "needs_review",
+      documentType: "receipt",
+      shopName: "匿名店",
+      date: "2026-09-09",
+      amountYen: 4662,
+      categoryId: CAT_ID,
+      confidence: { documentType: 1, shopName: 1, date: 1, amountYen: 1, categoryId: 1 },
+      reviewReasons: [],
+      taxSummaries: fixture.taxSummaries,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    items: fixture.items.map((item, index) => ({
+      ...item,
+      _id: "item-" + index,
+      groupId: GROUP_ID,
+      draftId: DRAFT_ID,
+      amountYen: item.printedAmountYen,
+      categoryId: CAT_ID,
+      confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+      createdAt: 1,
+      updatedAt: 1,
+    })),
+  });
+  const register = () =>
+    buildDraftRegistrationItems(
+      getDraft() as unknown as Doc<"aiExpenseDrafts">,
+      getItems() as unknown as Doc<"aiExpenseDraftItems">[],
+    );
+  expect(register).toThrow(/未確定/);
+  await updateForReviewHandler(ctx, {
+    draftId: DRAFT_ID,
+    documentType: "receipt",
+    shopName: "匿名店",
+    date: "2026-09-09",
+    amountYen: 4662,
+    categoryId: CAT_ID,
+  });
+  expect(getDraft().status).toBe("needs_review");
+  expect(getItems()[0].taxAllocationStatus).toBe("unallocated");
+  for (const summaryIndex of [0, 1])
+    await updateSummaryTaxOverridesHandler(
+      ctx,
+      { draftId: DRAFT_ID, summaryIndex, taxableAmountBasis: "tax_excluded" },
+      GROUP_ID,
+    );
+  expect(register).toThrow(/未確定/);
+  for (const itemIndex of [7, 8])
+    await persistDraftTaxInterpretation(ctx, {
+      draftId: DRAFT_ID,
+      groupId: GROUP_ID,
+      override: { itemIndex, taxRatePercent: 8 },
+    });
+  expect(getItems().reduce((sum, i) => sum + Number(i.allocatedTaxYen), 0)).toBe(370);
+  expect(register().reduce((sum, i) => sum + i.amountYen, 0)).toBe(4662);
+  await updateForReviewHandler(ctx, {
+    draftId: DRAFT_ID,
+    documentType: "receipt",
+    shopName: "匿名店",
+    date: "2026-09-09",
+    amountYen: 4662,
+    categoryId: CAT_ID,
+    items: getItems().map((i) => ({
+      itemId: i._id as Id<"aiExpenseDraftItems">,
+      itemName: String(i.itemName),
+      amountYen: Number(i.printedAmountYen),
+      categoryId: CAT_ID,
+    })),
+  });
+  expect(getDraft().status).toBe("ready");
+  expect(getItems().every((i) => i.taxAllocationStatus === "allocated")).toBe(true);
+  expect(register().reduce((sum, i) => sum + i.amountYen, 0)).toBe(4662);
 });

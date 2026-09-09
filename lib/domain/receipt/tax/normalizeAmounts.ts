@@ -25,7 +25,7 @@ export function normalizeAmounts(args: {
   contexts: TaxContextResolution[];
   taxSummaries: ExtractedTaxSummary[];
 }): InterpretedReceiptItem[] {
-  const result = args.items.map((item, index) => {
+  const result: InterpretedReceiptItem[] = args.items.map((item, index) => {
     const context = args.contexts[index];
     const contextWarnings = context.status === "unresolved" ? context.reasons : [];
     return {
@@ -35,6 +35,8 @@ export function normalizeAmounts(args: {
       taxContext: context,
       warnings: [...new Set([...item.warnings, ...contextWarnings])],
       allocatedTaxYen: 0,
+      taxAllocationStatus:
+        context.status === "resolved" && context.taxRatePercent === 0 ? "allocated" : "unallocated",
       normalizedAmountYen: item.printedAmountYen,
     } satisfies InterpretedReceiptItem;
   });
@@ -68,6 +70,7 @@ export function normalizeAmounts(args: {
       );
       indexes.forEach((itemIndex, allocationIndex) => {
         result[itemIndex].allocatedTaxYen = allocations[allocationIndex];
+        result[itemIndex].taxAllocationStatus = "allocated";
         if (result[itemIndex].amountBasis === "tax_excluded") {
           result[itemIndex].normalizedAmountYen += allocations[allocationIndex];
         }

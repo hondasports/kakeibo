@@ -43,9 +43,12 @@ describe("applyReviewItemsTaxPreview", () => {
     expect(previewed[0]?.allocatedTaxYen).toBe(0);
   });
 
-  it("税サマリが無い場合はそのまま返す", () => {
+  it("税サマリが無い課税明細は保存済み金額を確定扱いにしない", () => {
     const items = [externalTaxItem()];
-    expect(applyReviewItemsTaxPreview(items, { paidTotalYen: 322 })).toEqual(items);
+    expect(applyReviewItemsTaxPreview(items, { paidTotalYen: 322 })[0]).toMatchObject({
+      taxAllocationStatus: "unallocated",
+      normalizedAmountYen: 298,
+    });
   });
 
   it("2段階のユーザー選択がAI税サマリーより優先される", () => {
