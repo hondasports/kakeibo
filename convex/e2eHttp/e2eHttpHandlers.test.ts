@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { e2eCleanupHandler } from "./e2eCleanup";
 import {
   e2eSeedAiExpenseDraftHandler,
+  e2eSeedUnallocatedTaxDraftHandler,
   e2eSeedMixedTaxReviewDraftHandler,
   e2eSeedPendingGroupInvitationHandler,
   e2eSeedTaxReviewDraftHandler,
@@ -264,6 +265,20 @@ describe("e2eCleanupHandler", () => {
 describe("e2e seed handlers", () => {
   beforeEach(configureEnvironment);
 
+  it("税配分fixtureもsecret不一致・別ユーザー・本番環境を拒否する", async () => {
+    const ctx = createActionCtx();
+    await expect(
+      e2eSeedUnallocatedTaxDraftHandler(ctx, request({}, "wrong-secret")),
+    ).resolves.toMatchObject({ status: 401 });
+    await expect(
+      e2eSeedUnallocatedTaxDraftHandler(ctx, request({ userId: "clerk|other" })),
+    ).resolves.toMatchObject({ status: 403 });
+    process.env.APP_ENV = "production";
+    expect(
+      (await e2eSeedUnallocatedTaxDraftHandler(ctx, request({ userId: E2E_USER_ID }))).status,
+    ).not.toBe(200);
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+  });
   it("認証・入力・グループ認可の失敗を拒否する", async () => {
     const ctx = createActionCtx();
     await expect(

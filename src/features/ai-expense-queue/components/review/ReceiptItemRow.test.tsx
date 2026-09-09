@@ -13,6 +13,7 @@ describe("ReceiptItemRow", () => {
           categoryId: "cat",
           normalizedAmountYen: 214,
           taxResolutionStatus: "resolved",
+          taxAllocationStatus: "allocated",
           taxResolutionSource: "single_summary",
           taxRatePercent: 8,
           amountBasis: "tax_excluded",

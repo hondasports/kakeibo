@@ -164,6 +164,7 @@ export async function replaceDraftItemsForReview(
       markers: previous?.markers,
       taxMarker: previous?.taxMarker,
       allocatedTaxYen: previous?.allocatedTaxYen,
+      taxAllocationStatus: "unallocated",
       normalizedAmountYen:
         "normalizedAmountYen" in amounts
           ? amounts.normalizedAmountYen

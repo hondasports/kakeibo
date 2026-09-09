@@ -48,6 +48,7 @@ export type DraftItem<TId = string> = {
   markers?: string[];
   taxMarker?: string;
   allocatedTaxYen?: number;
+  taxAllocationStatus?: "allocated" | "unallocated";
   normalizedAmountYen?: number;
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource;
@@ -390,6 +391,7 @@ export function mapExtractionToDraftArgs<TId>(
       markers: normalized?.markers ?? item.markers,
       taxMarker: normalized?.taxMarker ?? item.taxMarker,
       allocatedTaxYen: taxFields?.allocatedTaxYen,
+      taxAllocationStatus: taxFields?.taxAllocationStatus,
       normalizedAmountYen: taxFields?.normalizedAmountYen,
       taxResolutionStatus: taxFields?.taxResolutionStatus,
       taxResolutionSource: taxFields?.taxResolutionSource,

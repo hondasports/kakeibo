@@ -149,6 +149,7 @@ describe("ReviewItemCard", () => {
     renderCard({
       item: makeItem({
         taxResolutionStatus: "resolved",
+        taxAllocationStatus: "allocated",
         taxResolutionSource: "item_explicit",
         taxRatePercent: 10,
         amountBasis: "tax_excluded",

@@ -1,3 +1,4 @@
+import { unallocatedTaxReceipt } from "../../domain/receipt/tax/fixtures/unallocatedTaxReceipt";
 import type { MutationCtx } from "../../../convex/_generated/server";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -448,5 +449,44 @@ export async function createE2eTaxSummaryConflictDraftForUserHandler(
     updatedAt: now,
   });
 
+  return draftId;
+}
+
+export async function createE2eUnallocatedTaxDraftForUserHandler(
+  ctx: MutationCtx,
+  args: CreateE2eReadyDraftForUserArgs,
+) {
+  const fixture = unallocatedTaxReceipt();
+  const now = Date.now();
+  const draftId = await ctx.db.insert("aiExpenseDrafts", {
+    groupId: args.groupId,
+    createdByUserId: args.createdByUserId,
+    sourceType: "image_upload",
+    status: "needs_review",
+    documentType: "receipt",
+    shopName: "E2E税配分確認店",
+    date: "2026-09-09",
+    amountYen: fixture.amountYen,
+    categoryId: args.categoryId,
+    registrationMode: "detailed",
+    taxSummaries: fixture.taxSummaries,
+    confidence: { documentType: 1, shopName: 1, date: 1, amountYen: 1, categoryId: 1 },
+    reviewReasons: ["amount_mismatch"],
+    createdAt: now,
+    updatedAt: now,
+  });
+  for (const item of fixture.items) {
+    await ctx.db.insert("aiExpenseDraftItems", {
+      ...item,
+      groupId: args.groupId,
+      draftId,
+      amountYen: item.printedAmountYen!,
+      lineType: item.printedAmountYen! < 0 ? "discount" : "item",
+      categoryId: args.categoryId,
+      confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
   return draftId;
 }

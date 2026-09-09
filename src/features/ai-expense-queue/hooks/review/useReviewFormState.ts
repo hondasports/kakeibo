@@ -53,7 +53,13 @@ export function useReviewFormState({
           : [];
       const categoryState = initializeReviewCategoryState(mappedItems, mappedForm.categoryId);
       setReviewForm({ ...mappedForm, categoryId: categoryState.receiptCategoryId });
-      setReviewItems(categoryState.items);
+      setReviewItems(
+        applyReviewItemsTaxPreview(categoryState.items, {
+          paidTotalYen: Number(mappedForm.amountYen),
+          taxSummaries: selectedReviewDraft.taxSummaries,
+          markerDefinitions: selectedReviewDraft.markerDefinitions,
+        }),
+      );
       setIsCategorySplit(categoryState.isCategorySplit);
       setInitializedReviewDraftId(selectedReviewDraft._id);
     }
@@ -238,13 +244,20 @@ export function useReviewFormState({
 
   const handleRemoveReviewItem = (itemId: string) => {
     setReviewItems((current) =>
-      current
-        .filter((item) => item.id !== itemId)
-        .map((item) =>
-          item.discountTargetItemId === itemId
-            ? { ...item, categoryId: "", discountTargetItemId: undefined }
-            : item,
-        ),
+      applyReviewItemsTaxPreview(
+        current
+          .filter((item) => item.id !== itemId)
+          .map((item) =>
+            item.discountTargetItemId === itemId
+              ? { ...item, categoryId: "", discountTargetItemId: undefined }
+              : item,
+          ),
+        {
+          paidTotalYen: Number(reviewForm.amountYen),
+          taxSummaries: selectedReviewDraft?.taxSummaries,
+          markerDefinitions: selectedReviewDraft?.markerDefinitions,
+        },
+      ),
     );
   };
 

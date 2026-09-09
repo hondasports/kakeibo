@@ -17,6 +17,7 @@ export function mergeReviewTaxItems(
             printedAmountYen: Number(item.amountYen),
             normalizedAmountYen: undefined,
             allocatedTaxYen: undefined,
+            taxAllocationStatus: "unallocated" as const,
             taxResolutionStatus: "unresolved" as const,
           }
         : {}),

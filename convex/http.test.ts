@@ -51,6 +51,7 @@ describe("HTTP router route registration", () => {
         "/e2e/seed-pending-group-invitation",
         "/webhooks/resend",
         "/webhooks/line",
+        "/e2e/seed-unallocated-tax-draft",
       ]);
     },
   );

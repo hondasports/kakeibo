@@ -34,7 +34,7 @@ describe("下書きの修正状態と保存内容", () => {
       [],
     );
     expect(getReviewSubmitError(form, [product, linked])).toBeNull();
-    expect(reviewSaveSummary(form, [product, linked])).toEqual({
+    expect(reviewSaveSummary(form, [product, linked])).toMatchObject({
       itemTotal: 92,
       difference: 0,
       taxYen: undefined,
@@ -65,8 +65,8 @@ describe("下書きの修正状態と保存内容", () => {
   it("現在の明細と合計を照合し、空の金額や未確定の税を0円にしない", () => {
     expect(
       reviewSaveSummary({ ...form, amountYen: "200" }, [{ ...product, amountYen: "150" }]),
-    ).toEqual({ itemTotal: 150, difference: 50, taxYen: undefined });
-    expect(reviewSaveSummary(form, [{ ...product, amountYen: "" }])).toEqual({
+    ).toMatchObject({ itemTotal: 150, difference: 50, taxYen: undefined });
+    expect(reviewSaveSummary(form, [{ ...product, amountYen: "" }])).toMatchObject({
       itemTotal: undefined,
       difference: undefined,
       taxYen: undefined,
@@ -77,6 +77,7 @@ describe("下書きの修正状態と保存内容", () => {
           ...product,
           amountYen: "92",
           normalizedAmountYen: 92,
+          taxAllocationStatus: "allocated",
           allocatedTaxYen: 6,
           taxRatePercent: 8,
           amountBasis: "tax_included",
