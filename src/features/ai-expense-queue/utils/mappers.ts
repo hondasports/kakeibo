@@ -118,6 +118,7 @@ export function mapDraftItemsToReviewItems(
       taxMarker: item.taxMarker,
       markers: item.markers,
       allocatedTaxYen: item.allocatedTaxYen,
+      taxAllocationStatus: item.taxAllocationStatus,
       normalizedAmountYen: item.normalizedAmountYen,
       taxResolutionStatus: item.taxResolutionStatus,
       taxResolutionSource: item.taxResolutionSource,

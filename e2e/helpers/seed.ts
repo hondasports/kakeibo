@@ -92,3 +92,7 @@ export async function seedGroupMemberForUser(
 
   return { memberUserId };
 }
+
+export async function seedUnallocatedTaxDraftByUser(userId: string): Promise<{ draftId: string }> {
+  return await postE2eSeed("/e2e/seed-unallocated-tax-draft", { userId });
+}

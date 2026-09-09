@@ -467,6 +467,26 @@ export function ReviewDialog(props: ReviewDialogProps) {
                         </Stack>
                       </Box>
                     )}
+                    {canEditTax && (
+                      <Box
+                        component="section"
+                        ref={register("tax-summary")}
+                        tabIndex={-1}
+                        aria-label="税内訳を確認"
+                      >
+                        <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 700 }}>
+                          税内訳を確認
+                        </Typography>
+                        <Typography variant="body2" sx={{ mb: 1 }}>
+                          税額が未確定の場合は、対象額が税込か税抜かをレシートと照合してください。8%と10%が混ざっている場合、上の全体設定だけでは税内訳は確定しません。割引も対象税率に含めて確認してください。
+                        </Typography>
+                        <ReceiptTaxSummary
+                          draft={draft}
+                          onSummaryChange={busy ? undefined : props.onTaxSummaryChange}
+                          updatingIndex={props.taxSummaryUpdatingIndex}
+                        />
+                      </Box>
+                    )}
                     <Box
                       component="section"
                       ref={register("items")}
@@ -661,6 +681,12 @@ export function ReviewDialog(props: ReviewDialogProps) {
                       {items.length > 0 && (
                         <>
                           <Typography>
+                            印字額の合計：
+                            {summary.printedTotal === undefined
+                              ? "未確定"
+                              : `${summary.printedTotal.toLocaleString()}円`}
+                          </Typography>
+                          <Typography>
                             商品合計：
                             {summary.itemTotal === undefined
                               ? "未確定"
@@ -747,11 +773,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                     ) : (
                       <Typography variant="body2">読み取り原文はありません。</Typography>
                     )}
-                    <ReceiptTaxSummary
-                      draft={draft}
-                      onSummaryChange={busy ? undefined : props.onTaxSummaryChange}
-                      updatingIndex={props.taxSummaryUpdatingIndex}
-                    />
+
                     {draft?.receiptInterpretation && draft.receiptUserOverride && (
                       <Button
                         disabled={busy}

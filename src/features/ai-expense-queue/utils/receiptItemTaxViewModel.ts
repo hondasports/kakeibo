@@ -91,10 +91,12 @@ export function toReceiptItemTaxViewModel(item: ReviewItemValues): ReceiptItemTa
   return {
     itemName: item.itemName,
     printedAmountLabel: formatYenLabel(printedAmountYen),
-    normalizedAmountLabel: formatYenLabel(normalizedAmountYen),
+    normalizedAmountLabel:
+      item.taxAllocationStatus === "allocated" ? formatYenLabel(normalizedAmountYen) : "未確定",
     taxRateLabel: formatTaxRateLabel(context.taxRatePercent),
     amountBasisLabel: getAmountBasisLabel(context.amountBasis),
-    allocatedTaxLabel: formatYenLabel(item.allocatedTaxYen),
+    allocatedTaxLabel:
+      item.taxAllocationStatus === "allocated" ? formatYenLabel(item.allocatedTaxYen) : "未確定",
     status: context.status,
     resolutionReasonLabel:
       context.status === "resolved" ? getTaxResolutionSourceLabel(context.source) : undefined,

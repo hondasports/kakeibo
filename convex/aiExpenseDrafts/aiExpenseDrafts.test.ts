@@ -161,9 +161,9 @@ function createMutationCtx(
         const rows =
           _tableName === "expenseEntries" ? (opts.expenseEntries ?? []) : (opts.items ?? []);
         return {
-          take: vi.fn().mockResolvedValue(rows),
+          take: vi.fn().mockImplementation(async (limit: number) => rows.slice(0, limit)),
           order: vi.fn().mockReturnValue({
-            take: vi.fn().mockResolvedValue(rows),
+            take: vi.fn().mockImplementation(async (limit: number) => rows.slice(0, limit)),
           }),
           collect: vi.fn().mockResolvedValue(rows),
         };
@@ -1029,6 +1029,65 @@ describe("aiExpenseDrafts", () => {
         }),
       );
     });
+  });
+
+  it.each([1, 101])("税サマリーなしの%d件目の課税明細も本登録前に検証する", async (count) => {
+    const items = Array.from({ length: count }, (_, index) => ({
+      _id: "item-" + index,
+      _creationTime: index,
+      groupId: GROUP_ID,
+      draftId: "draft-ready",
+      itemName: "商品",
+      amountYen: 1,
+      printedAmountYen: 1,
+      normalizedAmountYen: 1,
+      amountBasis: "tax_included",
+      taxRatePercent: index === count - 1 ? 8 : 0,
+      taxAllocationStatus: "unallocated",
+      categoryId: "cat-food",
+      confidence: {},
+      createdAt: 0,
+      updatedAt: 0,
+    }));
+    const ctx = createMutationCtx(createIdentity(), {
+      getDocById: { "draft-ready": { ...readyDraft, amountYen: count } },
+      items,
+    });
+    await expect(
+      registerReadyDraftsHandler(ctx, { draftIds: ["draft-ready" as Id<"aiExpenseDrafts">] }),
+    ).rejects.toThrow("税額または税込登録額が未確定");
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+  });
+
+  it("101件の確認済み非課税明細を切り捨てず登録する", async () => {
+    const items = Array.from({ length: 101 }, (_, index) => ({
+      _id: "item-" + index,
+      _creationTime: index,
+      groupId: GROUP_ID,
+      draftId: "draft-ready",
+      itemName: "商品",
+      amountYen: 1,
+      printedAmountYen: 1,
+      normalizedAmountYen: 1,
+      amountBasis: "tax_included",
+      taxRatePercent: 0,
+      taxAllocationStatus: "allocated",
+      categoryId: "cat-food",
+      confidence: {},
+      createdAt: 0,
+      updatedAt: 0,
+    }));
+    const ctx = createMutationCtx(createIdentity(), {
+      getDocById: {
+        "draft-ready": { ...readyDraft, amountYen: 101 },
+        "cat-food": { groupId: GROUP_ID, isActive: true },
+      },
+      items,
+      insertedIds: ["receipt-101"],
+    });
+    await expect(
+      registerReadyDraftsHandler(ctx, { draftIds: ["draft-ready" as Id<"aiExpenseDrafts">] }),
+    ).resolves.toMatchObject({ registeredReceiptIds: ["receipt-101"] });
   });
 
   it("登録準備OKの下書きを receipts としてまとめて登録し、下書きを registered に更新する", async () => {

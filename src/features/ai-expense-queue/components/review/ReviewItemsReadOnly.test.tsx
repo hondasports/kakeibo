@@ -14,6 +14,7 @@ describe("ReviewItemsReadOnly", () => {
     taxRatePercent: 8 as const,
     taxResolutionStatus: "resolved" as const,
     taxResolutionSource: "single_summary" as const,
+    taxAllocationStatus: "allocated" as const,
     allocatedTaxYen: 24,
     warnings: ["税額を確認してください"],
   };

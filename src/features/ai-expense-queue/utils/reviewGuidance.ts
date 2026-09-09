@@ -48,13 +48,46 @@ export function getReviewGuidance(
         add(
           `summary-${index}`,
           `${summary.taxRatePercent}%の税内訳：対象額・税額・税込／税抜をレシートと照合してください。`,
-          "reference",
+          "tax-summary",
           false,
         );
       }
     });
     for (const item of items) {
       const name = item.itemName || "名称未設定";
+      const target = items.find((candidate) => candidate.id === item.discountTargetItemId);
+      if (
+        isDiscountLine(item.itemName, item.lineType) &&
+        target &&
+        item.taxRatePercent != null &&
+        target.taxRatePercent != null &&
+        item.taxRatePercent !== target.taxRatePercent
+      ) {
+        add(
+          "discount-tax-" + item.id,
+          "「" +
+            name +
+            "」：割引の対象税率が対象商品（" +
+            target.taxRatePercent +
+            "%）と異なります。レシートを確認して選択してください。",
+          item.id,
+          false,
+        );
+      }
+      if (
+        !issues.some((issue) => issue.id === "allocation") &&
+        item.taxAllocationStatus === "unallocated" &&
+        buildTaxContextFromReviewItem(item).status === "resolved"
+      ) {
+        add(
+          "allocation",
+          "「" +
+            name +
+            "」：税額は未確定です。税内訳の対象額・商品の税率と金額を確認してください。",
+          draft?.taxSummaries?.length ? "tax-summary" : "tax",
+          false,
+        );
+      }
       if (isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId)
         add(
           "discount-" + item.id,
@@ -85,7 +118,12 @@ export function getReviewGuidance(
       (sum, item) => sum + (item.normalizedAmountYen ?? Number(item.amountYen)),
       0,
     );
-    if (items.length && Number.isFinite(total) && Number(form.amountYen) !== total) {
+    if (
+      items.length &&
+      !items.some((item) => item.taxAllocationStatus === "unallocated") &&
+      Number.isFinite(total) &&
+      Number(form.amountYen) !== total
+    ) {
       add(
         "difference",
         `支払額と商品合計に${Math.abs(Number(form.amountYen) - total).toLocaleString()}円の差があります。明細・割引・税を確認してください。`,
@@ -116,18 +154,27 @@ export function reviewSaveSummary(form: ReviewFormValues, items: ReviewItemValue
   const validAmounts = items.every(
     (item, index) => item.amountYen.trim() !== "" && Number.isFinite(parsed[index]),
   );
-  const itemTotal = validAmounts
-    ? items.reduce((sum, item) => sum + (item.normalizedAmountYen ?? Number(item.amountYen)), 0)
-    : undefined;
+  const printedTotal = validAmounts ? parsed.reduce((sum, amount) => sum + amount, 0) : undefined;
+  const hasUnallocatedTax = items.some(
+    (item) =>
+      item.taxAllocationStatus !== "allocated" &&
+      (item.taxRatePercent != null || item.amountBasis != null),
+  );
+  const itemTotal =
+    validAmounts && !hasUnallocatedTax
+      ? items.reduce((sum, item) => sum + (item.normalizedAmountYen ?? Number(item.amountYen)), 0)
+      : undefined;
   const taxResolved =
     items.length > 0 &&
     items.every(
       (item) =>
         buildTaxContextFromReviewItem(item).status === "resolved" &&
-        item.allocatedTaxYen !== undefined,
+        item.allocatedTaxYen !== undefined &&
+        item.taxAllocationStatus === "allocated",
     );
   return {
     itemTotal,
+    printedTotal,
     taxYen: taxResolved ? items.reduce((sum, item) => sum + item.allocatedTaxYen!, 0) : undefined,
     difference:
       itemTotal !== undefined &&

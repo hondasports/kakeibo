@@ -1,3 +1,4 @@
+import { applyReviewItemsTaxPreview } from "../../utils/reviewItemsTaxPreview";
 import type { Dispatch, SetStateAction } from "react";
 import { mergeReviewTaxItems } from "../../utils/reviewTaxItemMerge";
 import { useMutation } from "convex/react";
@@ -53,7 +54,14 @@ export function useReviewTaxOverrides({
       }
       setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft));
       setReviewItems((current) =>
-        mergeReviewTaxItems(current, mapDraftItemsToReviewItems(result.items)),
+        mergeReviewTaxItems(
+          current,
+          applyReviewItemsTaxPreview(mapDraftItemsToReviewItems(result.items), {
+            paidTotalYen: result.draft.amountYen,
+            taxSummaries: result.draft.taxSummaries,
+            markerDefinitions: result.draft.markerDefinitions,
+          }),
+        ),
       );
     } catch (error) {
       if (requestId !== taxOverrideRequestIdRef.current) {
@@ -83,7 +91,14 @@ export function useReviewTaxOverrides({
       }
       setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft));
       setReviewItems((current) =>
-        mergeReviewTaxItems(current, mapDraftItemsToReviewItems(result.items)),
+        mergeReviewTaxItems(
+          current,
+          applyReviewItemsTaxPreview(mapDraftItemsToReviewItems(result.items), {
+            paidTotalYen: result.draft.amountYen,
+            taxSummaries: result.draft.taxSummaries,
+            markerDefinitions: result.draft.markerDefinitions,
+          }),
+        ),
       );
     } catch (error) {
       if (requestId !== taxOverrideRequestIdRef.current) {

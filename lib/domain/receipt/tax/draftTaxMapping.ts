@@ -20,6 +20,7 @@ export type DraftItemTaxFields = {
   markers?: string[];
   taxMarker?: string;
   allocatedTaxYen?: number;
+  taxAllocationStatus?: "allocated" | "unallocated";
   normalizedAmountYen?: number;
   quantity?: number;
   unitPriceYen?: number;
@@ -101,6 +102,7 @@ export function interpretedItemToDraftFields(item: InterpretedReceiptItem) {
     markers: item.markers,
     taxMarker: item.taxMarker,
     allocatedTaxYen: item.allocatedTaxYen,
+    taxAllocationStatus: item.taxAllocationStatus,
     normalizedAmountYen: item.normalizedAmountYen,
     quantity: item.quantity,
     unitPriceYen: item.unitPriceYen,
@@ -127,9 +129,14 @@ export function deriveTaxReviewReasons(
   interpretation: ReceiptTaxInterpretation | undefined,
 ): AiExpenseDraftReviewReason[] {
   const taxWarnings = (interpretation?.warnings ?? []).filter(isTaxInterpretationWarning);
-  const hasUnresolvedTax = taxWarnings.some(
-    (warning) => warning.startsWith("unresolved_") || warning.startsWith("missing_tax_items:"),
-  );
+  const hasUnresolvedTax =
+    interpretation?.taxSummaries.some(
+      (summary) => summary.status !== "verified" && summary.status !== "coherent",
+    ) ||
+    interpretation?.items.some((item) => item.taxAllocationStatus === "unallocated") ||
+    taxWarnings.some(
+      (warning) => warning.startsWith("unresolved_") || warning.startsWith("missing_tax_items:"),
+    );
   const hasTaxMismatch = taxWarnings.some(
     (warning) =>
       warning === "normalized_amount_mismatch" ||

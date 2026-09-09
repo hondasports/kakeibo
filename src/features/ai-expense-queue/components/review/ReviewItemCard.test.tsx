@@ -43,6 +43,21 @@ function renderCard(props: Partial<Parameters<typeof ReviewItemCard>[0]>) {
 }
 
 describe("ReviewItemCard", () => {
+  it("未配分では税込登録額を使うという補足を表示しない", () => {
+    renderCard({
+      item: makeItem({
+        amountBasis: "tax_excluded",
+        taxRatePercent: 8,
+        taxResolutionStatus: "resolved",
+        normalizedAmountYen: 100,
+        taxAllocationStatus: "unallocated",
+      }),
+    });
+    expect(
+      screen.queryByText("税抜の印字額です。登録は下の税込額を使います"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("登録額（税込）：未確定")).toBeInTheDocument();
+  });
   it("明細名と金額を表示する", () => {
     renderCard({});
     expect(screen.getByDisplayValue("おにぎり")).toBeInTheDocument();
@@ -149,6 +164,7 @@ describe("ReviewItemCard", () => {
     renderCard({
       item: makeItem({
         taxResolutionStatus: "resolved",
+        taxAllocationStatus: "allocated",
         taxResolutionSource: "item_explicit",
         taxRatePercent: 10,
         amountBasis: "tax_excluded",

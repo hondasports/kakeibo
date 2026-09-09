@@ -127,6 +127,7 @@ export type TaxContextResolution =
 export type InterpretedReceiptItem = ExtractedReceiptItem & {
   taxContext: TaxContextResolution;
   allocatedTaxYen: number;
+  taxAllocationStatus?: "allocated" | "unallocated";
   normalizedAmountYen: number;
 };
 

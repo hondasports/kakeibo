@@ -1,3 +1,4 @@
+import { e2eSeedUnallocatedTaxDraftHandler } from "./e2eHttp/e2eSeedDraft";
 import { httpRouter } from "convex/server";
 import { resendWebhookHandler } from "./email/webhooks/resendWebhook";
 import { lineWebhookHandler } from "./lineWebhook/webhook";
@@ -89,6 +90,12 @@ http.route({
   path: "/webhooks/line",
   method: "POST",
   handler: lineWebhookHandler,
+});
+
+http.route({
+  path: "/e2e/seed-unallocated-tax-draft",
+  method: "POST",
+  handler: e2eSeedUnallocatedTaxDraftHandler,
 });
 
 export default http;

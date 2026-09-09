@@ -77,6 +77,7 @@ export function ReviewItemCard({
   onTaxRateChange,
   onToggleDetail,
 }: ReviewItemCardProps) {
+  const discount = isDiscountLine(item.itemName, item.lineType);
   const uncategorized = !item.categoryId;
   const lowConfidence = isLowConfidenceItem(item);
   const categoryName = categoryNamesById.get(item.categoryId);
@@ -85,6 +86,7 @@ export function ReviewItemCard({
   const isTaxUpdating = disabled || taxUpdatingItemId === item.id;
   const showTaxRateSelect = enableItemTaxEditing && taxContext.status === "unresolved";
   const showRegistrationAmount =
+    item.taxAllocationStatus === "allocated" &&
     taxContext.status === "resolved" &&
     item.amountBasis === "tax_excluded" &&
     item.normalizedAmountYen != null;
@@ -173,7 +175,7 @@ export function ReviewItemCard({
             helperText={
               isDiscountLine(item.itemName, item.lineType)
                 ? "割引額はマイナスで入力"
-                : item.amountBasis === "tax_excluded" && taxContext.status === "resolved"
+                : showRegistrationAmount
                   ? "税抜の印字額です。登録は下の税込額を使います"
                   : undefined
             }
@@ -196,6 +198,12 @@ export function ReviewItemCard({
           </TextField>
         )}
 
+        {item.taxAllocationStatus !== "allocated" &&
+          (item.amountBasis || item.taxRatePercent != null) && (
+            <Typography color="warning.main" variant="body2">
+              登録額（税込）：未確定
+            </Typography>
+          )}
         {showRegistrationAmount && item.normalizedAmountYen != null && (
           <Typography color="text.secondary" variant="body2">
             登録額: {formatYen(item.normalizedAmountYen)}（税込）
@@ -212,7 +220,8 @@ export function ReviewItemCard({
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TaxRateSelect
               disabled={isTaxUpdating}
-              label={`${item.itemName || `明細 ${index + 1}`}の税率`}
+              discount={discount}
+              label={`${item.itemName || `明細 ${index + 1}`}の${discount ? "割引対象税率" : "税率"}`}
               value={item.taxRatePercent}
               onChange={(value) => onTaxRateChange?.(item.id, value)}
             />
@@ -220,14 +229,14 @@ export function ReviewItemCard({
               select
               fullWidth
               disabled={isTaxUpdating}
-              label={`${item.itemName || `明細 ${index + 1}`}の表示価格`}
+              label={`${item.itemName || `明細 ${index + 1}`}の${discount ? "割引額の扱い" : "表示価格"}`}
               value={item.amountBasis ?? "unknown"}
               onChange={(event) =>
                 onAmountBasisChange?.(item.id, event.target.value as AmountBasis)
               }
             >
-              <MenuItem value="tax_included">税込</MenuItem>
-              <MenuItem value="tax_excluded">税抜</MenuItem>
+              <MenuItem value="tax_included">{discount ? "税込金額から引く" : "税込"}</MenuItem>
+              <MenuItem value="tax_excluded">{discount ? "税抜金額から引く" : "税抜"}</MenuItem>
               <MenuItem value="unknown">不明</MenuItem>
             </TextField>
           </Stack>
