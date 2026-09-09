@@ -175,7 +175,7 @@ export function ReviewItemCard({
             helperText={
               isDiscountLine(item.itemName, item.lineType)
                 ? "割引額はマイナスで入力"
-                : item.amountBasis === "tax_excluded" && taxContext.status === "resolved"
+                : showRegistrationAmount
                   ? "税抜の印字額です。登録は下の税込額を使います"
                   : undefined
             }

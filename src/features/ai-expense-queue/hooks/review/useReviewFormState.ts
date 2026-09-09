@@ -243,22 +243,44 @@ export function useReviewFormState({
   };
 
   const handleRemoveReviewItem = (itemId: string) => {
-    setReviewItems((current) =>
-      applyReviewItemsTaxPreview(
-        current
-          .filter((item) => item.id !== itemId)
-          .map((item) =>
-            item.discountTargetItemId === itemId
-              ? { ...item, categoryId: "", discountTargetItemId: undefined }
-              : item,
-          ),
-        {
-          paidTotalYen: Number(reviewForm.amountYen),
-          taxSummaries: selectedReviewDraft?.taxSummaries,
-          markerDefinitions: selectedReviewDraft?.markerDefinitions,
-        },
-      ),
-    );
+    setReviewItems((current) => {
+      const remaining = current
+        .filter((item) => item.id !== itemId)
+        .map((item) =>
+          item.discountTargetItemId === itemId
+            ? { ...item, categoryId: "", discountTargetItemId: undefined }
+            : item,
+        );
+      const selectedRate =
+        reviewForm.taxRateComposition === "rate8"
+          ? 8
+          : reviewForm.taxRateComposition === "rate10"
+            ? 10
+            : undefined;
+      const selectedBasis =
+        reviewForm.priceTaxTreatment === "excluded"
+          ? "tax_excluded"
+          : reviewForm.priceTaxTreatment === "included"
+            ? "tax_included"
+            : undefined;
+      // Keep receipt choices only when they do not overwrite a later item choice.
+      const preserveReceiptChoice = remaining.every(
+        (item) =>
+          (selectedRate === undefined || item.taxRatePercent === selectedRate) &&
+          (selectedBasis === undefined || item.amountBasis === selectedBasis),
+      );
+      return applyReviewItemsTaxPreview(remaining, {
+        paidTotalYen: Number(reviewForm.amountYen),
+        taxSummaries: selectedReviewDraft?.taxSummaries,
+        markerDefinitions: selectedReviewDraft?.markerDefinitions,
+        ...(preserveReceiptChoice
+          ? {
+              priceTaxTreatment: reviewForm.priceTaxTreatment,
+              taxRateComposition: reviewForm.taxRateComposition,
+            }
+          : {}),
+      });
+    });
   };
 
   const handleCategorySplitChange = (split: boolean) => {
