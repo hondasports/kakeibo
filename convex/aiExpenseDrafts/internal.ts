@@ -85,6 +85,7 @@ const extractedDraftItemValidator = v.object({
   markers: v.optional(receiptMarkersValidator),
   taxMarker: v.optional(v.string()),
   allocatedTaxYen: v.optional(v.number()),
+  taxAllocationStatus: v.optional(v.union(v.literal("allocated"), v.literal("unallocated"))),
   normalizedAmountYen: v.optional(v.number()),
   taxResolutionStatus: v.optional(taxResolutionStatusValidator),
   taxResolutionSource: v.optional(taxResolutionSourceValidator),
