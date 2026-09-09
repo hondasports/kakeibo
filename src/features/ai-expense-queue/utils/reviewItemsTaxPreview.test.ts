@@ -64,4 +64,20 @@ describe("applyReviewItemsTaxPreview", () => {
 
     expect(previewed[0]).toMatchObject({ normalizedAmountYen: 107, allocatedTaxYen: 8 });
   });
+  it("配分状態のない旧API応答も内訳から再評価し、不一致の内訳は確定しない", () => {
+    const legacy = [externalTaxItem()];
+    expect(
+      applyReviewItemsTaxPreview(legacy, { paidTotalYen: 322, taxSummaries })[0],
+    ).toMatchObject({
+      taxAllocationStatus: "allocated",
+      normalizedAmountYen: 322,
+      allocatedTaxYen: 24,
+    });
+    expect(
+      applyReviewItemsTaxPreview(legacy, {
+        paidTotalYen: 322,
+        taxSummaries: taxSummaries.map((s) => ({ ...s, taxableAmountYen: 299 })),
+      })[0],
+    ).toMatchObject({ taxAllocationStatus: "unallocated" });
+  });
 });
