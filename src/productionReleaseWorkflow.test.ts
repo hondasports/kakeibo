@@ -35,7 +35,7 @@ describe("production-release workflow", () => {
     expect(yaml).toContain(
       "PLAYWRIGHT_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}",
     );
-    expect(yaml).toContain("needs: release-candidate");
+    expect(yaml).toContain("needs: [release-candidate, preflight]");
   });
 
   test("deploys Convex production before Vercel production and records smoke results", () => {
@@ -68,18 +68,26 @@ describe("production-release workflow", () => {
 
     expect(yaml).toContain("TZ=Asia/Tokyo");
     expect(yaml).toContain("GITHUB_RUN_NUMBER");
-    expect(yaml).toContain("APP_VERSION=");
-    expect(yaml).toContain("PUBLISHED_AT=");
+    expect(yaml).toContain("app_version=");
+    expect(yaml).toContain("published_at=");
   });
 
-  test("injects VITE_APP_VERSION and generates product updates before the build", () => {
+  test("generates product updates in preflight before the production approval gate", () => {
     const yaml = workflow();
     const generateIndex = yaml.indexOf("Generate product updates");
-    const convexIndex = yaml.indexOf("Deploy Convex Production");
+    const productionIndex = yaml.indexOf("name: Deploy Production");
+    const uploadIndex = yaml.indexOf("Upload product updates artifact");
+    const downloadIndex = yaml.indexOf("Download product updates artifact");
 
-    expect(yaml).toContain("VITE_APP_VERSION");
     expect(generateIndex).toBeGreaterThan(-1);
-    expect(convexIndex).toBeGreaterThan(generateIndex);
+    expect(generateIndex).toBeLessThan(productionIndex);
+    expect(uploadIndex).toBeGreaterThan(generateIndex);
+    expect(uploadIndex).toBeLessThan(productionIndex);
+    expect(downloadIndex).toBeGreaterThan(productionIndex);
+    expect(yaml).toContain("fetch-depth: 0");
+    expect(yaml).toContain("pull-requests: read");
+    expect(yaml).toContain("actions/upload-artifact@");
+    expect(yaml).toContain("actions/download-artifact@");
   });
 
   test("creates a GitHub Release with a product-updates.json asset after smoke", () => {
@@ -110,33 +118,32 @@ describe("production-release workflow", () => {
     expect(yaml).toContain("contents: write");
   });
 
-  test("exposes OPENAI_API_KEY and BASE_REF to the generate product updates step", () => {
-    const yaml = workflow();
-
-    expect(yaml).toContain("OPENAI_API_KEY: ${{ secrets.PRODUCT_UPDATE_OPENAI_API_KEY }}");
-    expect(yaml).toContain("BASE_REF");
-    expect(yaml).not.toContain("OPENAI_API_KEY: ${{ secrets.RELEASE_NOTE }}");
-  });
-
-  test("records product update generation warnings without blocking deployment", () => {
+  test("does not depend on an OpenAI API key for product updates", () => {
     const yaml = workflow();
     const generator = readFileSync("scripts/generate-product-updates.ts", "utf8");
 
-    expect(generator).toContain("Product update generation warning");
-    expect(generator).toContain("automatic product updates were not added");
-    expect(generator).toContain(
-      "...(sourceRef && processedSourceAt ? { sourceRef, sourceMergedAt: processedSourceAt } : {}),",
-    );
-    expect(generator).not.toContain("...(sourceRef ? { sourceRef } : {}),");
-    expect(yaml).toContain("Generate product updates");
-    expect(yaml).toContain("Deploy Vercel Production");
+    expect(yaml).not.toContain("PRODUCT_UPDATE_OPENAI_API_KEY");
+    expect(yaml).not.toContain("OPENAI_API_KEY");
+    expect(generator).not.toContain("openai.com");
+    expect(generator).not.toContain("OPENAI_API_KEY");
   });
 
-  test("filters previously published PRs before generating product updates", () => {
+  test("fails product update generation on errors instead of silently falling back", () => {
     const generator = readFileSync("scripts/generate-product-updates.ts", "utf8");
 
-    expect(generator).toContain("filterUnpublishedPullRequests");
-    expect(generator).toContain("filterUnpublishedPullRequests(fetchedPulls, pastUpdates)");
+    expect(generator).not.toContain("Product update generation warning");
+    expect(generator).not.toContain("skipped_no_api_key");
+    expect(generator).toContain("SOURCE_REF をコミットSHAへ解決できません");
+    expect(generator).toContain("pullRequestDecisions");
+  });
+
+  test("collects source pull requests from the commit range, not the merge PR body", () => {
+    const generator = readFileSync("scripts/generate-product-updates.ts", "utf8");
+
+    expect(generator).toContain("classifyCommitSubjects");
+    expect(generator).toContain("collectPullRequestDecisions");
+    expect(generator).toContain("filterUnpublishedPullRequests(records, pastUpdates)");
+    expect(generator).toContain("fetchMergedPullsForCommit");
   });
 
   test("preserves release_note workflow input and RELEASE_NOTE for GitHub releases", () => {

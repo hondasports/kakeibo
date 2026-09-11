@@ -40,6 +40,12 @@ jobs:
     name: Production preflight
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      app_version: ${{ steps.version.outputs.app_version }}
+      published_at: ${{ steps.version.outputs.published_at }}
     env:
       RELEASE_MODE: ${{ github.event_name == 'push' && 'main_push' || 'manual' }}
       SOURCE_REF: ${{ github.event_name == 'push' && github.sha || inputs.source_ref }}
@@ -86,6 +92,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ env.SOURCE_REF }}
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
 
@@ -97,6 +104,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set APP_VERSION and PUBLISHED_AT
+        id: version
+        run: |
+          RELEASE_DATE="$(TZ=Asia/Tokyo date +%Y.%m.%d)"
+          PUBLISHED_AT="$(TZ=Asia/Tokyo date +%Y-%m-%d)"
+          APP_VERSION="${RELEASE_DATE}-${GITHUB_RUN_NUMBER}"
+          echo "app_version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "published_at=${PUBLISHED_AT}" >> "$GITHUB_OUTPUT"
+
       - name: Lint
         run: pnpm run lint
 
@@ -106,8 +122,27 @@ jobs:
       - name: Test
         run: pnpm test --run
 
+      # 承認待ちの時点で掲載予定の内容と元PRの対応をsummaryへ出力し、成果物はartifactでproduction jobへ受け渡す。
+      - name: Generate product updates
+        run: pnpm exec tsx scripts/generate-product-updates.ts
+        env:
+          APP_VERSION: ${{ steps.version.outputs.app_version }}
+          PUBLISHED_AT: ${{ steps.version.outputs.published_at }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_REF: ${{ env.SOURCE_REF }}
+
       - name: Build
         run: pnpm run build
+
+      - name: Upload product updates artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: product-updates
+          retention-days: 1
+          if-no-files-found: error
+          path: |
+            src/generated/product-updates.json
+            .tmp/product-updates.current-release.json
 
       - name: Write preflight summary
         run: |
@@ -255,7 +290,7 @@ jobs:
   production:
     name: Deploy Production
     runs-on: ubuntu-latest
-    needs: release-candidate
+    needs: [release-candidate, preflight]
     environment: production
     permissions:
       contents: write
@@ -267,6 +302,9 @@ jobs:
       CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
       PRODUCTION_SMOKE_URL: ${{ vars.PRODUCTION_SMOKE_URL }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      APP_VERSION: ${{ needs.preflight.outputs.app_version }}
+      PUBLISHED_AT: ${{ needs.preflight.outputs.published_at }}
+      VITE_APP_VERSION: ${{ needs.preflight.outputs.app_version }}
       BASE_REF: ${{ github.event_name == 'push' && 'main' || inputs.source_ref }}
       RELEASE_MODE: ${{ github.event_name == 'push' && 'main_push' || 'manual' }}
       SOURCE_REF: ${{ github.event_name == 'push' && github.sha || inputs.source_ref }}
@@ -304,27 +342,11 @@ jobs:
       - name: Enforce production Convex environment
         run: pnpm exec convex env set APP_ENV production
 
-      - name: Set APP_VERSION and PUBLISHED_AT
-        id: version
-        run: |
-          RELEASE_DATE="$(TZ=Asia/Tokyo date +%Y.%m.%d)"
-          PUBLISHED_AT="$(TZ=Asia/Tokyo date +%Y-%m-%d)"
-          APP_VERSION="${RELEASE_DATE}-${GITHUB_RUN_NUMBER}"
-          echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
-          echo "PUBLISHED_AT=${PUBLISHED_AT}" >> "$GITHUB_ENV"
-          echo "VITE_APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
-          echo "app_version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "published_at=${PUBLISHED_AT}" >> "$GITHUB_OUTPUT"
-
-      - name: Generate product updates
-        run: pnpm exec tsx scripts/generate-product-updates.ts
-        env:
-          APP_VERSION: ${{ env.APP_VERSION }}
-          PUBLISHED_AT: ${{ env.PUBLISHED_AT }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.PRODUCT_UPDATE_OPENAI_API_KEY }}
-          BASE_REF: ${{ env.BASE_REF }}
-          SOURCE_REF: ${{ env.SOURCE_REF }}
+      - name: Download product updates artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: product-updates
+          path: .
 
       - name: Check release tag idempotency
         id: idempotency

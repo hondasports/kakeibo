@@ -72,6 +72,26 @@ High   : Schema migration、認証・認可、削除、Production workflow、決
 
 なし
 
+## 更新履歴
+
+<!--
+preview 向けPRは、ユーザー向け更新履歴への掲載方針を必ず記入してください。
+未記入・プレースホルダー・矛盾した指定は CI でエラーになります。
+
+掲載する場合: publish: true にし、category を feature / improvement / fix / performance / stability から選び、
+description にユーザー向けの原稿を記入してください(UI変更以外のバグ修正や処理改善も掲載対象です)。
+
+掲載しない場合: publish: false にして category / description を削除し、reason に非掲載理由を記入してください。
+-->
+
+<!-- suzumemo-update:start -->
+```yaml
+publish: 
+category: 
+description: |
+```
+<!-- suzumemo-update:end -->
+
 ## UI変更
 
 <!-- UI変更がない場合は「なし」。ある場合はBefore / Afterの画像や説明を記載してください。 -->

@@ -14,4 +14,4 @@ license: Apache-2.0
 
 ## 判断と出力
 
-publish前にCLI statusとstaged diffを確認し、タスク状態や秘密値を含めない。PR本文は問題、結果、検証、制約を説明し、内部のGate一覧を転記しない。pr_createdなら公開後finishで終了。merge_readyならpr-aftercareへ進む。
+publish前にCLI statusとstaged diffを確認し、タスク状態や秘密値を含めない。PR本文は問題、結果、検証、制約を説明し、内部のGate一覧を転記しない。preview向けPRではテンプレートの更新履歴欄(suzumemo-updateブロック)に掲載方針(publish)と、掲載時はユーザー向け原稿、非掲載時は理由を必ず記入する。pr_createdなら公開後finishで終了。merge_readyならpr-aftercareへ進む。

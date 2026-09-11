@@ -76,13 +76,11 @@ PREVIEWで検証したcommit/refを確定
   ↓
 main への merge で production-release.yml が自動起動
   ↓
-preflight（入力確認、lint、format、test、build）
+preflight（入力確認、APP_VERSION確定、lint、format、test、Product Update 生成、build、artifact保存）
   ↓
 GitHub Environment: production の承認待ち
   ↓
-承認後に APP_VERSION / PUBLISHED_AT / VITE_APP_VERSION を確定
-  ↓
-Product Update 生成（過去 Release asset + `main` マージ PR から自動生成、手動ドラフトで上書き可能）
+承認後に artifact から生成済み Product Update を復元
   ↓
 Convex Production へ反映
   ↓
@@ -122,7 +120,7 @@ GitHub Environment `production` に以下を設定する。
 | -------- | ---------------------- | ------------------------------------- |
 | Secret   | `VERCEL_TOKEN`         | GitHub Actions から Vercel CLI を実行する |
 | Secret   | `CONVEX_DEPLOY_KEY`    | Convex Production deployment へ反映する |
-| Secret   | `PRODUCT_UPDATE_OPENAI_API_KEY` | 任意。PR から Product Update 草案を生成する OpenAI API key |
+
 | Variable | `VERCEL_ORG_ID`        | Vercel project の所属ID               |
 | Variable | `VERCEL_PROJECT_ID`    | Vercel project ID                     |
 | Variable | `PRODUCTION_SMOKE_URL` | 任意。custom domain など smoke 対象を固定したい場合に設定 |
@@ -141,22 +139,23 @@ Vercel Production Environment には Clerk Production instance と Convex Produc
 
 ## Product Update 生成
 
-`scripts/generate-product-updates.ts` は、Production リリース時に次の順で Product Update 草案を生成する。
+`scripts/generate-product-updates.ts` は `Production preflight` Job で実行され、Production リリース時に次の順で Product Update を生成する。生成AIや専用APIキーは使わない。
+
+**原稿の正本**: preview 向け PR 本文の `<!-- suzumemo-update:start -->` 〜 `<!-- suzumemo-update:end -->` マーカー内にある単一の `yaml` コードブロック。`publish: true` なら `category`（`feature` / `improvement` / `fix` / `performance` / `stability`）と `description`（ユーザー向け原稿、複数行は `|`）が必須、`publish: false` なら `reason`（非掲載理由）が必須。見出しや自由文の解釈は行わない。同じ解析・検証処理が PR 検証 CI（`.github/workflows/pr-update-spec.yml`）とこの生成処理で共有される。
 
 1. 過去の `app-v*` GitHub Release から `product-updates.json` asset を取得し、既に公開済みの更新を得る。asset は有効な JSON で、リリース tag の `app-v{version}` と `version` が一致し、過去の更新間で `id` が重複しないことを検証する。
-2. `SOURCE_REF` を `git rev-parse` でコミット SHA に解決する。解決できない場合は `SOURCE_REF` 値をそのまま使う。
-3. コミットに紐づくマージ済み PR を GitHub API で取得し、最も新しいマージ済み PR を `sourcePullRequest` として選ぶ。取得できない場合は `BASE_REF`（未指定時 `main`）とリリース時刻を使う。
-4. PR 検索の `base` は、source PR の `head.ref` が `preview` または `release/*` で始まる場合はその ref を使い、それ以外は `BASE_REF`（未指定時 `main`）を使う。これにより `preview -> main` マージをリリース対象にした場合でも、`preview` ブランチへマージされたユーザー向け PR を取りこぼさない。
-5. PR 検索の `since` は、新形式assetに保存された `sourceMergedAt` を優先する。旧形式assetで境界情報がない場合は、最後に更新履歴が存在するReleaseのtagが指すコミット時刻を使い、取得に失敗した場合はそのReleaseの `published_at` にfallbackする。空の更新履歴Releaseを境界にしないことで、2026.07.11以降の欠落分を再処理できる。`before` はsource PRの `merged_at` を使う。
-6. 上記の `base` / `since` / `before` を使い、GitHub API searchでマージ済みPRを取得する。
-7. 取得したPRリストを `OPENAI_API_KEY`（オプション）でリリース単位で判定し、ユーザーに見える価値がある場合だけ `ProductUpdateDraft` にする。ユーザーに見えないPR（内部リファクタリング、テスト、CI/CD、依存関係更新、ドキュメントのみなど）は掲載しない。関連するPRは1つの `ProductUpdateDraft` にまとめる。
-8. `id` はコード側で決定する。単一PRの場合は `pr-{number}`、複数PRの場合は `prs-{number}-{number}-...`（番号は昇順）となる。AIには `id` を生成させない。
-9. `OPENAI_API_KEY` が未設定、OpenAI APIエラー、JSON解析失敗、または生成結果のvalidationに失敗した場合は、自動生成は0件として扱い、リリースを中断しない。既存の更新履歴と `src/content/product-updates.ts` の手動ドラフトは保持する。失敗種別と「今回の自動更新は追加されなかった」ことをActions Summaryに警告として出力する。
-10. `src/content/product-updates.ts` に書かれた手動ドラフトとマージする。`id` が同じ場合は手動ドラフトが生成ドラフトを上書きする。
-11. 過去の更新と重複しないことを確認し、`src/generated/product-updates.json` と `.tmp/product-updates.current-release.json` を出力する。Release assetには `SOURCE_REF` と処理済み境界の `sourceMergedAt` も保存する。
-12. 生成結果の統計と判定明細をActions Summaryに出力する。
+2. 収集範囲をコミット範囲で決定する。起点は前回リリースassetに保存された `sourceSha`、無ければ最新 `app-v*` release tag が指すコミット（対象コミットの祖先でない場合は merge-base を使う）。末端は `SOURCE_REF` を `git rev-parse --verify` で解決したコミットSHA。マージ日時によるPR検索には依存しない。
+3. 範囲内の merge commit（`Merge pull request #N from ...`）と squash 取り込み（`... (#N)`）からPR番号を抽出し、head が `preview` / `release/*` / `main` の統合PRを除外する。各PRを GitHub API で取得し、`user.type == "Bot"` は記入例外として記録、それ以外のPRはマーカー内YAMLを検証する。
+4. 掲載指定されたPRは `id: pr-{number}`、`title` = PRタイトル（conventional接頭辞は除去）、`summary` = `description`、`category` = `category` で下書き化する。`publish: false` は非掲載として理由とともに記録する。
+5. `src/content/product-updates.ts` の手動ドラフトとID単位で統合する（同一IDは手動優先）。
+6. 過去の更新と重複しないことを確認し、`src/generated/product-updates.json` と `.tmp/product-updates.current-release.json` を出力する。Release assetには `sourceRef` / `sourceSha` / `sourceMergedAt` と、対象PRごとの掲載・非掲載・例外判定（`pullRequestDecisions`）を保存する。
+7. 掲載予定内容と元PR対応・非掲載理由をActions Summaryへ出力する。掲載0件の場合も理由を確認できる。生成物は artifact 経由で `Deploy Production` Job へ受け渡され、environment 承認前に内容を確認できる。
 
-新しい Release asset に保存された `sourceRef` / `sourceMergedAt` が次回生成の処理開始境界になる。旧形式の asset に境界情報がない場合は、最後に更新履歴が存在する Release を基準にして再処理するため、空の更新履歴リリースが続いても変更が恒久的に欠落しない。
+**エラー方針:** `SOURCE_REF` のSHA解決失敗・GitHub API失敗・範囲内PRのマーカー欠落や不正はすべてエラーで中断する。「変更なし」への黙った変換はしない。マージ済みPRにマーカーが無い場合の回収は、当該PR本文を編集してマーカーを追記するか、`src/content/product-updates.ts` に手動draftを追加する。
+
+**PR紐付けの方式:** PR番号は `commits/{sha}/pulls`(GitHub が記録したマージ済みPR)と merge commit の件名から取得する。squash / rebase / merge commit いずれの取り込み方式にも対応できる。件名中の `(#NNN)` は Issue 参照のことがあるためPR番号としては使わない。ただし default branch(`preview`)に存在しないコミット(mainへの直接hotfix等)はマージ済みPRを返さないため「PRに紐付かないコミット」エラーになる。その場合は変更を preview へ戻して通常のPR経路に乗せるか、手動draftで掲載原稿を補う。
+
+**運用メモ:** 取り消したい変更(revert等)が範囲に含まれる場合は、対象PR本文を `publish: false` に修正するか、同一IDの手動draftで上書きする。過去の `app-v*` リリースが一度も無い初回実行では収集対象0件として扱い、その旨をSummaryへ記録する。
 
 手動で内容を調整したい場合は `src/content/product-updates.ts` に `id` を `pr-{number}`（例: `pr-459`）または `prs-{number}-{number}`（例: `prs-459-460`）で指定するか、新規の `id` を追加する。
 

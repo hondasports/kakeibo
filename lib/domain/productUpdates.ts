@@ -1,13 +1,41 @@
+export const PRODUCT_UPDATE_CATEGORIES = [
+  "feature",
+  "improvement",
+  "fix",
+  "performance",
+  "stability",
+] as const;
+
+export type ProductUpdateCategory = (typeof PRODUCT_UPDATE_CATEGORIES)[number];
+
 export type ProductUpdateDraft = {
   id: string;
   title: string;
   summary: string;
   items?: string[];
+  category?: ProductUpdateCategory;
 };
 
 export type ProductUpdate = ProductUpdateDraft & {
   version: string;
   publishedAt: string;
+};
+
+export const PULL_REQUEST_DECISION_OUTCOMES = [
+  "published",
+  "skipped",
+  "exempt_bot",
+  "integration",
+  "not_merged",
+] as const;
+
+export type PullRequestDecisionOutcome = (typeof PULL_REQUEST_DECISION_OUTCOMES)[number];
+
+export type PullRequestDecision = {
+  pullRequest: number;
+  outcome: PullRequestDecisionOutcome;
+  reason: string;
+  updateId?: string;
 };
 
 export type ProductionProductUpdates = {
@@ -16,6 +44,8 @@ export type ProductionProductUpdates = {
   updates: ProductUpdate[];
   sourceRef?: string;
   sourceMergedAt?: string;
+  sourceSha?: string;
+  pullRequestDecisions?: PullRequestDecision[];
 };
 
 export class ProductUpdateValidationError extends Error {
@@ -111,6 +141,10 @@ export function validateProductUpdateDraft(
       }
     }
   }
+
+  if (draft.category !== undefined && !PRODUCT_UPDATE_CATEGORIES.includes(draft.category)) {
+    throw new ProductUpdateValidationError(`Invalid ProductUpdate category: ${draft.category}`);
+  }
 }
 
 export function validateProductUpdate(update: ProductUpdate): void {
@@ -201,6 +235,52 @@ export function validateProductionProductUpdates(
     );
   }
 
+  if (p.sourceSha !== undefined && !/^[0-9a-f]{40}$/i.test(p.sourceSha)) {
+    throw new ProductUpdateValidationError("sourceSha must be a 40-character hexadecimal string");
+  }
+
+  if (p.pullRequestDecisions !== undefined) {
+    if (!Array.isArray(p.pullRequestDecisions)) {
+      throw new ProductUpdateValidationError("pullRequestDecisions must be an array");
+    }
+    const seenPullRequests = new Set<number>();
+    for (const decision of p.pullRequestDecisions) {
+      if (!decision || typeof decision !== "object") {
+        throw new ProductUpdateValidationError("pullRequestDecisions entries must be objects");
+      }
+      const d = decision as PullRequestDecision;
+      if (!Number.isSafeInteger(d.pullRequest) || d.pullRequest <= 0) {
+        throw new ProductUpdateValidationError(
+          "pullRequestDecisions.pullRequest must be a positive integer",
+        );
+      }
+      if (seenPullRequests.has(d.pullRequest)) {
+        throw new ProductUpdateValidationError(
+          `pullRequestDecisions contains duplicated PR: ${d.pullRequest}`,
+        );
+      }
+      seenPullRequests.add(d.pullRequest);
+      if (!PULL_REQUEST_DECISION_OUTCOMES.includes(d.outcome)) {
+        throw new ProductUpdateValidationError(
+          `Invalid pullRequestDecisions outcome: ${d.outcome}`,
+        );
+      }
+      if (typeof d.reason !== "string" || d.reason.trim() === "") {
+        throw new ProductUpdateValidationError(
+          "pullRequestDecisions.reason must be a non-empty string",
+        );
+      }
+      if (
+        d.updateId !== undefined &&
+        (typeof d.updateId !== "string" || d.updateId.trim() === "")
+      ) {
+        throw new ProductUpdateValidationError(
+          "pullRequestDecisions.updateId must be a non-empty string when provided",
+        );
+      }
+    }
+  }
+
   const seenIds = new Set<string>();
   for (const update of p.updates) {
     validateProductUpdateDraft(update, seenIds);
@@ -219,17 +299,6 @@ export function validateProductionProductUpdates(
       );
     }
   }
-}
-
-export function resolveProductUpdateSourceAt(
-  latestReleasePayload: Pick<ProductionProductUpdates, "sourceRef" | "sourceMergedAt"> | undefined,
-  legacySourceAt: string | undefined,
-): string | undefined {
-  if (latestReleasePayload?.sourceRef && latestReleasePayload.sourceMergedAt) {
-    return latestReleasePayload.sourceMergedAt;
-  }
-
-  return legacySourceAt;
 }
 
 export function mergeProductUpdates({

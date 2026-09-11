@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest";
 import {
   mergeGeneratedAndManualDrafts,
   mergeProductUpdates,
-  resolveProductUpdateSourceAt,
   ProductUpdateValidationError,
   sortProductUpdates,
   validateAppVersion,
@@ -417,22 +416,58 @@ describe("validateProductionProductUpdates", () => {
     expect(() => validateProductionProductUpdates(payload)).toThrow(ProductUpdateValidationError);
   });
 
-  test("prefers the source cursor from the latest release", () => {
-    expect(
-      resolveProductUpdateSourceAt(
-        {
-          sourceRef: "current-ref",
-          sourceMergedAt: "2026-07-19T09:26:28Z",
-        },
-        "2026-07-11T12:36:56Z",
-      ),
-    ).toBe("2026-07-19T09:26:28Z");
+  test("accepts sourceSha and pullRequestDecisions for new release payloads", () => {
+    const payload = {
+      version: "2026.07.19-36",
+      publishedAt: "2026-07-19",
+      sourceRef: "4b697aee71314a1274f8007ae1678fac0dda57ee",
+      sourceMergedAt: "2026-07-19T09:26:28Z",
+      sourceSha: "4b697aee71314a1274f8007ae1678fac0dda57ee",
+      pullRequestDecisions: [
+        { pullRequest: 735, outcome: "published", reason: "category: fix", updateId: "pr-735" },
+        { pullRequest: 737, outcome: "skipped", reason: "内部ドキュメントのみ" },
+        { pullRequest: 740, outcome: "integration", reason: "統合PR" },
+      ],
+      updates: [],
+    };
+
+    expect(() => validateProductionProductUpdates(payload)).not.toThrow();
   });
 
-  test("falls back to the latest release with updates for legacy assets", () => {
-    expect(resolveProductUpdateSourceAt(undefined, "2026-07-11T12:36:56Z")).toBe(
-      "2026-07-11T12:36:56Z",
-    );
+  test("rejects an invalid sourceSha", () => {
+    const payload = {
+      version: "2026.07.19-36",
+      publishedAt: "2026-07-19",
+      sourceSha: "not-a-sha",
+      updates: [],
+    };
+
+    expect(() => validateProductionProductUpdates(payload)).toThrow(ProductUpdateValidationError);
+  });
+
+  test("rejects pullRequestDecisions with duplicated PR numbers", () => {
+    const payload = {
+      version: "2026.07.19-36",
+      publishedAt: "2026-07-19",
+      pullRequestDecisions: [
+        { pullRequest: 1, outcome: "skipped", reason: "a" },
+        { pullRequest: 1, outcome: "skipped", reason: "b" },
+      ],
+      updates: [],
+    };
+
+    expect(() => validateProductionProductUpdates(payload)).toThrow(ProductUpdateValidationError);
+  });
+
+  test("rejects pullRequestDecisions with unknown outcome", () => {
+    const payload = {
+      version: "2026.07.19-36",
+      publishedAt: "2026-07-19",
+      pullRequestDecisions: [{ pullRequest: 1, outcome: "maybe", reason: "x" }],
+      updates: [],
+    };
+
+    expect(() => validateProductionProductUpdates(payload)).toThrow(ProductUpdateValidationError);
   });
 
   test("rejects a payload whose update version does not match payload version", () => {
