@@ -57,3 +57,40 @@ const readyDraftRegistrationErrorMessages: Record<ValidateReadyDraftError, strin
 export function getReadyDraftRegistrationErrorMessage(error: ValidateReadyDraftError): string {
   return readyDraftRegistrationErrorMessages[error];
 }
+
+/**
+ * registered 遷移時に保存する derivedRegistration スナップショットを構築する。
+ * totalOnly の場合は税内訳を持たないことを null で明示する。
+ */
+export function buildDerivedRegistration(args: {
+  destination: "receipt" | "expense_entries";
+  registrationMode: "detailed" | "totalOnly";
+  amountYen: number;
+  date: string;
+  categoryIds: string[];
+  registeredAt: number;
+}): {
+  source: "derived";
+  destination: "receipt" | "expense_entries";
+  registrationMode?: "detailed" | "totalOnly";
+  taxRatePercent?: 0 | 8 | 10 | null;
+  taxableAmountYen?: number | null;
+  taxYen?: number | null;
+  amountYen: number;
+  date: string;
+  categoryIds: string[];
+  registeredAt: number;
+} {
+  return {
+    source: "derived",
+    destination: args.destination,
+    registrationMode: args.registrationMode,
+    ...(args.registrationMode === "totalOnly"
+      ? { taxRatePercent: null, taxableAmountYen: null, taxYen: null }
+      : {}),
+    amountYen: args.amountYen,
+    date: args.date,
+    categoryIds: args.categoryIds,
+    registeredAt: args.registeredAt,
+  };
+}
