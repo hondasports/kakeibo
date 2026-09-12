@@ -1,112 +1,18 @@
-import { ConvexError } from "convex/values";
 import { internalMutation, mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { requireGroupMembership } from "../groups/membership";
-import { calculateWeekStartDate } from "../lib/weekDates";
-import { getWeeklyStartDayForUser } from "../users/weeklySettings";
 import { v } from "convex/values";
 import { createReceiptHandler } from "../../lib/convex/receipts/insert";
-import {
-  normalizeUpdateReceiptPatch,
-  type NormalizedUpdateReceiptPatch,
-} from "../../lib/domain/receipt/normalize";
+import { updateReceiptHandler } from "../../lib/convex/receipts/update";
+import { deleteReceiptHandler } from "../../lib/convex/receipts/delete";
 
-type UpdateReceiptArgs = {
-  receiptId: Id<"receipts">;
-  date?: string;
-  shopName?: string;
-  bankName?: string;
-  amountYen?: number;
-  categoryId?: Id<"categories">;
-  memo?: string;
-};
-
-/** updateReceipt mutation の handler ロジック（テスト用に export） */
-export async function updateReceiptHandler(ctx: MutationCtx, args: UpdateReceiptArgs) {
-  const { groupId, userId } = await requireGroupMembership(ctx);
-
-  // receipt の所有権チェック
-  const receipt = await ctx.db.get(args.receiptId);
-  if (receipt === null) {
-    throw new ConvexError("Receipt not found");
-  }
-  if (receipt.groupId !== groupId) {
-    throw new ConvexError("Receipt does not belong to the current group");
-  }
-
-  // categoryId が指定された場合は所有権チェック
-  if (args.categoryId !== undefined) {
-    const category = await ctx.db.get(args.categoryId);
-    if (category === null) {
-      throw new ConvexError("Category not found");
-    }
-    if (category.groupId !== groupId) {
-      throw new ConvexError("Category does not belong to the current group");
-    }
-    if (!category.isActive && (args.categoryId as string) !== (receipt.categoryId as string)) {
-      throw new ConvexError("Inactive category cannot be used for new receipts");
-    }
-  }
-
-  let normalizedPatch: NormalizedUpdateReceiptPatch;
-  try {
-    normalizedPatch = normalizeUpdateReceiptPatch(args);
-  } catch (err) {
-    throw new ConvexError(err instanceof Error ? err.message : "Invalid receipt");
-  }
-
-  const now = Date.now();
-  const patch: Partial<{
-    date: string;
-    shopName: string;
-    bankName: string;
-    amountYen: number;
-    categoryId: Id<"categories">;
-    memo: string | undefined;
-    weekStartDate: string;
-    updatedAt: number;
-  }> = { updatedAt: now, ...normalizedPatch };
-
-  if (normalizedPatch.date !== undefined) {
-    const weekStartDay = await getWeeklyStartDayForUser(ctx, userId);
-    patch.weekStartDate = calculateWeekStartDate(normalizedPatch.date, weekStartDay);
-  }
-  if (args.categoryId !== undefined) {
-    patch.categoryId = args.categoryId;
-  }
-
-  await ctx.db.patch(args.receiptId, patch);
-
-  const updated = await ctx.db.get(args.receiptId);
-  if (updated === null) {
-    throw new ConvexError("Failed to retrieve updated receipt");
-  }
-  return updated;
-}
-
-type DeleteReceiptArgs = {
-  receiptId: Id<"receipts">;
-};
-
-/** deleteReceipt mutation の handler ロジック（テスト用に export） */
-export async function deleteReceiptHandler(ctx: MutationCtx, args: DeleteReceiptArgs) {
-  const { groupId } = await requireGroupMembership(ctx);
-
-  // receipt の所有権チェック
-  const receipt = await ctx.db.get(args.receiptId);
-  if (receipt === null) {
-    throw new ConvexError("Receipt not found");
-  }
-  if (receipt.groupId !== groupId) {
-    throw new ConvexError("Receipt does not belong to the current group");
-  }
-
-  await ctx.db.delete(args.receiptId);
-}
+// テスト・crud.ts 互換のためハンドラを再公開する
+export { updateReceiptHandler } from "../../lib/convex/receipts/update";
+export { deleteReceiptHandler } from "../../lib/convex/receipts/delete";
 
 /**
  * 指定グループ・作成者のレシートだけを削除する（E2E テストデータクリーンアップ専用）。
+ * インデックス走査を伴う内部ユーティリティのため、ここに残す。
  */
 export async function deleteReceiptsByUserHandler(
   ctx: MutationCtx,

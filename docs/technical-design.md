@@ -314,6 +314,33 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
 同様に `lib/domain/groups/role.ts` は `GroupRole` 型とロールラベル関数を提供し、
 フロントエンド・バックエンドの重複を解消する。
 
+#### 5.3.1 集約・リポジトリ・ユースケース（expenseEntries / receipts パイロット）
+
+`expenseEntries` / `receipts` / 支出一括操作（spending bulk ops）では、
+ミノ駆動流の「知識をドメインオブジェクトへ寄せる」方針で 4 層に分離している。
+
+| 層 | 配置 | 役割 |
+| --- | --- | --- |
+| ドメイン | `lib/domain/<domain>/` | 集約 class（`ExpenseEntry`, `Receipt`, `SourceDocument`）、値検証、所有権・利用可否の判定、リポジトリのポート（interface）。Convex の generated 型に依存しない（ID は `string`） |
+| ユースケース | `lib/usecase/<domain>/` | 1 操作 1 関数。ポート経由で永続化し、`ConvexError` への写像を担う |
+| インフラ | `lib/convex/<domain>/` | ポートの Convex 実装（`*Repository` / `*Reader` / `*Logger`）と handler グルー（`requireGroupMembership` 解決 + 依存構築） |
+| プレゼンテーション | `convex/<domain>/` | `mutation`/`query` 定義、引数バリデータ、handler の再公開 |
+
+要点:
+
+- エンティティは「構築時に不変条件を確定」する（`ExpenseEntry.createManualExpense` 等）。
+  `fromPersisted` は永続化済みドキュメントの復元専用で再検証しない。
+- 所有権（`belongsToGroup`）、更新 patch 構築（`buildUpdatePatch`）、
+  一括操作可否（`isSpendingRecord` / `isExpenseRecord`）はエンティティの知識。
+- カテゴリ利用可否（存在・所属・isActive・「現行値なら非活性も許容」）は
+  `lib/domain/categories/usability.ts` に集約し、メッセージ選択は呼び出し側が行う。
+- リポジトリは `findById`/`insert`/`patch`/`delete` の最小ポート。
+  `lib/convex/*Repository.ts` が `Id<>` と `string` の写像を吸収する。
+- 互換性のため `*Handler` のエクスポート名・`(ctx, args)` シグネチャ・
+  エラーメッセージは維持する（既存テスト・aiExpenseDrafts 連携が依存）。
+- `convex/receipts/mutations.ts` の `deleteReceiptsByUser`（E2E 用内部 API）は
+  インデックス走査を伴うユーティリティであり、ドメイン層には移さない。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
