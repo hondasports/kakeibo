@@ -1,4 +1,4 @@
-import { ConvexError, v, type Infer } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
@@ -11,8 +11,9 @@ import {
   taxModeValidator,
   taxSummaryTaxRatePercentValidator,
 } from "./model";
-import { deleteDraftAndItems } from "../../lib/convex/aiExpenseDrafts/draftRepository";
 import { requireGroupMembership } from "../groups/membership";
+import { deleteAiExpenseDraft } from "../../lib/usecase/aiExpenseDrafts/deleteDraft";
+import { createAiExpenseDraftDeps } from "../../lib/convex/aiExpenseDrafts/draftUsecaseDeps";
 import { updateDraftItemTaxOverridesHandler } from "../../lib/convex/aiExpenseDrafts/updateItemTaxOverrides";
 import { updateSummaryTaxOverridesHandler } from "../../lib/convex/aiExpenseDrafts/updateSummaryTaxOverrides";
 import { registerReadyDraftsHandler } from "../../lib/convex/aiExpenseDrafts/registerToReceipts";
@@ -33,19 +34,7 @@ type DeleteDraftArgs = {
 
 export async function deleteDraftHandler(ctx: MutationCtx, args: DeleteDraftArgs) {
   const { groupId } = await requireGroupMembership(ctx);
-  const draft = await ctx.db.get(args.draftId);
-  if (draft === null) {
-    return { deleted: false };
-  }
-  if (draft.groupId !== groupId) {
-    throw new ConvexError("AI expense draft does not belong to the current group");
-  }
-  if (draft.status === "registered") {
-    throw new ConvexError("Registered AI expense draft cannot be deleted from the queue");
-  }
-
-  await deleteDraftAndItems(ctx, args.draftId, groupId);
-  return { deleted: true };
+  return await deleteAiExpenseDraft({ groupId }, createAiExpenseDraftDeps(ctx), args);
 }
 
 export async function updateDraftItemTaxOverridesMutationHandler(

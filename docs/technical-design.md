@@ -253,7 +253,7 @@ convex/
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
-    aiExpenseDrafts/           # validators, classification, reviewValidation, draftRepository, registerTo*, updateForReview, tax overrides, persistTaxInterpretation, ...
+    aiExpenseDrafts/           # validators, reviewValidation, convex*Repository, convexDraftWorkflowServices, draftUsecaseDeps, handler グルー, persistTaxInterpretation, ...
     dateUtils.ts
     expenseEntries/            # createFromDraft, expenseEntryValidation
     groups/
@@ -314,9 +314,9 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
 同様に `lib/domain/groups/role.ts` は `GroupRole` 型とロールラベル関数を提供し、
 フロントエンド・バックエンドの重複を解消する。
 
-#### 5.3.1 集約・リポジトリ・ユースケース（expenseEntries / receipts パイロット）
+#### 5.3.1 集約・リポジトリ・ユースケース（expenseEntries / receipts / aiExpenseDrafts）
 
-`expenseEntries` / `receipts` / 支出一括操作（spending bulk ops）では、
+`expenseEntries` / `receipts` / 支出一括操作（spending bulk ops）と `aiExpenseDrafts` では、
 ミノ駆動流の「知識をドメインオブジェクトへ寄せる」方針で 4 層に分離している。
 
 | 層 | 配置 | 役割 |
@@ -340,6 +340,24 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   エラーメッセージは維持する（既存テスト・aiExpenseDrafts 連携が依存）。
 - `convex/receipts/mutations.ts` の `deleteReceiptsByUser`（E2E 用内部 API）は
   インデックス走査を伴うユーティリティであり、ドメイン層には移さない。
+
+`aiExpenseDrafts` ではこれに加えて次のパターンを使う。
+
+- **ワークフローサービス・ポート**（`lib/domain/aiExpenseDrafts/draftWorkflowServices.ts`）:
+  税再解釈の永続化（`DraftTaxInterpretationService`）、ユーザー上書きスナップショット
+  （`DraftOverrideSnapshotService`）、明細置換（`DraftItemReplaceService`）、
+  支出エントリのリコンサイル（`DraftExpenseEntryReconcileService`）、
+  receipt 登録（`DraftReceiptInsertService`）のように、複数テーブルにまたがる
+  永続化オーケストレーションをドメインが定義する interface として宣言し、
+  `lib/convex/aiExpenseDrafts/convexDraftWorkflowServices.ts` が既存の
+  永続化関数（`persistDraftTaxInterpretation` 等）へ ctx を束縛して実装する。
+- `AiExpenseDraft` 集約が所有権・状態遷移ガード（キュー/履歴からの編集可否、削除可否、
+  リセット可否、税解釈前提）と登録モード解決を保持し、ユースケースは
+  `toConvexError` でドメインの Error を既存メッセージの ConvexError へ写像する。
+- QueryCtx は書き込み不可のため、リポジトリポートは `*ReadRepository`（find/list）と
+  それを継承する書き込みポートに分離する。
+- `convex/aiExpenseDrafts/internal.ts` や `e2eDraftFixtures` 系の internal/E2E 専用
+  エンドポイントは層移行の対象外とする。
 
 ### 5.4 スタイリング責務
 

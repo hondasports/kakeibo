@@ -1,76 +1,23 @@
-import { reinterpretDraftTax } from "../../receiptTax/reinterpretDraftTax";
-import { mapDraftItemToTaxFields } from "../../receiptTax/draftTaxMapping";
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../../convex/_generated/server";
-import { resolveReceiptShopNameFromDraft } from "../../domain/aiExpenseDrafts/shopName";
 import type { AiExpenseRegistrationMode } from "../../domain/aiExpenseDrafts/receiptDataContract";
+import type { DraftRegistrationItem } from "../../domain/aiExpenseDrafts/registrationItems";
 import { assertExpenseCategoryBelongsToGroup } from "../expenseEntries/expenseEntryValidation";
-import { aggregateDraftItemsByCategory } from "./reviewValidation";
 
-type RegistrationItem = {
-  itemName: string;
-  amountYen: number;
+type RegistrationItem = Omit<DraftRegistrationItem, "categoryId"> & {
   categoryId: Id<"categories">;
 };
 
-export function resolveRegistrationMode(draft: Pick<Doc<"aiExpenseDrafts">, "registrationMode">) {
-  return draft.registrationMode ?? "detailed";
-}
+export {
+  buildDraftRegistrationItems,
+  resolveRegistrationMode,
+} from "../../domain/aiExpenseDrafts/registrationItems";
 
-function assertUserConfirmedReceiptTotal(draft: Doc<"aiExpenseDrafts">) {
-  const resolution = draft.receiptTotalResolution;
-  const hasMatchingUserCandidate = resolution?.candidates.some(
-    (candidate) => candidate.source === "user_confirmed" && candidate.amountYen === draft.amountYen,
-  );
-  if (
-    resolution?.status !== "verified" ||
-    resolution.protectedAmountYen !== draft.amountYen ||
-    !hasMatchingUserCandidate
-  ) {
-    throw new ConvexError("Receipt total must be confirmed before total-only registration");
-  }
-}
-
-export function buildDraftRegistrationItems(
-  draft: Doc<"aiExpenseDrafts">,
-  items: Doc<"aiExpenseDraftItems">[],
-): RegistrationItem[] {
-  const mode = resolveRegistrationMode(draft);
-  if (mode === "totalOnly") {
-    assertUserConfirmedReceiptTotal(draft);
-    return [
-      {
-        itemName: resolveReceiptShopNameFromDraft(draft),
-        amountYen: draft.amountYen!,
-        categoryId: draft.categoryId!,
-      },
-    ];
-  }
-  if (draft.taxSummaries?.length || items.some((item) => item.taxRatePercent != null)) {
-    const { itemFields, interpretation } = reinterpretDraftTax({
-      amountYen: draft.amountYen!,
-      items: items.map(mapDraftItemToTaxFields),
-      taxSummaries: draft.taxSummaries ?? [],
-      markerDefinitions: draft.markerDefinitions,
-    });
-    if (
-      interpretation.taxSummaries.some((summary) => summary.status !== "verified") ||
-      itemFields.some(
-        (item, index) =>
-          item.taxAllocationStatus !== "allocated" ||
-          item.normalizedAmountYen !== (items[index].normalizedAmountYen ?? items[index].amountYen),
-      ) ||
-      itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0) !== draft.amountYen
-    ) {
-      throw new ConvexError(
-        "税額または税込登録額が未確定です。税内訳と明細を確認して下書きを保存してください。",
-      );
-    }
-  }
-  return aggregateDraftItemsByCategory(draft, items);
-}
-
+/**
+ * 下書きに紐づく支出エントリを upsert/delete で同期する。
+ * 既存エントリはカテゴリ一致を優先して再利用し、残りは削除する。
+ */
 export async function reconcileDraftExpenseEntries(
   ctx: Pick<MutationCtx, "db">,
   args: {

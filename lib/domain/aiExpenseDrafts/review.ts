@@ -1,7 +1,9 @@
 import { trimOptional } from "../common/string";
 import { validateExpenseAmount } from "../expenseEntries/expenseEntryItem";
 import { isValidIsoDateString } from "../week/weekDates";
+import type { PriceTaxTreatment, TaxRateComposition } from "../receipt/tax/types";
 import type { AiExpenseDraftConfidence, AiExpenseDraftDocumentType } from "./constants";
+import type { AiExpenseRegistrationMode } from "./receiptDataContract";
 
 export type HasCounterpartyArgs = {
   documentType: AiExpenseDraftDocumentType;
@@ -120,4 +122,28 @@ export function getReviewUpdateReadyErrorMessage(
       : "Draft shop, payment place, or payee is required to mark ready";
   }
   return reviewUpdateReadyErrorMessages[error];
+}
+
+/**
+ * レビュー更新時の登録モードを解決する。
+ * 税判定が unknown に更新された場合は税内訳を扱えないため totalOnly に強制する。
+ * 税判定が明示された場合（detailed 化）は指定がなければ detailed へ切り替える。
+ */
+export function resolveReviewRegistrationMode(
+  args: {
+    registrationMode?: AiExpenseRegistrationMode;
+    priceTaxTreatment?: PriceTaxTreatment;
+    taxRateComposition?: TaxRateComposition;
+  },
+  draft: { registrationMode?: AiExpenseRegistrationMode },
+): AiExpenseRegistrationMode {
+  if (args.priceTaxTreatment === "unknown" || args.taxRateComposition === "unknown") {
+    return "totalOnly";
+  }
+  const hasTaxDecisionUpdate =
+    args.priceTaxTreatment !== undefined || args.taxRateComposition !== undefined;
+  return (
+    args.registrationMode ??
+    (hasTaxDecisionUpdate ? "detailed" : (draft.registrationMode ?? "detailed"))
+  );
 }
