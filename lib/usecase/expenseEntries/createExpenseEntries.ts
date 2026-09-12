@@ -1,8 +1,10 @@
+import { ConvexError } from "convex/values";
 import { ExpenseEntry } from "../../domain/expenseEntries/expenseEntry";
 import type { ExpenseEntryRepository } from "../../domain/expenseEntries/expenseEntryRepository";
 import type { CategoryRepository } from "../../domain/categories/categoryRepository";
 import { SourceDocument } from "../../domain/sourceDocuments/sourceDocument";
 import type { SourceDocumentRepository } from "../../domain/sourceDocuments/sourceDocumentRepository";
+import { isValidIsoDateString } from "../../domain/week/weekDates";
 import { assertUsableCategory } from "../categories/assertUsableCategory";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
@@ -33,6 +35,22 @@ export async function createExpenseEntries(
   },
   args: CreateExpenseEntriesUsecaseArgs,
 ): Promise<void> {
+  // items が空でも sourceDocument / エントリへ書き込むため、先に日付を検証する
+  if (!isValidIsoDateString(args.date)) {
+    throw new ConvexError("Date must be a valid YYYY-MM-DD value");
+  }
+
+  // 既存 sourceDocumentId が指定された場合は存在とグループ所属を検証する
+  if (args.sourceDocumentId !== undefined) {
+    const existing = await deps.sourceDocuments.findById(args.sourceDocumentId);
+    if (existing === null) {
+      throw new ConvexError("Source document not found");
+    }
+    if (!SourceDocument.fromPersisted(existing).belongsToGroup(ctx.groupId)) {
+      throw new ConvexError("Source document does not belong to the current group");
+    }
+  }
+
   const now = Date.now();
   let sourceDocumentId = args.sourceDocumentId;
 
