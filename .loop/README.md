@@ -70,6 +70,8 @@ environmentにはlocal/preview等と非秘密の環境revisionを記入する。
 
 templates/review.example.jsonをタスクディレクトリへコピーする。元Issueと契約の突き合わせ、差分の要求対応、検証の妥当性、manual結果を記録する。
 
+レビュー深度はレビュー直前に実際の差分で判定する。契約時の予測ではなく `git diff` の実測値を使い、4軸（blast_radius / data_security / reversibility / uncertainty）と floor_triggers を評価して `applied_tier`（T1/T2/T3）を決める。語彙とティアの要求は `.loop/process.yaml` `review_depth` と `skills/code-review/SKILL.md` が正本。CLIは構造と「applied_tierが評価の示すフロアを下回らない」ことだけを検証し、レビューの質そのものは保証しない。内容が変わったら判定をやり直す。
+
 ~~~sh
 node scripts/task-loop.mjs review issue-123 .loop/state/issue-123/review.json
 node scripts/task-loop.mjs finding issue-123 .loop/state/issue-123/finding.json
@@ -97,7 +99,7 @@ CIは実テストとbranch protectionで外側の条件を保証する。ignored
 
 ## 評価と改善
 
-v12のRisk floor、独立review必須、全レビュー指摘のLearning候補化はv13では使わない。保持するのは受入条件と維持条件の証明、指摘の全件処理、最新PR確認、作業分離、本番操作の承認。
+v12のRisk数値スコア・ライフサイクル（ratchet/降格規則）・独立review必須・全レビュー指摘のLearning候補化はv13では使わない。レビュー深度はprocess.yaml `review_depth` の定性軸とfloor_triggersをレビュー直前の実差分へ適用して決める（点数なし・一回判定）。保持するのは受入条件と維持条件の証明、指摘の全件処理、最新PR確認、作業分離、本番操作の承認。
 
 過去の文書・学習記録はGit履歴で参照できる。pending CIでの誤完了、古い証拠、指摘脱落、rename、不要な再試行に対して試す。Learningは反復失敗・明確な制御不足・ユーザー依頼時に最大限具体化し、通常タスクのDONE条件にはしない。改善が依頼範囲外なら同じPRに混ぜない。
 

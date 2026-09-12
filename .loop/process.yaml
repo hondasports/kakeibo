@@ -27,7 +27,7 @@ proof:
   invalidation: any_identity_change
   during_check_content_change: fail
   check_success: latest_run_for_current_key_has_exit_zero
-  review: current_key_self_review_pass
+  review: current_key_self_review_pass_with_risk_assessment
   manual: required_manual_results_have_pass_and_nonempty_evidence
   findings: no_open_findings
   task_state: reject_tracked_or_staged_state_paths
@@ -52,6 +52,32 @@ controls:
   selection: concrete_auth_data_financial_destructive_external_change
   lowering: explicit_contract_revision_reason_and_review
   manual_approval: human_judgment_record_never_cli_authorization
+review_depth:
+  purpose: decide_self_review_depth_from_actual_diff_immediately_before_review
+  assessed_at: review_time_not_contract_time
+  canonical_vocabulary: this_section_mirrored_by_scripts_task_loop_mjs_constants_and_skill_docs
+  axes:
+    blast_radius: [local, several_surfaces, shared_or_system_wide]
+    data_security: [none, indirect, direct_boundary_change]
+    reversibility: [easy, procedural_rollback, difficult_or_stateful]
+    uncertainty: [known_pattern, some_unknowns, novel_or_impact_unclear]
+  floor_triggers:
+    [
+      authentication_or_authorization,
+      schema_or_migration,
+      data_deletion_or_retention,
+      complex_state_transition_or_orchestration_port,
+      cross_domain_shared_caller_change,
+      external_service_write_or_webhook,
+      destructive_or_irreversible_operation,
+    ]
+  tiers:
+    T1: diff_spot_check_plus_all_checks_passing
+    T2: line_level_diff_review_error_order_compatibility_checks_relevant_tests
+    T3: base_vs_new_behavior_comparison_or_full_logic_trace_port_adapter_semantics_all_error_paths_shared_callers
+  floor_rule: any_floor_trigger_or_extreme_axis_requires_T3_any_middle_axis_requires_T2
+  enforcement: review_command_validates_structure_and_applied_tier_floor_only_not_review_quality
+  excluded: [numeric_scores, risk_lifecycle_or_ratchet, mandatory_independent_review_counts]
 learning:
   completion_gate: false
   trigger: repeated_failure_or_clear_enforcement_gap_or_user_request
