@@ -31,9 +31,12 @@ export function createExpenseEntryRepository(ctx: Pick<MutationCtx, "db">): Expe
       });
     },
     async patch(id, patch: ExpenseEntryUpdatePatch & { updatedAt: number }) {
+      // Convex の patch は undefined を「フィールド削除」と解釈するため、
+      // 指定のなかったキーは patch オブジェクトに含めてはいけない。
+      const { categoryId, ...rest } = patch;
       await ctx.db.patch(id as Id<"expenseEntries">, {
-        ...patch,
-        categoryId: patch.categoryId as Id<"categories"> | undefined,
+        ...rest,
+        ...(categoryId !== undefined ? { categoryId: categoryId as Id<"categories"> } : {}),
       });
     },
     async delete(id) {

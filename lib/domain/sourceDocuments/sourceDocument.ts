@@ -37,6 +37,11 @@ export class SourceDocument {
     this.fields = fields;
   }
 
+  /** 永続化済みドキュメントから復元する（再検証しない）。 */
+  static fromPersisted(fields: SourceDocumentFields): SourceDocument {
+    return new SourceDocument(fields);
+  }
+
   /**
    * 手動入力の sourceDocument を構築する。
    * 合計金額は sourceAmountYen 優先、未指定なら明細合計を使う。
@@ -57,6 +62,11 @@ export class SourceDocument {
       createdAt: now,
       updatedAt: now,
     });
+  }
+
+  /** 指定グループに属するか。データ境界の知識。 */
+  belongsToGroup(groupId: string): boolean {
+    return this.fields.groupId === groupId;
   }
 
   /** 新規 insert 用のフィールドを返す。 */
