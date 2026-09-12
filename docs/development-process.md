@@ -346,6 +346,8 @@ Agent Loopが独自に「常に1 approval」を追加しない。
 - test adequacy
 - existing pattern consistency
 
+Agent Loopのセルフレビューは `.loop/process.yaml` `review_depth` のリスク判定で深度（T1/T2/T3）を決めて実施する。詳細は `.loop/README.md` と `skills/code-review/SKILL.md` を参照。
+
 ---
 
 ## 13. PREVIEW / Production

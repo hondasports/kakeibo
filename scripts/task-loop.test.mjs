@@ -2,8 +2,20 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { run, fingerprint, validateContract, validatePr, matchesRepository } from "./task-loop.mjs";
+import {
+  run,
+  fingerprint,
+  validateContract,
+  validatePr,
+  validateReview,
+  reviewTierFloor,
+  REVIEW_AXES,
+  REVIEW_FLOOR_TRIGGERS,
+  REVIEW_TIERS,
+  matchesRepository,
+} from "./task-loop.mjs";
 
 const roots = [];
 afterEach(() => {
@@ -60,6 +72,15 @@ function fixture() {
         diff_assessment: "AC01 covers diff",
         verification_assessment: "Executed relevant check",
         manual_results: [],
+        risk_assessment: {
+          blast_radius: "local",
+          data_security: "none",
+          reversibility: "easy",
+          uncertainty: "known_pattern",
+          floor_triggers: [],
+        },
+        applied_tier: "T1",
+        tier_rationale: "fixture change is minimal",
         ...extra,
       }),
     );
@@ -270,6 +291,113 @@ describe("task loop execution boundaries", () => {
     const state = JSON.parse(readFileSync(path.join(f.dir, "state.json")));
     expect(state.findings).toHaveLength(1);
     expect(state.history.find((x) => x.previous?.id === "F1").previous.status).toBe("open");
+  });
+  it("requires a risk assessment and an applied tier consistent with its floor", () => {
+    const f = fixture();
+    f.call("check", "TC01");
+    const base = {
+      verdict: "pass",
+      source_comparison: "c",
+      diff_assessment: "d",
+      verification_assessment: "v",
+      manual_results: [],
+      risk_assessment: {
+        blast_radius: "local",
+        data_security: "none",
+        reversibility: "easy",
+        uncertainty: "known_pattern",
+        floor_triggers: [],
+      },
+      applied_tier: "T1",
+      tier_rationale: "minimal change",
+    };
+    expect(validateReview(base)).toEqual([]);
+    for (const missing of ["risk_assessment", "applied_tier", "tier_rationale"]) {
+      const broken = { ...base };
+      delete broken[missing];
+      expect(validateReview(broken).length).toBeGreaterThan(0);
+    }
+    expect(
+      validateReview({
+        ...base,
+        risk_assessment: { ...base.risk_assessment, blast_radius: "huge" },
+      }),
+    ).toContain(
+      "risk_assessment.blast_radius must be one of local/several_surfaces/shared_or_system_wide",
+    );
+    expect(
+      validateReview({
+        ...base,
+        risk_assessment: { ...base.risk_assessment, floor_triggers: ["invented"] },
+      }),
+    ).toContain("risk_assessment.floor_triggers entries must match process.yaml vocabulary");
+    expect(validateReview({ ...base, applied_tier: "T9" })).toContain(
+      "applied_tier must be one of T1/T2/T3",
+    );
+    // Middle-axis value floors at T2, extreme value or a floor trigger floors at T3.
+    expect(
+      validateReview({
+        ...base,
+        risk_assessment: { ...base.risk_assessment, uncertainty: "some_unknowns" },
+        applied_tier: "T1",
+      }).some((e) => e.includes("below the T2 floor")),
+    ).toBe(true);
+    expect(
+      validateReview({
+        ...base,
+        risk_assessment: { ...base.risk_assessment, uncertainty: "some_unknowns" },
+        applied_tier: "T2",
+      }),
+    ).toEqual([]);
+    for (const risk of [
+      { ...base.risk_assessment, blast_radius: "shared_or_system_wide" },
+      { ...base.risk_assessment, data_security: "direct_boundary_change" },
+      { ...base.risk_assessment, reversibility: "difficult_or_stateful" },
+      { ...base.risk_assessment, uncertainty: "novel_or_impact_unclear" },
+      { ...base.risk_assessment, floor_triggers: ["schema_or_migration"] },
+    ]) {
+      expect(reviewTierFloor(risk)).toBe("T3");
+      expect(
+        validateReview({ ...base, risk_assessment: risk, applied_tier: "T2" }).some((e) =>
+          e.includes("below the T3 floor"),
+        ),
+      ).toBe(true);
+    }
+    expect(
+      validateReview({
+        ...base,
+        risk_assessment: {
+          ...base.risk_assessment,
+          floor_triggers: ["schema_or_migration"],
+        },
+        applied_tier: "T3",
+      }),
+    ).toEqual([]);
+    // CLI rejects a review that ignores the floor, then accepts the corrected record.
+    const file = path.join(f.dir, "shallow.json");
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...base,
+        risk_assessment: {
+          ...base.risk_assessment,
+          floor_triggers: ["schema_or_migration"],
+        },
+        applied_tier: "T1",
+        tier_rationale: "claimed light review",
+      }),
+    );
+    expect(() => run(["review", "test", file], f.cwd)).toThrow("below the T3 floor");
+  });
+  it("keeps the canonical review-depth vocabulary mirrored in process.yaml and SKILL.md", () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+    const spec = readFileSync(path.join(root, ".loop/process.yaml"), "utf8");
+    const skill = readFileSync(path.join(root, "skills/code-review/SKILL.md"), "utf8");
+    const terms = [...Object.values(REVIEW_AXES).flat(), ...REVIEW_FLOOR_TRIGGERS, ...REVIEW_TIERS];
+    for (const term of terms) {
+      expect(spec, `process.yaml missing ${term}`).toContain(term);
+      expect(skill, `SKILL.md missing ${term}`).toContain(term);
+    }
   });
   it("rejects invalid IDs, branch mismatch, and repeat initialization", () => {
     const f = fixture();

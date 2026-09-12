@@ -1,7 +1,22 @@
 {
-  "verdict": "fail",
-  "source_comparison": "元要求と契約の比較結果を記入",
-  "diff_assessment": "各挙動変更とAC/IVの対応・範囲外変更の確認結果",
-  "verification_assessment": "テストが実際に期待結果を確認している根拠",
-  "manual_results": []
+  "verdict": "pass",
+  "risk_assessment": {
+    "blast_radius": "several_surfaces",
+    "data_security": "none",
+    "reversibility": "easy",
+    "uncertainty": "some_unknowns",
+    "floor_triggers": []
+  },
+  "applied_tier": "T2",
+  "tier_rationale": "中間のuncertaintyのみでfloor_triggersなし。複数ドメインにまたがるためT2",
+  "source_comparison": "Issue要求と契約AC/IVの対応を確認した",
+  "diff_assessment": "AC01を満たす差分であり、スコープ外の変更はない",
+  "verification_assessment": "TC01-03の現在key成功を確認した",
+  "manual_results": [
+    {
+      "target": "AC01",
+      "result": "pass",
+      "evidence": "実行ログと差分を確認した"
+    }
+  ]
 }
