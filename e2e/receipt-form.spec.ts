@@ -163,22 +163,6 @@ test.describe("支出項目保存フロー（Issue #13 / #181 受け入れ確認
     await expect(snackbar).toBeVisible({ timeout: 3_000 });
   });
 
-  // Issue #181: ExpenseEntryForm は保存後のフォーカス戻りを実装していないためスキップ
-  test.skip("[Issue #13] 保存成功後に店名欄にフォーカスが移動する (Issue #181で廃止)", async ({
-    page,
-  }) => {
-    const shopNameInput = page.getByLabel("店舗名 / 支払先");
-    await shopNameInput.fill("テストショップ");
-    await page.getByLabel("合計金額").fill("1000");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(shopNameInput).toHaveValue("");
-    await expect(shopNameInput).toBeFocused();
-  });
-
   test("[Issue #13] カテゴリが保存後も引き継がれる", async ({ page }) => {
     // Issue #181: 日付は週日選択UIに変更。カテゴリ引き継ぎのみ確認
     await page.getByLabel("店舗名 / 支払先").fill("テスト店舗");
