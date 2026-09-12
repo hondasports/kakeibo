@@ -13,27 +13,6 @@ import { clickUserMenuItem } from "./helpers/ui";
  *   - シナリオ 4: ログアウト → ログイン画面に戻る (P1)
  */
 
-// test.describe('未ログイン状態', () => {
-//   // storageState を空にして未ログイン状態を強制する
-//   test.use({ storageState: { cookies: [], origins: [] } })
-//
-//   test('シナリオ1: アクセスするとログイン画面が表示される', async ({ page }) => {
-//     await page.goto('/')
-//     await page.waitForFunction(
-//       () => {
-//         const w = window as Window & { Clerk?: { loaded?: boolean } }
-//         return w.Clerk?.loaded === true
-//       },
-//       { timeout: 30_000 },
-//     )
-//     await expect(page.getByRole('heading', { name: '家計簿にログイン' })).toBeVisible()
-//     await expect(page.getByRole('button', { name: 'Googleでログイン' })).toBeVisible()
-//     await expect(page.getByRole('alert')).toContainText(
-//       'Clerkの開発用テストユーザーではGoogle OAuthにログインできません',
-//     )
-//   })
-// })
-
 /**
  * ログアウトテスト
  * gotoAuthenticated でログイン状態を作り、ログアウト後の状態を確認する。
