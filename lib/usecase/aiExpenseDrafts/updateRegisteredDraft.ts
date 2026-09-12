@@ -6,6 +6,8 @@ import { buildDraftRegistrationItems } from "../../domain/aiExpenseDrafts/regist
 import type { AiExpenseRegistrationMode } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { validatePositiveCategoryTotals } from "../../domain/aiExpenseDrafts/reviewItems";
 import {
+  EXPENSE_ENTRY_AMOUNT_MAX,
+  EXPENSE_ENTRY_TITLE_MAX_LENGTH,
   validateExpenseAmount,
   validateExpenseMemo,
   validateExpenseTitle,
@@ -16,8 +18,6 @@ import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import type { AiExpenseDraftDeps } from "./deps";
 import { assertActiveCategoryForDraft } from "./assertActiveCategoryForDraft";
-
-const LIST_LIMIT = 100;
 
 export type UpdateRegisteredDraftUsecaseArgs = {
   draftId: string;
@@ -60,12 +60,21 @@ export async function updateRegisteredAiExpenseDraft(
   if (!isValidIsoDateString(args.date)) {
     throw new ConvexError("Date must be valid");
   }
-  if (!validateExpenseAmount(args.amountYen).success) {
-    throw new ConvexError("Amount must be a positive integer");
+  const amount = validateExpenseAmount(args.amountYen);
+  if (!amount.success) {
+    throw new ConvexError(
+      amount.error === "too_large"
+        ? `Amount must be ${EXPENSE_ENTRY_AMOUNT_MAX} yen or less`
+        : "Amount must be a positive integer",
+    );
   }
   const title = validateExpenseTitle(args.shopName);
   if (!title.success) {
-    throw new ConvexError("Shop name is required");
+    throw new ConvexError(
+      title.error === "too_long"
+        ? `Shop name must be ${EXPENSE_ENTRY_TITLE_MAX_LENGTH} characters or less`
+        : "Shop name is required",
+    );
   }
   const memo = validateExpenseMemo(args.memo);
   if (!memo.success) {
@@ -74,8 +83,8 @@ export async function updateRegisteredAiExpenseDraft(
   await assertActiveCategoryForDraft(deps.categories, args.categoryId, ctx.groupId);
 
   const now = Date.now();
-  if (args.registrationMode === "detailed" && args.items !== undefined) {
-    if (!validatePositiveCategoryTotals(args.items)) {
+  if (args.items !== undefined) {
+    if (args.registrationMode === "detailed" && !validatePositiveCategoryTotals(args.items)) {
       throw new ConvexError("Draft category total must be greater than zero");
     }
     await deps.itemReplace.replaceForReview(args.draftId, ctx.groupId, args.items, now);
@@ -111,7 +120,7 @@ export async function updateRegisteredAiExpenseDraft(
     ],
     updatedAt: now,
   });
-  const items = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId, LIST_LIMIT);
+  const items = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
   let registrationItems;
   try {
     registrationItems = buildDraftRegistrationItems(updated, items);

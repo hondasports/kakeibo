@@ -18,8 +18,6 @@ import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import type { AiExpenseDraftDeps } from "./deps";
 
-const LIST_LIMIT = 100;
-
 export type RegisterReadyDraftsAsExpenseEntriesResult = {
   registeredDraftIds: string[];
   createdExpenseEntryIds: string[];
@@ -74,7 +72,7 @@ export async function registerReadyDraftsAsExpenseEntries(
   const registeredCategoryIds = new Map<string, string[]>();
 
   for (const draft of draftsToRegister) {
-    const items = await deps.draftItems.listByDraftAsc(ctx.groupId, draft.id!, LIST_LIMIT);
+    const items = await deps.draftItems.listByDraftAsc(ctx.groupId, draft.id!);
 
     let itemsToRegister;
     try {

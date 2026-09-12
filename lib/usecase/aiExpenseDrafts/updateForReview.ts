@@ -40,8 +40,6 @@ const REVIEW_OVERRIDE_FIELDS = [
   "categoryId",
 ] as const;
 
-const LIST_LIMIT = 100;
-
 export type UpdateForReviewUsecaseArgs = {
   draftId: string;
   documentType: AiExpenseDraftDocumentType;
@@ -215,11 +213,7 @@ export async function updateAiExpenseDraftForReview(
     if (!wasRegistered) {
       return updatedDraft;
     }
-    const updatedItems = await deps.draftItems.listByDraftAsc(
-      ctx.groupId,
-      args.draftId,
-      LIST_LIMIT,
-    );
+    const updatedItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
     let registrationItems;
     try {
       registrationItems = buildDraftRegistrationItems(updatedDraft, updatedItems);
