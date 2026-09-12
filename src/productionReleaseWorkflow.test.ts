@@ -88,6 +88,8 @@ describe("production-release workflow", () => {
     expect(yaml).toContain("pull-requests: read");
     expect(yaml).toContain("actions/upload-artifact@");
     expect(yaml).toContain("actions/download-artifact@");
+    // .tmp/ は hidden dir のため artifact 対象外になる。除外されると本番jobが current-release.json を参照できず壊れる
+    expect(yaml).toContain("include-hidden-files: true");
   });
 
   test("creates a GitHub Release with a product-updates.json asset after smoke", () => {

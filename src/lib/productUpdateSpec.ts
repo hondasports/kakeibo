@@ -73,6 +73,14 @@ export function extractUpdateSpecYaml(
     };
   }
 
+  const outer = `${text.slice(0, starts[0])}${text.slice(end + UPDATE_SPEC_END_MARKER.length)}`;
+  if (outer.replace(/<!--[\s\S]*?-->/g, "").includes("<!--")) {
+    return {
+      ok: false,
+      errors: ["PR本文に閉じられていないHTMLコメント(<!--)があります。"],
+    };
+  }
+
   const inner = text.slice(start, end);
   const fences = [...inner.matchAll(CODE_FENCE_PATTERN)];
   if (fences.length === 0) {
@@ -91,7 +99,7 @@ export function extractUpdateSpecYaml(
   }
 
   const outside = `${inner.slice(0, fence.index)}${inner.slice(fence.index + fence[0].length)}`;
-  const outsideWithoutComments = outside.replace(/<!--[\s\S]*?(?:-->|$)/g, "");
+  const outsideWithoutComments = outside.replace(/<!--[\s\S]*?-->/g, "");
   if (outsideWithoutComments.trim() !== "") {
     errors.push("マーカー内には yaml コードブロック以外を記述しないでください。");
   }

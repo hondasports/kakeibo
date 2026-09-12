@@ -326,13 +326,8 @@ export function mergeProductUpdates({
     validateProductUpdateDraft(draft, draftIds);
     draftIds.add(draft.id);
 
-    const pastVersion = publishedMap.get(draft.id);
-    if (pastVersion) {
-      if (pastVersion !== appVersion) {
-        throw new ProductUpdateValidationError(
-          `ProductUpdate id ${draft.id} is already published in version ${pastVersion}`,
-        );
-      }
+    // 既公開idはスキップする。手動draft(補完等)は公開後も残り続けるため、再処理しても履歴を壊さず冪等でなければならない
+    if (publishedMap.has(draft.id)) {
       continue;
     }
 

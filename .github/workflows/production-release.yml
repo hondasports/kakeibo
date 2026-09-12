@@ -140,6 +140,8 @@ jobs:
           name: product-updates
           retention-days: 1
           if-no-files-found: error
+          # .tmp は hidden dir のため既定では除外される。current-release.json を含めるには必須。
+          include-hidden-files: true
           path: |
             src/generated/product-updates.json
             .tmp/product-updates.current-release.json

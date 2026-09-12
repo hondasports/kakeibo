@@ -25,17 +25,22 @@ export type SourcePullRequestRecord = {
 const MERGE_PULL_REQUEST_PATTERN = /^Merge pull request #(\d+) from (\S+)/;
 const MERGE_BRANCH_PATTERN = /^Merge branch /;
 
-/** Drop the `owner/` (same repository) or `owner:` (fork) prefix from a merge head ref. */
+/** Drop the `owner:` (fork) prefix. Bare branch names such as `release/m16` stay intact. */
 export function normalizeHeadRef(raw: string): string {
   const colonIndex = raw.indexOf(":");
   if (colonIndex >= 0) {
     return raw.slice(colonIndex + 1);
   }
-  const slashIndex = raw.indexOf("/");
-  if (slashIndex >= 0) {
-    return raw.slice(slashIndex + 1);
-  }
   return raw;
+}
+
+/** Merge-commit subjects carry `owner/branch` (same repo) or `owner:branch` (fork); strip the owner segment only. */
+export function normalizeMergeSubjectHeadRef(raw: string): string {
+  if (raw.indexOf(":") >= 0) {
+    return normalizeHeadRef(raw);
+  }
+  const slashIndex = raw.indexOf("/");
+  return slashIndex >= 0 ? raw.slice(slashIndex + 1) : raw;
 }
 
 /** Integration pull requests carry whole branches (preview/release/*) into main, not user changes. */
@@ -44,7 +49,15 @@ export function isIntegrationHeadRef(headRef: string | undefined): boolean {
     return false;
   }
   const normalized = normalizeHeadRef(headRef);
-  return normalized === "preview" || normalized === "main" || normalized.startsWith("release/");
+  const candidates = [normalized];
+  const slashIndex = normalized.indexOf("/");
+  if (slashIndex >= 0) {
+    candidates.push(normalized.slice(slashIndex + 1));
+  }
+  return candidates.some(
+    (candidate) =>
+      candidate === "preview" || candidate === "main" || candidate.startsWith("release/"),
+  );
 }
 
 /**
@@ -69,7 +82,7 @@ export function classifyCommitSubjects(
         return {
           kind: "pull_request",
           number,
-          headRef: normalizeHeadRef(mergeMatch[2]),
+          headRef: normalizeMergeSubjectHeadRef(mergeMatch[2]),
           sha,
         };
       }

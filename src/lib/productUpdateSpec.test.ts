@@ -89,6 +89,24 @@ describe("extractUpdateSpecYaml", () => {
     const result = extractUpdateSpecYaml(body);
     expect(result).toEqual({ ok: true, yaml: "publish: false\nreason: x\n" });
   });
+
+  test("rejects an unclosed HTML comment inside the markers", () => {
+    const body = `${START}\n<!-- 閉じていないコメント\n\`\`\`yaml\npublish: false\nreason: x\n\`\`\`\n${END}`;
+    const result = extractUpdateSpecYaml(body);
+    expect(result.ok).toBe(false);
+  });
+
+  test("allows properly closed HTML comments outside the markers", () => {
+    const body = `## 変更内容\n<!-- テンプレ案内コメント -->\n${START}\n\`\`\`yaml\npublish: false\nreason: x\n\`\`\`\n${END}\n<!-- 後続コメント -->`;
+    const result = extractUpdateSpecYaml(body);
+    expect(result).toEqual({ ok: true, yaml: "publish: false\nreason: x\n" });
+  });
+
+  test("rejects an unclosed HTML comment outside the markers", () => {
+    const body = `## 変更内容\n<!-- 閉じていないコメント\n${START}\n\`\`\`yaml\npublish: false\nreason: x\n\`\`\`\n${END}`;
+    const result = extractUpdateSpecYaml(body);
+    expect(result.ok).toBe(false);
+  });
 });
 
 describe("parseProductUpdateSpec", () => {

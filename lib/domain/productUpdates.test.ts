@@ -236,20 +236,21 @@ describe("mergeProductUpdates", () => {
     expect(allUpdates).toEqual(pastUpdates);
   });
 
-  test("rejects a draft whose id is already published with a different version", () => {
+  test("skips a draft already published under a different version", () => {
     const pastUpdates = [
       { id: "a", title: "A", summary: "A", version: "2026.07.10-100", publishedAt: "2026-07-10" },
     ];
     const drafts = [{ id: "a", title: "A", summary: "A" }];
 
-    expect(() =>
-      mergeProductUpdates({
-        pastUpdates,
-        drafts,
-        appVersion: "2026.07.11-458",
-        publishedAt: "2026-07-11",
-      }),
-    ).toThrow(ProductUpdateValidationError);
+    const { allUpdates, currentUpdates } = mergeProductUpdates({
+      pastUpdates,
+      drafts,
+      appVersion: "2026.07.11-458",
+      publishedAt: "2026-07-11",
+    });
+
+    expect(currentUpdates).toEqual([]);
+    expect(allUpdates).toEqual(pastUpdates);
   });
 
   test("rejects a draft whose id is duplicated in the draft list", () => {
@@ -269,7 +270,7 @@ describe("mergeProductUpdates", () => {
     ).toThrow(ProductUpdateValidationError);
   });
 
-  test("rejects a multi-PR id that is already published with a different version", () => {
+  test("skips a multi-PR id that is already published with a different version", () => {
     const pastUpdates = [
       {
         id: "prs-459-460",
@@ -281,14 +282,15 @@ describe("mergeProductUpdates", () => {
     ];
     const drafts = [{ id: "prs-459-460", title: "A", summary: "A" }];
 
-    expect(() =>
-      mergeProductUpdates({
-        pastUpdates,
-        drafts,
-        appVersion: "2026.07.11-458",
-        publishedAt: "2026-07-11",
-      }),
-    ).toThrow(ProductUpdateValidationError);
+    const { allUpdates, currentUpdates } = mergeProductUpdates({
+      pastUpdates,
+      drafts,
+      appVersion: "2026.07.11-458",
+      publishedAt: "2026-07-11",
+    });
+
+    expect(currentUpdates).toEqual([]);
+    expect(allUpdates).toEqual(pastUpdates);
   });
 });
 

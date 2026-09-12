@@ -8,6 +8,7 @@ import {
   collectPullRequestDecisions,
   isIntegrationHeadRef,
   normalizeHeadRef,
+  normalizeMergeSubjectHeadRef,
   resolveReleaseBoundary,
   titleForProductUpdate,
   type SourcePullRequestRecord,
@@ -35,24 +36,37 @@ function prRecord(overrides: Partial<SourcePullRequestRecord> = {}): SourcePullR
 
 describe("normalizeHeadRef", () => {
   test.each([
-    ["hondasports/preview", "preview"],
-    ["hondasports/release/m16", "release/m16"],
     ["fork-owner:feature/x", "feature/x"],
-    ["feature/plain", "plain"],
+    ["release/m16", "release/m16"],
+    ["hondasports/release/m16", "hondasports/release/m16"],
     ["preview", "preview"],
   ])("%s → %s", (input, expected) => {
     expect(normalizeHeadRef(input)).toBe(expected);
   });
 });
 
+describe("normalizeMergeSubjectHeadRef", () => {
+  test.each([
+    ["hondasports/preview", "preview"],
+    ["hondasports/release/m16", "release/m16"],
+    ["hondasports/feature/x", "feature/x"],
+    ["fork-owner:feature/x", "feature/x"],
+    ["fork-owner:feature/x/y", "feature/x/y"],
+  ])("%s → %s", (input, expected) => {
+    expect(normalizeMergeSubjectHeadRef(input)).toBe(expected);
+  });
+});
+
 describe("isIntegrationHeadRef", () => {
   test.each([
     ["preview", true],
+    ["release/m16", true],
     ["hondasports/preview", true],
     ["hondasports/release/m16", true],
     ["main", true],
     ["feature/x", false],
     ["hondasports/feature/x", false],
+    ["preview/x", false],
     [undefined, false],
   ])("%s → %s", (input, expected) => {
     expect(isIntegrationHeadRef(input)).toBe(expected);

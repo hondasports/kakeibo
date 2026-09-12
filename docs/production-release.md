@@ -159,6 +159,8 @@ Vercel Production Environment には Clerk Production instance と Convex Produc
 
 手動で内容を調整したい場合は `src/content/product-updates.ts` に `id` を `pr-{number}`（例: `pr-459`）または `prs-{number}-{number}`（例: `prs-459-460`）で指定するか、新規の `id` を追加する。
 
+`id` が一度公開されると、そのIDの手動draftは以後のリリースで自動的にスキップされる（冪等）。補完目的のdraftは公開後も削除不要で、残しても次回リリースを妨げない。
+
 ## DB/schema変更時のチェックリスト
 
 - schema変更内容を PR または Issue に明記する。
