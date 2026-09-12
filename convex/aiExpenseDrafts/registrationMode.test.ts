@@ -291,4 +291,72 @@ describe("registrationMode persistence and aggregation", () => {
         }),
     ).rejects.toThrow("グループに所属していません");
   });
+
+  it("totalOnly更新でも送信された明細が保存済み明細へ反映される", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const ids = await seed(t);
+    const authed = t.withIdentity(identity);
+
+    await authed.mutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft, {
+      draftId: ids.draftId,
+      date: "2026-08-26",
+      amountYen: 1200,
+      categoryId: ids.foodId,
+      shopName: "スーパー青葉",
+      registrationMode: "totalOnly",
+      items: [{ itemName: "牛乳", amountYen: 1200, categoryId: ids.foodId }],
+    });
+
+    const state = await t.run(async (ctx) => ({
+      draft: await ctx.db.get(ids.draftId),
+      items: await ctx.db
+        .query("aiExpenseDraftItems")
+        .withIndex("by_group_id_and_draft_id", (q) =>
+          q.eq("groupId", ids.groupId).eq("draftId", ids.draftId),
+        )
+        .collect(),
+    }));
+    expect(state.items).toHaveLength(1);
+    expect(state.items[0]).toMatchObject({ itemName: "牛乳", amountYen: 1200 });
+    expect(state.draft?.receiptUserOverride?.fields).toContain("items");
+  });
+
+  it("上限・文字数超過のバリデーションエラーが種別ごとのメッセージになる", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const ids = await seed(t);
+    const authed = t.withIdentity(identity);
+    const base = {
+      draftId: ids.draftId,
+      date: "2026-08-26",
+      amountYen: 1200,
+      categoryId: ids.foodId,
+      shopName: "スーパー青葉",
+      registrationMode: "totalOnly" as const,
+    };
+
+    await expect(
+      authed.mutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft, {
+        ...base,
+        amountYen: 10_000_000,
+      }),
+    ).rejects.toThrow("Amount must be 9999999 yen or less");
+    await expect(
+      authed.mutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft, {
+        ...base,
+        amountYen: -5,
+      }),
+    ).rejects.toThrow("Amount must be a positive integer");
+    await expect(
+      authed.mutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft, {
+        ...base,
+        shopName: "あ".repeat(101),
+      }),
+    ).rejects.toThrow("Shop name must be 100 characters or less");
+    await expect(
+      authed.mutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft, {
+        ...base,
+        shopName: "   ",
+      }),
+    ).rejects.toThrow("Shop name is required");
+  });
 });

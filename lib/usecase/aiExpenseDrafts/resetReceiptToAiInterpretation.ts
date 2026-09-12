@@ -35,7 +35,7 @@ export async function resetReceiptToAiInterpretation(
   }
   const values = draft.persisted.receiptInterpretation!.values;
 
-  const currentItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId, LIST_LIMIT);
+  const currentItems = await deps.draftItems.listAllByDraft(ctx.groupId, args.draftId);
   for (const item of currentItems) {
     await deps.draftItems.delete(item.id!);
   }
