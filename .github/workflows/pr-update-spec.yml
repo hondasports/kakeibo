@@ -1,0 +1,43 @@
+name: PR update spec
+
+# preview 向け PR の本文に記入された suzumemo-update ブロックを検証する。
+# 本文編集(edited)でも再評価される。main 向け統合PRは対象外(branches: preview のみ)。
+# bot作成PR(dependabot等)は記入義務の例外としてスキップする。
+
+on:
+  pull_request:
+    branches:
+      - preview
+    types:
+      - opened
+      - edited
+      - reopened
+      - ready_for_review
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Validate update spec
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event.pull_request.user.type != 'Bot'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate suzumemo-update spec
+        run: pnpm exec tsx scripts/check-pr-product-update.ts

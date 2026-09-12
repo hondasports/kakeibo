@@ -3,29 +3,32 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { productUpdateDrafts } from "../src/content/product-updates.ts";
+import { filterUnpublishedPullRequests } from "../src/lib/generateProductUpdates.ts";
 import {
-  fetchMergedPullRequests,
-  filterUnpublishedPullRequests,
-  generateProductUpdateCandidates,
-  toProductUpdateDrafts,
-  type ProductUpdateGenerationStatus,
-} from "../src/lib/generateProductUpdates.ts";
+  classifyCommitSubjects,
+  collectPullRequestDecisions,
+  isIntegrationHeadRef,
+  resolveReleaseBoundary,
+  type ParsedPullRequestRef,
+  type SourcePullRequestRecord,
+} from "../src/lib/releaseSourcePullRequests.ts";
 import {
   compareVersionStrings,
   mergeGeneratedAndManualDrafts,
   mergeProductUpdates,
   ProductUpdate,
   ProductUpdateValidationError,
-  resolveProductUpdateSourceAt,
   validateAppVersion,
   validateProductionProductUpdates,
   type ProductionProductUpdates,
+  type PullRequestDecision,
 } from "../src/lib/productUpdates.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
 
 const PUBLISHED_AT_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
@@ -86,86 +89,68 @@ async function downloadAssetText(assetId: number, token: string): Promise<string
   return response.text();
 }
 
-const SAFE_REF_PATTERN = /^[A-Za-z0-9._/:-]+$/;
+function gitText(args: string[]): string {
+  return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8" }).trim();
+}
 
-function resolveSourceRef(): string | undefined {
-  const sourceRef = process.env.SOURCE_REF;
-  if (!sourceRef) return undefined;
-  if (sourceRef.startsWith("-") || !SAFE_REF_PATTERN.test(sourceRef)) {
-    throw new ProductUpdateValidationError(`Invalid SOURCE_REF: ${sourceRef}`);
-  }
+function revParseCommit(ref: string): string | undefined {
   try {
-    return execFileSync("git", ["rev-parse", "--", sourceRef], { encoding: "utf8" }).trim();
-  } catch {
-    return sourceRef;
-  }
-}
-
-function normalizeTimestamp(timestamp: string): string {
-  return new Date(timestamp).toISOString().replace(/\.\d{3}Z$/, "Z");
-}
-
-type SourcePullRequest = {
-  mergedAt: string;
-  searchBase: string;
-};
-
-function resolveSearchBase(headRef: string, fallbackBase: string): string {
-  if (headRef === "preview" || headRef.startsWith("release/")) {
-    return headRef;
-  }
-  return fallbackBase;
-}
-
-async function fetchSourcePullRequest(
-  sourceSha: string,
-  fallbackBase: string,
-  token: string,
-): Promise<SourcePullRequest | undefined> {
-  const { owner, repo } = parseRepoSlug();
-
-  const pullsResponse = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/commits/${sourceSha}/pulls?per_page=10`,
-    {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "suzumemo-release-script",
-      },
-    },
-  );
-
-  if (pullsResponse.ok) {
-    const pulls = (await pullsResponse.json()) as Array<{
-      merged_at: string | null;
-      base: { ref: string };
-      head: { ref: string };
-    }>;
-    const mergedPulls = pulls
-      .filter((p): p is typeof p & { merged_at: string } => p.merged_at !== null)
-      .sort((a, b) => b.merged_at.localeCompare(a.merged_at));
-    if (mergedPulls.length > 0) {
-      const latest = mergedPulls[0];
-      return {
-        mergedAt: normalizeTimestamp(latest.merged_at),
-        searchBase: resolveSearchBase(latest.head.ref, fallbackBase),
-      };
-    }
-  }
-
-  try {
-    const commit = await fetchJson<{ commit: { committer: { date: string } } }>(
-      `https://api.github.com/repos/${owner}/${repo}/commits/${sourceSha}`,
-      token,
-    );
-    return {
-      mergedAt: normalizeTimestamp(commit.commit.committer.date),
-      searchBase: fallbackBase,
-    };
+    const resolved = gitText(["rev-parse", "--verify", `${ref}^{commit}`]);
+    return COMMIT_SHA_PATTERN.test(resolved) ? resolved : undefined;
   } catch {
     return undefined;
   }
+}
+
+function mergeBaseSha(a: string, b: string): string | undefined {
+  try {
+    const resolved = gitText(["merge-base", a, b]);
+    return COMMIT_SHA_PATTERN.test(resolved) ? resolved : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function commitTimestamp(sha: string): string {
+  return new Date(gitText(["show", "-s", "--format=%cI", sha]))
+    .toISOString()
+    .replace(/\.\d{3}Z$/, "Z");
+}
+
+function logCommits(range: string): Array<{ sha: string; subject: string }> {
+  const output = execFileSync("git", ["log", "--format=%H%x00%s", range], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  return output
+    .split("\n")
+    .map((line) => {
+      const [sha, subject] = line.split("\0");
+      return { sha: sha?.trim() ?? "", subject: subject ?? "" };
+    })
+    .filter((entry) => entry.sha !== "");
+}
+
+/**
+ * Resolve SOURCE_REF to a commit SHA. Resolution failure is an error, never a fallback.
+ * `actions/checkout` leaves only remote-tracking refs for branch names, so `main` is
+ * also tried as `origin/main` and, finally, the checked-out HEAD (the same commit the
+ * release job checks out for SOURCE_REF).
+ */
+function resolveSourceSha(): string | undefined {
+  const sourceRef = process.env.SOURCE_REF;
+  if (!sourceRef) {
+    return undefined;
+  }
+  const candidates = [sourceRef, `origin/${sourceRef}`, "HEAD"];
+  for (const candidate of candidates) {
+    const sha = revParseCommit(candidate);
+    if (sha) {
+      return sha;
+    }
+  }
+  throw new ProductUpdateValidationError(`SOURCE_REF をコミットSHAへ解決できません: ${sourceRef}`);
 }
 
 type GitHubRelease = {
@@ -176,17 +161,40 @@ type GitHubRelease = {
   assets: Array<{ id: number; name: string }>;
 };
 
-async function fetchCommitTime(commitSha: string, token: string): Promise<string | undefined> {
+async function fetchPullRequest(number: number, token: string): Promise<SourcePullRequestRecord> {
   const { owner, repo } = parseRepoSlug();
-  try {
-    const commit = await fetchJson<{ commit: { committer: { date: string } } }>(
-      `https://api.github.com/repos/${owner}/${repo}/commits/${commitSha}`,
-      token,
-    );
-    return normalizeTimestamp(commit.commit.committer.date);
-  } catch {
-    return undefined;
-  }
+  const pull = await fetchJson<{
+    number: number;
+    title: string;
+    body: string | null;
+    merged_at: string | null;
+    base: { ref: string };
+    head: { ref: string };
+    user: { type: string };
+  }>(`https://api.github.com/repos/${owner}/${repo}/pulls/${number}`, token);
+
+  return {
+    number: pull.number,
+    title: pull.title,
+    body: pull.body,
+    mergedAt: pull.merged_at,
+    baseRef: pull.base.ref,
+    headRef: pull.head.ref,
+    authorType: pull.user.type,
+  };
+}
+
+/** Map a commit to the merged PR numbers that introduced it (GitHub-tracked association). */
+async function fetchMergedPullsForCommit(sha: string, token: string): Promise<number[]> {
+  const { owner, repo } = parseRepoSlug();
+  const pulls = await fetchJson<Array<{ number: number; merged_at: string | null }>>(
+    `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/pulls`,
+    token,
+  );
+  return pulls
+    .filter((pull) => pull.merged_at !== null)
+    .map((pull) => pull.number)
+    .filter((number) => Number.isSafeInteger(number) && number > 0);
 }
 
 async function loadPastUpdates({
@@ -198,7 +206,7 @@ async function loadPastUpdates({
 }): Promise<{
   pastUpdates: ProductUpdate[];
   latestRelease?: GitHubRelease;
-  latestReleaseSourceAt?: string;
+  previousSourceSha?: string;
 }> {
   const { owner, repo } = parseRepoSlug();
   const releases = await fetchJson<GitHubRelease[]>(
@@ -210,7 +218,6 @@ async function loadPastUpdates({
   const seenIds = new Map<string, string>();
   let latestRelease: GitHubRelease | undefined;
   let latestReleasePayload: ProductionProductUpdates | undefined;
-  let latestReleaseHasUpdates: GitHubRelease | undefined;
 
   for (const release of releases) {
     if (!release.tag_name.startsWith("app-v")) {
@@ -254,17 +261,6 @@ async function loadPastUpdates({
       latestReleasePayload = payload;
     }
 
-    if (
-      payload.updates.length > 0 &&
-      (!latestReleaseHasUpdates ||
-        compareVersionStrings(
-          releaseVersion,
-          latestReleaseHasUpdates.tag_name.slice("app-v".length),
-        ) < 0)
-    ) {
-      latestReleaseHasUpdates = release;
-    }
-
     if (payload.version !== releaseVersion) {
       throw new ProductUpdateValidationError(
         `Release ${release.tag_name} version does not match asset version ${payload.version}`,
@@ -283,16 +279,7 @@ async function loadPastUpdates({
     }
   }
 
-  const legacySourceAt =
-    latestReleasePayload?.sourceRef && latestReleasePayload.sourceMergedAt
-      ? undefined
-      : latestReleaseHasUpdates
-        ? ((await fetchCommitTime(`tags/${latestReleaseHasUpdates.tag_name}`, token)) ??
-          latestReleaseHasUpdates.published_at)
-        : undefined;
-  const latestReleaseSourceAt = resolveProductUpdateSourceAt(latestReleasePayload, legacySourceAt);
-
-  return { pastUpdates, latestRelease, latestReleaseSourceAt };
+  return { pastUpdates, latestRelease, previousSourceSha: latestReleasePayload?.sourceSha };
 }
 
 function writeJsonFile(path: string, data: unknown): void {
@@ -304,8 +291,6 @@ async function main(): Promise<void> {
   const appVersion = getRequiredEnv("APP_VERSION");
   const publishedAt = getRequiredEnv("PUBLISHED_AT");
   const token = getRequiredEnv("GITHUB_TOKEN");
-  const openaiApiKey = process.env.OPENAI_API_KEY;
-  const base = process.env.BASE_REF || "main";
 
   validateAppVersion(appVersion);
 
@@ -313,39 +298,101 @@ async function main(): Promise<void> {
     throw new ProductUpdateValidationError(`Invalid PUBLISHED_AT: ${publishedAt}`);
   }
 
-  const { pastUpdates, latestRelease, latestReleaseSourceAt } = await loadPastUpdates({
+  const { pastUpdates, latestRelease, previousSourceSha } = await loadPastUpdates({
     appVersion,
     token,
   });
-  const { owner, repo } = parseRepoSlug();
 
-  const sourceSha = resolveSourceRef();
-  const sourcePullRequest = sourceSha
-    ? await fetchSourcePullRequest(sourceSha, base, token)
-    : undefined;
-  const searchBase = sourcePullRequest?.searchBase ?? base;
-  const before = sourcePullRequest?.mergedAt;
-  const processedSourceAt =
-    before ?? (sourceSha ? await fetchCommitTime(sourceSha, token) : undefined);
   const sourceRef = process.env.SOURCE_REF;
+  const sourceSha = resolveSourceSha();
+  const sourceMergedAt = sourceSha ? commitTimestamp(sourceSha) : undefined;
 
-  const fetchedPulls = await fetchMergedPullRequests({
-    owner,
-    repo,
-    base: searchBase,
-    since: latestReleaseSourceAt ?? latestRelease?.published_at,
-    before,
-    token,
-  });
-  const pulls = filterUnpublishedPullRequests(fetchedPulls, pastUpdates);
+  const decisions: PullRequestDecision[] = [];
+  const generatedDrafts: typeof productUpdateDrafts = [];
+  let collectionStatus: "collected" | "no_source_ref" | "initial_release" = "no_source_ref";
+  let boundaryNote: string | undefined;
 
-  const generationResult = await generateProductUpdateCandidates(pulls, {
-    apiKey: openaiApiKey,
-  });
-  const generatedCandidates = toProductUpdateDrafts(generationResult.decisions);
+  if (sourceSha) {
+    const boundary = resolveReleaseBoundary({
+      previousSourceSha,
+      latestReleaseTag: latestRelease?.tag_name,
+      sourceSha,
+      revParse: revParseCommit,
+      mergeBase: mergeBaseSha,
+    });
+    if (boundary.kind === "error") {
+      throw new ProductUpdateValidationError(boundary.reason);
+    }
+    if (boundary.kind === "initial_release") {
+      collectionStatus = "initial_release";
+      boundaryNote = "過去の app-v リリースがないため初回リリースとして扱います";
+    } else {
+      collectionStatus = "collected";
+      boundaryNote = boundary.note;
+
+      const commits = logCommits(`${boundary.boundarySha}..${sourceSha}`);
+      const classified = classifyCommitSubjects(commits);
+
+      const refsByNumber = new Map<number, ParsedPullRequestRef>();
+      const unresolvedCommits: Array<{ sha: string; subject: string }> = [];
+      for (const commit of classified) {
+        if (commit.kind === "pull_request") {
+          if (!refsByNumber.has(commit.number)) {
+            refsByNumber.set(commit.number, {
+              number: commit.number,
+              headRef: commit.headRef,
+            });
+          }
+        } else if (commit.kind === "unresolved") {
+          unresolvedCommits.push(commit);
+        }
+      }
+
+      const collectionErrors: string[] = [];
+      for (const commit of unresolvedCommits) {
+        const associated = await fetchMergedPullsForCommit(commit.sha, token);
+        if (associated.length === 0) {
+          collectionErrors.push(
+            `コミット ${commit.sha.slice(0, 7)} (${commit.subject}) に紐付くマージ済みPRが見つかりません`,
+          );
+          continue;
+        }
+        for (const number of associated) {
+          if (!refsByNumber.has(number)) {
+            refsByNumber.set(number, { number });
+          }
+        }
+      }
+      if (collectionErrors.length > 0) {
+        throw new ProductUpdateValidationError(
+          `リリース範囲内にPRへ紐付けできないコミットがあります:\n${collectionErrors.join("\n")}`,
+        );
+      }
+
+      const refs = [...refsByNumber.values()];
+      const fetchTargets = refs.filter((ref) => !isIntegrationHeadRef(ref.headRef));
+
+      const records: SourcePullRequestRecord[] = [];
+      for (const ref of fetchTargets) {
+        records.push(await fetchPullRequest(ref.number, token));
+      }
+
+      const unpublished = new Set(
+        filterUnpublishedPullRequests(records, pastUpdates).map((record) => record.number),
+      );
+      const collected = collectPullRequestDecisions(refs, records, unpublished);
+      decisions.push(...collected.decisions);
+      generatedDrafts.push(...collected.drafts);
+      if (collected.errors.length > 0) {
+        throw new ProductUpdateValidationError(
+          `リリース範囲内のPRの更新履歴欄に問題があります:\n${collected.errors.join("\n")}`,
+        );
+      }
+    }
+  }
 
   const mergedDrafts = mergeGeneratedAndManualDrafts({
-    generated: generatedCandidates,
+    generated: generatedDrafts,
     manual: productUpdateDrafts,
   });
 
@@ -363,96 +410,102 @@ async function main(): Promise<void> {
   writeJsonFile(currentReleasePath, {
     version: appVersion,
     publishedAt,
-    ...(sourceRef && processedSourceAt ? { sourceRef, sourceMergedAt: processedSourceAt } : {}),
+    ...(sourceRef && sourceSha && sourceMergedAt ? { sourceRef, sourceSha, sourceMergedAt } : {}),
+    pullRequestDecisions: [...decisions].sort((a, b) => a.pullRequest - b.pullRequest),
     updates: currentUpdates,
   });
 
   printGenerationSummary({
-    pulls,
-    decisions: generationResult.decisions,
-    candidates: generatedCandidates,
+    decisions,
+    updates: currentUpdates,
     manualCount: productUpdateDrafts.length,
-    status: generationResult.status,
+    collectionStatus,
+    boundaryNote,
   });
 
   console.log(`Generated ${generatedPath}`);
   console.log(`Generated ${currentReleasePath}`);
   console.log(`Total updates: ${allUpdates.length}`);
   console.log(`Current release updates: ${currentUpdates.length}`);
-  console.log(`Generated drafts from ${pulls.length} pull requests`);
 }
 
 type SummaryInput = {
-  pulls: Array<{ number: number }>;
-  decisions: Array<{
-    sourcePullRequestNumbers: number[];
-    publish: boolean;
-    reason: string;
-  }>;
-  candidates: Array<{ id: string }>;
+  decisions: PullRequestDecision[];
+  updates: Array<{ id: string; title: string }>;
   manualCount: number;
-  status: ProductUpdateGenerationStatus;
+  collectionStatus: "collected" | "no_source_ref" | "initial_release";
+  boundaryNote?: string;
+};
+
+const OUTCOME_LABEL: Record<PullRequestDecision["outcome"], string> = {
+  published: "掲載",
+  skipped: "非掲載",
+  exempt_bot: "対象外(bot)",
+  integration: "対象外(統合PR)",
+  not_merged: "対象外(未マージ)",
 };
 
 function printGenerationSummary({
-  pulls,
   decisions,
-  candidates,
+  updates,
   manualCount,
-  status,
+  collectionStatus,
+  boundaryNote,
 }: SummaryInput): void {
-  const publishedCount = candidates.length;
-  const skippedCount = decisions.length - publishedCount;
+  const publishedCount = decisions.filter((d) => d.outcome === "published").length;
   const statusLabel = {
-    success: "success",
-    skipped_no_api_key: "skipped (no API key)",
-    skipped_no_prs: "skipped (no PRs)",
-    failed_api: "failed (OpenAI API)",
-    failed_json: "failed (response format)",
-    failed_validation: "failed (validation)",
-  } satisfies Record<ProductUpdateGenerationStatus, string>;
-
-  const details: string[] = [];
-  if (status === "skipped_no_prs") {
-    details.push("No merged pull requests found.");
-  } else if (status === "skipped_no_api_key") {
-    details.push("Product update generation warning: skipped (no API key).");
-    details.push(
-      "automatic product updates were not added; existing and manual updates were retained.",
-    );
-    details.push("OPENAI_API_KEY is not set; using manual drafts only.");
-  } else if (status !== "success") {
-    details.push(`Product update generation warning: ${statusLabel[status]}.`);
-    details.push(
-      "automatic product updates were not added; existing and manual updates were retained.",
-    );
-  } else {
-    let candidateIndex = 0;
-    for (const decision of decisions) {
-      const numbers = [...decision.sourcePullRequestNumbers].sort((a, b) => a - b);
-      const prLabels = numbers.map((n) => `#${n}`).join(", ");
-      if (decision.publish) {
-        const candidate = candidates[candidateIndex++];
-        details.push(`PR ${prLabels} → published as ${candidate?.id ?? "unknown"}`);
-      } else {
-        details.push(`PR ${prLabels} → skipped: ${decision.reason}`);
-      }
-    }
-  }
+    collected: "collected",
+    no_source_ref: "skipped (SOURCE_REF 未設定)",
+    initial_release: "initial release (境界なし)",
+  }[collectionStatus];
 
   const lines = [
     "## Product update generation",
     "",
     "| Item | Value |",
     "| --- | --- |",
-    `| Target PRs | ${pulls.length} |`,
+    `| Collection | ${statusLabel} |`,
+    `| In-range pull requests | ${decisions.length} |`,
     `| Published product updates | ${publishedCount} |`,
-    `| Skipped PRs | ${skippedCount} |`,
     `| Manual drafts | ${manualCount} |`,
-    `| OpenAI generation status | ${statusLabel[status]} |`,
+    `| Updates in this release | ${updates.length} |`,
     "",
-    ...details,
   ];
+
+  if (boundaryNote) {
+    lines.push(`Boundary: ${boundaryNote}`, "");
+  }
+
+  if (collectionStatus === "no_source_ref") {
+    lines.push(
+      "SOURCE_REF が未設定のため元PR収集を行いませんでした。手動ドラフトのみが対象です。",
+      "",
+    );
+  }
+
+  if (decisions.length > 0) {
+    lines.push("| PR | Outcome | Detail |", "| --- | --- | --- |");
+    for (const decision of [...decisions].sort((a, b) => a.pullRequest - b.pullRequest)) {
+      const detail = decision.updateId
+        ? `${decision.reason} → ${decision.updateId}`
+        : decision.reason;
+      lines.push(`| #${decision.pullRequest} | ${OUTCOME_LABEL[decision.outcome]} | ${detail} |`);
+    }
+    lines.push("");
+  }
+
+  if (updates.length === 0) {
+    lines.push(
+      "今回のリリースで掲載される更新履歴はありません。上記の対象PRと理由を確認してください。",
+      "",
+    );
+  } else {
+    lines.push("### 掲載予定の更新履歴", "");
+    for (const update of updates) {
+      lines.push(`- ${update.id}: ${update.title}`);
+    }
+    lines.push("");
+  }
 
   const summary = `${lines.join("\n")}\n`;
   console.log(summary);

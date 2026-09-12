@@ -43,6 +43,8 @@ Production
 
 通常のAgent Delivery baseは `preview`、targetは `merge_ready`。
 
+preview向けPRの本文には `.github/pull_request_template.md` の更新履歴欄（`suzumemo-update` ブロック）に掲載方針と原稿または非掲載理由を必ず記入する。PR検証CIで欠落・不正はエラーになる。
+
 `PR created` はcheckpointであり完了ではない。ユーザーが明示的に「PR作成まで」と指定しない限り、latest PR contentのCI・review・conflict・mergeabilityを確認する。
 
 Task stateはCLI initで初期化する。現在値をtracked templateへ記入しない。公開前にCLI statusとstaged diffを確認する。
