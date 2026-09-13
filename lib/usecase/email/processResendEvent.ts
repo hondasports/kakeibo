@@ -37,6 +37,9 @@ export async function processResendEvent(
   } catch {
     throw new ConvexError("Invalid webhook payload JSON");
   }
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    throw new ConvexError("Invalid webhook payload JSON");
+  }
 
   const typedData = data as ResendWebhookPayloadData;
   const { providerMessageId, recipientEmail, eventCreatedAt } = extractResendEventFields(typedData);
