@@ -26,7 +26,7 @@ export async function listMyGroups(
       const group = await deps.groups.get(membership.groupId);
       if (group === null) return null;
       return {
-        groupId: group.id!,
+        groupId: group.id,
         name: group.name,
         clerkOrganizationId: group.clerkOrganizationId ?? null,
         role: membership.role,

@@ -4,14 +4,14 @@
  */
 import type { MutationCtx, QueryCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
-import type { GroupMemberFields } from "../../domain/groups/groupMember";
+import type { GroupMemberRecord } from "../../domain/groups/groupMember";
 import type {
   GroupMembershipReadRepository,
   GroupMembershipRepository,
 } from "../../domain/groups/groupMembershipRepository";
 import { readQueryDoc, readQueryDocs } from "../../../convex/groups/lib/groupQueryHelpers";
 
-function memberDocToFields(doc: Doc<"groupMembers">): GroupMemberFields {
+function memberDocToFields(doc: Doc<"groupMembers">): GroupMemberRecord {
   return {
     id: doc._id,
     groupId: doc.groupId,

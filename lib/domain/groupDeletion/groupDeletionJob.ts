@@ -48,9 +48,8 @@ export type GroupDeletionJobCounts = {
   groups: number;
 };
 
-/** groupDeletionJobs ドキュメントのフィールド。id は永続化済みの場合のみ存在する。 */
+/** groupDeletionJobs ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
 export type GroupDeletionJobFields = {
-  id?: string;
   targetGroupIdSnapshot: string;
   targetGroupNameSnapshot: string;
   source: GroupDeletionJobSource;
@@ -70,7 +69,10 @@ export type GroupDeletionJobFields = {
   completedAt?: number;
 };
 
+/** 永続化済みの groupDeletionJobs レコード。読み取り結果では id が必須。 */
+export type GroupDeletionJobRecord = GroupDeletionJobFields & { id: string };
+
 export interface GroupDeletionJobReader {
   /** ID で削除ジョブを1件取得する。 */
-  get(jobId: string): Promise<GroupDeletionJobFields | null>;
+  get(jobId: string): Promise<GroupDeletionJobRecord | null>;
 }

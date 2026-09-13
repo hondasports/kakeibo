@@ -24,7 +24,7 @@ export async function getGroupDeletionStatus(
     return null;
   }
   return {
-    jobId: job.id!,
+    jobId: job.id,
     groupName: job.targetGroupNameSnapshot,
     status: job.status,
     updatedAt: job.updatedAt,

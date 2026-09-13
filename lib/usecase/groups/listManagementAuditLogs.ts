@@ -38,7 +38,7 @@ export async function listManagementAuditLogs(
   );
 
   return logs.map((log) => ({
-    logId: log.id!,
+    logId: log.id,
     action: log.action,
     actorDisplayName: actorDisplayNamesByUserId.get(log.actorUserId) ?? "ユーザー",
     targetLabel: log.targetLabel ?? null,

@@ -41,11 +41,11 @@ export async function changeMemberRole(
   }
 
   if (currentRole === "owner" && args.newRole === "member") {
-    await deps.ownerTransition.assertAnotherOwnerRemains(ctx.groupId, targetMembership.id!);
+    await deps.ownerTransition.assertAnotherOwnerRemains(ctx.groupId, targetMembership.id);
   }
 
   const now = Date.now();
-  await deps.memberships.patch(targetMembership.id!, {
+  await deps.memberships.patch(targetMembership.id, {
     role: args.newRole,
     updatedAt: now,
   });

@@ -5,7 +5,7 @@
 import type { MutationCtx, QueryCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type {
-  GroupDeletionJobFields,
+  GroupDeletionJobRecord,
   GroupDeletionJobReader,
 } from "../../domain/groupDeletion/groupDeletionJob";
 import type { GroupDeletionWorkflowService } from "../../domain/groupDeletion/groupDeletionWorkflow";
@@ -13,7 +13,7 @@ import { countGroupDeletionImpact } from "../../../convex/groups/lib/groupDeleti
 import { resumeGroupDeletionHandler } from "../../../convex/groups/lib/groupDeletionResume";
 import { startGroupDeletionHandler } from "../../../convex/groups/lib/groupDeletionStart";
 
-function jobDocToFields(doc: Doc<"groupDeletionJobs">): GroupDeletionJobFields {
+function jobDocToFields(doc: Doc<"groupDeletionJobs">): GroupDeletionJobRecord {
   return {
     id: doc._id,
     targetGroupIdSnapshot: doc.targetGroupIdSnapshot,

@@ -7,9 +7,9 @@ import type {
   ManagementAuditLogReadRepository,
   ManagementAuditLogRecorder,
 } from "../../domain/groups/managementAuditLogRepository";
-import type { ManagementAuditLogFields } from "../../domain/groups/managementAudit";
+import type { ManagementAuditLogRecord } from "../../domain/groups/managementAudit";
 
-function auditDocToFields(doc: Doc<"managementAuditLogs">): ManagementAuditLogFields {
+function auditDocToFields(doc: Doc<"managementAuditLogs">): ManagementAuditLogRecord {
   return {
     id: doc._id,
     groupId: doc.groupId,

@@ -2,11 +2,11 @@
  * managementAuditLogs リポジトリのポート（domain interface）。
  * 実装は infrastructure 層（lib/convex）が提供する。
  */
-import type { ManagementAuditLogEntry, ManagementAuditLogFields } from "./managementAudit";
+import type { ManagementAuditLogEntry, ManagementAuditLogRecord } from "./managementAudit";
 
 export interface ManagementAuditLogReadRepository {
   /** グループの監査ログを createdAt 降順で取得する。limit 指定時は最大 limit 件。 */
-  listByGroupDesc(groupId: string, limit?: number): Promise<ManagementAuditLogFields[]>;
+  listByGroupDesc(groupId: string, limit?: number): Promise<ManagementAuditLogRecord[]>;
 }
 
 export interface ManagementAuditLogRecorder {
