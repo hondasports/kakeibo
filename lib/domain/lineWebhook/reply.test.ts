@@ -30,7 +30,9 @@ describe("replyForCompletedImageJob", () => {
   });
 
   it("skipReasonなし・未知状態はfetch失敗文へフォールバックする", () => {
-    expect(replyForCompletedImageJob({ status: "skipped" })).toBeTruthy();
+    expect(replyForCompletedImageJob({ status: "skipped" })).toBe(
+      replyForImageSkipReason("fetch_failed"),
+    );
     expect(replyForCompletedImageJob({ status: "pending" })).toBe(
       replyForImageSkipReason("fetch_failed"),
     );
