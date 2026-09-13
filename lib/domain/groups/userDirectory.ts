@@ -7,6 +7,8 @@ import type { GroupUserRecord } from "./groupUser";
 export interface UserDirectoryRead {
   /** 認証 userId（tokenIdentifier）でユーザーを1件取得する。 */
   findByUserId(userId: string): Promise<GroupUserRecord | null>;
+  /** users ドキュメントIDで1件取得する。 */
+  findByDocId(docId: string): Promise<GroupUserRecord | null>;
   /** メールアドレス（正規化済み）でユーザーを1件取得する。 */
   findByEmail(email: string): Promise<GroupUserRecord | null>;
 }

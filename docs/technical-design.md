@@ -418,6 +418,35 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
 - **状態遷移・エラー文言・メール payload/dedupe キー・子ジョブ生成の冪等性は
   不変**。internal endpoint 名と戻り値も維持する。
 
+`systemAdmin`（管理コンソール系）も同じハイブリッド方針で 4 層へ移行済み。
+
+- **既存純粋関数の維持**: `environment`（APP_ENV 解決）・`groupDeletion`
+  （エラーカテゴリ sanitize）・`membershipOperation`（操作 shape 検証）・
+  `reason`（理由正規化）は既に `lib/domain/systemAdmin/` に存在するためそのまま
+  利用し、検索クエリ正規化・SHA-256 ハッシュ・ページ件数検証を `searchQuery`、
+  systemAdmins/auditLogs/notifications のレコード型とポート、および検索面の
+  `SystemAdminSearchStore` を追加した。
+- **ポート**: `SystemAdminStore`（Reader 分離）・`SystemAdminAuditLogStore`
+  （Reader 分離・8 系統のインデックス選択はアダプタ側）・
+  `SystemAdminNotificationStore`・`SystemAdminSearchStore`（検索インデックス・
+  normalizeId・created_at ページネーションを隔離）。groups/accountDeletion 側の
+  既存ポート（`UserDirectory`・`GroupReadRepository`・`GroupMembershipRepository`・
+  `GroupInvitationRepository`・`GroupDeletionJobReader`・
+  `GroupDeletionWorkflowService`・`AccountDeletionRequestReader`）を再利用し、
+  `UserDirectoryRead.findByDocId`・`GroupUserRecord` の createdAt/updatedAt・
+  `GroupDeletionJobReader.paginate` のみ拡張した。
+- **ユースケース**（`lib/usecase/systemAdmin/`）: `requireSystemAdminActor` 認可
+  ゲート、管理者コンテキスト/一覧/監査一覧、grant/revoke/bootstrap/recover、
+  メンバーシップ 5 操作・ロール 2 操作・ownerless 復旧、検索 4 件
+  （監査 insert つき）、pending 招待 3 件、削除ジョブ一覧/再開を提供する。
+- **プレゼンテーション**: `convex/systemAdmin*.ts` は endpoint 定義と
+  `requireSystemAdmin` 互換シムのみを持ち、ctx.db/ctx.scheduler の直接アクセスは
+  ゼロ。`systemAdminPendingInvitationAction.ts` は `"use node"` の Clerk 連携
+  action として据え置き。
+- **監査フィールド・通知 dedupe キー（`auditId:recipientUserId` /
+  `auditId:user:...` / `auditId:email:...`）・payloadJson・エラー文言・
+  発生順序は不変**。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。

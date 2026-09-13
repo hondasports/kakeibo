@@ -15,11 +15,17 @@ function userDocToRecord(doc: Doc<"users">): GroupUserRecord {
     displayName: doc.displayName,
     email: doc.email,
     activeGroupId: doc.activeGroupId,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
   };
 }
 
 function userDirectoryRead(ctx: Pick<QueryCtx, "db">): UserDirectoryRead {
   return {
+    async findByDocId(docId) {
+      const doc = await ctx.db.get(docId as Id<"users">);
+      return doc === null ? null : userDocToRecord(doc);
+    },
     async findByUserId(userId) {
       const doc = await readQueryDoc(
         ctx.db.query("users").withIndex("by_token_identifier", (q) => q.eq("userId", userId)),

@@ -3,6 +3,8 @@
  * Convex の generated 型には依存せず、ID は string として扱う。
  * 実装は infrastructure 層（lib/convex）が提供する。
  */
+import type { PaginatedResult, PaginationOpts } from "../pagination";
+
 export type GroupDeletionJobSource = "owner" | "account_deletion" | "e2e_cleanup";
 
 export type GroupDeletionJobStatus =
@@ -76,4 +78,9 @@ export type GroupDeletionJobRecord = GroupDeletionJobFields & { id: string };
 export interface GroupDeletionJobReader {
   /** ID で削除ジョブを1件取得する。 */
   get(jobId: string): Promise<GroupDeletionJobRecord | null>;
+  /** updatedAt 降順でページネーションする。status 指定時はステータス絞り込み。 */
+  paginate(
+    filter: { status?: GroupDeletionJobStatus },
+    opts: PaginationOpts,
+  ): Promise<PaginatedResult<GroupDeletionJobRecord>>;
 }
