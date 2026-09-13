@@ -24,11 +24,23 @@ function memberDocToFields(doc: Doc<"groupMembers">): GroupMemberRecord {
 
 function createMembershipRead(ctx: Pick<QueryCtx, "db">): GroupMembershipReadRepository {
   return {
-    async listByUser(userId) {
-      const docs = await readQueryDocs(
-        ctx.db.query("groupMembers").withIndex("by_user_id", (q) => q.eq("userId", userId)),
-      );
+    async listByUser(userId, limit) {
+      const query = ctx.db
+        .query("groupMembers")
+        .withIndex("by_user_id", (q) => q.eq("userId", userId));
+      const docs = limit === undefined ? await readQueryDocs(query) : await query.take(limit);
       return docs.map(memberDocToFields);
+    },
+    async paginateByUser(userId, cursor, limit) {
+      const page = await ctx.db
+        .query("groupMembers")
+        .withIndex("by_user_id", (q) => q.eq("userId", userId))
+        .paginate({ cursor, numItems: limit });
+      return {
+        page: page.page.map(memberDocToFields),
+        isDone: page.isDone,
+        continueCursor: page.continueCursor,
+      };
     },
     async findByGroupAndUser(groupId, userId) {
       const doc = await readQueryDoc(
@@ -40,12 +52,11 @@ function createMembershipRead(ctx: Pick<QueryCtx, "db">): GroupMembershipReadRep
       );
       return doc === null ? null : memberDocToFields(doc);
     },
-    async listByGroup(groupId) {
-      const docs = await readQueryDocs(
-        ctx.db
-          .query("groupMembers")
-          .withIndex("by_group_id", (q) => q.eq("groupId", groupId as Id<"groups">)),
-      );
+    async listByGroup(groupId, limit) {
+      const query = ctx.db
+        .query("groupMembers")
+        .withIndex("by_group_id", (q) => q.eq("groupId", groupId as Id<"groups">));
+      const docs = limit === undefined ? await readQueryDocs(query) : await query.take(limit);
       return docs.map(memberDocToFields);
     },
     async listByGroupAndRole(groupId, role, limit) {

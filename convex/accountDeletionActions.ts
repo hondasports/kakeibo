@@ -4,23 +4,7 @@ import { createClerkClient } from "@clerk/backend";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-
-function safeError(error: unknown) {
-  const status =
-    typeof error === "object" && error !== null && "status" in error ? Number(error.status) : 0;
-  if (status === 404) return { kind: "already_deleted" as const };
-  if (status === 429 || status >= 500 || status === 0)
-    return {
-      kind: "retryable" as const,
-      code: "identity_deletion_failed",
-      message: "アカウント削除を完了できませんでした。時間をおいて再試行してください。",
-    };
-  return {
-    kind: "failed" as const,
-    code: "identity_deletion_failed",
-    message: "アカウント削除を完了できませんでした。もう一度お試しください。",
-  };
-}
+import { classifyClerkDeletionError } from "../lib/domain/accountDeletion/clerkError";
 
 export const processAccountDeletion = internalAction({
   args: { requestId: v.id("accountDeletionRequests") },
@@ -55,7 +39,7 @@ export const processAccountDeletion = internalAction({
         await createClerkClient({ secretKey }).users.deleteUser(request.clerkUserId);
       }
     } catch (error) {
-      const result = safeError(error);
+      const result = classifyClerkDeletionError(error);
       if (result.kind === "failed" || result.kind === "retryable") {
         await ctx.runMutation(internal.accountDeletion.scheduleRetry, {
           ...args,

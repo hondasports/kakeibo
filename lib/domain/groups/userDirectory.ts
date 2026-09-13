@@ -14,4 +14,6 @@ export interface UserDirectoryRead {
 export interface UserDirectory extends UserDirectoryRead {
   /** activeGroupId を更新する。undefined で解除する。 */
   setActiveGroup(docId: string, groupId: string | undefined, updatedAt: number): Promise<void>;
+  /** ユーザードキュメントを物理削除する（アカウント削除用）。 */
+  deleteById(docId: string): Promise<void>;
 }
