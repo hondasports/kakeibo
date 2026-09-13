@@ -447,6 +447,37 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   `auditId:user:...` / `auditId:email:...`）・payloadJson・エラー文言・
   発生順序は不変**。
 
+`lineWebhook`（LINE webhook 受信・案内/サマリ応答・画像処理・cleanup）も同じ
+ハイブリッド方針で 4 層へ移行済み。
+
+- **純粋関数**（`lib/domain/lineWebhook/`）: `payload`（payload 解析・
+  `LineWebhookPayloadError`）・`signature`（HMAC-SHA256 署名検証）・
+  `claimPlanning`（active link 一意性判定・イベント/ジョブ項目組み立て）・
+  `reply`（skip 理由・完了ジョブの応答文写像と
+  `LINE_UNLINKED_GUIDANCE_MESSAGE` の正本）。
+- **ポート**: `LineWebhookEventStore`/`LineImageJobStore`（Reader 分離）・
+  `LineAccountLinkReader`・`LineWebhookUserReader`（画像外部 API 同意）・
+  `LineActiveGroupResolver`（groups membership カーネルへ委譲）・
+  `LineSummaryDataReader`（receipts 側の既存 adapter 関数へ委譲）・
+  `LineWebhookScheduler`（mutation 側予約）。action 側は ctx.runQuery/
+  runMutation/scheduler を抽象化したランナーポート群（`actionRunner.ts`）を定義する。
+- **ユースケース**（`lib/usecase/lineWebhook/`）: `claimEvents`（dedupe・
+  delivery 分岐・原子予約）・`cleanupOldEvents`・`loadImageProcessingContext`・
+  `buildSummaryReply`・画像ジョブ遷移（skipped/drafted/failed）・
+  `sendUnlinkedGuide`・`sendSummaryReply`・`buildLinkedImageReply`/
+  `processLinkedImage`（リトライ規則を含む）。
+- **インフラ**（`lib/convex/lineWebhook/`）: 各ポートの Convex 実装、
+  LINE Messaging API / Rich Menu クライアント（旧 `client.ts`/
+  `richMenuClient.ts` の本体）、action ランナー、deps 組み立て。
+- **プレゼンテーション**: `convex/lineWebhook/*.ts` は endpoint 宣言・
+  validator・互換 export シムのみ。`webhook.ts` は HTTP 境界（raw body・
+  署名・payload 解析・413/401/400/200 応答）を担当し、mutation 呼び出しは
+  `webhookIngress` アダプタへ隔離。ctx.db/ctx.scheduler の直接アクセスは
+  プレゼンテーション層に残らない。
+- **冪等性・dedupe・画像ジョブ遷移・リトライ上限/遅延・cleanup 保持日数/
+  バッチサイズ・エラー文言・HTTP ステータスは不変**。endpoint 名・args・
+  returns も維持する。`lineLink` 本体の層移行は別 Issue とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
