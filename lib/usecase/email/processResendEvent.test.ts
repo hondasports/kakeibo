@@ -114,4 +114,14 @@ describe("processResendEvent", () => {
       }),
     ).rejects.toMatchObject({ data: "Invalid webhook payload JSON" });
   });
+
+  it.each(["null", "123", "[]"])(
+    "throws ConvexError for non-object payload %s",
+    async (payloadJson) => {
+      const deps = createDeps();
+      await expect(
+        processResendEvent(deps, { ...baseArgs, eventType: "email.delivered", payloadJson }),
+      ).rejects.toMatchObject({ data: "Invalid webhook payload JSON" });
+    },
+  );
 });
