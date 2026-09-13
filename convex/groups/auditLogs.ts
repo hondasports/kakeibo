@@ -1,61 +1,32 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import {
   MANAGEMENT_AUDIT_ACTION_LABELS,
   managementAuditLogListItemValidator,
 } from "./lib/managementAuditLogModel";
 import { requireGroupOwner } from "./membership";
+import {
+  listManagementAuditLogs as listManagementAuditLogsUsecase,
+  MANAGEMENT_AUDIT_LOG_LIST_LIMIT,
+} from "../../lib/usecase/groups/listManagementAuditLogs";
+import { createGroupQueryDeps } from "../../lib/convex/groups/groupUsecaseDeps";
 
-export const MANAGEMENT_AUDIT_LOG_LIST_LIMIT = 50;
-
-async function readQueryDoc<T>(queryHandle: {
-  unique: () => Promise<T | null>;
-}): Promise<T | null> {
-  return await queryHandle.unique();
-}
-
-async function loadActorDisplayNamesByUserId(
-  ctx: QueryCtx,
-  actorUserIds: string[],
-): Promise<Map<string, string>> {
-  const uniqueActorUserIds = [...new Set(actorUserIds)];
-  const actorDisplayNamesByUserId = new Map<string, string>();
-
-  await Promise.all(
-    uniqueActorUserIds.map(async (actorUserId) => {
-      const actor = await readQueryDoc(
-        ctx.db.query("users").withIndex("by_token_identifier", (q) => q.eq("userId", actorUserId)),
-      );
-      actorDisplayNamesByUserId.set(actorUserId, actor?.displayName ?? "ユーザー");
-    }),
-  );
-
-  return actorDisplayNamesByUserId;
-}
+export { MANAGEMENT_AUDIT_LOG_LIST_LIMIT };
 
 export async function listManagementAuditLogsHandler(ctx: QueryCtx) {
   const { groupId } = await requireGroupOwner(ctx);
 
-  const logs = await ctx.db
-    .query("managementAuditLogs")
-    .withIndex("by_group_id_and_created_at", (q) => q.eq("groupId", groupId))
-    .order("desc")
-    .take(MANAGEMENT_AUDIT_LOG_LIST_LIMIT);
-
-  const actorDisplayNamesByUserId = await loadActorDisplayNamesByUserId(
-    ctx,
-    logs.map((log) => log.actorUserId),
-  );
-
+  const logs = await listManagementAuditLogsUsecase({ groupId }, createGroupQueryDeps(ctx));
   return logs.map((log) => ({
-    _id: log._id,
+    _id: log.logId as Id<"managementAuditLogs">,
     action: log.action,
     actionLabel: MANAGEMENT_AUDIT_ACTION_LABELS[log.action],
-    actorDisplayName: actorDisplayNamesByUserId.get(log.actorUserId) ?? "ユーザー",
-    targetLabel: log.targetLabel ?? null,
-    beforeValue: log.beforeValue ?? null,
-    afterValue: log.afterValue ?? null,
+    actorDisplayName: log.actorDisplayName,
+    targetLabel: log.targetLabel,
+    beforeValue: log.beforeValue,
+    afterValue: log.afterValue,
     createdAt: log.createdAt,
   }));
 }

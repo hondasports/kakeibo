@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { createGroupMembershipReadRepository } from "../../lib/convex/groups/convexGroupMembershipRepository";
 import {
   getGroupAdminErrorMessage,
   validateActiveGroupScope,
@@ -61,12 +62,13 @@ export async function assertAnotherGroupOwnerRemains(
   groupId: Id<"groups">,
   demotedMembershipId: Id<"groupMembers">,
 ): Promise<void> {
-  const owners = await ctx.db
-    .query("groupMembers")
-    .withIndex("by_group_id_and_role", (q) => q.eq("groupId", groupId).eq("role", "owner"))
-    .take(2);
+  const owners = await createGroupMembershipReadRepository(ctx).listByGroupAndRole(
+    groupId,
+    "owner",
+    2,
+  );
 
-  if (!owners.some((owner) => owner._id !== demotedMembershipId)) {
+  if (!owners.some((owner) => owner.id !== demotedMembershipId)) {
     throw new ConvexError(GROUP_ADMIN_ERRORS.LAST_OWNER_PROTECTED);
   }
 }

@@ -1,14 +1,13 @@
-import { ConvexError } from "convex/values";
 import type { MutationCtx } from "../../../../convex/_generated/server";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { assertActiveGroupScope } from "../../../../convex/groups/adminGuards";
 import {
   invitationEmailsMatch,
   normalizeEmail,
 } from "../../../../convex/groups/lib/groupEmailMatching";
 import { readQueryDocs } from "../../../../convex/groups/lib/groupQueryHelpers";
-import { recordManagementAuditLog } from "../../../../convex/groups/lib/managementAuditLog";
 import { requireGroupOwner } from "../../../../convex/groups/membership";
+import { cancelPendingGroupInvitation } from "../../../usecase/groups/cancelPendingGroupInvitation";
+import { createGroupMutationDeps } from "../groupUsecaseDeps";
 
 export async function revokePendingGroupInvitationsForEmailInGroup(
   ctx: MutationCtx,
@@ -44,32 +43,9 @@ export async function cancelPendingGroupInvitationHandler(
   args: { invitationId: Id<"groupInvitations"> },
 ) {
   const { groupId, userId } = await requireGroupOwner(ctx);
-  const invitation = await ctx.db.get(args.invitationId);
-
-  if (invitation === null) {
-    throw new ConvexError("招待が見つかりません");
-  }
-
-  assertActiveGroupScope(groupId, invitation.groupId);
-
-  if (invitation.status !== "pending") {
-    throw new ConvexError("この招待は取り消せません");
-  }
-
-  const clerkInvitationIds = await revokePendingGroupInvitationsForEmailInGroup(
-    ctx,
-    groupId,
-    invitation.email,
+  return await cancelPendingGroupInvitation(
+    { groupId, userId },
+    createGroupMutationDeps(ctx),
+    args,
   );
-
-  await recordManagementAuditLog(ctx, {
-    groupId,
-    actorUserId: userId,
-    action: "invitation_revoked",
-    targetKind: "invitation",
-    targetId: invitation._id,
-    targetLabel: invitation.email,
-  });
-
-  return { clerkInvitationIds };
 }

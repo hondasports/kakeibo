@@ -1,19 +1,12 @@
 import type { MutationCtx } from "../../_generated/server";
-import { enqueueTransactionalEmailJobHandler } from "../../email/jobs";
+import { createGroupEmailNotificationQueue } from "../../../lib/convex/groups/convexGroupEmailNotifications";
 
 export async function enqueueGroupMembershipRemovedEmail(
   ctx: MutationCtx,
   groupName: string,
   recipientEmail: string | undefined,
 ): Promise<void> {
-  if (!recipientEmail) {
-    return;
-  }
-  await enqueueTransactionalEmailJobHandler(ctx, {
-    templateType: "group_membership_removed",
-    payloadJson: JSON.stringify({ groupName }),
-    recipientEmail,
-  });
+  await createGroupEmailNotificationQueue(ctx).membershipRemoved({ groupName, recipientEmail });
 }
 
 export async function enqueueGroupRoleChangedEmail(
@@ -23,12 +16,10 @@ export async function enqueueGroupRoleChangedEmail(
   newRole: "owner" | "member",
   recipientEmail: string | undefined,
 ): Promise<void> {
-  if (!recipientEmail) {
-    return;
-  }
-  await enqueueTransactionalEmailJobHandler(ctx, {
-    templateType: "group_role_changed",
-    payloadJson: JSON.stringify({ groupName, previousRole, newRole }),
+  await createGroupEmailNotificationQueue(ctx).roleChanged({
+    groupName,
+    previousRole,
+    newRole,
     recipientEmail,
   });
 }
@@ -38,14 +29,7 @@ export async function enqueueGroupOwnershipReceivedEmail(
   groupName: string,
   recipientEmail: string | undefined,
 ): Promise<void> {
-  if (!recipientEmail) {
-    return;
-  }
-  await enqueueTransactionalEmailJobHandler(ctx, {
-    templateType: "group_ownership_received",
-    payloadJson: JSON.stringify({ groupName }),
-    recipientEmail,
-  });
+  await createGroupEmailNotificationQueue(ctx).ownershipReceived({ groupName, recipientEmail });
 }
 
 export async function enqueueGroupOwnershipTransferredEmail(
@@ -54,12 +38,9 @@ export async function enqueueGroupOwnershipTransferredEmail(
   newOwnerDisplayName: string,
   recipientEmail: string | undefined,
 ): Promise<void> {
-  if (!recipientEmail) {
-    return;
-  }
-  await enqueueTransactionalEmailJobHandler(ctx, {
-    templateType: "group_ownership_transferred",
-    payloadJson: JSON.stringify({ groupName, newOwnerDisplayName }),
+  await createGroupEmailNotificationQueue(ctx).ownershipTransferred({
+    groupName,
+    newOwnerDisplayName,
     recipientEmail,
   });
 }
@@ -70,12 +51,8 @@ export async function enqueueGroupDeletedEmail(
   recipientEmail: string | undefined,
   businessDedupeKey?: string,
 ): Promise<void> {
-  if (!recipientEmail) {
-    return;
-  }
-  await enqueueTransactionalEmailJobHandler(ctx, {
-    templateType: "group_deleted",
-    payloadJson: JSON.stringify({ groupName }),
+  await createGroupEmailNotificationQueue(ctx).groupDeleted({
+    groupName,
     recipientEmail,
     businessDedupeKey,
   });
@@ -87,10 +64,8 @@ export async function enqueueGroupDeletionStartedEmail(
   recipientEmail: string | undefined,
   businessDedupeKey: string,
 ): Promise<void> {
-  if (!recipientEmail) return;
-  await enqueueTransactionalEmailJobHandler(ctx, {
-    templateType: "group_deletion_started",
-    payloadJson: JSON.stringify({ groupName }),
+  await createGroupEmailNotificationQueue(ctx).deletionStarted({
+    groupName,
     recipientEmail,
     businessDedupeKey,
   });
@@ -103,10 +78,9 @@ export async function enqueueGroupDeletionFailedEmail(
   recipientEmail: string | undefined,
   businessDedupeKey: string,
 ): Promise<void> {
-  if (!recipientEmail) return;
-  await enqueueTransactionalEmailJobHandler(ctx, {
-    templateType: "group_deletion_failed",
-    payloadJson: JSON.stringify({ groupName, jobId }),
+  await createGroupEmailNotificationQueue(ctx).deletionFailed({
+    groupName,
+    jobId,
     recipientEmail,
     businessDedupeKey,
   });
