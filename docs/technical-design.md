@@ -476,7 +476,24 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   プレゼンテーション層に残らない。
 - **冪等性・dedupe・画像ジョブ遷移・リトライ上限/遅延・cleanup 保持日数/
   バッチサイズ・エラー文言・HTTP ステータスは不変**。endpoint 名・args・
-  returns も維持する。`lineLink` 本体の層移行は別 Issue とする。
+  returns も維持する。
+
+`lineLink`（LINE Login OAuth/PKCE・連携状態・TTL cleanup）も同じ方針で 4 層へ
+移行済み。
+
+- **純粋関数**（`lib/domain/lineLink/`）: 公開 feedback 写像、integration mode
+  判定、ID token claims 検証、request claim/finalize と link 競合の判定。
+- **ポート**: `LineLinkRequestStore`・`LineAccountLinkStore`・
+  `LineLinkAuditLogStore`、action 側の内部 mutation bridge、request expiry scheduler、
+  LINE provider client。
+- **ユースケース**（`lib/usecase/lineLink/`）: OAuth開始/完了、request作成・claim・
+  finalize・失敗記録・期限削除、状態照会・解除、E2E cleanup。
+- **インフラ**（`lib/convex/lineLink/`）: Convexストア、scheduler、action runner、
+  LINE token/verify API client、依存組み立て。lineWebhook側のintegration mode参照も
+  presentation経由ではなく、このinfra境界を共有する。
+- **プレゼンテーション**: `convex/lineLink/*.ts` はendpoint宣言・validator・認証境界・
+  互換exportのみを持つ。OAuth endpoint/parameter、10分TTL、PKCE/nonce検証、
+  active link競合・revoke順序、監査ログ、公開feedback、args/returnsは不変とする。
 
 ### 5.4 スタイリング責務
 

@@ -17,11 +17,6 @@ export const lineLinkAuditActionValidator = v.union(
   v.literal("failed"),
 );
 
-export type LineLinkFeedback = {
-  result: "success" | "failure";
-  code: "success" | "expired" | "invalid" | "conflict" | "failed";
-};
-
 export const lineLinkFeedbackValidator = v.object({
   result: v.union(v.literal("success"), v.literal("failure")),
   code: v.union(
@@ -34,32 +29,6 @@ export const lineLinkFeedbackValidator = v.object({
 });
 
 /** 外部連携の内部詳細をUIへ伝播させないための有限な結果コード。 */
-export function getLineLinkFeedback(reason: string): LineLinkFeedback {
-  switch (reason) {
-    case "SUCCESS":
-      return { result: "success", code: "success" };
-    case "STATE_EXPIRED":
-      return { result: "failure", code: "expired" };
-    case "LINE_LINK_CONFLICT":
-      return { result: "failure", code: "conflict" };
-    case "INVALID_CALLBACK":
-    case "INVALID_NONCE":
-    case "INVALID_AUDIENCE":
-    case "INVALID_ISSUER":
-    case "INVALID_EXPIRY":
-      return { result: "failure", code: "invalid" };
-    default:
-      return { result: "failure", code: "failed" };
-  }
-}
-
-export function getLineIntegrationMode(): "mock" | "real" {
-  const mode = process.env.LINE_INTEGRATION_MODE;
-  if (mode !== "mock" && mode !== "real") {
-    throw new Error("LINE integration mode is unavailable");
-  }
-  if (mode === "mock" && process.env.APP_ENV === "production") {
-    throw new Error("LINE mock mode is not available in production");
-  }
-  return mode;
-}
+export { getLineLinkFeedback } from "../../lib/domain/lineLink/feedback";
+export type { LineLinkFeedback } from "../../lib/domain/lineLink/feedback";
+export { getLineIntegrationMode } from "../../lib/convex/lineLink/lineIntegrationConfig";

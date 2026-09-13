@@ -7,7 +7,7 @@ import {
   MAX_LINE_IMAGE_RAW_BYTES,
   type LineImageContent,
 } from "../../domain/lineImage/content";
-import { getLineIntegrationMode } from "../../../convex/lineLink/model";
+import { getLineIntegrationMode } from "../lineLink/lineIntegrationConfig";
 import { getAppBaseUrl } from "../../email/url";
 import {
   LINE_WEB_APP_PATH,
