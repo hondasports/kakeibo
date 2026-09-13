@@ -57,7 +57,7 @@ export async function acceptGroupInvitationForVerifiedEmails(
     await deps.users.setActiveGroup(user.docId, invite.groupId, now);
   }
 
-  await deps.invitations.patch(invite.id!, {
+  await deps.invitations.patch(invite.id, {
     status: "accepted",
     acceptedByUserId: args.acceptedUserId,
     acceptedAt: now,

@@ -18,9 +18,8 @@ export type ManagementAuditAction =
 
 export type ManagementAuditTargetKind = "group" | "member" | "invitation";
 
-/** managementAuditLogs ドキュメントのフィールド。id は永続化済みの場合のみ存在する。 */
+/** managementAuditLogs ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
 export type ManagementAuditLogFields = {
-  id?: string;
   groupId: string;
   actorUserId: string;
   action: ManagementAuditAction;
@@ -32,5 +31,8 @@ export type ManagementAuditLogFields = {
   createdAt: number;
 };
 
+/** 永続化済みの managementAuditLogs レコード。読み取り結果では id が必須。 */
+export type ManagementAuditLogRecord = ManagementAuditLogFields & { id: string };
+
 /** 記録時に指定する監査ログの内容。createdAt は記録側が付与する。 */
-export type ManagementAuditLogEntry = Omit<ManagementAuditLogFields, "id" | "createdAt">;
+export type ManagementAuditLogEntry = Omit<ManagementAuditLogFields, "createdAt">;

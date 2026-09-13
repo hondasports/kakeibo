@@ -3,10 +3,10 @@
  */
 import type { MutationCtx, QueryCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
-import type { GroupFields } from "../../domain/groups/group";
+import type { GroupRecord } from "../../domain/groups/group";
 import type { GroupReadRepository, GroupRepository } from "../../domain/groups/groupRepository";
 
-function groupDocToFields(doc: Doc<"groups">): GroupFields {
+function groupDocToFields(doc: Doc<"groups">): GroupRecord {
   return {
     id: doc._id,
     name: doc.name,

@@ -46,7 +46,7 @@ export async function removeMember(
     targetUser?.displayName?.trim() || targetUser?.email?.trim() || args.targetUserId;
   const groupName = group.name;
 
-  await deps.memberships.delete(targetMembership.id!);
+  await deps.memberships.delete(targetMembership.id);
 
   const remainingMemberships = await deps.memberships.listByUser(args.targetUserId);
   const removedTargetUser = targetUser;

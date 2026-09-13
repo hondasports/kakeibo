@@ -44,7 +44,7 @@ export async function transferGroupOwnership(
     targetUser?.displayName?.trim() || targetUser?.email?.trim() || args.targetUserId;
 
   const now = Date.now();
-  await deps.memberships.patch(targetMembership.id!, {
+  await deps.memberships.patch(targetMembership.id, {
     role: "owner",
     updatedAt: now,
   });

@@ -4,9 +4,8 @@
  */
 import type { GroupLifecycleStatus } from "./lifecycle";
 
-/** groups ドキュメントのフィールド。id は永続化済みの場合のみ存在する。 */
+/** groups ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
 export type GroupFields = {
-  id?: string;
   name: string;
   clerkOrganizationId?: string;
   status?: GroupLifecycleStatus;
@@ -14,3 +13,6 @@ export type GroupFields = {
   createdAt: number;
   updatedAt: number;
 };
+
+/** 永続化済みの groups レコード。読み取り結果では id が必須。 */
+export type GroupRecord = GroupFields & { id: string };

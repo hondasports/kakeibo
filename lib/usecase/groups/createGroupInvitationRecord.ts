@@ -29,12 +29,12 @@ export async function createGroupInvitationRecord(
   const existing = await deps.invitations.findByToken(args.token);
 
   if (existing) {
-    await deps.invitations.patch(existing.id!, {
+    await deps.invitations.patch(existing.id, {
       status: "pending",
       updatedAt: now,
       ...(args.clerkInvitationId ? { clerkInvitationId: args.clerkInvitationId } : {}),
     });
-    return existing.id!;
+    return existing.id;
   }
 
   await deps.invitationCleanup.revokeForEmail(args.groupId, args.email);

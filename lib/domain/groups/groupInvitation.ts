@@ -4,9 +4,8 @@
  */
 export type GroupInvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 
-/** groupInvitations ドキュメントのフィールド。id は永続化済みの場合のみ存在する。 */
+/** groupInvitations ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
 export type GroupInvitationFields = {
-  id?: string;
   groupId: string;
   email: string;
   token: string;
@@ -18,3 +17,6 @@ export type GroupInvitationFields = {
   createdAt: number;
   updatedAt: number;
 };
+
+/** 永続化済みの groupInvitations レコード。読み取り結果では id が必須。 */
+export type GroupInvitationRecord = GroupInvitationFields & { id: string };

@@ -14,6 +14,6 @@ export async function deletePendingGroupInvitationRecordByToken(
     return null;
   }
 
-  await deps.invitations.delete(existing.id!);
-  return existing.id!;
+  await deps.invitations.delete(existing.id);
+  return existing.id;
 }

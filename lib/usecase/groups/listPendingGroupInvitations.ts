@@ -21,7 +21,7 @@ export async function listPendingGroupInvitations(
 
   return dedupePendingInvitationsByEmail(
     invitations.map((invitation) => ({
-      invitationId: invitation.id!,
+      invitationId: invitation.id,
       email: invitation.email,
       status: "pending" as const,
       createdAt: invitation.createdAt,
