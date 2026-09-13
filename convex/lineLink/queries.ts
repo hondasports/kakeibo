@@ -1,6 +1,8 @@
-import { query } from "../_generated/server";
 import { v } from "convex/values";
+import { query } from "../_generated/server";
 import { requireAuthenticatedUserId } from "../users/auth";
+import { createLineLinkQueryDeps } from "../../lib/convex/lineLink/lineLinkDeps";
+import { getLineLinkStatus } from "../../lib/usecase/lineLink/statusAndUnlink";
 
 export const getStatus = query({
   args: {},
@@ -10,15 +12,6 @@ export const getStatus = query({
   ),
   handler: async (ctx) => {
     const userId = await requireAuthenticatedUserId(ctx);
-    const activeLink = await ctx.db
-      .query("lineAccountLinks")
-      .withIndex("by_user_id_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
-      .order("desc")
-      .first();
-
-    // LINE userIdはクライアントへ返さない。
-    return activeLink
-      ? { status: "linked" as const, linkedAt: activeLink.linkedAt }
-      : { status: "unlinked" as const };
+    return getLineLinkStatus(createLineLinkQueryDeps(ctx).accountLinks, userId);
   },
 });

@@ -2,7 +2,7 @@
  * LINE リッチメニュー適用クライアント（infrastructure adapter）。
  * scripts/apply-line-rich-menu.ts から直接利用される運用ツール。
  */
-import { getLineIntegrationMode } from "../../../convex/lineLink/model";
+import { getLineIntegrationMode } from "../lineLink/lineIntegrationConfig";
 import {
   LINE_RICH_MENU_NAME,
   buildLineRichMenuObject,
