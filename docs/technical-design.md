@@ -314,9 +314,10 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
 同様に `lib/domain/groups/role.ts` は `GroupRole` 型とロールラベル関数を提供し、
 フロントエンド・バックエンドの重複を解消する。
 
-#### 5.3.1 集約・リポジトリ・ユースケース（expenseEntries / receipts / aiExpenseDrafts）
+#### 5.3.1 集約・リポジトリ・ユースケース（expenseEntries / receipts / aiExpenseDrafts / groups）
 
-`expenseEntries` / `receipts` / 支出一括操作（spending bulk ops）と `aiExpenseDrafts` では、
+`expenseEntries` / `receipts` / 支出一括操作（spending bulk ops）と `aiExpenseDrafts`、
+および `groups` では、
 ミノ駆動流の「知識をドメインオブジェクトへ寄せる」方針で 4 層に分離している。
 
 | 層 | 配置 | 役割 |
@@ -358,6 +359,28 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   それを継承する書き込みポートに分離する。
 - `convex/aiExpenseDrafts/internal.ts` や `e2eDraftFixtures` 系の internal/E2E 専用
   エンドポイントは層移行の対象外とする。
+
+`groups` ではハイブリッド（集約 class ではなくフィールド型 + 純粋ドメイン関数 +
+ドメインサービス・ポート）を使い、次の点を重視する。
+
+- **共有認可カーネル**（`convex/groups/membership.ts`）: `requireGroupMembership` 等は
+  categories・weekSessions・receiptAnalysisJobs・aiExpenseDrafts・lineWebhook など
+  複数ドメインから呼ばれるため、関数名・シグネチャ・エラー文言を維持したまま内部を
+  ポート（`GroupMembershipReadRepository` / `UserDirectoryRead`）経由化している。
+- **ドメインサービス・ポート**（`lib/domain/groups/groupServices.ts`）: 監査ログ
+  （`ManagementAuditLog`）、メールキュー投入（`GroupEmailQueue`）、招待クリーンアップ
+  （`GroupInvitationCleanup`）、アカウント削除ガード（`GroupAccountDeletionGuard`）、
+  最後の owner 保護（`GroupOwnerTransitionGuard`）を interface として宣言し、
+  `lib/convex/groups/` のアダプタが既存実装（`convex/groups/lib/*`・`adminGuards`）へ
+  委譲する。これにより既存の委譲経路（spy 検証を含む）が保持される。
+- **クエリモック互換**: Convex クエリ読み出しは `convex/groups/lib/groupQueryHelpers.ts`
+  の `readQueryDoc(s)` 経由に統一し、インメモリテストモックのフォールバック
+  （`collect` → `take` → `unique`）を維持する。
+- **削除オーケストレーション**（`convex/groups/lib/groupDeletion*.ts` 群）は多テーブル
+  横断の大規模パイプラインのため別フェーズとして分離し、本フェーズでは
+  要求・プレビュー・ステータス参照の表面のみユースケース経由に移行した。
+  ジョブレコード型・ワークフローポートは `lib/domain/groupDeletion/` に追加済み。
+- `convex/groups/e2e.ts`（E2E 専用フィクスチャ）は層移行の対象外とする。
 
 ### 5.4 スタイリング責務
 
