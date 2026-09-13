@@ -530,6 +530,27 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   エラー文言、HTTP status、dedupe・retry間隔・30日保持・batch100・呼出順序は
   不変とする。
 
+`categories`（グループ共有カテゴリの CRUD・デフォルト seed・E2E cleanup）も
+4層へ移行済み。既存の `lib/domain/categories/`（normalize・defaults・usability・
+candidate・CategoryRepository port）を再利用し、endpoint 向けの完全形状と
+ルールを追加した。
+
+- **純粋関数**（`lib/domain/categories/`）: seed patch 判定（legacy色refresh・
+  description補完）、上限検証、sortOrder 決定（max+1）、所有権検証、E2E prefix
+  検証。完全形状の `CategoryStoreRecord` と `CategoryStore` ポートを持つ。
+- **ユースケース**（`lib/usecase/categories/`）: seed（sortOrder 既存なら
+  patch 判定・無ければ insert）、create（normalize・上限・sortOrder）、
+  update/deactivate（ownership・patch・get返却）、listActive/listForSettings、
+  E2E cleanup（prefix一致削除・ensure）。
+- **インフラ**（`lib/convex/categories/`）: `CategoryStore` の Convex 実装
+  （`createCategoryStore`）と query 用読み取り専用 `createCategoryReader`、
+  Doc/Record 変換。既存 `createCategoryRepository`（usability 用最小ポート）は
+  無変更で維持する。
+- **プレゼンテーション**: `convex/categories/*.ts` は endpoint・validator・
+  group認可・互換export（`*Handler`・`E2E_CATEGORY_NAME_PREFIX`・定数再export・
+  `./normalize` ラッパ）のみ。endpoint名、args/returns、エラー文言、seed 分岐、
+  上限判定、E2E挙動は不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
