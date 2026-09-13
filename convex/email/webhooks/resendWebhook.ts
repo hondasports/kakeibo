@@ -1,8 +1,7 @@
 import { Resend, type WebhookEventPayload } from "resend";
 import { httpAction } from "../../_generated/server";
-import { internal } from "../../_generated/api";
-import { EMAIL_WEBHOOK_EVENT_TYPES } from "../model";
-import type { EmailWebhookEventType } from "../../../lib/email/model";
+import { isResendWebhookEventType } from "../../../lib/domain/email/rules";
+import { createResendEventSubmitter } from "../../../lib/convex/email/emailEventSubmitter";
 
 type WebhookVerifier = (
   payload: Parameters<Resend["webhooks"]["verify"]>[0],
@@ -31,14 +30,14 @@ export function createResendWebhookHandler(
 
     const processedAt = Date.now();
 
-    if (!(EMAIL_WEBHOOK_EVENT_TYPES as unknown as readonly string[]).includes(event.type)) {
+    if (!isResendWebhookEventType(event.type)) {
       return new Response("ok", { status: 200 });
     }
 
-    await ctx.runMutation(internal.email.webhooks.processResendEvent.processResendEvent, {
+    await createResendEventSubmitter(ctx).submit({
       svixId: id,
       provider: "resend",
-      eventType: event.type as EmailWebhookEventType,
+      eventType: event.type,
       payloadJson: JSON.stringify(event.data),
       processedAt,
     });
