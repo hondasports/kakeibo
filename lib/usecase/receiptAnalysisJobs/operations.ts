@@ -240,14 +240,25 @@ export async function deleteReceiptAnalysisDataByUserBatch(
 ): Promise<{ deletedBatchCount: number; deletedJobCount: number; hasMore: boolean }> {
   const limit = clampReceiptAnalysisCleanupLimit(args.limit);
   const batches = await store.takeBatchesByGroupAndUser(args.groupId, args.userId, limit);
+  let deletedBatchCount = 0;
   let deletedJobCount = 0;
+  let retainedBatch = false;
   for (const batch of batches) {
     const jobs = await store.listJobsByBatch(batch.id, 100);
     for (const job of jobs) {
       await store.deleteJob(job.id);
       deletedJobCount += 1;
     }
+    if (jobs.length === 100) {
+      retainedBatch = true;
+      continue;
+    }
     await store.deleteBatch(batch.id);
+    deletedBatchCount += 1;
   }
-  return { deletedBatchCount: batches.length, deletedJobCount, hasMore: batches.length === limit };
+  return {
+    deletedBatchCount,
+    deletedJobCount,
+    hasMore: retainedBatch || batches.length === limit,
+  };
 }
