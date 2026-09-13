@@ -1,20 +1,28 @@
 import { v } from "convex/values";
 import { internalQuery, internalMutation } from "../_generated/server";
+import {
+  findEmailJobDocByProviderMessageId,
+  getEmailJobDocument,
+  createEmailJobStore,
+} from "../../lib/convex/email/convexEmailJobStore";
+import {
+  findLatestEmailEventDocForProviderMessageId,
+  getEmailEventDocBySvixId,
+} from "../../lib/convex/email/convexEmailWebhookEventStore";
+import { deleteTestEmailRecords as deleteTestEmailRecordsUsecase } from "../../lib/usecase/email/deleteTestRecords";
+import { createDeleteTestEmailRecordsDeps } from "../../lib/convex/email/emailDeps";
 
 export const getJobById = internalQuery({
   args: { jobId: v.id("transactionalEmailJobs") },
   handler: async (ctx, { jobId }) => {
-    return await ctx.db.get(jobId);
+    return await getEmailJobDocument(ctx, jobId);
   },
 });
 
 export const getJobByProviderMessageId = internalQuery({
   args: { providerMessageId: v.string() },
   handler: async (ctx, { providerMessageId }) => {
-    return await ctx.db
-      .query("transactionalEmailJobs")
-      .withIndex("by_provider_message_id", (q) => q.eq("providerMessageId", providerMessageId))
-      .unique();
+    return await findEmailJobDocByProviderMessageId(ctx, providerMessageId);
   },
 });
 
@@ -28,16 +36,7 @@ export const updateJobForSend = internalMutation({
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.jobId, {
-      providerMessageId: args.providerMessageId,
-      status: args.status,
-      html: args.html,
-      text: args.text,
-      updatedAt: args.updatedAt,
-      nextRetryAt: undefined,
-      errorMessage: undefined,
-      errorCode: undefined,
-    });
+    await createEmailJobStore(ctx).markJobSent(args);
   },
 });
 
@@ -52,14 +51,7 @@ export const updateJobForRetry = internalMutation({
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.jobId, {
-      status: args.status,
-      attemptCount: args.attemptCount,
-      nextRetryAt: args.nextRetryAt,
-      errorMessage: args.errorMessage,
-      errorCode: args.errorCode,
-      updatedAt: args.updatedAt,
-    });
+    await createEmailJobStore(ctx).markJobRetrying(args);
   },
 });
 
@@ -72,13 +64,7 @@ export const updateJobForFailure = internalMutation({
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.jobId, {
-      status: args.status,
-      errorMessage: args.errorMessage,
-      errorCode: args.errorCode,
-      nextRetryAt: undefined,
-      updatedAt: args.updatedAt,
-    });
+    await createEmailJobStore(ctx).markJobTerminal(args);
   },
 });
 
@@ -97,25 +83,14 @@ export const updateJobStatusFromWebhook = internalMutation({
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.jobId, {
-      status: args.status,
-      lastProviderEventAt: args.lastProviderEventAt,
-      updatedAt: args.updatedAt,
-    });
+    await createEmailJobStore(ctx).updateJobStatusFromWebhook(args);
   },
 });
 
 export const getLatestWebhookEventForProviderMessageId = internalQuery({
   args: { providerMessageId: v.string() },
   handler: async (ctx, { providerMessageId }) => {
-    const events = await ctx.db
-      .query("emailWebhookEvents")
-      .withIndex("by_provider_message_id_and_event_created_at", (q) =>
-        q.eq("providerMessageId", providerMessageId),
-      )
-      .order("desc")
-      .take(1);
-    return events[0] ?? null;
+    return await findLatestEmailEventDocForProviderMessageId(ctx, providerMessageId);
   },
 });
 
@@ -124,56 +99,15 @@ export const deleteTestEmailRecords = internalMutation({
     normalizedEmail: v.string(),
   },
   handler: async (ctx, { normalizedEmail }) => {
-    const jobs = await ctx.db
-      .query("transactionalEmailJobs")
-      .withIndex("by_normalized_recipient_email", (q) =>
-        q.eq("normalizedRecipientEmail", normalizedEmail),
-      )
-      .collect();
-    const providerMessageIds = new Set<string>();
-    for (const job of jobs) {
-      await ctx.db.delete(job._id);
-      if (job.providerMessageId) {
-        providerMessageIds.add(job.providerMessageId);
-      }
-    }
-
-    const suppressions = await ctx.db
-      .query("emailSuppressions")
-      .withIndex("by_normalized_email", (q) => q.eq("normalizedEmail", normalizedEmail))
-      .collect();
-    for (const suppression of suppressions) {
-      await ctx.db.delete(suppression._id);
-    }
-
-    let deletedWebhookEvents = 0;
-    for (const providerMessageId of providerMessageIds) {
-      const events = await ctx.db
-        .query("emailWebhookEvents")
-        .withIndex("by_provider_message_id_and_event_created_at", (q) =>
-          q.eq("providerMessageId", providerMessageId),
-        )
-        .collect();
-      for (const event of events) {
-        await ctx.db.delete(event._id);
-        deletedWebhookEvents++;
-      }
-    }
-
-    return {
-      deletedJobs: jobs.length,
-      deletedSuppressions: suppressions.length,
-      deletedWebhookEvents,
-    };
+    return await deleteTestEmailRecordsUsecase(createDeleteTestEmailRecordsDeps(ctx), {
+      normalizedEmail,
+    });
   },
 });
 
 export const getWebhookEventBySvixId = internalQuery({
   args: { svixId: v.string() },
   handler: async (ctx, { svixId }) => {
-    return await ctx.db
-      .query("emailWebhookEvents")
-      .withIndex("by_svix_id", (q) => q.eq("svixId", svixId))
-      .unique();
+    return await getEmailEventDocBySvixId(ctx, svixId);
   },
 });

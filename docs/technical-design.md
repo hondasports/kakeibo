@@ -509,6 +509,27 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   group認可・互換handlerへ薄化する。expectedDraftId/updatedAt CAS、stale draft削除、
   1時間後通知、一覧/cleanup上限、エラー文言、args/returnsは不変とする。
 
+`email`（transactionalメールジョブ・Resend送信・webhook・suppression・cleanup）も
+4層へ移行済み。
+
+- **純粋関数**（`lib/domain/email/`）: 終端status判定、送信失敗plan（retryable・
+  maxAttempts・delay表）、新規jobフィールド構築、webhook payload抽出・鮮度比較・
+  対象event type判定、cleanup cutoff/batch規則、status/suppression解決。
+  job/suppression/webhookEventレコード型とstore/scheduler/runner/senderポートを持つ。
+- **ユースケース**（`lib/usecase/email/`）: enqueue（payload検証・正規化・
+  businessDedupeKey冪等・0ms schedule）、processEmailJob（終端/抑制/payload/
+  送信結果の分岐とretry再予約）、processResendEvent（svixId dedupe・event記録・
+  鮮度比較・status更新・suppression upsert）、cleanup、suppression upsert、
+  E2E用テストレコード削除。
+- **インフラ**（`lib/convex/email/`）: 3テーブルのConvex storeとDoc/Record変換、
+  scheduler、action/webhook向けrunQuery/runMutationブリッジ、Resend provider選択
+  （APP_ENV/RESEND_API_KEY/RESEND_FROM_ADDRESS）、from解決、httpActionの
+  event submitter、依存組み立て。
+- **プレゼンテーション**: `convex/email/*.ts` はendpoint宣言・validator・
+  HTTP境界（署名検証・status応答）・互換handlerのみ。endpoint名、args/returns、
+  エラー文言、HTTP status、dedupe・retry間隔・30日保持・batch100・呼出順序は
+  不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
