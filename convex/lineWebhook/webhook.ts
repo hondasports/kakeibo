@@ -1,7 +1,10 @@
 import { httpAction } from "../_generated/server";
-import { internal } from "../_generated/api";
-import { parseLineWebhookPayload, LineWebhookPayloadError } from "./model";
-import { verifyLineSignature } from "./signature";
+import {
+  parseLineWebhookPayload,
+  LineWebhookPayloadError,
+} from "../../lib/domain/lineWebhook/payload";
+import { verifyLineSignature } from "../../lib/domain/lineWebhook/signature";
+import { runClaimEvents } from "../../lib/convex/lineWebhook/webhookIngress";
 
 export const MAX_RAW_BODY_BYTES = 1_000_000;
 
@@ -88,7 +91,7 @@ export function createLineWebhookHandler(
       return new Response("Bad Request", { status: 400 });
     }
 
-    await ctx.runMutation(internal.lineWebhook.internal.claimEvents, { events });
+    await runClaimEvents(ctx, events);
 
     return new Response("ok", { status: 200 });
   });

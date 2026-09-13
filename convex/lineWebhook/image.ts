@@ -1,31 +1,12 @@
 import { internalAction } from "../_generated/server";
-import { internal } from "../_generated/api";
 import type { ActionCtx } from "../_generated/server";
-import type { Doc, Id } from "../_generated/dataModel";
 import { v } from "convex/values";
-import { mapExtractionToDraftArgs } from "../../lib/domain/aiExpenseDrafts/extractionMapping";
-import { LineImageContentTooLargeError, toImageDataUrl } from "../../lib/domain/lineImage/content";
+import { createLineWebhookActionDeps } from "../../lib/convex/lineWebhook/lineWebhookDeps";
+import { getLineMessageContent } from "./client";
 import {
-  LINE_IMAGE_CONSENT_REQUIRED_MESSAGE,
-  LINE_IMAGE_FETCH_FAILED_MESSAGE,
-  LINE_IMAGE_INVALID_MESSAGE,
-  LINE_IMAGE_TOO_LARGE_MESSAGE,
-  buildLineImageReviewUrl,
-  formatLineImageAnalysisFailedReply,
-  formatLineImageDraftCreatedReply,
-} from "../../lib/domain/lineImage/reply";
-import {
-  LINE_NO_GROUP_MESSAGE,
-  LINE_UNRESOLVED_GROUP_MESSAGE,
-} from "../../lib/domain/lineSummary/reply";
-import { getSafeFailureWarning } from "../../lib/convex/receiptImageExtraction/analyzeReceiptImageCore";
-import { extractReceiptFieldsFromImage } from "../receiptImageExtraction/extraction";
-import { LINE_UNLINKED_GUIDANCE_MESSAGE, getLineMessageContent, sendLineTextReply } from "./client";
-import type { LineImageJobStatus, LineImageSkipReason } from "./model";
-
-const IMAGE_RETRY_DELAY_MS = 1_000;
-const MAX_IMAGE_RETRIES = 2;
-const LINE_IMAGE_FILE_NAME = "line-receipt.jpg";
+  buildLinkedImageReply as buildLinkedImageReplyUseCase,
+  processLinkedImage as processLinkedImageUseCase,
+} from "../../lib/usecase/lineWebhook/processLinkedImage";
 
 type ProcessLinkedImageArgs = {
   replyToken: string;
@@ -35,88 +16,11 @@ type ProcessLinkedImageArgs = {
   attempt?: number;
 };
 
-type ImageJobSnapshot = {
-  status: LineImageJobStatus;
-  skipReason?: LineImageSkipReason;
-  draftId?: Id<"aiExpenseDrafts">;
-};
-
-function replyForSkipReason(reason: LineImageSkipReason): string {
-  switch (reason) {
-    case "unlinked":
-      return LINE_UNLINKED_GUIDANCE_MESSAGE;
-    case "no_consent":
-      return LINE_IMAGE_CONSENT_REQUIRED_MESSAGE;
-    case "no_group":
-      return LINE_NO_GROUP_MESSAGE;
-    case "unresolved_group":
-      return LINE_UNRESOLVED_GROUP_MESSAGE;
-    case "invalid_image":
-      return LINE_IMAGE_INVALID_MESSAGE;
-    case "too_large":
-      return LINE_IMAGE_TOO_LARGE_MESSAGE;
-    case "fetch_failed":
-      return LINE_IMAGE_FETCH_FAILED_MESSAGE;
-  }
-}
-
-function replyForCompletedJob(job: ImageJobSnapshot): string {
-  const reviewUrl = buildLineImageReviewUrl();
-  if (job.status === "drafted") {
-    return formatLineImageDraftCreatedReply(reviewUrl);
-  }
-  if (job.status === "failed") {
-    return formatLineImageAnalysisFailedReply(reviewUrl);
-  }
-  if (job.status === "skipped" && job.skipReason) {
-    return replyForSkipReason(job.skipReason);
-  }
-  return LINE_IMAGE_FETCH_FAILED_MESSAGE;
-}
-
-async function skipJob(
-  ctx: ActionCtx,
-  webhookEventId: string,
-  skipReason: LineImageSkipReason,
-): Promise<string> {
-  await ctx.runMutation(internal.lineWebhook.internal.markImageJobSkipped, {
-    webhookEventId,
-    skipReason,
-  });
-  return replyForSkipReason(skipReason);
-}
-
-async function createDraftFromImage(
-  ctx: ActionCtx,
-  args: {
-    userId: string;
-    imageDataUrl: string;
-    categories: Array<{ _id: Id<"categories">; name: string; description?: string }>;
-  },
-): Promise<Doc<"aiExpenseDrafts">> {
-  try {
-    const extracted = await extractReceiptFieldsFromImage({
-      imageDataUrl: args.imageDataUrl,
-      categories: args.categories.map((category) => ({
-        name: category.name,
-        description: category.description,
-      })),
-    });
-    const draftArgs = mapExtractionToDraftArgs(extracted, args.categories, LINE_IMAGE_FILE_NAME);
-    return await ctx.runMutation(internal.aiExpenseDrafts.internal.createFromExtractionForUser, {
-      userId: args.userId,
-      ...draftArgs,
-    });
-  } catch (error) {
-    return await ctx.runMutation(
-      internal.aiExpenseDrafts.internal.createFailedDraftFromImageAnalysisForUser,
-      {
-        userId: args.userId,
-        warning: getSafeFailureWarning(error),
-        imageFileName: LINE_IMAGE_FILE_NAME,
-      },
-    );
-  }
+function withContentReader(ctx: ActionCtx, getContent: typeof getLineMessageContent) {
+  return {
+    ...createLineWebhookActionDeps(ctx),
+    contentReader: { getMessageContent: getContent },
+  };
 }
 
 export async function buildLinkedImageReply(
@@ -124,69 +28,7 @@ export async function buildLinkedImageReply(
   args: ProcessLinkedImageArgs,
   getContent: typeof getLineMessageContent = getLineMessageContent,
 ): Promise<string> {
-  const job = await ctx.runQuery(internal.lineWebhook.internal.getImageJob, {
-    webhookEventId: args.webhookEventId,
-  });
-  if (job === null) {
-    return LINE_IMAGE_FETCH_FAILED_MESSAGE;
-  }
-  if (job.status !== "pending") {
-    return replyForCompletedJob(job);
-  }
-
-  const context = await ctx.runQuery(internal.lineWebhook.internal.loadImageProcessingContext, {
-    userId: job.userId,
-  });
-  if (!context.hasUniqueActiveLink) {
-    return await skipJob(ctx, args.webhookEventId, "unlinked");
-  }
-  if (!context.hasConsent) {
-    return await skipJob(ctx, args.webhookEventId, "no_consent");
-  }
-  if (context.groupStatus === "no_group") {
-    return await skipJob(ctx, args.webhookEventId, "no_group");
-  }
-  if (context.groupStatus !== "resolved" || context.groupId === undefined) {
-    return await skipJob(ctx, args.webhookEventId, "unresolved_group");
-  }
-
-  let content;
-  try {
-    content = await getContent(job.messageId);
-  } catch (error) {
-    if (error instanceof LineImageContentTooLargeError) {
-      return await skipJob(ctx, args.webhookEventId, "too_large");
-    }
-    return await skipJob(ctx, args.webhookEventId, "fetch_failed");
-  }
-
-  const dataUrl = toImageDataUrl(content);
-  if (!dataUrl.ok) {
-    return await skipJob(
-      ctx,
-      args.webhookEventId,
-      dataUrl.error === "too_large" ? "too_large" : "invalid_image",
-    );
-  }
-
-  const draft = await createDraftFromImage(ctx, {
-    userId: job.userId,
-    imageDataUrl: dataUrl.dataUrl,
-    categories: context.categories,
-  });
-  if (draft.status === "failed") {
-    await ctx.runMutation(internal.lineWebhook.internal.markImageJobFailed, {
-      webhookEventId: args.webhookEventId,
-      draftId: draft._id,
-    });
-    return formatLineImageAnalysisFailedReply(buildLineImageReviewUrl());
-  }
-
-  await ctx.runMutation(internal.lineWebhook.internal.markImageJobDrafted, {
-    webhookEventId: args.webhookEventId,
-    draftId: draft._id,
-  });
-  return formatLineImageDraftCreatedReply(buildLineImageReviewUrl());
+  return await buildLinkedImageReplyUseCase(withContentReader(ctx, getContent), args);
 }
 
 export async function processLinkedImageHandler(
@@ -194,36 +36,7 @@ export async function processLinkedImageHandler(
   args: ProcessLinkedImageArgs,
   getContent: typeof getLineMessageContent = getLineMessageContent,
 ) {
-  const attempt = args.attempt ?? 0;
-  try {
-    const replyText = await buildLinkedImageReply(ctx, args, getContent);
-    if (args.replyToken) {
-      await sendLineTextReply(args.replyToken, replyText);
-    }
-  } catch {
-    if (attempt < MAX_IMAGE_RETRIES) {
-      await ctx.scheduler.runAfter(
-        IMAGE_RETRY_DELAY_MS,
-        internal.lineWebhook.image.processLinkedImage,
-        {
-          replyToken: args.replyToken,
-          userId: args.userId,
-          webhookEventId: args.webhookEventId,
-          messageId: args.messageId,
-          attempt: attempt + 1,
-        },
-      );
-      return null;
-    }
-    console.error("LINE image processing failed", {
-      webhookEventId: args.webhookEventId,
-      attempt,
-    });
-    await ctx.runMutation(internal.lineWebhook.internal.markImageJobFailed, {
-      webhookEventId: args.webhookEventId,
-    });
-  }
-  return null;
+  return await processLinkedImageUseCase(withContentReader(ctx, getContent), args);
 }
 
 export const processLinkedImage = internalAction({
