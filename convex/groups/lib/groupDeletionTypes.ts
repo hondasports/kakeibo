@@ -1,5 +1,6 @@
 import type { TableNames } from "../../_generated/dataModel";
-import { GROUP_DELETION_PURGE_TABLES } from "./groupDeletionRegistry";
+import type { PurgeStage as DomainPurgeStage } from "../../../lib/domain/groupDeletion/stages";
+import type { StageProgress as DeletionStageProgress } from "../../../lib/usecase/groupDeletion/runPurgeStage";
 
-export type PurgeStage = (typeof GROUP_DELETION_PURGE_TABLES)[number] & TableNames;
-export type StageProgress = { deleted: number; storageFiles: number };
+export type PurgeStage = DomainPurgeStage & TableNames;
+export type StageProgress = DeletionStageProgress;
