@@ -495,6 +495,20 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   互換exportのみを持つ。OAuth endpoint/parameter、10分TTL、PKCE/nonce検証、
   active link競合・revoke順序、監査ログ、公開feedback、args/returnsは不変とする。
 
+`receiptAnalysisJobs`（複数画像解析batch・AI draft世代管理・レビュー通知）も4層へ
+移行済み。
+
+- **純粋関数**（`lib/domain/receiptAnalysisJobs/`）: retry/cancel許可、batch完了状態、
+  terminal通知判定、cleanup上限。batch/jobレコード型とstore/scheduler/actionポートを持つ。
+- **ユースケース**（`lib/usecase/receiptAnalysisJobs/`）: batch/job作成・一覧・retry・cancel、
+  解析attemptの開始/確定、世代競合時のdraft整理、processedCount/final status、
+  AIレビュー通知、ユーザー単位cleanup、画像解析オーケストレーション。
+- **インフラ**（`lib/convex/receiptAnalysisJobs/`）: Convex store/scheduler、
+  receiptImageExtraction・aiExpenseDrafts・emailへのaction runner、Doc/Record変換。
+- **プレゼンテーション**: `convex/receiptAnalysisJobs/*.ts` はendpoint・validator・
+  group認可・互換handlerへ薄化する。expectedDraftId/updatedAt CAS、stale draft削除、
+  1時間後通知、一覧/cleanup上限、エラー文言、args/returnsは不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
