@@ -3,23 +3,30 @@ import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { requireGroupMembership } from "../groups/membership";
+import {
+  batchRecordToDoc,
+  jobRecordToDoc,
+} from "../../lib/convex/receiptAnalysisJobs/convexReceiptAnalysisStore";
+import { createReceiptAnalysisQueryDeps } from "../../lib/convex/receiptAnalysisJobs/receiptAnalysisDeps";
+import {
+  getReceiptAnalysisJobByDraftId,
+  listReceiptAnalysisBatches,
+  listReceiptAnalysisJobs,
+  listReceiptAnalysisJobsByBatch,
+} from "../../lib/usecase/receiptAnalysisJobs/queries";
 
 export async function listBatchesHandler(ctx: QueryCtx) {
   const { groupId } = await requireGroupMembership(ctx);
-  return await ctx.db
-    .query("receiptAnalysisBatches")
-    .withIndex("by_group_id_and_created_at", (q) => q.eq("groupId", groupId))
-    .order("desc")
-    .take(50);
+  return (
+    await listReceiptAnalysisBatches(createReceiptAnalysisQueryDeps(ctx).reader, groupId)
+  ).map(batchRecordToDoc);
 }
 
 export async function listJobsHandler(ctx: QueryCtx) {
   const { groupId } = await requireGroupMembership(ctx);
-  return await ctx.db
-    .query("receiptAnalysisImageJobs")
-    .withIndex("by_group_id_and_status", (q) => q.eq("groupId", groupId))
-    .order("desc")
-    .take(100);
+  return (await listReceiptAnalysisJobs(createReceiptAnalysisQueryDeps(ctx).reader, groupId)).map(
+    jobRecordToDoc,
+  );
 }
 
 export async function listJobsByBatchHandler(
@@ -27,15 +34,18 @@ export async function listJobsByBatchHandler(
   { batchId }: { batchId: Id<"receiptAnalysisBatches"> },
 ) {
   const { groupId } = await requireGroupMembership(ctx);
-  const batch = await ctx.db.get(batchId);
-  if (!batch || batch.groupId !== groupId) {
-    throw new ConvexError("Batch not found");
+  try {
+    return (
+      await listReceiptAnalysisJobsByBatch(
+        createReceiptAnalysisQueryDeps(ctx).reader,
+        groupId,
+        batchId,
+      )
+    ).map(jobRecordToDoc);
+  } catch (error) {
+    if (error instanceof ConvexError) throw error;
+    throw new ConvexError(error instanceof Error ? error.message : "Unknown error");
   }
-  return await ctx.db
-    .query("receiptAnalysisImageJobs")
-    .withIndex("by_batch_id", (q) => q.eq("batchId", batchId))
-    .order("asc")
-    .take(50);
 }
 
 export async function getJobByDraftIdHandler(
@@ -43,36 +53,21 @@ export async function getJobByDraftIdHandler(
   { draftId }: { draftId: Id<"aiExpenseDrafts"> },
 ) {
   const { groupId } = await requireGroupMembership(ctx);
-  const job = await ctx.db
-    .query("receiptAnalysisImageJobs")
-    .withIndex("by_draft_id", (q) => q.eq("draftId", draftId))
-    .unique();
-  if (!job || job.groupId !== groupId) {
-    return null;
-  }
-  return job;
+  const job = await getReceiptAnalysisJobByDraftId(
+    createReceiptAnalysisQueryDeps(ctx).reader,
+    groupId,
+    draftId,
+  );
+  return job === null ? null : jobRecordToDoc(job);
 }
 
-export const listBatches = query({
-  args: {},
-  handler: listBatchesHandler,
-});
-
-export const listJobs = query({
-  args: {},
-  handler: listJobsHandler,
-});
-
+export const listBatches = query({ args: {}, handler: listBatchesHandler });
+export const listJobs = query({ args: {}, handler: listJobsHandler });
 export const listJobsByBatch = query({
-  args: {
-    batchId: v.id("receiptAnalysisBatches"),
-  },
+  args: { batchId: v.id("receiptAnalysisBatches") },
   handler: listJobsByBatchHandler,
 });
-
 export const getJobByDraftId = query({
-  args: {
-    draftId: v.id("aiExpenseDrafts"),
-  },
+  args: { draftId: v.id("aiExpenseDrafts") },
   handler: getJobByDraftIdHandler,
 });
