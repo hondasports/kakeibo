@@ -6,13 +6,26 @@
 import type { GroupMemberFields, GroupMemberRecord } from "./groupMember";
 import type { GroupRole } from "./role";
 
+/** ページネーション結果（メンバーシップ走査用）。 */
+export type GroupMembershipPage = {
+  page: GroupMemberRecord[];
+  isDone: boolean;
+  continueCursor: string;
+};
+
 export interface GroupMembershipReadRepository {
-  /** ユーザーのメンバーシップを全件取得する。 */
-  listByUser(userId: string): Promise<GroupMemberRecord[]>;
+  /** ユーザーのメンバーシップを取得する。limit 指定時は最大 limit 件の bounded read。 */
+  listByUser(userId: string, limit?: number): Promise<GroupMemberRecord[]>;
+  /** ユーザーのメンバーシップをカーソル付きページネーションで取得する。 */
+  paginateByUser(
+    userId: string,
+    cursor: string | null,
+    limit: number,
+  ): Promise<GroupMembershipPage>;
   /** グループ×ユーザーのメンバーシップを1件取得する。 */
   findByGroupAndUser(groupId: string, userId: string): Promise<GroupMemberRecord | null>;
-  /** グループのメンバーシップを全件取得する。 */
-  listByGroup(groupId: string): Promise<GroupMemberRecord[]>;
+  /** グループのメンバーシップを取得する。limit 指定時は最大 limit 件の bounded read。 */
+  listByGroup(groupId: string, limit?: number): Promise<GroupMemberRecord[]>;
   /** グループ内の指定ロールのメンバーシップを取得する。limit 指定時は最大 limit 件。 */
   listByGroupAndRole(
     groupId: string,

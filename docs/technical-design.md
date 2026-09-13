@@ -392,6 +392,32 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
 - `convex/groups/e2e.ts`（E2E 専用フィクスチャ）は層移行の対象外とするが、
   `deleteAllGroupScopedData` 内部はユースケースへ委譲済み。
 
+`accountDeletion` も同じハイブリッド方針で 4 層へ移行済み。
+
+- **既存純粋関数の維持**: `classification`・`confirmation`・`errorCategory`・
+  `resume`・`retry`・`status` は既に `lib/domain/accountDeletion/` に存在するため
+  そのまま利用し、Clerk 削除エラー分類（`clerkError`）を追加した。
+- **ポート**: `AccountDeletionRequestStore`（Reader 分離）・
+  `AccountDeletionGroupPurgeStore`・`AccountDeletionUserDataPurgeStore`・
+  `AccountDeletionScheduler`、および汎用 `TransactionalEmailQueue`
+  （`lib/domain/email/`）を定義。グループ側の既存ポート
+  （`GroupMembershipRepository`・`GroupReadRepository`・`UserDirectory`・
+  `GroupDeletionJobStore`・`GroupDeletionWorkflowService`・
+  `GroupInvitationCleanupService`）を再利用し、bounded read（`limit` 引数）と
+  ページネーション（`paginateByUser`）、ユーザー物理削除（`deleteById`）のみ拡張した。
+- **ユースケース**（`lib/usecase/accountDeletion/`）: 分類・孤立 membership 回収・
+  進行中ガードの共有 helper と、プレビュー/ステータス参照、退会リクエスト開始、
+  リトライ、failed purge リセット、準備バッチ、purge 進捗確認、mark 系、
+  finalize、完了リクエスト掃除を 1 操作 1 関数で提供する。
+- **プレゼンテーション**: `convex/accountDeletion.ts` は endpoint 定義と
+  `loadAccountDeletionClassification` / `deleteOrphanedGroupMemberships` /
+  `assertAccountDeletionNotInProgress` の互換シムのみを持ち、
+  ctx.db/ctx.scheduler の直接アクセスはゼロ。`convex/accountDeletionActions.ts` は
+  `"use node"` の Clerk 連携 action として骨格を維持し、エラー分類のみ
+  ドメイン関数へ置き換えた。
+- **状態遷移・エラー文言・メール payload/dedupe キー・子ジョブ生成の冪等性は
+  不変**。internal endpoint 名と戻り値も維持する。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。

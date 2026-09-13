@@ -44,6 +44,9 @@ export function createUserDirectory(ctx: Pick<MutationCtx, "db">): UserDirectory
         updatedAt,
       });
     },
+    async deleteById(docId) {
+      await ctx.db.delete(docId as Id<"users">);
+    },
   };
 }
 
