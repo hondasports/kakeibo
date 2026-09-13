@@ -63,6 +63,7 @@ export type GroupDeletionJobFields = {
   lastErrorCategory?: string;
   snapshotCursor?: string;
   failureNotificationHandledAt?: number;
+  failureNotificationAttemptCount?: number;
   deletedCounts: GroupDeletionJobCounts;
   createdAt: number;
   updatedAt: number;

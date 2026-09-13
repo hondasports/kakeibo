@@ -376,11 +376,21 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
 - **クエリモック互換**: Convex クエリ読み出しは `convex/groups/lib/groupQueryHelpers.ts`
   の `readQueryDoc(s)` 経由に統一し、インメモリテストモックのフォールバック
   （`collect` → `take` → `unique`）を維持する。
-- **削除オーケストレーション**（`convex/groups/lib/groupDeletion*.ts` 群）は多テーブル
-  横断の大規模パイプラインのため別フェーズとして分離し、本フェーズでは
-  要求・プレビュー・ステータス参照の表面のみユースケース経由に移行した。
-  ジョブレコード型・ワークフローポートは `lib/domain/groupDeletion/` に追加済み。
-- `convex/groups/e2e.ts`（E2E 専用フィクスチャ）は層移行の対象外とする。
+- **削除オーケストレーション**（`convex/groups/lib/groupDeletion*.ts` 群）も
+  4層へ移行済み。ステージ順序・遷移判定・リトライ計画・影響集計の純粋関数は
+  `lib/domain/groupDeletion/`（`stages`・`jobTransitions`・`counts`・`impact`・
+  `retry`）、オーケストレーションは `lib/usecase/groupDeletion/`（`startGroupDeletion`・
+  `resumeGroupDeletion`・`processGroupDeletionBatch`・
+  `processRecipientNotificationBatch`・`processGroupDeletionFailureNotification`・
+  `recordBatchRetry`・`runPurgeStage`・`countGroupDeletionImpact`・
+  `deleteAllGroupScopedData`）、テーブル横断の ctx.db/scheduler/storage アクセスは
+  `lib/convex/groupDeletion/` のアダプタ（`GroupDeletionJobStore`・
+  `GroupDeletionPurgeStore`・`GroupDeletionRecipientStore`・`GroupDeletionScheduler`）
+  へ隔離した。`convex/groups/lib/groupDeletion*.ts` は export 名・シグネチャを
+  維持した互換シムとなり、internal endpoint 名・ステージ順序・削除カウント・
+  通知 dedupe キー・エラーメッセージは不変。
+- `convex/groups/e2e.ts`（E2E 専用フィクスチャ）は層移行の対象外とするが、
+  `deleteAllGroupScopedData` 内部はユースケースへ委譲済み。
 
 ### 5.4 スタイリング責務
 

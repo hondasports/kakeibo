@@ -1,50 +1,15 @@
 /**
  * GroupDeletionWorkflowService / GroupDeletionJobReader の Convex 実装。
- * 削除オーケストレーション内部は既存の groupDeletion lib ハンドラへ委譲する。
+ * オーケストレーションは groupDeletion ユースケースへ委譲する。
  */
 import type { MutationCtx, QueryCtx } from "../../../convex/_generated/server";
-import type { Doc, Id } from "../../../convex/_generated/dataModel";
-import type {
-  GroupDeletionJobRecord,
-  GroupDeletionJobReader,
-} from "../../domain/groupDeletion/groupDeletionJob";
 import type { GroupDeletionWorkflowService } from "../../domain/groupDeletion/groupDeletionWorkflow";
-import { countGroupDeletionImpact } from "../../../convex/groups/lib/groupDeletionImpact";
-import { resumeGroupDeletionHandler } from "../../../convex/groups/lib/groupDeletionResume";
-import { startGroupDeletionHandler } from "../../../convex/groups/lib/groupDeletionStart";
+import { countGroupDeletionImpact } from "../../usecase/groupDeletion/countGroupDeletionImpact";
+import { resumeGroupDeletion } from "../../usecase/groupDeletion/resumeGroupDeletion";
+import { startGroupDeletion } from "../../usecase/groupDeletion/startGroupDeletion";
+import { createGroupDeletionMutationDeps, createGroupDeletionQueryDeps } from "./groupDeletionDeps";
 
-function jobDocToFields(doc: Doc<"groupDeletionJobs">): GroupDeletionJobRecord {
-  return {
-    id: doc._id,
-    targetGroupIdSnapshot: doc.targetGroupIdSnapshot,
-    targetGroupNameSnapshot: doc.targetGroupNameSnapshot,
-    source: doc.source,
-    actorUserIdSnapshot: doc.actorUserIdSnapshot,
-    status: doc.status,
-    stage: doc.stage,
-    isActive: doc.isActive,
-    attemptCount: doc.attemptCount,
-    maxAttempts: doc.maxAttempts,
-    nextRetryAt: doc.nextRetryAt,
-    lastErrorCategory: doc.lastErrorCategory,
-    snapshotCursor: doc.snapshotCursor,
-    failureNotificationHandledAt: doc.failureNotificationHandledAt,
-    deletedCounts: doc.deletedCounts,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt,
-    completedAt: doc.completedAt,
-  };
-}
-
-/** 読み取り専用コンテキスト（query）向けのジョブ参照。 */
-export function createGroupDeletionJobReader(ctx: Pick<QueryCtx, "db">): GroupDeletionJobReader {
-  return {
-    async get(jobId) {
-      const doc = await ctx.db.get(jobId as Id<"groupDeletionJobs">);
-      return doc === null ? null : jobDocToFields(doc);
-    },
-  };
-}
+export { createGroupDeletionJobReader } from "./convexGroupDeletionJobStore";
 
 /** 読み取り専用コンテキスト（query）向けの影響件数集計。 */
 export function createGroupDeletionQueryService(
@@ -52,7 +17,7 @@ export function createGroupDeletionQueryService(
 ): Pick<GroupDeletionWorkflowService, "countImpact"> {
   return {
     async countImpact(groupId) {
-      return await countGroupDeletionImpact(ctx, groupId as Id<"groups">);
+      return await countGroupDeletionImpact(createGroupDeletionQueryDeps(ctx), groupId);
     },
   };
 }
@@ -60,19 +25,13 @@ export function createGroupDeletionQueryService(
 export function createGroupDeletionWorkflowService(ctx: MutationCtx): GroupDeletionWorkflowService {
   return {
     async start(args) {
-      return await startGroupDeletionHandler(ctx, {
-        groupId: args.groupId as Id<"groups">,
-        source: args.source,
-        actorUserIdSnapshot: args.actorUserIdSnapshot,
-      });
+      return await startGroupDeletion(createGroupDeletionMutationDeps(ctx), args);
     },
     async resume(args) {
-      return await resumeGroupDeletionHandler(ctx, {
-        jobId: args.jobId as Id<"groupDeletionJobs">,
-      });
+      return await resumeGroupDeletion(createGroupDeletionMutationDeps(ctx), args);
     },
     async countImpact(groupId) {
-      return await countGroupDeletionImpact(ctx, groupId as Id<"groups">);
+      return await countGroupDeletionImpact(createGroupDeletionQueryDeps(ctx), groupId);
     },
   };
 }
