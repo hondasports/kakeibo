@@ -1,25 +1,28 @@
 import { ConvexError, v } from "convex/values";
+import type { Infer } from "convex/values";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
-  getNormalizeReasonErrorMessage,
-  normalizeSystemAdminReason,
-} from "../lib/domain/systemAdmin/reason";
-import {
   getResolveAppEnvironmentErrorMessage,
   resolveAppEnvironment,
   type AppEnvironment,
 } from "../lib/domain/systemAdmin/environment";
-
-function normalizeReason(reason: string): string {
-  const result = normalizeSystemAdminReason(reason);
-  if (!result.success) {
-    throw new ConvexError(getNormalizeReasonErrorMessage(result.error));
-  }
-  return result.reason;
-}
+import {
+  createSystemAdminMutationDeps,
+  createSystemAdminQueryDeps,
+} from "../lib/convex/systemAdmin/systemAdminDeps";
+import {
+  bootstrapSystemAdmin as bootstrapSystemAdminUsecase,
+  getMySystemAdminContext as getMySystemAdminContextUsecase,
+  grantSystemAdmin as grantSystemAdminUsecase,
+  listSystemAdminAuditLogs as listSystemAdminAuditLogsUsecase,
+  listSystemAdmins as listSystemAdminsUsecase,
+  recoverSystemAdmin as recoverSystemAdminUsecase,
+  requireSystemAdminActor,
+  revokeSystemAdmin as revokeSystemAdminUsecase,
+} from "../lib/usecase/systemAdmin";
 
 function getAppEnvironment(expected?: string): AppEnvironment {
   const result = resolveAppEnvironment(process.env.APP_ENV, expected);
@@ -100,92 +103,36 @@ const systemAdminAuditItemValidator = v.object({
   afterOwnerCount: v.optional(v.number()),
   createdAt: v.number(),
 });
+const listSystemAdminsResultValidator = v.object({
+  ...paginationResultValidator(systemAdminListItemValidator).fields,
+  hasAnotherActiveAdmin: v.boolean(),
+});
+const listAuditLogsResultValidator = v.object({
+  ...paginationResultValidator(systemAdminAuditItemValidator).fields,
+});
 
 type DbCtx = Pick<QueryCtx, "db" | "auth"> | Pick<MutationCtx, "db" | "auth">;
 
-async function findUserByTokenIdentifier(ctx: DbCtx, tokenIdentifier: string) {
-  return ctx.db
-    .query("users")
-    .withIndex("by_token_identifier", (q) => q.eq("userId", tokenIdentifier))
-    .unique();
-}
-
-export async function requireSystemAdmin(ctx: DbCtx) {
+/**
+ * システム管理者認可ゲート（互換シム）。
+ * 旧実装の返却 shape（identity/user Doc/admin Doc）を維持する。
+ */
+export async function requireSystemAdmin(ctx: DbCtx): Promise<{
+  identity: { tokenIdentifier: string };
+  user: Doc<"users">;
+  admin: Doc<"systemAdmins">;
+}> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new ConvexError("システム管理者権限が必要です");
-  const user = await findUserByTokenIdentifier(ctx, identity.tokenIdentifier);
-  if (!user) throw new ConvexError("システム管理者権限が必要です");
-  let admin: Doc<"systemAdmins"> | null;
-  try {
-    admin = await ctx.db
-      .query("systemAdmins")
-      .withIndex("by_user_id", (q) => q.eq("userId", user._id))
-      .unique();
-  } catch {
-    throw new ConvexError("システム管理者権限が必要です");
-  }
-  if (!admin || admin.status !== "active") {
-    throw new ConvexError("システム管理者権限が必要です");
-  }
-  return { identity, user, admin };
-}
-
-async function insertNotifications(
-  ctx: MutationCtx,
-  action: Doc<"systemAdminNotifications">["action"],
-  targetUserId: Id<"users">,
-  auditId: Id<"systemAdminAuditLogs">,
-  environment: AppEnvironment,
-) {
-  const recipients = new Set<Id<"users">>([targetUserId]);
-  let cursor: string | null = null;
-  while (true) {
-    const page = await ctx.db
-      .query("systemAdmins")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .paginate({ cursor, numItems: 100 });
-    for (const admin of page.page) recipients.add(admin.userId);
-    if (page.isDone) break;
-    cursor = page.continueCursor;
-  }
-  const payloadJson = JSON.stringify({ action, targetUserId, environment });
-  const now = Date.now();
-  for (const recipientUserId of recipients) {
-    const dedupeKey = `${auditId}:${recipientUserId}`;
-    const existing = await ctx.db
-      .query("systemAdminNotifications")
-      .withIndex("by_dedupe_key", (q) => q.eq("dedupeKey", dedupeKey))
-      .unique();
-    if (existing) continue;
-    await ctx.db.insert("systemAdminNotifications", {
-      action,
-      recipientUserId,
-      targetUserId,
-      dedupeKey,
-      payloadJson,
-      createdAt: now,
-    });
-  }
-}
-
-async function createAudit(
-  ctx: MutationCtx,
-  args: {
-    action: Doc<"systemAdminAuditLogs">["action"];
-    actorType: Doc<"systemAdminAuditLogs">["actorType"];
-    actorUserId?: Id<"users">;
-    targetUserId: Id<"users">;
-    targetDisplayNameSnapshot: string;
-    reason: string;
-    previousStatus?: Doc<"systemAdminAuditLogs">["previousStatus"];
-    newStatus: Doc<"systemAdminAuditLogs">["newStatus"];
-  },
-) {
-  return ctx.db.insert("systemAdminAuditLogs", {
-    ...args,
-    targetKind: "system_admin",
-    createdAt: Date.now(),
-  });
+  const actor = await requireSystemAdminActor(
+    createSystemAdminQueryDeps(ctx),
+    identity.tokenIdentifier,
+  );
+  return {
+    identity,
+    user: { ...actor.user, _id: actor.user.docId } as unknown as Doc<"users">,
+    admin: { ...actor.admin, _id: actor.admin.id } as unknown as Doc<"systemAdmins">,
+  };
 }
 
 export const getMySystemAdminContext = query({
@@ -194,25 +141,13 @@ export const getMySystemAdminContext = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     const environment = getAppEnvironment();
-    if (!identity) return { status: "none" as const, environment };
-    const user = await findUserByTokenIdentifier(ctx, identity.tokenIdentifier);
-    if (!user) return { status: "none" as const, environment };
-    let admin: Doc<"systemAdmins"> | null = null;
-    try {
-      admin = await ctx.db
-        .query("systemAdmins")
-        .withIndex("by_user_id", (q) => q.eq("userId", user._id))
-        .unique();
-    } catch {
-      return { status: "none" as const, environment };
-    }
-    if (admin?.status === "active") {
-      return { status: "active" as const, environment, userId: user._id };
-    }
-    if (admin?.status === "revoked") {
-      return { status: "revoked" as const, environment };
-    }
-    return { status: "none" as const, environment };
+    return (await getMySystemAdminContextUsecase(createSystemAdminQueryDeps(ctx), {
+      tokenIdentifier: identity?.tokenIdentifier ?? null,
+      environment,
+    })) as
+      | { status: "active"; environment: AppEnvironment; userId: Id<"users"> }
+      | { status: "revoked"; environment: AppEnvironment }
+      | { status: "none"; environment: AppEnvironment };
   },
 });
 
@@ -221,42 +156,15 @@ export const listSystemAdmins = query({
     paginationOpts: paginationOptsValidator,
     status: v.optional(v.union(v.literal("active"), v.literal("revoked"))),
   },
-  returns: v.object({
-    ...paginationResultValidator(systemAdminListItemValidator).fields,
-    hasAnotherActiveAdmin: v.boolean(),
-  }),
+  returns: listSystemAdminsResultValidator,
   handler: async (ctx, args) => {
-    const actor = await requireSystemAdmin(ctx);
-    const status = args.status ?? "active";
-    const page = await ctx.db
-      .query("systemAdmins")
-      .withIndex("by_status", (q) => q.eq("status", status))
-      .order("desc")
-      .paginate(args.paginationOpts);
-    const hasAnotherActiveAdmin =
-      (
-        await ctx.db
-          .query("systemAdmins")
-          .withIndex("by_status", (q) => q.eq("status", "active"))
-          .take(2)
-      ).length >= 2;
-    const users = await Promise.all(page.page.map((admin) => ctx.db.get(admin.userId)));
-    return {
-      ...page,
-      hasAnotherActiveAdmin,
-      page: page.page.map((admin, index) => ({
-        id: admin._id,
-        targetUserId: admin.userId,
-        status: admin.status,
-        displayName: users[index]?.displayName ?? "ユーザー",
-        email: users[index]?.email ?? null,
-        createdAt: admin.createdAt,
-        updatedAt: admin.updatedAt,
-        grantedAt: admin.grantedAt,
-        revokedAt: admin.revokedAt,
-        isSelf: admin.userId === actor.user._id,
-      })),
-    };
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new ConvexError("システム管理者権限が必要です");
+    return (await listSystemAdminsUsecase(createSystemAdminQueryDeps(ctx), {
+      tokenIdentifier: identity.tokenIdentifier,
+      paginationOpts: args.paginationOpts,
+      status: args.status,
+    })) as Infer<typeof listSystemAdminsResultValidator>;
   },
 });
 
@@ -269,245 +177,47 @@ export const listSystemAdminAuditLogs = query({
     actorUserId: v.optional(v.id("users")),
     targetUserId: v.optional(v.id("users")),
   },
-  returns: v.object({
-    ...paginationResultValidator(systemAdminAuditItemValidator).fields,
-  }),
+  returns: listAuditLogsResultValidator,
   handler: async (ctx, args) => {
-    await requireSystemAdmin(ctx);
-    const from = args.from ?? 0;
-    const to = args.to ?? Number.MAX_SAFE_INTEGER;
-    const page =
-      args.action && args.actorUserId && args.targetUserId
-        ? await ctx.db
-            .query("systemAdminAuditLogs")
-            .withIndex("by_action_and_actor_user_id_and_target_user_id_and_created_at", (q) =>
-              q
-                .eq("action", args.action!)
-                .eq("actorUserId", args.actorUserId!)
-                .eq("targetUserId", args.targetUserId!)
-                .gte("createdAt", from)
-                .lte("createdAt", to),
-            )
-            .order("desc")
-            .paginate(args.paginationOpts)
-        : args.action && args.actorUserId
-          ? await ctx.db
-              .query("systemAdminAuditLogs")
-              .withIndex("by_action_and_actor_user_id_and_created_at", (q) =>
-                q
-                  .eq("action", args.action!)
-                  .eq("actorUserId", args.actorUserId!)
-                  .gte("createdAt", from)
-                  .lte("createdAt", to),
-              )
-              .order("desc")
-              .paginate(args.paginationOpts)
-          : args.action && args.targetUserId
-            ? await ctx.db
-                .query("systemAdminAuditLogs")
-                .withIndex("by_action_and_target_user_id_and_created_at", (q) =>
-                  q
-                    .eq("action", args.action!)
-                    .eq("targetUserId", args.targetUserId!)
-                    .gte("createdAt", from)
-                    .lte("createdAt", to),
-                )
-                .order("desc")
-                .paginate(args.paginationOpts)
-            : args.actorUserId && args.targetUserId
-              ? await ctx.db
-                  .query("systemAdminAuditLogs")
-                  .withIndex("by_actor_user_id_and_target_user_id_and_created_at", (q) =>
-                    q
-                      .eq("actorUserId", args.actorUserId!)
-                      .eq("targetUserId", args.targetUserId!)
-                      .gte("createdAt", from)
-                      .lte("createdAt", to),
-                  )
-                  .order("desc")
-                  .paginate(args.paginationOpts)
-              : args.action
-                ? await ctx.db
-                    .query("systemAdminAuditLogs")
-                    .withIndex("by_action_and_created_at", (q) =>
-                      q.eq("action", args.action!).gte("createdAt", from).lte("createdAt", to),
-                    )
-                    .order("desc")
-                    .paginate(args.paginationOpts)
-                : args.actorUserId
-                  ? await ctx.db
-                      .query("systemAdminAuditLogs")
-                      .withIndex("by_actor_user_id_and_created_at", (q) =>
-                        q
-                          .eq("actorUserId", args.actorUserId!)
-                          .gte("createdAt", from)
-                          .lte("createdAt", to),
-                      )
-                      .order("desc")
-                      .paginate(args.paginationOpts)
-                  : args.targetUserId
-                    ? await ctx.db
-                        .query("systemAdminAuditLogs")
-                        .withIndex("by_target_user_id_and_created_at", (q) =>
-                          q
-                            .eq("targetUserId", args.targetUserId!)
-                            .gte("createdAt", from)
-                            .lte("createdAt", to),
-                        )
-                        .order("desc")
-                        .paginate(args.paginationOpts)
-                    : await ctx.db
-                        .query("systemAdminAuditLogs")
-                        .withIndex("by_created_at", (q) =>
-                          q.gte("createdAt", from).lte("createdAt", to),
-                        )
-                        .order("desc")
-                        .paginate(args.paginationOpts);
-    const actors = await Promise.all(
-      page.page.map((log) => (log.actorUserId ? ctx.db.get(log.actorUserId) : null)),
-    );
-    return {
-      ...page,
-      page: page.page.map((log, index) => ({
-        id: log._id,
-        action: log.action,
-        actorType: log.actorType,
-        actorUserId: log.actorUserId,
-        actorDisplayName: actors[index]?.displayName ?? null,
-        targetUserId: log.targetUserId,
-        targetId: log.targetId,
-        targetDisplayName: log.targetDisplayNameSnapshot,
-        sourceUserId: log.sourceUserId,
-        sourceUserDisplayName: log.sourceUserDisplayNameSnapshot,
-        reason: log.reason,
-        queryHash: log.queryHash,
-        resultCount: log.resultCount,
-        result: log.result ?? "success",
-        previousStatus: log.previousStatus,
-        newStatus: log.newStatus,
-        sourceGroupId: log.sourceGroupId,
-        sourceGroupNameSnapshot: log.sourceGroupNameSnapshot,
-        targetGroupId: log.targetGroupId,
-        targetGroupNameSnapshot: log.targetGroupNameSnapshot,
-        beforeMembershipStatus: log.beforeMembershipStatus,
-        afterMembershipStatus: log.afterMembershipStatus,
-        beforeActiveGroupId: log.beforeActiveGroupId,
-        afterActiveGroupId: log.afterActiveGroupId,
-        beforeOwnerCount: log.beforeOwnerCount,
-        afterOwnerCount: log.afterOwnerCount,
-        createdAt: log.createdAt,
-      })),
-    };
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new ConvexError("システム管理者権限が必要です");
+    return (await listSystemAdminAuditLogsUsecase(createSystemAdminQueryDeps(ctx), {
+      tokenIdentifier: identity.tokenIdentifier,
+      paginationOpts: args.paginationOpts,
+      from: args.from,
+      to: args.to,
+      action: args.action,
+      actorUserId: args.actorUserId,
+      targetUserId: args.targetUserId,
+    })) as Infer<typeof listAuditLogsResultValidator>;
   },
 });
 
 export const grantSystemAdmin = mutation({
   args: { targetUserId: v.id("users"), reason: v.string() },
   handler: async (ctx, args) => {
-    const actor = await requireSystemAdmin(ctx);
-    const reason = normalizeReason(args.reason);
-    if (actor.user._id === args.targetUserId) throw new ConvexError("自分自身は操作できません");
-    const target = await ctx.db.get(args.targetUserId);
-    if (!target) throw new ConvexError("対象ユーザーが存在しません");
-    let existing: Doc<"systemAdmins"> | null;
-    try {
-      existing = await ctx.db
-        .query("systemAdmins")
-        .withIndex("by_user_id", (q) => q.eq("userId", args.targetUserId))
-        .unique();
-    } catch {
-      throw new ConvexError("管理者レコードが不正です");
-    }
-    if (existing?.status === "active") throw new ConvexError("既に管理者です");
-    const now = Date.now();
-    if (!existing) {
-      await ctx.db.insert("systemAdmins", {
-        userId: args.targetUserId,
-        status: "active",
-        createdAt: now,
-        updatedAt: now,
-        grantedAt: now,
-        grantedByUserId: actor.user._id,
-        grantReason: reason,
-      });
-    } else {
-      await ctx.db.patch(existing._id, {
-        status: "active",
-        updatedAt: now,
-        grantedAt: now,
-        grantedByUserId: actor.user._id,
-        grantReason: reason,
-        revokedAt: undefined,
-        revokedByUserId: undefined,
-        revokeReason: undefined,
-      });
-    }
-    const auditId = await createAudit(ctx, {
-      action: "system_admin_granted",
-      actorType: "system_admin",
-      actorUserId: actor.user._id,
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new ConvexError("システム管理者権限が必要です");
+    return await grantSystemAdminUsecase(createSystemAdminMutationDeps(ctx), {
+      tokenIdentifier: identity.tokenIdentifier,
       targetUserId: args.targetUserId,
-      targetDisplayNameSnapshot: target.displayName,
-      reason,
-      previousStatus: existing?.status,
-      newStatus: "active",
+      reason: args.reason,
+      environment: getAppEnvironment(),
     });
-    await insertNotifications(
-      ctx,
-      "system_admin_granted",
-      args.targetUserId,
-      auditId,
-      getAppEnvironment(),
-    );
-    return { status: "active" as const, regranted: existing?.status === "revoked" };
   },
 });
 
 export const revokeSystemAdmin = mutation({
   args: { targetUserId: v.id("users"), reason: v.string() },
   handler: async (ctx, args) => {
-    const actor = await requireSystemAdmin(ctx);
-    const reason = normalizeReason(args.reason);
-    if (actor.user._id === args.targetUserId) throw new ConvexError("自分自身は操作できません");
-    const target = await ctx.db.get(args.targetUserId);
-    if (!target) throw new ConvexError("対象ユーザーが存在しません");
-    const targetAdmin = await ctx.db
-      .query("systemAdmins")
-      .withIndex("by_user_id", (q) => q.eq("userId", args.targetUserId))
-      .unique();
-    if (!targetAdmin || targetAdmin.status !== "active")
-      throw new ConvexError("対象はactive管理者ではありません");
-    const activeAdmins = await ctx.db
-      .query("systemAdmins")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .take(2);
-    if (activeAdmins.length < 2) throw new ConvexError("最後の管理者は剥奪できません");
-    const now = Date.now();
-    await ctx.db.patch(targetAdmin._id, {
-      status: "revoked",
-      updatedAt: now,
-      revokedAt: now,
-      revokedByUserId: actor.user._id,
-      revokeReason: reason,
-    });
-    const auditId = await createAudit(ctx, {
-      action: "system_admin_revoked",
-      actorType: "system_admin",
-      actorUserId: actor.user._id,
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new ConvexError("システム管理者権限が必要です");
+    return await revokeSystemAdminUsecase(createSystemAdminMutationDeps(ctx), {
+      tokenIdentifier: identity.tokenIdentifier,
       targetUserId: args.targetUserId,
-      targetDisplayNameSnapshot: target.displayName,
-      reason,
-      previousStatus: "active",
-      newStatus: "revoked",
+      reason: args.reason,
+      environment: getAppEnvironment(),
     });
-    await insertNotifications(
-      ctx,
-      "system_admin_revoked",
-      args.targetUserId,
-      auditId,
-      getAppEnvironment(),
-    );
-    return { status: "revoked" as const };
   },
 });
 
@@ -519,44 +229,11 @@ export const bootstrapSystemAdmin = internalMutation({
   },
   handler: async (ctx, args) => {
     const environment = getAppEnvironment(args.expectedEnvironment);
-    const reason = normalizeReason(args.reason);
-    const target = await ctx.db.get(args.targetUserId);
-    if (!target) throw new ConvexError("対象ユーザーが存在しません");
-    const active = await ctx.db
-      .query("systemAdmins")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .take(1);
-    if (active.length > 0) throw new ConvexError("初回管理者は既に存在します");
-    const existing = await ctx.db
-      .query("systemAdmins")
-      .withIndex("by_user_id", (q) => q.eq("userId", args.targetUserId))
-      .unique();
-    if (existing) throw new ConvexError("対象ユーザーの管理者履歴が既に存在します");
-    const now = Date.now();
-    await ctx.db.insert("systemAdmins", {
-      userId: args.targetUserId,
-      status: "active",
-      createdAt: now,
-      updatedAt: now,
-      grantedAt: now,
-      grantReason: reason,
-    });
-    const auditId = await createAudit(ctx, {
-      action: "system_admin_bootstrapped",
-      actorType: "system",
+    return await bootstrapSystemAdminUsecase(createSystemAdminMutationDeps(ctx), {
       targetUserId: args.targetUserId,
-      targetDisplayNameSnapshot: target.displayName,
-      reason,
-      newStatus: "active",
-    });
-    await insertNotifications(
-      ctx,
-      "system_admin_bootstrapped",
-      args.targetUserId,
-      auditId,
+      reason: args.reason,
       environment,
-    );
-    return { status: "active" as const };
+    });
   },
 });
 
@@ -568,55 +245,10 @@ export const recoverSystemAdmin = internalMutation({
   },
   handler: async (ctx, args) => {
     const environment = getAppEnvironment(args.expectedEnvironment);
-    const reason = normalizeReason(args.reason);
-    const target = await ctx.db.get(args.targetUserId);
-    if (!target) throw new ConvexError("対象ユーザーが存在しません");
-    const active = await ctx.db
-      .query("systemAdmins")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .take(1);
-    if (active.length > 0) throw new ConvexError("active管理者が存在するため復旧できません");
-    const existing = await ctx.db
-      .query("systemAdmins")
-      .withIndex("by_user_id", (q) => q.eq("userId", args.targetUserId))
-      .unique();
-    const now = Date.now();
-    if (!existing) {
-      await ctx.db.insert("systemAdmins", {
-        userId: args.targetUserId,
-        status: "active",
-        createdAt: now,
-        updatedAt: now,
-        grantedAt: now,
-        grantReason: reason,
-      });
-    } else {
-      await ctx.db.patch(existing._id, {
-        status: "active",
-        updatedAt: now,
-        grantedAt: now,
-        grantReason: reason,
-        revokedAt: undefined,
-        revokedByUserId: undefined,
-        revokeReason: undefined,
-      });
-    }
-    const auditId = await createAudit(ctx, {
-      action: "system_admin_recovered",
-      actorType: "system",
+    return await recoverSystemAdminUsecase(createSystemAdminMutationDeps(ctx), {
       targetUserId: args.targetUserId,
-      targetDisplayNameSnapshot: target.displayName,
-      reason,
-      previousStatus: existing?.status,
-      newStatus: "active",
-    });
-    await insertNotifications(
-      ctx,
-      "system_admin_recovered",
-      args.targetUserId,
-      auditId,
+      reason: args.reason,
       environment,
-    );
-    return { status: "active" as const };
+    });
   },
 });

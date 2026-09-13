@@ -40,6 +40,20 @@ export function createGroupDeletionJobReader(ctx: Pick<QueryCtx, "db">): GroupDe
       const doc = await ctx.db.get(jobId as Id<"groupDeletionJobs">);
       return doc === null ? null : groupDeletionJobDocToRecord(doc);
     },
+    async paginate(filter, opts) {
+      const page = filter.status
+        ? await ctx.db
+            .query("groupDeletionJobs")
+            .withIndex("by_status_and_updated_at", (q) => q.eq("status", filter.status!))
+            .order("desc")
+            .paginate(opts)
+        : await ctx.db
+            .query("groupDeletionJobs")
+            .withIndex("by_updated_at")
+            .order("desc")
+            .paginate(opts);
+      return { ...page, page: page.page.map(groupDeletionJobDocToRecord) };
+    },
   };
 }
 
@@ -48,6 +62,20 @@ export function createGroupDeletionJobStore(ctx: Pick<MutationCtx, "db">): Group
     async get(jobId) {
       const doc = await ctx.db.get(jobId as Id<"groupDeletionJobs">);
       return doc === null ? null : groupDeletionJobDocToRecord(doc);
+    },
+    async paginate(filter, opts) {
+      const page = filter.status
+        ? await ctx.db
+            .query("groupDeletionJobs")
+            .withIndex("by_status_and_updated_at", (q) => q.eq("status", filter.status!))
+            .order("desc")
+            .paginate(opts)
+        : await ctx.db
+            .query("groupDeletionJobs")
+            .withIndex("by_updated_at")
+            .order("desc")
+            .paginate(opts);
+      return { ...page, page: page.page.map(groupDeletionJobDocToRecord) };
     },
     async insert(fields) {
       return await ctx.db.insert(

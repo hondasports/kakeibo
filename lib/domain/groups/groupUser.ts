@@ -10,4 +10,6 @@ export type GroupUserRecord = {
   displayName?: string;
   email?: string;
   activeGroupId?: string;
+  createdAt?: number;
+  updatedAt?: number;
 };
