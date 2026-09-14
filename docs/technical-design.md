@@ -610,6 +610,17 @@ schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` �
   `extractReceiptFieldsHandler`・型/関数再export）のみ。ドメインエラーだけを
   ConvexError へ変換し、判定順序と全エラー文言は不変とする。
 
+`aiExpenseDrafts` のレビュー明細置換（`replaceDraftItemsForReview`）は、infra に混在
+していた業務ルールを `lib/domain/aiExpenseDrafts/` へ分離済み。
+
+- **純粋関数**: `reviewItemReplace.ts`（明細上限100、itemId 重複/所属検証、previous
+  からの税関連フィールド継承を含む置換明細フィールド構築、エラー文言変換）と
+  `reviewCategory.ts`（レビュー用カテゴリ利用可否: 不在/他グループ・非アクティブ）。
+- **ユースケース**: `assertActiveCategoryForDraft` は `reviewCategory.ts` へ委譲する。
+- **インフラ**: `lib/convex/aiExpenseDrafts/reviewValidation.ts` は既存明細取得・削除・
+  insert と Doc/Fields 変換のみを担い、判定順序（上限 → 取得 → ID 検証 → 削除 →
+  各明細で名前/金額 → カテゴリ → insert）と文言は不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。

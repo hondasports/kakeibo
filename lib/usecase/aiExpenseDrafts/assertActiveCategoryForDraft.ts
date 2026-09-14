@@ -1,5 +1,9 @@
 import { ConvexError } from "convex/values";
 import type { CategoryRepository } from "../../domain/categories/categoryRepository";
+import {
+  getReviewCategoryErrorMessage,
+  validateReviewCategory,
+} from "../../domain/aiExpenseDrafts/reviewCategory";
 
 /**
  * レビュー済み下書きに利用可能なカテゴリか検証する。
@@ -11,10 +15,8 @@ export async function assertActiveCategoryForDraft(
   groupId: string,
 ): Promise<void> {
   const category = await categories.findById(categoryId);
-  if (category === null || category.groupId !== groupId) {
-    throw new ConvexError("Category does not belong to the current group");
-  }
-  if (!category.isActive) {
-    throw new ConvexError("Inactive category cannot be used for reviewed drafts");
+  const result = validateReviewCategory(category, groupId);
+  if (!result.success) {
+    throw new ConvexError(getReviewCategoryErrorMessage(result.error));
   }
 }
