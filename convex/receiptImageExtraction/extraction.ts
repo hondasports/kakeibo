@@ -2,16 +2,19 @@ import type { ActionCtx } from "../_generated/server";
 import { action } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireAuthenticatedUserId } from "../users/auth";
-import { api } from "../_generated/api";
-import { getMockResult } from "../../lib/convex/receiptImageExtraction/mock";
-import { getExtractorMode } from "../../lib/convex/receiptImageExtraction/mode";
-import { callOpenAIReceiptExtractor } from "../../lib/convex/receiptImageExtraction/openaiClient";
+import { ReceiptImageExtractionDomainError } from "../../lib/domain/receiptImageExtraction/rules";
+import {
+  createReceiptExtractionContextReader,
+  createReceiptExtractorDeps,
+} from "../../lib/convex/receiptImageExtraction/extractorDeps";
 import type {
   ExtractReceiptFieldsArgs,
   ExtractReceiptFieldsResult,
-  ReceiptCategoryHint,
 } from "../../lib/convex/receiptImageExtraction/types";
-import { validateImageDataUrl } from "../../lib/convex/receiptImageExtraction/validators";
+import {
+  extractReceiptFields as extractReceiptFieldsUsecase,
+  extractReceiptFieldsForCurrentGroup,
+} from "../../lib/usecase/receiptImageExtraction";
 
 export type {
   ExtractionConfidence,
@@ -27,44 +30,20 @@ export { parseOpenAIResponse } from "../../lib/convex/receiptImageExtraction/par
 export { getMockResult } from "../../lib/convex/receiptImageExtraction/mock";
 export { getExtractorMode } from "../../lib/convex/receiptImageExtraction/mode";
 
+function convexError(error: unknown): never {
+  if (error instanceof ConvexError) throw error;
+  if (error instanceof ReceiptImageExtractionDomainError) throw new ConvexError(error.message);
+  throw error;
+}
+
 export async function extractReceiptFieldsFromImage(
   args: ExtractReceiptFieldsArgs,
 ): Promise<ExtractReceiptFieldsResult> {
-  const { imageDataUrl } = args;
-
-  // imageDataUrl バリデーション
-  validateImageDataUrl(imageDataUrl);
-
-  const appEnv = process.env.APP_ENV ?? "development";
-  const mode = getExtractorMode(appEnv);
-
-  // real モードのガード: production 以外では実行不可
-  if (mode === "real" && appEnv !== "production") {
-    throw new ConvexError(
-      `real モードは APP_ENV=production のときのみ利用できます（現在: ${appEnv}）`,
-    );
+  try {
+    return await extractReceiptFieldsUsecase(createReceiptExtractorDeps(), args);
+  } catch (error) {
+    convexError(error);
   }
-
-  // mock モード
-  if (mode === "mock") {
-    return getMockResult();
-  }
-
-  // real モード: OPENAI_API_KEY チェック
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new ConvexError(
-      "OPENAI_API_KEY が設定されていません。Convex Dashboard で環境変数を設定してください",
-    );
-  }
-
-  return callOpenAIReceiptExtractor({
-    imageDataUrl,
-    apiKey,
-    telemetryId: args.telemetryId,
-    categoryNames: args.categoryNames ?? [],
-    categories: args.categories,
-  });
 }
 
 export async function extractReceiptFieldsHandler(
@@ -82,23 +61,14 @@ export const extractReceiptFields = action({
   },
   handler: async (ctx, args): Promise<ExtractReceiptFieldsResult> => {
     // 公開 action 側でグループ所属と外部 API 同意を確認する。
-    const group = await ctx.runQuery(api.groups.queries.getMyGroup, {});
-    if (group === null) {
-      throw new ConvexError("グループを選択してください");
+    try {
+      return await extractReceiptFieldsForCurrentGroup(
+        createReceiptExtractionContextReader(ctx),
+        (extractArgs) => extractReceiptFieldsHandler(ctx, extractArgs),
+        args,
+      );
+    } catch (error) {
+      convexError(error);
     }
-    const [consent, categories] = await Promise.all([
-      ctx.runQuery(api.users.queries.getReceiptImageConsent, {}),
-      ctx.runQuery(api.categories.queries.listActive, {}),
-    ]);
-    if (!consent.hasAcceptedExternalApiConsent) {
-      throw new ConvexError("Receipt image external API consent is required");
-    }
-    return extractReceiptFieldsHandler(ctx, {
-      ...args,
-      categories: categories.map<ReceiptCategoryHint>((category) => ({
-        name: category.name,
-        description: category.description,
-      })),
-    });
   },
 });

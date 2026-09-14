@@ -592,6 +592,24 @@ E2E reset・取得）も4層へ移行済み。週の日付計算は既存 `lib/d
   membership → 週開始曜日取得 → 指定週 handler へ委譲する既存の呼出順序を維持する。
   endpoint名、args/returns、エラー文言、Doc 返却形状、patch キー構成は不変とする。
 
+`receiptImageExtraction`（レシート画像抽出 action）も4層へ移行済み。OpenAI client・
+schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を無変更で再利用する。
+
+- **純粋関数**（`lib/domain/receiptImageExtraction/`）: 既存 `mode.ts` に加え、
+  `rules.ts`（imageDataUrl 検証、抽出計画解決: mode → real は production 限定 →
+  mock → OPENAI_API_KEY 必須、グループ選択・同意検証）と `ports.ts`（環境読み取り・
+  mock/real extractor・group/consent/categories 読み取りポート）。
+- **ユースケース**（`lib/usecase/receiptImageExtraction/`）: `extractReceiptFields`
+  （検証 → 計画 → mock/real）と `extractReceiptFieldsForCurrentGroup`
+  （group → consent+categories 並列取得 → 抽出）。
+- **インフラ**（`lib/convex/receiptImageExtraction/extractorDeps.ts`）: process.env を
+  呼出時に読む環境スナップショット、`getMockResult`/`callOpenAIReceiptExtractor` の合成、
+  `runQuery` ベースのコンテキスト読み取り。
+- **プレゼンテーション**: `convex/receiptImageExtraction/extraction.ts` は action・
+  validator・`requireAuthenticatedUserId`・互換export（`extractReceiptFieldsFromImage`・
+  `extractReceiptFieldsHandler`・型/関数再export）のみ。ドメインエラーだけを
+  ConvexError へ変換し、判定順序と全エラー文言は不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
