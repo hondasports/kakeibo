@@ -5,6 +5,13 @@
 import { normalizeEmail } from "./email";
 import { resolveDisplayName } from "./displayName";
 
+/**
+ * endpoint 契約上期待されるドメインエラー。
+ * presentation 層はこの型のみ ConvexError へ変換し、
+ * 予期しないエラー（DB・adapter 由来）はそのまま再送出する。
+ */
+export class UserDomainError extends Error {}
+
 /** identity 由来の upsert 入力。Clerk 型に依存しない。 */
 export type UserIdentityInput = {
   userId: string;
@@ -66,7 +73,7 @@ export function resolveProfileDisplayName(displayName: string, email?: string): 
 /** ユーザーの存在を検証して返す。 */
 export function assertUserFound<T>(user: T | null): T {
   if (user === null) {
-    throw new Error("User not found");
+    throw new UserDomainError("User not found");
   }
   return user;
 }

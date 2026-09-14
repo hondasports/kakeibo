@@ -6,6 +6,7 @@ import {
   assertUserFound,
   buildUserInsertFields,
   buildUserUpsertPatch,
+  UserDomainError,
   type UserIdentityInput,
 } from "../../domain/users/rules";
 import { validateMonthlyIncome } from "../../domain/users/monthlyIncome";
@@ -50,7 +51,7 @@ export async function updateMonthlyIncome(
   if (monthlyIncome !== null) {
     const result = validateMonthlyIncome(monthlyIncome);
     if (!result.success) {
-      throw new Error("月収入は0以上の整数で入力してください");
+      throw new UserDomainError("月収入は0以上の整数で入力してください");
     }
   }
 
@@ -70,11 +71,11 @@ export async function updateWeeklyDays(
 ): Promise<void> {
   const startDayResult = validateWeekDay(args.weeklyStartDay);
   if (!startDayResult.success) {
-    throw new Error("週の開始曜日は0〜6の整数で入力してください");
+    throw new UserDomainError("週の開始曜日は0〜6の整数で入力してください");
   }
   const endDayResult = validateWeekDay(args.weeklyEndDay);
   if (!endDayResult.success) {
-    throw new Error("週の終了曜日は0〜6の整数で入力してください");
+    throw new UserDomainError("週の終了曜日は0〜6の整数で入力してください");
   }
 
   const user = assertUserFound(await store.findByUserId(userId));
