@@ -632,6 +632,16 @@ schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` �
   チェック・enrichment 取得と ConvexError 変換のみを担い、フォールバック条件・
   receipts 取得回数・文言は不変とする。
 
+`aiExpenseDrafts` の作成（抽出結果 → 下書き）も `lib/domain/aiExpenseDrafts/createFromExtraction.ts`
+へ分離済み。
+
+- **純粋関数**: 分類 → AI 値スナップショット → ユーザー上書き適用 → 下書き insert
+  フィールド構築（`receiptInterpretation` に AI 値を保持、`rawObservation` は行指定時のみ）、
+  明細 insert フィールド構築、失敗下書き構築（failed / unknown / parse_failed）、
+  カテゴリ所属判定（未指定は検証不要）。カテゴリ ID は総称型で永続化層の ID をそのまま通す。
+- **インフラ**: `lib/convex/aiExpenseDrafts/createFromExtraction.ts` は group 認可解決・
+  カテゴリ取得・insert / get と ConvexError 変換のみを担い、判定順序と文言は不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
