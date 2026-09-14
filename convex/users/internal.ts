@@ -1,6 +1,13 @@
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
+import { createUserReader, createUserStore } from "../../lib/convex/users/convexUserStore";
+import {
+  clearUserMonthlyIncome as clearUserMonthlyIncomeUsecase,
+  getUserById as getUserByIdUsecase,
+  getUserIdByEmail as getUserIdByEmailUsecase,
+  upsertUserProfile as upsertUserProfileUsecase,
+} from "../../lib/usecase/users";
 
 type UpsertUserProfileArgs = {
   userId: string;
@@ -9,30 +16,7 @@ type UpsertUserProfileArgs = {
 };
 
 export async function upsertUserProfileHandler(ctx: MutationCtx, args: UpsertUserProfileArgs) {
-  const now = Date.now();
-  const email = args.email?.trim().toLowerCase();
-  const displayName = args.displayName.trim() || email || "ユーザー";
-  const existing = await ctx.db
-    .query("users")
-    .withIndex("by_token_identifier", (q) => q.eq("userId", args.userId))
-    .unique();
-
-  if (existing === null) {
-    await ctx.db.insert("users", {
-      userId: args.userId,
-      displayName,
-      email,
-      createdAt: now,
-      updatedAt: now,
-    });
-    return;
-  }
-
-  await ctx.db.patch(existing._id, {
-    displayName,
-    email: email ?? existing.email,
-    updatedAt: now,
-  });
+  await upsertUserProfileUsecase(createUserStore(ctx), args, Date.now());
 }
 
 export const upsertUserProfile = internalMutation({
@@ -47,45 +31,20 @@ export const upsertUserProfile = internalMutation({
 export const getUserIdByEmail = internalQuery({
   args: { email: v.string() },
   handler: async (ctx, args) => {
-    const email = args.email.trim().toLowerCase();
-    if (!email) {
-      return null;
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", email))
-      .unique();
-
-    return user?.userId ?? null;
+    return await getUserIdByEmailUsecase(createUserReader(ctx), args.email);
   },
 });
 
 export const getUserById = internalQuery({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token_identifier", (q) => q.eq("userId", userId))
-      .unique();
-    if (user === null) return null;
-    return {
-      userId: user.userId,
-      email: user.email,
-      displayName: user.displayName,
-    };
+    return await getUserByIdUsecase(createUserReader(ctx), userId);
   },
 });
 
 export const clearUserMonthlyIncome = internalMutation({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token_identifier", (q) => q.eq("userId", userId))
-      .unique();
-    if (user === null) return { cleared: false };
-    await ctx.db.patch(user._id, { monthlyIncome: undefined, updatedAt: Date.now() });
-    return { cleared: true };
+    return await clearUserMonthlyIncomeUsecase(createUserStore(ctx), userId, Date.now());
   },
 });

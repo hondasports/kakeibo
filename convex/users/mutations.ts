@@ -1,13 +1,22 @@
 import { mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
-import { getIdentityDisplayName, requireAuthenticatedUserId } from "./auth";
-import { getWeekEndDay } from "../lib/weekDates";
-import { normalizeEmail } from "../../lib/domain/users/email";
-import { validateMonthlyIncome } from "../../lib/domain/users/monthlyIncome";
-import { validateWeekDay } from "../../lib/domain/week/weekDates";
+import { requireAuthenticatedUserId } from "./auth";
+import { createUserStore } from "../../lib/convex/users/convexUserStore";
+import {
+  acceptReceiptImageExternalApiConsent as acceptReceiptImageExternalApiConsentUsecase,
+  updateMonthlyIncome as updateMonthlyIncomeUsecase,
+  updateWeeklyDays as updateWeeklyDaysUsecase,
+  upsertUser as upsertUserUsecase,
+} from "../../lib/usecase/users";
 
-/** upsertUser mutation の handler ロジック（テスト用に export） */
+function convexError(error: unknown): never {
+  if (error instanceof ConvexError) throw error;
+  throw new ConvexError(error instanceof Error ? error.message : "Unknown error");
+}
+
+// by_token_identifier インデックスにはConvexの仕様上unique constraintを付与できない
+// 複数ドキュメントが挿入されないよう、呼び出し元で制御すること
 export async function upsertUserHandler(ctx: MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
 
@@ -16,30 +25,15 @@ export async function upsertUserHandler(ctx: MutationCtx) {
   }
 
   const userId = identity.tokenIdentifier;
-  const email = normalizeEmail(identity.email);
-  const now = Date.now();
 
-  // NOTE: by_token_identifier インデックスには Convex の仕様上 unique constraint を付与できない。
-  // そのため、複数ドキュメントが挿入されないよう upsertUser の呼び出し元で制御すること。
-  const existing = await ctx.db
-    .query("users")
-    .withIndex("by_token_identifier", (q) => q.eq("userId", userId))
-    .unique();
-
-  if (existing === null) {
-    await ctx.db.insert("users", {
-      userId,
-      displayName: getIdentityDisplayName(identity),
-      email,
-      createdAt: now,
-      updatedAt: now,
-    });
-  } else {
-    await ctx.db.patch(existing._id, {
-      displayName: getIdentityDisplayName(identity, existing.displayName),
-      email: email ?? existing.email,
-      updatedAt: now,
-    });
+  try {
+    await upsertUserUsecase(
+      createUserStore(ctx),
+      { userId, name: identity.name, email: identity.email },
+      Date.now(),
+    );
+  } catch (error) {
+    convexError(error);
   }
 }
 
@@ -56,20 +50,11 @@ export const upsertUser = mutation({
 export async function acceptReceiptImageExternalApiConsentHandler(ctx: MutationCtx) {
   const userId = await requireAuthenticatedUserId(ctx);
 
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_token_identifier", (q) => q.eq("userId", userId))
-    .unique();
-
-  if (user === null) {
-    throw new ConvexError("User not found");
+  try {
+    await acceptReceiptImageExternalApiConsentUsecase(createUserStore(ctx), userId, Date.now());
+  } catch (error) {
+    convexError(error);
   }
-
-  const now = Date.now();
-  await ctx.db.patch(user._id, {
-    receiptImageExternalApiConsentAcceptedAt: user.receiptImageExternalApiConsentAcceptedAt ?? now,
-    updatedAt: now,
-  });
 }
 
 export const acceptReceiptImageExternalApiConsent = mutation({
@@ -84,27 +69,11 @@ export async function updateMonthlyIncomeHandler(
 ) {
   const userId = await requireAuthenticatedUserId(ctx);
 
-  if (args.monthlyIncome !== null) {
-    const result = validateMonthlyIncome(args.monthlyIncome);
-    if (!result.success) {
-      throw new ConvexError("月収入は0以上の整数で入力してください");
-    }
+  try {
+    await updateMonthlyIncomeUsecase(createUserStore(ctx), userId, args.monthlyIncome, Date.now());
+  } catch (error) {
+    convexError(error);
   }
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_token_identifier", (q) => q.eq("userId", userId))
-    .unique();
-
-  if (user === null) {
-    throw new ConvexError("User not found");
-  }
-
-  const now = Date.now();
-  await ctx.db.patch(user._id, {
-    monthlyIncome: args.monthlyIncome ?? undefined,
-    updatedAt: now,
-  });
 }
 
 export const updateMonthlyIncome = mutation({
@@ -121,30 +90,16 @@ export async function updateWeeklyDaysHandler(
 ) {
   const userId = await requireAuthenticatedUserId(ctx);
 
-  const startDayResult = validateWeekDay(args.weeklyStartDay);
-  if (!startDayResult.success) {
-    throw new ConvexError("週の開始曜日は0〜6の整数で入力してください");
+  try {
+    await updateWeeklyDaysUsecase(
+      createUserStore(ctx),
+      userId,
+      { weeklyStartDay: args.weeklyStartDay, weeklyEndDay: args.weeklyEndDay },
+      Date.now(),
+    );
+  } catch (error) {
+    convexError(error);
   }
-  const endDayResult = validateWeekDay(args.weeklyEndDay);
-  if (!endDayResult.success) {
-    throw new ConvexError("週の終了曜日は0〜6の整数で入力してください");
-  }
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_token_identifier", (q) => q.eq("userId", userId))
-    .unique();
-
-  if (user === null) {
-    throw new ConvexError("User not found");
-  }
-
-  const now = Date.now();
-  await ctx.db.patch(user._id, {
-    weeklyStartDay: args.weeklyStartDay,
-    weeklyEndDay: getWeekEndDay(args.weeklyStartDay),
-    updatedAt: now,
-  });
 }
 
 export const updateWeeklyDays = mutation({
