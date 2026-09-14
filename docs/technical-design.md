@@ -642,6 +642,18 @@ schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` �
 - **インフラ**: `lib/convex/aiExpenseDrafts/createFromExtraction.ts` は group 認可解決・
   カテゴリ取得・insert / get と ConvexError 変換のみを担い、判定順序と文言は不変とする。
 
+`aiExpenseDrafts` の税再解釈の永続化も `lib/domain/aiExpenseDrafts/taxInterpretationPlan.ts`
+へ計画算出を分離済み。
+
+- **純粋関数**: 適格性判定（不在 → 他グループ → 金額/税サマリ欠落。decisionOverride
+  があれば税サマリ無しでも許可）、receiptTotalSource 解決（保存済み候補から amountYen
+  一致の source、3値外は ai_estimate）、裏付け候補の除外、`planDraftTaxInterpretation`
+  （再解釈 → 税/非税レビュー理由統合 → 再分類 → status → 明細 patch 配列＋下書き patch）。
+  totalOnly は税詳細を無視して分類する。
+- **インフラ**: `lib/convex/aiExpenseDrafts/persistTaxInterpretation.ts` は下書き/明細の
+  取得・patch・再取得と ConvexError 変換のみを担い、判定順序・patch フィールド・文言は
+  不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
