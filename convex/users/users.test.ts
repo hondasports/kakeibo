@@ -151,6 +151,21 @@ describe("upsertUser", () => {
     });
   });
 
+  it("DB由来の予期しないエラーは ConvexError に変換せずそのまま再送出する", async () => {
+    const identity = createIdentity({
+      tokenIdentifier: "https://issuer.example|clerk-user-token",
+    });
+    const ctx = createMutationCtx(identity, null);
+    const dbError = new Error("internal storage failure");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((ctx.db as any).query as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw dbError;
+    });
+
+    await expect(upsertUserHandler(ctx)).rejects.toBe(dbError);
+    await expect(upsertUserHandler(ctx)).rejects.not.toBeInstanceOf(ConvexError);
+  });
+
   it("初回ログイン時は users テーブルに新規ドキュメントを作成する", async () => {
     const identity = createIdentity({
       tokenIdentifier: "https://issuer.example|clerk-user-token",

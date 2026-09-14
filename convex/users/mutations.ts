@@ -2,6 +2,7 @@ import { mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireAuthenticatedUserId } from "./auth";
+import { UserDomainError } from "../../lib/domain/users/rules";
 import { createUserStore } from "../../lib/convex/users/convexUserStore";
 import {
   acceptReceiptImageExternalApiConsent as acceptReceiptImageExternalApiConsentUsecase,
@@ -12,7 +13,10 @@ import {
 
 function convexError(error: unknown): never {
   if (error instanceof ConvexError) throw error;
-  throw new ConvexError(error instanceof Error ? error.message : "Unknown error");
+  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
+  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
+  if (error instanceof UserDomainError) throw new ConvexError(error.message);
+  throw error;
 }
 
 // by_token_identifier インデックスにはConvexの仕様上unique constraintを付与できない
