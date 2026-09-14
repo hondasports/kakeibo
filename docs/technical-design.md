@@ -621,6 +621,17 @@ schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` �
   insert と Doc/Fields 変換のみを担い、判定順序（上限 → 取得 → ID 検証 → 削除 →
   各明細で名前/金額 → カテゴリ → insert）と文言は不変とする。
 
+`receipts` 集計の新旧形式フォールバック判定も `lib/domain/receipt/legacyFallback.ts`
+へ分離済み。
+
+- **純粋関数**: 種別フィルタ（receipts の `type` 未設定は支出扱い）、週収入の3値判定
+  （new / none / legacy）、月・年集計での旧形式取得要否、`mapAggregationEntries`
+  （種別ごとに独立フォールバック・categoryId 欠落エラー）、`groupDocsByMonth`、
+  `resolveYearRange`。
+- **インフラ**: `lib/convex/receipts/spendingEntries.ts` はインデックス取得・上限
+  チェック・enrichment 取得と ConvexError 変換のみを担い、フォールバック条件・
+  receipts 取得回数・文言は不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
