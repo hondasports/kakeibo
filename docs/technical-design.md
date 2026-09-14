@@ -551,6 +551,29 @@ candidate・CategoryRepository port）を再利用し、endpoint 向けの完全
   `./normalize` ラッパ）のみ。endpoint名、args/returns、エラー文言、seed 分岐、
   上限判定、E2E挙動は不変とする。
 
+`users`（Clerk認証由来のプロフィール upsert・consent・monthlyIncome・
+weekly settings・internal user lookup）も4層へ移行済み。既存の
+`lib/domain/users/`（clerkProfile・displayName・email・monthlyIncome）と
+`lib/domain/week/weekDates.ts` を再利用し、endpoint 向けのストアポートと
+フィールド構築ルールを追加した。
+
+- **純粋関数**（`lib/domain/users/`）: `store.ts`（`UserRecord`・`UserStore`
+  ポート）と `rules.ts`（identity 由来の insert/patch フィールド構築・
+  displayName 解決・User not found 検証）。
+- **ユースケース**（`lib/usecase/users/`）: upsertUser（insert/patch 分岐）、
+  consent（既設定時刻を保持する冪等 patch）、updateMonthlyIncome（null で
+  undefined クリア）、updateWeeklyDays（weeklyEndDay は開始曜日から導出）、
+  getUserProfile/getReceiptImageConsent、internal upsert/getUserIdByEmail/
+  getUserById/clearUserMonthlyIncome、共有 `getWeeklyStartDayForUser`。
+- **インフラ**（`lib/convex/users/`）: `UserStore` の Convex 実装
+  （`createUserStore`）と query 用読み取り専用 `createUserReader`、
+  Doc/Record 変換。by_token_identifier・by_email インデックス利用を隔離する。
+- **プレゼンテーション**: `convex/users/*.ts` は endpoint・validator・
+  `requireAuthenticatedUserId` 等の認証境界・互換export（`*Handler`）のみ。
+  `weeklySettings.ts` は他ドメイン向け共有 helper の薄い委譲を維持する。
+  endpoint名、args/returns、エラー文言、undefined クリア挙動、consent 冪等性、
+  internal upsert の email trim+小文字化（空文字保持）は不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
