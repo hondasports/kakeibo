@@ -3,17 +3,29 @@ import type { MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { requireGroupMembership } from "../groups/membership";
-import { calculateWeekStartDate, calculateWeekEndDate } from "../lib/weekDates";
+import { calculateWeekStartDate } from "../lib/weekDates";
 import { getWeeklyStartDayForUser } from "../users/weeklySettings";
+import { formatLocalDate, WeekSessionDomainError } from "../../lib/domain/weekSessions/rules";
+import {
+  createWeekSessionStore,
+  weekSessionRecordToDoc,
+} from "../../lib/convex/weekSessions/convexWeekSessionStore";
+import {
+  completeWeekSession as completeWeekSessionUsecase,
+  getOrCreateWeekSession as getOrCreateWeekSessionUsecase,
+  updateReviewMemo as updateReviewMemoUsecase,
+} from "../../lib/usecase/weekSessions";
+
+function convexError(error: unknown): never {
+  if (error instanceof ConvexError) throw error;
+  if (error instanceof WeekSessionDomainError) throw new ConvexError(error.message);
+  throw error;
+}
 
 /** getOrCreateCurrentWeekSession mutation の handler ロジック（テスト用に export） */
 export async function getOrCreateCurrentWeekSessionHandler(ctx: MutationCtx) {
   const { userId } = await requireGroupMembership(ctx);
-  const today = new Date(Date.now());
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, "0");
-  const d = String(today.getDate()).padStart(2, "0");
-  const todayStr = `${y}-${m}-${d}`;
+  const todayStr = formatLocalDate(Date.now());
   const weekStartDay = await getWeeklyStartDayForUser(ctx, userId);
   const weekStartDate = calculateWeekStartDate(todayStr, weekStartDay);
 
@@ -32,34 +44,17 @@ export async function getOrCreateWeekSessionHandler(
 ) {
   const { groupId } = await requireGroupMembership(ctx);
 
-  const weekEndDate = calculateWeekEndDate(args.weekStartDate);
-
-  const existing = await ctx.db
-    .query("weekSessions")
-    .withIndex("by_group_id_and_week_start_date", (q) =>
-      q.eq("groupId", groupId).eq("weekStartDate", args.weekStartDate),
-    )
-    .unique();
-
-  if (existing !== null) {
-    return existing;
+  try {
+    const session = await getOrCreateWeekSessionUsecase(
+      createWeekSessionStore(ctx),
+      groupId,
+      args.weekStartDate,
+      Date.now,
+    );
+    return weekSessionRecordToDoc(session);
+  } catch (error) {
+    convexError(error);
   }
-
-  const now = Date.now();
-  const sessionId = await ctx.db.insert("weekSessions", {
-    groupId,
-    weekStartDate: args.weekStartDate,
-    weekEndDate,
-    status: "draft",
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  const session = await ctx.db.get(sessionId);
-  if (session === null) {
-    throw new ConvexError("Failed to retrieve created week session");
-  }
-  return session;
 }
 
 export const getOrCreateWeekSession = mutation({
@@ -74,27 +69,17 @@ export async function updateReviewMemoHandler(
 ) {
   const { groupId } = await requireGroupMembership(ctx);
 
-  const session = await ctx.db
-    .query("weekSessions")
-    .withIndex("by_group_id_and_week_start_date", (q) =>
-      q.eq("groupId", groupId).eq("weekStartDate", args.weekStartDate),
-    )
-    .unique();
-
-  if (session === null) {
-    throw new ConvexError("Week session not found");
+  try {
+    const session = await updateReviewMemoUsecase(
+      createWeekSessionStore(ctx),
+      groupId,
+      args,
+      Date.now,
+    );
+    return weekSessionRecordToDoc(session);
+  } catch (error) {
+    convexError(error);
   }
-
-  await ctx.db.patch(session._id, {
-    reviewMemo: args.reviewMemo,
-    updatedAt: Date.now(),
-  });
-
-  const updated = await ctx.db.get(session._id);
-  if (updated === null) {
-    throw new ConvexError("Failed to retrieve updated week session");
-  }
-  return updated;
 }
 
 export const updateReviewMemo = mutation({
@@ -112,32 +97,17 @@ export async function completeWeekSessionHandler(
 ) {
   const { groupId } = await requireGroupMembership(ctx);
 
-  const session = await ctx.db
-    .query("weekSessions")
-    .withIndex("by_group_id_and_week_start_date", (q) =>
-      q.eq("groupId", groupId).eq("weekStartDate", args.weekStartDate),
-    )
-    .unique();
-
-  if (session === null) {
-    throw new ConvexError("Week session not found");
+  try {
+    const session = await completeWeekSessionUsecase(
+      createWeekSessionStore(ctx),
+      groupId,
+      args,
+      Date.now,
+    );
+    return weekSessionRecordToDoc(session);
+  } catch (error) {
+    convexError(error);
   }
-
-  const now = Date.now();
-  const patchData: { status: "completed"; updatedAt: number; reviewMemo?: string } = {
-    status: "completed",
-    updatedAt: now,
-  };
-  if (args.reviewMemo !== undefined) {
-    patchData.reviewMemo = args.reviewMemo;
-  }
-  await ctx.db.patch(session._id, patchData);
-
-  const updated = await ctx.db.get(session._id);
-  if (updated === null) {
-    throw new ConvexError("Failed to retrieve updated week session");
-  }
-  return updated;
 }
 
 export const completeWeekSession = mutation({

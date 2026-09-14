@@ -574,6 +574,24 @@ weekly settings・internal user lookup）も4層へ移行済み。既存の
   endpoint名、args/returns、エラー文言、undefined クリア挙動、consent 冪等性、
   internal upsert の email trim+小文字化（空文字保持）は不変とする。
 
+`weekSessions`（週次セッションの get-or-create・reviewMemo 更新・complete・
+E2E reset・取得）も4層へ移行済み。週の日付計算は既存 `lib/domain/week/weekDates.ts`
+を再利用する。
+
+- **純粋関数**（`lib/domain/weekSessions/`）: `store.ts`（`WeekSessionRecord`・
+  `WeekSessionStore` ポート）と `rules.ts`（ローカル日付 YYYY-MM-DD 生成、
+  新規 draft フィールド構築、complete patch（reviewMemo は指定時のみキー含有）、
+  reset patch（reviewMemo を undefined で明示クリア）、not found / retrieve 失敗検証）。
+- **ユースケース**（`lib/usecase/weekSessions/`）: getOrCreate（既存返却・無ければ
+  insert→get）、updateReviewMemo・complete（patch→get）、reset（`{reset}` 返却）、get。
+- **インフラ**（`lib/convex/weekSessions/`）: `WeekSessionStore` の Convex 実装
+  （`createWeekSessionStore`）と query 用 `createWeekSessionReader`、Doc/Record 変換。
+  by_group_id_and_week_start_date インデックス利用を隔離する。
+- **プレゼンテーション**: `convex/weekSessions/*.ts` は endpoint・validator・
+  `requireGroupMembership` 認可・互換export（`*Handler`）のみ。current 版は
+  membership → 週開始曜日取得 → 指定週 handler へ委譲する既存の呼出順序を維持する。
+  endpoint名、args/returns、エラー文言、Doc 返却形状、patch キー構成は不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
