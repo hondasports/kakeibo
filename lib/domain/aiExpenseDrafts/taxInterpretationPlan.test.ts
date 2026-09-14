@@ -146,11 +146,19 @@ describe("planDraftTaxInterpretation", () => {
   });
 
   it("totalOnly は税レビュー理由を付けない", () => {
+    const regularPlan = planDraftTaxInterpretation(
+      makeDraft() as AiExpenseDraftFields & { amountYen: number },
+      [makeItem()],
+      {},
+      1,
+    );
+    expect(regularPlan.draftPatch.reviewReasons).toContain("user_confirmation_required");
+
     const draft = makeDraft({ registrationMode: "totalOnly" }) as AiExpenseDraftFields & {
       amountYen: number;
     };
     const plan = planDraftTaxInterpretation(draft, [makeItem()], {}, 1);
-    expect(plan.draftPatch.reviewReasons.some((r) => String(r).startsWith("tax_"))).toBe(false);
+    expect(plan.draftPatch.reviewReasons).not.toContain("user_confirmation_required");
   });
 
   it("preservedNonTaxReasons は下書きの理由へ引き継がれる", () => {
