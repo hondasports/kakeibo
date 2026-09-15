@@ -686,6 +686,16 @@ schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` �
   `ClerkInvitationDomainError` の ConvexError 変換のみを担い、ハンドラ公開シグネチャ
   （ctx, args, deps）・エラー文言・console.warn 内容は不変とする。
 
+`aiExpenseDrafts` の支出エントリ調整（`reconcileDraftExpenseEntries`）も
+`lib/domain/aiExpenseDrafts/reconcileExpenseEntriesPlan.ts` へ計画算出を分離済み。
+
+- **純粋関数**: `planExpenseEntryReconciliation`（既存100件上限、再利用選択
+  （カテゴリ一致 → 未保持の先頭）、patch/insert フィールド構築、memo の非対称条件
+  （patch は memoUpdate 指定時にキー含有・insert は value 指定時のみ）、削除対象算出）。
+- **インフラ**: `lib/convex/aiExpenseDrafts/reconcileExpenseEntries.ts` は既存エントリ
+  取得・各op適用前のカテゴリ検証委譲・patch/insert/delete 適用・結果ID順序維持と
+  `ReconcileExpenseEntriesDomainError` の ConvexError 変換のみを担う。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
