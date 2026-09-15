@@ -1,18 +1,20 @@
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../../convex/_generated/server";
+import {
+  planExpenseEntryReconciliation,
+  ReconcileExpenseEntriesDomainError,
+} from "../../domain/aiExpenseDrafts/reconcileExpenseEntriesPlan";
 import type { AiExpenseRegistrationMode } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import type { DraftRegistrationItem } from "../../domain/aiExpenseDrafts/registrationItems";
 import { assertExpenseCategoryBelongsToGroup } from "../expenseEntries/expenseEntryValidation";
-
-type RegistrationItem = Omit<DraftRegistrationItem, "categoryId"> & {
-  categoryId: Id<"categories">;
-};
 
 export {
   buildDraftRegistrationItems,
   resolveRegistrationMode,
 } from "../../domain/aiExpenseDrafts/registrationItems";
+
+type RegistrationItem = DraftRegistrationItem;
 
 /**
  * 下書きに紐づく支出エントリを upsert/delete で同期する。
@@ -35,55 +37,53 @@ export async function reconcileDraftExpenseEntries(
       q.eq("groupId", args.groupId).eq("aiExpenseDraftId", args.draft._id),
     )
     .take(101);
-  if (existing.length > 100) {
-    throw new ConvexError("Too many expense entries are linked to this draft");
+
+  let plan;
+  try {
+    plan = planExpenseEntryReconciliation({
+      existing,
+      items: args.items,
+      draftId: args.draft._id,
+      draftDate: args.draft.date!,
+      groupId: args.groupId,
+      userId: args.userId,
+      memoUpdate: args.memoUpdate,
+      now: args.now,
+    });
+  } catch (error) {
+    if (error instanceof ReconcileExpenseEntriesDomainError) {
+      throw new ConvexError(error.message);
+    }
+    throw error;
   }
 
-  const retainedIds = new Set<Id<"expenseEntries">>();
   const resultIds: Id<"expenseEntries">[] = [];
-  for (const item of args.items) {
-    await assertExpenseCategoryBelongsToGroup(ctx, item.categoryId, args.groupId);
-    const reusable =
-      existing.find(
-        (entry) => entry.categoryId === item.categoryId && !retainedIds.has(entry._id),
-      ) ?? existing.find((entry) => !retainedIds.has(entry._id));
-    if (reusable) {
-      retainedIds.add(reusable._id);
-      await ctx.db.patch(reusable._id, {
-        date: args.draft.date!,
-        amount: item.amountYen,
-        categoryId: item.categoryId,
-        title: item.itemName,
-        ...(args.memoUpdate === undefined ? {} : { memo: args.memoUpdate.value }),
-        entryType: "expense",
-        source: "ai_suggested",
-        updatedAt: args.now,
+  for (const op of plan.ops) {
+    await assertExpenseCategoryBelongsToGroup(ctx, op.categoryId as Id<"categories">, args.groupId);
+    if (op.kind === "patch") {
+      const { memo, ...rest } = op.fields;
+      await ctx.db.patch(op.entryId as Id<"expenseEntries">, {
+        ...rest,
+        categoryId: op.fields.categoryId as Id<"categories">,
+        ...("memo" in op.fields ? { memo } : {}),
       });
-      resultIds.push(reusable._id);
+      resultIds.push(op.entryId as Id<"expenseEntries">);
       continue;
     }
+    const { memo, ...rest } = op.fields;
     resultIds.push(
       await ctx.db.insert("expenseEntries", {
-        groupId: args.groupId,
-        createdByUserId: args.userId,
-        aiExpenseDraftId: args.draft._id,
-        date: args.draft.date!,
-        amount: item.amountYen,
-        categoryId: item.categoryId,
-        title: item.itemName,
-        ...(args.memoUpdate?.value === undefined ? {} : { memo: args.memoUpdate.value }),
-        entryType: "expense",
-        source: "ai_suggested",
-        createdAt: args.now,
-        updatedAt: args.now,
+        ...rest,
+        groupId: op.fields.groupId as Id<"groups">,
+        aiExpenseDraftId: op.fields.aiExpenseDraftId as Id<"aiExpenseDrafts">,
+        categoryId: op.fields.categoryId as Id<"categories">,
+        ...("memo" in op.fields ? { memo } : {}),
       }),
     );
   }
 
-  for (const entry of existing) {
-    if (!retainedIds.has(entry._id) && !resultIds.includes(entry._id)) {
-      await ctx.db.delete(entry._id);
-    }
+  for (const entryId of plan.deleteIds) {
+    await ctx.db.delete(entryId as Id<"expenseEntries">);
   }
   return resultIds;
 }
