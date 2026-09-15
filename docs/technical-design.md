@@ -670,6 +670,22 @@ schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` �
   `ctx.db` 取得（カテゴリ・履歴・カテゴリ情報）と `ExpenseSearchDomainError` の
   ConvexError 変換のみを担い、戻り値 shape・エラー文言・truncated 伝播は不変とする。
 
+`groups` の Clerk 招待オーケストレーション（`inviteMember` / `cancelPendingGroupInvitation`）も
+`lib/usecase/groups/clerkInvitationActions.ts` へ分離済み。
+
+- **純粋関数**: `lib/domain/groups/invitationFlow.ts`（`ClerkInvitationDomainError`、
+  グループ前提検証（未選択・非オーナー）、招待メール正規化、招待レコード入力構築）。
+  リダイレクトURL・Clerk パラメータの純粋ルールは既存 `lib/domain/groups/clerkInvitations.ts`
+  をそのまま利用する。
+- **ユースケース**: グループ解決 → オーナー検証 → 認証ユーザー解決 → メール正規化 →
+  トークン/リダイレクト生成 → ローカル予約 → Clerk 招待 → 失敗時の補償削除（warnして元
+  エラー再送出）→ `clerkInvitationId` 追記、および取消時の revoke ループ（個別失敗は warn
+  して継続）をストア/サービスポート経由で実行する。
+- **インフラ**: `lib/convex/groups/clerkInvitationLib/inviteActions.ts` は
+  runQuery/runMutation ブリッジ・`getClerkClient`（CLERK_SECRET_KEY）・
+  `ClerkInvitationDomainError` の ConvexError 変換のみを担い、ハンドラ公開シグネチャ
+  （ctx, args, deps）・エラー文言・console.warn 内容は不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
