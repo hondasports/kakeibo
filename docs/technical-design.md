@@ -654,6 +654,22 @@ schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` �
   取得・patch・再取得と ConvexError 変換のみを担い、判定順序・patch フィールド・文言は
   不変とする。
 
+`expenseSearch`（履歴検索）の検索オーケストレーションも `lib/usecase/expenseSearch/searchExpenses.ts`
+へ分離済み。
+
+- **純粋関数**: `lib/domain/expenseSearch/searchResult.ts`（`ExpenseSearchReceipt` /
+  `ExpenseSearchResult` 型、`emptySearchResult`、`collectCategoryIds`（収入グループ除外・
+  重複排除）、`mapHistoryGroupToItems`（カテゴリ名 fallback「不明」・色 fallback
+  「#AAB7C4」）、`ExpenseSearchDomainError`）。既存 `analytics.ts` / `filter.ts` の
+  集計・フィルタ・ページング・前期間算出はそのまま利用する。
+- **ユースケース**: `searchExpenses` はストアポート経由で、フィルタ検証 → カテゴリ
+  所有権チェック（他グループなら空結果）→ 履歴読込 → グルーピング/フィルタ →
+  初回ページのみ前期間読込・比較 → カテゴリ情報 → 集計 → ページング → 項目マッピング
+  を逐語移植した順序で実行する。
+- **インフラ**: `lib/convex/expenseSearch/searchExpenses.ts` は `requireGroupMembership`、
+  `ctx.db` 取得（カテゴリ・履歴・カテゴリ情報）と `ExpenseSearchDomainError` の
+  ConvexError 変換のみを担い、戻り値 shape・エラー文言・truncated 伝播は不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
