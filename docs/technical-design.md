@@ -714,6 +714,19 @@ schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` �
   の変換のみを担い、公開ハンドラ名・戻り値型・エラー文言は不変とする。
   `buildCategoryInfoMap` は `categoryAggregation.ts` の DB アダプタとして維持する。
 
+`spendingEntries` のソース選択とレシートグループエンリッチメントの判定も
+domain へ分離済み。
+
+- **純粋関数**: `lib/domain/receipt/legacyFallback.ts` の
+  `resolveSpendingEntriesSource`（新形式の支出エントリ有無で new/legacy）と
+  `lib/domain/receipt/spendingEntry.ts` の `buildReceiptEnrichmentMaps`
+  （sourceDocument/aiExpenseDraft のグループ所有権フィルタ、明細の
+  `categoryId && itemName` 有効項目フィルタ、参照map構築）。
+- **インフラ**: `lib/convex/receipts/spendingEntries.ts` は期間クエリ・上限チェック
+  （`MAX_DATE_RANGE_ENTRIES`/`MAX_YEAR_RANGE_ENTRIES`）・`ctx.db` 一括取得・
+  ConvexError 変換のみを担い、新形式時はエンリッチメント付き新エントリ、
+  無ければ旧 receipts+`addLegacyReceiptGroups` への分岐順は不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。

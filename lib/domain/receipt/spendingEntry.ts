@@ -231,3 +231,73 @@ export function enrichSpendingEntries(
     }),
   );
 }
+
+/** エンリッチメント判定に必要な永続化ドキュメントの最小形状。 */
+export type ReceiptEnrichmentSourceDocumentDoc = EnrichSpendingEntrySourceDocument & {
+  groupId: string;
+};
+
+export type ReceiptEnrichmentAiExpenseDraftDoc = EnrichSpendingEntryAiExpenseDraft & {
+  groupId: string;
+};
+
+export type ReceiptEnrichmentDraftItemDoc = {
+  categoryId?: string;
+  itemName?: string;
+};
+
+export type ReceiptEnrichmentMaps = {
+  sourceDocumentMap: Map<string, EnrichSpendingEntrySourceDocument>;
+  aiExpenseDraftMap: Map<string, EnrichSpendingEntryAiExpenseDraft>;
+  aiExpenseDraftItemsMap: Map<string, EnrichSpendingEntryAiExpenseDraftItem[]>;
+};
+
+/**
+ * レシートグループエンリッチメント用の参照mapを構築する。
+ * 他グループのドキュメント・下書きは除外し、明細はカテゴリと品名が揃うものだけを使う。
+ */
+export function buildReceiptEnrichmentMaps(
+  groupId: string,
+  sourceDocuments: readonly (ReceiptEnrichmentSourceDocumentDoc | null)[],
+  aiExpenseDrafts: readonly (ReceiptEnrichmentAiExpenseDraftDoc | null)[],
+  aiExpenseDraftItems: ReadonlyArray<readonly [string, readonly ReceiptEnrichmentDraftItemDoc[]]>,
+): ReceiptEnrichmentMaps {
+  const sourceDocumentMap = new Map<string, EnrichSpendingEntrySourceDocument>();
+  for (const document of sourceDocuments) {
+    if (document !== null && document.groupId === groupId) {
+      sourceDocumentMap.set(document._id, {
+        _id: document._id,
+        shopName: document.shopName,
+        totalAmount: document.totalAmount,
+      });
+    }
+  }
+
+  const aiExpenseDraftMap = new Map<string, EnrichSpendingEntryAiExpenseDraft>();
+  for (const draft of aiExpenseDrafts) {
+    if (draft !== null && draft.groupId === groupId) {
+      aiExpenseDraftMap.set(draft._id, {
+        _id: draft._id,
+        shopName: draft.shopName,
+        payeeName: draft.payeeName,
+        amountYen: draft.amountYen,
+        registrationMode: draft.registrationMode,
+      });
+    }
+  }
+
+  const aiExpenseDraftItemsMap = new Map<string, EnrichSpendingEntryAiExpenseDraftItem[]>();
+  for (const [draftId, items] of aiExpenseDraftItems) {
+    aiExpenseDraftItemsMap.set(
+      draftId,
+      items
+        .filter((item) => item.categoryId !== undefined && item.itemName !== undefined)
+        .map((item) => ({
+          categoryId: item.categoryId as string,
+          itemName: item.itemName as string,
+        })),
+    );
+  }
+
+  return { sourceDocumentMap, aiExpenseDraftMap, aiExpenseDraftItemsMap };
+}

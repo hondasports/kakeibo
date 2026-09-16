@@ -10,6 +10,7 @@ import {
   mapAggregationEntries as mapAggregationEntriesDomain,
   needsLegacyReceiptsForMonthAggregation,
   needsLegacyReceiptsForYearAggregation,
+  resolveSpendingEntriesSource,
   resolveWeekIncomeSource,
   resolveYearRange,
   type AggregationExpense,
@@ -17,6 +18,7 @@ import {
 } from "../../domain/receipt/legacyFallback";
 import {
   addLegacyReceiptGroups,
+  buildReceiptEnrichmentMaps,
   enrichSpendingEntries,
   mapExpenseEntryToSpendingEntry as mapExpenseEntryToSpendingEntryDomain,
   mapIncomeExpenseEntryToListEntry,
@@ -112,44 +114,7 @@ async function fetchReceiptEnrichmentData(
     }),
   );
 
-  const sourceDocumentMap = new Map<string, EnrichSpendingEntrySourceDocument>();
-  for (const document of sourceDocuments) {
-    if (document !== null && document.groupId === groupId) {
-      sourceDocumentMap.set(document._id as string, {
-        _id: document._id as string,
-        shopName: document.shopName,
-        totalAmount: document.totalAmount,
-      });
-    }
-  }
-
-  const aiExpenseDraftMap = new Map<string, EnrichSpendingEntryAiExpenseDraft>();
-  for (const draft of aiExpenseDrafts) {
-    if (draft !== null && draft.groupId === groupId) {
-      aiExpenseDraftMap.set(draft._id as string, {
-        _id: draft._id as string,
-        shopName: draft.shopName,
-        payeeName: draft.payeeName,
-        amountYen: draft.amountYen,
-        registrationMode: draft.registrationMode,
-      });
-    }
-  }
-
-  const aiExpenseDraftItemsMap = new Map<string, EnrichSpendingEntryAiExpenseDraftItem[]>();
-  for (const [draftId, items] of aiExpenseDraftItems) {
-    aiExpenseDraftItemsMap.set(
-      draftId as string,
-      items
-        .filter((item) => item.categoryId !== undefined && item.itemName !== undefined)
-        .map((item) => ({
-          categoryId: item.categoryId as string,
-          itemName: item.itemName as string,
-        })),
-    );
-  }
-
-  return { sourceDocumentMap, aiExpenseDraftMap, aiExpenseDraftItemsMap };
+  return buildReceiptEnrichmentMaps(groupId, sourceDocuments, aiExpenseDrafts, aiExpenseDraftItems);
 }
 
 export async function enrichSpendingEntriesWithReceiptGroups(
@@ -274,12 +239,11 @@ export async function getWeekSpendingEntries(
     weekStartDate,
     weekEndDate,
   );
-  const expenseEntriesForWeek = filterEntriesByKind(expenseEntries, "expense");
-  if (expenseEntriesForWeek.length > 0) {
+  if (resolveSpendingEntriesSource(expenseEntries) === "new") {
     return enrichSpendingEntriesWithReceiptGroups(
       ctx,
       groupId,
-      mapExpenseEntriesToReceiptLinkages(expenseEntriesForWeek),
+      mapExpenseEntriesToReceiptLinkages(filterEntriesByKind(expenseEntries, "expense")),
     );
   }
 
@@ -295,12 +259,11 @@ export async function getDateSpendingEntries(
   date: string,
 ): Promise<SpendingEntry[]> {
   const expenseEntries = await fetchExpenseEntriesByDateRange(ctx, groupId, date, date);
-  const expenseEntriesForDate = filterEntriesByKind(expenseEntries, "expense");
-  if (expenseEntriesForDate.length > 0) {
+  if (resolveSpendingEntriesSource(expenseEntries) === "new") {
     return enrichSpendingEntriesWithReceiptGroups(
       ctx,
       groupId,
-      mapExpenseEntriesToReceiptLinkages(expenseEntriesForDate),
+      mapExpenseEntriesToReceiptLinkages(filterEntriesByKind(expenseEntries, "expense")),
     );
   }
 
@@ -322,14 +285,13 @@ export async function getMonthSpendingEntries(
     monthStartDate,
     monthEndDate,
   );
-  const monthExpenseEntries = filterEntriesByKind(expenseEntries, "expense");
   // 同じ種別の新形式がある場合だけ旧形式を抑止する。
   // 移行途中に支出と収入が混在していても、別種別の記録は補完する。
-  if (monthExpenseEntries.length > 0) {
+  if (resolveSpendingEntriesSource(expenseEntries) === "new") {
     return enrichSpendingEntriesWithReceiptGroups(
       ctx,
       groupId,
-      mapExpenseEntriesToReceiptLinkages(monthExpenseEntries),
+      mapExpenseEntriesToReceiptLinkages(filterEntriesByKind(expenseEntries, "expense")),
     );
   }
 
