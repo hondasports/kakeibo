@@ -48,6 +48,18 @@ export function resolveWeekIncomeSource(
   return "legacy";
 }
 
+/**
+ * 支出一覧のソース判定。
+ * 新形式の支出エントリが1件でもあればそれを使い、無ければ旧レシートへフォールバックする。
+ */
+export type SpendingEntriesSource = "new" | "legacy";
+
+export function resolveSpendingEntriesSource(
+  entries: readonly FallbackExpenseEntry[],
+): SpendingEntriesSource {
+  return entries.some((entry) => isEntryOfKind(entry, "expense")) ? "new" : "legacy";
+}
+
 /** 月集計: 支出・収入とも新形式があるときだけ旧形式の取得を省略できる。 */
 export function needsLegacyReceiptsForMonthAggregation(
   entries: readonly FallbackExpenseEntry[],

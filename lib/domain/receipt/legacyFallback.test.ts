@@ -6,6 +6,7 @@ import {
   mapAggregationEntries,
   needsLegacyReceiptsForMonthAggregation,
   needsLegacyReceiptsForYearAggregation,
+  resolveSpendingEntriesSource,
   resolveWeekIncomeSource,
   resolveYearRange,
 } from "./legacyFallback";
@@ -127,5 +128,16 @@ describe("resolveYearRange", () => {
     expect(r.months).toHaveLength(12);
     expect(r.startDate).toBe("2024-01-01");
     expect(r.endDate).toBe("2024-12-31");
+  });
+});
+
+describe("resolveSpendingEntriesSource", () => {
+  it("新形式の支出があれば new、収入のみ・空なら legacy", () => {
+    expect(resolveSpendingEntriesSource([{ entryType: "expense" }])).toBe("new");
+    expect(resolveSpendingEntriesSource([{ entryType: "income" }])).toBe("legacy");
+    expect(resolveSpendingEntriesSource([{ entryType: "income" }, { entryType: "expense" }])).toBe(
+      "new",
+    );
+    expect(resolveSpendingEntriesSource([])).toBe("legacy");
   });
 });
