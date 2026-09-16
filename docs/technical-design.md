@@ -294,6 +294,31 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
 
 `CategoriesPage.tsx` は存在するが、現行ルーターでは `/categories` も `SettingsPage` へ向ける。
 
+#### 5.1.1 feature 内ファイルの格納基準
+
+feature 内の `utils/` には、その feature の UI 表現に閉じた変換（ViewModel 構築・表示用
+フォーマット・フォーム状態からドメイン型への写像）のみを置く。`lib/domain/` の関数を
+改名・委譲するだけのラッパーファイルは置かず、呼び出し側から `lib/domain/` を直接
+import する（例: `features/ai-expense-queue/utils/reviewValidation.ts` のような中継のみの
+ファイルは、`lib/domain/aiExpenseDrafts/reviewValidation` を直接参照する形へ整理する）。
+
+#### 5.1.2 Convex API の参照方針
+
+画面からの `useQuery` / `useMutation` / `useAction` には `convex/_generated/api` の
+`api` オブジェクトを直接渡す（`useQuery(api.groups.queries.getMyGroup)` の形）。
+`api.<path>` を返すだけの間接層は新設しない。テストで API 呼び出しを差し替える場合は
+`vi.mock("convex/react")` で hook ごと差し替える（既存テストの主流パターン）。
+
+なお `src/lib/repositories/` はこの方針に反する既存の間接層であり、#826 Phase C で
+撤去予定の経過措置として残っている。
+
+#### 5.1.3 feature の分割基準
+
+1 つの feature が複数のサブドメイン（例: 一覧キュー・レビューダイアログ・画像投入）を
+抱えて肥大化した場合は、サブドメイン単位で別 feature へ分離する。目安は
+「別々のルートや責務を持つ」「`components/<sub>/` のような第二階層が育つ」場合。
+#826 Phase B で `ai-expense-queue` から review 系を独立 feature へ分離する。
+
 ### 5.2 Convex モジュール分割方針
 
 - **公開 API**（`query` / `mutation` / `action` / `internal*`）は `convex/<domain>/` に置く。
