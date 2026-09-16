@@ -5,6 +5,7 @@ import {
   normalizeEmail,
 } from "../../../../convex/groups/lib/groupEmailMatching";
 import { readQueryDoc, readQueryDocs } from "../../../../convex/groups/lib/groupQueryHelpers";
+import { assessGroupInvitationStaleness } from "../../../domain/groups/groupInvitation";
 
 async function collectStaleGroupInvitationIdsForEmail(
   ctx: Pick<QueryCtx, "db">,
@@ -23,15 +24,12 @@ async function collectStaleGroupInvitationIdsForEmail(
     if (!invitationEmailsMatch(normalizedEmail, invitation.email)) {
       return;
     }
-    if (invitation.status === "pending") {
+    const assessment = assessGroupInvitationStaleness(invitation);
+    if (assessment === "stale") {
       invitationIds.add(invitation._id);
       return;
     }
-    if (invitation.status !== "accepted") {
-      return;
-    }
-    if (!invitation.acceptedByUserId) {
-      invitationIds.add(invitation._id);
+    if (assessment === "keep") {
       return;
     }
 
