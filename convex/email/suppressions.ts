@@ -3,14 +3,14 @@ import { internalQuery, internalMutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import { emailSuppressionReasonValidator } from "./model";
 import type { EmailSuppressionReason } from "../../lib/email/model";
+import { getEmailSuppressionDocByNormalizedEmail } from "../../lib/convex/email/convexEmailSuppressionStore";
+import { upsertEmailSuppression } from "../../lib/usecase/email/suppressions";
+import { createSuppressionDeps } from "../../lib/convex/email/emailDeps";
 
 export const getSuppressionByNormalizedEmail = internalQuery({
   args: { normalizedEmail: v.string() },
   handler: async (ctx, { normalizedEmail }) => {
-    return await ctx.db
-      .query("emailSuppressions")
-      .withIndex("by_normalized_email", (q) => q.eq("normalizedEmail", normalizedEmail))
-      .unique();
+    return await getEmailSuppressionDocByNormalizedEmail(ctx, normalizedEmail);
   },
 });
 
@@ -25,28 +25,7 @@ export async function upsertSuppressionHandler(
     createdAt: number;
   },
 ): Promise<string> {
-  const existing = await ctx.db
-    .query("emailSuppressions")
-    .withIndex("by_normalized_email", (q) => q.eq("normalizedEmail", args.normalizedEmail))
-    .unique();
-  if (existing) {
-    await ctx.db.patch(existing._id, {
-      reason: args.reason,
-      source: args.source,
-      providerMessageId: args.providerMessageId,
-      updatedAt: args.createdAt,
-    });
-    return existing._id;
-  }
-  return await ctx.db.insert("emailSuppressions", {
-    email: args.email,
-    normalizedEmail: args.normalizedEmail,
-    reason: args.reason,
-    source: args.source,
-    providerMessageId: args.providerMessageId,
-    createdAt: args.createdAt,
-    updatedAt: args.createdAt,
-  });
+  return await upsertEmailSuppression(createSuppressionDeps(ctx), args);
 }
 
 export const upsertSuppression = internalMutation({

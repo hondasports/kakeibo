@@ -1,30 +1,28 @@
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
 import { requireGroupMembership } from "../groups/membership";
-import { MAX_CATEGORIES_PER_GROUP } from "./mutations";
+import {
+  categoryRecordToDoc,
+  createCategoryReader,
+} from "../../lib/convex/categories/convexCategoryStore";
+import {
+  listActive as listActiveUsecase,
+  listForSettings as listForSettingsUsecase,
+} from "../../lib/usecase/categories";
 
 /** listActive query の handler ロジック（テスト用に export） */
-export async function listActiveHandler(ctx: QueryCtx) {
+export async function listActiveHandler(ctx: QueryCtx): Promise<Doc<"categories">[]> {
   const { groupId } = await requireGroupMembership(ctx);
-
-  return await ctx.db
-    .query("categories")
-    .withIndex("by_group_id_and_is_active_and_sort_order", (q) =>
-      q.eq("groupId", groupId).eq("isActive", true),
-    )
-    .order("asc")
-    .collect();
+  const records = await listActiveUsecase(createCategoryReader(ctx), groupId);
+  return records.map(categoryRecordToDoc);
 }
 
 /** listForSettings query の handler ロジック（テスト用に export） */
-export async function listForSettingsHandler(ctx: QueryCtx) {
+export async function listForSettingsHandler(ctx: QueryCtx): Promise<Doc<"categories">[]> {
   const { groupId } = await requireGroupMembership(ctx);
-
-  return await ctx.db
-    .query("categories")
-    .withIndex("by_group_id_and_sort_order", (q) => q.eq("groupId", groupId))
-    .order("asc")
-    .take(MAX_CATEGORIES_PER_GROUP);
+  const records = await listForSettingsUsecase(createCategoryReader(ctx), groupId);
+  return records.map(categoryRecordToDoc);
 }
 
 /**

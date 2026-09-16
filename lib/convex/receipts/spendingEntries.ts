@@ -1,9 +1,24 @@
 import type { QueryCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { addDays, getMonthEndDate } from "../../domain/common/date";
-import { getYearMonths } from "../../domain/common/year";
+import {
+  AGGREGATION_EXPENSE_CATEGORY_REQUIRED_MESSAGE,
+  filterEntriesByKind,
+  filterReceiptsByKind,
+  groupDocsByMonth,
+  INVALID_YEAR_MESSAGE,
+  mapAggregationEntries as mapAggregationEntriesDomain,
+  needsLegacyReceiptsForMonthAggregation,
+  needsLegacyReceiptsForYearAggregation,
+  resolveSpendingEntriesSource,
+  resolveWeekIncomeSource,
+  resolveYearRange,
+  type AggregationExpense,
+  type AggregationIncome,
+} from "../../domain/receipt/legacyFallback";
 import {
   addLegacyReceiptGroups,
+  buildReceiptEnrichmentMaps,
   enrichSpendingEntries,
   mapExpenseEntryToSpendingEntry as mapExpenseEntryToSpendingEntryDomain,
   mapIncomeExpenseEntryToListEntry,
@@ -48,7 +63,7 @@ export function mapExpenseEntryToSpendingEntry(
 ): SpendingEntry {
   const result = mapExpenseEntryToSpendingEntryDomain(expenseEntry);
   if (!result.success) {
-    throw new ConvexError("Expense entry category is required for spending aggregation");
+    throw new ConvexError(AGGREGATION_EXPENSE_CATEGORY_REQUIRED_MESSAGE);
   }
   return result.entry;
 }
@@ -99,44 +114,7 @@ async function fetchReceiptEnrichmentData(
     }),
   );
 
-  const sourceDocumentMap = new Map<string, EnrichSpendingEntrySourceDocument>();
-  for (const document of sourceDocuments) {
-    if (document !== null && document.groupId === groupId) {
-      sourceDocumentMap.set(document._id as string, {
-        _id: document._id as string,
-        shopName: document.shopName,
-        totalAmount: document.totalAmount,
-      });
-    }
-  }
-
-  const aiExpenseDraftMap = new Map<string, EnrichSpendingEntryAiExpenseDraft>();
-  for (const draft of aiExpenseDrafts) {
-    if (draft !== null && draft.groupId === groupId) {
-      aiExpenseDraftMap.set(draft._id as string, {
-        _id: draft._id as string,
-        shopName: draft.shopName,
-        payeeName: draft.payeeName,
-        amountYen: draft.amountYen,
-        registrationMode: draft.registrationMode,
-      });
-    }
-  }
-
-  const aiExpenseDraftItemsMap = new Map<string, EnrichSpendingEntryAiExpenseDraftItem[]>();
-  for (const [draftId, items] of aiExpenseDraftItems) {
-    aiExpenseDraftItemsMap.set(
-      draftId as string,
-      items
-        .filter((item) => item.categoryId !== undefined && item.itemName !== undefined)
-        .map((item) => ({
-          categoryId: item.categoryId as string,
-          itemName: item.itemName as string,
-        })),
-    );
-  }
-
-  return { sourceDocumentMap, aiExpenseDraftMap, aiExpenseDraftItemsMap };
+  return buildReceiptEnrichmentMaps(groupId, sourceDocuments, aiExpenseDrafts, aiExpenseDraftItems);
 }
 
 export async function enrichSpendingEntriesWithReceiptGroups(
@@ -207,9 +185,6 @@ async function fetchReceiptsByDateRange(
   return receipts;
 }
 
-type AggregationExpense = { amountYen: number; categoryId: string };
-type AggregationIncome = { amountYen: number };
-
 function mapAggregationEntries(
   expenseEntries: Doc<"expenseEntries">[],
   receipts: Doc<"receipts">[],
@@ -217,55 +192,11 @@ function mapAggregationEntries(
   expenses: AggregationExpense[];
   incomes: AggregationIncome[];
 } {
-  const monthExpenseEntries = expenseEntries.filter((entry) => entry.entryType !== "income");
-  const monthIncomeEntries = expenseEntries.filter((entry) => entry.entryType === "income");
-  const needsLegacyExpenses = monthExpenseEntries.length === 0;
-  const needsLegacyIncomes = monthIncomeEntries.length === 0;
-
-  return {
-    expenses: needsLegacyExpenses
-      ? receipts
-          .filter((receipt) => receipt.type !== "income")
-          .map((receipt) => ({
-            amountYen: receipt.amountYen,
-            categoryId: receipt.categoryId,
-          }))
-      : monthExpenseEntries.map((entry) => {
-          if (entry.categoryId === undefined) {
-            throw new ConvexError("Expense entry category is required for spending aggregation");
-          }
-          return {
-            amountYen: entry.amount,
-            categoryId: entry.categoryId,
-          };
-        }),
-    incomes: needsLegacyIncomes
-      ? receipts
-          .filter((receipt) => receipt.type === "income")
-          .map((receipt) => ({ amountYen: receipt.amountYen }))
-      : monthIncomeEntries.map((entry) => ({ amountYen: entry.amount })),
-  };
-}
-
-function groupDocsByMonth<T extends { date: string }>(
-  docs: T[],
-  startDate: string,
-  endDate: string,
-): Map<string, T[]> {
-  const grouped = new Map<string, T[]>();
-  for (const doc of docs) {
-    if (doc.date < startDate || doc.date > endDate) {
-      continue;
-    }
-    const month = doc.date.slice(0, 7);
-    const bucket = grouped.get(month);
-    if (bucket === undefined) {
-      grouped.set(month, [doc]);
-    } else {
-      bucket.push(doc);
-    }
+  const result = mapAggregationEntriesDomain(expenseEntries, receipts);
+  if (!result.success) {
+    throw new ConvexError(AGGREGATION_EXPENSE_CATEGORY_REQUIRED_MESSAGE);
   }
-  return grouped;
+  return { expenses: result.expenses, incomes: result.incomes };
 }
 
 export async function getWeekIncomeEntries(
@@ -280,19 +211,20 @@ export async function getWeekIncomeEntries(
     weekStartDate,
     weekEndDate,
   );
-  const incomeEntriesForWeek = expenseEntries.filter((entry) => entry.entryType === "income");
-  if (incomeEntriesForWeek.length > 0) {
-    return incomeEntriesForWeek.map((entry) => mapIncomeExpenseEntryToListEntry(entry));
+  const source = resolveWeekIncomeSource(expenseEntries);
+  if (source === "new") {
+    return filterEntriesByKind(expenseEntries, "income").map((entry) =>
+      mapIncomeExpenseEntryToListEntry(entry),
+    );
   }
-
-  if (expenseEntries.length > 0) {
+  if (source === "none") {
     return [];
   }
 
   const receipts = await fetchReceiptsByDateRange(ctx, groupId, weekStartDate, weekEndDate);
-  return receipts
-    .filter((receipt) => receipt.type === "income")
-    .map((receipt) => mapReceiptToIncomeListEntry(receipt));
+  return filterReceiptsByKind(receipts, "income").map((receipt) =>
+    mapReceiptToIncomeListEntry(receipt),
+  );
 }
 
 export async function getWeekSpendingEntries(
@@ -307,20 +239,17 @@ export async function getWeekSpendingEntries(
     weekStartDate,
     weekEndDate,
   );
-  const expenseEntriesForWeek = expenseEntries.filter((entry) => entry.entryType !== "income");
-  if (expenseEntriesForWeek.length > 0) {
+  if (resolveSpendingEntriesSource(expenseEntries) === "new") {
     return enrichSpendingEntriesWithReceiptGroups(
       ctx,
       groupId,
-      mapExpenseEntriesToReceiptLinkages(expenseEntriesForWeek),
+      mapExpenseEntriesToReceiptLinkages(filterEntriesByKind(expenseEntries, "expense")),
     );
   }
 
   const receipts = await fetchReceiptsByDateRange(ctx, groupId, weekStartDate, weekEndDate);
   return addLegacyReceiptGroups(
-    receipts
-      .filter((receipt) => receipt.type !== "income")
-      .map((receipt) => mapReceiptToSpendingEntry(receipt)),
+    filterReceiptsByKind(receipts, "expense").map((receipt) => mapReceiptToSpendingEntry(receipt)),
   );
 }
 
@@ -330,20 +259,17 @@ export async function getDateSpendingEntries(
   date: string,
 ): Promise<SpendingEntry[]> {
   const expenseEntries = await fetchExpenseEntriesByDateRange(ctx, groupId, date, date);
-  const expenseEntriesForDate = expenseEntries.filter((entry) => entry.entryType !== "income");
-  if (expenseEntriesForDate.length > 0) {
+  if (resolveSpendingEntriesSource(expenseEntries) === "new") {
     return enrichSpendingEntriesWithReceiptGroups(
       ctx,
       groupId,
-      mapExpenseEntriesToReceiptLinkages(expenseEntriesForDate),
+      mapExpenseEntriesToReceiptLinkages(filterEntriesByKind(expenseEntries, "expense")),
     );
   }
 
   const receipts = await fetchReceiptsByDateRange(ctx, groupId, date, date);
   return addLegacyReceiptGroups(
-    receipts
-      .filter((receipt) => receipt.type !== "income")
-      .map((receipt) => mapReceiptToSpendingEntry(receipt)),
+    filterReceiptsByKind(receipts, "expense").map((receipt) => mapReceiptToSpendingEntry(receipt)),
   );
 }
 
@@ -359,22 +285,19 @@ export async function getMonthSpendingEntries(
     monthStartDate,
     monthEndDate,
   );
-  const monthExpenseEntries = expenseEntries.filter((entry) => entry.entryType !== "income");
   // 同じ種別の新形式がある場合だけ旧形式を抑止する。
   // 移行途中に支出と収入が混在していても、別種別の記録は補完する。
-  if (monthExpenseEntries.length > 0) {
+  if (resolveSpendingEntriesSource(expenseEntries) === "new") {
     return enrichSpendingEntriesWithReceiptGroups(
       ctx,
       groupId,
-      mapExpenseEntriesToReceiptLinkages(monthExpenseEntries),
+      mapExpenseEntriesToReceiptLinkages(filterEntriesByKind(expenseEntries, "expense")),
     );
   }
 
   const receipts = await fetchReceiptsByDateRange(ctx, groupId, monthStartDate, monthEndDate);
   return addLegacyReceiptGroups(
-    receipts
-      .filter((receipt) => receipt.type !== "income")
-      .map((receipt) => mapReceiptToSpendingEntry(receipt)),
+    filterReceiptsByKind(receipts, "expense").map((receipt) => mapReceiptToSpendingEntry(receipt)),
   );
 }
 
@@ -390,16 +313,16 @@ export async function getMonthIncomeEntries(
     monthStartDate,
     monthEndDate,
   );
-  const monthIncomeEntries = expenseEntries.filter((entry) => entry.entryType === "income");
+  const monthIncomeEntries = filterEntriesByKind(expenseEntries, "income");
 
   if (monthIncomeEntries.length > 0) {
     return monthIncomeEntries.map((entry) => mapIncomeExpenseEntryToListEntry(entry));
   }
 
   const receipts = await fetchReceiptsByDateRange(ctx, groupId, monthStartDate, monthEndDate);
-  return receipts
-    .filter((receipt) => receipt.type === "income")
-    .map((receipt) => mapReceiptToIncomeListEntry(receipt));
+  return filterReceiptsByKind(receipts, "income").map((receipt) =>
+    mapReceiptToIncomeListEntry(receipt),
+  );
 }
 
 export async function getMonthAggregationEntries(
@@ -417,12 +340,9 @@ export async function getMonthAggregationEntries(
     monthStartDate,
     monthEndDate,
   );
-  const hasNewExpenses = expenseEntries.some((entry) => entry.entryType !== "income");
-  const hasNewIncomes = expenseEntries.some((entry) => entry.entryType === "income");
-  const receipts =
-    hasNewExpenses && hasNewIncomes
-      ? []
-      : await fetchReceiptsByDateRange(ctx, groupId, monthStartDate, monthEndDate);
+  const receipts = needsLegacyReceiptsForMonthAggregation(expenseEntries)
+    ? await fetchReceiptsByDateRange(ctx, groupId, monthStartDate, monthEndDate)
+    : [];
 
   return mapAggregationEntries(expenseEntries, receipts);
 }
@@ -438,14 +358,11 @@ export async function getYearAggregationEntries(
     incomes: Array<{ amountYen: number }>;
   }>
 > {
-  const months = getYearMonths(year);
-  const firstMonth = months[0];
-  const lastMonth = months[11];
-  if (firstMonth === undefined || lastMonth === undefined) {
-    throw new ConvexError("Invalid year");
+  const range = resolveYearRange(year);
+  if (!range.success) {
+    throw new ConvexError(INVALID_YEAR_MESSAGE);
   }
-  const startDate = `${firstMonth}-01`;
-  const endDate = getMonthEndDate(`${lastMonth}-01`);
+  const { months, startDate, endDate } = range;
   const expenseEntries = await fetchExpenseEntriesByDateRange(
     ctx,
     groupId,
@@ -454,13 +371,7 @@ export async function getYearAggregationEntries(
     MAX_YEAR_RANGE_ENTRIES,
   );
   const entriesByMonth = groupDocsByMonth(expenseEntries, startDate, endDate);
-  const needsLegacy = months.some((month) => {
-    const monthEntries = entriesByMonth.get(month) ?? [];
-    const hasNewExpenses = monthEntries.some((entry) => entry.entryType !== "income");
-    const hasNewIncomes = monthEntries.some((entry) => entry.entryType === "income");
-    return !hasNewExpenses || !hasNewIncomes;
-  });
-  const receipts = needsLegacy
+  const receipts = needsLegacyReceiptsForYearAggregation(months, entriesByMonth)
     ? await fetchReceiptsByDateRange(ctx, groupId, startDate, endDate, MAX_YEAR_RANGE_ENTRIES)
     : [];
   const receiptsByMonth = groupDocsByMonth(receipts, startDate, endDate);

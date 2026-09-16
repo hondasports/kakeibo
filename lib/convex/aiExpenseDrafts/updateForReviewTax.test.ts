@@ -86,6 +86,12 @@ function createInMemoryMutationCtx(initial: { draft: StoredDoc; items: StoredDoc
             Object.entries(filters).every(([field, value]) => doc[field] === value),
           );
           return {
+            take: vi
+              .fn()
+              .mockImplementation(async (limit?: number) =>
+                typeof limit === "number" ? filtered.slice(0, limit) : filtered,
+              ),
+            collect: vi.fn().mockResolvedValue(filtered),
             order: vi.fn().mockReturnValue({
               take: vi.fn().mockResolvedValue(filtered),
               collect: vi.fn().mockResolvedValue(filtered),
@@ -902,6 +908,59 @@ describe("updateForReviewHandler tax reinterpretation", () => {
     expect(getItems()).toEqual([
       expect.objectContaining({ itemName: "AI商品", amountYen: 803, printedAmountYen: 803 }),
     ]);
+  });
+
+  it("101件以上の明細を持つ下書きのリセットは全件削除してからスナップショットを復元する", async () => {
+    const aiValues = {
+      status: "needs_review" as const,
+      documentType: "receipt" as const,
+      shopName: "AI店舗",
+      date: "2026-07-04",
+      amountYen: 803,
+      categoryId: CAT_ID,
+      confidence: { shopName: 0.9, date: 0.9, amountYen: 0.9, categoryId: 0.9 },
+      warnings: [] as string[],
+      reviewReasons: ["user_confirmation_required" as const],
+      items: [
+        {
+          itemName: "AI商品",
+          amountYen: 803,
+          printedAmountYen: 803,
+          categoryId: CAT_ID,
+          confidence: { itemName: 0.9, amountYen: 0.9, categoryId: 0.9 },
+        },
+      ],
+    };
+    const staleItems = Array.from({ length: 101 }, (_, index) => ({
+      _id: `stale-item-${index}`,
+      groupId: GROUP_ID,
+      draftId: DRAFT_ID,
+      itemName: `旧明細${index}`,
+      amountYen: 1,
+      categoryId: CAT_ID,
+      confidence: {},
+      createdAt: index,
+      updatedAt: index,
+    }));
+    const { ctx, getItems } = createInMemoryMutationCtx({
+      draft: {
+        _id: DRAFT_ID,
+        groupId: GROUP_ID,
+        ...aiValues,
+        sourceType: "image_upload",
+        receiptInterpretation: { source: "ai", interpretedAt: 1, values: aiValues },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      items: staleItems,
+    });
+
+    await resetReceiptToAiInterpretationHandler(ctx, { draftId: DRAFT_ID }, GROUP_ID);
+
+    const items = getItems();
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ itemName: "AI商品", amountYen: 803 });
+    expect(items.every((item) => !item.itemName.startsWith("旧明細"))).toBe(true);
   });
 
   it("外税一括適用後に印字金額を変えず保存すると ready になり得る", async () => {

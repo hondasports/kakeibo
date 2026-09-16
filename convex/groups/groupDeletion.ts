@@ -10,6 +10,7 @@ import { processGroupDeletionBatchHandler } from "./lib/groupDeletionBatchProces
 import { processGroupDeletionFailureNotificationHandler } from "./lib/groupDeletionFailureNotification";
 import { resumeGroupDeletionHandler } from "./lib/groupDeletionResume";
 import { startGroupDeletionHandler } from "./lib/groupDeletionStart";
+import { createGroupDeletionJobReader } from "../../lib/convex/groupDeletion/convexGroupDeletionWorkflow";
 
 export { processGroupDeletionFailureNotificationHandler };
 export { recordRetry } from "./lib/groupDeletionBatchRetry";
@@ -58,12 +59,12 @@ export const getGroupDeletionStatus = internalQuery({
     }),
   ),
   handler: async (ctx, args) => {
-    const job = await ctx.db.get(args.jobId);
+    const job = await createGroupDeletionJobReader(ctx).get(args.jobId);
     if (job === null) {
       return null;
     }
     return {
-      jobId: job._id,
+      jobId: job.id as typeof args.jobId,
       targetGroupIdSnapshot: job.targetGroupIdSnapshot,
       targetGroupNameSnapshot: job.targetGroupNameSnapshot,
       source: job.source,

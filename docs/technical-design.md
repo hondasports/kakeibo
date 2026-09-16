@@ -253,7 +253,7 @@ convex/
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
-    aiExpenseDrafts/           # validators, classification, reviewValidation, draftRepository, registerTo*, updateForReview, tax overrides, persistTaxInterpretation, ...
+    aiExpenseDrafts/           # reviewValidation, convex*Repository, convexDraftWorkflowServices, draftUsecaseDeps, handler グルー, persistTaxInterpretation, ...（v.* validator 宣言は convex/aiExpenseDrafts/validators.ts、E2Eフィクスチャは convex/aiExpenseDrafts/e2eDraftFixtures.ts へ移動）
     dateUtils.ts
     expenseEntries/            # createFromDraft, expenseEntryValidation
     groups/
@@ -313,6 +313,456 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
 `convex/groups/lib/groupName.ts` はそれを `ConvexError` でラップして利用する。
 同様に `lib/domain/groups/role.ts` は `GroupRole` 型とロールラベル関数を提供し、
 フロントエンド・バックエンドの重複を解消する。
+
+#### 5.3.1 集約・リポジトリ・ユースケース（expenseEntries / receipts / aiExpenseDrafts / groups）
+
+`expenseEntries` / `receipts` / 支出一括操作（spending bulk ops）と `aiExpenseDrafts`、
+および `groups` では、
+ミノ駆動流の「知識をドメインオブジェクトへ寄せる」方針で 4 層に分離している。
+
+| 層 | 配置 | 役割 |
+| --- | --- | --- |
+| ドメイン | `lib/domain/<domain>/` | 集約 class（`ExpenseEntry`, `Receipt`, `SourceDocument`）、値検証、所有権・利用可否の判定、リポジトリのポート（interface）。Convex の generated 型に依存しない（ID は `string`） |
+| ユースケース | `lib/usecase/<domain>/` | 1 操作 1 関数。ポート経由で永続化し、`ConvexError` への写像を担う |
+| インフラ | `lib/convex/<domain>/` | ポートの Convex 実装（`*Repository` / `*Reader` / `*Logger`）と handler グルー（`requireGroupMembership` 解決 + 依存構築） |
+| プレゼンテーション | `convex/<domain>/` | `mutation`/`query` 定義、引数バリデータ、handler の再公開 |
+
+要点:
+
+- エンティティは「構築時に不変条件を確定」する（`ExpenseEntry.createManualExpense` 等）。
+  `fromPersisted` は永続化済みドキュメントの復元専用で再検証しない。
+- 所有権（`belongsToGroup`）、更新 patch 構築（`buildUpdatePatch`）、
+  一括操作可否（`isSpendingRecord` / `isExpenseRecord`）はエンティティの知識。
+- カテゴリ利用可否（存在・所属・isActive・「現行値なら非活性も許容」）は
+  `lib/domain/categories/usability.ts` に集約し、メッセージ選択は呼び出し側が行う。
+- リポジトリは `findById`/`insert`/`patch`/`delete` の最小ポート。
+  `lib/convex/*Repository.ts` が `Id<>` と `string` の写像を吸収する。
+- 互換性のため `*Handler` のエクスポート名・`(ctx, args)` シグネチャ・
+  エラーメッセージは維持する（既存テスト・aiExpenseDrafts 連携が依存）。
+- `convex/receipts/mutations.ts` の `deleteReceiptsByUser`（E2E 用内部 API）は
+  インデックス走査を伴うユーティリティであり、ドメイン層には移さない。
+
+`aiExpenseDrafts` ではこれに加えて次のパターンを使う。
+
+- **ワークフローサービス・ポート**（`lib/domain/aiExpenseDrafts/draftWorkflowServices.ts`）:
+  税再解釈の永続化（`DraftTaxInterpretationService`）、ユーザー上書きスナップショット
+  （`DraftOverrideSnapshotService`）、明細置換（`DraftItemReplaceService`）、
+  支出エントリのリコンサイル（`DraftExpenseEntryReconcileService`）、
+  receipt 登録（`DraftReceiptInsertService`）のように、複数テーブルにまたがる
+  永続化オーケストレーションをドメインが定義する interface として宣言し、
+  `lib/convex/aiExpenseDrafts/convexDraftWorkflowServices.ts` が既存の
+  永続化関数（`persistDraftTaxInterpretation` 等）へ ctx を束縛して実装する。
+- `AiExpenseDraft` 集約が所有権・状態遷移ガード（キュー/履歴からの編集可否、削除可否、
+  リセット可否、税解釈前提）と登録モード解決を保持し、ユースケースは
+  `toConvexError` でドメインの Error を既存メッセージの ConvexError へ写像する。
+- QueryCtx は書き込み不可のため、リポジトリポートは `*ReadRepository`（find/list）と
+  それを継承する書き込みポートに分離する。
+- `convex/aiExpenseDrafts/internal.ts` や `e2eDraftFixtures` 系の internal/E2E 専用
+  エンドポイントは層移行の対象外とする。
+
+`groups` ではハイブリッド（集約 class ではなくフィールド型 + 純粋ドメイン関数 +
+ドメインサービス・ポート）を使い、次の点を重視する。
+
+- **共有認可カーネル**（`convex/groups/membership.ts`）: `requireGroupMembership` 等は
+  categories・weekSessions・receiptAnalysisJobs・aiExpenseDrafts・lineWebhook など
+  複数ドメインから呼ばれるため、関数名・シグネチャ・エラー文言を維持したまま内部を
+  ポート（`GroupMembershipReadRepository` / `UserDirectoryRead`）経由化している。
+- **ドメインサービス・ポート**（`lib/domain/groups/groupServices.ts`）: 監査ログ
+  （`ManagementAuditLog`）、メールキュー投入（`GroupEmailQueue`）、招待クリーンアップ
+  （`GroupInvitationCleanup`）、アカウント削除ガード（`GroupAccountDeletionGuard`）、
+  最後の owner 保護（`GroupOwnerTransitionGuard`）を interface として宣言し、
+  `lib/convex/groups/` のアダプタが既存実装（`convex/groups/lib/*`・`adminGuards`）へ
+  委譲する。これにより既存の委譲経路（spy 検証を含む）が保持される。
+- **クエリモック互換**: Convex クエリ読み出しは `convex/groups/lib/groupQueryHelpers.ts`
+  の `readQueryDoc(s)` 経由に統一し、インメモリテストモックのフォールバック
+  （`collect` → `take` → `unique`）を維持する。
+- **削除オーケストレーション**（`convex/groups/lib/groupDeletion*.ts` 群）も
+  4層へ移行済み。ステージ順序・遷移判定・リトライ計画・影響集計の純粋関数は
+  `lib/domain/groupDeletion/`（`stages`・`jobTransitions`・`counts`・`impact`・
+  `retry`）、オーケストレーションは `lib/usecase/groupDeletion/`（`startGroupDeletion`・
+  `resumeGroupDeletion`・`processGroupDeletionBatch`・
+  `processRecipientNotificationBatch`・`processGroupDeletionFailureNotification`・
+  `recordBatchRetry`・`runPurgeStage`・`countGroupDeletionImpact`・
+  `deleteAllGroupScopedData`）、テーブル横断の ctx.db/scheduler/storage アクセスは
+  `lib/convex/groupDeletion/` のアダプタ（`GroupDeletionJobStore`・
+  `GroupDeletionPurgeStore`・`GroupDeletionRecipientStore`・`GroupDeletionScheduler`）
+  へ隔離した。`convex/groups/lib/groupDeletion*.ts` は export 名・シグネチャを
+  維持した互換シムとなり、internal endpoint 名・ステージ順序・削除カウント・
+  通知 dedupe キー・エラーメッセージは不変。
+- `convex/groups/e2e.ts`（E2E 専用フィクスチャ）は層移行の対象外とするが、
+  `deleteAllGroupScopedData` 内部はユースケースへ委譲済み。
+
+`accountDeletion` も同じハイブリッド方針で 4 層へ移行済み。
+
+- **既存純粋関数の維持**: `classification`・`confirmation`・`errorCategory`・
+  `resume`・`retry`・`status` は既に `lib/domain/accountDeletion/` に存在するため
+  そのまま利用し、Clerk 削除エラー分類（`clerkError`）を追加した。
+- **ポート**: `AccountDeletionRequestStore`（Reader 分離）・
+  `AccountDeletionGroupPurgeStore`・`AccountDeletionUserDataPurgeStore`・
+  `AccountDeletionScheduler`、および汎用 `TransactionalEmailQueue`
+  （`lib/domain/email/`）を定義。グループ側の既存ポート
+  （`GroupMembershipRepository`・`GroupReadRepository`・`UserDirectory`・
+  `GroupDeletionJobStore`・`GroupDeletionWorkflowService`・
+  `GroupInvitationCleanupService`）を再利用し、bounded read（`limit` 引数）と
+  ページネーション（`paginateByUser`）、ユーザー物理削除（`deleteById`）のみ拡張した。
+- **ユースケース**（`lib/usecase/accountDeletion/`）: 分類・孤立 membership 回収・
+  進行中ガードの共有 helper と、プレビュー/ステータス参照、退会リクエスト開始、
+  リトライ、failed purge リセット、準備バッチ、purge 進捗確認、mark 系、
+  finalize、完了リクエスト掃除を 1 操作 1 関数で提供する。
+- **プレゼンテーション**: `convex/accountDeletion.ts` は endpoint 定義と
+  `loadAccountDeletionClassification` / `deleteOrphanedGroupMemberships` /
+  `assertAccountDeletionNotInProgress` の互換シムのみを持ち、
+  ctx.db/ctx.scheduler の直接アクセスはゼロ。`convex/accountDeletionActions.ts` は
+  `"use node"` の Clerk 連携 action として骨格を維持し、エラー分類のみ
+  ドメイン関数へ置き換えた。
+- **状態遷移・エラー文言・メール payload/dedupe キー・子ジョブ生成の冪等性は
+  不変**。internal endpoint 名と戻り値も維持する。
+
+`systemAdmin`（管理コンソール系）も同じハイブリッド方針で 4 層へ移行済み。
+
+- **既存純粋関数の維持**: `environment`（APP_ENV 解決）・`groupDeletion`
+  （エラーカテゴリ sanitize）・`membershipOperation`（操作 shape 検証）・
+  `reason`（理由正規化）は既に `lib/domain/systemAdmin/` に存在するためそのまま
+  利用し、検索クエリ正規化・SHA-256 ハッシュ・ページ件数検証を `searchQuery`、
+  systemAdmins/auditLogs/notifications のレコード型とポート、および検索面の
+  `SystemAdminSearchStore` を追加した。
+- **ポート**: `SystemAdminStore`（Reader 分離）・`SystemAdminAuditLogStore`
+  （Reader 分離・8 系統のインデックス選択はアダプタ側）・
+  `SystemAdminNotificationStore`・`SystemAdminSearchStore`（検索インデックス・
+  normalizeId・created_at ページネーションを隔離）。groups/accountDeletion 側の
+  既存ポート（`UserDirectory`・`GroupReadRepository`・`GroupMembershipRepository`・
+  `GroupInvitationRepository`・`GroupDeletionJobReader`・
+  `GroupDeletionWorkflowService`・`AccountDeletionRequestReader`）を再利用し、
+  `UserDirectoryRead.findByDocId`・`GroupUserRecord` の createdAt/updatedAt・
+  `GroupDeletionJobReader.paginate` のみ拡張した。
+- **ユースケース**（`lib/usecase/systemAdmin/`）: `requireSystemAdminActor` 認可
+  ゲート、管理者コンテキスト/一覧/監査一覧、grant/revoke/bootstrap/recover、
+  メンバーシップ 5 操作・ロール 2 操作・ownerless 復旧、検索 4 件
+  （監査 insert つき）、pending 招待 3 件、削除ジョブ一覧/再開を提供する。
+- **プレゼンテーション**: `convex/systemAdmin*.ts` は endpoint 定義と
+  `requireSystemAdmin` 互換シムのみを持ち、ctx.db/ctx.scheduler の直接アクセスは
+  ゼロ。`systemAdminPendingInvitationAction.ts` は `"use node"` の Clerk 連携
+  action として据え置き。
+- **監査フィールド・通知 dedupe キー（`auditId:recipientUserId` /
+  `auditId:user:...` / `auditId:email:...`）・payloadJson・エラー文言・
+  発生順序は不変**。
+
+`lineWebhook`（LINE webhook 受信・案内/サマリ応答・画像処理・cleanup）も同じ
+ハイブリッド方針で 4 層へ移行済み。
+
+- **純粋関数**（`lib/domain/lineWebhook/`）: `payload`（payload 解析・
+  `LineWebhookPayloadError`）・`signature`（HMAC-SHA256 署名検証）・
+  `claimPlanning`（active link 一意性判定・イベント/ジョブ項目組み立て）・
+  `reply`（skip 理由・完了ジョブの応答文写像と
+  `LINE_UNLINKED_GUIDANCE_MESSAGE` の正本）。
+- **ポート**: `LineWebhookEventStore`/`LineImageJobStore`（Reader 分離）・
+  `LineAccountLinkReader`・`LineWebhookUserReader`（画像外部 API 同意）・
+  `LineActiveGroupResolver`（groups membership カーネルへ委譲）・
+  `LineSummaryDataReader`（receipts 側の既存 adapter 関数へ委譲）・
+  `LineWebhookScheduler`（mutation 側予約）。action 側は ctx.runQuery/
+  runMutation/scheduler を抽象化したランナーポート群（`actionRunner.ts`）を定義する。
+- **ユースケース**（`lib/usecase/lineWebhook/`）: `claimEvents`（dedupe・
+  delivery 分岐・原子予約）・`cleanupOldEvents`・`loadImageProcessingContext`・
+  `buildSummaryReply`・画像ジョブ遷移（skipped/drafted/failed）・
+  `sendUnlinkedGuide`・`sendSummaryReply`・`buildLinkedImageReply`/
+  `processLinkedImage`（リトライ規則を含む）。
+- **インフラ**（`lib/convex/lineWebhook/`）: 各ポートの Convex 実装、
+  LINE Messaging API / Rich Menu クライアント（旧 `client.ts`/
+  `richMenuClient.ts` の本体）、action ランナー、deps 組み立て。
+- **プレゼンテーション**: `convex/lineWebhook/*.ts` は endpoint 宣言・
+  validator・互換 export シムのみ。`webhook.ts` は HTTP 境界（raw body・
+  署名・payload 解析・413/401/400/200 応答）を担当し、mutation 呼び出しは
+  `webhookIngress` アダプタへ隔離。ctx.db/ctx.scheduler の直接アクセスは
+  プレゼンテーション層に残らない。
+- **冪等性・dedupe・画像ジョブ遷移・リトライ上限/遅延・cleanup 保持日数/
+  バッチサイズ・エラー文言・HTTP ステータスは不変**。endpoint 名・args・
+  returns も維持する。
+
+`lineLink`（LINE Login OAuth/PKCE・連携状態・TTL cleanup）も同じ方針で 4 層へ
+移行済み。
+
+- **純粋関数**（`lib/domain/lineLink/`）: 公開 feedback 写像、integration mode
+  判定、ID token claims 検証、request claim/finalize と link 競合の判定。
+- **ポート**: `LineLinkRequestStore`・`LineAccountLinkStore`・
+  `LineLinkAuditLogStore`、action 側の内部 mutation bridge、request expiry scheduler、
+  LINE provider client。
+- **ユースケース**（`lib/usecase/lineLink/`）: OAuth開始/完了、request作成・claim・
+  finalize・失敗記録・期限削除、状態照会・解除、E2E cleanup。
+- **インフラ**（`lib/convex/lineLink/`）: Convexストア、scheduler、action runner、
+  LINE token/verify API client、依存組み立て。lineWebhook側のintegration mode参照も
+  presentation経由ではなく、このinfra境界を共有する。
+- **プレゼンテーション**: `convex/lineLink/*.ts` はendpoint宣言・validator・認証境界・
+  互換exportのみを持つ。OAuth endpoint/parameter、10分TTL、PKCE/nonce検証、
+  active link競合・revoke順序、監査ログ、公開feedback、args/returnsは不変とする。
+
+`receiptAnalysisJobs`（複数画像解析batch・AI draft世代管理・レビュー通知）も4層へ
+移行済み。
+
+- **純粋関数**（`lib/domain/receiptAnalysisJobs/`）: retry/cancel許可、batch完了状態、
+  terminal通知判定、cleanup上限。batch/jobレコード型とstore/scheduler/actionポートを持つ。
+- **ユースケース**（`lib/usecase/receiptAnalysisJobs/`）: batch/job作成・一覧・retry・cancel、
+  解析attemptの開始/確定、世代競合時のdraft整理、processedCount/final status、
+  AIレビュー通知、ユーザー単位cleanup、画像解析オーケストレーション。
+- **インフラ**（`lib/convex/receiptAnalysisJobs/`）: Convex store/scheduler、
+  receiptImageExtraction・aiExpenseDrafts・emailへのaction runner、Doc/Record変換。
+- **プレゼンテーション**: `convex/receiptAnalysisJobs/*.ts` はendpoint・validator・
+  group認可・互換handlerへ薄化する。expectedDraftId/updatedAt CAS、stale draft削除、
+  1時間後通知、一覧/cleanup上限、エラー文言、args/returnsは不変とする。
+
+`email`（transactionalメールジョブ・Resend送信・webhook・suppression・cleanup）も
+4層へ移行済み。
+
+- **純粋関数**（`lib/domain/email/`）: 終端status判定、送信失敗plan（retryable・
+  maxAttempts・delay表）、新規jobフィールド構築、webhook payload抽出・鮮度比較・
+  対象event type判定、cleanup cutoff/batch規則、status/suppression解決。
+  job/suppression/webhookEventレコード型とstore/scheduler/runner/senderポートを持つ。
+- **ユースケース**（`lib/usecase/email/`）: enqueue（payload検証・正規化・
+  businessDedupeKey冪等・0ms schedule）、processEmailJob（終端/抑制/payload/
+  送信結果の分岐とretry再予約）、processResendEvent（svixId dedupe・event記録・
+  鮮度比較・status更新・suppression upsert）、cleanup、suppression upsert、
+  E2E用テストレコード削除。
+- **インフラ**（`lib/convex/email/`）: 3テーブルのConvex storeとDoc/Record変換、
+  scheduler、action/webhook向けrunQuery/runMutationブリッジ、Resend provider選択
+  （APP_ENV/RESEND_API_KEY/RESEND_FROM_ADDRESS）、from解決、httpActionの
+  event submitter、依存組み立て。
+- **プレゼンテーション**: `convex/email/*.ts` はendpoint宣言・validator・
+  HTTP境界（署名検証・status応答）・互換handlerのみ。endpoint名、args/returns、
+  エラー文言、HTTP status、dedupe・retry間隔・30日保持・batch100・呼出順序は
+  不変とする。
+
+`categories`（グループ共有カテゴリの CRUD・デフォルト seed・E2E cleanup）も
+4層へ移行済み。既存の `lib/domain/categories/`（normalize・defaults・usability・
+candidate・CategoryRepository port）を再利用し、endpoint 向けの完全形状と
+ルールを追加した。
+
+- **純粋関数**（`lib/domain/categories/`）: seed patch 判定（legacy色refresh・
+  description補完）、上限検証、sortOrder 決定（max+1）、所有権検証、E2E prefix
+  検証。完全形状の `CategoryStoreRecord` と `CategoryStore` ポートを持つ。
+- **ユースケース**（`lib/usecase/categories/`）: seed（sortOrder 既存なら
+  patch 判定・無ければ insert）、create（normalize・上限・sortOrder）、
+  update/deactivate（ownership・patch・get返却）、listActive/listForSettings、
+  E2E cleanup（prefix一致削除・ensure）。
+- **インフラ**（`lib/convex/categories/`）: `CategoryStore` の Convex 実装
+  （`createCategoryStore`）と query 用読み取り専用 `createCategoryReader`、
+  Doc/Record 変換。既存 `createCategoryRepository`（usability 用最小ポート）は
+  無変更で維持する。
+- **プレゼンテーション**: `convex/categories/*.ts` は endpoint・validator・
+  group認可・互換export（`*Handler`・`E2E_CATEGORY_NAME_PREFIX`・定数再export・
+  `./normalize` ラッパ）のみ。endpoint名、args/returns、エラー文言、seed 分岐、
+  上限判定、E2E挙動は不変とする。
+
+`users`（Clerk認証由来のプロフィール upsert・consent・monthlyIncome・
+weekly settings・internal user lookup）も4層へ移行済み。既存の
+`lib/domain/users/`（clerkProfile・displayName・email・monthlyIncome）と
+`lib/domain/week/weekDates.ts` を再利用し、endpoint 向けのストアポートと
+フィールド構築ルールを追加した。
+
+- **純粋関数**（`lib/domain/users/`）: `store.ts`（`UserRecord`・`UserStore`
+  ポート）と `rules.ts`（identity 由来の insert/patch フィールド構築・
+  displayName 解決・User not found 検証）。
+- **ユースケース**（`lib/usecase/users/`）: upsertUser（insert/patch 分岐）、
+  consent（既設定時刻を保持する冪等 patch）、updateMonthlyIncome（null で
+  undefined クリア）、updateWeeklyDays（weeklyEndDay は開始曜日から導出）、
+  getUserProfile/getReceiptImageConsent、internal upsert/getUserIdByEmail/
+  getUserById/clearUserMonthlyIncome、共有 `getWeeklyStartDayForUser`。
+- **インフラ**（`lib/convex/users/`）: `UserStore` の Convex 実装
+  （`createUserStore`）と query 用読み取り専用 `createUserReader`、
+  Doc/Record 変換。by_token_identifier・by_email インデックス利用を隔離する。
+- **プレゼンテーション**: `convex/users/*.ts` は endpoint・validator・
+  `requireAuthenticatedUserId` 等の認証境界・互換export（`*Handler`）のみ。
+  `weeklySettings.ts` は他ドメイン向け共有 helper の薄い委譲を維持する。
+  endpoint名、args/returns、エラー文言、undefined クリア挙動、consent 冪等性、
+  internal upsert の email trim+小文字化（空文字保持）は不変とする。
+
+`weekSessions`（週次セッションの get-or-create・reviewMemo 更新・complete・
+E2E reset・取得）も4層へ移行済み。週の日付計算は既存 `lib/domain/week/weekDates.ts`
+を再利用する。
+
+- **純粋関数**（`lib/domain/weekSessions/`）: `store.ts`（`WeekSessionRecord`・
+  `WeekSessionStore` ポート）と `rules.ts`（ローカル日付 YYYY-MM-DD 生成、
+  新規 draft フィールド構築、complete patch（reviewMemo は指定時のみキー含有）、
+  reset patch（reviewMemo を undefined で明示クリア）、not found / retrieve 失敗検証）。
+- **ユースケース**（`lib/usecase/weekSessions/`）: getOrCreate（既存返却・無ければ
+  insert→get）、updateReviewMemo・complete（patch→get）、reset（`{reset}` 返却）、get。
+- **インフラ**（`lib/convex/weekSessions/`）: `WeekSessionStore` の Convex 実装
+  （`createWeekSessionStore`）と query 用 `createWeekSessionReader`、Doc/Record 変換。
+  by_group_id_and_week_start_date インデックス利用を隔離する。
+- **プレゼンテーション**: `convex/weekSessions/*.ts` は endpoint・validator・
+  `requireGroupMembership` 認可・互換export（`*Handler`）のみ。current 版は
+  membership → 週開始曜日取得 → 指定週 handler へ委譲する既存の呼出順序を維持する。
+  endpoint名、args/returns、エラー文言、Doc 返却形状、patch キー構成は不変とする。
+
+`receiptImageExtraction`（レシート画像抽出 action）も4層へ移行済み。OpenAI client・
+parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を再利用し、リクエスト構築
+（プロンプト・JSONスキーマ・カテゴリ正規化）は `lib/domain/receiptImageExtraction/` へ統合済み。
+
+- **純粋関数**（`lib/domain/receiptImageExtraction/`）: 既存 `mode.ts` に加え、
+  `rules.ts`（imageDataUrl 検証、抽出計画解決: mode → real は production 限定 →
+  mock → OPENAI_API_KEY 必須、グループ選択・同意検証）と `ports.ts`（環境読み取り・
+  mock/real extractor・group/consent/categories 読み取りポート）、
+  `extractionRequest.ts`（抽出リクエスト構築: `ReceiptCategoryHint`/`CategoryInput` 型、
+  BiDi制御文字 sanitize・重複排除 `normalizeCategories`、プロンプト構築
+  `buildReceiptExtractionPrompt`、JSONスキーマ `buildReceiptExtractionJsonSchema`、
+  リクエストボディ `buildOpenAIReceiptExtractionRequestBody`）。
+- **ユースケース**（`lib/usecase/receiptImageExtraction/`）: `extractReceiptFields`
+  （検証 → 計画 → mock/real）と `extractReceiptFieldsForCurrentGroup`
+  （group → consent+categories 並列取得 → 抽出）。
+- **インフラ**（`lib/convex/receiptImageExtraction/extractorDeps.ts`）: process.env を
+  呼出時に読む環境スナップショット、`getMockResult`/`callOpenAIReceiptExtractor` の合成、
+  `runQuery` ベースのコンテキスト読み取り。
+- **プレゼンテーション**: `convex/receiptImageExtraction/extraction.ts` は action・
+  validator・`requireAuthenticatedUserId`・互換export（`extractReceiptFieldsFromImage`・
+  `extractReceiptFieldsHandler`・型/関数再export）のみ。ドメインエラーだけを
+  ConvexError へ変換し、判定順序と全エラー文言は不変とする。
+
+`aiExpenseDrafts` のレビュー明細置換（`replaceDraftItemsForReview`）は、infra に混在
+していた業務ルールを `lib/domain/aiExpenseDrafts/` へ分離済み。
+
+- **純粋関数**: `reviewItemReplace.ts`（明細上限100、itemId 重複/所属検証、previous
+  からの税関連フィールド継承を含む置換明細フィールド構築、エラー文言変換）と
+  `reviewCategory.ts`（レビュー用カテゴリ利用可否: 不在/他グループ・非アクティブ）。
+- **ユースケース**: `assertActiveCategoryForDraft` は `reviewCategory.ts` へ委譲する。
+- **インフラ**: `lib/convex/aiExpenseDrafts/reviewValidation.ts` は既存明細取得・削除・
+  insert と Doc/Fields 変換のみを担い、判定順序（上限 → 取得 → ID 検証 → 削除 →
+  各明細で名前/金額 → カテゴリ → insert）と文言は不変とする。
+
+`receipts` 集計の新旧形式フォールバック判定も `lib/domain/receipt/legacyFallback.ts`
+へ分離済み。
+
+- **純粋関数**: 種別フィルタ（receipts の `type` 未設定は支出扱い）、週収入の3値判定
+  （new / none / legacy）、月・年集計での旧形式取得要否、`mapAggregationEntries`
+  （種別ごとに独立フォールバック・categoryId 欠落エラー）、`groupDocsByMonth`、
+  `resolveYearRange`。
+- **インフラ**: `lib/convex/receipts/spendingEntries.ts` はインデックス取得・上限
+  チェック・enrichment 取得と ConvexError 変換のみを担い、フォールバック条件・
+  receipts 取得回数・文言は不変とする。
+
+`aiExpenseDrafts` の作成（抽出結果 → 下書き）も `lib/domain/aiExpenseDrafts/createFromExtraction.ts`
+へ分離済み。
+
+- **純粋関数**: 分類 → AI 値スナップショット → ユーザー上書き適用 → 下書き insert
+  フィールド構築（`receiptInterpretation` に AI 値を保持、`rawObservation` は行指定時のみ）、
+  明細 insert フィールド構築、失敗下書き構築（failed / unknown / parse_failed）、
+  カテゴリ所属判定（未指定は検証不要）。カテゴリ ID は総称型で永続化層の ID をそのまま通す。
+- **インフラ**: `lib/convex/aiExpenseDrafts/createFromExtraction.ts` は group 認可解決・
+  カテゴリ取得・insert / get と ConvexError 変換のみを担い、判定順序と文言は不変とする。
+
+`aiExpenseDrafts` の税再解釈の永続化も `lib/domain/aiExpenseDrafts/taxInterpretationPlan.ts`
+へ計画算出を分離済み。
+
+- **純粋関数**: 適格性判定（不在 → 他グループ → 金額/税サマリ欠落。decisionOverride
+  があれば税サマリ無しでも許可）、receiptTotalSource 解決（保存済み候補から amountYen
+  一致の source、3値外は ai_estimate）、裏付け候補の除外、`planDraftTaxInterpretation`
+  （再解釈 → 税/非税レビュー理由統合 → 再分類 → status → 明細 patch 配列＋下書き patch）。
+  totalOnly は税詳細を無視して分類する。
+- **インフラ**: `lib/convex/aiExpenseDrafts/persistTaxInterpretation.ts` は下書き/明細の
+  取得・patch・再取得と ConvexError 変換のみを担い、判定順序・patch フィールド・文言は
+  不変とする。
+
+`expenseSearch`（履歴検索）の検索オーケストレーションも `lib/usecase/expenseSearch/searchExpenses.ts`
+へ分離済み。
+
+- **純粋関数**: `lib/domain/expenseSearch/searchResult.ts`（`ExpenseSearchReceipt` /
+  `ExpenseSearchResult` 型、`emptySearchResult`、`collectCategoryIds`（収入グループ除外・
+  重複排除）、`mapHistoryGroupToItems`（カテゴリ名 fallback「不明」・色 fallback
+  「#AAB7C4」）、`ExpenseSearchDomainError`）。既存 `analytics.ts` / `filter.ts` の
+  集計・フィルタ・ページング・前期間算出はそのまま利用する。
+- **ユースケース**: `searchExpenses` はストアポート経由で、フィルタ検証 → カテゴリ
+  所有権チェック（他グループなら空結果）→ 履歴読込 → グルーピング/フィルタ →
+  初回ページのみ前期間読込・比較 → カテゴリ情報 → 集計 → ページング → 項目マッピング
+  を逐語移植した順序で実行する。
+- **インフラ**: `lib/convex/expenseSearch/searchExpenses.ts` は `requireGroupMembership`、
+  `ctx.db` 取得（カテゴリ・履歴・カテゴリ情報）と `ExpenseSearchDomainError` の
+  ConvexError 変換のみを担い、戻り値 shape・エラー文言・truncated 伝播は不変とする。
+
+`groups` の Clerk 招待オーケストレーション（`inviteMember` / `cancelPendingGroupInvitation`）も
+`lib/usecase/groups/clerkInvitationActions.ts` へ分離済み。
+
+- **純粋関数**: `lib/domain/groups/invitationFlow.ts`（`ClerkInvitationDomainError`、
+  グループ前提検証（未選択・非オーナー）、招待メール正規化、招待レコード入力構築）。
+  リダイレクトURL・Clerk パラメータの純粋ルールは既存 `lib/domain/groups/clerkInvitations.ts`
+  をそのまま利用する。
+- **ユースケース**: グループ解決 → オーナー検証 → 認証ユーザー解決 → メール正規化 →
+  トークン/リダイレクト生成 → ローカル予約 → Clerk 招待 → 失敗時の補償削除（warnして元
+  エラー再送出）→ `clerkInvitationId` 追記、および取消時の revoke ループ（個別失敗は warn
+  して継続）をストア/サービスポート経由で実行する。
+- **インフラ**: `lib/convex/groups/clerkInvitationLib/inviteActions.ts` は
+  runQuery/runMutation ブリッジ・`getClerkClient`（CLERK_SECRET_KEY）・
+  `ClerkInvitationDomainError` の ConvexError 変換のみを担い、ハンドラ公開シグネチャ
+  （ctx, args, deps）・エラー文言・console.warn 内容は不変とする。
+
+`aiExpenseDrafts` の支出エントリ調整（`reconcileDraftExpenseEntries`）も
+`lib/domain/aiExpenseDrafts/reconcileExpenseEntriesPlan.ts` へ計画算出を分離済み。
+
+- **純粋関数**: `planExpenseEntryReconciliation`（既存100件上限、再利用選択
+  （カテゴリ一致 → 未保持の先頭）、patch/insert フィールド構築、memo の非対称条件
+  （patch は memoUpdate 指定時にキー含有・insert は value 指定時のみ）、削除対象算出）。
+- **インフラ**: `lib/convex/aiExpenseDrafts/reconcileExpenseEntries.ts` は既存エントリ
+  取得・各op適用前のカテゴリ検証委譲・patch/insert/delete 適用・結果ID順序維持と
+  `ReconcileExpenseEntriesDomainError` の ConvexError 変換のみを担う。
+
+`receipts` の集計ハンドラ群（週次・4週・日次推移・月次・年次サマリ）も
+`lib/usecase/receipts/summaries.ts` へオーケストレーションを分離済み。
+
+- **純粋関数**: `lib/domain/receipt/summaryEntries.ts`（`SummaryReceiptEntry` 型と
+  `mapSpendingEntryToSummaryReceipt`。カテゴリ名 fallback「不明」・色 fallback
+  「#AAB7C4」）。既存 `summary.ts` / `monthlySummary.ts` / `yearlySummary.ts` /
+  `weekDates.ts` の集計・週算出はそのまま利用する。
+- **ユースケース**: `SummaryStore` ポート経由で週/日/月/年のエントリ取得・前週算出・
+  4週反復（降順取得→昇順反転）・日次7日ループ・カテゴリ情報取得・応答組立を行う。
+  `prevWeekTotalAmountYen` の null 化（前週0件時）・4週 `weekCount`（0円週除外）・
+  月次 `netAmountYen`（収入-支出）の算出もここに置く。
+- **インフラ**: `lib/convex/receipts/summaryLib/summaryStore.ts` が `SummaryStore` を
+  `ctx.db` / `spendingEntries` アダプタへ橋渡しする。`week.ts` / `monthly.ts` /
+  `trend.ts` / `yearly.ts` の各ハンドラは `requireGroupMembership` と
+  `normalizeMonth`/`normalizeYear` → `ConvexError("Invalid month"/"Invalid year")`
+  の変換のみを担い、公開ハンドラ名・戻り値型・エラー文言は不変とする。
+  `buildCategoryInfoMap` は `categoryAggregation.ts` の DB アダプタとして維持する。
+
+`spendingEntries` のソース選択とレシートグループエンリッチメントの判定も
+domain へ分離済み。
+
+- **純粋関数**: `lib/domain/receipt/legacyFallback.ts` の
+  `resolveSpendingEntriesSource`（新形式の支出エントリ有無で new/legacy）と
+  `lib/domain/receipt/spendingEntry.ts` の `buildReceiptEnrichmentMaps`
+  （sourceDocument/aiExpenseDraft のグループ所有権フィルタ、明細の
+  `categoryId && itemName` 有効項目フィルタ、参照map構築）。
+- **インフラ**: `lib/convex/receipts/spendingEntries.ts` は期間クエリ・上限チェック
+  （`MAX_DATE_RANGE_ENTRIES`/`MAX_YEAR_RANGE_ENTRIES`）・`ctx.db` 一括取得・
+  ConvexError 変換のみを担い、新形式時はエンリッチメント付き新エントリ、
+  無ければ旧 receipts+`addLegacyReceiptGroups` への分岐順は不変とする。
+
+`expenseSearch` の履歴ロードの合成規則も `lib/domain/expenseSearch/searchEntries.ts`
+へ分離済み。
+
+- **純粋関数**: `dedupeSearchEntries`（`recordType:_id` キーのみで重複排除。
+  日付・金額・名称での推測dedupeは行わない）、`partitionExpenseEntriesByKind` /
+  `partitionReceiptsByKind`（種別振り分け。旧レシートの type 未設定は支出扱い）、
+  `mergeSearchEntrySources`（新形式を先に結合してdedupe）。
+- **インフラ**: `lib/convex/expenseSearch/loadSpendingEntries.ts` は新旧sourceの
+  並列取得・`SEARCH_MAX_RECORDS` 上限と `truncated` 判定・エンリッチメント/
+  マッピングアダプタ呼出のみを担い、公開シグネチャ・戻り値・truncated 伝播は
+  不変とする。
+
+`groups` の stale 招待判定も `lib/domain/groups/groupInvitation.ts` へ分離済み。
+
+- **純粋関数**: `assessGroupInvitationStaleness`（pending→stale、revoked/expired→keep、
+  accepted+`acceptedByUserId` 無し→stale、accepted+有り→check_membership）。
+- **インフラ**: `lib/convex/groups/invitationHandlers/staleCleanup.ts` はメール一致
+  フィルタ・index クエリ（email→status 収集順）・check_membership 時のみ membership
+  参照・`status: "revoked"` patch ループのみを担い、公開シグネチャは不変とする。
+
+`aiExpenseDrafts` の `receiptUserOverride` スナップショット永続化も domain へ分離済み。
+
+- **純粋関数**: `lib/domain/aiExpenseDrafts/receiptDataContract.ts` の
+  `snapshotReceiptDraftValues`（draft・明細のフィールド射影。warnings 未設定は
+  空配列へ正規化）と `buildReceiptUserOverride`（fields の和集合マージ・
+  `source: "user"` 組立）。
+- **インフラ**: `lib/convex/aiExpenseDrafts/receiptDataContract.ts` は draft get・
+  所有権チェック（`groupId` 不一致または不存在で Error・文言維持）・明細
+  `by_group_id_and_draft_id` asc take(100)・patch・再取得のみを担い、
+  `persistReceiptUserOverrideSnapshot` / `snapshotReceiptDraftValues` /
+  `resetReceiptToAiInterpretationHandler` の公開シグネチャは不変とする。
 
 ### 5.4 スタイリング責務
 

@@ -55,6 +55,9 @@ playwright/.clerk/
 !.agents/skills/virtual-company/
 !.agents/skills/virtual-company/**
 
+# Local script outputs
+.tmp/
+
 # Logs and OS files
 *.log
 .DS_Store

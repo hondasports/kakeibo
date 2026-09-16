@@ -1,4 +1,4 @@
-import { createE2eUnallocatedTaxDraftForUserHandler } from "../../lib/convex/aiExpenseDrafts/e2eDraftFixtures";
+import { createE2eUnallocatedTaxDraftForUserHandler } from "./e2eDraftFixtures";
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import {
@@ -18,7 +18,7 @@ import {
   taxResolutionSourceValidator,
   taxResolutionStatusValidator,
   taxSummaryValidator,
-} from "../../lib/convex/aiExpenseDrafts/validators";
+} from "./validators";
 import {
   createFailedDraftFromImageAnalysisForUserHandler,
   createFailedDraftFromImageAnalysisHandler,
@@ -32,7 +32,7 @@ import {
   createE2eTaxReviewDraftForUserHandler,
   createE2eTaxSummaryConflictDraftForUserHandler,
   deleteDraftsByUserBatchHandler,
-} from "../../lib/convex/aiExpenseDrafts/e2eDraftFixtures";
+} from "./e2eDraftFixtures";
 
 export { deleteDraftAndItems } from "../../lib/convex/aiExpenseDrafts/draftRepository";
 export {
@@ -48,7 +48,7 @@ export {
   createE2eMixedTaxReviewDraftForUserHandler,
   createE2eTaxReviewDraftForUserHandler,
   createE2eTaxSummaryConflictDraftForUserHandler,
-} from "../../lib/convex/aiExpenseDrafts/e2eDraftFixtures";
+} from "./e2eDraftFixtures";
 export type {
   CreateFromExtractionArgs,
   CreateFromExtractionForUserArgs,
@@ -58,7 +58,7 @@ export type {
 export type {
   DeleteDraftsByUserBatchArgs,
   CreateE2eReadyDraftForUserArgs,
-} from "../../lib/convex/aiExpenseDrafts/e2eDraftFixtures";
+} from "./e2eDraftFixtures";
 
 export const createFailedDraftFromImageAnalysis = internalMutation({
   args: {

@@ -164,6 +164,7 @@ function createMutationCtx(
           take: vi.fn().mockImplementation(async (limit: number) => rows.slice(0, limit)),
           order: vi.fn().mockReturnValue({
             take: vi.fn().mockImplementation(async (limit: number) => rows.slice(0, limit)),
+            collect: vi.fn().mockResolvedValue(rows),
           }),
           collect: vi.fn().mockResolvedValue(rows),
         };
@@ -239,6 +240,7 @@ function createQueryCtx(
         take: vi.fn().mockImplementation(async (limit?: number) => {
           return typeof limit === "number" ? filteredDocs.slice(0, limit) : filteredDocs;
         }),
+        collect: vi.fn().mockResolvedValue(filteredDocs),
       };
       chain.order.mockReturnValue(chain);
       return chain;
@@ -2509,6 +2511,45 @@ describe("aiExpenseDrafts", () => {
       ).rejects.toThrow(ConvexError);
       expect(ctx.db.insert).not.toHaveBeenCalled();
       expect(ctx.db.patch).not.toHaveBeenCalled();
+    });
+
+    it("101件以上の明細を持つready下書きも全件を集約して登録できる", async () => {
+      const manyItems: DraftItemDoc[] = Array.from({ length: 101 }, (_, index) => ({
+        _id: `draft-item-${index}` as Id<"aiExpenseDraftItems">,
+        _creationTime: index,
+        groupId: GROUP_ID,
+        draftId: "draft-ready",
+        itemName: `商品${index}`,
+        amountYen: 10,
+        categoryId: index % 2 === 0 ? "cat-food" : "cat-medical",
+        confidence: { itemName: 0.9, amountYen: 0.9, categoryId: 0.9 },
+        createdAt: index,
+        updatedAt: index,
+      }));
+      const ctx = createMutationCtx(createIdentity(), {
+        getDocById: {
+          "draft-ready": { ...readyDraft, amountYen: 1010 },
+          "cat-food": { groupId: GROUP_ID, isActive: true },
+          "cat-medical": { groupId: GROUP_ID, isActive: true },
+        },
+        items: manyItems,
+        insertedIds: ["entry-food", "entry-medical"],
+      });
+
+      const result = await registerReadyDraftsAsExpenseEntriesHandler(ctx, {
+        draftIds: ["draft-ready" as Id<"aiExpenseDrafts">],
+      });
+
+      expect(result.registeredDraftIds).toContain("draft-ready");
+      expect(result.createdExpenseEntryIds).toHaveLength(2);
+      expect(ctx.db.insert).toHaveBeenCalledWith(
+        "expenseEntries",
+        expect.objectContaining({ categoryId: "cat-food", amount: 510 }),
+      );
+      expect(ctx.db.insert).toHaveBeenCalledWith(
+        "expenseEntries",
+        expect.objectContaining({ categoryId: "cat-medical", amount: 500 }),
+      );
     });
   });
 });

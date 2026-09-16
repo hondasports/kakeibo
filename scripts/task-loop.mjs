@@ -93,6 +93,78 @@ export function validateContract(c) {
   }
   return errors;
 }
+/** Review-depth vocabulary mirrored from .loop/process.yaml review_depth; drift is caught by task-loop tests. */
+export const REVIEW_AXES = {
+  blast_radius: ["local", "several_surfaces", "shared_or_system_wide"],
+  data_security: ["none", "indirect", "direct_boundary_change"],
+  reversibility: ["easy", "procedural_rollback", "difficult_or_stateful"],
+  uncertainty: ["known_pattern", "some_unknowns", "novel_or_impact_unclear"],
+};
+export const REVIEW_FLOOR_TRIGGERS = [
+  "authentication_or_authorization",
+  "schema_or_migration",
+  "data_deletion_or_retention",
+  "complex_state_transition_or_orchestration_port",
+  "cross_domain_shared_caller_change",
+  "external_service_write_or_webhook",
+  "destructive_or_irreversible_operation",
+];
+export const REVIEW_TIERS = ["T1", "T2", "T3"];
+/** Minimum self-review depth implied by a risk assessment: any floor trigger or extreme axis value forces T3, any middle value forces T2. */
+export function reviewTierFloor(assessment) {
+  const values = Object.values(REVIEW_AXES).map((allowed, index) => ({
+    allowed,
+    value: assessment?.[Object.keys(REVIEW_AXES)[index]],
+  }));
+  if (
+    (assessment?.floor_triggers ?? []).length > 0 ||
+    values.some(({ allowed, value }) => value === allowed.at(-1))
+  )
+    return "T3";
+  if (values.some(({ allowed, value }) => value === allowed.at(-2))) return "T2";
+  return "T1";
+}
+/** Validate a self-review record including its risk assessment and depth-tier floor; format only, not review quality. */
+export function validateReview(review) {
+  const errors = [];
+  if (!["pass", "fail"].includes(review?.verdict)) errors.push("verdict must be pass or fail");
+  for (const field of [
+    "source_comparison",
+    "diff_assessment",
+    "verification_assessment",
+    "tier_rationale",
+  ])
+    if (!nonempty(review?.[field])) errors.push(`${field} is required`);
+  if (!Array.isArray(review?.manual_results)) errors.push("manual_results must be an array");
+  const assessment = review?.risk_assessment;
+  let floor = null;
+  if (!assessment || typeof assessment !== "object") {
+    errors.push("risk_assessment is required");
+  } else {
+    let valid = true;
+    for (const [axis, allowed] of Object.entries(REVIEW_AXES))
+      if (!allowed.includes(assessment[axis])) {
+        errors.push(`risk_assessment.${axis} must be one of ${allowed.join("/")}`);
+        valid = false;
+      }
+    if (!Array.isArray(assessment.floor_triggers)) {
+      errors.push("risk_assessment.floor_triggers must be an array");
+      valid = false;
+    } else if (assessment.floor_triggers.some((t) => !REVIEW_FLOOR_TRIGGERS.includes(t))) {
+      errors.push("risk_assessment.floor_triggers entries must match process.yaml vocabulary");
+      valid = false;
+    }
+    if (valid) floor = reviewTierFloor(assessment);
+  }
+  if (!REVIEW_TIERS.includes(review?.applied_tier))
+    errors.push("applied_tier must be one of T1/T2/T3");
+  else if (
+    floor !== null &&
+    REVIEW_TIERS.indexOf(review.applied_tier) < REVIEW_TIERS.indexOf(floor)
+  )
+    errors.push(`applied_tier is below the ${floor} floor implied by risk_assessment`);
+  return errors;
+}
 /** Bind evidence to file content, the contract, and observable runtime identity. */
 export function evidenceKey(cwd, contract) {
   return hash(
@@ -317,16 +389,8 @@ export function run(args, cwd = process.cwd()) {
       event.result = record;
     } else if (command === "review") {
       const review = json(rest[0]);
-      if (
-        !["pass", "fail"].includes(review.verdict) ||
-        !nonempty(review.source_comparison) ||
-        !nonempty(review.diff_assessment) ||
-        !nonempty(review.verification_assessment) ||
-        !Array.isArray(review.manual_results)
-      )
-        throw new Error(
-          "review requires verdict, source comparison, diff assessment, verification assessment, manual_results",
-        );
+      const errors = validateReview(review);
+      if (errors.length) throw new Error(`invalid review: ${errors.join("; ")}`);
       state.reviews.push({ ...review, key, kind: "self", at: event.at });
     } else if (command === "finding") {
       const finding = json(rest[0]);

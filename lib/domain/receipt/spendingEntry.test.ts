@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addLegacyReceiptGroups,
+  buildReceiptEnrichmentMaps,
   enrichSpendingEntry,
   mapExpenseEntryToSpendingEntry,
   mapIncomeExpenseEntryToListEntry,
@@ -200,5 +201,40 @@ describe("addLegacyReceiptGroups", () => {
         receiptTotalAmountYen: 1000,
       },
     ]);
+  });
+});
+
+describe("buildReceiptEnrichmentMaps", () => {
+  it("他グループのドキュメント・下書きを除外する", () => {
+    const { sourceDocumentMap, aiExpenseDraftMap } = buildReceiptEnrichmentMaps(
+      "g1",
+      [
+        { _id: "sd1", groupId: "g1", shopName: "店", totalAmount: 100 },
+        { _id: "sd2", groupId: "g2", shopName: "他店" },
+        null,
+      ],
+      [
+        { _id: "d1", groupId: "g1", shopName: "下書き店", registrationMode: "detailed" },
+        { _id: "d2", groupId: "g2" },
+      ],
+      [],
+    );
+    expect([...sourceDocumentMap.keys()]).toEqual(["sd1"]);
+    expect([...aiExpenseDraftMap.keys()]).toEqual(["d1"]);
+  });
+
+  it("明細は categoryId と itemName が揃うものだけ残す", () => {
+    const { aiExpenseDraftItemsMap } = buildReceiptEnrichmentMaps(
+      "g1",
+      [],
+      [],
+      [
+        [
+          "d1",
+          [{ categoryId: "c1", itemName: "牛乳" }, { categoryId: "c2" }, { itemName: "名前だけ" }],
+        ],
+      ],
+    );
+    expect(aiExpenseDraftItemsMap.get("d1")).toEqual([{ categoryId: "c1", itemName: "牛乳" }]);
   });
 });

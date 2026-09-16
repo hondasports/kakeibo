@@ -1,19 +1,25 @@
 import { ConvexError } from "convex/values";
 import type { MutationCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
-import {
-  isValidSignedLineItemAmount,
-  type ReceiptItemLineType,
-} from "../../../lib/domain/receipt/discountItems";
-import { trimOptional } from "../../../lib/domain/common/string";
+import { type ReceiptItemLineType } from "../../../lib/domain/receipt/discountItems";
 import {
   getReviewUpdateReadyErrorMessage,
   validateReviewUpdateCanBecomeReady,
 } from "../../../lib/domain/aiExpenseDrafts/review";
-import { type AiExpenseDraftDocumentType } from "./validators";
+import { type AiExpenseDraftDocumentType } from "../../../lib/domain/aiExpenseDrafts/constants";
 import type { AiExpenseRegistrationMode } from "../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import type { PriceTaxTreatment, TaxRateComposition } from "../../receiptTax/types";
-import { resolveReviewItemAmountsForReplace } from "../../../lib/domain/aiExpenseDrafts/reviewItemAmounts";
+import {
+  getReviewCategoryErrorMessage,
+  validateReviewCategory,
+} from "../../../lib/domain/aiExpenseDrafts/reviewCategory";
+import {
+  buildReplacementDraftItemFields,
+  getReviewItemReplaceErrorMessage,
+  validateReviewItemCount,
+  validateReviewItemIds,
+} from "../../../lib/domain/aiExpenseDrafts/reviewItemReplace";
+import { draftItemDocToFields, draftItemFieldsToDoc } from "./draftRecordMapping";
 import {
   aggregateDraftItemsByCategory as aggregateDraftItemsByCategoryDomain,
   getDraftItemAggregationErrorMessage,
@@ -70,11 +76,9 @@ export async function assertActiveCategoryBelongsToGroup(
   groupId: Id<"groups">,
 ) {
   const category = await ctx.db.get(categoryId);
-  if (category === null || category.groupId !== groupId) {
-    throw new ConvexError("Category does not belong to the current group");
-  }
-  if (!category.isActive) {
-    throw new ConvexError("Inactive category cannot be used for reviewed drafts");
+  const result = validateReviewCategory(category, groupId);
+  if (!result.success) {
+    throw new ConvexError(getReviewCategoryErrorMessage(result.error));
   }
 }
 
@@ -117,8 +121,9 @@ export async function replaceDraftItemsForReview(
   items: NonNullable<UpdateForReviewArgs["items"]>,
   now: number,
 ) {
-  if (items.length > 100) {
-    throw new ConvexError("Draft items must be 100 or fewer");
+  const countResult = validateReviewItemCount(items);
+  if (!countResult.success) {
+    throw new ConvexError(getReviewItemReplaceErrorMessage(countResult.error));
   }
   const existingItems = await ctx.db
     .query("aiExpenseDraftItems")
@@ -126,63 +131,31 @@ export async function replaceDraftItemsForReview(
     .order("asc")
     .take(100);
   const existingItemsById = new Map(existingItems.map((item) => [item._id, item]));
-  const submittedItemIds = new Set<Id<"aiExpenseDraftItems">>();
-  for (const item of items) {
-    if (item.itemId === undefined) {
-      continue;
-    }
-    if (submittedItemIds.has(item.itemId)) {
-      throw new ConvexError("Draft item ID must not be duplicated");
-    }
-    if (!existingItemsById.has(item.itemId)) {
-      throw new ConvexError("Draft item does not belong to the current draft");
-    }
-    submittedItemIds.add(item.itemId);
+  const idsResult = validateReviewItemIds(items, new Set<string>(existingItemsById.keys()));
+  if (!idsResult.success) {
+    throw new ConvexError(getReviewItemReplaceErrorMessage(idsResult.error));
   }
   for (const item of existingItems) {
     await ctx.db.delete(item._id);
   }
   for (const item of items) {
-    const itemName = trimOptional(item.itemName);
     const previous = item.itemId === undefined ? undefined : existingItemsById.get(item.itemId);
-    const lineType = item.lineType ?? previous?.lineType;
-    if (!itemName || !isValidSignedLineItemAmount(itemName, item.amountYen, lineType)) {
-      throw new ConvexError("Draft item name and amount are required");
-    }
-    await assertActiveCategoryBelongsToGroup(ctx, item.categoryId, groupId);
-    const amounts = resolveReviewItemAmountsForReplace(item.amountYen, previous);
-    await ctx.db.insert("aiExpenseDraftItems", {
+    const built = buildReplacementDraftItemFields({
       groupId,
       draftId,
-      itemName,
-      lineType,
-      amountYen: amounts.amountYen,
-      printedAmountYen: amounts.printedAmountYen,
-      categoryId: item.categoryId,
-      amountBasis: previous?.amountBasis,
-      taxRatePercent: previous?.taxRatePercent,
-      markers: previous?.markers,
-      taxMarker: previous?.taxMarker,
-      allocatedTaxYen: previous?.allocatedTaxYen,
-      taxAllocationStatus: "unallocated",
-      normalizedAmountYen:
-        "normalizedAmountYen" in amounts
-          ? amounts.normalizedAmountYen
-          : previous?.normalizedAmountYen,
-      taxResolutionStatus: previous?.taxResolutionStatus,
-      taxResolutionSource: previous?.taxResolutionSource,
-      taxReviewReasons: previous?.taxReviewReasons,
-      quantity: previous?.quantity,
-      unitPriceYen: previous?.unitPriceYen,
-      categoryName: previous?.categoryName,
-      confidence: item.confidence ?? {
-        itemName: 1,
-        amountYen: 1,
-        categoryId: 1,
-      },
-      warnings: item.warnings ?? previous?.warnings,
-      createdAt: now,
-      updatedAt: now,
+      item,
+      previous: previous === undefined ? undefined : draftItemDocToFields(previous),
+      now,
     });
+    if (!built.success) {
+      throw new ConvexError(getReviewItemReplaceErrorMessage(built.error));
+    }
+    await assertActiveCategoryBelongsToGroup(ctx, item.categoryId, groupId);
+    const {
+      _id: _ignoredId,
+      _creationTime: _ignoredCreationTime,
+      ...insertFields
+    } = draftItemFieldsToDoc(built.fields);
+    await ctx.db.insert("aiExpenseDraftItems", insertFields);
   }
 }

@@ -6,23 +6,16 @@ import type { ActionCtx } from "../../../../convex/_generated/server";
 import { api, internal } from "../../../../convex/_generated/api";
 import { ConvexError } from "convex/values";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { assertGroupOwnerRole } from "../../../../convex/groups/adminGuards";
+import { ClerkInvitationDomainError } from "../../../domain/groups/invitationFlow";
+import {
+  cancelPendingGroupInvitation,
+  inviteMember,
+  type CancelClerkServices,
+  type InviteClerkServices,
+  type ClerkInvitationStore,
+  type InviteMemberResult,
+} from "../../../usecase/groups/clerkInvitationActions";
 import { buildClerkInvitationParams, buildInvitationRedirectUrl } from "./redirectUrls";
-import { normalizeEmail as normalizeEmailDomain } from "../../../../lib/domain/users/email";
-
-type MyGroup = {
-  _id: Id<"groups">;
-  name: string;
-  clerkOrganizationId: string | null;
-  role: "owner" | "member";
-  createdAt: number;
-} | null;
-
-type InviteMemberResult = {
-  token: string;
-  clerkInvitationId: string;
-  clerkOrganizationId: string | null;
-};
 
 type InviteMemberArgs = {
   email: string;
@@ -50,14 +43,6 @@ type CancelPendingGroupInvitationDeps = {
   };
 };
 
-function normalizeEmail(email: string) {
-  const normalized = normalizeEmailDomain(email);
-  if (normalized === undefined) {
-    throw new ConvexError("メールアドレスを入力してください");
-  }
-  return normalized;
-}
-
 function getClerkClient() {
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) {
@@ -69,6 +54,40 @@ function getClerkClient() {
   return createClerkClient({ secretKey });
 }
 
+function createInvitationStore(
+  ctx: Pick<ActionCtx, "runMutation" | "runQuery">,
+): ClerkInvitationStore {
+  return {
+    getMyGroup: () => ctx.runQuery(api.groups.queries.getMyGroup, {}),
+    getAuthenticatedUserId: () => ctx.runQuery(api.users.queries.getAuthenticatedUserId, {}),
+    createGroupInvitationRecord: (input) =>
+      ctx.runMutation(internal.groups.invitations.createGroupInvitationRecord, {
+        groupId: input.groupId as Id<"groups">,
+        email: input.email,
+        token: input.token,
+        invitedByUserId: input.invitedByUserId,
+        ...(input.clerkInvitationId !== undefined
+          ? { clerkInvitationId: input.clerkInvitationId }
+          : {}),
+      }),
+    deletePendingGroupInvitationRecordByToken: (token) =>
+      ctx.runMutation(internal.groups.invitations.deletePendingGroupInvitationRecordByToken, {
+        token,
+      }),
+    cancelPendingGroupInvitation: (invitationId) =>
+      ctx.runMutation(api.groups.invitations.cancelPendingGroupInvitation, {
+        invitationId: invitationId as Id<"groupInvitations">,
+      }),
+  };
+}
+
+function toConvexBoundaryError(error: unknown): never {
+  if (error instanceof ClerkInvitationDomainError) {
+    throw new ConvexError(error.message);
+  }
+  throw error;
+}
+
 export async function cancelPendingGroupInvitationHandler(
   ctx: Pick<ActionCtx, "runMutation" | "runQuery">,
   args: CancelPendingGroupInvitationArgs,
@@ -76,32 +95,17 @@ export async function cancelPendingGroupInvitationHandler(
     getClerkClient,
   },
 ): Promise<null> {
-  const group: MyGroup = await ctx.runQuery(api.groups.queries.getMyGroup, {});
-  if (!group) {
-    throw new ConvexError("グループを選択してください");
-  }
-  assertGroupOwnerRole(group.role);
-
-  const { clerkInvitationIds } = await ctx.runMutation(
-    api.groups.invitations.cancelPendingGroupInvitation,
-    {
+  const services: CancelClerkServices = {
+    getClerk: deps.getClerkClient,
+    warn: (message, errorName) => console.warn(message, errorName),
+  };
+  try {
+    return await cancelPendingGroupInvitation(createInvitationStore(ctx), services, {
       invitationId: args.invitationId,
-    },
-  );
-
-  const clerk = deps.getClerkClient();
-  for (const clerkInvitationId of clerkInvitationIds) {
-    try {
-      await clerk.invitations.revokeInvitation(clerkInvitationId);
-    } catch (caughtError) {
-      console.warn(
-        "[groups.clerkInvitations.cancelPendingGroupInvitation] failed to revoke Clerk invitation",
-        caughtError instanceof Error ? caughtError.name : "UnknownError",
-      );
-    }
+    });
+  } catch (error) {
+    toConvexBoundaryError(error);
   }
-
-  return null;
 }
 
 export async function inviteMemberHandler(
@@ -112,57 +116,19 @@ export async function inviteMemberHandler(
     getClerkClient,
   },
 ): Promise<InviteMemberResult> {
-  const group: MyGroup = await ctx.runQuery(api.groups.queries.getMyGroup, {});
-  if (!group) {
-    throw new ConvexError("グループを選択してください");
-  }
-  assertGroupOwnerRole(group.role);
-  const currentUserId: string = await ctx.runQuery(api.users.queries.getAuthenticatedUserId, {});
-
-  const email = normalizeEmail(args.email);
-  const token = deps.createToken();
-  const redirectUrl = buildInvitationRedirectUrl(args.redirectUrl, token);
-
-  await ctx.runMutation(internal.groups.invitations.createGroupInvitationRecord, {
-    groupId: group._id,
-    email,
-    token,
-    invitedByUserId: currentUserId,
-  });
-
-  const clerk = deps.getClerkClient();
-  let invitation: { id: string };
-  try {
-    invitation = await clerk.invitations.createInvitation(
-      buildClerkInvitationParams(email, redirectUrl, group._id, token),
-    );
-  } catch (caughtError) {
-    try {
-      await ctx.runMutation(internal.groups.invitations.deletePendingGroupInvitationRecordByToken, {
-        token,
-      });
-    } catch (cleanupError) {
-      console.warn(
-        "[groups.clerkInvitations.inviteMember] failed to clean up reserved invitation",
-        cleanupError instanceof Error ? cleanupError.name : "UnknownError",
-      );
-    }
-    throw caughtError;
-  }
-
-  await ctx.runMutation(internal.groups.invitations.createGroupInvitationRecord, {
-    groupId: group._id,
-    email,
-    token,
-    invitedByUserId: currentUserId,
-    clerkInvitationId: invitation.id,
-  });
-
-  return {
-    token,
-    clerkInvitationId: invitation.id,
-    clerkOrganizationId: group.clerkOrganizationId,
+  const services: InviteClerkServices = {
+    createToken: deps.createToken,
+    buildRedirectUrl: buildInvitationRedirectUrl,
+    buildClerkInvitationParams: (email, redirectUrl, groupId, token) =>
+      buildClerkInvitationParams(email, redirectUrl, groupId as Id<"groups">, token),
+    getClerk: deps.getClerkClient,
+    warn: (message, errorName) => console.warn(message, errorName),
   };
+  try {
+    return await inviteMember(createInvitationStore(ctx), services, args);
+  } catch (error) {
+    toConvexBoundaryError(error);
+  }
 }
 
 export { getClerkClient };

@@ -3,10 +3,12 @@ import type { QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { assertGroupOwnerRole } from "./adminGuards";
 import { isGroupDeleted } from "./lib/groupLifecycle";
-import type { GroupDoc, GroupMembership, UserDoc } from "./lib/groupTypes";
-import { readQueryDoc, readQueryDocs } from "./lib/groupQueryHelpers";
+import type { GroupMembership } from "./lib/groupTypes";
 import { requireAuthenticatedUserId } from "../users/auth";
 import { resolveActiveMembership } from "../../lib/domain/groups/membershipResolution";
+import { createGroupReadRepository } from "../../lib/convex/groups/convexGroupRepository";
+import { createGroupMembershipReadRepository } from "../../lib/convex/groups/convexGroupMembershipRepository";
+import { createUserDirectoryRead } from "../../lib/convex/groups/convexUserDirectory";
 
 export type { GroupMembership } from "./lib/groupTypes";
 
@@ -17,6 +19,14 @@ export type ActiveGroupResolution =
   | { status: "no_group" }
   | { status: "unresolved" };
 
+function createMembershipKernelDeps(ctx: Pick<QueryCtx, "db">) {
+  return {
+    groups: createGroupReadRepository(ctx),
+    memberships: createGroupMembershipReadRepository(ctx),
+    users: createUserDirectoryRead(ctx),
+  };
+}
+
 /**
  * Clerk認証を使わず、既に解決済みのuserIdからactiveグループを決める。
  * LINE Webhookなど、外部連携から内部的に呼ぶためのヘルパー。
@@ -25,14 +35,12 @@ export async function resolveActiveGroupForUserId(
   ctx: Pick<QueryCtx, "db">,
   userId: string,
 ): Promise<ActiveGroupResolution> {
-  const membershipQuery = ctx.db
-    .query("groupMembers")
-    .withIndex("by_user_id", (q) => q.eq("userId", userId));
-  const memberships = await readQueryDocs(membershipQuery);
+  const deps = createMembershipKernelDeps(ctx);
+  const memberships = await deps.memberships.listByUser(userId);
 
   const activeMemberships: typeof memberships = [];
   for (const membership of memberships) {
-    const group = (await ctx.db.get(membership.groupId)) as GroupDoc | null;
+    const group = await deps.groups.get(membership.groupId);
     if (group !== null && isGroupDeleted(group)) {
       continue;
     }
@@ -43,9 +51,7 @@ export async function resolveActiveGroupForUserId(
     return { status: "no_group" };
   }
 
-  const user = await readQueryDoc(
-    ctx.db.query("users").withIndex("by_token_identifier", (q) => q.eq("userId", userId)),
-  );
+  const user = await deps.users.findByUserId(userId);
   const activeMembership = resolveActiveMembership(activeMemberships, user?.activeGroupId);
   if (activeMembership === null) {
     return { status: "unresolved" };
@@ -54,8 +60,8 @@ export async function resolveActiveGroupForUserId(
   return {
     status: "resolved",
     membership: {
-      membershipId: activeMembership._id,
-      groupId: activeMembership.groupId,
+      membershipId: activeMembership.id as Id<"groupMembers">,
+      groupId: activeMembership.groupId as Id<"groups">,
       userId,
       role: activeMembership.role,
     },
@@ -63,7 +69,7 @@ export async function resolveActiveGroupForUserId(
 }
 
 /**
- * 認証済みユーザーのグループメンバーシップ一覧を取得する。
+ * 認証済みユーザーのグループメンバーシップを取得する。
  * データファイルから共通利用するため export する。
  */
 export async function getGroupMembership(
@@ -76,28 +82,25 @@ export async function getGroupMembership(
 
 async function getAllGroupMemberships(ctx: Pick<QueryCtx, "auth" | "db">) {
   const userId = await requireAuthenticatedUserId(ctx);
-  const membershipQuery = ctx.db
-    .query("groupMembers")
-    .withIndex("by_user_id", (q) => q.eq("userId", userId));
-  return await readQueryDocs(membershipQuery);
+  return await createGroupMembershipReadRepository(ctx).listByUser(userId);
 }
 
-async function getCurrentUserDoc(ctx: Pick<QueryCtx, "auth" | "db">): Promise<UserDoc | null> {
+async function getCurrentUserActiveGroupId(
+  ctx: Pick<QueryCtx, "auth" | "db">,
+): Promise<string | null> {
   const userId = await requireAuthenticatedUserId(ctx);
-  const user = await readQueryDoc(
-    ctx.db.query("users").withIndex("by_token_identifier", (q) => q.eq("userId", userId)),
-  );
-  return user as UserDoc | null;
+  const user = await createUserDirectoryRead(ctx).findByUserId(userId);
+  return user?.activeGroupId ?? null;
 }
 
 export async function getResolvedMemberships(ctx: Pick<QueryCtx, "auth" | "db">) {
   const memberships = await getAllGroupMemberships(ctx);
-  const user = await getCurrentUserDoc(ctx);
-  const activeGroupId = user?.activeGroupId ?? null;
+  const activeGroupId = await getCurrentUserActiveGroupId(ctx);
+  const deps = createMembershipKernelDeps(ctx);
 
   const activeMemberships: typeof memberships = [];
   for (const membership of memberships) {
-    const group = (await ctx.db.get(membership.groupId)) as GroupDoc | null;
+    const group = await deps.groups.get(membership.groupId);
     if (group === null || isGroupDeleted(group)) {
       continue;
     }
@@ -114,17 +117,16 @@ export async function findNextActiveGroupIdForUser(
   userId: string,
   excludedGroupId: Id<"groups">,
 ): Promise<Id<"groups"> | undefined> {
-  const memberships = await readQueryDocs(
-    ctx.db.query("groupMembers").withIndex("by_user_id", (q) => q.eq("userId", userId)),
-  );
+  const deps = createMembershipKernelDeps(ctx);
+  const memberships = await deps.memberships.listByUser(userId);
 
   for (const membership of memberships) {
-    if (membership.groupId === excludedGroupId) {
+    if ((membership.groupId as Id<"groups">) === excludedGroupId) {
       continue;
     }
-    const group = (await ctx.db.get(membership.groupId)) as GroupDoc | null;
+    const group = await deps.groups.get(membership.groupId);
     if (group !== null && !isGroupDeleted(group)) {
-      return membership.groupId;
+      return membership.groupId as Id<"groups">;
     }
   }
 

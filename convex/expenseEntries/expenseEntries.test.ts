@@ -355,7 +355,18 @@ describe("createExpenseEntriesHandler", () => {
 
   it("sourceDocumentId が指定された場合、expenseEntries に紐付けて保存できる", async () => {
     const ctx = createMutationCtx(createIdentity(), {
-      getDocById: { "cat-food": activeFoodCategory },
+      getDocById: {
+        "cat-food": activeFoodCategory,
+        "source-doc-1": {
+          _id: "source-doc-1",
+          _creationTime: 1000,
+          groupId: GROUP_ID,
+          sourceType: "manual",
+          status: "finalized",
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
+      },
     });
 
     await createExpenseEntriesHandler(ctx, {

@@ -51,23 +51,5 @@ export const groupDeletionCountsValidator = v.object({
   groups: v.number(),
 });
 
-export type GroupDeletionStatus = "requested" | "running" | "retry_wait" | "failed" | "completed";
-
-export type GroupDeletionStage =
-  | "recipientSnapshot"
-  | "startedEnqueue"
-  | "receiptAnalysisImageJobs"
-  | "aiExpenseDraftItems"
-  | "aiExpenseDrafts"
-  | "receiptAnalysisBatches"
-  | "expenseEntries"
-  | "receipts"
-  | "sourceDocuments"
-  | "weekSessions"
-  | "categories"
-  | "groupInvitations"
-  | "managementAuditLogs"
-  | "groupMembers"
-  | "finalSweep"
-  | "completedEnqueue"
-  | "recipientCleanup";
+export type { GroupDeletionJobStatus as GroupDeletionStatus } from "../../../lib/domain/groupDeletion/groupDeletionJob";
+export type { GroupDeletionJobStage as GroupDeletionStage } from "../../../lib/domain/groupDeletion/groupDeletionJob";

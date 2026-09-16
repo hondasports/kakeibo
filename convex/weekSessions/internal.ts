@@ -2,29 +2,19 @@ import { internalMutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
+import { createWeekSessionStore } from "../../lib/convex/weekSessions/convexWeekSessionStore";
+import { resetWeekSession as resetWeekSessionUsecase } from "../../lib/usecase/weekSessions";
 
 export async function resetWeekSessionForUserHandler(
   ctx: MutationCtx,
   { groupId, weekStartDate }: { groupId: Id<"groups">; weekStartDate: string },
 ) {
-  const session = await ctx.db
-    .query("weekSessions")
-    .withIndex("by_group_id_and_week_start_date", (q) =>
-      q.eq("groupId", groupId).eq("weekStartDate", weekStartDate),
-    )
-    .unique();
-
-  if (session === null) {
-    return { reset: false };
-  }
-
-  await ctx.db.patch(session._id, {
-    status: "draft",
-    reviewMemo: undefined,
-    updatedAt: Date.now(),
-  });
-
-  return { reset: true };
+  return await resetWeekSessionUsecase(
+    createWeekSessionStore(ctx),
+    groupId,
+    weekStartDate,
+    Date.now,
+  );
 }
 
 /**

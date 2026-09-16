@@ -1,28 +1,17 @@
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import { requireAuthenticatedUserId } from "./auth";
-import { getWeekEndDay, normalizeWeekStartDay } from "../lib/weekDates";
+import { createUserReader } from "../../lib/convex/users/convexUserStore";
+import {
+  getReceiptImageConsent as getReceiptImageConsentUsecase,
+  getUserProfile as getUserProfileUsecase,
+} from "../../lib/usecase/users";
 
 /** getUserProfile query の handler ロジック（テスト用に export） */
 export async function getUserProfileHandler(ctx: QueryCtx) {
   const userId = await requireAuthenticatedUserId(ctx);
 
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_token_identifier", (q) => q.eq("userId", userId))
-    .unique();
-
-  if (user === null) {
-    return undefined;
-  }
-
-  const weeklyStartDay = normalizeWeekStartDay(user.weeklyStartDay);
-
-  return {
-    monthlyIncome: user.monthlyIncome ?? null,
-    weeklyStartDay,
-    weeklyEndDay: getWeekEndDay(weeklyStartDay),
-  };
+  return await getUserProfileUsecase(createUserReader(ctx), userId);
 }
 
 export const getUserProfile = query({
@@ -40,17 +29,7 @@ export const getAuthenticatedUserId = query({
 export async function getReceiptImageConsentHandler(ctx: QueryCtx) {
   const userId = await requireAuthenticatedUserId(ctx);
 
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_token_identifier", (q) => q.eq("userId", userId))
-    .unique();
-
-  const acceptedAt = user?.receiptImageExternalApiConsentAcceptedAt ?? null;
-
-  return {
-    hasAcceptedExternalApiConsent: acceptedAt !== null,
-    acceptedAt,
-  };
+  return await getReceiptImageConsentUsecase(createUserReader(ctx), userId);
 }
 
 export const getReceiptImageConsent = query({

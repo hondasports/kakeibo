@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { applyReceiptUserOverride, type ReceiptDraftValueSnapshot } from "./receiptDataContract";
+import {
+  applyReceiptUserOverride,
+  buildReceiptUserOverride,
+  snapshotReceiptDraftValues,
+  type ReceiptDraftValueSnapshot,
+} from "./receiptDataContract";
 
 const aiValues: ReceiptDraftValueSnapshot = {
   status: "needs_review",
@@ -108,5 +113,60 @@ describe("applyReceiptUserOverride", () => {
 
     expect(merged.amountYen).toBe(7803);
     expect(merged.receiptTotalResolution).toEqual(userResolution);
+  });
+});
+
+describe("snapshotReceiptDraftValues", () => {
+  it("draft・明細を射影し warnings 未設定は空配列にする", () => {
+    const result = snapshotReceiptDraftValues(
+      {
+        status: "needs_review",
+        documentType: "receipt",
+        shopName: "店舗",
+        amountYen: 500,
+        confidence: { shopName: 0.9 },
+        reviewReasons: ["low_confidence"],
+        receiptInterpretation: {
+          values: { receiptLineClassifications: [{ kind: "item" } as never] },
+        },
+      },
+      [
+        {
+          itemName: "商品A",
+          amountYen: 500,
+          confidence: { itemName: 0.8 },
+          warnings: ["w1"],
+        },
+      ],
+    );
+    expect(result.warnings).toEqual([]);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].itemName).toBe("商品A");
+    expect(result.items[0].warnings).toEqual(["w1"]);
+    expect(result.receiptLineClassifications).toEqual([{ kind: "item" }]);
+  });
+});
+
+describe("buildReceiptUserOverride", () => {
+  it("fields を既存と新規の和集合にし source:'user' を付ける", () => {
+    const override = buildReceiptUserOverride({
+      existingFields: ["amountYen", "shopName"],
+      fields: ["amountYen", "memo"],
+      updatedAt: 123,
+      values: aiValues,
+    });
+    expect(override.source).toBe("user");
+    expect(override.updatedAt).toBe(123);
+    expect(override.fields).toEqual(["amountYen", "shopName", "memo"]);
+    expect(override.values).toBe(aiValues);
+  });
+
+  it("既存 fields が無ければ新規のみ", () => {
+    const override = buildReceiptUserOverride({
+      fields: ["date"],
+      updatedAt: 1,
+      values: aiValues,
+    });
+    expect(override.fields).toEqual(["date"]);
   });
 });
