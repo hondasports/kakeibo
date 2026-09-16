@@ -747,6 +747,18 @@ domain へ分離済み。
   フィルタ・index クエリ（email→status 収集順）・check_membership 時のみ membership
   参照・`status: "revoked"` patch ループのみを担い、公開シグネチャは不変とする。
 
+`aiExpenseDrafts` の `receiptUserOverride` スナップショット永続化も domain へ分離済み。
+
+- **純粋関数**: `lib/domain/aiExpenseDrafts/receiptDataContract.ts` の
+  `snapshotReceiptDraftValues`（draft・明細のフィールド射影。warnings 未設定は
+  空配列へ正規化）と `buildReceiptUserOverride`（fields の和集合マージ・
+  `source: "user"` 組立）。
+- **インフラ**: `lib/convex/aiExpenseDrafts/receiptDataContract.ts` は draft get・
+  所有権チェック（`groupId` 不一致または不存在で Error・文言維持）・明細
+  `by_group_id_and_draft_id` asc take(100)・patch・再取得のみを担い、
+  `persistReceiptUserOverrideSnapshot` / `snapshotReceiptDraftValues` /
+  `resetReceiptToAiInterpretationHandler` の公開シグネチャは不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。

@@ -1,8 +1,10 @@
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../../convex/_generated/server";
-import type {
-  ReceiptDraftValueSnapshot,
-  ReceiptUserOverrideSnapshot,
+import {
+  buildReceiptUserOverride,
+  snapshotReceiptDraftValues as snapshotReceiptDraftValuesDomain,
+  type ReceiptDraftValueSnapshot,
+  type ReceiptUserOverrideSnapshot,
 } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { resetReceiptToAiInterpretation } from "../../usecase/aiExpenseDrafts/resetReceiptToAiInterpretation";
 import { createAiExpenseDraftDeps } from "./draftUsecaseDeps";
@@ -12,48 +14,7 @@ export function snapshotReceiptDraftValues(
   draft: Doc<"aiExpenseDrafts">,
   items: Doc<"aiExpenseDraftItems">[],
 ): ReceiptDraftValueSnapshot<Id<"categories">> {
-  return {
-    status: draft.status,
-    documentType: draft.documentType,
-    shopName: draft.shopName,
-    paymentPlace: draft.paymentPlace,
-    payeeName: draft.payeeName,
-    paymentPurpose: draft.paymentPurpose,
-    date: draft.date,
-    amountYen: draft.amountYen,
-    registrationMode: draft.registrationMode,
-    taxSummaries: draft.taxSummaries,
-    receiptTotalResolution: draft.receiptTotalResolution,
-    receiptTaxDecision: draft.receiptTaxDecision,
-    receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
-    markerDefinitions: draft.markerDefinitions,
-    categoryId: draft.categoryId,
-    confidence: draft.confidence,
-    warnings: draft.warnings ?? [],
-    reviewReasons: draft.reviewReasons,
-    items: items.map((item) => ({
-      itemName: item.itemName,
-      lineType: item.lineType,
-      amountYen: item.amountYen,
-      printedAmountYen: item.printedAmountYen,
-      amountBasis: item.amountBasis,
-      taxRatePercent: item.taxRatePercent,
-      markers: item.markers,
-      taxMarker: item.taxMarker,
-      allocatedTaxYen: item.allocatedTaxYen,
-      taxAllocationStatus: item.taxAllocationStatus,
-      normalizedAmountYen: item.normalizedAmountYen,
-      taxResolutionStatus: item.taxResolutionStatus,
-      taxResolutionSource: item.taxResolutionSource,
-      taxReviewReasons: item.taxReviewReasons,
-      quantity: item.quantity,
-      unitPriceYen: item.unitPriceYen,
-      categoryName: item.categoryName,
-      categoryId: item.categoryId,
-      confidence: item.confidence,
-      warnings: item.warnings,
-    })),
-  };
+  return snapshotReceiptDraftValuesDomain(draft, items);
 }
 
 export async function persistReceiptUserOverrideSnapshot(
@@ -77,12 +38,13 @@ export async function persistReceiptUserOverrideSnapshot(
     .order("asc")
     .take(100);
   const updatedAt = args.updatedAt ?? Date.now();
-  const receiptUserOverride: ReceiptUserOverrideSnapshot<Id<"categories">> = {
-    source: "user",
-    updatedAt,
-    fields: [...new Set([...(draft.receiptUserOverride?.fields ?? []), ...args.fields])],
-    values: snapshotReceiptDraftValues(draft, items),
-  };
+  const receiptUserOverride: ReceiptUserOverrideSnapshot<Id<"categories">> =
+    buildReceiptUserOverride({
+      existingFields: draft.receiptUserOverride?.fields,
+      fields: args.fields,
+      updatedAt,
+      values: snapshotReceiptDraftValues(draft, items),
+    });
   await ctx.db.patch(args.draftId, { receiptUserOverride, updatedAt });
   const updated = await ctx.db.get(args.draftId);
   if (updated === null) {
