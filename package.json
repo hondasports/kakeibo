@@ -74,7 +74,7 @@
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.8",
     "oxfmt": "^0.62.0",
-    "oxlint": "^1.77.0",
+    "oxlint": "^1.82.0",
     "tailwindcss": "^4.3.3",
     "tsx": "4.23.13",
     "typescript": "~7.0.2",
