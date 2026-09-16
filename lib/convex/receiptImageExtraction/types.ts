@@ -5,7 +5,9 @@ import {
 } from "../../../lib/domain/receipt/extraction";
 import type { ReceiptRawObservationLine } from "../../../lib/domain/receipt/observations";
 import type { ReceiptItemLineType } from "../../../lib/domain/receipt/discountItems";
+import type { ReceiptCategoryHint } from "../../../lib/domain/receiptImageExtraction/extractionRequest";
 export type { ReceiptItemLineType } from "../../../lib/domain/receipt/discountItems";
+export type { ReceiptCategoryHint } from "../../../lib/domain/receiptImageExtraction/extractionRequest";
 export type { ReceiptRawObservationLine } from "../../../lib/domain/receipt/observations";
 
 export type ExtractionConfidence = {
@@ -117,11 +119,6 @@ export type ExtractReceiptFieldsArgs = {
   categories?: ReceiptCategoryHint[];
   /** @deprecated Use categories so descriptions reach the extractor. */
   categoryNames?: string[];
-};
-
-export type ReceiptCategoryHint = {
-  name: string;
-  description?: string;
 };
 
 export type OpenAIReceiptExtractorArgs = {

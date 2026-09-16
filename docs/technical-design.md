@@ -593,12 +593,17 @@ E2E reset・取得）も4層へ移行済み。週の日付計算は既存 `lib/d
   endpoint名、args/returns、エラー文言、Doc 返却形状、patch キー構成は不変とする。
 
 `receiptImageExtraction`（レシート画像抽出 action）も4層へ移行済み。OpenAI client・
-schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を無変更で再利用する。
+parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を再利用し、リクエスト構築
+（プロンプト・JSONスキーマ・カテゴリ正規化）は `lib/domain/receiptImageExtraction/` へ統合済み。
 
 - **純粋関数**（`lib/domain/receiptImageExtraction/`）: 既存 `mode.ts` に加え、
   `rules.ts`（imageDataUrl 検証、抽出計画解決: mode → real は production 限定 →
   mock → OPENAI_API_KEY 必須、グループ選択・同意検証）と `ports.ts`（環境読み取り・
-  mock/real extractor・group/consent/categories 読み取りポート）。
+  mock/real extractor・group/consent/categories 読み取りポート）、
+  `extractionRequest.ts`（抽出リクエスト構築: `ReceiptCategoryHint`/`CategoryInput` 型、
+  BiDi制御文字 sanitize・重複排除 `normalizeCategories`、プロンプト構築
+  `buildReceiptExtractionPrompt`、JSONスキーマ `buildReceiptExtractionJsonSchema`、
+  リクエストボディ `buildOpenAIReceiptExtractionRequestBody`）。
 - **ユースケース**（`lib/usecase/receiptImageExtraction/`）: `extractReceiptFields`
   （検証 → 計画 → mock/real）と `extractReceiptFieldsForCurrentGroup`
   （group → consent+categories 並列取得 → 抽出）。

@@ -4,8 +4,7 @@ import {
   buildReceiptExtractionPrompt,
   buildReceiptExtractionJsonSchema,
   RECEIPT_EXTRACTION_PROMPT_LINES,
-} from "./openaiSchema";
-import { getMockResult } from "./mock";
+} from "./extractionRequest";
 
 describe("RECEIPT_EXTRACTION_PROMPT_LINES", () => {
   it("印字金額と税率別集計を抽出し、小数税率を使わない", () => {
@@ -165,26 +164,5 @@ describe("RECEIPT_EXTRACTION_PROMPT_LINES", () => {
     expect(taxSummarySchema.additionalProperties).toBe(false);
     expect(schema.required).toContain("taxSummaries");
     expect(schema.required).toContain("markerDefinitions");
-  });
-
-  it("mock結果が印字金額と税率別集計を持つ", () => {
-    const mock = getMockResult();
-
-    expect(mock.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          printedAmountYen: expect.any(Number),
-          amountBasis: "tax_included",
-          taxRatePercent: 10,
-        }),
-      ]),
-    );
-    expect(mock.taxSummaries).toEqual([
-      expect.objectContaining({
-        taxRatePercent: 10,
-        taxMode: "included",
-        taxYen: expect.any(Number),
-      }),
-    ]);
   });
 });

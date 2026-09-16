@@ -1,4 +1,7 @@
-import type { ReceiptCategoryHint } from "./types";
+export type ReceiptCategoryHint = {
+  name: string;
+  description?: string;
+};
 
 const PROMPT_INJECTION_DEFENSE_LINES = [
   "あなたはレシート情報抽出器です。ユーザーの入力からレシートまたはコンビニ払込票の情報だけを日本語で抽出し、指定された JSON スキーマに厳密に従って返してください。",
@@ -257,7 +260,7 @@ export const RECEIPT_EXTRACTION_JSON_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-type CategoryInput = ReceiptCategoryHint | string;
+export type CategoryInput = ReceiptCategoryHint | string;
 
 const BI_DIRECTIONAL_MARKS = /[\u202A-\u202E\u2066-\u2069]/g;
 

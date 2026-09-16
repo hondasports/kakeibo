@@ -4,7 +4,7 @@ import type {
   OpenAIReceiptExtractorArgs,
   OpenAIResponsesApiResponse,
 } from "./types";
-import { buildOpenAIReceiptExtractionRequestBody } from "./openaiSchema";
+import { buildOpenAIReceiptExtractionRequestBody } from "../../../lib/domain/receiptImageExtraction/extractionRequest";
 import { parseOpenAIResponse } from "./parseExtraction";
 import { logReceiptExtractionStage } from "./telemetry";
 
