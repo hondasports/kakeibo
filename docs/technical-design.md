@@ -696,6 +696,24 @@ schema・parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` �
   取得・各op適用前のカテゴリ検証委譲・patch/insert/delete 適用・結果ID順序維持と
   `ReconcileExpenseEntriesDomainError` の ConvexError 変換のみを担う。
 
+`receipts` の集計ハンドラ群（週次・4週・日次推移・月次・年次サマリ）も
+`lib/usecase/receipts/summaries.ts` へオーケストレーションを分離済み。
+
+- **純粋関数**: `lib/domain/receipt/summaryEntries.ts`（`SummaryReceiptEntry` 型と
+  `mapSpendingEntryToSummaryReceipt`。カテゴリ名 fallback「不明」・色 fallback
+  「#AAB7C4」）。既存 `summary.ts` / `monthlySummary.ts` / `yearlySummary.ts` /
+  `weekDates.ts` の集計・週算出はそのまま利用する。
+- **ユースケース**: `SummaryStore` ポート経由で週/日/月/年のエントリ取得・前週算出・
+  4週反復（降順取得→昇順反転）・日次7日ループ・カテゴリ情報取得・応答組立を行う。
+  `prevWeekTotalAmountYen` の null 化（前週0件時）・4週 `weekCount`（0円週除外）・
+  月次 `netAmountYen`（収入-支出）の算出もここに置く。
+- **インフラ**: `lib/convex/receipts/summaryLib/summaryStore.ts` が `SummaryStore` を
+  `ctx.db` / `spendingEntries` アダプタへ橋渡しする。`week.ts` / `monthly.ts` /
+  `trend.ts` / `yearly.ts` の各ハンドラは `requireGroupMembership` と
+  `normalizeMonth`/`normalizeYear` → `ConvexError("Invalid month"/"Invalid year")`
+  の変換のみを担い、公開ハンドラ名・戻り値型・エラー文言は不変とする。
+  `buildCategoryInfoMap` は `categoryAggregation.ts` の DB アダプタとして維持する。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
