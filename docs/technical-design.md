@@ -739,6 +739,14 @@ domain へ分離済み。
   マッピングアダプタ呼出のみを担い、公開シグネチャ・戻り値・truncated 伝播は
   不変とする。
 
+`groups` の stale 招待判定も `lib/domain/groups/groupInvitation.ts` へ分離済み。
+
+- **純粋関数**: `assessGroupInvitationStaleness`（pending→stale、revoked/expired→keep、
+  accepted+`acceptedByUserId` 無し→stale、accepted+有り→check_membership）。
+- **インフラ**: `lib/convex/groups/invitationHandlers/staleCleanup.ts` はメール一致
+  フィルタ・index クエリ（email→status 収集順）・check_membership 時のみ membership
+  参照・`status: "revoked"` patch ループのみを担い、公開シグネチャは不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
