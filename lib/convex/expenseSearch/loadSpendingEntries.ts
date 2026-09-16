@@ -1,6 +1,11 @@
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { QueryCtx } from "../../../convex/_generated/server";
 import {
+  mergeSearchEntrySources,
+  partitionExpenseEntriesByKind,
+  partitionReceiptsByKind,
+} from "../../domain/expenseSearch/searchEntries";
+import {
   addLegacyReceiptGroups,
   enrichSpendingEntriesWithReceiptGroups,
   mapExpenseEntriesToReceiptLinkages,
@@ -21,23 +26,6 @@ type SearchDocsResult<T> = {
   docs: T[];
   truncated: boolean;
 };
-
-/**
- * 移行期間は新旧sourceが同じ月に共存しうる。source間には同一明細を
- * 判定できるlinkがないため、日付・金額・名称での推測dedupeは行わず、
- * sourceとIDが同じものだけを重複排除する。
- */
-function dedupeSearchEntries<T extends { _id: string; recordType: string }>(entries: T[]): T[] {
-  const seen = new Set<string>();
-  return entries.filter((entry) => {
-    const sourceKey = `${entry.recordType}:${entry._id}`;
-    if (seen.has(sourceKey)) {
-      return false;
-    }
-    seen.add(sourceKey);
-    return true;
-  });
-}
 
 async function fetchExpenseEntriesForSearch(
   ctx: QueryCtx,
@@ -120,26 +108,24 @@ export async function loadHistoryEntriesForSearch(
   // 同じ明細であることを確実に判定できないため、検索では両sourceを結合して
   // source-qualified IDだけでdedupeする。週次・月次集計の互換ルールとは別に、
   // 移行中の履歴検索は利用可能な履歴をすべて表示する。
-  const expenseEntriesToUse = newEntries.filter((entry) => entry.entryType === "expense");
-  const legacyExpenseReceiptsToUse = receipts.filter((receipt) => receipt.type !== "income");
-  const incomeEntriesToUse = newEntries.filter((entry) => entry.entryType === "income");
-  const legacyIncomeReceiptsToUse = receipts.filter((receipt) => receipt.type === "income");
+  const newKinds = partitionExpenseEntriesByKind(newEntries);
+  const legacyKinds = partitionReceiptsByKind(receipts);
 
   const enrichedEntries = await enrichSpendingEntriesWithReceiptGroups(
     ctx,
     groupId,
-    mapExpenseEntriesToReceiptLinkages(expenseEntriesToUse),
+    mapExpenseEntriesToReceiptLinkages(newKinds.expenses),
   );
-  const entries = dedupeSearchEntries([
-    ...enrichedEntries,
-    ...addLegacyReceiptGroups(
-      legacyExpenseReceiptsToUse.map((receipt) => mapReceiptToSpendingEntry(receipt)),
+  const entries = mergeSearchEntrySources(
+    enrichedEntries,
+    addLegacyReceiptGroups(
+      legacyKinds.expenses.map((receipt) => mapReceiptToSpendingEntry(receipt)),
     ),
-  ]);
-  const incomes = dedupeSearchEntries([
-    ...incomeEntriesToUse.map((entry) => mapIncomeExpenseEntryToListEntry(entry)),
-    ...legacyIncomeReceiptsToUse.map((receipt) => mapReceiptToIncomeListEntry(receipt)),
-  ]);
+  );
+  const incomes = mergeSearchEntrySources(
+    newKinds.incomes.map((entry) => mapIncomeExpenseEntryToListEntry(entry)),
+    legacyKinds.incomes.map((receipt) => mapReceiptToIncomeListEntry(receipt)),
+  );
 
   return {
     entries,

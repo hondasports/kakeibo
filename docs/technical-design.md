@@ -727,6 +727,18 @@ domain へ分離済み。
   ConvexError 変換のみを担い、新形式時はエンリッチメント付き新エントリ、
   無ければ旧 receipts+`addLegacyReceiptGroups` への分岐順は不変とする。
 
+`expenseSearch` の履歴ロードの合成規則も `lib/domain/expenseSearch/searchEntries.ts`
+へ分離済み。
+
+- **純粋関数**: `dedupeSearchEntries`（`recordType:_id` キーのみで重複排除。
+  日付・金額・名称での推測dedupeは行わない）、`partitionExpenseEntriesByKind` /
+  `partitionReceiptsByKind`（種別振り分け。旧レシートの type 未設定は支出扱い）、
+  `mergeSearchEntrySources`（新形式を先に結合してdedupe）。
+- **インフラ**: `lib/convex/expenseSearch/loadSpendingEntries.ts` は新旧sourceの
+  並列取得・`SEARCH_MAX_RECORDS` 上限と `truncated` 判定・エンリッチメント/
+  マッピングアダプタ呼出のみを担い、公開シグネチャ・戻り値・truncated 伝播は
+  不変とする。
+
 ### 5.4 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
