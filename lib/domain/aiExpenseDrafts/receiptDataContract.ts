@@ -140,3 +140,78 @@ export function applyReceiptUserOverride<TCategoryId>(
   }
   return merged;
 }
+
+/** スナップショット構築に必要な draft の最小形状。warnings 未設定は空配列へ正規化する。 */
+export type ReceiptDraftSnapshotSource<TCategoryId = string> = Omit<
+  ReceiptDraftValueSnapshot<TCategoryId>,
+  "items" | "warnings" | "receiptLineClassifications"
+> & {
+  warnings?: string[];
+  receiptInterpretation?: {
+    values: { receiptLineClassifications?: ReceiptLineClassification[] };
+  };
+};
+
+/** draft・明細からスナップショットを構築する純粋射影。 */
+export function snapshotReceiptDraftValues<TCategoryId>(
+  draft: ReceiptDraftSnapshotSource<TCategoryId>,
+  items: readonly ReceiptDraftItemSnapshot<TCategoryId>[],
+): ReceiptDraftValueSnapshot<TCategoryId> {
+  return {
+    status: draft.status,
+    documentType: draft.documentType,
+    shopName: draft.shopName,
+    paymentPlace: draft.paymentPlace,
+    payeeName: draft.payeeName,
+    paymentPurpose: draft.paymentPurpose,
+    date: draft.date,
+    amountYen: draft.amountYen,
+    registrationMode: draft.registrationMode,
+    taxSummaries: draft.taxSummaries,
+    receiptTotalResolution: draft.receiptTotalResolution,
+    receiptTaxDecision: draft.receiptTaxDecision,
+    receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
+    markerDefinitions: draft.markerDefinitions,
+    categoryId: draft.categoryId,
+    confidence: draft.confidence,
+    warnings: draft.warnings ?? [],
+    reviewReasons: draft.reviewReasons,
+    items: items.map((item) => ({
+      itemName: item.itemName,
+      lineType: item.lineType,
+      amountYen: item.amountYen,
+      printedAmountYen: item.printedAmountYen,
+      amountBasis: item.amountBasis,
+      taxRatePercent: item.taxRatePercent,
+      markers: item.markers,
+      taxMarker: item.taxMarker,
+      allocatedTaxYen: item.allocatedTaxYen,
+      taxAllocationStatus: item.taxAllocationStatus,
+      normalizedAmountYen: item.normalizedAmountYen,
+      taxResolutionStatus: item.taxResolutionStatus,
+      taxResolutionSource: item.taxResolutionSource,
+      taxReviewReasons: item.taxReviewReasons,
+      quantity: item.quantity,
+      unitPriceYen: item.unitPriceYen,
+      categoryName: item.categoryName,
+      categoryId: item.categoryId,
+      confidence: item.confidence,
+      warnings: item.warnings,
+    })),
+  };
+}
+
+/** receiptUserOverride を組み立てる。fields は既存と新規の和集合を取る。 */
+export function buildReceiptUserOverride<TCategoryId>(args: {
+  existingFields?: readonly string[];
+  fields: readonly string[];
+  updatedAt: number;
+  values: ReceiptDraftValueSnapshot<TCategoryId>;
+}): ReceiptUserOverrideSnapshot<TCategoryId> {
+  return {
+    source: "user",
+    updatedAt: args.updatedAt,
+    fields: [...new Set([...(args.existingFields ?? []), ...args.fields])],
+    values: args.values,
+  };
+}
