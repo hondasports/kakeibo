@@ -1,18 +1,12 @@
 import type { QueryCtx } from "../../../../convex/_generated/server";
 import { requireGroupMembership } from "../../../../convex/groups/membership";
-import { calculateRelativeWeekStartDate } from "../../../../convex/lib/weekDates";
-import { addDays, getDateSpendingEntries } from "../../../../convex/receipts/spendingEntries";
+import {
+  getDailySpendingTrend,
+  type DailySpendingTrendResult,
+} from "../../../usecase/receipts/summaries";
+import { createSummaryStore } from "./summaryStore";
 
-export type DailySpendingTrendData = {
-  currentWeek: Array<{
-    date: string;
-    totalAmountYen: number;
-  }>;
-  previousWeek: Array<{
-    date: string;
-    totalAmountYen: number;
-  }>;
-};
+export type DailySpendingTrendData = DailySpendingTrendResult;
 
 type GetDailySpendingTrendArgs = {
   weekStartDate: string;
@@ -24,24 +18,5 @@ export async function getDailySpendingTrendHandler(
   args: GetDailySpendingTrendArgs,
 ): Promise<DailySpendingTrendData> {
   const { groupId } = await requireGroupMembership(ctx);
-
-  async function getTotalForDate(targetDate: string): Promise<number> {
-    const receipts = await getDateSpendingEntries(ctx, groupId, targetDate);
-    return receipts.reduce((sum, r) => sum + r.amountYen, 0);
-  }
-
-  const currentWeekStart = args.weekStartDate;
-  const previousWeekStart = calculateRelativeWeekStartDate(args.weekStartDate, -1);
-
-  const currentWeek: DailySpendingTrendData["currentWeek"] = [];
-  const previousWeek: DailySpendingTrendData["previousWeek"] = [];
-
-  for (let i = 0; i < 7; i++) {
-    const currentDate = addDays(currentWeekStart, i);
-    const previousDate = addDays(previousWeekStart, i);
-    currentWeek.push({ date: currentDate, totalAmountYen: await getTotalForDate(currentDate) });
-    previousWeek.push({ date: previousDate, totalAmountYen: await getTotalForDate(previousDate) });
-  }
-
-  return { currentWeek, previousWeek };
+  return getDailySpendingTrend(createSummaryStore(ctx), groupId, args);
 }
