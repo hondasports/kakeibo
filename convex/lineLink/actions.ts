@@ -5,7 +5,7 @@ import type { ActionCtx } from "../_generated/server";
 import { action } from "../_generated/server";
 import { requireAuthenticatedUserId } from "../users/auth";
 import { lineLinkFeedbackValidator } from "./model";
-import { createLineLinkActionDeps } from "../../lib/convex/lineLink/lineLinkDeps";
+import { createLineLinkActionDeps } from "../../lib/convex/lineLink/lineLinkActionDeps";
 import type { LineProviderClient } from "../../lib/domain/lineLink/provider";
 import { completeLineLink } from "../../lib/usecase/lineLink/completeLineLink";
 import { startLineLink } from "../../lib/usecase/lineLink/startLineLink";
