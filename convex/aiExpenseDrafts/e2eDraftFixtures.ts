@@ -1,6 +1,6 @@
-import { unallocatedTaxReceipt } from "../../domain/receipt/tax/fixtures/unallocatedTaxReceipt";
-import type { MutationCtx } from "../../../convex/_generated/server";
-import type { Id } from "../../../convex/_generated/dataModel";
+import { unallocatedTaxReceipt } from "../../lib/domain/receipt/tax/fixtures/unallocatedTaxReceipt";
+import type { MutationCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 
 export type DeleteDraftsByUserBatchArgs = {
   groupId: Id<"groups">;
