@@ -10,7 +10,7 @@ export {
   type AiExpenseDraftReviewReason,
   type AiExpenseDraftSourceType,
   type AiExpenseDraftStatus,
-} from "../../domain/aiExpenseDrafts/constants";
+} from "../../lib/domain/aiExpenseDrafts/constants";
 
 export const aiExpenseDraftStatusValidator = v.union(
   v.literal("queued"),

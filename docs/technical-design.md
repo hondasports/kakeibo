@@ -253,7 +253,7 @@ convex/
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
-    aiExpenseDrafts/           # validators, reviewValidation, convex*Repository, convexDraftWorkflowServices, draftUsecaseDeps, handler グルー, persistTaxInterpretation, ...
+    aiExpenseDrafts/           # reviewValidation, convex*Repository, convexDraftWorkflowServices, draftUsecaseDeps, handler グルー, persistTaxInterpretation, ...（v.* validator 宣言は convex/aiExpenseDrafts/validators.ts へ移動）
     dateUtils.ts
     expenseEntries/            # createFromDraft, expenseEntryValidation
     groups/
