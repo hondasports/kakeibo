@@ -18,7 +18,7 @@ import {
   taxResolutionSourceValidator,
   taxResolutionStatusValidator,
   taxSummaryValidator,
-} from "../../lib/convex/aiExpenseDrafts/validators";
+} from "./validators";
 import {
   createFailedDraftFromImageAnalysisForUserHandler,
   createFailedDraftFromImageAnalysisHandler,

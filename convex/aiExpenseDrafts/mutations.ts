@@ -21,10 +21,7 @@ import { registerReadyDraftsAsExpenseEntriesHandler } from "../../lib/convex/aiE
 import { applyReceiptTaxSettingsHandler } from "../../lib/convex/aiExpenseDrafts/applyReceiptTaxSettings";
 import { updateForReviewHandler } from "../../lib/convex/aiExpenseDrafts/updateForReview";
 import type { TaxMode, TaxRatePercent } from "../../lib/receiptTax/types";
-import {
-  priceTaxTreatmentValidator,
-  taxRateCompositionValidator,
-} from "../../lib/convex/aiExpenseDrafts/validators";
+import { priceTaxTreatmentValidator, taxRateCompositionValidator } from "./validators";
 import { resetReceiptToAiInterpretationHandler } from "../../lib/convex/aiExpenseDrafts/receiptDataContract";
 import { updateRegisteredDraftHandler } from "../../lib/convex/aiExpenseDrafts/updateRegisteredDraft";
 

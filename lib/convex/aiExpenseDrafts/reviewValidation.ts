@@ -6,7 +6,7 @@ import {
   getReviewUpdateReadyErrorMessage,
   validateReviewUpdateCanBecomeReady,
 } from "../../../lib/domain/aiExpenseDrafts/review";
-import { type AiExpenseDraftDocumentType } from "./validators";
+import { type AiExpenseDraftDocumentType } from "../../../lib/domain/aiExpenseDrafts/constants";
 import type { AiExpenseRegistrationMode } from "../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import type { PriceTaxTreatment, TaxRateComposition } from "../../receiptTax/types";
 import {
