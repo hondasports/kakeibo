@@ -1,15 +1,15 @@
 {
   "name": "Suzumemo (kakeibo)",
-  "install": "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && nvm install >/dev/null && export PATH=\"$HOME/.nvm/versions/node/$(cat .nvmrc)/bin:$PATH\" && corepack enable && corepack prepare pnpm@11.1.2 --activate && pnpm install --frozen-lockfile",
-  "start": "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && (nvm install >/dev/null 2>&1 || true) && export PATH=\"$HOME/.nvm/versions/node/$(cat .nvmrc)/bin:$PATH\" && export CONVEX_AGENT_MODE=anonymous; pnpm exec convex dev --once || true; pnpm exec convex env get CLERK_JWT_ISSUER_DOMAIN >/dev/null 2>&1 || pnpm exec convex env set CLERK_JWT_ISSUER_DOMAIN \"https://example-dev.clerk.accounts.dev\" || true; pnpm exec convex env get APP_ENV >/dev/null 2>&1 || pnpm exec convex env set APP_ENV development || true; pnpm exec convex env get RECEIPT_IMAGE_EXTRACTOR_MODE >/dev/null 2>&1 || pnpm exec convex env set RECEIPT_IMAGE_EXTRACTOR_MODE mock || true; pnpm exec convex dev --once || true",
+  "install": "export PATH=\"$HOME/.local/bin:/opt/homebrew/bin:$PATH\"; if ! command -v mise >/dev/null 2>&1; then curl -fsSL https://mise.run | sh; fi; mise install; mise exec -- pnpm install --frozen-lockfile",
+  "start": "export PATH=\"$HOME/.local/bin:/opt/homebrew/bin:$PATH\"; mise exec -- sh -c 'export CONVEX_AGENT_MODE=anonymous; pnpm exec convex dev --once || true; pnpm exec convex env get CLERK_JWT_ISSUER_DOMAIN >/dev/null 2>&1 || pnpm exec convex env set CLERK_JWT_ISSUER_DOMAIN \"https://example-dev.clerk.accounts.dev\" || true; pnpm exec convex env get APP_ENV >/dev/null 2>&1 || pnpm exec convex env set APP_ENV development || true; pnpm exec convex env get RECEIPT_IMAGE_EXTRACTOR_MODE >/dev/null 2>&1 || pnpm exec convex env set RECEIPT_IMAGE_EXTRACTOR_MODE mock || true; pnpm exec convex dev --once || true'",
   "terminals": [
     {
       "name": "convex",
-      "command": "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && export PATH=\"$HOME/.nvm/versions/node/$(cat .nvmrc)/bin:$PATH\" && export CONVEX_AGENT_MODE=anonymous && exec pnpm exec convex dev"
+      "command": "export PATH=\"$HOME/.local/bin:/opt/homebrew/bin:$PATH\" && export CONVEX_AGENT_MODE=anonymous && exec mise exec -- pnpm exec convex dev"
     },
     {
       "name": "vite",
-      "command": "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && export PATH=\"$HOME/.nvm/versions/node/$(cat .nvmrc)/bin:$PATH\" && exec pnpm exec vite --host 127.0.0.1"
+      "command": "export PATH=\"$HOME/.local/bin:/opt/homebrew/bin:$PATH\" && exec mise exec -- pnpm exec vite --host 127.0.0.1"
     }
   ],
   "ports": [5173, 3210, 3211]

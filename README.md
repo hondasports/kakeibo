@@ -10,6 +10,19 @@ UI ブランド名は **Suzumemo**、リポジトリ名は **kakeibo** です。
 
 ## ローカル起動
 
+### 0. Node.jsとpnpm
+
+Node.jsはリポジトリの `mise.toml`、pnpmのバージョンは `package.json` の `packageManager` で管理します。miseが未導入の場合は [公式のインストール手順](https://mise.jdx.dev/installing-mise.html) に従って導入し、zshでは `mise activate` を一度だけ設定してください。
+
+```bash
+eval "$(mise activate zsh)"
+mise install
+```
+
+`~/.zshrc` にactivation行がすでにある場合は重複して追加しません。
+
+通常のコマンドは、miseを有効化したシェルで既存の `pnpm` コマンドを使います。非対話シェルやCursor環境では `mise exec -- <command>` を使います。
+
 ### 1. 依存関係と環境変数
 
 ```bash
