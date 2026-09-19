@@ -23,7 +23,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version-file: ".nvmrc"
+          node-version-file: "mise.toml"
           cache: pnpm
 
       - name: Cache node_modules
@@ -55,7 +55,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version-file: ".nvmrc"
+          node-version-file: "mise.toml"
           cache: pnpm
 
       - name: Cache node_modules
@@ -85,7 +85,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version-file: ".nvmrc"
+          node-version-file: "mise.toml"
           cache: pnpm
 
       - name: Cache node_modules

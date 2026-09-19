@@ -228,6 +228,12 @@ browser層のAcceptance Criteriaがある変更では、push前に対象specをl
 
 初回または新しいtask worktreeでは、次の順に準備する。通常の `pnpm run dev` はlocal Convex watcherとViteを同時に起動する。
 
+Node.jsとpnpmはリポジトリの `mise.toml` と `package.json` から選択されるため、新しいworktreeでは最初に次を実行する。
+
+```bash
+mise install
+```
+
 ターミナル1:
 
 ```bash
