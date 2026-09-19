@@ -123,7 +123,7 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 
 ## Astraエージェントループ
 
-[AGENTS.md](AGENTS.md)を入口に、契約・変更・検証・セルフレビュー・引き渡しを進めます。実行記録と完了判定は scripts/task-loop.mjs が担います。[操作方法と保証の境界](.loop/README.md)を参照してください。
+[AGENTS.md](AGENTS.md)を入口に、契約・変更・検証・評価・セルフレビュー・引き渡しを進めます。実行記録と完了判定は scripts/task-loop.mjs が担います。[操作方法と保証の境界](.loop/README.md)を参照してください。
 
 通常は単独Astraで作業し、ユーザー指定の完了地点を契約に記録します。旧ループや委譲用workflowは使用しません。
 
