@@ -228,6 +228,12 @@ browser層のAcceptance Criteriaがある変更では、push前に対象specをl
 
 初回または新しいtask worktreeでは、次の順に準備する。通常の `pnpm run dev` はlocal Convex watcherとViteを同時に起動する。
 
+Node.jsとpnpmはリポジトリの `mise.toml` と `package.json` から選択されるため、新しいworktreeでは最初に次を実行する。
+
+```bash
+mise install
+```
+
 ターミナル1:
 
 ```bash
@@ -301,6 +307,8 @@ ACやrequired invariantを証明できない場合はFinding Ledgerへ `test_gap
 - `.github/workflows/e2e.yml`
 - `.github/workflows/preview-deploy.yml`
 - `.github/workflows/production-release.yml`
+
+各workflowのNode.jsは `jdx/mise-action@v4` でリポジトリの `mise.toml` から導入する。pnpmは `package.json` の `packageManager` に合わせて `pnpm/action-setup` で導入し、ローカルとCIでNode.jsの選択元を分けない。
 
 通常CIの主なcheck:
 

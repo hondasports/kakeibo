@@ -21,9 +21,10 @@
 | メール | Resend + React Email |
 | テスト | Vitest + Testing Library + Playwright |
 | ホスティング | Vercel |
+| Node.js toolchain | mise |
 | package manager | pnpm |
 
-開発時のNode.js要件とpnpmのバージョンは `package.json` の `engines` / `packageManager` を正とする。
+開発時のNode.jsバージョンは `mise.toml`、Node.jsの互換条件は `package.json` の `engines`、pnpmのバージョンは `package.json` の `packageManager` を正とする。
 
 ## 2. フロントエンド構成
 
