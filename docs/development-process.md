@@ -308,6 +308,8 @@ ACやrequired invariantを証明できない場合はFinding Ledgerへ `test_gap
 - `.github/workflows/preview-deploy.yml`
 - `.github/workflows/production-release.yml`
 
+各workflowのNode.jsは `jdx/mise-action@v4` でリポジトリの `mise.toml` から導入する。pnpmは `package.json` の `packageManager` に合わせて `pnpm/action-setup` で導入し、ローカルとCIでNode.jsの選択元を分けない。
+
 通常CIの主なcheck:
 
 - lint
