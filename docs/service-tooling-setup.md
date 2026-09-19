@@ -36,6 +36,7 @@ UI ブランド名は **Suzumemo**、Clerk application 名は **kakeibo** であ
 | 項目                      | 状態                                                       | 備考                                                           |
 | ------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
 | `pnpm`                    | 完了                                                       | パッケージマネージャー正本                                     |
+| `mise`                    | 完了                                                       | Node.jsとpnpmのバージョン管理                                 |
 | Vite + React + TypeScript | 完了                                                       | React 19 + Vite 8                                              |
 | Clerk + Google OAuth      | 完了                                                       | Restricted mode + invitation                                   |
 | Clerk + Convex 連携       | 完了                                                       | `ConvexProviderWithClerk`、`CLERK_JWT_ISSUER_DOMAIN` 必須      |
@@ -55,6 +56,7 @@ UI ブランド名は **Suzumemo**、Clerk application 名は **kakeibo** であ
 1. 依存関係を入れる。
 
 ```bash
+mise install
 pnpm install
 ```
 
@@ -222,7 +224,13 @@ pnpm run dev
 
 `skills-lock.json` はsecretを含まないスキルhash一覧である。Git管理するかどうかは、スキル再現性を重視するか、生成物を減らすかで別途判断する。
 
-### 2.4 パッケージ管理方針
+### 2.4 Node.jsとpnpmのバージョン管理
+
+Node.jsはリポジトリ直下の `mise.toml` を正本とし、現在は `24.18.0` を使う。pnpmは `package.json` の `packageManager` を正本とし、現在は `11.1.2` を使う。
+
+新しい環境では `mise install` でNode.jsとpnpmを導入する。通常の開発シェルではmiseを有効化し、Cursorなどの非対話環境では `mise exec -- <command>` を使う。Node.jsのバージョン切り替えにnvmは使わず、pnpmはmiseで管理する。
+
+### 2.5 パッケージ管理方針
 
 `kakeibo` では、JavaScript/TypeScriptのパッケージ管理に `pnpm` を使う。
 

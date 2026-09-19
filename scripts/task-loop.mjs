@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  realpathSync,
   writeFileSync,
   lstatSync,
   readlinkSync,
@@ -301,10 +302,9 @@ export function run(args, cwd = process.cwd()) {
     throw new Error(
       "usage: task-loop <init|contract|check|review|finding|status|finish> <task-id> [arguments]",
     );
-  if (
-    path.resolve(git(cwd, ["rev-parse", "--show-toplevel"])).toLowerCase() !==
-    path.resolve(cwd).toLowerCase()
-  )
+  const worktreeRoot = realpathSync(path.resolve(git(cwd, ["rev-parse", "--show-toplevel"])));
+  const workingDirectory = realpathSync(path.resolve(cwd));
+  if (worktreeRoot.toLowerCase() !== workingDirectory.toLowerCase())
     throw new Error("run from worktree root");
   const directory = path.join(cwd, ".loop", "state", id);
   const file = path.join(directory, "state.json");
