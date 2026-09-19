@@ -113,7 +113,7 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 | 用途                           | 参照先                          |
 | ------------------------------ | ------------------------------- |
 | Agent Loopの常時実行契約       | `AGENTS.md`                     |
-| Agent Loopの機械可読contract   | `.loop/process.yaml`            |
+| Agent Loopの実装契約（Loop改修時） | `.loop/process.yaml`            |
 | Astra Loopの操作と設計意図       | `.loop/README.md`               |
 | 工程別Agent Skill              | `skills/*/SKILL.md`             |
 | 開発プロセス、PR、CI、レビュー | `docs/development-process.md`   |

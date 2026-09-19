@@ -1,12 +1,12 @@
 ---
 name: requirements
-description: 契約を固めるためのv13判断手順。
+description: タスクの目的・受入条件・検証方法・完了地点を契約にするときに使う。
 license: Apache-2.0
 ---
 
 # 契約を固める
 
-実行条件とCLI操作は[Loop README](../../.loop/README.md)を正本とする。
+操作は `node scripts/task-loop.mjs status <task-id>` の案内を使う。詳細が必要な場合だけ[Loop README](../../.loop/README.md)を参照する。
 
 ## 入力・起動
 

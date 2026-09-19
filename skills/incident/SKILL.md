@@ -1,12 +1,12 @@
 ---
 name: incident
-description: 原因不明・反復失敗の切り分けためのv13判断手順。
+description: 原因不明・反復失敗・localとCIの不一致を切り分けるときに使う。
 license: Apache-2.0
 ---
 
 # 原因不明・反復失敗の切り分け
 
-実行条件とCLI操作は[Loop README](../../.loop/README.md)を正本とする。
+操作の詳細が必要な場合だけ[Loop README](../../.loop/README.md)を参照する。
 
 ## 入力・起動
 

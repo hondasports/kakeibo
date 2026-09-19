@@ -1,12 +1,12 @@
 ---
 name: implementation
-description: 変更するためのv13判断手順。
+description: 契約に沿った変更と、実装中に判明した仕様変更を扱う。
 license: Apache-2.0
 ---
 
 # 変更する
 
-実行条件とCLI操作は[Loop README](../../.loop/README.md)を正本とする。
+操作は `node scripts/task-loop.mjs status <task-id>` の案内を使う。詳細が必要な場合だけ[Loop README](../../.loop/README.md)を参照する。
 
 ## 入力・起動
 

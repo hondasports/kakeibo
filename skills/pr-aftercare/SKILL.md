@@ -1,12 +1,12 @@
 ---
 name: pr-aftercare
-description: PRを確認するためのv13判断手順。
+description: merge_readyを目標とするPRのCI・指摘・承認・競合を確認する。
 license: Apache-2.0
 ---
 
 # PRを確認する
 
-実行条件とCLI操作は[Loop README](../../.loop/README.md)を正本とする。
+操作は `node scripts/task-loop.mjs status <task-id>` の案内を使う。詳細が必要な場合だけ[Loop README](../../.loop/README.md)を参照する。
 
 ## 入力・起動
 

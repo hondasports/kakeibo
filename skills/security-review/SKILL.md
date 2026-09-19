@@ -1,12 +1,12 @@
 ---
 name: security-review
-description: セキュリティ観点を確認するためのv13判断手順。
+description: 認証・データ・入力・secret・外部書込みの境界を変更するときに使う。
 license: Apache-2.0
 ---
 
 # セキュリティ観点
 
-実行条件とCLI操作は[Loop README](../../.loop/README.md)を正本とする。
+操作の詳細が必要な場合だけ[Loop README](../../.loop/README.md)を参照する。
 
 ## 入力・起動
 
