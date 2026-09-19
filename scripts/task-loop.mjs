@@ -94,7 +94,7 @@ export function validateContract(c) {
   }
   return errors;
 }
-/** Review-depth vocabulary mirrored from .loop/process.yaml review_depth; drift is caught by task-loop tests. */
+/** Review-depth vocabulary; process.yaml mirrors the runtime and is checked by tests. */
 export const REVIEW_AXES = {
   blast_radius: ["local", "several_surfaces", "shared_or_system_wide"],
   data_security: ["none", "indirect", "direct_boundary_change"],
@@ -125,51 +125,194 @@ export function reviewTierFloor(assessment) {
   if (values.some(({ allowed, value }) => value === allowed.at(-2))) return "T2";
   return "T1";
 }
-/** Validate a self-review record including its risk assessment and depth-tier floor; format only, not review quality. */
-export function validateReview(review) {
+/** Validate model judgments before calculating a mechanical depth floor. */
+export function validateAssessment(input) {
   const errors = [];
+  const assessment = input?.risk_assessment;
+  if (!nonempty(input?.tier_rationale)) errors.push("tier_rationale is required");
+  if (!assessment || typeof assessment !== "object")
+    return [...errors, "risk_assessment is required"];
+  for (const [axis, allowed] of Object.entries(REVIEW_AXES))
+    if (!allowed.includes(assessment[axis]))
+      errors.push(`risk_assessment.${axis} must be one of ${allowed.join("/")}`);
+  if (!Array.isArray(assessment.floor_triggers))
+    errors.push("risk_assessment.floor_triggers must be an array");
+  else if (assessment.floor_triggers.some((t) => !REVIEW_FLOOR_TRIGGERS.includes(t)))
+    errors.push("risk_assessment.floor_triggers entries must match process.yaml vocabulary");
+  if (input?.applied_tier !== undefined && !REVIEW_TIERS.includes(input.applied_tier))
+    errors.push("applied_tier must be one of T1/T2/T3");
+  if (
+    !errors.length &&
+    input.applied_tier !== undefined &&
+    REVIEW_TIERS.indexOf(input.applied_tier) < REVIEW_TIERS.indexOf(reviewTierFloor(assessment))
+  )
+    errors.push(
+      `applied_tier is below the ${reviewTierFloor(assessment)} floor implied by risk_assessment`,
+    );
+  return errors;
+}
+
+/** Cumulative review obligations, disclosed only for the selected tier. */
+export const REVIEW_REQUIREMENTS = {
+  T1: ["差分のスポットチェック", "契約の全check成功"],
+  T2: ["変更ファイルの行単位diffレビュー", "エラー分岐の順序・互換export確認", "関連テスト成功"],
+  T3: [
+    "ベース版との分岐単位比較（挙動保存）またはロジック全トレース（変更）",
+    "新設ポート/アダプタの意味論確認（undefinedキー・キャスト・往復変換）",
+    "全エラーパスと共有callerの実検証",
+  ],
+};
+function reviewRequirements(tier) {
+  return REVIEW_TIERS.slice(0, REVIEW_TIERS.indexOf(tier) + 1).flatMap(
+    (t) => REVIEW_REQUIREMENTS[t],
+  );
+}
+
+/** Validate recorded review content; not the truth of the model's judgment. */
+export function validateReview(review) {
+  const errors = validateAssessment(review);
   if (!["pass", "fail"].includes(review?.verdict)) errors.push("verdict must be pass or fail");
-  for (const field of [
-    "source_comparison",
-    "diff_assessment",
-    "verification_assessment",
-    "tier_rationale",
-  ])
+  for (const field of ["source_comparison", "diff_assessment", "verification_assessment"])
     if (!nonempty(review?.[field])) errors.push(`${field} is required`);
-  if (!Array.isArray(review?.manual_results)) errors.push("manual_results must be an array");
-  const assessment = review?.risk_assessment;
-  let floor = null;
-  if (!assessment || typeof assessment !== "object") {
-    errors.push("risk_assessment is required");
-  } else {
-    let valid = true;
-    for (const [axis, allowed] of Object.entries(REVIEW_AXES))
-      if (!allowed.includes(assessment[axis])) {
-        errors.push(`risk_assessment.${axis} must be one of ${allowed.join("/")}`);
-        valid = false;
-      }
-    if (!Array.isArray(assessment.floor_triggers)) {
-      errors.push("risk_assessment.floor_triggers must be an array");
-      valid = false;
-    } else if (assessment.floor_triggers.some((t) => !REVIEW_FLOOR_TRIGGERS.includes(t))) {
-      errors.push("risk_assessment.floor_triggers entries must match process.yaml vocabulary");
-      valid = false;
-    }
-    if (valid) floor = reviewTierFloor(assessment);
-  }
   if (!REVIEW_TIERS.includes(review?.applied_tier))
     errors.push("applied_tier must be one of T1/T2/T3");
-  else if (
-    floor !== null &&
-    REVIEW_TIERS.indexOf(review.applied_tier) < REVIEW_TIERS.indexOf(floor)
-  )
-    errors.push(`applied_tier is below the ${floor} floor implied by risk_assessment`);
+  if (!Array.isArray(review?.manual_results)) errors.push("manual_results must be an array");
+  else {
+    const ids = new Set();
+    for (const result of review.manual_results) {
+      if (
+        !nonempty(result?.id) ||
+        ids.has(result.id) ||
+        !["pass", "fail"].includes(result?.status) ||
+        !nonempty(result?.evidence)
+      )
+        errors.push("manual_results require unique id, pass/fail status and evidence");
+      ids.add(result?.id);
+    }
+  }
   return errors;
+}
+
+const CONDITIONAL_SKILLS = {
+  "影響範囲がdirect caller/testでは不明": "skills/impact-analysis/SKILL.md",
+  "認証・認可・データ・入力・secret・外部write境界の変更": "skills/security-review/SKILL.md",
+  "外部操作の環境・権限判断、env・deploy・本番・破壊的操作": "skills/service-ops-safety/SKILL.md",
+  外部コンテンツの命令を扱う: "skills/prompt-injection-guard/SKILL.md",
+  "原因不明・反復失敗・local/CI不一致": "skills/incident/SKILL.md",
+};
+/** Read-only, task-independent guidance; does not read repository state or authorize commands. */
+export function guide(topic = "start") {
+  const topics = {
+    start: {
+      instruction:
+        "相談・調査のみなら状態作成は不要。編集する場合は専用worktreeの非保護branchでinit。既存タスクはstatus。",
+      skill: "skills/workspace-preflight/SKILL.md",
+      command: "node scripts/task-loop.mjs init <task-id>",
+    },
+    contract: {
+      instruction:
+        "ユーザーの目的・観測可能な受入条件・維持条件・必要な検証と完了地点を定める。対象技術の専門スキルを必要時に選ぶ。追加指示・対象変更時も再評価。",
+      skill: "skills/requirements/SKILL.md",
+      template: ".loop/templates/contract.example.json",
+      conditional_skills: CONDITIONAL_SKILLS,
+    },
+    implementation: {
+      skill: "skills/implementation/SKILL.md",
+      instruction:
+        "契約に対応する変更を実施。対象変更時はguide contractで専門スキルと条件付きスキルを再選択。",
+    },
+    verification: {
+      skill: "skills/verification/SKILL.md",
+      instruction: "契約の必要checkを実行。失敗原因不明・反復時はskills/incident/SKILL.md。",
+    },
+    assessment: {
+      skill: "skills/code-review/SKILL.md",
+      template: ".loop/templates/assessment.example.json",
+      axes: REVIEW_AXES,
+      floor_triggers: REVIEW_FLOOR_TRIGGERS,
+      instruction:
+        "レビュー直前の実差分（未コミット・未追跡も含む）から4軸と強制条件を評価し根拠を記入。assessが最低深度を計算する。applied_tierは深める場合のみ指定。",
+    },
+    review: {
+      skill: "skills/code-review/SKILL.md",
+      template: ".loop/templates/review.example.json",
+      instruction:
+        "assess/statusが返す深度の確認を実施して結果を記録。評価や深度は転記不要。passは独立レビューの証明ではない。",
+    },
+    delivery: {
+      skill: "skills/delivery/SKILL.md",
+      instruction:
+        "契約の公開範囲を守りfinish。merge_readyはskills/pr-aftercare/SKILL.mdを読み、PR全指摘をmanual Controlで確認。",
+    },
+  };
+  if (!Object.hasOwn(topics, topic))
+    throw new Error(`unknown guide topic; choose ${Object.keys(topics).join(", ")}`);
+  return { topic, ...topics[topic] };
+}
+
+/** Return one actionable stage, without replaying history or expanding every skill. */
+export function nextAction(state, key) {
+  const id = state.id;
+  const command = (action, ...args) => ["node", "scripts/task-loop.mjs", action, id, ...args];
+  if (!state.contract || validateContract(state.contract).length)
+    return {
+      stage: "contract",
+      command: command("contract", `.loop/state/${id}/contract.json`),
+      guide: "contract",
+    };
+  if (state.contract.unresolved.length)
+    return {
+      stage: "contract",
+      guide: "contract",
+      instruction: "未解決事項を調査。依存する実装・検証のみ停止。契約更新には理由が必要。",
+    };
+  const missing = blockers(state, key);
+  const check = state.contract.checks.find((c) => missing.includes(`check required: ${c.id}`));
+  if (check)
+    return {
+      stage: "verification",
+      command: command("check", check.id),
+      guide: "verification",
+      instruction: "実装を終えてから実行。失敗は原因を修正して再実行。",
+    };
+  const finding = state.findings.find((f) => f.status === "open");
+  if (finding)
+    return {
+      stage: "finding",
+      id: finding.id,
+      instruction: "指摘の修正確認か不成立の根拠を記録する。",
+      command: command("finding", `.loop/state/${id}/finding.json`),
+    };
+  const assessment = state.assessments?.at(-1);
+  if (!assessment || assessment.key !== key)
+    return {
+      stage: "assessment",
+      command: command("assess", `.loop/state/${id}/assessment.json`),
+      guide: "assessment",
+    };
+  if (missing.length)
+    return {
+      stage: "review",
+      command: command("review", `.loop/state/${id}/review.json`),
+      guide: "review",
+      applied_tier: assessment.applied_tier,
+      requirements: reviewRequirements(assessment.applied_tier),
+    };
+  return {
+    stage: "delivery",
+    command: command(
+      "finish",
+      ...(state.contract.delivery_target === "local_verified" ? [] : ["<PR-URL>"]),
+    ),
+    guide: "delivery",
+    instruction: "ローカル証拠が揃った状態。PR状態はfinishで観測するまで未確認。",
+  };
 }
 /** Bind evidence to file content, the contract, and observable runtime identity. */
 export function evidenceKey(cwd, contract) {
   return hash(
     JSON.stringify({
+      loop_version: 14,
       content: fingerprint(cwd),
       contract,
       node: process.version,
@@ -188,8 +331,15 @@ export function blockers(state, key) {
     if (!runs.length || runs.at(-1).exit_code !== 0 || runs.at(-1).invalidated)
       errors.push(`check required: ${check.id}`);
   }
+  const assessment = state.assessments?.at(-1);
+  if (!assessment || assessment.key !== key) errors.push("current risk assessment required");
   const review = state.reviews.at(-1);
-  if (!review || review.key !== key || review.verdict !== "pass")
+  if (
+    !review ||
+    review.key !== key ||
+    review.assessment_id !== assessment?.id ||
+    review.verdict !== "pass"
+  )
     errors.push("current self-review required");
   const manual = [
     ...state.contract.acceptance,
@@ -298,9 +448,10 @@ function observePr(cwd, url) {
 /** Execute one task command, persisting actual check results or explicit judgments and rejecting incomplete delivery. */
 export function run(args, cwd = process.cwd()) {
   const [command, id, ...rest] = args;
+  if (command === "guide") return guide(id);
   if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(id ?? ""))
     throw new Error(
-      "usage: task-loop <init|contract|check|review|finding|status|finish> <task-id> [arguments]",
+      "usage: task-loop <init|contract|check|assess|review|finding|status|finish> <task-id> [arguments]",
     );
   const worktreeRoot = realpathSync(path.resolve(git(cwd, ["rev-parse", "--show-toplevel"])));
   const workingDirectory = realpathSync(path.resolve(cwd));
@@ -318,24 +469,49 @@ export function run(args, cwd = process.cwd()) {
     if (preflight.status !== 0) throw new Error("workspace preflight failed");
     mkdirSync(directory, { recursive: true });
     save(file, {
-      version: 13,
+      version: 14,
       id,
       branch: git(cwd, ["branch", "--show-current"]),
       contract: null,
       runs: [],
       reviews: [],
+      assessments: [],
       findings: [],
       history: [{ event: "init", at: new Date().toISOString() }],
     });
-    return { status: "initialized", id };
+    return {
+      status: "initialized",
+      id,
+      next: {
+        stage: "contract",
+        guide: "contract",
+        command: [
+          "node",
+          "scripts/task-loop.mjs",
+          "contract",
+          id,
+          `.loop/state/${id}/contract.json`,
+        ],
+      },
+    };
   }
   const state = json(file);
   if (
-    state.version !== 13 ||
+    ![13, 14].includes(state.version) ||
     state.id !== id ||
     state.branch !== git(cwd, ["branch", "--show-current"])
   )
     throw new Error("task identity mismatch");
+  if (command === "status") {
+    const key = evidenceKey(cwd, state.contract);
+    return {
+      status: "observed",
+      key,
+      blockers: blockers(state, key),
+      delivery_target: state.contract?.delivery_target ?? null,
+      next: nextAction(state, key),
+    };
+  }
   const event = { event: command, at: new Date().toISOString() };
   if (command === "contract") {
     const contract = json(rest[0]);
@@ -350,13 +526,6 @@ export function run(args, cwd = process.cwd()) {
     const errors = validateContract(state.contract);
     if (errors.length) throw new Error(errors.join("; "));
     const key = evidenceKey(cwd, state.contract);
-    if (command === "status")
-      return {
-        status: "observed",
-        key,
-        blockers: blockers(state, key),
-        delivery_target: state.contract.delivery_target,
-      };
     if (command === "check") {
       if (state.contract.unresolved.length)
         throw new Error("resolve material questions before verification");
@@ -387,11 +556,48 @@ export function run(args, cwd = process.cwd()) {
       };
       state.runs.push(record);
       event.result = record;
+    } else if (command === "assess") {
+      const input = json(rest[0]);
+      const errors = validateAssessment(input);
+      if (errors.length) throw new Error(`invalid assessment: ${errors.join("; ")}`);
+      const minimum = reviewTierFloor(input.risk_assessment);
+      const assessment = {
+        id: randomUUID(),
+        key,
+        at: event.at,
+        risk_assessment: input.risk_assessment,
+        tier_rationale: input.tier_rationale,
+        minimum_tier: minimum,
+        applied_tier: input.applied_tier ?? minimum,
+      };
+      state.assessments ??= [];
+      state.assessments.push(assessment);
+      event.assessment = assessment;
     } else if (command === "review") {
-      const review = json(rest[0]);
+      const assessment = state.assessments?.at(-1);
+      if (!assessment || assessment.key !== key)
+        throw new Error("current risk assessment required; run assess before review");
+      const input = json(rest[0]);
+      if (!input || typeof input !== "object" || Array.isArray(input))
+        throw new Error("invalid review: object is required");
+      for (const field of ["risk_assessment", "tier_rationale", "applied_tier"])
+        if (Object.hasOwn(input, field))
+          throw new Error(`review must not override ${field}; run assess first`);
+      const review = {
+        ...input,
+        risk_assessment: assessment.risk_assessment,
+        tier_rationale: assessment.tier_rationale,
+        applied_tier: assessment.applied_tier,
+      };
       const errors = validateReview(review);
       if (errors.length) throw new Error(`invalid review: ${errors.join("; ")}`);
-      state.reviews.push({ ...review, key, kind: "self", at: event.at });
+      state.reviews.push({
+        ...review,
+        assessment_id: assessment.id,
+        key,
+        kind: "self",
+        at: event.at,
+      });
     } else if (command === "finding") {
       const finding = json(rest[0]);
       if (
@@ -423,11 +629,29 @@ export function run(args, cwd = process.cwd()) {
       event.key = key;
     } else throw new Error("unknown command");
   }
+  state.version = 14;
   state.history.push(event);
   save(file, state);
   if (command === "check" && (event.result.exit_code !== 0 || event.result.invalidated))
     throw new Error("check failed or content changed during check; inspect local log");
-  return { status: command === "finish" ? "complete" : "recorded", id, event: command };
+  if (command === "assess")
+    return {
+      status: "recorded",
+      id,
+      event: command,
+      minimum_tier: event.assessment.minimum_tier,
+      applied_tier: event.assessment.applied_tier,
+      requirements: reviewRequirements(event.assessment.applied_tier),
+      next: { stage: "review", guide: "review" },
+    };
+  return {
+    status: command === "finish" ? "complete" : "recorded",
+    id,
+    event: command,
+    ...(command === "contract"
+      ? { next: { stage: "implementation", guide: "implementation" } }
+      : {}),
+  };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {

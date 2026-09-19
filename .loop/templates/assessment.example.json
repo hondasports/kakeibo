@@ -1,0 +1,10 @@
+{
+  "risk_assessment": {
+    "blast_radius": "several_surfaces",
+    "data_security": "none",
+    "reversibility": "easy",
+    "uncertainty": "some_unknowns",
+    "floor_triggers": []
+  },
+  "tier_rationale": "複数箇所に影響し、一部の挙動確認が必要。強制条件への該当はない。"
+}
