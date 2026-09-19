@@ -8,6 +8,7 @@ coverage
 playwright-report
 test-results
 dev-server-check.png
+.playwright-browsers/
 
 # Playwright auth state（認証情報を含むため git 管理外）
 playwright/.clerk/
