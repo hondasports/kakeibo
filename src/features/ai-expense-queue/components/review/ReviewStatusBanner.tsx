@@ -117,9 +117,7 @@ export function ReviewStatusBanner({
           </Box>
         </Alert>
       )}
-      {checksAreMatched && (
-        <Alert severity="success">印字額と明細の金額が一致しています。</Alert>
-      )}
+      {checksAreMatched && <Alert severity="success">印字額と明細の金額が一致しています。</Alert>}
       {issues.length > 0 && (
         <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>
           {issues.map((issue) => (
