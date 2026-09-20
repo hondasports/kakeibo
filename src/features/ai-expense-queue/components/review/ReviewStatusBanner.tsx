@@ -37,6 +37,7 @@ export function ReviewStatusBanner({
 }) {
   const { amount, taxRate } = checks;
   const mismatchedTaxRows = taxRate.rows.filter((row) => row.status === "mismatch");
+  const checksAreMatched = amount.status === "matched" && taxRate.status === "matched";
 
   return (
     <Stack spacing={1.5} component="section" aria-label="全体の確認状態">
@@ -116,7 +117,7 @@ export function ReviewStatusBanner({
           </Box>
         </Alert>
       )}
-      {amount.status === "matched" && taxRate.status === "matched" && (
+      {checksAreMatched && (
         <Alert severity="success">
           印字額と明細の金額が一致しています。OCRの読み取りがすべて正しいことを保証するものではありません。
         </Alert>
@@ -144,17 +145,23 @@ export function ReviewStatusBanner({
           ))}
         </Stack>
       )}
-      {receiptIssues.map((issue) => (
-        <Alert key={issue.id} severity="info">
-          <Typography variant="subtitle2">レシート全体の確認</Typography>
-          {issue.message}
-          <Box>
-            <Button disabled={busy} size="small" type="button" onClick={() => onJump(issue.target)}>
-              商品一覧を見比べる
-            </Button>
-          </Box>
-        </Alert>
-      ))}
+      {!checksAreMatched &&
+        receiptIssues.map((issue) => (
+          <Alert key={issue.id} severity="info">
+            <Typography variant="subtitle2">レシート全体の確認</Typography>
+            {issue.message}
+            <Box>
+              <Button
+                disabled={busy}
+                size="small"
+                type="button"
+                onClick={() => onJump(issue.target)}
+              >
+                商品一覧を見比べる
+              </Button>
+            </Box>
+          </Alert>
+        ))}
     </Stack>
   );
 }

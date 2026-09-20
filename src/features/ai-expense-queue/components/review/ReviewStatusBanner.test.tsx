@@ -134,9 +134,37 @@ describe("ReviewStatusBanner", () => {
     expect(onJump).toHaveBeenCalledWith("discount-1");
   });
 
-  it("レシート全体の確認は情報アラートとして表示する", () => {
+  it("金額と税率別集計が一致していればレシート全体の確認を重ねて表示しない", () => {
     const { banner } = renderBanner(
       matchedChecks,
+      [],
+      [
+        {
+          id: "reading",
+          message: "レシート全体の読み取り確認です。",
+          target: "items",
+          required: false,
+          scope: "receipt",
+        },
+      ],
+    );
+    expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
+    expect(
+      within(banner).queryByRole("button", { name: "商品一覧を見比べる" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("比較不能ならレシート全体の確認を補助情報として表示する", () => {
+    const { banner } = renderBanner(
+      {
+        amount: matchedChecks.amount,
+        taxRate: {
+          status: "uncomparable",
+          rows: [],
+          reason: "税率が未確定です",
+          focusTarget: "items",
+        },
+      },
       [],
       [
         {

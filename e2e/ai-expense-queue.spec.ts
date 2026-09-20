@@ -661,7 +661,11 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
     await expect(dialog.getByText("パン", { exact: true })).toBeVisible();
 
     // 税が未確定の明細行は自動展開されている。牛乳を直すと残りはサーバ側の再解釈で解決される。
-    await dialog.getByRole("combobox", { name: "牛乳の税率", exact: true }).click();
+    const milkTaxRate = dialog.getByRole("combobox", { name: "牛乳の税率", exact: true });
+    await expect
+      .poll(async () => (await milkTaxRate.boundingBox())?.width ?? 0)
+      .toBeGreaterThanOrEqual(176);
+    await milkTaxRate.click();
     await page.getByRole("option", { name: "8%", exact: true }).click();
     await dialog.getByRole("combobox", { name: "牛乳の表示価格", exact: true }).click();
     await page.getByRole("option", { name: "税込", exact: true }).click();
@@ -673,6 +677,7 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
     await expect(checkSection.getByText("明細合計 438円 ＝ 支払額 438円")).toBeVisible();
     await expect(checkSection.getByText(/現在 218円 ／ 印字 218円/)).toBeVisible();
     await expect(checkSection.getByText(/現在 220円 ／ 印字 220円/)).toBeVisible();
+    await expect(dialog.getByText("レシート全体の確認")).toHaveCount(0);
   });
 
   test("SPでレシート参照を開き、未解決のまま下書きを保存できる", async ({ page }) => {

@@ -52,8 +52,7 @@ const props: ComponentProps<typeof ReviewDialog> = {
 };
 
 describe("下書きの修正導線", () => {
-  it("全体の読み取り確認を個別推奨に数えず、バナーに理由を表示する", async () => {
-    const user = userEvent.setup();
+  it("一致時は全体の読み取り確認を個別推奨に数えず、重複表示もしない", () => {
     render(
       <ReviewDialog
         {...props}
@@ -88,9 +87,8 @@ describe("下書きの修正導線", () => {
       within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 0件"),
     ).toBeVisible();
     const banner = screen.getByRole("region", { name: "全体の確認状態" });
-    expect(within(banner).getByText("レシート全体の確認")).toBeVisible();
-    await user.click(within(banner).getByRole("button", { name: "商品一覧を見比べる" }));
-    expect(screen.getByRole("region", { name: "商品一覧" })).toBeVisible();
+    expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
+    expect(within(banner).getByText(/印字額と明細の金額が一致しています/)).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("金額が一致");
   });
   it("金額の不一致は差額だけを示し、確認ボタンから商品一覧へ移動できる", async () => {

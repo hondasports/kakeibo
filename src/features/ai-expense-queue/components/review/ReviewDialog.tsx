@@ -499,7 +499,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                         </Typography>
                         <Typography
                           variant="caption"
-                          sx={{ width: 76, flexShrink: 0, textAlign: "right" }}
+                          sx={{ width: 88, flexShrink: 0, textAlign: "right" }}
                         >
                           税率
                         </Typography>

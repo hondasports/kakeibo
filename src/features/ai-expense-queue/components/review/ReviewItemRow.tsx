@@ -127,7 +127,7 @@ export function ReviewItemRow({
           <Box
             sx={{
               display: { xs: "none", sm: "block" },
-              width: 76,
+              width: 88,
               flexShrink: 0,
               textAlign: "right",
             }}
