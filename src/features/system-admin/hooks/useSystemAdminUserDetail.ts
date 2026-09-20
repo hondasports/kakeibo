@@ -47,10 +47,8 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
   const [operationError, setOperationError] = useState<string>();
   const [success, setSuccess] = useState("");
 
-  const load = useCallback(async () => {
+  const fetchDetail = useCallback(async () => {
     if (!userId) return;
-    setDetail(undefined);
-    setError(false);
     try {
       const response = await getUserDetail({ userId: userId as Id<"users"> });
       setDetail(response as UserDetail | null);
@@ -59,14 +57,37 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
     }
   }, [getUserDetail, userId]);
 
+  const load = useCallback(async () => {
+    setDetail(undefined);
+    setError(false);
+    await fetchDetail();
+  }, [fetchDetail]);
+
+  const [prevUserId, setPrevUserId] = useState(userId);
+  if (prevUserId !== userId) {
+    setPrevUserId(userId);
+    setDetail(undefined);
+    setError(false);
+  }
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!userId) return;
+    let cancelled = false;
+    getUserDetail({ userId: userId as Id<"users"> })
+      .then((response) => {
+        if (!cancelled) setDetail(response as UserDetail | null);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getUserDetail, userId]);
 
   useEffect(() => {
     let cancelled = false;
     if (groupQuery.trim().length === 0) {
-      setCandidates([]);
       return;
     }
     void searchGroups({
@@ -134,7 +155,7 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
     setSuccess,
     groupQuery,
     setGroupQuery,
-    candidates,
+    candidates: groupQuery.trim().length === 0 ? [] : candidates,
     selectedSource,
     selectSource,
     dialog,

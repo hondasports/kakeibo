@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { getUserProfileApi, updateWeeklyDaysApi } from "../../../lib/repositories/users";
 import {
@@ -38,11 +38,13 @@ export function WeekDaySettingsPanel() {
     severity: "success" | "error";
   } | null>(null);
 
-  useEffect(() => {
+  const [prevUserProfile, setPrevUserProfile] = useState<typeof userProfile>(undefined);
+  if (prevUserProfile !== userProfile) {
+    setPrevUserProfile(userProfile);
     if (userProfile) {
       setStartDay(userProfile.weeklyStartDay ?? 1);
     }
-  }, [userProfile]);
+  }
 
   if (userProfile === undefined) {
     return (

@@ -114,7 +114,6 @@ export function useGroupInvitationAccept() {
     }
 
     hasStartedClerkInvitation.current = true;
-    setIsCompletingInvitation(true);
 
     const consumeClerkInvitation = async () => {
       if (shouldUseSignIn) {
@@ -171,7 +170,11 @@ export function useGroupInvitationAccept() {
       }
     };
 
-    consumeClerkInvitation()
+    Promise.resolve()
+      .then(() => {
+        setIsCompletingInvitation(true);
+        return consumeClerkInvitation();
+      })
       .catch((caughtError: unknown) => {
         hasStartedClerkInvitation.current = false;
         console.error(

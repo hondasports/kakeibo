@@ -71,13 +71,14 @@ function CheckCard({
   );
 }
 
-function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
-  const numericSx = {
-    fontVariantNumeric: "tabular-nums",
-    whiteSpace: "nowrap",
-    textAlign: "right",
-  } as const;
-  const Line = ({ label, value }: { label: string; value: number | undefined }) => (
+const numericSx = {
+  fontVariantNumeric: "tabular-nums",
+  whiteSpace: "nowrap",
+  textAlign: "right",
+} as const;
+
+function AmountCheckLine({ label, value }: { label: string; value: number | undefined }) {
+  return (
     <Stack direction="row" sx={{ justifyContent: "space-between", gap: 1 }}>
       <Typography variant="body2" color="text.secondary">
         {label}
@@ -87,7 +88,9 @@ function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
       </Typography>
     </Stack>
   );
+}
 
+function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
   if (check.status === "uncomparable") {
     return (
       <Typography variant="body2" color="text.secondary">
@@ -116,13 +119,13 @@ function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
       <Stack spacing={0.5}>
         {check.mismatchStep === "itemsVsSubtotal" ? (
           <>
-            <Line label="明細合計" value={check.itemsPrintedTotalYen} />
-            <Line label="印字小計（税抜）" value={check.printedSubtotalYen} />
+            <AmountCheckLine label="明細合計" value={check.itemsPrintedTotalYen} />
+            <AmountCheckLine label="印字小計（税抜）" value={check.printedSubtotalYen} />
           </>
         ) : (
           <>
-            <Line label="小計＋税額" value={check.expectedPaidYen} />
-            <Line label="支払額" value={check.paidTotalYen} />
+            <AmountCheckLine label="小計＋税額" value={check.expectedPaidYen} />
+            <AmountCheckLine label="支払額" value={check.paidTotalYen} />
           </>
         )}
         <Stack direction="row" sx={{ justifyContent: "space-between", gap: 1 }}>
@@ -151,8 +154,8 @@ function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
   }
   return (
     <Stack spacing={0.5}>
-      <Line label="明細合計" value={check.itemsComparableTotalYen} />
-      <Line label="支払額" value={check.paidTotalYen} />
+      <AmountCheckLine label="明細合計" value={check.itemsComparableTotalYen} />
+      <AmountCheckLine label="支払額" value={check.paidTotalYen} />
       <Stack direction="row" sx={{ justifyContent: "space-between", gap: 1 }}>
         <Typography variant="body2" color="error.main" sx={{ fontWeight: 700 }}>
           差額

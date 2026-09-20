@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   CircularProgress,
@@ -48,9 +48,12 @@ export function SystemAdminActionDialog({
 }: SystemAdminActionDialogProps) {
   const [reason, setReason] = useState("");
   const targetKey = target ? ("targetUserId" in target ? target.targetUserId : target.id) : null;
-  useEffect(() => {
+  const contextKey = `${open}:${targetKey ?? ""}`;
+  const [prevContextKey, setPrevContextKey] = useState(contextKey);
+  if (prevContextKey !== contextKey) {
+    setPrevContextKey(contextKey);
     if (open) setReason("");
-  }, [open, targetKey]);
+  }
 
   const normalizedReason = reason.trim();
   const reasonError = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { getGroupSettingsErrorMessage } from "./useGroupSettingsFeedback";
 
@@ -24,12 +24,19 @@ export function useGroupRenameManagement({
   const [activeGroupId, setActiveGroupId] = useState<Id<"groups"> | "">("");
   const [groupNameDraft, setGroupNameDraft] = useState("");
 
-  useEffect(() => {
-    if (groupId && groupName !== undefined) {
-      setActiveGroupId(groupId);
-      setGroupNameDraft(groupName);
-    }
-  }, [groupId, groupName]);
+  const [syncedGroup, setSyncedGroup] = useState<{
+    id: Id<"groups"> | undefined;
+    name: string | undefined;
+  }>({ id: undefined, name: undefined });
+  if (
+    groupId &&
+    groupName !== undefined &&
+    (syncedGroup.id !== groupId || syncedGroup.name !== groupName)
+  ) {
+    setSyncedGroup({ id: groupId, name: groupName });
+    setActiveGroupId(groupId);
+    setGroupNameDraft(groupName);
+  }
 
   const handleUpdateGroupName = async () => {
     const normalizedName = groupNameDraft.trim();

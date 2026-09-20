@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   emptyReviewForm,
   mapDraftItemsToReviewItems,
@@ -39,37 +39,29 @@ export function useReviewFormState({
   const [reviewItems, setReviewItems] = useState<ReviewItemValues[]>([]);
   const [isCategorySplit, setIsCategorySplit] = useState(false);
 
-  useEffect(() => {
-    if (
-      selectedReviewDraft &&
-      selectedReviewDraft._id === selectedReviewDraftId &&
-      initializedReviewDraftId !== selectedReviewDraft._id
-    ) {
-      const mappedForm = mapDraftToReviewForm(selectedReviewDraft);
-      const mappedItems = localReviewItems
-        ? mapDraftItemsToReviewItems(localReviewItems)
-        : isDraftWithItems(selectedReviewDraftDetails)
-          ? mapDraftItemsToReviewItems(selectedReviewDraftDetails.items)
-          : [];
-      const categoryState = initializeReviewCategoryState(mappedItems, mappedForm.categoryId);
-      setReviewForm({ ...mappedForm, categoryId: categoryState.receiptCategoryId });
-      setReviewItems(
-        applyReviewItemsTaxPreview(categoryState.items, {
-          paidTotalYen: Number(mappedForm.amountYen),
-          taxSummaries: selectedReviewDraft.taxSummaries,
-          markerDefinitions: selectedReviewDraft.markerDefinitions,
-        }),
-      );
-      setIsCategorySplit(categoryState.isCategorySplit);
-      setInitializedReviewDraftId(selectedReviewDraft._id);
-    }
-  }, [
-    initializedReviewDraftId,
-    localReviewItems,
-    selectedReviewDraft,
-    selectedReviewDraftDetails,
-    selectedReviewDraftId,
-  ]);
+  if (
+    selectedReviewDraft &&
+    selectedReviewDraft._id === selectedReviewDraftId &&
+    initializedReviewDraftId !== selectedReviewDraft._id
+  ) {
+    const mappedForm = mapDraftToReviewForm(selectedReviewDraft);
+    const mappedItems = localReviewItems
+      ? mapDraftItemsToReviewItems(localReviewItems)
+      : isDraftWithItems(selectedReviewDraftDetails)
+        ? mapDraftItemsToReviewItems(selectedReviewDraftDetails.items)
+        : [];
+    const categoryState = initializeReviewCategoryState(mappedItems, mappedForm.categoryId);
+    setReviewForm({ ...mappedForm, categoryId: categoryState.receiptCategoryId });
+    setReviewItems(
+      applyReviewItemsTaxPreview(categoryState.items, {
+        paidTotalYen: Number(mappedForm.amountYen),
+        taxSummaries: selectedReviewDraft.taxSummaries,
+        markerDefinitions: selectedReviewDraft.markerDefinitions,
+      }),
+    );
+    setIsCategorySplit(categoryState.isCategorySplit);
+    setInitializedReviewDraftId(selectedReviewDraft._id);
+  }
 
   const resetForm = () => {
     setInitializedReviewDraftId(null);
