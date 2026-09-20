@@ -117,46 +117,8 @@ export function ReviewStatusBanner({
           </Box>
         </Alert>
       )}
-      {taxRate.status === "mismatch" && (
-        <Alert severity="error">
-          <Typography variant="subtitle2">商品の税率を確認してください</Typography>
-          <Typography variant="body2">
-            レシートの税内訳と、商品の税率設定が一致していません。
-          </Typography>
-          <Box>
-            <Button
-              disabled={busy}
-              size="small"
-              type="button"
-              onClick={() => onJump(taxRate.focusTarget ?? "items")}
-            >
-              税率を確認する
-            </Button>
-          </Box>
-        </Alert>
-      )}
-      {taxRate.status === "uncomparable" && !combineUncomparable && (
-        <Alert severity="warning">
-          <Typography variant="subtitle2">商品の税率を確認してください</Typography>
-          <Typography variant="body2">
-            商品の税率または税込／税抜設定を、レシートと照合してください。
-          </Typography>
-          <Box>
-            <Button
-              disabled={busy}
-              size="small"
-              type="button"
-              onClick={() => onJump(taxRate.focusTarget ?? "items")}
-            >
-              税率を確認する
-            </Button>
-          </Box>
-        </Alert>
-      )}
       {checksAreMatched && (
-        <Alert severity="success">
-          印字額と明細の金額が一致しています。OCRの読み取りがすべて正しいことを保証するものではありません。
-        </Alert>
+        <Alert severity="success">印字額と明細の金額が一致しています。</Alert>
       )}
       {issues.length > 0 && (
         <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>

@@ -46,7 +46,7 @@ export function ReviewDialogActions({
             ? `税率未確定 ${unresolvedTaxItemCount}件。商品ごとに税率を確認してください。`
             : recommendationCount > 0
               ? "確認事項があります。確認事項を残したまま下書きを保存できます。"
-              : "確認結果：計算した金額が一致しています。OCRの読み取りがすべて正しいことを保証するものではありません。";
+              : "確認結果：計算した金額が一致しています。";
   const statusColor =
     requiredCount > 0 || checkMismatchCount > 0
       ? "error.main"
