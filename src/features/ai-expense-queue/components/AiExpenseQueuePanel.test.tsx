@@ -1301,10 +1301,9 @@ describe("AiExpenseQueuePanel", () => {
     );
     const itemInput = within(dialog).getByDisplayValue("パン");
     const detail = itemInput.closest("details")!;
-    expect(detail).toHaveAttribute("open");
-    await user.click(detail.querySelector("summary")!);
     expect(detail).not.toHaveAttribute("open");
     await user.click(detail.querySelector("summary")!);
+    expect(detail).toHaveAttribute("open");
     expect(itemInput).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "下書きを保存" })).toBeEnabled();
   });

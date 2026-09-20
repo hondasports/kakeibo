@@ -660,8 +660,12 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(800);
     await expect(dialog.getByText("パン", { exact: true })).toBeVisible();
 
-    // 税が未確定の明細行は自動展開されている。牛乳を直すと残りはサーバ側の再解釈で解決される。
-    const milkTaxRate = dialog.getByRole("combobox", { name: "牛乳の税率", exact: true });
+    // 要確認の明細行は畳んだまま表示する。牛乳を開いて直すと残りはサーバ側の再解釈で解決される。
+    const milkRow = dialog.locator('section[aria-label="商品一覧"] details').filter({
+      hasText: "牛乳",
+    });
+    await milkRow.getByRole("button", { name: "確認・修正" }).click();
+    const milkTaxRate = milkRow.getByRole("combobox", { name: "牛乳の税率", exact: true });
     await expect
       .poll(async () => (await milkTaxRate.boundingBox())?.width ?? 0)
       .toBeGreaterThanOrEqual(176);

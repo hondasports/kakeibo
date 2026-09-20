@@ -112,6 +112,32 @@ describe("buildAmountCheck", () => {
     expect(check.status).toBe("matched");
   });
 
+  it("内税表記と税抜対象額が矛盾していても税額を支払額へ加算しない", () => {
+    const check = buildAmountCheck({
+      items: [
+        resolvedItem({
+          amountBasis: "unknown",
+          taxResolutionStatus: "unresolved",
+          taxRatePercent: null,
+          printedAmountYen: 3651,
+          amountYen: "3651",
+        }),
+      ],
+      paidTotalYen: 3651,
+      taxSummaries: [
+        summary({
+          taxMode: "included",
+          taxableAmountYen: 3458,
+          taxableAmountBasis: "tax_excluded",
+          taxYen: 328,
+        }),
+      ],
+    });
+    expect(check.variant).toBe("direct");
+    expect(check.status).toBe("uncomparable");
+    expect(check.expectedPaidYen).toBeUndefined();
+  });
+
   it("サマリなしは明細合計と支払額の直接比較", () => {
     const check = buildAmountCheck({
       items: [

@@ -98,6 +98,14 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const recommendations = guidance.filter((issue) => !issue.required && issue.scope !== "receipt");
   const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");
   const specificGuidance = guidance.filter((issue) => issue.scope !== "receipt");
+  const itemTargets = new Set(items.map((item) => item.id));
+  const bannerGuidance = specificGuidance.filter(
+    (issue) =>
+      issue.required &&
+      issue.target !== "items" &&
+      issue.target !== "tax-summary" &&
+      !itemTargets.has(issue.target),
+  );
   const totalOnly = effectiveReviewMode(form) === "totalOnly";
   const paidTotalYen =
     form.amountYen.trim() !== "" && Number.isFinite(Number(form.amountYen))
@@ -404,7 +412,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                 </Stack>
                 <ReviewStatusBanner
                   checks={checks}
-                  issues={specificGuidance}
+                  issues={bannerGuidance}
                   receiptIssues={receiptGuidance}
                   busy={busy}
                   onJump={goTo}
@@ -514,7 +522,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                     <Stack spacing={1}>
                       {items.map((item, index) => {
                         const itemIssues = guidance.filter((issue) => issue.target === item.id);
-                        const isOpen = expanded[item.id] ?? itemIssues.length > 0;
+                        const isOpen = expanded[item.id] ?? false;
                         const target = products.find(
                           (product) => product.id === item.discountTargetItemId,
                         );

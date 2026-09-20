@@ -116,7 +116,11 @@ export function buildAmountCheck(args: {
   const paidTotalYen = args.paidTotalYen;
   const external =
     summaries.length > 0 &&
-    summaries.every((summary) => summaryAmountBasis(summary) === "tax_excluded");
+    summaries.every(
+      (summary) =>
+        summaryAmountBasis(summary) === "tax_excluded" &&
+        (summary.taxMode === "external" || summary.taxMode === "unknown"),
+    );
   const variant: "external" | "direct" = external ? "external" : "direct";
 
   if (paidTotalYen === undefined || !Number.isFinite(paidTotalYen))
@@ -297,7 +301,9 @@ export function buildTaxRateCheck(args: {
         ? "比較対象の明細がありません"
         : undefined;
   const focusTarget =
-    untargetedDiscount?.id ?? unresolved[0]?.id ?? (globalReason ? "items" : undefined);
+    untargetedDiscount?.id ??
+    unresolved[0]?.id ??
+    (items.length === 0 ? "tax-summary" : globalReason ? "items" : undefined);
 
   const rows: ReviewTaxRateRow[] = summaries.map((summary) => {
     const basis = summaryAmountBasis(summary);

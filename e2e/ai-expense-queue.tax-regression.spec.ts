@@ -85,9 +85,13 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     await page.reload();
     const { queue, dialog } = await openFirstReviewDialog(page);
 
-    // 税が未確定の明細行は自動展開されている。牛乳を直すと残りはサーバ側の再解釈で解決される。
+    // 要確認の明細行は畳んだまま表示する。牛乳を開いて直すと残りはサーバ側の再解釈で解決される。
     const expectedMixedTaxRates = { パン: "8%", 洗剤: "10%", 牛乳: "8%", ラップ: "10%" };
-    await dialog.getByRole("combobox", { name: "牛乳の税率", exact: true }).click();
+    const milkRow = dialog.locator('section[aria-label="商品一覧"] details').filter({
+      hasText: "牛乳",
+    });
+    await milkRow.getByRole("button", { name: "確認・修正" }).click();
+    await milkRow.getByRole("combobox", { name: "牛乳の税率", exact: true }).click();
     await page.getByRole("option", { name: "8%", exact: true }).click();
     await dialog.getByRole("combobox", { name: "牛乳の表示価格", exact: true }).click();
     await page.getByRole("option", { name: "税込", exact: true }).click();

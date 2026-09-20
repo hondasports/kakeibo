@@ -152,7 +152,7 @@ describe("下書きの修正導線", () => {
     expect(reference).not.toHaveAttribute("open");
     await user.click(
       within(screen.getByRole("region", { name: "全体の確認状態" })).getByRole("button", {
-        name: "確認箇所へ",
+        name: "税率を確認する",
       }),
     );
     expect(reference).toHaveAttribute("open");
@@ -184,16 +184,15 @@ describe("下書きの修正導線", () => {
     await user.type(field, "修正");
     expect(props.onItemChange).toHaveBeenCalled();
   });
-  it("保存前に割引の問題と対象選択への導線を示す", async () => {
+  it("商品ごとの問題を全体バナーへ重複表示せず、商品行から修正できる", async () => {
     const user = userEvent.setup();
     render(<ReviewDialog {...props} />);
     const banner = screen.getByRole("region", { name: "全体の確認状態" });
-    const discountIssue = within(banner)
-      .getByText(/割引対象の商品を選択/)
-      .closest("li")!;
-    await user.click(within(discountIssue).getByRole("button", { name: "確認箇所へ" }));
+    expect(within(banner).queryByText(/割引対象の商品を選択/)).not.toBeInTheDocument();
+    const discountRow = screen.getByText("割引", { exact: true }).closest("details")!;
+    expect(discountRow).not.toHaveAttribute("open");
+    await user.click(within(discountRow).getByRole("button", { name: "確認・修正" }));
     expect(screen.getByRole("combobox", { name: "割引対象の商品" })).toBeVisible();
-    expect(screen.getByRole("combobox", { name: "割引対象の商品" })).toHaveFocus();
     expect(screen.getByRole("region", { name: "商品一覧" })).toBeVisible();
     expect(
       screen.queryByRole("region", { name: "レシート全体の税込・税率設定" }),
@@ -231,8 +230,11 @@ describe("下書きの修正導線", () => {
   it("割引対象が未確定でも確認項目を残したまま下書きを保存できる", async () => {
     const user = userEvent.setup();
     render(<ReviewDialog {...props} />);
-    const banner = screen.getByRole("region", { name: "全体の確認状態" });
-    expect(within(banner).getByText(/割引対象の商品を選択/)).toBeVisible();
+    expect(
+      within(screen.getByRole("region", { name: "全体の確認状態" })).queryByText(
+        /割引対象の商品を選択/,
+      ),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "下書きを保存" }));
     expect(props.onSubmit).toHaveBeenCalledWith(false, "detailed");
   });
