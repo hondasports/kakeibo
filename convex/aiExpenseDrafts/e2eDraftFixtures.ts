@@ -13,8 +13,6 @@ export type CreateE2eReadyDraftForUserArgs = {
   createdByUserId: string;
   categoryId: Id<"categories">;
   secondaryCategoryId?: Id<"categories">;
-  /** 税判定不能として保存済みの下書きを再現する（レシート合計だけ登録） */
-  savedAsTotalOnly?: boolean;
 };
 
 async function insertDraftItems(
@@ -171,7 +169,6 @@ export async function createE2eTaxReviewDraftForUserHandler(
     shopName: "E2E税レビュー店",
     date: "2026-07-04",
     amountYen: 108,
-    ...(args.savedAsTotalOnly ? { registrationMode: "totalOnly" as const } : {}),
     categoryId: args.categoryId,
     confidence: {
       documentType: 1,
