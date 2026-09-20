@@ -52,8 +52,7 @@ const props: ComponentProps<typeof ReviewDialog> = {
 };
 
 describe("下書きの修正導線", () => {
-  it("全体の読み取り確認を個別推奨に数えず、商品一覧にも理由を表示する", async () => {
-    const user = userEvent.setup();
+  it("一致時は全体の読み取り確認を個別推奨に数えず、重複表示もしない", () => {
     render(
       <ReviewDialog
         {...props}
@@ -84,16 +83,15 @@ describe("下書きの修正導線", () => {
         ]}
       />,
     );
-    const guidance = screen.getByRole("region", { name: "確認すること" });
-    expect(within(guidance).getByText("確認推奨 0件")).toBeVisible();
-    expect(within(guidance).getByText("レシート全体の確認")).toBeVisible();
-    expect(within(guidance).queryByRole("button", { name: "確認箇所へ" })).not.toBeInTheDocument();
-    await user.click(within(guidance).getByRole("button", { name: "商品一覧を見比べる" }));
-    const items = screen.getByRole("region", { name: "商品と割引" });
-    expect(within(items).getByText(/特定の誤りを検出したものではありません/)).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("レシート全体の読み取り確認");
+    expect(
+      within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 0件"),
+    ).toBeVisible();
+    const banner = screen.getByRole("region", { name: "全体の確認状態" });
+    expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
+    expect(within(banner).getByText(/印字額と明細の金額が一致しています/)).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("金額が一致");
   });
-  it("金額差の推奨から商品一覧へ移動すると差額の理由が読める", async () => {
+  it("金額の不一致は差額だけを示し、確認ボタンから商品一覧へ移動できる", async () => {
     const user = userEvent.setup();
     render(
       <ReviewDialog
@@ -109,20 +107,12 @@ describe("下書きの修正導線", () => {
         ]}
       />,
     );
-    const guidance = screen.getByRole("region", { name: "確認すること" });
-    await user.click(
-      within(
-        within(guidance)
-          .getByText(/24円の差/)
-          .closest("li")!,
-      ).getByRole("button", { name: "確認箇所へ" }),
-    );
-    expect(
-      within(screen.getByRole("region", { name: "商品と割引" })).getByText(/24円の差/),
-    ).toBeVisible();
-    expect(screen.getByRole("region", { name: "レシート全体の税込・税率設定" })).toHaveTextContent(
-      "登録額と税額を再計算",
-    );
+    const banner = screen.getByRole("region", { name: "全体の確認状態" });
+    expect(within(banner).getByText("印字額と明細の金額が一致していません")).toBeVisible();
+    expect(within(banner).getByText(/差額 24円/)).toBeVisible();
+    await user.click(within(banner).getByRole("button", { name: "金額を確認する" }));
+    expect(screen.getByRole("region", { name: "確認結果" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "商品一覧" })).toBeVisible();
   });
   it("不正な明細金額の修正では金額欄へフォーカスする", async () => {
     const user = userEvent.setup();
@@ -130,7 +120,7 @@ describe("下書きの修正導線", () => {
     await user.click(screen.getByRole("button", { name: "修正が必要な項目へ" }));
     expect(screen.getByRole("textbox", { name: "レシートの金額" })).toHaveFocus();
   });
-  it("税内訳の矛盾から常設の修正欄へ移動できる", async () => {
+  it("税内訳の矛盾から折りたたみ内の修正欄へ移動できる", async () => {
     const user = userEvent.setup();
     render(
       <ReviewDialog
@@ -156,13 +146,15 @@ describe("下書きの修正導線", () => {
         }}
       />,
     );
-    expect(screen.getByRole("spinbutton", { name: "対象額" })).toBeVisible();
+    const reference = screen.getByText("読み取り原文・詳しい税情報（参考）").closest("details")!;
+    expect(reference).not.toHaveAttribute("open");
     await user.click(
-      within(screen.getByRole("region", { name: "確認すること" })).getByRole("button", {
-        name: "確認箇所へ",
+      within(screen.getByRole("region", { name: "全体の確認状態" })).getByRole("button", {
+        name: "税率を確認する",
       }),
     );
-    expect(screen.getByRole("spinbutton", { name: "対象額" })).toBeVisible();
+    expect(reference).toHaveAttribute("open");
+    expect(screen.getByRole("spinbutton", { name: "対象額" })).toBeInTheDocument();
   });
   it("編集した商品は問題が解消しても閉じず、再編集できる", async () => {
     const user = userEvent.setup();
@@ -190,17 +182,20 @@ describe("下書きの修正導線", () => {
     await user.type(field, "修正");
     expect(props.onItemChange).toHaveBeenCalled();
   });
-  it("保存前に割引の問題と対象選択への導線を示す", async () => {
+  it("商品ごとの問題を全体バナーへ重複表示せず、商品行から修正できる", async () => {
     const user = userEvent.setup();
     render(<ReviewDialog {...props} />);
-    const guidance = screen.getByRole("region", { name: "確認すること" });
-    expect(within(guidance).getByText(/割引対象の商品を選択/)).toBeVisible();
-    await user.click(within(guidance).getByRole("button", { name: "修正箇所へ" }));
+    const banner = screen.getByRole("region", { name: "全体の確認状態" });
+    expect(within(banner).queryByText(/割引対象の商品を選択/)).not.toBeInTheDocument();
+    const discountRow = screen.getByText("割引", { exact: true }).closest("details")!;
+    expect(discountRow).not.toHaveAttribute("open");
+    await user.click(discountRow.querySelector("summary")!);
+    expect(discountRow).toHaveAttribute("open");
     expect(screen.getByRole("combobox", { name: "割引対象の商品" })).toBeVisible();
-    expect(screen.getByRole("combobox", { name: "割引対象の商品" })).toHaveFocus();
-    const tax = screen.getByRole("region", { name: "レシート全体の税込・税率設定" });
-    const details = screen.getByRole("region", { name: "商品と割引" });
-    expect(tax.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("region", { name: "商品一覧" })).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "レシート全体の税込・税率設定" }),
+    ).not.toBeInTheDocument();
   });
   it("保存失敗をフッターにも示し、税更新中は保存を待つ", () => {
     render(
@@ -211,11 +206,41 @@ describe("下書きの修正導線", () => {
       />,
     );
     expect(screen.getByText(/入力は残っています/)).toBeVisible();
-    expect(screen.getByRole("button", { name: "修正が必要な項目へ" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "下書きを保存" })).toBeDisabled();
+  });
+  it("税内訳がない下書きでも永続化済み明細の税率・税込／税抜を修正できる", async () => {
+    const user = userEvent.setup();
+    render(
+      <ReviewDialog
+        {...props}
+        reviewItems={[
+          { ...props.reviewItems[0], persistedItemId: "item-food" },
+          props.reviewItems[1],
+        ]}
+      />,
+    );
+    const item = screen.getByText("ホットケーキ").closest("details")!;
+    if (!item.hasAttribute("open")) {
+      await user.click(item.querySelector("summary")!);
+    }
+    expect(screen.getByRole("combobox", { name: "ホットケーキの税率" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "ホットケーキの表示価格" })).toBeEnabled();
+  });
+  it("割引対象が未確定でも確認項目を残したまま下書きを保存できる", async () => {
+    const user = userEvent.setup();
+    render(<ReviewDialog {...props} />);
+    expect(
+      within(screen.getByRole("region", { name: "全体の確認状態" })).queryByText(
+        /割引対象の商品を選択/,
+      ),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "下書きを保存" }));
+    expect(props.onSubmit).toHaveBeenCalledWith(false, "detailed");
   });
 });
 
-it("全体設定の後の個別修正を再描画で上書きしない", () => {
+it("個別修正した税込登録額を再描画で上書きしない", async () => {
+  const user = userEvent.setup();
   render(
     <ReviewDialog
       {...props}
@@ -235,5 +260,9 @@ it("全体設定の後の個別修正を再描画で上書きしない", () => {
       ]}
     />,
   );
-  expect(screen.getByRole("region", { name: "保存内容" })).toHaveTextContent("商品の税額：10円");
+  const item = screen.getByText("ホットケーキ").closest("details")!;
+  if (!item.hasAttribute("open")) {
+    await user.click(item.querySelector("summary")!);
+  }
+  expect(within(item as HTMLElement).getByText("登録額: 110円（税込）")).toBeInTheDocument();
 });

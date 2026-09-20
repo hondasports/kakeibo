@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   CircularProgress,
@@ -72,9 +72,12 @@ export function SystemAdminMembershipChangeDialog({
   sourceUser,
 }: Props) {
   const [reason, setReason] = useState("");
-  useEffect(() => {
+  const contextKey = `${open}:${operation}:${target?.id ?? ""}:${sourceGroup?.id ?? ""}:${targetGroup?.id ?? ""}`;
+  const [prevContextKey, setPrevContextKey] = useState(contextKey);
+  if (prevContextKey !== contextKey) {
+    setPrevContextKey(contextKey);
     if (open) setReason("");
-  }, [open, operation, target?.id, sourceGroup?.id, targetGroup?.id]);
+  }
 
   const normalizedReason = reason.trim();
   const reasonError = useMemo(

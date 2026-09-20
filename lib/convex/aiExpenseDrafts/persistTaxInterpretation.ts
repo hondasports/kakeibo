@@ -40,7 +40,11 @@ export async function persistDraftTaxInterpretation(
   const eligibility = validateTaxInterpretationEligibility(
     draftDoc === null ? null : draftDocToFields(draftDoc),
     args.groupId,
-    args.decisionOverride,
+    {
+      decisionOverride: args.decisionOverride,
+      override: args.override,
+      bulkUnresolvedOverride: args.bulkUnresolvedOverride,
+    },
   );
   if (!eligibility.success) {
     throw new ConvexError(getTaxInterpretationEligibilityErrorMessage(eligibility.error));

@@ -1,12 +1,12 @@
 ---
 name: impact-analysis
-description: 影響範囲を調べるためのv13判断手順。
+description: 直接のcaller・testだけでは変更の影響範囲を判断できないときに使う。
 license: Apache-2.0
 ---
 
 # 影響範囲を調べる
 
-実行条件とCLI操作は[Loop README](../../.loop/README.md)を正本とする。
+操作の詳細が必要な場合だけ[Loop README](../../.loop/README.md)を参照する。
 
 ## 入力・起動
 

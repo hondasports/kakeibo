@@ -1,22 +1,13 @@
 {
   "verdict": "pass",
-  "risk_assessment": {
-    "blast_radius": "several_surfaces",
-    "data_security": "none",
-    "reversibility": "easy",
-    "uncertainty": "some_unknowns",
-    "floor_triggers": []
-  },
-  "applied_tier": "T2",
-  "tier_rationale": "中間のuncertaintyのみでfloor_triggersなし。複数ドメインにまたがるためT2",
   "source_comparison": "Issue要求と契約AC/IVの対応を確認した",
   "diff_assessment": "AC01を満たす差分であり、スコープ外の変更はない",
-  "verification_assessment": "TC01-03の現在key成功を確認した",
+  "verification_assessment": "TC01の現在key成功と受入条件への対応を確認した",
   "manual_results": [
     {
-      "target": "AC01",
-      "result": "pass",
-      "evidence": "実行ログと差分を確認した"
+      "id": "AC01",
+      "status": "pass",
+      "evidence": "実際に確認した結果と根拠を記入する"
     }
   ]
 }

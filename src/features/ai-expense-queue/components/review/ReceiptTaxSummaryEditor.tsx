@@ -1,5 +1,5 @@
 import { Button, MenuItem, Stack, TextField, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type {
   AmountBasis,
   ExtractedTaxSummary,
@@ -45,7 +45,9 @@ export function ReceiptTaxSummaryEditor({
     taxIncludedAmountYen: summary.taxIncludedAmountYen,
   });
 
-  useEffect(() => {
+  const [prevSummary, setPrevSummary] = useState(summary);
+  if (prevSummary !== summary) {
+    setPrevSummary(summary);
     setForm({
       taxRatePercent: summary.taxRatePercent,
       taxMode: summary.taxMode,
@@ -54,7 +56,7 @@ export function ReceiptTaxSummaryEditor({
       taxYen: summary.taxYen,
       taxIncludedAmountYen: summary.taxIncludedAmountYen,
     });
-  }, [summary]);
+  }
 
   const handleChange = (next: Partial<TaxSummaryChange>) => {
     setForm((current) => ({ ...current, ...next }));

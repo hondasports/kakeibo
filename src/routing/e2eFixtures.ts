@@ -21,6 +21,7 @@ export const devAiExpenseQueueItems: AiExpenseQueueItem[] = [
     date: "2026-06-01",
     categoryName: "水道光熱費",
   },
+
   {
     id: "e2e-failed-draft",
     fileName: "failed-receipt.png",
@@ -40,6 +41,20 @@ export const devAiExpenseQueueItems: AiExpenseQueueItem[] = [
     categoryName: "日用品",
   },
 ];
+
+/** totalOnly 確認用の追加fixture。`?totalOnly=1` 指定時のみキューへ混ぜる */
+export const devAiExpenseTotalOnlyQueueItem: AiExpenseQueueItem = {
+  id: "e2e-totalonly-draft",
+  fileName: "review-totalonly.png",
+  status: "needs_review",
+  documentType: "receipt",
+  title: "E2E合計のみ店",
+  reviewReasons: ["user_confirmation_required"],
+  amountYen: 108,
+  date: "2026-07-04",
+  categoryName: "食費",
+  registrationMode: "totalOnly",
+};
 
 export const devAiExpenseQueueCategories = [
   { _id: "e2e-cat-utilities", name: "水道光熱費", color: "#AAB7C4" },
@@ -76,6 +91,36 @@ export const devAiExpenseReviewDrafts = {
       ],
     },
   },
+  "e2e-totalonly-draft": {
+    _id: "e2e-totalonly-draft",
+    status: "needs_review" as const,
+    documentType: "receipt" as const,
+    shopName: "E2E合計のみ店",
+    paymentPlace: "",
+    payeeName: "",
+    paymentPurpose: "",
+    date: "2026-07-04",
+    amountYen: 108,
+    categoryId: "e2e-cat-food",
+    registrationMode: "totalOnly" as const,
+    reviewReasons: ["user_confirmation_required"],
+    warnings: [],
+    rawObservation: {
+      source: "ai_ocr" as const,
+      observedAt: 1,
+      lines: [
+        {
+          rawText: "E2E合計のみ商品 108円",
+          amountText: "108円",
+          amountYen: 108,
+          lineRoleCandidates: ["item" as const],
+          roleConfidence: 0.95,
+          explicitlyPrinted: true,
+          sourceLineIndex: 0,
+        },
+      ],
+    },
+  },
 };
 
 export const devAiExpenseReviewDraftItems = {
@@ -94,6 +139,18 @@ export const devAiExpenseReviewDraftItems = {
       amountYen: 980,
       confidence: { itemName: 0.72, amountYen: 0.95, categoryName: 0.4 },
       warnings: ["品名が不鮮明です"],
+    },
+  ],
+  "e2e-totalonly-draft": [
+    {
+      _id: "e2e-item-totalonly",
+      itemName: "E2E合計のみ商品",
+      amountYen: 108,
+      printedAmountYen: 108,
+      categoryId: "e2e-cat-food",
+      confidence: { itemName: 0.95, amountYen: 0.95, categoryId: 0.95 },
+      warnings: [],
+      taxResolutionStatus: "unresolved" as const,
     },
   ],
 };

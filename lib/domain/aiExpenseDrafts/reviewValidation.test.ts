@@ -59,8 +59,8 @@ describe("getReviewFormErrorMessage", () => {
 });
 
 describe("getReviewItemsErrorMessage", () => {
-  it("割引対象の商品が未選択ならエラー", () => {
-    expect(getReviewItemsErrorMessage([discountItem])).toBe("割引対象の商品を選択してください。");
+  it("割引対象の商品が未選択でも明細入力エラーにはしない（確認項目として残す）", () => {
+    expect(getReviewItemsErrorMessage([discountItem])).toBeNull();
   });
 
   it("割引対象が選択済みならカテゴリ不足を通常の明細エラーとして扱う", () => {
@@ -142,10 +142,16 @@ describe("getReviewSubmitErrorMessage", () => {
     );
   });
 
+  it("割引対象が未確定でも他の明細が有効なら保存を妨げない", () => {
+    expect(getReviewSubmitErrorMessage(baseForm, [validItem, discountItem])).toBeNull();
+  });
+
   it("明細エラーを優先する", () => {
-    expect(getReviewSubmitErrorMessage(baseForm, [discountItem])).toBe(
-      "割引対象の商品を選択してください。",
-    );
+    expect(
+      getReviewSubmitErrorMessage(baseForm, [
+        { itemName: "", amountYen: "110", categoryId: "cat-daily" },
+      ]),
+    ).toBe("明細名、明細金額、カテゴリを確認してください。");
   });
 
   it("カテゴリ集計エラーを最後に判定する", () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   Button,
@@ -41,11 +41,13 @@ export function ExpenseBulkCategoryDialog({
   const selectedCategory = categories.find((category) => category._id === categoryId) ?? null;
   const mixedCategories = hasMultipleSourceCategories(selectedReceipts);
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (!open) {
       setCategoryId("");
     }
-  }, [open]);
+  }
 
   const handleCategoryChange = (nextCategoryId: string) => {
     setCategoryId(nextCategoryId);

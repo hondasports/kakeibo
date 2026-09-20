@@ -4,12 +4,17 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { parse } from "yaml";
+import { createHash } from "node:crypto";
 import {
   run,
   fingerprint,
   validateContract,
   validatePr,
   validateReview,
+  validateAssessment,
+  guide,
+  REVIEW_REQUIREMENTS,
   reviewTierFloor,
   REVIEW_AXES,
   REVIEW_FLOOR_TRIGGERS,
@@ -62,7 +67,26 @@ function fixture() {
     writeFileSync(file, JSON.stringify(c));
     run(["contract", "test", file, reason], cwd);
   }
+  function assess(extra = {}) {
+    const file = path.join(dir, "assessment.json");
+    writeFileSync(
+      file,
+      JSON.stringify({
+        risk_assessment: {
+          blast_radius: "local",
+          data_security: "none",
+          reversibility: "easy",
+          uncertainty: "known_pattern",
+          floor_triggers: [],
+        },
+        tier_rationale: "fixture change is minimal",
+        ...extra,
+      }),
+    );
+    return run(["assess", "test", file], cwd);
+  }
   function review(extra = {}) {
+    assess();
     const file = path.join(dir, "review.json");
     writeFileSync(
       file,
@@ -72,25 +96,16 @@ function fixture() {
         diff_assessment: "AC01 covers diff",
         verification_assessment: "Executed relevant check",
         manual_results: [],
-        risk_assessment: {
-          blast_radius: "local",
-          data_security: "none",
-          reversibility: "easy",
-          uncertainty: "known_pattern",
-          floor_triggers: [],
-        },
-        applied_tier: "T1",
-        tier_rationale: "fixture change is minimal",
         ...extra,
       }),
     );
-    run(["review", "test", file], cwd);
+    return run(["review", "test", file], cwd);
   }
   function call(...args) {
     return run([args[0], "test", ...args.slice(1)], cwd);
   }
   set();
-  return { cwd, dir, contract, set, review, call, git };
+  return { cwd, dir, contract, set, assess, review, call, git };
 }
 describe("task loop execution boundaries", () => {
   it("accepts manual-only requirements without checks but still requires their evidence", () => {
@@ -387,17 +402,15 @@ describe("task loop execution boundaries", () => {
         tier_rationale: "claimed light review",
       }),
     );
-    expect(() => run(["review", "test", file], f.cwd)).toThrow("below the T3 floor");
+    expect(() => run(["assess", "test", file], f.cwd)).toThrow("below the T3 floor");
   });
-  it("keeps the canonical review-depth vocabulary mirrored in process.yaml and SKILL.md", () => {
+  it("keeps executable vocabulary and the process contract aligned", () => {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-    const spec = readFileSync(path.join(root, ".loop/process.yaml"), "utf8");
-    const skill = readFileSync(path.join(root, "skills/code-review/SKILL.md"), "utf8");
-    const terms = [...Object.values(REVIEW_AXES).flat(), ...REVIEW_FLOOR_TRIGGERS, ...REVIEW_TIERS];
-    for (const term of terms) {
-      expect(spec, `process.yaml missing ${term}`).toContain(term);
-      expect(skill, `SKILL.md missing ${term}`).toContain(term);
-    }
+    const spec = parse(readFileSync(path.join(root, ".loop/process.yaml"), "utf8"));
+    expect(spec.version).toBe(14);
+    expect(spec.review_depth.axes).toEqual(REVIEW_AXES);
+    expect(spec.review_depth.floor_triggers).toEqual(REVIEW_FLOOR_TRIGGERS);
+    expect(Object.keys(spec.review_depth.tiers)).toEqual(REVIEW_TIERS);
   });
   it("rejects invalid IDs, branch mismatch, and repeat initialization", () => {
     const f = fixture();
@@ -419,5 +432,166 @@ describe("task loop execution boundaries", () => {
     ).toContain("unknown verification check");
     f.contract.checks[0].argv = [];
     expect(validateContract(f.contract)).toContain("check argv must be non-empty strings");
+  });
+  it("routes from initialization through checks, assessment, review and delivery without writing on status", () => {
+    const f = fixture();
+    const statePath = path.join(f.dir, "state.json");
+    const state = JSON.parse(readFileSync(statePath));
+    state.contract = null;
+    writeFileSync(statePath, JSON.stringify(state));
+    const before = readFileSync(statePath, "utf8");
+    expect(f.call("status").next.stage).toBe("contract");
+    expect(readFileSync(statePath, "utf8")).toBe(before);
+    f.set();
+    expect(f.call("status").next.stage).toBe("verification");
+    f.contract.unresolved = ["choose behavior"];
+    f.set();
+    expect(f.call("status").next.stage).toBe("contract");
+    f.contract.unresolved = [];
+    f.set();
+    f.call("check", "TC01");
+    expect(f.call("status").next.stage).toBe("assessment");
+    expect(f.assess().applied_tier).toBe("T1");
+    const next = f.call("status").next;
+    expect(next.stage).toBe("review");
+    expect(next.requirements).toEqual(REVIEW_REQUIREMENTS.T1);
+    f.review();
+    expect(f.call("status").next.stage).toBe("delivery");
+    writeFileSync(
+      path.join(f.dir, "finding.json"),
+      JSON.stringify({ id: "F1", description: "gap", status: "open", evidence: "observed" }),
+    );
+    f.call("finding", path.join(f.dir, "finding.json"));
+    expect(f.call("status").next.stage).toBe("finding");
+    expect(() => f.call("finish")).toThrow("open finding");
+  });
+  it("discloses only the requested guide without requiring git or task state", () => {
+    expect(run(["guide", "assessment"], "/nonexistent")).toEqual(guide("assessment"));
+    expect(guide("assessment").axes).toEqual(REVIEW_AXES);
+    expect(guide("assessment").floor_triggers).toEqual(REVIEW_FLOOR_TRIGGERS);
+    expect(guide("verification").axes).toBeUndefined();
+    expect(guide("contract").conditional_skills).toBeDefined();
+    expect(() => guide("toString")).toThrow("unknown guide topic");
+  });
+  it.each(REVIEW_FLOOR_TRIGGERS)(
+    "forces T3 for %s and discloses cumulative obligations",
+    (trigger) => {
+      const f = fixture();
+      const risk_assessment = {
+        blast_radius: "local",
+        data_security: "none",
+        reversibility: "easy",
+        uncertainty: "known_pattern",
+        floor_triggers: [trigger],
+      };
+      const result = f.assess({ risk_assessment });
+      expect(result.minimum_tier).toBe("T3");
+      expect(result.applied_tier).toBe("T3");
+      expect(result.requirements).toEqual(Object.values(REVIEW_REQUIREMENTS).flat());
+      expect(() => f.assess({ risk_assessment, applied_tier: "T2" })).toThrow("below the T3 floor");
+    },
+  );
+  it("allows deeper assessment but rejects review-time overrides and missing or stale assessments", () => {
+    const f = fixture();
+    const file = path.join(f.dir, "review.json");
+    const review = {
+      verdict: "pass",
+      source_comparison: "c",
+      diff_assessment: "d",
+      verification_assessment: "v",
+      manual_results: [],
+    };
+    writeFileSync(file, JSON.stringify(review));
+    expect(() => f.call("review", file)).toThrow("current risk assessment");
+    expect(f.assess({ applied_tier: "T3" }).applied_tier).toBe("T3");
+    writeFileSync(file, "null");
+    expect(() => f.call("review", file)).toThrow("invalid review: object is required");
+    for (const extra of [
+      { applied_tier: "T1" },
+      { risk_assessment: {} },
+      { tier_rationale: "override" },
+    ]) {
+      writeFileSync(file, JSON.stringify({ ...review, ...extra }));
+      expect(() => f.call("review", file)).toThrow("must not override");
+    }
+    writeFileSync(file, JSON.stringify(review));
+    f.call("check", "TC01");
+    f.call("review", file);
+    expect(f.call("finish").status).toBe("complete");
+    f.assess({ applied_tier: "T3" });
+    expect(() => f.call("finish")).toThrow("self-review");
+    writeFileSync(path.join(f.cwd, "source.txt"), "changed");
+    expect(() => f.call("review", file)).toThrow("current risk assessment");
+    expect(() => f.call("finish")).toThrow("check required");
+  });
+  it("invalidates assessment for contract and environment changes", () => {
+    const f = fixture();
+    f.review();
+    f.contract.environment = "test-v2";
+    f.set();
+    expect(() => f.call("review", path.join(f.dir, "review.json"))).toThrow(
+      "current risk assessment",
+    );
+  });
+  it("uses the shipped assessment and review templates with real manual proof", () => {
+    const f = fixture();
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+    f.contract.acceptance = [
+      { id: "AC01", expectation: "manual behavior", manual: "inspect result" },
+    ];
+    f.contract.checks = [];
+    f.set();
+    f.call("assess", path.join(root, ".loop/templates/assessment.example.json"));
+    const review = JSON.parse(readFileSync(path.join(root, ".loop/templates/review.example.json")));
+    review.manual_results[0].evidence = "Observed expected fixture result";
+    const file = path.join(f.dir, "review.json");
+    writeFileSync(file, JSON.stringify(review));
+    f.call("review", file);
+    expect(f.call("finish").status).toBe("complete");
+    review.manual_results = [{ target: "AC01", result: "pass", evidence: "legacy shape" }];
+    writeFileSync(file, JSON.stringify(review));
+    expect(() => f.call("review", file)).toThrow("manual_results require");
+  });
+  it("preserves v13 history but refuses its old proof and upgrades on mutation", () => {
+    const f = fixture();
+    f.call("check", "TC01");
+    f.review();
+    const file = path.join(f.dir, "state.json");
+    const state = JSON.parse(readFileSync(file));
+    state.version = 13;
+    delete state.assessments;
+    const legacyKey = createHash("sha256")
+      .update(
+        JSON.stringify({
+          content: fingerprint(f.cwd),
+          contract: f.contract,
+          node: process.version,
+          platform: process.platform,
+          arch: process.arch,
+        }),
+      )
+      .digest("hex");
+    state.runs[0].key = legacyKey;
+    state.reviews[0].key = legacyKey;
+    writeFileSync(file, JSON.stringify(state));
+    expect(() => f.call("finish")).toThrow("check required");
+    expect(f.call("status").next.stage).toBe("verification");
+    expect(JSON.parse(readFileSync(file)).version).toBe(13);
+    f.call("check", "TC01");
+    f.review();
+    expect(f.call("finish").status).toBe("complete");
+    const updated = JSON.parse(readFileSync(file));
+    expect(updated.version).toBe(14);
+    expect(updated.runs[0].key).toBe(legacyKey);
+    expect(updated.history.length).toBeGreaterThan(state.history.length);
+  });
+  it("rejects malformed assessment inputs before computing depth", () => {
+    for (const input of [
+      null,
+      {},
+      { risk_assessment: {} },
+      { risk_assessment: { floor_triggers: "bad" } },
+    ])
+      expect(validateAssessment(input).length).toBeGreaterThan(0);
   });
 });

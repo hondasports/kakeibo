@@ -1,9 +1,5 @@
 import { parseExpenseAmountString } from "../expenseEntries/expenseEntryItem";
-import {
-  isDiscountLine,
-  isValidSignedLineItemAmount,
-  type ReceiptItemLineType,
-} from "../receipt/discountItems";
+import { isValidSignedLineItemAmount, type ReceiptItemLineType } from "../receipt/discountItems";
 import { isValidIsoDateString } from "../week/weekDates";
 import type { AiExpenseDraftDocumentType } from "./constants";
 import type { AiExpenseRegistrationMode } from "./receiptDataContract";
@@ -66,15 +62,12 @@ export function getReviewFormErrorMessage(reviewForm: ReviewFormInput): string |
   return null;
 }
 
-/** レビュー明細入力エラーをユーザー向けメッセージに変換する。 */
+/**
+ * レビュー明細入力エラーをユーザー向けメッセージに変換する。
+ * 割引対象の未確定は明細自体の入力エラーではなく確認項目のため、ここでは扱わない
+ * （税率別集計の比較不能として案内し、確認事項を残したまま下書きを保存できる）。
+ */
 export function getReviewItemsErrorMessage(reviewItems: ReviewItemInput[]): string | null {
-  const unresolvedDiscount = reviewItems.find(
-    (item) => isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId,
-  );
-  if (unresolvedDiscount) {
-    return "割引対象の商品を選択してください。";
-  }
-
   const invalidItem = reviewItems.find((item) => {
     const itemAmount = Number(item.amountYen);
     return (

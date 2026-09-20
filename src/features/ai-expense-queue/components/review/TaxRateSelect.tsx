@@ -30,6 +30,8 @@ export function TaxRateSelect({
       }}
       select
       size="small"
+      fullWidth
+      sx={{ flex: 1, minWidth: 176 }}
       value={selectValue}
     >
       <MenuItem value="8">{discount ? "8%対象の割引" : "8%"}</MenuItem>

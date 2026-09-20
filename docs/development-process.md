@@ -5,7 +5,8 @@
 Agent Loopの詳細をここへ二重定義しない。この文書は非normativeな運用説明で、内容が衝突した場合は次を正本とする。
 
 - Agent実行契約: `AGENTS.md`
-- Loop実行条件: `.loop/process.yaml`
+- Loop操作: `node scripts/task-loop.mjs guide <topic>` / `status <task-id>`
+- Loop自体を変更する際の実装契約: `.loop/process.yaml`
 - Task contract example: `.loop/templates/contract.example.json`
 - Current task instance / Finding Ledger: `.loop/state/<task-id>/state.json`（worktree-local・ignored）
 - 各工程の手順: `skills/*/SKILL.md`
@@ -197,7 +198,7 @@ Agent taskで残す価値があるもの:
 
 ## 5. Agent Loop
 
-[AGENTS.md](../AGENTS.md)と[CLI操作](../.loop/README.md)を参照する。規則をこの文書へ再定義しない。
+[AGENTS.md](../AGENTS.md)を入口に、CLIが案内する工程のスキルだけを読む。通常作業でREADME・process.yamlの全文読込は不要。操作・移行・保証の詳細が必要な場合は[CLI操作](../.loop/README.md)を参照する。
 
 ## 7. Verification
 
@@ -354,7 +355,7 @@ Agent Loopが独自に「常に1 approval」を追加しない。
 - test adequacy
 - existing pattern consistency
 
-Agent Loopのセルフレビューは `.loop/process.yaml` `review_depth` のリスク判定で深度（T1/T2/T3）を決めて実施する。詳細は `.loop/README.md` と `skills/code-review/SKILL.md` を参照。
+Agent Loop v14ではレビュー直前に `guide assessment` の4軸と強制条件を評価し、`assess` が算出する最低深度（T1/T2/T3）以上でレビューする。必要な確認内容はCLIが返す。評価の妥当性とレビューの実施はAgentの責任。詳細は `skills/code-review/SKILL.md` を参照。
 
 ---
 

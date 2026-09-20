@@ -20,6 +20,7 @@ import {
   devAiExpenseQueueItems,
   devAiExpenseReviewDraftItems,
   devAiExpenseReviewDrafts,
+  devAiExpenseTotalOnlyQueueItem,
 } from "./e2eFixtures";
 
 export function shouldEnableE2eRoutes() {
@@ -30,8 +31,13 @@ export function shouldEnableE2eRoutes() {
 }
 
 function E2eAiExpenseQueuePage() {
-  const [items, setItems] = useState(devAiExpenseQueueItems);
-  const includesReviewItems = new URLSearchParams(window.location.search).get("withItems") === "1";
+  const params = new URLSearchParams(window.location.search);
+  const includesReviewItems = params.get("withItems") === "1";
+  const includesTotalOnly = params.get("totalOnly") === "1";
+  const initialItems = includesTotalOnly
+    ? [...devAiExpenseQueueItems, devAiExpenseTotalOnlyQueueItem]
+    : devAiExpenseQueueItems;
+  const [items, setItems] = useState(initialItems);
 
   return (
     <AiExpenseQueuePanel

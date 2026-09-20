@@ -102,26 +102,27 @@ export function ExpenseEntryEditDialog({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!receipt) {
-      return;
+  const [prevReceipt, setPrevReceipt] = useState<ReceiptItem | null>(null);
+  if (prevReceipt !== receipt) {
+    setPrevReceipt(receipt);
+    if (receipt) {
+      setDate(receipt.date);
+      setAmountYen(
+        String(
+          receipt.aiExpenseDraftId
+            ? (receipt.receiptTotalAmountYen ?? receipt.amountYen)
+            : receipt.amountYen,
+        ),
+      );
+      setCategoryId(receipt.categoryId);
+      setTitle(getEditableReceiptTitle(receipt));
+      setMemo(receipt.memo ?? "");
+      setRegistrationMode(receipt.registrationMode ?? "detailed");
+      setDraftItems([]);
+      setDraftItemsLoading(Boolean(receipt.aiExpenseDraftId));
+      setError("");
     }
-    setDate(receipt.date);
-    setAmountYen(
-      String(
-        receipt.aiExpenseDraftId
-          ? (receipt.receiptTotalAmountYen ?? receipt.amountYen)
-          : receipt.amountYen,
-      ),
-    );
-    setCategoryId(receipt.categoryId);
-    setTitle(getEditableReceiptTitle(receipt));
-    setMemo(receipt.memo ?? "");
-    setRegistrationMode(receipt.registrationMode ?? "detailed");
-    setDraftItems([]);
-    setDraftItemsLoading(Boolean(receipt.aiExpenseDraftId));
-    setError("");
-  }, [receipt]);
+  }
 
   const handleSave = async () => {
     if (!receipt) {
