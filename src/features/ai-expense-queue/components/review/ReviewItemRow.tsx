@@ -48,7 +48,7 @@ export function ReviewItemRow({
   const discount = isDiscountLine(item.itemName, item.lineType);
   const context = buildTaxContextFromReviewItem(item);
   const hasRequired = issues.some((issue) => issue.required);
-  const issueLabel = issues.length ? (hasRequired ? "修正必須" : "確認推奨") : undefined;
+  const issueLabel = hasRequired ? "修正必須" : undefined;
   const supplementary = [
     categoryName ?? "カテゴリ未設定",
     taxLabel(item),
@@ -65,7 +65,7 @@ export function ReviewItemRow({
       open={open}
       sx={{
         border: "1px solid",
-        borderColor: hasRequired ? "error.main" : issues.length ? "warning.main" : "divider",
+        borderColor: hasRequired ? "error.main" : "divider",
         borderRadius: 1.5,
         scrollMarginTop: 16,
       }}

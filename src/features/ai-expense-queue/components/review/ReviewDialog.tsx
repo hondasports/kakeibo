@@ -28,7 +28,6 @@ import type { AmountBasis } from "../../../../../lib/receiptTax/types";
 import { ReviewDialogActions } from "./ReviewDialogActions";
 import { ReviewItemCard } from "./ReviewItemCard";
 import { ReviewItemRow } from "./ReviewItemRow";
-import { ReviewCheckCards } from "./ReviewCheckCards";
 import { ReviewStatusBanner } from "./ReviewStatusBanner";
 import { ReceiptTaxSummary } from "./ReceiptTaxSummary";
 import { getReviewGuidance, effectiveReviewMode } from "../../utils/reviewGuidance";
@@ -417,7 +416,6 @@ export function ReviewDialog(props: ReviewDialogProps) {
                   busy={busy}
                   onJump={goTo}
                 />
-                <ReviewCheckCards amount={checks.amount} taxRate={checks.taxRate} />
                 <Box
                   component="fieldset"
                   disabled={busy}
