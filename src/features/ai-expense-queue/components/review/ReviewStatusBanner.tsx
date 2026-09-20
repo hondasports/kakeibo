@@ -23,21 +23,25 @@ function amountMismatchLine(check: ReviewAmountCheck): string | undefined {
 export function ReviewStatusBanner({
   checks,
   issues,
-  receiptIssues,
+  unresolvedTaxItemCount,
   busy,
   onJump,
 }: {
   checks: ReviewChecks;
   /** 明細・基本情報など特定箇所への確認・修正項目 */
   issues: ReviewGuidanceItem[];
-  /** レシート全体の読み取り確認 */
-  receiptIssues: ReviewGuidanceItem[];
+  /** 税率または税込／税抜が未確定の明細数 */
+  unresolvedTaxItemCount: number;
   busy: boolean;
   onJump: (target: string) => void;
 }) {
   const { amount, taxRate } = checks;
   const mismatchedTaxRows = taxRate.rows.filter((row) => row.status === "mismatch");
   const checksAreMatched = amount.status === "matched" && taxRate.status === "matched";
+  const combineUncomparable =
+    unresolvedTaxItemCount > 0 &&
+    amount.status === "uncomparable" &&
+    taxRate.status === "uncomparable";
 
   return (
     <Stack spacing={1.5} component="section" aria-label="全体の確認状態">
@@ -61,7 +65,28 @@ export function ReviewStatusBanner({
           </Box>
         </Alert>
       )}
-      {amount.status === "uncomparable" && (
+      {combineUncomparable && (
+        <Alert severity="warning">
+          <Typography variant="subtitle2">
+            税率が未確定のため、金額と税率別集計を比較できません
+          </Typography>
+          <Typography variant="body2">
+            税率・税込／税抜が未確定の商品が{unresolvedTaxItemCount}
+            件あります。商品ごとに確認してください。
+          </Typography>
+          <Box>
+            <Button
+              disabled={busy}
+              size="small"
+              type="button"
+              onClick={() => onJump(taxRate.focusTarget ?? amount.focusTarget ?? "items")}
+            >
+              未確定の商品を確認する
+            </Button>
+          </Box>
+        </Alert>
+      )}
+      {amount.status === "uncomparable" && !combineUncomparable && (
         <Alert severity="warning">
           <Typography variant="subtitle2">金額を比較できません</Typography>
           <Typography variant="body2">
@@ -99,7 +124,7 @@ export function ReviewStatusBanner({
           </Box>
         </Alert>
       )}
-      {taxRate.status === "uncomparable" && (
+      {taxRate.status === "uncomparable" && !combineUncomparable && (
         <Alert severity="warning">
           <Typography variant="subtitle2">税率別の明細合計を比較できません</Typography>
           <Typography variant="body2">
@@ -145,23 +170,6 @@ export function ReviewStatusBanner({
           ))}
         </Stack>
       )}
-      {!checksAreMatched &&
-        receiptIssues.map((issue) => (
-          <Alert key={issue.id} severity="info">
-            <Typography variant="subtitle2">レシート全体の確認</Typography>
-            {issue.message}
-            <Box>
-              <Button
-                disabled={busy}
-                size="small"
-                type="button"
-                onClick={() => onJump(issue.target)}
-              >
-                商品一覧を見比べる
-              </Button>
-            </Box>
-          </Alert>
-        ))}
     </Stack>
   );
 }

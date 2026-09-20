@@ -1,4 +1,5 @@
-import { Box, Button, Stack, Typography } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { Box, Stack, Typography } from "@mui/material";
 import { formatYen } from "../../../../utils/currency";
 import type { ReviewItemValues } from "../../types/types";
 import type { ReviewGuidanceItem } from "../../utils/reviewGuidance";
@@ -141,20 +142,28 @@ export function ReviewItemRow({
               </Typography>
             )}
           </Box>
-          <Button
-            size="small"
-            variant="outlined"
-            type="button"
-            disabled={busy}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onToggle();
+          <Box
+            aria-hidden="true"
+            sx={{
+              width: 88,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: 0.5,
+              color: "text.secondary",
+              opacity: busy ? 0.5 : 1,
             }}
-            sx={{ flexShrink: 0 }}
           >
-            {open ? "閉じる" : "確認・修正"}
-          </Button>
+            <Typography variant="caption">{open ? "閉じる" : "詳細"}</Typography>
+            <ExpandMoreIcon
+              fontSize="small"
+              sx={{
+                transform: open ? "rotate(180deg)" : "rotate(0deg)",
+                transition: (theme) => theme.transitions.create("transform"),
+              }}
+            />
+          </Box>
         </Stack>
         <Typography
           variant="caption"

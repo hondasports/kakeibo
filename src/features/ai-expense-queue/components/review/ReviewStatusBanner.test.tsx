@@ -13,14 +13,14 @@ const matchedChecks: ReviewChecks = {
 function renderBanner(
   checks: ReviewChecks,
   issues: ReviewGuidanceItem[] = [],
-  receiptIssues: ReviewGuidanceItem[] = [],
+  unresolvedTaxItemCount = 0,
   onJump = vi.fn(),
 ) {
   render(
     <ReviewStatusBanner
       checks={checks}
       issues={issues}
-      receiptIssues={receiptIssues}
+      unresolvedTaxItemCount={unresolvedTaxItemCount}
       busy={false}
       onJump={onJump}
     />,
@@ -51,7 +51,7 @@ describe("ReviewStatusBanner", () => {
         taxRate: matchedChecks.taxRate,
       },
       [],
-      [],
+      0,
       onJump,
     );
     expect(within(banner).getByText("印字額と明細の金額が一致していません")).toBeInTheDocument();
@@ -81,7 +81,7 @@ describe("ReviewStatusBanner", () => {
         },
       },
       [],
-      [],
+      0,
       onJump,
     );
     expect(within(banner).getByText("税率別の明細合計が一致していません")).toBeInTheDocument();
@@ -104,7 +104,7 @@ describe("ReviewStatusBanner", () => {
         },
       },
       [],
-      [],
+      0,
       onJump,
     );
     expect(within(banner).getByText("税率別の明細合計を比較できません")).toBeInTheDocument();
@@ -126,7 +126,7 @@ describe("ReviewStatusBanner", () => {
           required: true,
         },
       ],
-      [],
+      0,
       onJump,
     );
     expect(within(banner).getByText(/割引対象の商品を選択/)).toBeInTheDocument();
@@ -134,49 +134,40 @@ describe("ReviewStatusBanner", () => {
     expect(onJump).toHaveBeenCalledWith("discount-1");
   });
 
-  it("金額と税率別集計が一致していればレシート全体の確認を重ねて表示しない", () => {
-    const { banner } = renderBanner(
-      matchedChecks,
-      [],
-      [
-        {
-          id: "reading",
-          message: "レシート全体の読み取り確認です。",
-          target: "items",
-          required: false,
-          scope: "receipt",
-        },
-      ],
-    );
+  it("金額と税率別集計が一致していれば成功メッセージだけを表示する", () => {
+    const { banner } = renderBanner(matchedChecks);
     expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
-    expect(
-      within(banner).queryByRole("button", { name: "商品一覧を見比べる" }),
-    ).not.toBeInTheDocument();
+    expect(within(banner).getByText(/印字額と明細の金額が一致しています/)).toBeInTheDocument();
   });
 
-  it("比較不能ならレシート全体の確認を補助情報として表示する", () => {
+  it("税率未確定による比較不能は1つの案内にまとめる", async () => {
+    const user = userEvent.setup();
+    const onJump = vi.fn();
     const { banner } = renderBanner(
       {
-        amount: matchedChecks.amount,
+        amount: {
+          status: "uncomparable",
+          variant: "direct",
+          reason: "税率が未確定です",
+          focusTarget: "item-1",
+        },
         taxRate: {
           status: "uncomparable",
           rows: [],
           reason: "税率が未確定です",
-          focusTarget: "items",
+          focusTarget: "item-1",
         },
       },
       [],
-      [
-        {
-          id: "reading",
-          message: "レシート全体の読み取り確認です。",
-          target: "items",
-          required: false,
-          scope: "receipt",
-        },
-      ],
+      3,
+      onJump,
     );
-    expect(within(banner).getByText("レシート全体の確認")).toBeInTheDocument();
-    expect(within(banner).getByRole("button", { name: "商品一覧を見比べる" })).toBeInTheDocument();
+    expect(
+      within(banner).getByText("税率が未確定のため、金額と税率別集計を比較できません"),
+    ).toBeInTheDocument();
+    expect(within(banner).getByText(/未確定の商品が3件/)).toBeInTheDocument();
+    expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
+    await user.click(within(banner).getByRole("button", { name: "未確定の商品を確認する" }));
+    expect(onJump).toHaveBeenCalledWith("item-1");
   });
 });

@@ -95,7 +95,6 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const guidance = getReviewGuidance(form, items, draft);
   const required = guidance.filter((issue) => issue.required);
   const recommendations = guidance.filter((issue) => !issue.required && issue.scope !== "receipt");
-  const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");
   const specificGuidance = guidance.filter((issue) => issue.scope !== "receipt");
   const itemTargets = new Set(items.map((item) => item.id));
   const bannerGuidance = specificGuidance.filter(
@@ -116,6 +115,9 @@ export function ReviewDialog(props: ReviewDialogProps) {
     taxSummaries: draft?.taxSummaries,
     rawObservation: draft?.rawObservation,
   });
+  const unresolvedTaxItemCount = items.filter(
+    (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
+  ).length;
   const checkMismatchCount = [checks.amount, checks.taxRate].filter(
     (check) => check.status === "mismatch",
   ).length;
@@ -406,13 +408,17 @@ export function ReviewDialog(props: ReviewDialogProps) {
                     variant="outlined"
                     color={recommendationCount ? "warning" : "success"}
                     icon={recommendationCount ? undefined : <CheckCircleIcon />}
-                    label={`確認推奨 ${recommendationCount}件`}
+                    label={
+                      unresolvedTaxItemCount > 0
+                        ? `税率未確定 ${unresolvedTaxItemCount}件`
+                        : `確認推奨 ${recommendationCount}件`
+                    }
                   />
                 </Stack>
                 <ReviewStatusBanner
                   checks={checks}
                   issues={bannerGuidance}
-                  receiptIssues={receiptGuidance}
+                  unresolvedTaxItemCount={unresolvedTaxItemCount}
                   busy={busy}
                   onJump={goTo}
                 />
@@ -513,7 +519,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                           variant="caption"
                           sx={{ width: 88, flexShrink: 0, textAlign: "center" }}
                         >
-                          操作
+                          詳細
                         </Typography>
                       </Stack>
                     )}
@@ -660,6 +666,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
         requiredCount={required.length}
         checkMismatchCount={checkMismatchCount}
         recommendationCount={recommendationCount}
+        unresolvedTaxItemCount={unresolvedTaxItemCount}
         totalOnly={totalOnly}
         onClose={props.onClose}
         onSubmit={save}

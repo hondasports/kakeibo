@@ -8,6 +8,7 @@ export function ReviewDialogActions({
   requiredCount,
   checkMismatchCount = 0,
   recommendationCount,
+  unresolvedTaxItemCount = 0,
   totalOnly,
   onClose,
   onSubmit,
@@ -22,6 +23,8 @@ export function ReviewDialogActions({
   checkMismatchCount?: number;
   /** 確認推奨件数（比較不能を含む） */
   recommendationCount: number;
+  /** 税率または税込／税抜が未確定の明細数 */
+  unresolvedTaxItemCount?: number;
   totalOnly: boolean;
   onClose: () => void;
   onSubmit: () => void;
@@ -34,8 +37,10 @@ export function ReviewDialogActions({
       ? `保存前に修正が必要：${fixCount}件`
       : checkMismatchCount > 0
         ? `修正必須 ${fixCount}件。確認事項を残したまま下書きを保存できます。`
-        : recommendationCount > 0
-          ? `確認推奨 ${recommendationCount}件。確認事項を残したまま下書きを保存できます。`
+        : unresolvedTaxItemCount > 0
+          ? `税率未確定 ${unresolvedTaxItemCount}件。商品ごとに税率を確認してください。`
+          : recommendationCount > 0
+            ? "確認事項があります。確認事項を残したまま下書きを保存できます。"
           : "確認結果：計算した金額が一致しています。OCRの読み取りがすべて正しいことを保証するものではありません。";
   const statusColor =
     requiredCount > 0 || checkMismatchCount > 0
@@ -47,8 +52,10 @@ export function ReviewDialogActions({
     ? "処理中"
     : fixCount > 0
       ? `修正必須 ${fixCount}件`
-      : recommendationCount > 0
-        ? `確認推奨 ${recommendationCount}件`
+      : unresolvedTaxItemCount > 0
+        ? `税率未確定 ${unresolvedTaxItemCount}件`
+        : recommendationCount > 0
+          ? "確認事項あり"
         : "金額を確認済み";
   const submitLabel =
     requiredCount > 0
