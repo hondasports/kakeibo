@@ -58,13 +58,18 @@ async function resolveE2eScope(
   return { userId: resolvedUserId, groupId: configuredGroupId };
 }
 
-function isSeedBody(body: unknown): body is { userId?: string; email?: string; groupId?: string } {
+function isSeedBody(
+  body: unknown,
+): body is { userId?: string; email?: string; groupId?: string; savedAsTotalOnly?: boolean } {
   if (body === null || typeof body !== "object" || Array.isArray(body)) return false;
   const candidate = body as Record<string, unknown>;
-  return ["userId", "email", "groupId"].every(
-    (key) =>
-      candidate[key] === undefined ||
-      (typeof candidate[key] === "string" && candidate[key].length <= MAX_E2E_FIELD_LENGTH),
+  return (
+    ["userId", "email", "groupId"].every(
+      (key) =>
+        candidate[key] === undefined ||
+        (typeof candidate[key] === "string" && candidate[key].length <= MAX_E2E_FIELD_LENGTH),
+    ) &&
+    (candidate.savedAsTotalOnly === undefined || typeof candidate.savedAsTotalOnly === "boolean")
   );
 }
 
@@ -149,6 +154,7 @@ export const e2eSeedTaxReviewDraftHandler = httpAction(async (ctx, req) => {
       groupId: scope.groupId,
       createdByUserId: scope.userId,
       categoryId,
+      savedAsTotalOnly: body.savedAsTotalOnly,
     },
   );
 

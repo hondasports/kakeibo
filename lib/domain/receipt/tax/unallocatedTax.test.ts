@@ -1,19 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { unallocatedTaxReceipt } from "./fixtures/unallocatedTaxReceipt";
 import { reinterpretDraftTax } from "./reinterpretDraftTax";
-import { reviewSaveSummary } from "../../../../src/features/ai-expense-queue/utils/reviewGuidance";
-import type {
-  ReviewFormValues,
-  ReviewItemValues,
-} from "../../../../src/features/ai-expense-queue/types/types";
-const form: ReviewFormValues = {
-  documentType: "receipt",
-  shopName: "匿名店",
-  date: "2026-09-09",
-  amountYen: "4662",
-  categoryId: "cat",
-  registrationMode: "detailed",
-};
+import { buildAmountCheck } from "../../../../src/features/ai-expense-queue/utils/reviewChecks";
+import type { ReviewItemValues } from "../../../../src/features/ai-expense-queue/types/types";
+import type { ReinterpretDraftTaxInput } from "./reinterpretDraftTax";
 const reviewItems = (
   fields: ReturnType<typeof reinterpretDraftTax>["itemFields"],
 ): ReviewItemValues[] =>
@@ -24,16 +14,24 @@ const reviewItems = (
     categoryId: "cat",
     amountYen: String(field.printedAmountYen),
   }));
+const amountCheck = (input: ReinterpretDraftTaxInput) =>
+  buildAmountCheck({
+    items: reviewItems(reinterpretDraftTax(input).itemFields),
+    paidTotalYen: 4662,
+    taxSummaries: input.taxSummaries,
+  });
 describe("#748 配分未完了と真の0円", () => {
   it("旧0円データ→税内訳だけ修正→割引修正で4662/370/0になる", () => {
     const input = unallocatedTaxReceipt();
     const initial = reinterpretDraftTax(input);
     expect(initial.itemFields[0].taxAllocationStatus).toBe("unallocated");
-    expect(reviewSaveSummary(form, reviewItems(initial.itemFields))).toMatchObject({
-      printedTotal: 4292,
-      itemTotal: undefined,
-      taxYen: undefined,
-      difference: undefined,
+    expect(amountCheck(input)).toMatchObject({
+      status: "matched",
+      variant: "external",
+      itemsPrintedTotalYen: 4292,
+      itemsComparableTotalYen: 4292,
+      printedSubtotalYen: 4292,
+      printedTaxYen: 370,
     });
     input.taxSummaries = input.taxSummaries.map((s) => ({
       ...s,
@@ -50,11 +48,12 @@ describe("#748 配分未完了と真の0円", () => {
     input.items[8].taxRatePercent = 8;
     const complete = reinterpretDraftTax(input);
     expect(complete.itemFields.every((i) => i.taxAllocationStatus === "allocated")).toBe(true);
-    expect(reviewSaveSummary(form, reviewItems(complete.itemFields))).toMatchObject({
-      printedTotal: 4292,
-      itemTotal: 4662,
-      taxYen: 370,
-      difference: 0,
+    expect(amountCheck(input)).toMatchObject({
+      status: "matched",
+      variant: "external",
+      itemsPrintedTotalYen: 4292,
+      itemsComparableTotalYen: 4662,
+      printedTaxYen: 370,
     });
     const again = reinterpretDraftTax({
       ...input,

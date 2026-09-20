@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewFormValues, ReviewItemValues } from "../types/types";
-import { effectiveReviewMode, getReviewGuidance, reviewSaveSummary } from "./reviewGuidance";
+import { effectiveReviewMode, getReviewGuidance } from "./reviewGuidance";
+import { buildAmountCheck } from "./reviewChecks";
 import { getReviewSubmitError } from "./reviewValidation";
 
 const form: ReviewFormValues = {
@@ -34,11 +35,12 @@ describe("下書きの修正状態と保存内容", () => {
       [],
     );
     expect(getReviewSubmitError(form, [product, linked])).toBeNull();
-    expect(reviewSaveSummary(form, [product, linked])).toMatchObject({
-      itemTotal: 92,
-      difference: 0,
-      taxYen: undefined,
-    });
+    expect(
+      buildAmountCheck({
+        items: [product, linked],
+        paidTotalYen: Number(form.amountYen),
+      }),
+    ).toMatchObject({ status: "matched" });
   });
   it.each([
     [{ ...form, documentType: "unknown" as const }, [product], "document"],
@@ -62,29 +64,18 @@ describe("下書きの修正状態と保存内容", () => {
       getReviewGuidance({ ...total, shopName: "" }, [discount]).filter((issue) => issue.required),
     ).toEqual([expect.objectContaining({ target: "shopName" })]);
   });
-  it("現在の明細と合計を照合し、空の金額や未確定の税を0円にしない", () => {
+  it("明細と支払額の差は金額確認が担い、空の金額は比較不能にする", () => {
     expect(
-      reviewSaveSummary({ ...form, amountYen: "200" }, [{ ...product, amountYen: "150" }]),
-    ).toMatchObject({ itemTotal: 150, difference: 50, taxYen: undefined });
-    expect(reviewSaveSummary(form, [{ ...product, amountYen: "" }])).toMatchObject({
-      itemTotal: undefined,
-      difference: undefined,
-      taxYen: undefined,
-    });
+      buildAmountCheck({
+        items: [{ ...product, amountYen: "150" }],
+        paidTotalYen: 200,
+      }),
+    ).toMatchObject({ status: "mismatch", differenceYen: -50 });
     expect(
-      reviewSaveSummary(form, [
-        {
-          ...product,
-          amountYen: "92",
-          normalizedAmountYen: 92,
-          taxAllocationStatus: "allocated",
-          allocatedTaxYen: 6,
-          taxRatePercent: 8,
-          amountBasis: "tax_included",
-          taxResolutionStatus: "resolved",
-          taxResolutionSource: "item_explicit",
-        },
-      ]).taxYen,
-    ).toBe(6);
+      buildAmountCheck({
+        items: [{ ...product, amountYen: "" }],
+        paidTotalYen: 92,
+      }).status,
+    ).toBe("uncomparable");
   });
 });

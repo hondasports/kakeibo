@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CloseIcon from "@mui/icons-material/Close";
 import {
   Alert,
   Box,
@@ -7,12 +9,8 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  FormControl,
-  FormControlLabel,
-  FormLabel,
+  IconButton,
   MenuItem,
-  Radio,
-  RadioGroup,
   Stack,
   TextField,
   Typography,
@@ -29,16 +27,16 @@ import type { TaxSummaryChange } from "./ReceiptTaxSummaryEditor";
 import type { AmountBasis } from "../../../../../lib/receiptTax/types";
 import { ReviewDialogActions } from "./ReviewDialogActions";
 import { ReviewItemCard } from "./ReviewItemCard";
+import { ReviewItemRow } from "./ReviewItemRow";
+import { ReviewCheckCards } from "./ReviewCheckCards";
+import { ReviewStatusBanner } from "./ReviewStatusBanner";
 import { ReceiptTaxSummary } from "./ReceiptTaxSummary";
-import {
-  getReviewGuidance,
-  effectiveReviewMode,
-  reviewSaveSummary,
-} from "../../utils/reviewGuidance";
+import { getReviewGuidance, effectiveReviewMode } from "../../utils/reviewGuidance";
+import { buildReviewChecks } from "../../utils/reviewChecks";
+import { buildTaxContextFromReviewItem } from "../../utils/receiptItemTaxViewModel";
 import { isDiscountLine } from "../../utils/discountItems";
 import { documentTypeLabels, reviewDocumentTypeOptions } from "../labels";
 import { getReviewSubmitError } from "../../utils/reviewValidation";
-import { buildTaxContextFromReviewItem } from "../../utils/receiptItemTaxViewModel";
 
 export type ReviewDialogProps = {
   open: boolean;
@@ -101,7 +99,24 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");
   const specificGuidance = guidance.filter((issue) => issue.scope !== "receipt");
   const totalOnly = effectiveReviewMode(form) === "totalOnly";
-  const summary = reviewSaveSummary(form, items);
+  const paidTotalYen =
+    form.amountYen.trim() !== "" && Number.isFinite(Number(form.amountYen))
+      ? Number(form.amountYen)
+      : undefined;
+  const checks = buildReviewChecks({
+    items,
+    paidTotalYen,
+    taxSummaries: draft?.taxSummaries,
+    rawObservation: draft?.rawObservation,
+  });
+  const checkMismatchCount = [checks.amount, checks.taxRate].filter(
+    (check) => check.status === "mismatch",
+  ).length;
+  const checkUncomparableCount = [checks.amount, checks.taxRate].filter(
+    (check) => check.status === "uncomparable",
+  ).length;
+  const fixCount = required.length + checkMismatchCount;
+  const recommendationCount = recommendations.length + checkUncomparableCount;
   const busy =
     props.reviewSubmitting ||
     props.taxUpdatingItemId != null ||
@@ -110,10 +125,12 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const products = items.filter((item) => !isDiscountLine(item.itemName, item.lineType));
   const categoryNames = new Map(categories.map((category) => [category._id, category.name]));
   const canEditTax = Boolean(draft?.taxSummaries?.length);
-  const unknownChoice =
-    form.priceTaxTreatment === "unknown" || form.taxRateComposition === "unknown";
   const goTo = (target: string) => {
-    setExpanded((current) => ({ ...current, [target]: true }));
+    setExpanded((current) => ({
+      ...current,
+      [target]: true,
+      ...(target === "tax-summary" ? { reference: true } : {}),
+    }));
     setJump(target);
   };
   useEffect(() => {
@@ -139,10 +156,6 @@ export function ReviewDialog(props: ReviewDialogProps) {
     if (node) sections.current.set(target, node);
     else sections.current.delete(target);
   };
-  const setChoice = (field: "priceTaxTreatment" | "taxRateComposition", value: string) => {
-    onFieldChange(field, value);
-    if (value === "unknown") onFieldChange("registrationMode", "totalOnly");
-  };
   const save = () => {
     const validation = getReviewSubmitError(
       { ...form, registrationMode: effectiveReviewMode(form) },
@@ -167,7 +180,20 @@ export function ReviewDialog(props: ReviewDialogProps) {
         paper: { sx: { overscrollBehavior: "contain", height: { sm: "min(900px, 92dvh)" } } },
       }}
     >
-      <DialogTitle sx={{ pb: 1 }}>下書き確認</DialogTitle>
+      <DialogTitle sx={{ pb: 1, display: "flex", alignItems: "center" }}>
+        <Box component="span" sx={{ flexGrow: 1 }}>
+          下書き確認
+        </Box>
+        <IconButton
+          aria-label="閉じる"
+          disabled={busy}
+          onClick={props.onClose}
+          size="small"
+          sx={{ mr: -1 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
       <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
         {isReviewDraftLoading ? (
           <Typography>下書きを読み込んでいます。</Typography>
@@ -178,7 +204,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
         ) : (
           <>
             {!categories.length && (
-              <Alert severity="warning">
+              <Alert severity="warning" sx={{ mb: 2 }}>
                 カテゴリを読み込めていません。カテゴリ設定と接続状態を確認してください。
               </Alert>
             )}
@@ -196,554 +222,343 @@ export function ReviewDialog(props: ReviewDialogProps) {
                 <Box
                   component="aside"
                   aria-label="レシート画像"
-                  sx={{ position: { md: "sticky" }, top: 0, minWidth: 0 }}
+                  sx={{
+                    display: { xs: "none", md: "block" },
+                    position: { md: "sticky" },
+                    top: 0,
+                    minWidth: 0,
+                  }}
                 >
-                  <Box component="details" sx={{ display: { xs: "block", md: "none" } }}>
-                    <Typography component="summary" sx={{ cursor: "pointer", py: 1 }}>
-                      レシート画像を見ながら確認
-                    </Typography>
-                    <Box
-                      component="img"
-                      src={props.imageDataUrl}
-                      alt="読み取り元のレシート"
-                      sx={{ width: "100%" }}
-                    />
-                  </Box>
-                  <Box sx={{ display: { xs: "none", md: "block" } }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                      読み取り元のレシート
-                    </Typography>
-                    <Box
-                      component="img"
-                      src={props.imageDataUrl}
-                      alt="読み取り元のレシート"
-                      sx={{
-                        width: "100%",
-                        maxHeight: "70dvh",
-                        objectFit: "contain",
-                        objectPosition: "top",
-                      }}
-                    />
-                  </Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    読み取り元のレシート
+                  </Typography>
+                  <Box
+                    component="img"
+                    src={props.imageDataUrl}
+                    alt="読み取り元のレシート"
+                    sx={{
+                      width: "100%",
+                      maxHeight: "70dvh",
+                      objectFit: "contain",
+                      objectPosition: "top",
+                    }}
+                  />
                 </Box>
               )}
-              <Stack spacing={3} sx={{ minWidth: 0 }}>
-                <Box>
-                  <Typography component="h2" variant="h6">
-                    {form.shopName || "店名・内容が未入力"}
-                  </Typography>
-                  <Typography color="text.secondary">
-                    {form.date || "日付未入力"} ・{" "}
-                    {form.amountYen ? `${Number(form.amountYen).toLocaleString()}円` : "金額未入力"}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    読み取り内容を確認し、必要なところだけその場で直せます。
-                  </Typography>
-                </Box>
-                <Box component="section" aria-label="確認すること">
-                  <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap" }}>
-                    <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 700 }}>
-                      確認すること
-                    </Typography>
-                    <Chip
-                      size="small"
-                      color={required.length ? "error" : "default"}
-                      label={`修正必須 ${required.length}件`}
-                    />
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label={`確認推奨 ${recommendations.length}件`}
-                    />
-                  </Stack>
-                  {specificGuidance.length ? (
-                    <Stack component="ul" spacing={1} sx={{ m: 0, pl: 2.5 }}>
-                      {specificGuidance.map((issue) => (
-                        <Box component="li" key={issue.id}>
-                          <Typography
-                            variant="body2"
-                            color={issue.required ? "error.main" : "text.secondary"}
-                          >
-                            {issue.message}
-                          </Typography>
-                          <Button
-                            disabled={busy}
-                            type="button"
-                            size="small"
-                            onClick={() => goTo(issue.target)}
-                          >
-                            {issue.required ? "修正箇所へ" : "確認箇所へ"}
-                          </Button>
-                        </Box>
-                      ))}
-                    </Stack>
-                  ) : (
-                    <Typography variant="body2">
-                      個別の修正・確認が必要な項目はありません。
-                    </Typography>
-                  )}
-                  {receiptGuidance.map((issue) => (
-                    <Alert key={issue.id} severity="info" sx={{ mt: 1.5 }}>
-                      <Typography variant="subtitle2">レシート全体の確認</Typography>
-                      {issue.message}
-                      <Box>
-                        <Button disabled={busy} size="small" onClick={() => goTo(issue.target)}>
-                          商品一覧を見比べる
-                        </Button>
-                      </Box>
-                    </Alert>
-                  ))}
-                </Box>
+              <Stack spacing={2.5} sx={{ minWidth: 0 }}>
                 <Box
                   component="fieldset"
                   disabled={busy}
                   inert={busy}
                   sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}
                 >
-                  <Stack spacing={3}>
+                  <Box
+                    component="section"
+                    ref={register("basics")}
+                    tabIndex={-1}
+                    aria-label="レシートの基本情報"
+                    sx={{ scrollMarginTop: 16 }}
+                  >
+                    <TextField
+                      ref={register("shopName")}
+                      variant="standard"
+                      label="店名・内容"
+                      fullWidth
+                      value={form.shopName}
+                      error={!form.shopName.trim()}
+                      slotProps={{
+                        htmlInput: { style: { fontSize: "1.25rem", fontWeight: 600 } },
+                        inputLabel: { shrink: true },
+                      }}
+                      onChange={(event) => onFieldChange("shopName", event.target.value)}
+                    />
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 1.5 }}>
+                      <TextField
+                        ref={register("date")}
+                        variant="standard"
+                        label="支出日（レシート記載日）"
+                        type="date"
+                        fullWidth
+                        value={form.date}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                        onChange={(event) => onFieldChange("date", event.target.value)}
+                      />
+                      <TextField
+                        ref={register("amountYen")}
+                        variant="standard"
+                        label="合計金額"
+                        fullWidth
+                        value={form.amountYen}
+                        slotProps={{ htmlInput: { inputMode: "numeric" } }}
+                        onChange={(event) =>
+                          onFieldChange("amountYen", event.target.value.replace(/[^\d]/g, ""))
+                        }
+                      />
+                      <TextField
+                        ref={register("categoryId")}
+                        variant="standard"
+                        label="レシート全体のカテゴリ"
+                        select
+                        fullWidth
+                        value={form.categoryId}
+                        error={!form.categoryId}
+                        onChange={(event) => onFieldChange("categoryId", event.target.value)}
+                      >
+                        {categories.map((category) => (
+                          <MenuItem key={category._id} value={category._id}>
+                            {category.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Stack>
                     <Box
-                      component="section"
-                      ref={register("basics")}
-                      tabIndex={-1}
-                      aria-label="レシートの基本情報"
-                      sx={{ scrollMarginTop: 16 }}
+                      component="details"
+                      ref={register("document")}
+                      open={expanded.document ?? form.documentType === "unknown"}
+                      sx={{ mt: 1 }}
                     >
                       <Typography
-                        component="h3"
-                        variant="subtitle1"
-                        sx={{ fontWeight: 700, mb: 1.5 }}
-                      >
-                        レシートの基本情報
-                      </Typography>
-                      <Stack spacing={1.5}>
-                        <TextField
-                          ref={register("shopName")}
-                          label="店名・内容"
-                          fullWidth
-                          value={form.shopName}
-                          error={!form.shopName.trim()}
-                          onChange={(event) => onFieldChange("shopName", event.target.value)}
-                        />
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                          <TextField
-                            ref={register("date")}
-                            label="支出日（レシート記載日）"
-                            type="date"
-                            fullWidth
-                            value={form.date}
-                            slotProps={{ inputLabel: { shrink: true } }}
-                            onChange={(event) => onFieldChange("date", event.target.value)}
-                          />
-                          <TextField
-                            ref={register("amountYen")}
-                            label="合計金額"
-                            fullWidth
-                            value={form.amountYen}
-                            slotProps={{ htmlInput: { inputMode: "numeric" } }}
-                            onChange={(event) =>
-                              onFieldChange("amountYen", event.target.value.replace(/[^\d]/g, ""))
-                            }
-                          />
-                        </Stack>
-                        <TextField
-                          ref={register("categoryId")}
-                          label="レシート全体のカテゴリ"
-                          select
-                          fullWidth
-                          disabled={busy}
-                          value={form.categoryId}
-                          error={!form.categoryId}
-                          onChange={(event) => onFieldChange("categoryId", event.target.value)}
-                        >
-                          {categories.map((category) => (
-                            <MenuItem key={category._id} value={category._id}>
-                              {category.name}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                        <Box
-                          component="details"
-                          ref={register("document")}
-                          open={expanded.document ?? form.documentType === "unknown"}
-                        >
-                          <Typography
-                            component="summary"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              setExpanded((current) => ({
-                                ...current,
-                                document: !(current.document ?? form.documentType === "unknown"),
-                              }));
-                            }}
-                            sx={{ cursor: "pointer" }}
-                          >
-                            書類種別：{documentTypeLabels[form.documentType]}
-                          </Typography>
-                          <TextField
-                            label="書類種別"
-                            error={form.documentType === "unknown"}
-                            select
-                            fullWidth
-                            disabled={busy}
-                            value={form.documentType === "unknown" ? "" : form.documentType}
-                            sx={{ mt: 1 }}
-                            onChange={(event) => onFieldChange("documentType", event.target.value)}
-                          >
-                            <MenuItem value="" disabled>
-                              書類種別を選択
-                            </MenuItem>
-                            {reviewDocumentTypeOptions.map(([value, label]) => (
-                              <MenuItem key={value} value={value}>
-                                {label}
-                              </MenuItem>
-                            ))}
-                          </TextField>
-                        </Box>
-                      </Stack>
-                    </Box>
-                    {items.length > 0 && (
-                      <Box
-                        component="section"
-                        ref={register("tax")}
-                        tabIndex={-1}
-                        aria-label="レシート全体の税込・税率設定"
-                        sx={{ scrollMarginTop: 16 }}
-                      >
-                        <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 700 }}>
-                          レシート全体の税込・税率設定
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          選択すると、各商品の税込／税抜・税率をもとに登録額と税額を再計算します。結果は下の「商品と割引」「保存内容を確認」に表示されます。分からない場合は合計だけ保存できます。
-                        </Typography>
-                        <Stack spacing={1.5}>
-                          <FormControl>
-                            <FormLabel>1. 商品の表示価格はどれですか</FormLabel>
-                            <RadioGroup
-                              aria-label="1. 商品の表示価格はどれですか"
-                              value={form.priceTaxTreatment ?? ""}
-                              onChange={(event) =>
-                                setChoice("priceTaxTreatment", event.target.value)
-                              }
-                            >
-                              {[
-                                ["included", "表示価格に税が含まれている"],
-                                ["excluded", "表示価格にあとから税が加算される"],
-                                ["perItem", "商品によって異なる"],
-                                ["unknown", "分からない"],
-                              ].map(([value, label]) => (
-                                <FormControlLabel
-                                  key={value}
-                                  value={value}
-                                  control={<Radio disabled={busy} />}
-                                  label={label}
-                                />
-                              ))}
-                            </RadioGroup>
-                          </FormControl>
-                          <FormControl>
-                            <FormLabel>2. 税率はどれですか</FormLabel>
-                            <RadioGroup
-                              aria-label="2. 税率はどれですか"
-                              value={form.taxRateComposition ?? ""}
-                              onChange={(event) =>
-                                setChoice("taxRateComposition", event.target.value)
-                              }
-                            >
-                              {[
-                                ["rate8", "すべて8%"],
-                                ["rate10", "すべて10%"],
-                                ["mixed", "8%と10%が混ざっている"],
-                                ["unknown", "分からない"],
-                              ].map(([value, label]) => (
-                                <FormControlLabel
-                                  key={value}
-                                  value={value}
-                                  control={<Radio disabled={busy} />}
-                                  label={label}
-                                />
-                              ))}
-                            </RadioGroup>
-                          </FormControl>
-                        </Stack>
-                      </Box>
-                    )}
-                    {canEditTax && (
-                      <Box
-                        component="section"
-                        ref={register("tax-summary")}
-                        tabIndex={-1}
-                        aria-label="税内訳を確認"
-                      >
-                        <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 700 }}>
-                          税内訳を確認
-                        </Typography>
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                          税額が未確定の場合は、対象額が税込か税抜かをレシートと照合してください。8%と10%が混ざっている場合、上の全体設定だけでは税内訳は確定しません。割引も対象税率に含めて確認してください。
-                        </Typography>
-                        <ReceiptTaxSummary
-                          draft={draft}
-                          onSummaryChange={busy ? undefined : props.onTaxSummaryChange}
-                          updatingIndex={props.taxSummaryUpdatingIndex}
-                        />
-                      </Box>
-                    )}
-                    <Box
-                      component="section"
-                      ref={register("items")}
-                      tabIndex={-1}
-                      aria-label="商品と割引"
-                      sx={{ scrollMarginTop: 16 }}
-                    >
-                      <Stack
-                        direction="row"
-                        sx={{
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                          mb: 1,
+                        component="summary"
+                        variant="body2"
+                        color="text.secondary"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setExpanded((current) => ({
+                            ...current,
+                            document: !(current.document ?? form.documentType === "unknown"),
+                          }));
                         }}
+                        sx={{ cursor: "pointer" }}
                       >
-                        <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 700 }}>
-                          商品と割引（{items.length}明細）
-                        </Typography>
+                        書類種別：{documentTypeLabels[form.documentType]}
+                      </Typography>
+                      <TextField
+                        label="書類種別"
+                        error={form.documentType === "unknown"}
+                        select
+                        fullWidth
+                        value={form.documentType === "unknown" ? "" : form.documentType}
+                        sx={{ mt: 1 }}
+                        onChange={(event) => onFieldChange("documentType", event.target.value)}
+                      >
+                        <MenuItem value="" disabled>
+                          書類種別を選択
+                        </MenuItem>
+                        {reviewDocumentTypeOptions.map(([value, label]) => (
+                          <MenuItem key={value} value={value}>
+                            {label}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Box>
+                  </Box>
+                </Box>
+                <Stack
+                  component="section"
+                  aria-label="確認件数"
+                  direction="row"
+                  spacing={1}
+                  sx={{ flexWrap: "wrap", rowGap: 0.5 }}
+                >
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color={fixCount ? "error" : "success"}
+                    icon={fixCount ? undefined : <CheckCircleIcon />}
+                    label={`修正必須 ${fixCount}件`}
+                  />
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color={recommendationCount ? "warning" : "success"}
+                    icon={recommendationCount ? undefined : <CheckCircleIcon />}
+                    label={`確認推奨 ${recommendationCount}件`}
+                  />
+                </Stack>
+                <ReviewStatusBanner
+                  checks={checks}
+                  issues={specificGuidance}
+                  receiptIssues={receiptGuidance}
+                  busy={busy}
+                  onJump={goTo}
+                />
+                <ReviewCheckCards amount={checks.amount} taxRate={checks.taxRate} />
+                <Box
+                  component="fieldset"
+                  disabled={busy}
+                  inert={busy}
+                  sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}
+                >
+                  <Box
+                    component="section"
+                    ref={register("items")}
+                    tabIndex={-1}
+                    aria-label="商品一覧"
+                    sx={{ scrollMarginTop: 16 }}
+                  >
+                    <Stack
+                      direction="row"
+                      sx={{
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        mb: 1,
+                      }}
+                    >
+                      <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 700 }}>
+                        商品一覧（{items.length}件）
+                      </Typography>
+                      <Stack direction="row" spacing={1}>
+                        {products.length > 1 && (
+                          <Button
+                            disabled={busy}
+                            type="button"
+                            onClick={() => props.onCategorySplitChange(!props.isCategorySplit)}
+                          >
+                            {props.isCategorySplit ? "単一カテゴリに戻す" : "カテゴリを分ける"}
+                          </Button>
+                        )}
                         <Button disabled={busy} type="button" onClick={props.onAddItem}>
                           明細を追加
                         </Button>
                       </Stack>
-                      {guidance
-                        .filter((issue) => issue.target === "items")
-                        .map((issue) => (
-                          <Alert
-                            key={issue.id}
-                            severity={issue.required ? "error" : "info"}
-                            sx={{ mb: 1.5 }}
-                          >
-                            <Typography variant="subtitle2">
-                              {issue.scope === "receipt"
-                                ? "レシート全体の確認"
-                                : issue.required
-                                  ? "修正必須"
-                                  : "確認推奨"}
-                            </Typography>
-                            {issue.message}
-                          </Alert>
-                        ))}
-                      {totalOnly && (
-                        <Alert severity="info" sx={{ mb: 1 }}>
-                          合計だけ保存するため、商品明細は参考として残します。商品別のカテゴリ集計には使いません。
-                        </Alert>
-                      )}
-                      {products.length > 1 && (
-                        <Button
-                          disabled={busy}
-                          type="button"
-                          onClick={() => props.onCategorySplitChange(!props.isCategorySplit)}
-                          sx={{ mb: 1 }}
+                    </Stack>
+                    {guidance
+                      .filter(
+                        (issue) => issue.target === "items" && issue.scope !== "receipt",
+                      )
+                      .map((issue) => (
+                        <Alert
+                          key={issue.id}
+                          severity={issue.required ? "error" : "info"}
+                          sx={{ mb: 1.5 }}
                         >
-                          {props.isCategorySplit ? "単一カテゴリに戻す" : "カテゴリを分ける"}
-                        </Button>
-                      )}
-                      {!items.length && (
-                        <Typography variant="body2">
-                          明細はありません。レシートの合計とカテゴリを確認してください。
+                          <Typography variant="subtitle2">
+                            {issue.required ? "修正必須" : "確認推奨"}
+                          </Typography>
+                          {issue.message}
+                        </Alert>
+                      ))}
+                    {totalOnly && (
+                      <Alert severity="info" sx={{ mb: 1 }}>
+                        税を推測せず、レシート合計だけで保存します。商品明細は確認用に残りますが、履歴・予算・カテゴリ集計には使われません。
+                      </Alert>
+                    )}
+                    {!items.length && (
+                      <Typography variant="body2">
+                        明細はありません。レシートの合計とカテゴリを確認してください。
+                      </Typography>
+                    )}
+                    {items.length > 0 && (
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{
+                          display: { xs: "none", sm: "flex" },
+                          px: 1.5,
+                          mb: 0.5,
+                          color: "text.secondary",
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ width: "1.5em", flexShrink: 0 }}>
+                          No.
                         </Typography>
-                      )}
-                      <Stack spacing={1.5}>
-                        {items.map((item, index) => {
-                          const itemIssues = guidance.filter((issue) => issue.target === item.id);
-                          const isOpen = expanded[item.id] ?? itemIssues.length > 0;
-                          const context = buildTaxContextFromReviewItem(item);
-                          const target = products.find(
-                            (product) => product.id === item.discountTargetItemId,
-                          );
-                          return (
-                            <Box
-                              component="details"
-                              key={item.id}
-                              ref={register(item.id)}
-                              tabIndex={-1}
-                              open={isOpen}
-                              sx={{
-                                border: "1px solid",
-                                borderColor: itemIssues.some((issue) => issue.required)
-                                  ? "error.main"
-                                  : itemIssues.length
-                                    ? "warning.main"
-                                    : "divider",
-                                borderRadius: 1.5,
-                                p: 1.5,
-                                scrollMarginTop: 16,
-                              }}
-                            >
-                              <Box
-                                component="summary"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  setExpanded((current) => ({ ...current, [item.id]: !isOpen }));
-                                }}
-                                sx={{ cursor: "pointer" }}
-                              >
-                                <Typography component="span" sx={{ fontWeight: 700 }}>
-                                  {item.itemName || `明細 ${index + 1}`}　
-                                  {item.amountYen || "未入力"}円
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  {categoryNames.get(item.categoryId) ?? "カテゴリ未設定"} ・{" "}
-                                  {context.status === "resolved"
-                                    ? `${context.taxRatePercent}% / ${context.amountBasis === "tax_included" ? "税込" : "税抜"}`
-                                    : "税情報は未確定"}
-                                  {target ? ` ・ 割引対象：${target.itemName}` : ""}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  color={
-                                    itemIssues.some((issue) => issue.required)
-                                      ? "error.main"
-                                      : "text.secondary"
-                                  }
+                        <Typography variant="caption" sx={{ flex: 1, minWidth: 0 }}>
+                          商品名・内容
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ whiteSpace: "nowrap", flexShrink: 0, textAlign: "right" }}
+                        >
+                          金額
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ width: 76, flexShrink: 0, textAlign: "right" }}
+                        >
+                          税率
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ width: 88, flexShrink: 0, textAlign: "center" }}
+                        >
+                          操作
+                        </Typography>
+                      </Stack>
+                    )}
+                    <Stack spacing={1}>
+                      {items.map((item, index) => {
+                        const itemIssues = guidance.filter((issue) => issue.target === item.id);
+                        const isOpen = expanded[item.id] ?? itemIssues.length > 0;
+                        const target = products.find(
+                          (product) => product.id === item.discountTargetItemId,
+                        );
+                        return (
+                          <ReviewItemRow
+                            key={item.id}
+                            item={item}
+                            index={index}
+                            issues={itemIssues}
+                            open={isOpen}
+                            registerRef={register(item.id)}
+                            onToggle={() =>
+                              setExpanded((current) => ({ ...current, [item.id]: !isOpen }))
+                            }
+                            onOpen={() =>
+                              setExpanded((current) => ({ ...current, [item.id]: true }))
+                            }
+                            busy={busy}
+                            categoryName={categoryNames.get(item.categoryId)}
+                            targetName={target?.itemName}
+                          >
+                            <Stack spacing={1}>
+                              {itemIssues.map((issue) => (
+                                <Alert
+                                  key={issue.id}
+                                  severity={issue.required ? "error" : "info"}
                                 >
-                                  {itemIssues.length
-                                    ? `${itemIssues.some((issue) => issue.required) ? "修正必須" : "確認推奨"} ・ `
-                                    : ""}
-                                  {isOpen ? "閉じる" : "確認・修正する"}
-                                </Typography>
-                              </Box>
-                              <Stack
-                                spacing={1}
-                                sx={{ pt: 1.5 }}
-                                onFocusCapture={() =>
-                                  setExpanded((current) =>
-                                    current[item.id] === true
-                                      ? current
-                                      : { ...current, [item.id]: true },
-                                  )
+                                  {issue.message}
+                                </Alert>
+                              ))}
+                              <ReviewItemCard
+                                embedded
+                                item={item}
+                                index={index}
+                                categories={categories}
+                                categoryNamesById={categoryNames}
+                                productItems={products}
+                                selectedReviewDraft={draft}
+                                isCategorySplit={props.isCategorySplit}
+                                isExpanded={taxDetails[item.id] ?? false}
+                                taxUpdatingItemId={props.taxUpdatingItemId}
+                                disabled={busy}
+                                enableItemTaxEditing={canEditTax && !!item.persistedItemId}
+                                inlineTaxEditing
+                                onAmountBasisChange={props.onAmountBasisChange}
+                                onItemChange={props.onItemChange}
+                                onRemoveItem={props.onRemoveItem}
+                                onAssignCategoryToItems={props.onAssignCategoryToItems}
+                                onDiscountTargetChange={props.onDiscountTargetChange}
+                                onTaxRateChange={props.onTaxRateChange}
+                                onToggleDetail={() =>
+                                  setTaxDetails((current) => ({
+                                    ...current,
+                                    [item.id]: !current[item.id],
+                                  }))
                                 }
-                              >
-                                {itemIssues.map((issue) => (
-                                  <Alert
-                                    key={issue.id}
-                                    severity={issue.required ? "error" : "info"}
-                                  >
-                                    {issue.message}
-                                  </Alert>
-                                ))}
-                                <ReviewItemCard
-                                  item={item}
-                                  index={index}
-                                  categories={categories}
-                                  categoryNamesById={categoryNames}
-                                  productItems={products}
-                                  selectedReviewDraft={draft}
-                                  isCategorySplit={props.isCategorySplit}
-                                  isExpanded={taxDetails[item.id] ?? false}
-                                  taxUpdatingItemId={props.taxUpdatingItemId}
-                                  disabled={busy}
-                                  enableItemTaxEditing={canEditTax && !!item.persistedItemId}
-                                  inlineTaxEditing
-                                  onAmountBasisChange={props.onAmountBasisChange}
-                                  onItemChange={props.onItemChange}
-                                  onRemoveItem={props.onRemoveItem}
-                                  onAssignCategoryToItems={props.onAssignCategoryToItems}
-                                  onDiscountTargetChange={props.onDiscountTargetChange}
-                                  onTaxRateChange={props.onTaxRateChange}
-                                  onToggleDetail={() =>
-                                    setTaxDetails((current) => ({
-                                      ...current,
-                                      [item.id]: !current[item.id],
-                                    }))
-                                  }
-                                />
-                                {!canEditTax && context.status === "unresolved" && (
+                              />
+                              {!canEditTax &&
+                                buildTaxContextFromReviewItem(item).status === "unresolved" && (
                                   <Typography variant="body2" color="text.secondary">
-                                    税内訳を読み取れていません。上の「レシート全体の税込・税率設定」で確認するか、合計だけ保存できます。
+                                    税内訳を読み取れていません。レシートと照合して税率・税込／税抜を確認してください。
                                   </Typography>
                                 )}
-                              </Stack>
-                            </Box>
-                          );
-                        })}
-                      </Stack>
-                    </Box>
-                    <Box
-                      component="section"
-                      ref={register("save")}
-                      tabIndex={-1}
-                      aria-label="保存内容"
-                      sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1.5 }}
-                    >
-                      <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 700 }}>
-                        保存内容を確認
-                      </Typography>
-                      <Typography>
-                        支払額：
-                        {form.amountYen ? `${Number(form.amountYen).toLocaleString()}円` : "未入力"}
-                      </Typography>
-                      {items.length > 0 && (
-                        <>
-                          <Typography>
-                            印字額の合計：
-                            {summary.printedTotal === undefined
-                              ? "未確定"
-                              : `${summary.printedTotal.toLocaleString()}円`}
-                          </Typography>
-                          <Typography>
-                            商品合計：
-                            {summary.itemTotal === undefined
-                              ? "未確定"
-                              : `${summary.itemTotal.toLocaleString()}円`}
-                          </Typography>
-                          <Typography>
-                            差額：
-                            {summary.difference === undefined
-                              ? "未確定"
-                              : summary.difference === 0
-                                ? "0円（金額一致）"
-                                : `${Math.abs(summary.difference).toLocaleString()}円`}
-                          </Typography>
-                          <Typography>
-                            商品の税額：
-                            {summary.taxYen === undefined
-                              ? "未確定"
-                              : `${summary.taxYen.toLocaleString()}円`}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            金額の一致と、税情報の確定は別に確認しています。
-                          </Typography>
-                        </>
-                      )}
-                      <FormControl sx={{ mt: 2 }}>
-                        <FormLabel>保存方法</FormLabel>
-                        <RadioGroup
-                          aria-label="保存方法"
-                          value={effectiveReviewMode(form)}
-                          onChange={(event) =>
-                            onFieldChange("registrationMode", event.target.value)
-                          }
-                        >
-                          <FormControlLabel
-                            value="detailed"
-                            disabled={unknownChoice || busy}
-                            control={<Radio />}
-                            label="明細ごとに保存"
-                          />
-                          <FormControlLabel
-                            value="totalOnly"
-                            disabled={busy}
-                            control={<Radio />}
-                            label="レシート合計だけ保存"
-                          />
-                        </RadioGroup>
-                      </FormControl>
-                      {totalOnly && (
-                        <Alert severity="info">
-                          税を推測せず、レシート合計だけで保存します。商品明細は確認用に残りますが、履歴・予算・カテゴリ集計には使われません。
-                        </Alert>
-                      )}
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        まず下書きとして保存します。確認事項が残る場合は、保存後も確認待ちに残ります。
-                      </Typography>
-                    </Box>
-                  </Stack>
+                            </Stack>
+                          </ReviewItemRow>
+                        );
+                      })}
+                    </Stack>
+                  </Box>
                 </Box>
                 <Box
                   component="details"
@@ -773,7 +588,26 @@ export function ReviewDialog(props: ReviewDialogProps) {
                     ) : (
                       <Typography variant="body2">読み取り原文はありません。</Typography>
                     )}
-
+                    {canEditTax && (
+                      <Box
+                        component="section"
+                        ref={register("tax-summary")}
+                        tabIndex={-1}
+                        aria-label="税内訳を確認"
+                      >
+                        <Typography component="h3" variant="subtitle2" sx={{ fontWeight: 700 }}>
+                          税内訳を確認
+                        </Typography>
+                        <Typography variant="body2" sx={{ mb: 1 }}>
+                          税額が未確定の場合は、対象額が税込か税抜かをレシートと照合してください。割引も対象税率に含めて確認してください。
+                        </Typography>
+                        <ReceiptTaxSummary
+                          draft={draft}
+                          onSummaryChange={busy ? undefined : props.onTaxSummaryChange}
+                          updatingIndex={props.taxSummaryUpdatingIndex}
+                        />
+                      </Box>
+                    )}
                     {draft?.receiptInterpretation && draft.receiptUserOverride && (
                       <Button
                         disabled={busy}
@@ -796,8 +630,8 @@ export function ReviewDialog(props: ReviewDialogProps) {
         busy={busy}
         unavailable={unavailable}
         requiredCount={required.length}
-        recommendationCount={recommendations.length}
-        receiptReviewRecommended={receiptGuidance.length > 0}
+        checkMismatchCount={checkMismatchCount}
+        recommendationCount={recommendationCount}
         totalOnly={totalOnly}
         onClose={props.onClose}
         onSubmit={save}

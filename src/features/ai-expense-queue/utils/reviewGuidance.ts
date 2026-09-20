@@ -84,7 +84,7 @@ export function getReviewGuidance(
           "「" +
             name +
             "」：税額は未確定です。税内訳の対象額・商品の税率と金額を確認してください。",
-          draft?.taxSummaries?.length ? "tax-summary" : "tax",
+          draft?.taxSummaries?.length ? "tax-summary" : "items",
           false,
         );
       }
@@ -114,23 +114,6 @@ export function getReviewGuidance(
       const aggregateError = getReviewCategoryAggregateError(items);
       if (aggregateError) add("aggregate", aggregateError, "items", true);
     }
-    const total = items.reduce(
-      (sum, item) => sum + (item.normalizedAmountYen ?? Number(item.amountYen)),
-      0,
-    );
-    if (
-      items.length &&
-      !items.some((item) => item.taxAllocationStatus === "unallocated") &&
-      Number.isFinite(total) &&
-      Number(form.amountYen) !== total
-    ) {
-      add(
-        "difference",
-        `支払額と商品合計に${Math.abs(Number(form.amountYen) - total).toLocaleString()}円の差があります。明細・割引・税を確認してください。`,
-        "items",
-        false,
-      );
-    }
   }
   if (
     draft?.reviewReasons.some((reason) =>
@@ -147,40 +130,4 @@ export function getReviewGuidance(
     });
   }
   return issues;
-}
-
-export function reviewSaveSummary(form: ReviewFormValues, items: ReviewItemValues[]) {
-  const parsed = items.map((item) => Number(item.amountYen));
-  const validAmounts = items.every(
-    (item, index) => item.amountYen.trim() !== "" && Number.isFinite(parsed[index]),
-  );
-  const printedTotal = validAmounts ? parsed.reduce((sum, amount) => sum + amount, 0) : undefined;
-  const hasUnallocatedTax = items.some(
-    (item) =>
-      item.taxAllocationStatus !== "allocated" &&
-      (item.taxRatePercent != null || item.amountBasis != null),
-  );
-  const itemTotal =
-    validAmounts && !hasUnallocatedTax
-      ? items.reduce((sum, item) => sum + (item.normalizedAmountYen ?? Number(item.amountYen)), 0)
-      : undefined;
-  const taxResolved =
-    items.length > 0 &&
-    items.every(
-      (item) =>
-        buildTaxContextFromReviewItem(item).status === "resolved" &&
-        item.allocatedTaxYen !== undefined &&
-        item.taxAllocationStatus === "allocated",
-    );
-  return {
-    itemTotal,
-    printedTotal,
-    taxYen: taxResolved ? items.reduce((sum, item) => sum + item.allocatedTaxYen!, 0) : undefined,
-    difference:
-      itemTotal !== undefined &&
-      form.amountYen.trim() !== "" &&
-      Number.isFinite(Number(form.amountYen))
-        ? Number(form.amountYen) - itemTotal
-        : undefined,
-  };
 }
