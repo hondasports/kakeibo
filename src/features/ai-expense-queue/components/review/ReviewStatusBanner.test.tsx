@@ -60,7 +60,7 @@ describe("ReviewStatusBanner", () => {
     expect(onJump).toHaveBeenCalledWith("items");
   });
 
-  it("税率別不一致は行ごとの現在／印字を表示する", async () => {
+  it("税率設定の不一致は修正対象だけを案内する", async () => {
     const user = userEvent.setup();
     const onJump = vi.fn();
     const { banner } = renderBanner(
@@ -84,8 +84,11 @@ describe("ReviewStatusBanner", () => {
       0,
       onJump,
     );
-    expect(within(banner).getByText("税率別の明細合計が一致していません")).toBeInTheDocument();
-    expect(within(banner).getByText(/8%：現在 0円 ／ 印字 2,912円/)).toBeInTheDocument();
+    expect(within(banner).getByText("商品の税率を確認してください")).toBeInTheDocument();
+    expect(
+      within(banner).getByText(/レシートの税内訳と、商品の税率設定が一致/),
+    ).toBeInTheDocument();
+    expect(within(banner).queryByText(/税率別の明細合計/)).not.toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "税率を確認する" }));
     expect(onJump).toHaveBeenCalledWith("items");
   });
@@ -107,8 +110,9 @@ describe("ReviewStatusBanner", () => {
       0,
       onJump,
     );
-    expect(within(banner).getByText("税率別の明細合計を比較できません")).toBeInTheDocument();
-    expect(within(banner).getByText(/割引対象の商品が未確定/)).toBeInTheDocument();
+    expect(within(banner).getByText("商品の税率を確認してください")).toBeInTheDocument();
+    expect(within(banner).getByText(/税率または税込／税抜設定/)).toBeInTheDocument();
+    expect(within(banner).queryByText(/税率別の明細合計/)).not.toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "税率を確認する" }));
     expect(onJump).toHaveBeenCalledWith("discount-1");
   });
@@ -167,7 +171,7 @@ describe("ReviewStatusBanner", () => {
       onJump,
     );
     expect(
-      within(banner).getByText("税率が未確定のため、金額と税率別集計を比較できません"),
+      within(banner).getByText("税率・税込／税抜が未確定の商品があります"),
     ).toBeInTheDocument();
     expect(within(banner).getByText(/未確定の商品が3件/)).toBeInTheDocument();
     expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();

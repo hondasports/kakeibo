@@ -36,7 +36,6 @@ export function ReviewStatusBanner({
   onJump: (target: string) => void;
 }) {
   const { amount, taxRate } = checks;
-  const mismatchedTaxRows = taxRate.rows.filter((row) => row.status === "mismatch");
   const checksAreMatched = amount.status === "matched" && taxRate.status === "matched";
   const sharedBlockerCode =
     amount.status === "uncomparable" &&
@@ -79,7 +78,7 @@ export function ReviewStatusBanner({
           <Typography variant="subtitle2">
             {sharedBlockerCode === "basis-conflict"
               ? "商品の税込／税抜設定が、レシートの税内訳と一致していません"
-              : "税率が未確定のため、金額と税率別集計を比較できません"}
+              : "税率・税込／税抜が未確定の商品があります"}
           </Typography>
           <Typography variant="body2">
             {sharedBlockerCode === "basis-conflict"
@@ -120,12 +119,10 @@ export function ReviewStatusBanner({
       )}
       {taxRate.status === "mismatch" && (
         <Alert severity="error">
-          <Typography variant="subtitle2">税率別の明細合計が一致していません</Typography>
-          {mismatchedTaxRows.map((row) => (
-            <Typography variant="body2" key={row.taxRatePercent}>
-              {row.taxRatePercent}%：現在 {yen(row.currentYen)} ／ 印字 {yen(row.printedYen)}
-            </Typography>
-          ))}
+          <Typography variant="subtitle2">商品の税率を確認してください</Typography>
+          <Typography variant="body2">
+            レシートの税内訳と、商品の税率設定が一致していません。
+          </Typography>
           <Box>
             <Button
               disabled={busy}
@@ -140,9 +137,9 @@ export function ReviewStatusBanner({
       )}
       {taxRate.status === "uncomparable" && !combineUncomparable && (
         <Alert severity="warning">
-          <Typography variant="subtitle2">税率別の明細合計を比較できません</Typography>
+          <Typography variant="subtitle2">商品の税率を確認してください</Typography>
           <Typography variant="body2">
-            {taxRate.reason ?? "税率別の対象額が読み取れていません"}。レシートと照合してください。
+            商品の税率または税込／税抜設定を、レシートと照合してください。
           </Typography>
           <Box>
             <Button
