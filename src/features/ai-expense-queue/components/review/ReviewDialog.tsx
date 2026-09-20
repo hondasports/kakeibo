@@ -424,9 +424,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                       </Stack>
                     </Stack>
                     {guidance
-                      .filter(
-                        (issue) => issue.target === "items" && issue.scope !== "receipt",
-                      )
+                      .filter((issue) => issue.target === "items" && issue.scope !== "receipt")
                       .map((issue) => (
                         <Alert
                           key={issue.id}
@@ -513,10 +511,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                           >
                             <Stack spacing={1}>
                               {itemIssues.map((issue) => (
-                                <Alert
-                                  key={issue.id}
-                                  severity={issue.required ? "error" : "info"}
-                                >
+                                <Alert key={issue.id} severity={issue.required ? "error" : "info"}>
                                   {issue.message}
                                 </Alert>
                               ))}

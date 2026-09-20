@@ -149,12 +149,7 @@ export function ReviewStatusBanner({
           <Typography variant="subtitle2">レシート全体の確認</Typography>
           {issue.message}
           <Box>
-            <Button
-              disabled={busy}
-              size="small"
-              type="button"
-              onClick={() => onJump(issue.target)}
-            >
+            <Button disabled={busy} size="small" type="button" onClick={() => onJump(issue.target)}>
               商品一覧を見比べる
             </Button>
           </Box>

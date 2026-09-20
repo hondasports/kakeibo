@@ -46,7 +46,13 @@ describe("ReviewItemRow", () => {
 
   it("税率未確定は未確定と表示する", () => {
     renderRow({
-      item: { ...item, taxRatePercent: null, amountBasis: "unknown", taxResolutionStatus: "unresolved", taxResolutionSource: undefined },
+      item: {
+        ...item,
+        taxRatePercent: null,
+        amountBasis: "unknown",
+        taxResolutionStatus: "unresolved",
+        taxResolutionSource: undefined,
+      },
     });
     expect(screen.getAllByText(/未確定/).length).toBeGreaterThan(0);
   });
@@ -61,7 +67,9 @@ describe("ReviewItemRow", () => {
       item: { ...item, itemName: "値引", amountYen: "-50", lineType: "discount" },
       targetName: "対象商品のとても長い名前テスト商品",
     });
-    expect(screen.getAllByText(/割引対象：対象商品のとても長い名前テスト商品/).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/割引対象：対象商品のとても長い名前テスト商品/).length,
+    ).toBeGreaterThan(0);
   });
 
   it("修正必須・確認推奨のマーカーを表示する", () => {

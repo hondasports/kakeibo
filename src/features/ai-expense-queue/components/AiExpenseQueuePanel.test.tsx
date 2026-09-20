@@ -1150,9 +1150,7 @@ describe("AiExpenseQueuePanel", () => {
     expect(
       within(dialog).queryByRole("radio", { name: "レシート合計だけ保存" }),
     ).not.toBeInTheDocument();
-    expect(
-      within(dialog).queryByRole("radio", { name: "明細ごとに保存" }),
-    ).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("radio", { name: "明細ごとに保存" })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
 
     expect(updateForReviewMock).toHaveBeenCalledWith(
@@ -1298,9 +1296,9 @@ describe("AiExpenseQueuePanel", () => {
     expect(within(dialog).getByLabelText("支出日（レシート記載日）")).toHaveValue("2026-06-21");
     expect(within(dialog).getByLabelText("合計金額")).toHaveValue("1380");
     expect(within(dialog).queryByText(/判定が曖昧なOCR行/)).not.toBeInTheDocument();
-    expect(
-      within(dialog).getByRole("region", { name: "全体の確認状態" }),
-    ).toHaveTextContent("差額 250円");
+    expect(within(dialog).getByRole("region", { name: "全体の確認状態" })).toHaveTextContent(
+      "差額 250円",
+    );
     const itemInput = within(dialog).getByDisplayValue("パン");
     const detail = itemInput.closest("details")!;
     expect(detail).toHaveAttribute("open");
@@ -1512,9 +1510,7 @@ describe("AiExpenseQueuePanel", () => {
     await user.type(amountInputs[1], "-110");
     expect(amountInputs[1]).toHaveValue("-110");
     const amountCheck = within(dialog).getByRole("region", { name: "確認結果" });
-    expect(
-      within(amountCheck).getByText(/明細合計 990円 ＝ 支払額 990円/),
-    ).toBeVisible();
+    expect(within(amountCheck).getByText(/明細合計 990円 ＝ 支払額 990円/)).toBeVisible();
 
     await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
 

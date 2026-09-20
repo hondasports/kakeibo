@@ -110,9 +110,7 @@ describe("下書きの修正導線", () => {
       />,
     );
     const banner = screen.getByRole("region", { name: "全体の確認状態" });
-    expect(
-      within(banner).getByText("印字額と明細の金額が一致していません"),
-    ).toBeVisible();
+    expect(within(banner).getByText("印字額と明細の金額が一致していません")).toBeVisible();
     expect(within(banner).getByText(/差額 24円/)).toBeVisible();
     await user.click(within(banner).getByRole("button", { name: "金額を確認する" }));
     const checks = screen.getByRole("region", { name: "確認結果" });
@@ -152,9 +150,7 @@ describe("下書きの修正導線", () => {
         }}
       />,
     );
-    const reference = screen
-      .getByText("読み取り原文・詳しい税情報（参考）")
-      .closest("details")!;
+    const reference = screen.getByText("読み取り原文・詳しい税情報（参考）").closest("details")!;
     expect(reference).not.toHaveAttribute("open");
     await user.click(
       within(screen.getByRole("region", { name: "全体の確認状態" })).getByRole("button", {

@@ -86,7 +86,10 @@ export function ReviewItemRow({
         <Stack
           direction="row"
           spacing={1}
-          sx={{ alignItems: { xs: "flex-start", sm: "center" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}
+          sx={{
+            alignItems: { xs: "flex-start", sm: "center" },
+            flexWrap: { xs: "wrap", sm: "nowrap" },
+          }}
         >
           <Typography
             variant="body2"
@@ -121,7 +124,14 @@ export function ReviewItemRow({
           >
             {amountLabel(item)}
           </Typography>
-          <Box sx={{ display: { xs: "none", sm: "block" }, width: 76, flexShrink: 0, textAlign: "right" }}>
+          <Box
+            sx={{
+              display: { xs: "none", sm: "block" },
+              width: 76,
+              flexShrink: 0,
+              textAlign: "right",
+            }}
+          >
             <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
               {context.status === "resolved" ? `${context.taxRatePercent}%` : "未確定"}
             </Typography>

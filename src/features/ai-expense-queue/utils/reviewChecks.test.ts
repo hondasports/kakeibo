@@ -148,9 +148,7 @@ describe("buildAmountCheck", () => {
   });
 
   it("明細なし・金額未確定は比較不能", () => {
-    expect(
-      buildAmountCheck({ items: [], paidTotalYen: 100 }).status,
-    ).toBe("uncomparable");
+    expect(buildAmountCheck({ items: [], paidTotalYen: 100 }).status).toBe("uncomparable");
     expect(
       buildAmountCheck({
         items: [resolvedItem({ printedAmountYen: undefined, amountYen: "" })],
@@ -328,9 +326,7 @@ describe("buildTaxRateCheck", () => {
   it("対象額の税込／税抜が未確定ならその行だけ比較不能", () => {
     const check = buildTaxRateCheck({
       items: [resolvedItem()],
-      taxSummaries: [
-        summary({ taxableAmountBasis: "unknown", taxMode: "unknown" }),
-      ],
+      taxSummaries: [summary({ taxableAmountBasis: "unknown", taxMode: "unknown" })],
     });
     expect(check.status).toBe("uncomparable");
     expect(check.rows[0].reason).toContain("税込／税抜");

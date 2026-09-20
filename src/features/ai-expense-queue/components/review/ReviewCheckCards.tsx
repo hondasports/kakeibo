@@ -205,7 +205,13 @@ function TaxRateCheckBody({ check }: { check: ReviewTaxRateCheck }) {
   );
 }
 
-export function ReviewCheckCards({ amount, taxRate }: { amount: ReviewAmountCheck; taxRate: ReviewTaxRateCheck }) {
+export function ReviewCheckCards({
+  amount,
+  taxRate,
+}: {
+  amount: ReviewAmountCheck;
+  taxRate: ReviewTaxRateCheck;
+}) {
   return (
     <Box
       component="section"

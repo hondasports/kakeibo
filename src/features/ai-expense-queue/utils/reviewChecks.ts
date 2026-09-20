@@ -309,7 +309,8 @@ export function buildTaxRateCheck(args: {
     status,
     rows,
     reason: globalReason,
-    focusTarget: focusTarget ?? (rows.some((row) => row.status !== "matched") ? "items" : undefined),
+    focusTarget:
+      focusTarget ?? (rows.some((row) => row.status !== "matched") ? "items" : undefined),
   };
 }
 

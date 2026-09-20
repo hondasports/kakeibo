@@ -31,9 +31,7 @@ describe("ReviewCheckCards", () => {
       },
     );
     expect(within(region).getAllByText("一致")).toHaveLength(2);
-    expect(
-      within(region).getByText(/明細合計 4,662円 ＝ 支払額 4,662円/),
-    ).toBeInTheDocument();
+    expect(within(region).getByText(/明細合計 4,662円 ＝ 支払額 4,662円/)).toBeInTheDocument();
     expect(within(region).getByText(/8% 内税/)).toBeInTheDocument();
     expect(within(region).getByText(/現在 2,912円 ／ 印字 2,912円/)).toBeInTheDocument();
   });
@@ -96,9 +94,7 @@ describe("ReviewCheckCards", () => {
     );
     expect(within(region).getAllByText("比較不能")).toHaveLength(2);
     expect(within(region).getByText("支払額が未確定です")).toBeInTheDocument();
-    expect(
-      within(region).getByText("対象額の税込／税抜が未確定です"),
-    ).toBeInTheDocument();
+    expect(within(region).getByText("対象額の税込／税抜が未確定です")).toBeInTheDocument();
     expect(within(region).getByText(/現在 未確定 ／ 印字 4,292円/)).toBeInTheDocument();
   });
 

@@ -87,9 +87,7 @@ export function ReviewDialogActions({
         <Chip
           size="small"
           variant="outlined"
-          color={
-            fixCount > 0 ? "error" : recommendationCount > 0 ? "warning" : "success"
-          }
+          color={fixCount > 0 ? "error" : recommendationCount > 0 ? "warning" : "success"}
           icon={fixCount === 0 && recommendationCount === 0 ? <CheckCircleIcon /> : undefined}
           label={compactStatus}
           sx={{ display: { xs: "inline-flex", sm: "none" } }}

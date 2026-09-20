@@ -31,9 +31,7 @@ function renderBanner(
 describe("ReviewStatusBanner", () => {
   it("すべて一致なら成功メッセージを表示する", () => {
     const { banner } = renderBanner(matchedChecks);
-    expect(
-      within(banner).getByText(/印字額と明細の金額が一致しています/),
-    ).toBeInTheDocument();
+    expect(within(banner).getByText(/印字額と明細の金額が一致しています/)).toBeInTheDocument();
   });
 
   it("金額不一致は差額と確認ボタンを表示する", async () => {
@@ -56,9 +54,7 @@ describe("ReviewStatusBanner", () => {
       [],
       onJump,
     );
-    expect(
-      within(banner).getByText("印字額と明細の金額が一致していません"),
-    ).toBeInTheDocument();
+    expect(within(banner).getByText("印字額と明細の金額が一致していません")).toBeInTheDocument();
     expect(within(banner).getByText(/差額 8円/)).toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "金額を確認する" }));
     expect(onJump).toHaveBeenCalledWith("items");
@@ -88,9 +84,7 @@ describe("ReviewStatusBanner", () => {
       [],
       onJump,
     );
-    expect(
-      within(banner).getByText("税率別の明細合計が一致していません"),
-    ).toBeInTheDocument();
+    expect(within(banner).getByText("税率別の明細合計が一致していません")).toBeInTheDocument();
     expect(within(banner).getByText(/8%：現在 0円 ／ 印字 2,912円/)).toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "税率を確認する" }));
     expect(onJump).toHaveBeenCalledWith("items");
@@ -113,9 +107,7 @@ describe("ReviewStatusBanner", () => {
       [],
       onJump,
     );
-    expect(
-      within(banner).getByText("税率別の明細合計を比較できません"),
-    ).toBeInTheDocument();
+    expect(within(banner).getByText("税率別の明細合計を比較できません")).toBeInTheDocument();
     expect(within(banner).getByText(/割引対象の商品が未確定/)).toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "税率を確認する" }));
     expect(onJump).toHaveBeenCalledWith("discount-1");
@@ -143,18 +135,20 @@ describe("ReviewStatusBanner", () => {
   });
 
   it("レシート全体の確認は情報アラートとして表示する", () => {
-    const { banner } = renderBanner(matchedChecks, [], [
-      {
-        id: "reading",
-        message: "レシート全体の読み取り確認です。",
-        target: "items",
-        required: false,
-        scope: "receipt",
-      },
-    ]);
+    const { banner } = renderBanner(
+      matchedChecks,
+      [],
+      [
+        {
+          id: "reading",
+          message: "レシート全体の読み取り確認です。",
+          target: "items",
+          required: false,
+          scope: "receipt",
+        },
+      ],
+    );
     expect(within(banner).getByText("レシート全体の確認")).toBeInTheDocument();
-    expect(
-      within(banner).getByRole("button", { name: "商品一覧を見比べる" }),
-    ).toBeInTheDocument();
+    expect(within(banner).getByRole("button", { name: "商品一覧を見比べる" })).toBeInTheDocument();
   });
 });
