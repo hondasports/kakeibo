@@ -9,6 +9,7 @@ export function ReviewDialogActions({
   checkMismatchCount = 0,
   recommendationCount,
   unresolvedTaxItemCount = 0,
+  basisConflictItemCount = 0,
   totalOnly,
   onClose,
   onSubmit,
@@ -25,6 +26,8 @@ export function ReviewDialogActions({
   recommendationCount: number;
   /** 税率または税込／税抜が未確定の明細数 */
   unresolvedTaxItemCount?: number;
+  /** レシートの税内訳と税込／税抜設定が一致しない明細数 */
+  basisConflictItemCount?: number;
   totalOnly: boolean;
   onClose: () => void;
   onSubmit: () => void;
@@ -37,11 +40,13 @@ export function ReviewDialogActions({
       ? `保存前に修正が必要：${fixCount}件`
       : checkMismatchCount > 0
         ? `修正必須 ${fixCount}件。確認事項を残したまま下書きを保存できます。`
-        : unresolvedTaxItemCount > 0
-          ? `税率未確定 ${unresolvedTaxItemCount}件。商品ごとに税率を確認してください。`
-          : recommendationCount > 0
-            ? "確認事項があります。確認事項を残したまま下書きを保存できます。"
-            : "確認結果：計算した金額が一致しています。OCRの読み取りがすべて正しいことを保証するものではありません。";
+        : basisConflictItemCount > 0
+          ? `税込・税抜の不一致 ${basisConflictItemCount}件。該当商品を確認してください。`
+          : unresolvedTaxItemCount > 0
+            ? `税率未確定 ${unresolvedTaxItemCount}件。商品ごとに税率を確認してください。`
+            : recommendationCount > 0
+              ? "確認事項があります。確認事項を残したまま下書きを保存できます。"
+              : "確認結果：計算した金額が一致しています。OCRの読み取りがすべて正しいことを保証するものではありません。";
   const statusColor =
     requiredCount > 0 || checkMismatchCount > 0
       ? "error.main"
@@ -52,11 +57,13 @@ export function ReviewDialogActions({
     ? "処理中"
     : fixCount > 0
       ? `修正必須 ${fixCount}件`
-      : unresolvedTaxItemCount > 0
-        ? `税率未確定 ${unresolvedTaxItemCount}件`
-        : recommendationCount > 0
-          ? "確認事項あり"
-          : "金額を確認済み";
+      : basisConflictItemCount > 0
+        ? `税込・税抜の不一致 ${basisConflictItemCount}件`
+        : unresolvedTaxItemCount > 0
+          ? `税率未確定 ${unresolvedTaxItemCount}件`
+          : recommendationCount > 0
+            ? "確認事項あり"
+            : "金額を確認済み";
   const submitLabel =
     requiredCount > 0
       ? "修正が必要な項目へ"

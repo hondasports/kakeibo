@@ -34,14 +34,15 @@ function renderRow(overrides: Partial<Parameters<typeof ReviewItemRow>[0]> = {})
 }
 
 describe("ReviewItemRow", () => {
-  it("番号・商品名・金額・税率・操作ボタンを1行で表示する", () => {
+  it("番号・商品名・金額・税率・アコーディオン表示を1行で表示する", () => {
     renderRow();
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("ホットケーキミックス 200g")).toBeInTheDocument();
     expect(screen.getByText("1,234円")).toBeInTheDocument();
     expect(screen.getByText("8%")).toBeInTheDocument();
     expect(screen.getByText("税抜")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "確認・修正" })).toBeInTheDocument();
+    expect(screen.getByText("詳細")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "確認・修正" })).not.toBeInTheDocument();
   });
 
   it("税率未確定は未確定と表示する", () => {
@@ -82,20 +83,20 @@ describe("ReviewItemRow", () => {
     expect(screen.getAllByText(/修正必須/).length).toBeGreaterThan(0);
   });
 
-  it("サマリのクリックとボタンでトグルできる", async () => {
+  it("サマリ行のクリックでトグルできる", async () => {
     const user = userEvent.setup();
     const props = renderRow();
     const details = screen.getByText("ホットケーキミックス 200g").closest("details")!;
     await user.click(details.querySelector("summary")!);
     expect(props.onToggle).toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "確認・修正" }));
+    await user.click(details.querySelector("summary")!);
     expect(props.onToggle).toHaveBeenCalledTimes(2);
   });
 
-  it("展開中は閉じるボタンを表示し、内容のフォーカスで開いたままにする", async () => {
+  it("展開中は閉じる表示に変わり、内容のフォーカスで開いたままにする", async () => {
     const user = userEvent.setup();
     const props = renderRow({ open: true });
-    expect(screen.getByRole("button", { name: "閉じる" })).toBeInTheDocument();
+    expect(screen.getByText("閉じる")).toBeInTheDocument();
     await user.click(screen.getByLabelText("明細名"));
     expect(props.onOpen).toHaveBeenCalled();
   });

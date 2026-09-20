@@ -35,4 +35,9 @@ describe("ReviewDialogActions", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("入力は残っています");
     expect(screen.getByRole("button", { name: "この内容で保存" })).toBeEnabled();
   });
+  it("税込・税抜の矛盾件数を具体的に表示する", () => {
+    render(<ReviewDialogActions {...props} recommendationCount={2} basisConflictItemCount={4} />);
+    expect(screen.getByRole("status")).toHaveTextContent("税込・税抜の不一致 4件");
+    expect(screen.getByText("税込・税抜の不一致 4件")).toBeInTheDocument();
+  });
 });

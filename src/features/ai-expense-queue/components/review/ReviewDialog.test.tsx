@@ -111,9 +111,7 @@ describe("下書きの修正導線", () => {
     expect(within(banner).getByText("印字額と明細の金額が一致していません")).toBeVisible();
     expect(within(banner).getByText(/差額 24円/)).toBeVisible();
     await user.click(within(banner).getByRole("button", { name: "金額を確認する" }));
-    const checks = screen.getByRole("region", { name: "確認結果" });
-    expect(within(checks).getByText("金額確認")).toBeVisible();
-    expect(within(checks).getByText(/差額/)).toBeVisible();
+    expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "商品一覧" })).toBeVisible();
   });
   it("不正な明細金額の修正では金額欄へフォーカスする", async () => {
@@ -191,7 +189,8 @@ describe("下書きの修正導線", () => {
     expect(within(banner).queryByText(/割引対象の商品を選択/)).not.toBeInTheDocument();
     const discountRow = screen.getByText("割引", { exact: true }).closest("details")!;
     expect(discountRow).not.toHaveAttribute("open");
-    await user.click(within(discountRow).getByRole("button", { name: "確認・修正" }));
+    await user.click(discountRow.querySelector("summary")!);
+    expect(discountRow).toHaveAttribute("open");
     expect(screen.getByRole("combobox", { name: "割引対象の商品" })).toBeVisible();
     expect(screen.getByRole("region", { name: "商品一覧" })).toBeVisible();
     expect(

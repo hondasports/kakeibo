@@ -112,6 +112,37 @@ describe("buildAmountCheck", () => {
     expect(check.status).toBe("matched");
   });
 
+  it("内税サマリに税抜明細が混在する場合は基準矛盾として比較不能にする", () => {
+    const check = buildAmountCheck({
+      items: [
+        resolvedItem({
+          id: "conflict-1",
+          taxRatePercent: 10,
+          amountBasis: "tax_excluded",
+          printedAmountYen: 636,
+          amountYen: "636",
+        }),
+      ],
+      paidTotalYen: 636,
+      taxSummaries: [
+        summary({
+          taxRatePercent: 10,
+          taxMode: "included",
+          taxableAmountYen: 636,
+          taxableAmountBasis: "tax_included",
+          taxYen: 58,
+        }),
+      ],
+    });
+    expect(check).toMatchObject({
+      status: "uncomparable",
+      blockerCode: "basis-conflict",
+      affectedItemIds: ["conflict-1"],
+      focusTarget: "conflict-1",
+    });
+    expect(check.reason).toContain("一致していません");
+  });
+
   it("内税表記と税抜対象額が矛盾していても税額を支払額へ加算しない", () => {
     const check = buildAmountCheck({
       items: [
@@ -495,7 +526,10 @@ describe("buildTaxRateCheck", () => {
       taxSummaries: [summary()],
     });
     expect(check.status).toBe("uncomparable");
-    expect(check.rows[0].reason).toContain("基準が異なる");
+    expect(check.blockerCode).toBe("basis-conflict");
+    expect(check.affectedItemIds).toEqual(["item-1"]);
+    expect(check.focusTarget).toBe("item-1");
+    expect(check.reason).toContain("一致していません");
   });
 
   it("サマリに無い税率の明細は未確定行として追加する", () => {

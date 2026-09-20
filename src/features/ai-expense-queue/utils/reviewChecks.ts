@@ -7,6 +7,14 @@ import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
 /** 金額確認・税率別集計それぞれの判定状態。 */
 export type ReviewCheckStatus = "matched" | "mismatch" | "uncomparable";
 
+export type ReviewBlockerCode =
+  | "missing-paid-total"
+  | "missing-items"
+  | "missing-amount"
+  | "unresolved-tax"
+  | "basis-conflict"
+  | "missing-tax-summary";
+
 /** 逆算由来の対象額だけに許容する±1円の一致を、直接印字の完全一致と区別する。 */
 export type ReviewMatchKind = "exact" | "approx";
 
@@ -30,6 +38,8 @@ export type ReviewAmountCheck = {
   differenceYen?: number;
   /** 比較不能の理由 */
   reason?: string;
+  blockerCode?: ReviewBlockerCode;
+  affectedItemIds?: string[];
   /** 修正・確認を促すジャンプ先（セクションまたは明細id） */
   focusTarget?: string;
 };
@@ -47,6 +57,8 @@ export type ReviewTaxRateRow = {
   /** 現在 − 印字。0以外のとき不一致 */
   differenceYen?: number;
   reason?: string;
+  blockerCode?: ReviewBlockerCode;
+  affectedItemIds?: string[];
 };
 
 export type ReviewTaxRateCheck = {
@@ -54,6 +66,8 @@ export type ReviewTaxRateCheck = {
   rows: ReviewTaxRateRow[];
   /** 全行比較不能にする理由（割引対象・税率の未確定など） */
   reason?: string;
+  blockerCode?: ReviewBlockerCode;
+  affectedItemIds?: string[];
   /** 修正・確認を促すジャンプ先（セクションまたは明細id） */
   focusTarget?: string;
 };
@@ -107,6 +121,36 @@ function summaryAmountBasis(summary: TaxSummary): AmountBasis {
   return "unknown";
 }
 
+function effectiveTaxRateOf(
+  item: ReviewItemValues,
+  items: ReviewItemValues[],
+): TaxRatePercent | null {
+  if (isDiscountLine(item.itemName, item.lineType)) {
+    const target = items.find((candidate) => candidate.id === item.discountTargetItemId);
+    return target?.taxRatePercent ?? null;
+  }
+  return item.taxRatePercent ?? null;
+}
+
+function findBasisConflicts(
+  items: ReviewItemValues[],
+  summaries: TaxSummary[],
+): ReviewItemValues[] {
+  const basisByRate = new Map(
+    summaries.map((summary) => [summary.taxRatePercent, summaryAmountBasis(summary)]),
+  );
+  return items.filter((item) => {
+    const rate = effectiveTaxRateOf(item, items);
+    if (rate === null) return false;
+    const expectedBasis = basisByRate.get(rate);
+    if (!expectedBasis || expectedBasis === "unknown") return false;
+    return (
+      (item.amountBasis === "tax_included" || item.amountBasis === "tax_excluded") &&
+      item.amountBasis !== expectedBasis
+    );
+  });
+}
+
 export function buildAmountCheck(args: {
   items: ReviewItemValues[];
   paidTotalYen?: number;
@@ -129,6 +173,7 @@ export function buildAmountCheck(args: {
       variant,
       paidTotalYen,
       reason: "支払額が未確定です",
+      blockerCode: "missing-paid-total",
       focusTarget: "amountYen",
     };
   if (args.items.length === 0)
@@ -137,6 +182,7 @@ export function buildAmountCheck(args: {
       variant,
       paidTotalYen,
       reason: "比較対象の明細がありません",
+      blockerCode: "missing-items",
       focusTarget: "items",
     };
   const missingAmount = args.items.find((item) => itemPrintedYen(item) === undefined);
@@ -146,7 +192,21 @@ export function buildAmountCheck(args: {
       variant,
       paidTotalYen,
       reason: "明細金額が未確定です",
+      blockerCode: "missing-amount",
+      affectedItemIds: [missingAmount.id],
       focusTarget: missingAmount.id,
+    };
+
+  const basisConflicts = findBasisConflicts(args.items, summaries);
+  if (basisConflicts.length > 0)
+    return {
+      status: "uncomparable",
+      variant,
+      paidTotalYen,
+      reason: "商品の税込／税抜設定が、レシートの税内訳と一致していません",
+      blockerCode: "basis-conflict",
+      affectedItemIds: basisConflicts.map((item) => item.id),
+      focusTarget: basisConflicts[0].id,
     };
 
   const itemsPrintedTotalYen = args.items.reduce(
@@ -205,6 +265,10 @@ export function buildAmountCheck(args: {
       paidTotalYen,
       itemsPrintedTotalYen,
       reason: "税率・税込／税抜が未確定の明細があるため、支払額と比較できません",
+      blockerCode: "unresolved-tax",
+      affectedItemIds: args.items
+        .filter((item) => itemComparableYen(item) === undefined)
+        .map((item) => item.id),
       focusTarget: uncertainItem?.id,
     };
 
@@ -275,16 +339,10 @@ export function buildTaxRateCheck(args: {
       status: "uncomparable",
       rows: [],
       reason: "税率別の対象額が読み取れていません",
+      blockerCode: "missing-tax-summary",
+      affectedItemIds: items.map((item) => item.id),
       focusTarget: "reference",
     };
-
-  const rateOf = (item: ReviewItemValues): TaxRatePercent | null => {
-    if (isDiscountLine(item.itemName, item.lineType)) {
-      const target = items.find((candidate) => candidate.id === item.discountTargetItemId);
-      return target?.taxRatePercent ?? null;
-    }
-    return item.taxRatePercent ?? null;
-  };
 
   const untargetedDiscount = items.find(
     (item) => isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId,
@@ -300,6 +358,17 @@ export function buildTaxRateCheck(args: {
       : items.length === 0
         ? "比較対象の明細がありません"
         : undefined;
+  const globalBlockerCode: ReviewBlockerCode | undefined =
+    untargetedDiscount || unresolved.length > 0
+      ? "unresolved-tax"
+      : items.length === 0
+        ? "missing-items"
+        : undefined;
+  const globalAffectedItemIds = untargetedDiscount
+    ? [untargetedDiscount.id]
+    : unresolved.length > 0
+      ? unresolved.map((item) => item.id)
+      : [];
   const focusTarget =
     untargetedDiscount?.id ??
     unresolved[0]?.id ??
@@ -313,23 +382,48 @@ export function buildTaxRateCheck(args: {
       taxableAmountBasis: basis,
       printedYen: summary.taxableAmountYen,
     };
-    if (globalReason) return { ...base, status: "uncomparable" as const, reason: globalReason };
+    if (globalReason)
+      return {
+        ...base,
+        status: "uncomparable" as const,
+        reason: globalReason,
+        blockerCode: globalBlockerCode,
+        affectedItemIds: globalAffectedItemIds,
+      };
     if (basis === "unknown")
       return {
         ...base,
         status: "uncomparable" as const,
         reason: "対象額の税込／税抜が未確定です",
+        blockerCode: "unresolved-tax",
       };
-    const bucket = items.filter((item) => rateOf(item) === summary.taxRatePercent);
-    if (bucket.some((item) => item.amountBasis !== basis))
+    const bucket = items.filter(
+      (item) => effectiveTaxRateOf(item, items) === summary.taxRatePercent,
+    );
+    const conflictingItems = bucket.filter(
+      (item) =>
+        (item.amountBasis === "tax_included" || item.amountBasis === "tax_excluded") &&
+        item.amountBasis !== basis,
+    );
+    if (conflictingItems.length > 0)
       return {
         ...base,
         status: "uncomparable" as const,
-        reason: "税込／税抜の基準が異なる明細が含まれています",
+        reason: "商品の税込／税抜設定が、レシートの税内訳と一致していません",
+        blockerCode: "basis-conflict",
+        affectedItemIds: conflictingItems.map((item) => item.id),
       };
     const printedAmounts = bucket.map(itemPrintedYen);
     if (printedAmounts.some((amount) => amount === undefined))
-      return { ...base, status: "uncomparable" as const, reason: "明細金額が未確定です" };
+      return {
+        ...base,
+        status: "uncomparable" as const,
+        reason: "明細金額が未確定です",
+        blockerCode: "missing-amount",
+        affectedItemIds: bucket
+          .filter((item) => itemPrintedYen(item) === undefined)
+          .map((item) => item.id),
+      };
     const currentYen = bucket.reduce((sum, item) => sum + (itemPrintedYen(item) ?? 0), 0);
     const differenceYen = currentYen - summary.taxableAmountYen;
     if (differenceYen === 0)
@@ -344,11 +438,11 @@ export function buildTaxRateCheck(args: {
     const summaryRates = new Set(summaries.map((summary) => summary.taxRatePercent));
     const extraRates = new Set<TaxRatePercent>();
     for (const item of items) {
-      const rate = rateOf(item);
+      const rate = effectiveTaxRateOf(item, items);
       if (rate !== null && rate !== 0 && !summaryRates.has(rate)) extraRates.add(rate);
     }
     for (const rate of [...extraRates].sort((a, b) => a - b)) {
-      const bucket = items.filter((item) => rateOf(item) === rate);
+      const bucket = items.filter((item) => effectiveTaxRateOf(item, items) === rate);
       const printedAmounts = bucket.map(itemPrintedYen);
       rows.push({
         taxRatePercent: rate,
@@ -357,6 +451,8 @@ export function buildTaxRateCheck(args: {
           : undefined,
         status: "uncomparable",
         reason: "印字の対象額が読み取れていません",
+        blockerCode: "missing-tax-summary",
+        affectedItemIds: bucket.map((item) => item.id),
       });
     }
   }
@@ -366,12 +462,20 @@ export function buildTaxRateCheck(args: {
     : rows.some((row) => row.status === "uncomparable")
       ? "uncomparable"
       : "matched";
+  const firstUncomparableRow = rows.find((row) => row.status === "uncomparable");
   return {
     status,
     rows,
-    reason: globalReason,
+    reason: globalReason ?? firstUncomparableRow?.reason,
+    blockerCode: globalBlockerCode ?? firstUncomparableRow?.blockerCode,
+    affectedItemIds:
+      globalAffectedItemIds.length > 0
+        ? globalAffectedItemIds
+        : firstUncomparableRow?.affectedItemIds,
     focusTarget:
-      focusTarget ?? (rows.some((row) => row.status !== "matched") ? "items" : undefined),
+      focusTarget ??
+      firstUncomparableRow?.affectedItemIds?.[0] ??
+      (rows.some((row) => row.status !== "matched") ? "items" : undefined),
   };
 }
 

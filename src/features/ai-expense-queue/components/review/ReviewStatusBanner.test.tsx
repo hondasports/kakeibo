@@ -149,12 +149,16 @@ describe("ReviewStatusBanner", () => {
           status: "uncomparable",
           variant: "direct",
           reason: "税率が未確定です",
+          blockerCode: "unresolved-tax",
+          affectedItemIds: ["item-1", "item-2", "item-3"],
           focusTarget: "item-1",
         },
         taxRate: {
           status: "uncomparable",
           rows: [],
           reason: "税率が未確定です",
+          blockerCode: "unresolved-tax",
+          affectedItemIds: ["item-1", "item-2", "item-3"],
           focusTarget: "item-1",
         },
       },
@@ -168,6 +172,35 @@ describe("ReviewStatusBanner", () => {
     expect(within(banner).getByText(/未確定の商品が3件/)).toBeInTheDocument();
     expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "未確定の商品を確認する" }));
+    expect(onJump).toHaveBeenCalledWith("item-1");
+  });
+
+  it("税込／税抜の矛盾による比較不能は1つの案内にまとめる", async () => {
+    const user = userEvent.setup();
+    const onJump = vi.fn();
+    const conflict = {
+      status: "uncomparable" as const,
+      reason: "商品の税込／税抜設定が、レシートの税内訳と一致していません",
+      blockerCode: "basis-conflict" as const,
+      affectedItemIds: ["item-1", "item-2"],
+      focusTarget: "item-1",
+    };
+    const { banner } = renderBanner(
+      {
+        amount: { ...conflict, variant: "direct" },
+        taxRate: { ...conflict, rows: [] },
+      },
+      [],
+      0,
+      onJump,
+    );
+    expect(
+      within(banner).getByText("商品の税込／税抜設定が、レシートの税内訳と一致していません"),
+    ).toBeInTheDocument();
+    expect(within(banner).getByText(/一致していない商品が2件/)).toBeInTheDocument();
+    expect(within(banner).queryByText("金額を比較できません")).not.toBeInTheDocument();
+    expect(within(banner).queryByText("税率別の明細合計を比較できません")).not.toBeInTheDocument();
+    await user.click(within(banner).getByRole("button", { name: "該当商品を確認する" }));
     expect(onJump).toHaveBeenCalledWith("item-1");
   });
 });

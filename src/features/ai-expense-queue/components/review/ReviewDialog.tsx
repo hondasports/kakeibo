@@ -118,6 +118,14 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const unresolvedTaxItemCount = items.filter(
     (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
   ).length;
+  const basisConflictItemCount = new Set([
+    ...(checks.amount.blockerCode === "basis-conflict"
+      ? (checks.amount.affectedItemIds ?? [])
+      : []),
+    ...(checks.taxRate.blockerCode === "basis-conflict"
+      ? (checks.taxRate.affectedItemIds ?? [])
+      : []),
+  ]).size;
   const checkMismatchCount = [checks.amount, checks.taxRate].filter(
     (check) => check.status === "mismatch",
   ).length;
@@ -409,9 +417,11 @@ export function ReviewDialog(props: ReviewDialogProps) {
                     color={recommendationCount ? "warning" : "success"}
                     icon={recommendationCount ? undefined : <CheckCircleIcon />}
                     label={
-                      unresolvedTaxItemCount > 0
-                        ? `税率未確定 ${unresolvedTaxItemCount}件`
-                        : `確認推奨 ${recommendationCount}件`
+                      basisConflictItemCount > 0
+                        ? `税込・税抜の不一致 ${basisConflictItemCount}件`
+                        : unresolvedTaxItemCount > 0
+                          ? `税率未確定 ${unresolvedTaxItemCount}件`
+                          : `確認推奨 ${recommendationCount}件`
                     }
                   />
                 </Stack>
@@ -667,6 +677,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
         checkMismatchCount={checkMismatchCount}
         recommendationCount={recommendationCount}
         unresolvedTaxItemCount={unresolvedTaxItemCount}
+        basisConflictItemCount={basisConflictItemCount}
         totalOnly={totalOnly}
         onClose={props.onClose}
         onSubmit={save}

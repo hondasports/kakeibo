@@ -38,10 +38,19 @@ export function ReviewStatusBanner({
   const { amount, taxRate } = checks;
   const mismatchedTaxRows = taxRate.rows.filter((row) => row.status === "mismatch");
   const checksAreMatched = amount.status === "matched" && taxRate.status === "matched";
-  const combineUncomparable =
-    unresolvedTaxItemCount > 0 &&
+  const sharedBlockerCode =
     amount.status === "uncomparable" &&
-    taxRate.status === "uncomparable";
+    taxRate.status === "uncomparable" &&
+    amount.blockerCode === taxRate.blockerCode
+      ? amount.blockerCode
+      : undefined;
+  const combineUncomparable =
+    sharedBlockerCode === "unresolved-tax" || sharedBlockerCode === "basis-conflict";
+  const combinedAffectedItemCount = new Set([
+    ...(amount.affectedItemIds ?? []),
+    ...(taxRate.affectedItemIds ?? []),
+  ]).size;
+  const combinedItemCount = combinedAffectedItemCount || unresolvedTaxItemCount;
 
   return (
     <Stack spacing={1.5} component="section" aria-label="全体の確認状態">
@@ -68,11 +77,14 @@ export function ReviewStatusBanner({
       {combineUncomparable && (
         <Alert severity="warning">
           <Typography variant="subtitle2">
-            税率が未確定のため、金額と税率別集計を比較できません
+            {sharedBlockerCode === "basis-conflict"
+              ? "商品の税込／税抜設定が、レシートの税内訳と一致していません"
+              : "税率が未確定のため、金額と税率別集計を比較できません"}
           </Typography>
           <Typography variant="body2">
-            税率・税込／税抜が未確定の商品が{unresolvedTaxItemCount}
-            件あります。商品ごとに確認してください。
+            {sharedBlockerCode === "basis-conflict"
+              ? `税込／税抜の設定が一致していない商品が${combinedItemCount}件あります。商品ごとに確認してください。`
+              : `税率・税込／税抜が未確定の商品が${combinedItemCount}件あります。商品ごとに確認してください。`}
           </Typography>
           <Box>
             <Button
@@ -81,7 +93,9 @@ export function ReviewStatusBanner({
               type="button"
               onClick={() => onJump(taxRate.focusTarget ?? amount.focusTarget ?? "items")}
             >
-              未確定の商品を確認する
+              {sharedBlockerCode === "basis-conflict"
+                ? "該当商品を確認する"
+                : "未確定の商品を確認する"}
             </Button>
           </Box>
         </Alert>
