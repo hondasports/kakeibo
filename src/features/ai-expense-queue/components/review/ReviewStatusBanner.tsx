@@ -24,6 +24,7 @@ export function ReviewStatusBanner({
   checks,
   issues,
   unresolvedTaxItemCount,
+  receiptIssues = [],
   busy,
   onJump,
 }: {
@@ -32,6 +33,8 @@ export function ReviewStatusBanner({
   issues: ReviewGuidanceItem[];
   /** 税率または税込／税抜が未確定の明細数 */
   unresolvedTaxItemCount: number;
+  /** レシート全体の読み取り確認 */
+  receiptIssues?: ReviewGuidanceItem[];
   busy: boolean;
   onJump: (target: string) => void;
 }) {
@@ -117,6 +120,42 @@ export function ReviewStatusBanner({
           </Box>
         </Alert>
       )}
+      {taxRate.status === "mismatch" && (
+        <Alert severity="error">
+          <Typography variant="subtitle2">商品の税率を確認してください</Typography>
+          <Typography variant="body2">
+            レシートの税内訳と、商品の税率設定が一致していません。
+          </Typography>
+          <Box>
+            <Button
+              disabled={busy}
+              size="small"
+              type="button"
+              onClick={() => onJump(taxRate.focusTarget ?? "items")}
+            >
+              税率を確認する
+            </Button>
+          </Box>
+        </Alert>
+      )}
+      {taxRate.status === "uncomparable" && !combineUncomparable && (
+        <Alert severity="warning">
+          <Typography variant="subtitle2">商品の税率を確認してください</Typography>
+          <Typography variant="body2">
+            商品の税率または税込／税抜設定を、レシートと照合してください。
+          </Typography>
+          <Box>
+            <Button
+              disabled={busy}
+              size="small"
+              type="button"
+              onClick={() => onJump(taxRate.focusTarget ?? "items")}
+            >
+              税率を確認する
+            </Button>
+          </Box>
+        </Alert>
+      )}
       {checksAreMatched && <Alert severity="success">印字額と明細の金額が一致しています。</Alert>}
       {issues.length > 0 && (
         <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>
@@ -141,6 +180,23 @@ export function ReviewStatusBanner({
           ))}
         </Stack>
       )}
+      {!checksAreMatched &&
+        receiptIssues.map((issue) => (
+          <Alert key={issue.id} severity="info">
+            <Typography variant="subtitle2">レシート全体の確認</Typography>
+            {issue.message}
+            <Box>
+              <Button
+                disabled={busy}
+                size="small"
+                type="button"
+                onClick={() => onJump(issue.target)}
+              >
+                商品一覧を見比べる
+              </Button>
+            </Box>
+          </Alert>
+        ))}
     </Stack>
   );
 }

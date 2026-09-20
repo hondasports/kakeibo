@@ -90,7 +90,7 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     const milkRow = dialog.locator('section[aria-label="商品一覧"] details').filter({
       hasText: "牛乳",
     });
-    await milkRow.getByRole("button", { name: "確認・修正" }).click();
+    if ((await milkRow.getAttribute("open")) === null) await milkRow.locator("summary").click();
     await milkRow.getByRole("combobox", { name: "牛乳の税率", exact: true }).click();
     await page.getByRole("option", { name: "8%", exact: true }).click();
     await dialog.getByRole("combobox", { name: "牛乳の表示価格", exact: true }).click();

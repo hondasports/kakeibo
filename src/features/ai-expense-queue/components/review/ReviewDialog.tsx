@@ -28,6 +28,7 @@ import type { AmountBasis } from "../../../../../lib/receiptTax/types";
 import { ReviewDialogActions } from "./ReviewDialogActions";
 import { ReviewItemCard } from "./ReviewItemCard";
 import { ReviewItemRow } from "./ReviewItemRow";
+import { ReviewCheckCards } from "./ReviewCheckCards";
 import { ReviewStatusBanner } from "./ReviewStatusBanner";
 import { ReceiptTaxSummary } from "./ReceiptTaxSummary";
 import { getReviewGuidance, effectiveReviewMode } from "../../utils/reviewGuidance";
@@ -89,12 +90,22 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const small = useMediaQuery(useTheme().breakpoints.down("sm"));
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [taxDetails, setTaxDetails] = useState<Record<string, boolean>>({});
-  const [jump, setJump] = useState<string | null>(null);
   const [localError, setLocalError] = useState("");
   const sections = useRef(new Map<string, HTMLElement>());
+  const pendingJump = useRef<string | null>(null);
+  const dialogKey = `${draft?._id ?? ""}:${open}`;
+  const lastDialogKey = useRef(dialogKey);
+  const [resetDialogKey, setResetDialogKey] = useState(dialogKey);
+  if (resetDialogKey !== dialogKey) {
+    setResetDialogKey(dialogKey);
+    setExpanded({});
+    setTaxDetails({});
+    setLocalError("");
+  }
   const guidance = getReviewGuidance(form, items, draft);
   const required = guidance.filter((issue) => issue.required);
   const recommendations = guidance.filter((issue) => !issue.required && issue.scope !== "receipt");
+  const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");
   const specificGuidance = guidance.filter((issue) => issue.scope !== "receipt");
   const itemTargets = new Set(items.map((item) => item.id));
   const bannerGuidance = specificGuidance.filter(
@@ -148,17 +159,17 @@ export function ReviewDialog(props: ReviewDialogProps) {
       [target]: true,
       ...(target === "tax-summary" ? { reference: true } : {}),
     }));
-    setJump(target);
+    pendingJump.current = target;
   };
   useEffect(() => {
-    setExpanded({});
-    setTaxDetails({});
-    setLocalError("");
-    setJump(null);
-  }, [draft?._id, open]);
-  useEffect(() => {
-    if (!jump) return;
-    const section = sections.current.get(jump);
+    if (lastDialogKey.current !== dialogKey) {
+      lastDialogKey.current = dialogKey;
+      pendingJump.current = null;
+    }
+    const target = pendingJump.current;
+    if (target === null) return;
+    pendingJump.current = null;
+    const section = sections.current.get(target);
     section?.scrollIntoView?.({ block: "start", behavior: "instant" });
     const invalid = section?.querySelector<HTMLElement>(
       '[role="combobox"][aria-invalid="true"],input[aria-invalid="true"]:not([aria-hidden="true"])',
@@ -167,8 +178,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
       'input:not([aria-hidden="true"]),[role="combobox"]',
     );
     (invalid ?? field ?? section)?.focus();
-    setJump(null);
-  }, [jump, expanded]);
+  });
   const register = (target: string) => (node: HTMLElement | null) => {
     if (node) sections.current.set(target, node);
     else sections.current.delete(target);
@@ -429,9 +439,11 @@ export function ReviewDialog(props: ReviewDialogProps) {
                   checks={checks}
                   issues={bannerGuidance}
                   unresolvedTaxItemCount={unresolvedTaxItemCount}
+                  receiptIssues={receiptGuidance}
                   busy={busy}
                   onJump={goTo}
                 />
+                <ReviewCheckCards amount={checks.amount} taxRate={checks.taxRate} />
                 <Box
                   component="fieldset"
                   disabled={busy}

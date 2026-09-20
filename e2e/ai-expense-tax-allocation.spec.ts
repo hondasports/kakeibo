@@ -39,7 +39,7 @@ test("#748 未配分の13明細を確認して税込合計・税額を保存後�
       await item.getByRole("combobox", { name: "割引対象の商品", exact: true }).click();
       await page.getByRole("option", { name: target, exact: true }).click();
     }
-    await expect(dialog.getByRole("region", { name: "全体の確認状態" })).toContainText(
+    await expect(dialog.getByRole("region", { name: "商品一覧" })).toContainText(
       "割引の対象税率が対象商品（8%）と異なります",
     );
     // Fix each summary using the existing editor; the first editor becomes read-only after save.

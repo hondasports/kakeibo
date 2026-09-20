@@ -332,10 +332,12 @@ test.describe("Issue #321 AI支出下書きの明細確認・修正UI", () => {
     await expect(dialog.getByText("未分類の明細があります")).toHaveCount(0);
     await expect(dialog.getByText("低信頼度の明細があります")).toHaveCount(0);
 
-    for (const summary of await dialog
-      .locator('section[aria-label="商品一覧"] details:not([open]) > summary')
-      .all())
-      await summary.click();
+    const closedSummaries = dialog.locator(
+      'section[aria-label="商品一覧"] details:not([open]) > summary',
+    );
+    while ((await closedSummaries.count()) > 0) {
+      await closedSummaries.first().click();
+    }
     await expect(dialog.getByRole("heading", { name: /商品一覧/ })).toBeVisible();
     const checkSection = dialog.getByRole("region", { name: "確認結果" });
     await expect(checkSection).toBeVisible();
@@ -351,6 +353,12 @@ test.describe("Issue #321 AI支出下書きの明細確認・修正UI", () => {
     await dialog.getByLabel("レシートの金額", { exact: true }).first().fill("400");
     await dialog.getByRole("button", { name: "胃薬を削除" }).click();
     await dialog.getByRole("button", { name: "明細を追加" }).click();
+    // 追加した明細行は畳まれた状態で出るため展開してから入力する
+    await dialog
+      .locator('section[aria-label="商品一覧"] details:not([open])')
+      .last()
+      .locator("summary")
+      .click();
 
     await dialog.getByLabel("明細名").nth(1).fill("牛乳");
     await dialog.getByLabel("レシートの金額", { exact: true }).nth(1).fill("520");
@@ -664,7 +672,7 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
     const milkRow = dialog.locator('section[aria-label="商品一覧"] details').filter({
       hasText: "牛乳",
     });
-    await milkRow.getByRole("button", { name: "確認・修正" }).click();
+    if ((await milkRow.getAttribute("open")) === null) await milkRow.locator("summary").click();
     const milkTaxRate = milkRow.getByRole("combobox", { name: "牛乳の税率", exact: true });
     await expect
       .poll(async () => (await milkTaxRate.boundingBox())?.width ?? 0)

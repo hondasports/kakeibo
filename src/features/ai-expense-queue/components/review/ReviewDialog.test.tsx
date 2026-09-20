@@ -111,7 +111,7 @@ describe("下書きの修正導線", () => {
     expect(within(banner).getByText("印字額と明細の金額が一致していません")).toBeVisible();
     expect(within(banner).getByText(/差額 24円/)).toBeVisible();
     await user.click(within(banner).getByRole("button", { name: "金額を確認する" }));
-    expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "確認結果" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "商品一覧" })).toBeVisible();
   });
   it("不正な明細金額の修正では金額欄へフォーカスする", async () => {
