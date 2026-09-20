@@ -120,7 +120,7 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
   // totalOnly の下書きは dev バックエンドのシードに依存せず、
   // フロントのみの __e2e__ fixture で確認する（registrationMode の表示・保存導線）。
   test("@smoke R018 確認済みtotalOnlyの下書きは合計だけ保存モードで開ける", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1");
+    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1&totalOnly=1");
 
     const queue = page.getByRole("region", { name: "レシート入力" });
     const reviewSection = queue.getByRole("region", { name: "確認待ち" });
@@ -148,7 +148,7 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
   });
 
   test("@smoke totalOnlyの下書きは再編集しても合計だけ登録を維持できる", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1");
+    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1&totalOnly=1");
 
     const queue = page.getByRole("region", { name: "レシート入力" });
     await queue

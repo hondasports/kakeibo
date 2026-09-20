@@ -17,10 +17,7 @@ test("#748 未配分の13明細を確認して税込合計・税額を保存後�
     await row.getByRole("button", { name: "確認する" }).click();
     const dialog = page.getByRole("dialog", { name: "下書き確認" });
     const checks = dialog.getByRole("region", { name: "確認結果", exact: true });
-    // 割引対象が未確定のため税率別集計は比較不能。金額は印字どおり一致している。
-    await expect(
-      checks.getByText("割引対象の商品が未確定のため、税率別に集計できません").first(),
-    ).toBeVisible();
+    // 金額は印字どおり一致している。割引対象は最寄りの商品へ自動推論される。
     await expect(
       checks.getByText(/明細合計 4,292円 ＋ 税額 370円 ＝ 支払額 4,662円/),
     ).toBeVisible();

@@ -21,18 +21,7 @@ export const devAiExpenseQueueItems: AiExpenseQueueItem[] = [
     date: "2026-06-01",
     categoryName: "水道光熱費",
   },
-  {
-    id: "e2e-totalonly-draft",
-    fileName: "review-totalonly.png",
-    status: "needs_review",
-    documentType: "receipt",
-    title: "E2E合計のみ店",
-    reviewReasons: ["user_confirmation_required"],
-    amountYen: 108,
-    date: "2026-07-04",
-    categoryName: "食費",
-    registrationMode: "totalOnly",
-  },
+
   {
     id: "e2e-failed-draft",
     fileName: "failed-receipt.png",
@@ -52,6 +41,20 @@ export const devAiExpenseQueueItems: AiExpenseQueueItem[] = [
     categoryName: "日用品",
   },
 ];
+
+/** totalOnly 確認用の追加fixture。`?totalOnly=1` 指定時のみキューへ混ぜる */
+export const devAiExpenseTotalOnlyQueueItem: AiExpenseQueueItem = {
+  id: "e2e-totalonly-draft",
+  fileName: "review-totalonly.png",
+  status: "needs_review",
+  documentType: "receipt",
+  title: "E2E合計のみ店",
+  reviewReasons: ["user_confirmation_required"],
+  amountYen: 108,
+  date: "2026-07-04",
+  categoryName: "食費",
+  registrationMode: "totalOnly",
+};
 
 export const devAiExpenseQueueCategories = [
   { _id: "e2e-cat-utilities", name: "水道光熱費", color: "#AAB7C4" },
