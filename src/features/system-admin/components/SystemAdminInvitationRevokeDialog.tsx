@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   CircularProgress,
@@ -31,9 +31,12 @@ export function SystemAdminInvitationRevokeDialog({
   onConfirm,
 }: Props) {
   const [reason, setReason] = useState("");
-  useEffect(() => {
+  const contextKey = `${open}:${invitation?.id ?? ""}`;
+  const [prevContextKey, setPrevContextKey] = useState(contextKey);
+  if (prevContextKey !== contextKey) {
+    setPrevContextKey(contextKey);
     if (open) setReason("");
-  }, [open, invitation?.id]);
+  }
   const normalizedReason = reason.trim();
   const reasonError = useMemo(
     () =>

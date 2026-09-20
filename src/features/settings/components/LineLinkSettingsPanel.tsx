@@ -65,9 +65,16 @@ export function LineLinkSettingsPanel() {
     isFeedbackCode(feedbackQuery) ? feedbackQuery : getNavigationFeedback(location.state),
   );
 
+  const [prevFeedbackQuery, setPrevFeedbackQuery] = useState(feedbackQuery);
+  if (prevFeedbackQuery !== feedbackQuery) {
+    setPrevFeedbackQuery(feedbackQuery);
+    if (isFeedbackCode(feedbackQuery)) {
+      setFeedback(feedbackQuery);
+    }
+  }
+
   useEffect(() => {
     if (!isFeedbackCode(feedbackQuery)) return;
-    setFeedback(feedbackQuery);
     navigate(location.pathname, {
       replace: true,
       state: { lineLinkFeedback: feedbackQuery },

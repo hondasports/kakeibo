@@ -42,6 +42,8 @@ export type ReviewItemCardProps = {
   isExpanded: boolean;
   enableItemTaxEditing?: boolean;
   inlineTaxEditing?: boolean;
+  /** 行コンポーネント内に埋め込む場合は外枠を描画しない */
+  embedded?: boolean;
   disabled?: boolean;
   onAmountBasisChange?: (itemId: string, value: AmountBasis) => void;
   onItemChange: (
@@ -68,6 +70,7 @@ export function ReviewItemCard({
   isExpanded,
   enableItemTaxEditing = false,
   inlineTaxEditing = false,
+  embedded = false,
   disabled = false,
   onAmountBasisChange,
   onItemChange,
@@ -94,12 +97,16 @@ export function ReviewItemCard({
   return (
     <Box
       key={item.id}
-      sx={{
-        border: "1px solid",
-        borderColor: uncategorized || lowConfidence ? "warning.main" : "divider",
-        borderRadius: 1,
-        p: 1.5,
-      }}
+      sx={
+        embedded
+          ? undefined
+          : {
+              border: "1px solid",
+              borderColor: uncategorized || lowConfidence ? "warning.main" : "divider",
+              borderRadius: 1,
+              p: 1.5,
+            }
+      }
     >
       <Stack spacing={1}>
         <Stack

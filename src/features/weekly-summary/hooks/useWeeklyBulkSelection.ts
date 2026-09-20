@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   MAX_BULK_SPENDING_SELECTION,
   canSelectAnotherSpendingRecord,
@@ -24,14 +24,18 @@ export function useWeeklyBulkSelection(receipts: ReceiptItem[], weekStartDate: s
     [selectableReceipts],
   );
 
-  useEffect(() => {
+  const [prevWeekStartDate, setPrevWeekStartDate] = useState(weekStartDate);
+  if (prevWeekStartDate !== weekStartDate) {
+    setPrevWeekStartDate(weekStartDate);
     setSelectedKeys(new Set());
     setLimitMessage("");
-  }, [weekStartDate]);
+  }
 
-  useEffect(() => {
+  const [prevSelectableKeys, setPrevSelectableKeys] = useState(selectableKeys);
+  if (prevSelectableKeys !== selectableKeys) {
+    setPrevSelectableKeys(selectableKeys);
     setSelectedKeys((current) => pruneSelectionToVisibleKeys(current, selectableKeys));
-  }, [selectableKeys]);
+  }
 
   const selectedReceipts = useMemo(
     () =>

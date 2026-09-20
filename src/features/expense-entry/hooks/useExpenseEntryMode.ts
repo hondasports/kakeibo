@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { ExpenseItemEntryErrors } from "../validation/expenseItems";
 
@@ -27,12 +27,16 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
   const [itemErrors, setItemErrors] = useState<ExpenseItemEntryErrors[]>([{}]);
 
   // BUG#1: weekStartDate が変わったら date をリセット（WeekNavigator 週移動時のstale防止）
-  useEffect(() => {
+  const [prevWeekStartDate, setPrevWeekStartDate] = useState(weekStartDate);
+  if (prevWeekStartDate !== weekStartDate) {
+    setPrevWeekStartDate(weekStartDate);
     setDate(weekStartDate);
-  }, [weekStartDate]);
+  }
 
   // ANALYSIS#1: categories が非同期ロードされたとき items[0].categoryId を更新
-  useEffect(() => {
+  const [prevCategories, setPrevCategories] = useState(categories);
+  if (prevCategories !== categories) {
+    setPrevCategories(categories);
     const firstCategoryId = categories[0]?._id ?? "";
     if (firstCategoryId) {
       setItems((prev) =>
@@ -41,7 +45,7 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
         ),
       );
     }
-  }, [categories]);
+  }
 
   // 単一モードの差額計算 (入力した合計金額 vs items[0].amountYen)
   const singleAmountNum = parseInt(items[0]?.amountYen || "0", 10) || 0;

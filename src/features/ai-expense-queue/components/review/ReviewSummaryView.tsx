@@ -1,7 +1,7 @@
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Box, Button, Collapse, Stack, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ReviewReasonChips } from "../ReviewReasonChips";
 import { StatusChip } from "../StatusChip";
 import type {
@@ -32,9 +32,11 @@ export function ReviewSummaryView({
 }) {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const [prevDraftId, setPrevDraftId] = useState(selectedReviewDraft?._id);
+  if (prevDraftId !== selectedReviewDraft?._id) {
+    setPrevDraftId(selectedReviewDraft?._id);
     setExpandedItemId(null);
-  }, [selectedReviewDraft?._id]);
+  }
 
   const shopName = resolveReviewShopName(
     reviewForm,

@@ -60,10 +60,8 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
   const [invitationSaving, setInvitationSaving] = useState(false);
   const [invitationError, setInvitationError] = useState("");
 
-  const load = useCallback(async () => {
+  const fetchDetail = useCallback(async () => {
     if (!groupId) return;
-    setDetail(undefined);
-    setError(false);
     try {
       const response = await getGroupDetail({ groupId: groupId as Id<"groups"> });
       setDetail(response as GroupDetail | null);
@@ -72,9 +70,33 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
     }
   }, [getGroupDetail, groupId]);
 
+  const load = useCallback(async () => {
+    setDetail(undefined);
+    setError(false);
+    await fetchDetail();
+  }, [fetchDetail]);
+
+  const [prevGroupId, setPrevGroupId] = useState(groupId);
+  if (prevGroupId !== groupId) {
+    setPrevGroupId(groupId);
+    setDetail(undefined);
+    setError(false);
+  }
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!groupId) return;
+    let cancelled = false;
+    getGroupDetail({ groupId: groupId as Id<"groups"> })
+      .then((response) => {
+        if (!cancelled) setDetail(response as GroupDetail | null);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getGroupDetail, groupId]);
 
   const requestRemove = (member: GroupDetailMember) => {
     setOperationError(undefined);

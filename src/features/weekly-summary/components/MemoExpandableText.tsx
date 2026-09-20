@@ -1,7 +1,7 @@
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Box, Button, Stack, Typography } from "@mui/material";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import {
   getMemoLineClampSx,
   MEMO_COLLAPSED_MAX_LINES,
@@ -42,13 +42,18 @@ export function MemoExpandableText({ memo }: { memo: string }) {
   const measureRef = useRef<HTMLSpanElement>(null);
   const contentId = useId();
 
-  useEffect(() => {
+  const [prevMemo, setPrevMemo] = useState(memo);
+  if (prevMemo !== memo) {
+    setPrevMemo(memo);
     setExpanded(false);
-  }, [memo]);
+  }
+
+  if (needsCollapseByLines && !needsCollapse) {
+    setNeedsCollapse(true);
+  }
 
   useLayoutEffect(() => {
     if (needsCollapseByLines) {
-      setNeedsCollapse(true);
       return;
     }
 
@@ -62,7 +67,7 @@ export function MemoExpandableText({ memo }: { memo: string }) {
       setNeedsCollapse((current) => (current === nextNeedsCollapse ? current : nextNeedsCollapse));
     };
 
-    updateNeedsCollapse();
+    queueMicrotask(updateNeedsCollapse);
 
     window.addEventListener("resize", updateNeedsCollapse);
     return () => {

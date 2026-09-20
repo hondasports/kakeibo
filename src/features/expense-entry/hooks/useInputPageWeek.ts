@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { getUserProfileApi } from "../../../lib/repositories/users";
 import { getOrCreateWeekSessionApi } from "../../../lib/repositories/weekSessions";
@@ -32,38 +32,40 @@ export function useInputPageWeek() {
   const [sessionError, setSessionError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const loadSession = useCallback(
-    (targetWeekStartDate: string) => {
-      setIsLoading(true);
-      setWeekSession(null);
-      setSessionError("");
-      getOrCreateSession({ weekStartDate: targetWeekStartDate })
-        .then((session) => {
-          setWeekSession(session);
-          setIsLoading(false);
-        })
-        .catch((err: unknown) => {
-          console.error("週次セッション初期化失敗:", err);
-          setSessionError("週次セッションの初期化に失敗しました。ページをリロードしてください。");
-          setIsLoading(false);
-        });
-    },
-    [getOrCreateSession],
-  );
+  if (userProfile !== undefined && !settingsApplied) {
+    setSettingsApplied(true);
+    setWeekStartDate(currentWeekStartDate);
+  }
 
-  useEffect(() => {
-    if (userProfile !== undefined && !settingsApplied) {
-      setWeekStartDate(currentWeekStartDate);
-      setSettingsApplied(true);
-    }
-  }, [currentWeekStartDate, settingsApplied, userProfile]);
+  const [requestedWeekStartDate, setRequestedWeekStartDate] = useState<string | null>(null);
+  if (settingsApplied && requestedWeekStartDate !== weekStartDate) {
+    setRequestedWeekStartDate(weekStartDate);
+    setIsLoading(true);
+    setWeekSession(null);
+    setSessionError("");
+  }
 
   useEffect(() => {
     if (userProfile === undefined || !settingsApplied) {
       return;
     }
-    loadSession(weekStartDate);
-  }, [loadSession, settingsApplied, userProfile, weekStartDate]);
+    let cancelled = false;
+    getOrCreateSession({ weekStartDate })
+      .then((session) => {
+        if (cancelled) return;
+        setWeekSession(session);
+        setIsLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        console.error("週次セッション初期化失敗:", err);
+        setSessionError("週次セッションの初期化に失敗しました。ページをリロードしてください。");
+        setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getOrCreateSession, settingsApplied, userProfile, weekStartDate]);
 
   const goToPreviousWeek = () => {
     setWeekStartDate((prev) => addWeeks(prev, -1));

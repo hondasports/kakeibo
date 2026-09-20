@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Box,
   Button,
@@ -54,10 +54,12 @@ export function QueueItemCard({
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const secondaryLabel = item.fileName ?? "AI支出下書き";
   const canPreview = Boolean(item.previewImageDataUrl) && !imageLoadFailed;
-  useEffect(() => {
+  const [prevImageUrl, setPrevImageUrl] = useState(item.previewImageDataUrl);
+  if (prevImageUrl !== item.previewImageDataUrl) {
+    setPrevImageUrl(item.previewImageDataUrl);
     setImageLoadFailed(false);
     setPreviewOpen(false);
-  }, [item.previewImageDataUrl]);
+  }
   const metadata = [
     item.date ? formatQueueDate(item.date) : undefined,
     item.amountYen !== undefined ? `${formatYen(item.amountYen)}` : undefined,

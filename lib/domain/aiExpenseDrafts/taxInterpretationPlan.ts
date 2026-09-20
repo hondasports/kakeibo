@@ -43,20 +43,29 @@ export const UPDATED_DRAFT_NOT_FOUND_MESSAGE = "Failed to retrieve updated AI ex
 
 /**
  * 再解釈の適格性を判定する。不在 → 他グループ → 金額/税サマリ欠落の順。
- * decisionOverride がある場合は税サマリが無くても許可する。
+ * 税サマリが無い下書きでも、ユーザーが新しい税情報を供給するオーバーライド
+ * （decisionOverride・明細単位 override・未解決一括 override）があれば許可する。
+ * summaryOverride は既存サマリの編集なので適格性の根拠にはしない。
  */
 export function validateTaxInterpretationEligibility(
   draft: AiExpenseDraftFields | null,
   groupId: string,
-  decisionOverride: ReinterpretDraftTaxInput["decisionOverride"] | undefined,
+  overrides?: Pick<
+    TaxInterpretationPlanArgs,
+    "decisionOverride" | "override" | "bulkUnresolvedOverride"
+  >,
 ):
   | { success: true; draft: AiExpenseDraftFields & { amountYen: number } }
   | { success: false; error: TaxInterpretationEligibilityError } {
   if (draft === null) return { success: false, error: "not_found" };
   if (draft.groupId !== groupId) return { success: false, error: "wrong_group" };
+  const hasOverride =
+    overrides?.decisionOverride !== undefined ||
+    overrides?.override !== undefined ||
+    overrides?.bulkUnresolvedOverride !== undefined;
   if (
     draft.amountYen === undefined ||
-    ((!draft.taxSummaries || draft.taxSummaries.length === 0) && decisionOverride === undefined)
+    ((!draft.taxSummaries || draft.taxSummaries.length === 0) && !hasOverride)
   ) {
     return { success: false, error: "missing_amount_or_summaries" };
   }

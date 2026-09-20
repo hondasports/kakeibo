@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "convex/react";
 import { Alert, Box, Button, Stack, Typography } from "@mui/material";
@@ -146,18 +146,12 @@ export function ExpenseSearchPage() {
   const searchResult = searchQueryValue instanceof Error ? undefined : searchQueryValue;
   const searchError = searchQueryValue instanceof Error ? searchQueryValue : null;
 
-  useEffect(() => {
-    if (draftKey === appliedKey) {
-      return;
-    }
+  if (draftKey !== appliedKey) {
     setDraftKey(appliedKey);
     setDraft(applied);
-  }, [applied, appliedKey, draftKey]);
+  }
 
-  useEffect(() => {
-    if (loadedKey === appliedKey) {
-      return;
-    }
+  if (loadedKey !== appliedKey) {
     setLoadedKey(appliedKey);
     setPaginationCursor(null);
     setLoadedCursor(null);
@@ -165,18 +159,17 @@ export function ExpenseSearchPage() {
     setLoadedItems([]);
     setLastSearchResult(null);
     setInitialSearchResult(null);
-  }, [appliedKey, loadedKey]);
+  }
 
-  useEffect(() => {
-    if (
-      searchResult === undefined ||
-      loadedKey !== appliedKey ||
-      (activeCursor === null && hasLoadedPage) ||
-      (activeCursor !== null &&
-        (loadedCursor === activeCursor || searchResult.continueCursor === activeCursor))
-    ) {
-      return;
-    }
+  if (
+    searchResult !== undefined &&
+    loadedKey === appliedKey &&
+    !(activeCursor === null && hasLoadedPage) &&
+    !(
+      activeCursor !== null &&
+      (loadedCursor === activeCursor || searchResult.continueCursor === activeCursor)
+    )
+  ) {
     setHasLoadedPage(true);
     setLoadedItems((current) =>
       activeCursor === null ? searchResult.page : mergeSearchPage(current, searchResult.page),
@@ -186,7 +179,7 @@ export function ExpenseSearchPage() {
     if (activeCursor === null) {
       setInitialSearchResult(searchResult);
     }
-  }, [activeCursor, appliedKey, hasLoadedPage, loadedCursor, loadedKey, searchResult]);
+  }
 
   const currentSearchPath = `${location.pathname}${location.search}`;
   const categoryName = categories.find((category) => category._id === applied.categoryId)?.name;
