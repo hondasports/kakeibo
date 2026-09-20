@@ -17,7 +17,7 @@ export type ReviewAmountCheck = {
   paidTotalYen?: number;
   /** 明細の印字額合計（外税時の税抜小計との比較用） */
   itemsPrintedTotalYen?: number;
-  /** 支払額との直接比較に使う合計（税込正規化を優先） */
+  /** 支払額との直接比較に使う合計（税込正規化を優先。比較不能な明細があるときは undefined） */
   itemsComparableTotalYen?: number;
   /** 外税時に印字された税抜小計（Σ対象額） */
   printedSubtotalYen?: number;
@@ -71,14 +71,32 @@ function parseYenInput(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-/** 明細の印字額。OCRの印字値があればそちらを優先する。 */
+/**
+ * 明細の比較用金額。現在の入力値を使い、空欄・不正値は未確定として扱う。
+ * 入力値が有効な場合は handleReviewItemChange が printedAmountYen へ同期済みのため
+ * 印字額と一致するが、空欄のまま印字額へフォールバックすると未確定を見逃す。
+ */
 function itemPrintedYen(item: ReviewItemValues): number | undefined {
-  return item.printedAmountYen ?? parseYenInput(item.amountYen);
+  const entered = parseYenInput(item.amountYen);
+  if (entered === undefined) return undefined;
+  return item.printedAmountYen ?? entered;
 }
 
-/** 支払額との比較に使う金額。税込へ正規化済みならそちらを優先する。 */
+/**
+ * 支払額との比較に使う税込換算額。
+ * - 税抜明細: 税額配分が完了（allocated）した normalizedAmountYen のみが税込相当。
+ *   未配分の印字額（税抜）を支払額（税込）と比較しない。
+ * - 税込／基準が unknown の明細: 税込は印字額で比較。unknown は比較不能。
+ * - amountBasis 未設定: 税解釈を通っていない明細は印字額をそのまま比較する。
+ */
 function itemComparableYen(item: ReviewItemValues): number | undefined {
-  return item.normalizedAmountYen ?? itemPrintedYen(item);
+  const printed = itemPrintedYen(item);
+  if (printed === undefined) return undefined;
+  if (item.amountBasis === "tax_excluded") {
+    return item.taxAllocationStatus === "allocated" ? item.normalizedAmountYen : undefined;
+  }
+  if (item.amountBasis === "unknown") return undefined;
+  return printed;
 }
 
 /** サマリの対象額基準。basis が unknown でも税モードから意味を復元する。 */
@@ -131,10 +149,11 @@ export function buildAmountCheck(args: {
     (sum, item) => sum + (itemPrintedYen(item) ?? 0),
     0,
   );
-  const itemsComparableTotalYen = args.items.reduce(
-    (sum, item) => sum + (itemComparableYen(item) ?? 0),
-    0,
-  );
+  // 税込換算できない明細が1件でもあれば合計は確定できない。欠損を0円扱いしない。
+  const itemsComparableTotalYen = args.items.reduce<number | undefined>((sum, item) => {
+    const amount = itemComparableYen(item);
+    return sum === undefined || amount === undefined ? undefined : sum + amount;
+  }, 0);
 
   if (external) {
     const printedSubtotalYen = summaries.reduce(
@@ -173,6 +192,18 @@ export function buildAmountCheck(args: {
     return { ...base, status: "matched" };
   }
 
+  // 税込基準が未確定の明細（税抜かつ未配分、基準不明など）を支払額と比較しない
+  const uncertainItem = args.items.find((item) => itemComparableYen(item) === undefined);
+  if (uncertainItem || itemsComparableTotalYen === undefined)
+    return {
+      status: "uncomparable",
+      variant,
+      paidTotalYen,
+      itemsPrintedTotalYen,
+      reason: "税率・税込／税抜が未確定の明細があるため、支払額と比較できません",
+      focusTarget: uncertainItem?.id,
+    };
+
   const differenceYen = itemsComparableTotalYen - paidTotalYen;
   const base = { variant, paidTotalYen, itemsComparableTotalYen, itemsPrintedTotalYen };
   if (differenceYen !== 0)
@@ -190,18 +221,42 @@ export function buildAmountCheck(args: {
 const DIRECT_PRINT_PATTERN = /(?:対象|小計|%)/;
 const TAX_AMOUNT_LINE_ROLES = new Set(["tax", "subtotal", "total"]);
 
+/**
+ * 観測行テキストから税率を読み取る。印字に税率を含まない行は undefined。
+ * 「8%対象」「10% 対象額」などを拾う。
+ */
+function parsePrintedTaxRatePercent(rawText: string): number | undefined {
+  const m = /(\d{1,2}(?:\.\d+)?)\s*%/.exec(rawText.replace(/\s+/g, ""));
+  if (!m) return undefined;
+  const rate = Number(m[1]);
+  return Number.isFinite(rate) && rate >= 0 && rate <= 100 ? rate : undefined;
+}
+
 function hasDirectPrintEvidence(
   summary: TaxSummary,
   rawObservation: ReceiptRawObservation | undefined,
+  summaries: TaxSummary[],
 ): boolean {
   if (!rawObservation) return false;
-  return rawObservation.lines.some(
-    (line) =>
-      line.explicitlyPrinted &&
-      line.amountYen === summary.taxableAmountYen &&
-      (line.lineRoleCandidates.some((role) => TAX_AMOUNT_LINE_ROLES.has(role)) ||
-        DIRECT_PRINT_PATTERN.test(line.rawText)),
-  );
+  const sameAmountCount = summaries.filter(
+    (candidate) => candidate.taxableAmountYen === summary.taxableAmountYen,
+  ).length;
+  return rawObservation.lines.some((line) => {
+    if (
+      !line.explicitlyPrinted ||
+      line.amountYen !== summary.taxableAmountYen ||
+      !(
+        line.lineRoleCandidates.some((role) => TAX_AMOUNT_LINE_ROLES.has(role)) ||
+        DIRECT_PRINT_PATTERN.test(line.rawText)
+      )
+    )
+      return false;
+    const lineRate = parsePrintedTaxRatePercent(line.rawText);
+    // 税率表記がある行は、その税率の内訳だけの証拠とする
+    if (lineRate !== undefined) return lineRate === summary.taxRatePercent;
+    // 税率表記がない行は、同一対象額の内訳が複数あると帰属を特定できない
+    return sameAmountCount === 1;
+  });
 }
 
 export function buildTaxRateCheck(args: {
@@ -273,7 +328,7 @@ export function buildTaxRateCheck(args: {
     const differenceYen = currentYen - summary.taxableAmountYen;
     if (differenceYen === 0)
       return { ...base, currentYen, differenceYen, status: "matched", matchKind: "exact" };
-    const approxAllowed = !hasDirectPrintEvidence(summary, args.rawObservation);
+    const approxAllowed = !hasDirectPrintEvidence(summary, args.rawObservation, summaries);
     if (approxAllowed && Math.abs(differenceYen) === 1)
       return { ...base, currentYen, differenceYen, status: "matched", matchKind: "approx" };
     return { ...base, currentYen, differenceYen, status: "mismatch" };

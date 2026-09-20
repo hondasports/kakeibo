@@ -31,7 +31,8 @@ describe("ReviewCheckCards", () => {
       },
     );
     expect(within(region).getAllByText("一致")).toHaveLength(2);
-    expect(within(region).getByText(/明細合計 4,662円 ＝ 支払額 4,662円/)).toBeInTheDocument();
+    expect(within(region).getByText(/明細合計 4,662円/)).toBeInTheDocument();
+    expect(within(region).getByText(/支払額 4,662円/)).toBeInTheDocument();
     expect(within(region).getByText(/8% 内税/)).toBeInTheDocument();
     expect(within(region).getByText(/現在 2,912円 ／ 印字 2,912円/)).toBeInTheDocument();
   });
@@ -49,9 +50,9 @@ describe("ReviewCheckCards", () => {
       },
       taxRateBase,
     );
-    expect(
-      within(region).getByText(/明細合計 4,292円 ＋ 税額 370円 ＝ 支払額 4,662円/),
-    ).toBeInTheDocument();
+    expect(within(region).getByText(/明細合計 4,292円/)).toBeInTheDocument();
+    expect(within(region).getByText(/税額 370円/)).toBeInTheDocument();
+    expect(within(region).getByText(/支払額 4,662円/)).toBeInTheDocument();
   });
 
   it("不一致時は確定した差額だけを表示する", () => {

@@ -99,9 +99,16 @@ function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
   if (check.variant === "external") {
     if (check.status === "matched") {
       return (
-        <Typography variant="body2" sx={numericSx}>
-          明細合計 {yen(check.itemsPrintedTotalYen)} ＋ 税額 {yen(check.printedTaxYen)} ＝ 支払額{" "}
-          {yen(check.paidTotalYen)}
+        <Typography variant="body2" sx={{ textAlign: "right" }}>
+          <Box component="span" sx={numericSx}>
+            明細合計 {yen(check.itemsPrintedTotalYen)}
+          </Box>{" "}
+          <Box component="span" sx={numericSx}>
+            ＋ 税額 {yen(check.printedTaxYen)}
+          </Box>{" "}
+          <Box component="span" sx={numericSx}>
+            ＝ 支払額 {yen(check.paidTotalYen)}
+          </Box>
         </Typography>
       );
     }
@@ -132,8 +139,13 @@ function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
 
   if (check.status === "matched") {
     return (
-      <Typography variant="body2" sx={numericSx}>
-        明細合計 {yen(check.itemsComparableTotalYen)} ＝ 支払額 {yen(check.paidTotalYen)}
+      <Typography variant="body2" sx={{ textAlign: "right" }}>
+        <Box component="span" sx={numericSx}>
+          明細合計 {yen(check.itemsComparableTotalYen)}
+        </Box>{" "}
+        <Box component="span" sx={numericSx}>
+          ＝ 支払額 {yen(check.paidTotalYen)}
+        </Box>
       </Typography>
     );
   }

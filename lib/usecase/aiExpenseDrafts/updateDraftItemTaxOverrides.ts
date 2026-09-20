@@ -32,12 +32,9 @@ export async function updateDraftItemTaxOverrides(
   },
   args: UpdateDraftItemTaxOverridesUsecaseArgs,
 ): Promise<{ draft: AiExpenseDraftFields; items: AiExpenseDraftItemFields[] }> {
-  const draft = await loadEditableDraft(deps, ctx.groupId, args.draftId);
-  try {
-    draft.assertHasTaxInterpretationBasis();
-  } catch (err) {
-    throw toConvexError(err);
-  }
+  // 税内訳が無い下書きでも明細単位の補正は受け付ける。金額・サマリ欠落の判定は
+  // persistInterpretation 内の validateTaxInterpretationEligibility に委譲する。
+  await loadEditableDraft(deps, ctx.groupId, args.draftId);
 
   const items = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
   const itemIndex = items.findIndex((item) => item.id === args.itemId);

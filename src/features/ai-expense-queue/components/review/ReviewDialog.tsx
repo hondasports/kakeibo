@@ -246,6 +246,33 @@ export function ReviewDialog(props: ReviewDialogProps) {
                 </Box>
               )}
               <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+                {props.imageDataUrl && (
+                  <Box
+                    component="details"
+                    sx={{ display: { xs: "block", md: "none" }, minWidth: 0 }}
+                  >
+                    <Typography
+                      component="summary"
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ cursor: "pointer" }}
+                    >
+                      レシート画像を表示
+                    </Typography>
+                    <Box
+                      component="img"
+                      src={props.imageDataUrl}
+                      alt="読み取り元のレシート"
+                      sx={{
+                        width: "100%",
+                        maxHeight: "50dvh",
+                        objectFit: "contain",
+                        objectPosition: "top",
+                        mt: 1,
+                      }}
+                    />
+                  </Box>
+                )}
                 <Box
                   component="fieldset"
                   disabled={busy}
@@ -527,7 +554,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                                 isExpanded={taxDetails[item.id] ?? false}
                                 taxUpdatingItemId={props.taxUpdatingItemId}
                                 disabled={busy}
-                                enableItemTaxEditing={canEditTax && !!item.persistedItemId}
+                                enableItemTaxEditing={!!item.persistedItemId}
                                 inlineTaxEditing
                                 onAmountBasisChange={props.onAmountBasisChange}
                                 onItemChange={props.onItemChange}

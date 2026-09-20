@@ -190,8 +190,10 @@ describe("下書きの修正導線", () => {
     const user = userEvent.setup();
     render(<ReviewDialog {...props} />);
     const banner = screen.getByRole("region", { name: "全体の確認状態" });
-    expect(within(banner).getByText(/割引対象の商品を選択/)).toBeVisible();
-    await user.click(within(banner).getByRole("button", { name: "修正箇所へ" }));
+    const discountIssue = within(banner)
+      .getByText(/割引対象の商品を選択/)
+      .closest("li")!;
+    await user.click(within(discountIssue).getByRole("button", { name: "確認箇所へ" }));
     expect(screen.getByRole("combobox", { name: "割引対象の商品" })).toBeVisible();
     expect(screen.getByRole("combobox", { name: "割引対象の商品" })).toHaveFocus();
     expect(screen.getByRole("region", { name: "商品一覧" })).toBeVisible();
@@ -208,7 +210,33 @@ describe("下書きの修正導線", () => {
       />,
     );
     expect(screen.getByText(/入力は残っています/)).toBeVisible();
-    expect(screen.getByRole("button", { name: "修正が必要な項目へ" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "下書きを保存" })).toBeDisabled();
+  });
+  it("税内訳がない下書きでも永続化済み明細の税率・税込／税抜を修正できる", async () => {
+    const user = userEvent.setup();
+    render(
+      <ReviewDialog
+        {...props}
+        reviewItems={[
+          { ...props.reviewItems[0], persistedItemId: "item-food" },
+          props.reviewItems[1],
+        ]}
+      />,
+    );
+    const item = screen.getByText("ホットケーキ").closest("details")!;
+    if (!item.hasAttribute("open")) {
+      await user.click(item.querySelector("summary")!);
+    }
+    expect(screen.getByRole("combobox", { name: "ホットケーキの税率" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "ホットケーキの表示価格" })).toBeEnabled();
+  });
+  it("割引対象が未確定でも確認項目を残したまま下書きを保存できる", async () => {
+    const user = userEvent.setup();
+    render(<ReviewDialog {...props} />);
+    const banner = screen.getByRole("region", { name: "全体の確認状態" });
+    expect(within(banner).getByText(/割引対象の商品を選択/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "下書きを保存" }));
+    expect(props.onSubmit).toHaveBeenCalledWith(false, "detailed");
   });
 });
 

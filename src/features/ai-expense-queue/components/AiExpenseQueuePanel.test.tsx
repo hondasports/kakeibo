@@ -1510,7 +1510,8 @@ describe("AiExpenseQueuePanel", () => {
     await user.type(amountInputs[1], "-110");
     expect(amountInputs[1]).toHaveValue("-110");
     const amountCheck = within(dialog).getByRole("region", { name: "確認結果" });
-    expect(within(amountCheck).getByText(/明細合計 990円 ＝ 支払額 990円/)).toBeVisible();
+    expect(within(amountCheck).getByText(/明細合計 990円/)).toBeVisible();
+    expect(within(amountCheck).getByText(/支払額 990円/)).toBeVisible();
 
     await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
 

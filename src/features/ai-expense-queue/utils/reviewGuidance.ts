@@ -88,12 +88,14 @@ export function getReviewGuidance(
           false,
         );
       }
+      // 割引対象の未確定は税率別集計を比較不能にする確認項目。
+      // 下書き保存は妨げない（登録前に解消する必須検証とは分離する）。
       if (isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId)
         add(
           "discount-" + item.id,
           "「" + name + "」：割引対象の商品を選択してください。",
           item.id,
-          true,
+          false,
         );
       else if (!item.itemName.trim())
         add("name-" + item.id, "明細名を入力してください。", item.id, true);

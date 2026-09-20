@@ -29,10 +29,11 @@ describe("#748 配分未完了と真の0円", () => {
       status: "matched",
       variant: "external",
       itemsPrintedTotalYen: 4292,
-      itemsComparableTotalYen: 4292,
       printedSubtotalYen: 4292,
       printedTaxYen: 370,
     });
+    // 未配分の税抜明細があるため税込換算の合計は確定しない
+    expect(amountCheck(input).itemsComparableTotalYen).toBeUndefined();
     input.taxSummaries = input.taxSummaries.map((s) => ({
       ...s,
       taxableAmountBasis: "tax_excluded",

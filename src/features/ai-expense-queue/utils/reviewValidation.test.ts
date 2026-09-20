@@ -29,7 +29,7 @@ describe("getReviewFormError", () => {
 });
 
 describe("getReviewItemsError", () => {
-  it("カテゴリが残っていても割引対象の商品が未選択なら拒否する", () => {
+  it("割引対象の商品が未選択でも明細入力エラーにはしない（確認項目として残す）", () => {
     expect(
       getReviewItemsError([
         {
@@ -39,7 +39,7 @@ describe("getReviewItemsError", () => {
           categoryId: "cat-daily",
         },
       ]),
-    ).toBe("割引対象の商品を選択してください。");
+    ).toBeNull();
   });
 
   it("割引対象が選択済みならカテゴリ不足を通常の明細エラーとして扱う", () => {

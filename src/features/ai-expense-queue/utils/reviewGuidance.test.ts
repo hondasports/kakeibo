@@ -25,11 +25,20 @@ const discount: ReviewItemValues = {
   categoryId: "food",
 };
 describe("下書きの修正状態と保存内容", () => {
-  it("割引対象だけを必須修正に数え、解消後は税の確認推奨だけが残る", () => {
+  it("割引対象の未確定は確認項目として残し、下書き保存は妨げない", () => {
     const before = getReviewGuidance(form, [product, discount]);
-    expect(before.filter((issue) => issue.required)).toEqual([
-      expect.objectContaining({ target: "discount", message: expect.stringContaining("割引対象") }),
-    ]);
+    expect(before.filter((issue) => issue.required)).toEqual([]);
+    expect(before).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target: "discount",
+          required: false,
+          message: expect.stringContaining("割引対象"),
+        }),
+      ]),
+    );
+    // 確認項目を残したまま下書きを保存できる
+    expect(getReviewSubmitError(form, [product, discount])).toBeNull();
     const linked = { ...discount, discountTargetItemId: "product" };
     expect(getReviewGuidance(form, [product, linked]).filter((issue) => issue.required)).toEqual(
       [],

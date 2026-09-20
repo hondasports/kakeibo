@@ -31,7 +31,7 @@ export function ReviewDialogActions({
   const statusText = busy
     ? "処理中です。しばらくお待ちください。"
     : requiredCount > 0
-      ? `保存前に修正が必要：${requiredCount}件`
+      ? `保存前に修正が必要：${fixCount}件`
       : checkMismatchCount > 0
         ? `修正必須 ${fixCount}件。確認事項を残したまま下書きを保存できます。`
         : recommendationCount > 0

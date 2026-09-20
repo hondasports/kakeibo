@@ -19,6 +19,11 @@ describe("ReviewDialogActions", () => {
     expect(props.onReviewRequired).toHaveBeenCalled();
     expect(props.onSubmit).not.toHaveBeenCalled();
   });
+  it("必須修正とチェック不一致の合計をPC表示でも件数に使う", () => {
+    render(<ReviewDialogActions {...props} requiredCount={1} checkMismatchCount={1} />);
+    expect(screen.getByRole("status")).toHaveTextContent("保存前に修正が必要：2件");
+    expect(screen.getByText("修正必須 2件")).toBeInTheDocument();
+  });
   it("保存方法に対応した主ボタンだけを表示する", async () => {
     render(<ReviewDialogActions {...props} totalOnly />);
     expect(screen.queryByRole("button", { name: "この内容で保存" })).not.toBeInTheDocument();

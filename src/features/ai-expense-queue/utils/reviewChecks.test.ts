@@ -114,11 +114,84 @@ describe("buildAmountCheck", () => {
 
   it("サマリなしは明細合計と支払額の直接比較", () => {
     const check = buildAmountCheck({
-      items: [resolvedItem({ printedAmountYen: 500, amountYen: "500" })],
+      items: [
+        resolvedItem({
+          amountBasis: "tax_included",
+          printedAmountYen: 500,
+          amountYen: "500",
+        }),
+      ],
       paidTotalYen: 500,
     });
     expect(check.variant).toBe("direct");
     expect(check.status).toBe("matched");
+  });
+
+  it("税解釈を通っていない明細（amountBasis未設定）は印字額で直接比較する", () => {
+    const check = buildAmountCheck({
+      items: [
+        {
+          id: "item-1",
+          itemName: "商品",
+          amountYen: "500",
+          categoryId: "cat1",
+          printedAmountYen: 500,
+        },
+      ],
+      paidTotalYen: 500,
+    });
+    expect(check.variant).toBe("direct");
+    expect(check.status).toBe("matched");
+  });
+
+  it("未配分の税抜明細は印字額を税込比較額として使わず比較不能にする", () => {
+    const check = buildAmountCheck({
+      items: [
+        resolvedItem({
+          amountBasis: "tax_excluded",
+          printedAmountYen: 100,
+          amountYen: "100",
+          // normalizeAmounts は未配分でも normalizedAmountYen に印字額を入れる
+          normalizedAmountYen: 100,
+          taxAllocationStatus: "unallocated",
+        }),
+      ],
+      paidTotalYen: 108,
+    });
+    expect(check.status).toBe("uncomparable");
+    expect(check.reason).toContain("未確定");
+    expect(check.focusTarget).toBe("item-1");
+  });
+
+  it("税込／税抜の基準が unknown の明細は支払額と比較不能にする", () => {
+    const check = buildAmountCheck({
+      items: [
+        resolvedItem({
+          amountBasis: "unknown",
+          taxResolutionStatus: "unresolved",
+          taxResolutionSource: undefined,
+          printedAmountYen: 100,
+          amountYen: "100",
+        }),
+      ],
+      paidTotalYen: 100,
+    });
+    expect(check.status).toBe("uncomparable");
+  });
+
+  it("明細金額を空にした場合は以前の印字額にフォールバックしない", () => {
+    const check = buildAmountCheck({
+      items: [
+        resolvedItem({
+          amountBasis: "tax_included",
+          amountYen: "",
+          printedAmountYen: 100,
+        }),
+      ],
+      paidTotalYen: 100,
+    });
+    expect(check.status).toBe("uncomparable");
+    expect(check.reason).toContain("明細金額");
   });
 
   it("外税の税抜明細は税込正規化額で支払額と直接比較できる", () => {
@@ -231,6 +304,64 @@ describe("buildTaxRateCheck", () => {
     });
     expect(check.status).toBe("matched");
     expect(check.rows[0].matchKind).toBe("approx");
+  });
+
+  it("直接印字の証拠は税率が一致する内訳にだけ適用する", () => {
+    const check = buildTaxRateCheck({
+      items: [
+        resolvedItem({ id: "a", taxRatePercent: 8, printedAmountYen: 501, amountYen: "501" }),
+        resolvedItem({ id: "b", taxRatePercent: 10, printedAmountYen: 501, amountYen: "501" }),
+      ],
+      taxSummaries: [
+        summary({ taxRatePercent: 8, taxableAmountYen: 500 }),
+        summary({ taxRatePercent: 10, taxableAmountYen: 500, taxYen: 50 }),
+      ],
+      rawObservation: rawObservation([
+        { rawText: "8%対象 500", amountYen: 500, lineRoleCandidates: ["tax"] },
+      ]),
+    });
+    // 「8%対象 500」の印字は8%の内訳だけの証拠になる
+    expect(check.rows.find((row) => row.taxRatePercent === 8)).toMatchObject({
+      status: "mismatch",
+      differenceYen: 1,
+    });
+    // 10%側は証拠を流用されないので±1円は近似一致を維持する
+    expect(check.rows.find((row) => row.taxRatePercent === 10)).toMatchObject({
+      status: "matched",
+      matchKind: "approx",
+      differenceYen: 1,
+    });
+  });
+
+  it("税率表記のない印字行は同一対象額の内訳が複数あると証拠にしない", () => {
+    const check = buildTaxRateCheck({
+      items: [
+        resolvedItem({ id: "a", taxRatePercent: 8, printedAmountYen: 501, amountYen: "501" }),
+        resolvedItem({ id: "b", taxRatePercent: 10, printedAmountYen: 501, amountYen: "501" }),
+      ],
+      taxSummaries: [
+        summary({ taxRatePercent: 8, taxableAmountYen: 500 }),
+        summary({ taxRatePercent: 10, taxableAmountYen: 500, taxYen: 50 }),
+      ],
+      rawObservation: rawObservation([
+        { rawText: "対象 500", amountYen: 500, lineRoleCandidates: ["tax"] },
+      ]),
+    });
+    for (const rate of [8, 10]) {
+      expect(check.rows.find((row) => row.taxRatePercent === rate)).toMatchObject({
+        status: "matched",
+        matchKind: "approx",
+      });
+    }
+  });
+
+  it("明細金額を空にした行は税率別集計でも比較不能にする", () => {
+    const check = buildTaxRateCheck({
+      items: [resolvedItem({ amountYen: "", printedAmountYen: 100 })],
+      taxSummaries: [summary()],
+    });
+    expect(check.status).toBe("uncomparable");
+    expect(check.rows[0].reason).toContain("明細金額");
   });
 
   it("±2円の差は証拠の有無に関わらず不一致", () => {
