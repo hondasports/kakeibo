@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, preview]
+    # main は PR 経由のみ更新される。merge commit のツリーは PR の CI で検証済みのため、
+    # main への push では再実行しない。
+    branches: [preview]
     paths-ignore:
       - "**/*.md"
   pull_request:
