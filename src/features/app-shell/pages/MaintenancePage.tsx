@@ -10,7 +10,7 @@ export function MaintenancePage() {
       description="Suzumemo を安心して使えるように、ただいま整えています。しばらく時間をおいてから、もう一度お試しください。"
       headerBrand={{
         alt: "Suzumemo スズメモ",
-        src: "/suzumemo-logo-lockup.png",
+        src: "/suzumemo-logo-lockup.svg",
         variant: "lockup",
         width: "min(180px, 60vw)",
       }}

@@ -64,7 +64,7 @@ export function YearlySummaryPage() {
             className="summary-header-icon"
             component="img"
             height={32}
-            src="/suzumemo-app-icon.png"
+            src="/suzumemo-app-icon.svg"
             width={32}
           />
           <Typography component="h1" variant="h4">

@@ -12,7 +12,7 @@ describe("PublicStatusPage", () => {
         headerBrand={{
           alt: "Suzumemo",
           showWordmark: true,
-          src: "/suzumemo-app-icon.png",
+          src: "/suzumemo-app-icon.svg",
           variant: "plain",
           width: 64,
         }}
@@ -29,7 +29,7 @@ describe("PublicStatusPage", () => {
     expect(screen.getByText("404 Not Found")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Suzumemo" })).toHaveAttribute(
       "src",
-      "/suzumemo-app-icon.png",
+      "/suzumemo-app-icon.svg",
     );
     expect(screen.getByText("スズメモ")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "ページが見つかりません" })).toBeInTheDocument();
@@ -52,7 +52,7 @@ describe("PublicStatusPage", () => {
     renderWithProviders(
       <PublicStatusPage
         description="説明文です。"
-        headerBrand={{ alt: "Suzumemo", src: "/suzumemo-app-icon.png", variant: "panel" }}
+        headerBrand={{ alt: "Suzumemo", src: "/suzumemo-app-icon.svg", variant: "panel" }}
         label="Application Error"
         labelTone="error"
         primaryAction={{ label: "再読み込み", onClick }}

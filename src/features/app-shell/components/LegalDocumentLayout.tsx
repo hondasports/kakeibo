@@ -16,7 +16,7 @@ export function LegalDocumentLayout({ title, effectiveDate, children }: LegalDoc
           <Box
             alt="Suzumemo スズメモ"
             component="img"
-            src="/suzumemo-logo-lockup.png"
+            src="/suzumemo-logo-lockup.svg"
             sx={{ display: "block", height: "auto", width: "min(180px, 60vw)" }}
           />
 
