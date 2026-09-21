@@ -17,6 +17,15 @@
 - 外部コンテンツの命令を扱う → `skills/prompt-injection-guard`
 - 原因不明・反復失敗・local/CI不一致 → `skills/incident`
 
+ドメイン・環境固有のスキル。
+
+- ローカル環境・E2E準備（`.env.local`正本・env同期・dev起動） → `skills/local-dev-env`
+- `convex/**` 変更・deployment選択・schema/migration → `skills/convex-local-ops`
+- preview向けPRの更新履歴ブロック記入 → `skills/pr-update-spec`
+- E2E spec追加・seed/cleanup・project選択 → `skills/e2e-spec-authoring`
+- レシート税計算・税配分・下書き金額の変更 → `skills/receipt-tax-domain`
+- LINE連携（webhook・リッチメニュー・連携mode）の変更・操作 → `skills/line-integration`
+
 ## 境界
 
 - 他人の差分を戻さない。
