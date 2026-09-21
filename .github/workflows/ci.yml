@@ -11,6 +11,9 @@ on:
     branches: [main, preview]
     paths-ignore:
       - "**/*.md"
+  # main への push では自動実行しないが、チェック未実行のまま取り込まれた変更の
+  # 再検証用に手動実行を残す。
+  workflow_dispatch:
 
 jobs:
   lint:
