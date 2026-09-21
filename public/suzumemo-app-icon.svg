@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="235" height="228" viewBox="0 0 235 228">
+<title>Suzumemo</title>
+<defs><radialGradient id="tile"><stop stop-color="#fffdf3"/><stop offset="1" stop-color="#fbf2e3"/></radialGradient></defs>
+<rect x="7" y="8" width="221" height="216" rx="57" fill="#805a3a" opacity=".08"/>
+<rect x="8" y="4" width="219" height="216" rx="56" fill="url(#tile)"/>
+<g transform="translate(-59 16) scale(.51)"><defs>
+  <linearGradient id="feathers" x1="285" y1="30" x2="381" y2="176" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#b97944"/><stop offset="1" stop-color="#91592f"/>
+  </linearGradient>
+  <linearGradient id="wing" x1="250" y1="82" x2="265" y2="161" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#b57b47"/><stop offset="1" stop-color="#956035"/>
+  </linearGradient>
+  <linearGradient id="breast" x1="328" y1="69" x2="361" y2="176" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#fffbeb"/><stop offset="1" stop-color="#ffebca"/>
+  </linearGradient>
+  <linearGradient id="paper" x1="227" y1="176" x2="452" y2="369" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#fffdf0"/><stop offset="1" stop-color="#fcf5e1"/>
+  </linearGradient>
+  <linearGradient id="fold" x1="406" y1="308" x2="417" y2="359" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#fff7df"/><stop offset="1" stop-color="#e9c7a0"/>
+  </linearGradient>
+  <linearGradient id="leaves" x1="466" y1="127" x2="504" y2="184" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#a1b282"/><stop offset="1" stop-color="#839667"/>
+  </linearGradient>
+</defs>
+<g stroke-linecap="round" stroke-linejoin="round">
+  <!-- 尾羽 -->
+  <path d="M225 151C212 164 189 181 173 191C165 198 179 203 188 198C176 208 188 213 199 205L251 171Z" fill="#755336" stroke="#624a33" stroke-width="3.5"/>
+  <path d="M181 199L215 175" fill="none" stroke="#4f3c2b" stroke-width="4"/>
+  <!-- 頭と胸 -->
+  <path d="M270 75C282 37 313 19 347 20C387 19 417 43 419 79C420 96 413 105 414 122C416 146 407 162 389 169L243 170C229 146 239 103 270 75Z" fill="url(#feathers)" stroke="#a36a3c" stroke-width="2"/>
+  <path d="M271 66C281 58 301 65 312 80C324 59 340 55 357 61C380 67 384 94 414 101C420 136 408 161 389 167L245 169C240 146 248 117 273 98C280 91 278 82 271 74C268 71 269 68 271 66Z" fill="url(#breast)"/>
+  <path d="M309 102C331 122 365 128 388 114C399 107 405 103 414 104" fill="none" stroke="#fff9e9" stroke-width="5" opacity=".65"/>
+  <!-- 翼 -->
+  <path d="M270 74C237 91 213 119 208 148C206 155 212 158 225 158C265 156 300 143 307 118C312 102 296 101 270 74Z" fill="url(#wing)" stroke="#96623b" stroke-width="3"/>
+  <path d="M214 126C232 131 249 124 266 113M209 145C229 146 249 139 270 128M220 156C246 154 264 148 282 137" fill="none" stroke="#654a31" stroke-width="5"/>
+  <path d="M240 105C231 116 240 120 253 112C245 124 257 127 270 119C266 132 277 134 286 128" fill="none" stroke="#fff4db" stroke-width="4"/>
+  <!-- 目とくちばし -->
+  <ellipse cx="353" cy="82" rx="13.5" ry="14" fill="#493524"/>
+  <circle cx="357.5" cy="77.5" r="3.6" fill="#fffdf5"/>
+  <path d="M386 91C390 105 392 115 402 116C411 115 414 103 414 94Z" fill="#5b4530" stroke="#483827" stroke-width="3"/>
+  <path d="M384 90C394 77 400 72 407 77L429 90C435 97 418 100 407 99C399 98 390 97 384 94Z" fill="#806246" stroke="#52412f" stroke-width="4"/>
+  <path d="M390 89L404 80L422 90Z" fill="#c6a079"/>
+  <!-- 葉 -->
+  <path d="M464 184C462 171 471 155 480 137M465 180L491 172" fill="none" stroke="#94a576" stroke-width="4"/>
+  <path d="M467 167C457 150 467 133 480 126C488 121 485 153 476 163C473 166 470 167 467 167Z" fill="url(#leaves)"/>
+  <path d="M470 176C479 160 501 157 517 164C524 167 500 191 477 181Z" fill="url(#leaves)"/>
+  <!-- メモ帳と折り返し -->
+  <path d="M240 178H438C455 178 463 190 463 206V305C447 342 414 383 366 387H240C226 387 218 375 218 361V201C218 186 227 178 240 178Z" fill="#b88e66" opacity=".1"/>
+  <path d="M239 166H437C450 166 456 174 456 186L458 300C451 322 410 365 365 372H239C225 372 219 366 219 352V188C219 174 225 166 239 166Z" fill="url(#paper)" stroke="#805a3a" stroke-width="4"/>
+  <path d="M357 372C381 372 390 346 395 318C397 305 403 306 419 307C436 309 448 307 458 300C440 327 402 361 365 371Z" fill="url(#fold)" stroke="#805a3a" stroke-width="4"/>
+  <path d="M379 360C399 348 422 331 442 315" fill="none" stroke="#d8af85" stroke-width="2" opacity=".65"/>
+  <!-- 足 -->
+  <g fill="none" stroke="#674c33" stroke-width="8">
+    <path d="M246 166C253 164 261 170 261 179"/>
+    <path d="M259 166C266 165 270 172 270 182"/>
+    <path d="M270 166C278 166 279 175 280 180"/>
+    <path d="M355 165C365 161 365 172 355 177"/>
+    <path d="M366 165C376 160 375 173 366 179"/>
+    <path d="M377 164C386 162 383 173 377 177"/>
+  </g>
+  <g fill="none" stroke="#9a7651" stroke-width="2">
+    <path d="M247 165C255 165 260 171 260 178"/>
+    <path d="M260 165C266 166 269 173 269 180"/>
+    <path d="M355 164C362 162 363 169 358 173"/>
+    <path d="M367 163C374 162 373 170 368 175"/>
+  </g>
+  <!-- メモの項目 -->
+  <circle cx="268" cy="227" r="11" fill="#f49d70"/>
+  <circle cx="268" cy="268" r="11" fill="#a1af80"/>
+  <circle cx="268" cy="309" r="11" fill="#a3b7ba"/>
+  <path d="M301 227H413M301 268H413M301 309H373" fill="none" stroke="#d7ad84" stroke-width="5.5"/>
+</g>
+</g>
+</svg>

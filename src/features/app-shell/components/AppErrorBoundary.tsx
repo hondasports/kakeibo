@@ -39,7 +39,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
           description="画面の表示中にエラーが発生しました。再読み込みしても直らない場合は、時間をおいてもう一度お試しください。"
           headerBrand={{
             alt: "Suzumemo",
-            src: "/suzumemo-app-icon.png",
+            src: "/suzumemo-app-icon.svg",
             variant: "panel",
             width: 56,
           }}

@@ -83,7 +83,7 @@ export function DashboardPage() {
             <Box
               alt=""
               component="img"
-              src="/suzumemo-app-icon.png"
+              src="/suzumemo-app-icon.svg"
               sx={{ height: 28, width: 28 }}
             />
             <Typography component="h1" variant="h5">

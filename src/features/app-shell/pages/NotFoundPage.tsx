@@ -7,7 +7,7 @@ export function NotFoundPage() {
       headerBrand={{
         alt: "Suzumemo",
         showWordmark: true,
-        src: "/suzumemo-app-icon.png",
+        src: "/suzumemo-app-icon.svg",
         variant: "plain",
         width: 64,
       }}

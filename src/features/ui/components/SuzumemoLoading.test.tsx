@@ -53,8 +53,9 @@ describe("Suzumemo loading Lottie", () => {
 
     expect(existsSync(logoPath)).toBe(true);
     const logo = readFileSync(logoPath, "utf8");
-    expect(logo).toContain('href="leaf-left.svg"');
-    expect(logo).toContain('href="leaf-right.svg"');
+    expect(logo).toContain('id="leaf-left"');
+    expect(logo).toContain('id="leaf-right"');
+    expect(logo).not.toContain("<image");
   });
 
   it("狭い画面では親要素の利用可能幅を超えない", () => {
