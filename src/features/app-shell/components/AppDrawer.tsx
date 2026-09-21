@@ -77,7 +77,7 @@ export function AppDrawer({ navItems, onToggleSidebar, sidebarOpen }: AppDrawerP
             <Box
               alt=""
               component="img"
-              src="/suzumemo-app-icon.png"
+              src="/suzumemo-app-icon.svg"
               sx={{ height: 34, width: 34, flex: "0 0 auto", borderRadius: 2 }}
             />
             <Box sx={{ minWidth: 0 }}>

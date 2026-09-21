@@ -120,7 +120,7 @@ function AuthBrand() {
     <Box
       alt="Suzumemo スズメモ"
       component="img"
-      src="/suzumemo-logo-lockup.png"
+      src="/suzumemo-logo-lockup.svg"
       sx={{ display: "block", height: "auto", mx: "auto", width: "min(220px, 72vw)" }}
     />
   );

@@ -10,7 +10,7 @@ describe("NotFoundPage", () => {
     expect(screen.getByText("404 Not Found")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Suzumemo" })).toHaveAttribute(
       "src",
-      "/suzumemo-app-icon.png",
+      "/suzumemo-app-icon.svg",
     );
     expect(screen.getByText("スズメモ")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "ページが見つかりません" })).toBeInTheDocument();
