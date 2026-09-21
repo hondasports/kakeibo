@@ -68,13 +68,44 @@ function shouldApplyBulkOverride(
   return extracted.amountBasis === "unknown" && extracted.taxRatePercent === null;
 }
 
+/**
+ * 下書き再解釈では、画面表示と同じ規則（表示側の summaryAmountBasis と同じフォールバック）で
+ * 税サマリの欠けた側を確定入力として補完する。税モードが宣言済みで基準が未確定なら
+ * モードから基準を、基確定でモードが未確定なら基準からモードを埋める。
+ * 算術的な矛盾（税込合計・対象額の不一致）は下流の整合性チェックが検出するため、
+ * ここで補完しても誤った確定にはならない。
+ */
+function completeSummaryModeBasis(summary: ExtractedTaxSummary): ExtractedTaxSummary {
+  if (
+    summary.taxableAmountBasis === "unknown" &&
+    (summary.taxMode === "external" || summary.taxMode === "included")
+  ) {
+    return {
+      ...summary,
+      taxableAmountBasis: summary.taxMode === "external" ? "tax_excluded" : "tax_included",
+    };
+  }
+  if (
+    summary.taxMode === "unknown" &&
+    (summary.taxableAmountBasis === "tax_included" || summary.taxableAmountBasis === "tax_excluded")
+  ) {
+    return {
+      ...summary,
+      taxMode: summary.taxableAmountBasis === "tax_included" ? "included" : "external",
+    };
+  }
+  return summary;
+}
+
 export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): ReinterpretDraftTaxResult {
-  const sourceTaxSummaries = input.taxSummaries.map((summary, index) => {
-    if (input.summaryOverride?.index === index) {
-      return { ...summary, ...input.summaryOverride.summary };
-    }
-    return summary;
-  });
+  const sourceTaxSummaries = input.taxSummaries
+    .map((summary, index) => {
+      if (input.summaryOverride?.index === index) {
+        return { ...summary, ...input.summaryOverride.summary };
+      }
+      return summary;
+    })
+    .map(completeSummaryModeBasis);
 
   const items = input.items.map((item, index) => {
     const extracted = draftItemToExtractedReceiptItem(item);
