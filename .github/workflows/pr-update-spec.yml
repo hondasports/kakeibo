@@ -2,7 +2,7 @@ name: PR update spec
 
 # preview 向け PR の本文に記入された suzumemo-update ブロックを検証する。
 # 本文編集(edited)でも再評価される。main 向け統合PRは対象外(branches: preview のみ)。
-# bot作成PR(dependabot等)は記入義務の例外としてスキップする。
+# bot作成PR(dependabot等)は更新履歴ブロックがない場合のみスクリプト側でスキップする。
 
 on:
   pull_request:
@@ -23,7 +23,6 @@ jobs:
     name: Validate update spec
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.event.pull_request.user.type != 'Bot'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

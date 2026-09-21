@@ -145,7 +145,7 @@ Vercel Production Environment には Clerk Production instance と Convex Produc
 
 1. 過去の `app-v*` GitHub Release から `product-updates.json` asset を取得し、既に公開済みの更新を得る。asset は有効な JSON で、リリース tag の `app-v{version}` と `version` が一致し、過去の更新間で `id` が重複しないことを検証する。
 2. 収集範囲をコミット範囲で決定する。起点は前回リリースassetに保存された `sourceSha`、無ければ最新 `app-v*` release tag が指すコミット（対象コミットの祖先でない場合は merge-base を使う）。末端は `SOURCE_REF` を `git rev-parse --verify` で解決したコミットSHA。マージ日時によるPR検索には依存しない。
-3. 範囲内の merge commit（`Merge pull request #N from ...`）と squash 取り込み（`... (#N)`）からPR番号を抽出し、head が `preview` / `release/*` / `main` の統合PRを除外する。各PRを GitHub API で取得し、`user.type == "Bot"` は記入例外として記録、それ以外のPRはマーカー内YAMLを検証する。
+3. 範囲内の merge commit（`Merge pull request #N from ...`）と squash 取り込み（`... (#N)`）からPR番号を抽出し、head が `preview` / `release/*` / `main` の統合PRを除外する。各PRを GitHub API で取得し、`user.type == "Bot"` で本文に `suzumemo-update` マーカーを持たないPRのみ記入例外として記録する。マーカーを持つbot PRを含むそれ以外のPRはマーカー内YAMLを検証する。
 4. 掲載指定されたPRは `id: pr-{number}`、`title` = PRタイトル（conventional接頭辞は除去）、`summary` = `description`、`category` = `category` で下書き化する。`publish: false` は非掲載として理由とともに記録する。
 5. `src/content/product-updates.ts` の手動ドラフトとID単位で統合する（同一IDは手動優先）。
 6. 過去の更新と重複しないことを確認し、`src/generated/product-updates.json` と `.tmp/product-updates.current-release.json` を出力する。Release assetには `sourceRef` / `sourceSha` / `sourceMergedAt` と、対象PRごとの掲載・非掲載・例外判定（`pullRequestDecisions`）を保存する。

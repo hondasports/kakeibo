@@ -44,7 +44,7 @@ Production
 
 通常のAgent Delivery baseは `preview`、targetは `merge_ready`。
 
-preview向けPRの本文には `.github/pull_request_template.md` の更新履歴欄（`suzumemo-update` ブロック）に掲載方針と原稿または非掲載理由を必ず記入する。PR検証CIで欠落・不正はエラーになる。
+preview向けPRの本文には `.github/pull_request_template.md` の更新履歴欄（`suzumemo-update` ブロック）に掲載方針と原稿または非掲載理由を必ず記入する。PR検証CIで欠落・不正はエラーになる。例外は更新履歴ブロックを持たないbot作成PR（dependabot等）のみで、マーカーを記入したbot PRは人間のPRと同じく検証される。
 
 `PR created` はcheckpointであり完了ではない。ユーザーが明示的に「PR作成まで」と指定しない限り、latest PR contentのCI・review・conflict・mergeabilityを確認する。
 
