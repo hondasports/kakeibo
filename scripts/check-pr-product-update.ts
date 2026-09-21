@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   readProductUpdateSpec,
+  UPDATE_SPEC_START_MARKER,
   type ProductUpdateSpecResult,
 } from "../src/lib/productUpdateSpec.ts";
 
@@ -40,10 +41,11 @@ export function evaluatePullRequestSpec(payload: PullRequestEventPayload): SpecC
   }
 
   const authorType = pull.user?.type;
-  if (authorType === "Bot") {
+  const hasUpdateSpecMarker = (pull.body ?? "").includes(UPDATE_SPEC_START_MARKER);
+  if (authorType === "Bot" && !hasUpdateSpecMarker) {
     return {
       kind: "skipped",
-      summary: `${label}: bot作成PRのため対象外です(dependabot等)。`,
+      summary: `${label}: bot作成PRで更新履歴ブロックがないため対象外です(dependabot等)。`,
     };
   }
 

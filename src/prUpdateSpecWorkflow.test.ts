@@ -15,10 +15,12 @@ describe("pr-update-spec workflow", () => {
     expect(yaml).toContain("- reopened");
   });
 
-  test("skips bot-authored pull requests", () => {
+  test("runs for bot-authored pull requests too; the checker gates on the spec marker", () => {
     const yaml = workflow();
+    const checker = readFileSync("scripts/check-pr-product-update.ts", "utf8");
 
-    expect(yaml).toContain("github.event.pull_request.user.type != 'Bot'");
+    expect(yaml).not.toContain("github.event.pull_request.user.type");
+    expect(checker).toContain("UPDATE_SPEC_START_MARKER");
   });
 
   test("validates the PR body with the shared spec module", () => {

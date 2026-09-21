@@ -250,11 +250,52 @@ describe("collectPullRequestDecisions", () => {
     expect(result.drafts).toEqual([]);
   });
 
-  test("exempts bot-authored PRs", () => {
+  test("exempts bot-authored PRs only when the spec marker is absent", () => {
     const record = prRecord({ number: 751, authorType: "Bot", body: null });
     const result = collectPullRequestDecisions([{ number: 751 }], [record]);
     expect(result.errors).toEqual([]);
     expect(result.decisions[0]).toMatchObject({ outcome: "exempt_bot" });
+  });
+
+  test("publishes a bot-authored PR when it carries a spec block", () => {
+    const record = prRecord({ number: 752, authorType: "Bot" });
+    const result = collectPullRequestDecisions([{ number: 752 }], [record]);
+    expect(result.errors).toEqual([]);
+    expect(result.drafts).toEqual([
+      {
+        id: "pr-752",
+        title: "明細の重複を修正",
+        summary: "明細の重複を修正しました。",
+        category: "fix",
+      },
+    ]);
+    expect(result.decisions[0]).toMatchObject({ outcome: "published", updateId: "pr-752" });
+  });
+
+  test("records publish:false for a bot-authored PR with its reason", () => {
+    const record = prRecord({
+      number: 753,
+      authorType: "Bot",
+      body: specBlock("publish: false\nreason: 内部リファクタリング\n"),
+    });
+    const result = collectPullRequestDecisions([{ number: 753 }], [record]);
+    expect(result.errors).toEqual([]);
+    expect(result.drafts).toEqual([]);
+    expect(result.decisions[0]).toMatchObject({
+      outcome: "skipped",
+      reason: "内部リファクタリング",
+    });
+  });
+
+  test("bot-authored PR with a malformed spec block is an error", () => {
+    const record = prRecord({
+      number: 754,
+      authorType: "Bot",
+      body: `## 概要\n\n本文\n\n${START}\n`,
+    });
+    const result = collectPullRequestDecisions([{ number: 754 }], [record]);
+    expect(result.errors[0]).toContain("PR #754");
+    expect(result.drafts).toEqual([]);
   });
 
   test("missing marker on a normal PR is an error, not a silent skip", () => {
