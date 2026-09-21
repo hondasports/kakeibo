@@ -323,7 +323,7 @@ PRのrequired checksがすべてsuccessになるまでmergeしない。
 
 `CI`だけgreenでも他required checkがpendingなら未完了。
 
-`ci.yml` の `push` triggerは `preview` のみ。`main` への merge commit は `preview -> main` の PR で同一ツリーが検証済みのため、main push では `ci.yml` を再実行しない。同じ理由で `production-release.yml` の preflight も main push 時は lint / format / test をスキップし、手動リリース時のみ実行する。
+`ci.yml` の `push` triggerは `preview` のみ。`main` への merge commit は `preview -> main` の PR で同一ツリーが検証済みのため、main push では `ci.yml` を再実行しない。同じ理由で `production-release.yml` の preflight も main push 時は lint / format / test をスキップし、手動リリース時のみ実行する。チェック未実行のまま取り込まれた変更を main で再検証したい場合は、`ci.yml` の `workflow_dispatch` で手動実行する。
 
 Markdown-onlyでworkflowがpaths-ignoreにより起動しない場合は、`git diff --check`等の文書差分確認で代替できる。
 
