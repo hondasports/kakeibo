@@ -22,19 +22,18 @@ const E2E_WORKFLOW_PATH = path.resolve(
 
 describe("E2E relevance path classification", () => {
   it("normalizes Windows separators and leading ./", () => {
-    expect(normalizeChangedPath(".\\.loop\\process.yaml")).toBe(".loop/process.yaml");
+    expect(normalizeChangedPath(".\\docs\\guide.md")).toBe("docs/guide.md");
   });
 
   it("recognizes documentation and process-only paths", () => {
     const processOnlyPaths = [
       "README.md",
       "docs/development-process.md",
-      ".loop/process.yaml",
       "skills/workspace-preflight/SKILL.md",
       ".husky/pre-commit",
       "plugin.json",
-      "scripts/task-loop.mjs",
-      "scripts/task-loop.test.mjs",
+      "scripts/review-depth.mjs",
+      "scripts/review-depth.test.mjs",
       "scripts/check-task-worktree.mjs",
     ];
 
@@ -67,7 +66,7 @@ describe("E2E relevance path classification", () => {
 
   it("skips only when every changed path is process-only", () => {
     expect(
-      classifyChangedFiles([".loop/process.yaml", "docs/development-process.md"]),
+      classifyChangedFiles(["skills/code-review/SKILL.md", "docs/development-process.md"]),
     ).toMatchObject({
       runtimeRelevant: false,
       reason: "all_changed_paths_process_only",
@@ -76,7 +75,7 @@ describe("E2E relevance path classification", () => {
 
   it("fails closed for a mixed or unknown change", () => {
     expect(
-      classifyChangedFiles([".loop/process.yaml", "src/App.tsx", "unknown/config.yaml"]),
+      classifyChangedFiles(["skills/code-review/SKILL.md", "src/App.tsx", "unknown/config.yaml"]),
     ).toMatchObject({
       runtimeRelevant: true,
       reason: "runtime_relevant_path_detected",

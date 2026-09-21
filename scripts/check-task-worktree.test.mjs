@@ -105,7 +105,7 @@ describe("documentation-only exceptions", () => {
     expect(isDocumentationOnlyPath("docs/development-process.md")).toBe(true);
     expect(isDocumentationOnlyPath("README.md")).toBe(true);
     expect(isDocumentationOnlyPath("AGENTS.md")).toBe(false);
-    expect(isDocumentationOnlyPath(".loop/process.yaml")).toBe(false);
+    expect(isDocumentationOnlyPath("skills/code-review/SKILL.md")).toBe(false);
     expect(isDocumentationOnlyPath("scripts/check-task-worktree.mjs")).toBe(false);
     expect(isDocumentationOnlyPath("src/example.ts")).toBe(false);
   });

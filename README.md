@@ -112,20 +112,19 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 
 | 用途                           | 参照先                          |
 | ------------------------------ | ------------------------------- |
-| Agent Loopの常時実行契約       | `AGENTS.md`                     |
-| Agent Loopの実装契約（Loop改修時） | `.loop/process.yaml`            |
-| Astra Loopの操作と設計意図       | `.loop/README.md`               |
+| エージェントの常時適用ルール   | `AGENTS.md`                     |
+| レビュー深度の機械算出         | `scripts/review-depth.mjs`      |
 | 工程別Agent Skill              | `skills/*/SKILL.md`             |
 | 開発プロセス、PR、CI、レビュー | `docs/development-process.md`   |
 | 認証ガード設計                 | `docs/auth-guard.md`            |
 | 環境変数一覧                   | `docs/environment-variables.md` |
 | QAチェックリスト               | `docs/qa-checklist.md`          |
 
-## Astraエージェントループ
+## エージェント作業
 
-[AGENTS.md](AGENTS.md)を入口に、契約・変更・検証・評価・セルフレビュー・引き渡しを進めます。実行記録と完了判定は scripts/task-loop.mjs が担います。[操作方法と保証の境界](.loop/README.md)を参照してください。
+[AGENTS.md](AGENTS.md)を入口に、実装・検証・セルフレビュー・引き渡しを進めます。セルフレビューの最低深度は `scripts/review-depth.mjs` が実差分のリスク評価から機械算出します。
 
-通常は単独Astraで作業し、ユーザー指定の完了地点を契約に記録します。旧ループや委譲用workflowは使用しません。
+通常は単独エージェントで作業し、完了地点はユーザーの指定に従います。委譲用workflowは使用しません。
 
 ## ローカル状態とsecret
 

@@ -15,7 +15,7 @@
     "pretest": "node scripts/check-test-environment.mjs",
     "test": "vitest --maxWorkers=4",
     "test:agent": "node scripts/run-compact-tests.mjs vitest",
-    "test:loop": "vitest run scripts/task-loop.test.mjs scripts/check-task-worktree.test.mjs scripts/classify-e2e-relevance.test.mjs",
+    "test:process": "vitest run scripts/review-depth.test.mjs scripts/check-task-worktree.test.mjs scripts/classify-e2e-relevance.test.mjs",
     "test:preflight": "node scripts/check-test-environment.mjs --coverage",
     "test:coverage": "node scripts/run-coverage.mjs",
     "prepare": "husky",
@@ -33,7 +33,7 @@
     "convex:dev:cloud": "pnpm exec convex deployment select dev && pnpm exec convex dev",
     "line:rich-menu": "tsx scripts/apply-line-rich-menu.ts",
     "test:email-integration": "vitest run -c vitest.integration.config.ts",
-    "loop:task": "node scripts/task-loop.mjs"
+    "review:depth": "node scripts/review-depth.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.16.6",

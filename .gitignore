@@ -62,6 +62,3 @@ playwright/.clerk/
 # Logs and OS files
 *.log
 .DS_Store
-
-# Agent loop task state and local execution evidence
-.loop/state/

@@ -10,7 +10,7 @@ license: Apache-2.0
 
 repository fileを変更するtaskでは最初の編集前に実行する。
 
-独立した長いLoop stateではなく、PREPARE内のdeterministic control。
+編集前に実行するdeterministic control。
 
 ## 実行
 
@@ -55,7 +55,6 @@ git worktree add <task-path> -b codex/<task-name> preview
 次はpure docs扱いしない。
 
 - `AGENTS.md`
-- `.loop/`
 - `skills/`
 - `scripts/`
 - config
