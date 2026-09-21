@@ -76,7 +76,7 @@ PREVIEWで検証したcommit/refを確定
   ↓
 main への merge で production-release.yml が自動起動
   ↓
-preflight（入力確認、APP_VERSION確定、lint、format、test、Product Update 生成、build、artifact保存）
+preflight（入力確認、APP_VERSION確定、Product Update 生成、build、artifact保存。lint/format/test は手動リリース時のみ）
   ↓
 GitHub Environment: production の承認待ち
   ↓
@@ -98,6 +98,8 @@ Actions Summary に結果を残す
 `main` push では、merge commit の SHA を `source_ref` として扱い、
 `preview -> main` のブランチ運用により PREVIEW 確認済みとみなす。
 実際の Production 反映は GitHub Environment `production` の承認後にだけ実行される。
+
+main push 時の preflight では lint / format / test を実行しない。同一 SHA が `preview -> main` の PR で CI 済みのため再検証しない。手動実行（workflow_dispatch）では `release/*` など PR CI を通っていない ref を扱えるため、従来どおり lint / format / test を実行する。
 
 手動実行時の入力値:
 

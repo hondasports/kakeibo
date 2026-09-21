@@ -110,13 +110,18 @@ jobs:
           echo "app_version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
           echo "published_at=${PUBLISHED_AT}" >> "$GITHUB_OUTPUT"
 
+      # Lint / Format check / Test は main push では PR で同一 SHA が検証済みのため
+      # スキップする。手動リリース（release/* 等、PR CI を通っていない ref）では実行する。
       - name: Lint
+        if: github.event_name == 'workflow_dispatch'
         run: pnpm run lint
 
       - name: Format check
+        if: github.event_name == 'workflow_dispatch'
         run: pnpm run format:check
 
       - name: Test
+        if: github.event_name == 'workflow_dispatch'
         run: pnpm test --run
 
       # 承認待ちの時点で掲載予定の内容と元PRの対応をsummaryへ出力し、成果物はartifactでproduction jobへ受け渡す。
