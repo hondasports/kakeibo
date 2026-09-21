@@ -71,9 +71,28 @@ describe("evaluatePullRequestSpec", () => {
     expect(decision.summary).toContain("対象外");
   });
 
-  test("skips bot-authored pull requests", () => {
+  test("skips bot-authored pull requests without a spec marker", () => {
     const decision = evaluatePullRequestSpec(payload({ userType: "Bot", body: "no spec" }));
     expect(decision.kind).toBe("skipped");
     expect(decision.summary).toContain("bot");
+  });
+
+  test("validates bot-authored pull requests that carry a spec block", () => {
+    const decision = evaluatePullRequestSpec(payload({ userType: "Bot" }));
+    expect(decision.kind).toBe("validated");
+    if (decision.kind === "validated") {
+      expect(decision.result.ok).toBe(true);
+      expect(decision.summary).toContain("非掲載");
+    }
+  });
+
+  test("fails bot-authored pull requests with an invalid spec", () => {
+    const decision = evaluatePullRequestSpec(
+      payload({ userType: "Bot", body: specBody("publish: true\ncategory: fix\n") }),
+    );
+    expect(decision.kind).toBe("validated");
+    if (decision.kind === "validated") {
+      expect(decision.result.ok).toBe(false);
+    }
   });
 });

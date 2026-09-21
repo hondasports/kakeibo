@@ -1,6 +1,6 @@
 import { sanitizeExternalText } from "./generateProductUpdates";
 import type { ProductUpdateDraft, PullRequestDecision } from "./productUpdates";
-import { readProductUpdateSpec } from "./productUpdateSpec";
+import { readProductUpdateSpec, UPDATE_SPEC_START_MARKER } from "./productUpdateSpec";
 
 export type ClassifiedCommit =
   | { kind: "pull_request"; number: number; headRef?: string; sha: string }
@@ -224,11 +224,13 @@ export function collectPullRequestDecisions(
       continue;
     }
 
-    if (record.authorType === "Bot") {
+    // dependabot等の記入しないbotのみ例外。マーカーを書いたbotは通常どおり検証する
+    const hasUpdateSpecMarker = (record.body ?? "").includes(UPDATE_SPEC_START_MARKER);
+    if (record.authorType === "Bot" && !hasUpdateSpecMarker) {
       decisions.push({
         pullRequest: ref.number,
         outcome: "exempt_bot",
-        reason: "bot作成PRのため記入対象外",
+        reason: "bot作成PRで更新履歴ブロックがないため記入対象外",
       });
       continue;
     }
