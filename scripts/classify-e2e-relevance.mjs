@@ -4,7 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
-const PROCESS_ONLY_SCRIPT_PATTERN = /^scripts\/(?:task-loop|check-task-worktree)(?:\.test)?\.mjs$/;
+const PROCESS_ONLY_SCRIPT_PATTERN =
+  /^scripts\/(?:review-depth|check-task-worktree)(?:\.test)?\.mjs$/;
 
 /** Normalize a Git path to a stable repository-relative form. */
 export function normalizeChangedPath(filePath) {
@@ -28,7 +29,6 @@ export function isProcessOnlyPath(filePath) {
   if (
     normalized === "AGENTS.md" ||
     normalized === "plugin.json" ||
-    normalized.startsWith(".loop/") ||
     normalized.startsWith("skills/") ||
     normalized.startsWith(".husky/")
   ) {

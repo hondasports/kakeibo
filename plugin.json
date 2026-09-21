@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "suzumemo-agent-loop",
-  "version": "0.3.0",
-  "description": "単独Astraの契約・差分・実行証拠に基づくIssue Loop。CLIで検証結果と完了地点を管理する。",
+  "version": "0.4.0",
+  "description": "単独エージェントの作業ルール（AGENTS.md + skills/）と、レビュー深度を機械算出するstateless CLI。タスク状態の永続化はしない。",
   "author": {
     "name": "hondasports"
   },
