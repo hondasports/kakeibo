@@ -2,13 +2,11 @@
 
 このドキュメントは Suzumemo（kakeibo）の**日常開発・PR・リリース運用の入口**を定義する。
 
-Agent Loopの詳細をここへ二重定義しない。この文書は非normativeな運用説明で、内容が衝突した場合は次を正本とする。
+エージェント作業の詳細をここへ二重定義しない。この文書は非normativeな運用説明で、内容が衝突した場合は次を正本とする。
 
 - Agent実行契約: `AGENTS.md`
-- Loop操作: `node scripts/task-loop.mjs guide <topic>` / `status <task-id>`
-- Loop自体を変更する際の実装契約: `.loop/process.yaml`
-- Task contract example: `.loop/templates/contract.example.json`
-- Current task instance / Finding Ledger: `.loop/state/<task-id>/state.json`（worktree-local・ignored）
+- レビュー深度の機械算出: `node scripts/review-depth.mjs --help`
+- Workspace preflight: `node scripts/check-task-worktree.mjs --require-clean`
 - 各工程の手順: `skills/*/SKILL.md`
 - 技術設計: `docs/technical-design.md`
 - 認証: `docs/auth-guard.md`
@@ -48,7 +46,7 @@ preview向けPRの本文には `.github/pull_request_template.md` の更新履�
 
 `PR created` はcheckpointであり完了ではない。ユーザーが明示的に「PR作成まで」と指定しない限り、latest PR contentのCI・review・conflict・mergeabilityを確認する。
 
-Task stateはCLI initで初期化する。現在値をtracked templateへ記入しない。公開前にCLI statusとstaged diffを確認する。
+公開前にstaged diffを確認し、タスク固有の作業ファイルや秘密値を含めない。
 
 ---
 
@@ -104,7 +102,6 @@ FAILしたまま編集しない。
 `docs/`、`README.md`、`CHANGELOG.md`だけのpure docsは理由を記録して例外にできる。ただし次はpure docs扱いしない。
 
 - `AGENTS.md`
-- `.loop/`
 - `skills/`
 - `scripts/`
 - `.github/`
@@ -196,9 +193,9 @@ Agent taskで残す価値があるもの:
 
 ---
 
-## 5. Agent Loop
+## 5. Agent の工程
 
-[AGENTS.md](../AGENTS.md)を入口に、CLIが案内する工程のスキルだけを読む。通常作業でREADME・process.yamlの全文読込は不要。操作・移行・保証の詳細が必要な場合は[CLI操作](../.loop/README.md)を参照する。
+[AGENTS.md](../AGENTS.md)を入口に、工程に応じたskills/だけを読む。セルフレビューの最低深度（T1/T2/T3）と確認項目は `scripts/review-depth.mjs` が実差分のリスク評価から機械算出する。状態の永続化やgate別の記録JSONは持たない。
 
 ## 7. Verification
 
@@ -272,9 +269,9 @@ E2E終了後はターミナル1のwatcherを `Ctrl+C` で停止する。
 
 ### PR CI E2Eの差分判定
 
-PRのE2E workflowは、まずPRのbase/head間のchanged pathを機械的に分類する。`.loop/**`、`skills/**`、ドキュメント、`.husky/**`、およびAgent Loopのprocess enforcement用スクリプトだけの変更は `runtime_relevant=false` としてbrowser E2Eを起動しない。アプリ、認証、データ、browser、E2E harness、package、workflow、環境同期に関わる変更や判定できないpathは `runtime_relevant=true` として従来どおりE2Eを実行する。判定結果と理由はworkflowのsummaryへ出力し、Agentの手動判断でskipしない。
+PRのE2E workflowは、まずPRのbase/head間のchanged pathを機械的に分類する。`skills/**`、ドキュメント、`.husky/**`、および工程管理用スクリプト（`scripts/review-depth.mjs`、`scripts/check-task-worktree.mjs`）だけの変更は `runtime_relevant=false` としてbrowser E2Eを起動しない。アプリ、認証、データ、browser、E2E harness、package、workflow、環境同期に関わる変更や判定できないpathは `runtime_relevant=true` として従来どおりE2Eを実行する。判定結果と理由はworkflowのsummaryへ出力し、Agentの手動判断でskipしない。
 
-判定ロジックは [`scripts/classify-e2e-relevance.mjs`](../scripts/classify-e2e-relevance.mjs) とその `test:loop` で検証する。判定スクリプトやE2E workflow自身の変更はruntime-relevantとして扱い、E2Eの実行条件を弱めた変更を見逃しにくくする。
+判定ロジックは [`scripts/classify-e2e-relevance.mjs`](../scripts/classify-e2e-relevance.mjs) とその `test:process` で検証する。判定スクリプトやE2E workflow自身の変更はruntime-relevantとして扱い、E2Eの実行条件を弱めた変更を見逃しにくくする。
 
 ### Convex reflection
 
@@ -290,13 +287,13 @@ required environment不足、env sync失敗、Convex CLI未反映を「未実行
 
 ### Test gap
 
-ACやrequired invariantを証明できない場合はFinding Ledgerへ `test_gap` を1件記録し、解決するまでVerification PASSにしない。Human Gateで迂回しない。
+ACやrequired invariantを証明できない場合は未検証項目としてPR・作業報告へ記録し、解決するまで完了にしない。Human Gateで迂回しない。
 
 ---
 
 ## 8. Review / Delivery
 
-ループの契約とdelivery_targetに従う。PR指摘は全件確認し、対応根拠を残す。GitHubの承認・branch保護条件を満たす。
+ユーザー指定の完了地点に従う。PR指摘は全件確認し、対応根拠を残す。GitHubの承認・branch保護条件を満たす。
 
 ## 11. CI / マージ条件
 
@@ -338,7 +335,7 @@ Markdown-onlyでworkflowがpaths-ignoreにより起動しない場合は、`git 
 
 GitHub ruleset / branch protection / CODEOWNERSが要求するapprovalを満たす。
 
-Agent Loopが独自に「常に1 approval」を追加しない。
+AGENTS.mdのルールが独自に「常に1 approval」を追加しない。
 
 `main` はPull Request経由で変更する。
 
@@ -355,7 +352,7 @@ Agent Loopが独自に「常に1 approval」を追加しない。
 - test adequacy
 - existing pattern consistency
 
-Agent Loop v14ではレビュー直前に `guide assessment` の4軸と強制条件を評価し、`assess` が算出する最低深度（T1/T2/T3）以上でレビューする。必要な確認内容はCLIが返す。評価の妥当性とレビューの実施はAgentの責任。詳細は `skills/code-review/SKILL.md` を参照。
+レビュー直前に実差分を4軸と強制条件で評価し、`scripts/review-depth.mjs` が算出する最低深度（T1/T2/T3）以上でレビューする。必要な確認内容はスクリプトが返す。評価の妥当性とレビューの実施はAgentの責任。詳細は `skills/code-review/SKILL.md` を参照。
 
 ---
 
@@ -428,7 +425,7 @@ chore: 〜を整理
 
 ## 16. 完了
 
-契約で指定した完了地点をCLI finishで確認する。詳細はLoop READMEを参照する。
+ユーザー指定の完了地点を確認する。PR作成までならCI結果を伝え、merge_ready相当ならrequired checks・承認・競合まで確認する。
 
 ## 17. Hotfix
 

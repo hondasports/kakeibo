@@ -19,7 +19,7 @@ pnpm run e2e:smoke -- --project=chromium
 pnpm run e2e -- --project=chromium
 ```
 
-エージェントループ（`AGENTS.md` / `.loop/process.yaml` / `skills/*/SKILL.md`）でコード変更を含むPRを納品する場合は、PR作成前または差し戻し修正後に
+エージェント作業（`AGENTS.md` / `skills/*/SKILL.md`）でコード変更を含むPRを納品する場合は、PR作成前または差し戻し修正後に
 ローカルで必要なE2Eを実行します。Issue 用 worktree では作成直後に `preview` 用 worktree の
 正本 `.env.local` をコピーし、Convex 反映または E2E の直前には
 `pnpm run e2e:env-sync` を実行して `.env.local` 同期、Convex `APP_ENV`・
