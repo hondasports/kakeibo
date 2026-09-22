@@ -4,11 +4,9 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { Box, Chip, Stack, Typography } from "@mui/material";
 import { formatYen } from "../../../utils/currency";
 import { getTaxModeLabel } from "../utils/receiptItemTaxViewModel";
-import type {
-  ReviewAmountCheck,
-  ReviewCheckStatus,
-  ReviewTaxRateCheck,
-} from "../utils/reviewChecks";
+import type { ReviewAmountCheck } from "../utils/reviewAmountChecks";
+import type { ReviewCheckStatus } from "../utils/reviewCheckUtils";
+import type { ReviewTaxRateCheck } from "../utils/reviewTaxChecks";
 
 const STATUS_LABEL: Record<ReviewCheckStatus, string> = {
   matched: "一致",

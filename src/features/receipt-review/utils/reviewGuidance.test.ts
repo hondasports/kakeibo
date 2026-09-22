@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewFormValues, ReviewItemValues } from "../types/types";
 import { effectiveReviewMode, getReviewGuidance } from "./reviewGuidance";
-import { buildAmountCheck } from "./reviewChecks";
+import { buildAmountCheck } from "./reviewAmountChecks";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 
 const form: ReviewFormValues = {

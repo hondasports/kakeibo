@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTaxRateCheck } from "./reviewChecks";
+import { buildTaxRateCheck } from "./reviewTaxChecks";
 import { resolvedItem, summary, rawObservation } from "./reviewChecksTestHelpers";
 
 describe("buildTaxRateCheck", () => {

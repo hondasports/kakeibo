@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAmountCheck } from "./reviewChecks";
+import { buildAmountCheck } from "./reviewAmountChecks";
 import { resolvedItem, summary } from "./reviewChecksTestHelpers";
 
 describe("buildAmountCheck", () => {
