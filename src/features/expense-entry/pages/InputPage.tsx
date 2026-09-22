@@ -1,6 +1,5 @@
+import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
-import { listActiveApi } from "../../../lib/repositories/categories";
-import { getWeekSummaryApi } from "../../../lib/repositories/receipts";
 import { Alert, Box, Stack } from "@mui/material";
 import { ExpenseEntryForm } from "../components/ExpenseEntryForm";
 import { WeekNavigator } from "../../week";
@@ -20,8 +19,8 @@ export function InputPage() {
     goToNextWeek,
   } = useInputPageWeek();
 
-  const categories = useQuery(listActiveApi()) ?? [];
-  const weekSummary = useQuery(getWeekSummaryApi(), {
+  const categories = useQuery(api.categories.queries.listActive) ?? [];
+  const weekSummary = useQuery(api.receipts.summaries.getWeekSummary, {
     weekStartDate,
   });
 

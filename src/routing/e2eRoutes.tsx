@@ -1,11 +1,8 @@
+import { api } from "../../convex/_generated/api";
 import { useState } from "react";
 import { Box, Button, Stack, TextField } from "@mui/material";
 import { useAuth } from "@clerk/react";
 import { useMutation, useQuery } from "convex/react";
-import { registerReadyDraftsAsExpenseEntriesApi } from "../lib/repositories/aiExpenseDrafts";
-import { listActiveApi } from "../lib/repositories/categories";
-import { getMyGroupApi } from "../lib/repositories/groups";
-import { getAuthenticatedUserIdApi } from "../lib/repositories/users";
 import type { RouteObject } from "react-router-dom";
 import type { Id } from "../../convex/_generated/dataModel";
 import { AiExpenseQueuePanel, AiExpenseQueuePanelProvider } from "../features/ai-expense-queue";
@@ -113,10 +110,13 @@ function E2eInputWorkbenchPage() {
 function E2eRegisterAsExpenseEntriesPage() {
   const draftId = new URLSearchParams(window.location.search).get("draftId");
   const { isLoaded, isSignedIn } = useAuth();
-  const categories = useQuery(listActiveApi(), isLoaded && isSignedIn ? {} : "skip");
-  const group = useQuery(getMyGroupApi(), isLoaded && isSignedIn ? {} : "skip");
+  const categories = useQuery(
+    api.categories.queries.listActive,
+    isLoaded && isSignedIn ? {} : "skip",
+  );
+  const group = useQuery(api.groups.queries.getMyGroup, isLoaded && isSignedIn ? {} : "skip");
   const authenticatedUserId = useQuery(
-    getAuthenticatedUserIdApi(),
+    api.users.queries.getAuthenticatedUserId,
     isLoaded && isSignedIn ? {} : "skip",
   );
   const [result, setResult] = useState<{
@@ -126,7 +126,9 @@ function E2eRegisterAsExpenseEntriesPage() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const registerMutation = useMutation(registerReadyDraftsAsExpenseEntriesApi());
+  const registerMutation = useMutation(
+    api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries,
+  );
   const isAuthReady = isLoaded && isSignedIn;
   const isConvexReady =
     categories !== undefined && group !== undefined && authenticatedUserId !== undefined;

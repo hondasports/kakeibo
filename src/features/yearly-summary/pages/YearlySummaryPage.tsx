@@ -1,9 +1,9 @@
+import { api } from "../../../../convex/_generated/api";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { formatMonthLabel } from "../../../../lib/domain/common/month";
-import { getYearSummaryApi } from "../../../lib/repositories/receipts";
 import { formatYen } from "../../../utils/currency";
 import { CategoryBreakdownCard } from "../../weekly-summary/components/CategoryBreakdownCard";
 import { MonthlyMetricsPanel } from "../../monthly-summary/components/MonthlyMetricsPanel";
@@ -23,7 +23,7 @@ export function YearlySummaryPage() {
       ? normalizedYear
       : currentYear;
 
-  const yearlySummary = useQuery(getYearSummaryApi(), { year });
+  const yearlySummary = useQuery(api.receipts.summaries.getYearSummary, { year });
   const isSummaryLoading = yearlySummary === undefined;
   const summary = yearlySummary ?? {
     byCategory: [],

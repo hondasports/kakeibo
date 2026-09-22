@@ -1,15 +1,9 @@
+import { api } from "../../../../convex/_generated/api";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { listActiveApi } from "../../../lib/repositories/categories";
-import { deleteExpenseEntryApi } from "../../../lib/repositories/expenseEntries";
-import { getUserProfileApi } from "../../../lib/repositories/users";
-import {
-  deleteReceiptApi,
-  getMonthSummaryWithCategoriesApi,
-} from "../../../lib/repositories/receipts";
 import { ExpenseEntryDeleteDialog } from "../../weekly-summary/components/ExpenseEntryDeleteDialog";
 import { ExpenseEntryEditDialog } from "../../weekly-summary/components/ExpenseEntryEditDialog";
 import { CategoryBreakdownCard } from "../../weekly-summary/components/CategoryBreakdownCard";
@@ -43,11 +37,11 @@ export function MonthlySummaryPage() {
       ? normalizedMonth
       : currentMonth;
 
-  const deleteExpenseEntry = useMutation(deleteExpenseEntryApi());
-  const deleteReceipt = useMutation(deleteReceiptApi());
-  const userProfile = useQuery(getUserProfileApi());
-  const categoriesQuery = useQuery(listActiveApi());
-  const monthlySummary = useQuery(getMonthSummaryWithCategoriesApi(), { month });
+  const deleteExpenseEntry = useMutation(api.expenseEntries.mutations.deleteExpenseEntry);
+  const deleteReceipt = useMutation(api.receipts.crud.deleteReceipt);
+  const userProfile = useQuery(api.users.queries.getUserProfile);
+  const categoriesQuery = useQuery(api.categories.queries.listActive);
+  const monthlySummary = useQuery(api.receipts.summaries.getMonthSummaryWithCategories, { month });
   const categories = Array.isArray(categoriesQuery) ? categoriesQuery : [];
   const isSummaryLoading = monthlySummary === undefined;
   const summary = monthlySummary ?? {

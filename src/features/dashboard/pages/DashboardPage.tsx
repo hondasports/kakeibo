@@ -1,5 +1,5 @@
+import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
-import { getWeekSummaryWithCategoriesApi } from "../../../lib/repositories/receipts";
 import { Alert, Box, Stack, Typography, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { CategoryBreakdownCard } from "../../weekly-summary/components/CategoryBreakdownCard";
@@ -23,7 +23,7 @@ export function DashboardPage() {
   const currentYear = getCurrentYear();
 
   const summary = useQuery(
-    getWeekSummaryWithCategoriesApi(),
+    api.receipts.summaries.getWeekSummaryWithCategories,
     weekSession ? { weekStartDate: weekSession.weekStartDate } : "skip",
   );
 

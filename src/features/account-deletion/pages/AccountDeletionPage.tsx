@@ -1,3 +1,4 @@
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import {
   Alert,
@@ -12,17 +13,12 @@ import {
   Typography,
 } from "@mui/material";
 import { useMutation, useQuery } from "convex/react";
-import {
-  getAccountDeletionPreviewApi,
-  requestAccountDeletionApi,
-} from "../../../lib/repositories/accountDeletion";
-import { setActiveGroupApi } from "../../../lib/repositories/groups";
 import { useNavigate } from "react-router-dom";
 
 export function AccountDeletionPage() {
-  const preview = useQuery(getAccountDeletionPreviewApi());
-  const requestDeletion = useMutation(requestAccountDeletionApi());
-  const setActiveGroup = useMutation(setActiveGroupApi());
+  const preview = useQuery(api.accountDeletion.getAccountDeletionPreview);
+  const requestDeletion = useMutation(api.accountDeletion.requestAccountDeletion);
+  const setActiveGroup = useMutation(api.groups.mutations.setActiveGroup);
   const navigate = useNavigate();
   const [confirmationText, setConfirmationText] = useState("");
   const [error, setError] = useState("");

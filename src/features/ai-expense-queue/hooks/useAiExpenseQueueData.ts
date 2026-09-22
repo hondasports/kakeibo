@@ -1,7 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useMemo } from "react";
 import { useQuery } from "convex/react";
-import { listByStatusApi } from "../../../lib/repositories/aiExpenseDrafts";
-import { listJobsApi } from "../../../lib/repositories/receiptAnalysisJobs";
 import type { Doc } from "../../../../convex/_generated/dataModel";
 import { getSectionKey } from "../../receipt-review/components/labels";
 import { getImageCaptureFailureHint } from "../../../../lib/domain/aiExpenseDrafts/failure";
@@ -27,19 +26,21 @@ export function useAiExpenseQueueData({
   sessionBatches: AiExpenseUploadBatch[];
   initialItems?: AiExpenseQueueItem[];
 }) {
-  const readyDrafts = useQuery(listByStatusApi(), { status: "ready" }) as
+  const readyDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, { status: "ready" }) as
     | AiExpenseDraft[]
     | undefined;
-  const needsReviewDrafts = useQuery(listByStatusApi(), {
+  const needsReviewDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, {
     status: "needs_review",
   }) as AiExpenseDraft[] | undefined;
-  const failedDrafts = useQuery(listByStatusApi(), { status: "failed" }) as
+  const failedDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, { status: "failed" }) as
     | AiExpenseDraft[]
     | undefined;
-  const registeredDrafts = useQuery(listByStatusApi(), {
+  const registeredDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, {
     status: "registered",
   }) as AiExpenseDraft[] | undefined;
-  const jobs = useQuery(listJobsApi()) as Doc<"receiptAnalysisImageJobs">[] | undefined;
+  const jobs = useQuery(api.receiptAnalysisJobs.queries.listJobs) as
+    | Doc<"receiptAnalysisImageJobs">[]
+    | undefined;
   const jobByDraftId = useMemo(() => {
     const result = new Map<string, Doc<"receiptAnalysisImageJobs">>();
     for (const job of jobs ?? []) {

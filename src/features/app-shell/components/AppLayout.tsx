@@ -1,3 +1,4 @@
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery } from "convex/react";
@@ -11,14 +12,12 @@ import { NavigationPendingOutlet } from "./NavigationPendingOutlet";
 import { UserMenu } from "./UserMenu";
 import { createNavItems } from "../lib/navigationConfig";
 import { ExpenseSearchBox } from "../../expense-search/components/ExpenseSearchBox";
-import { getUserProfileApi } from "../../../lib/repositories/users";
-
 export function AppLayout() {
   const theme = useTheme();
   const isPC = useMediaQuery(theme.breakpoints.up("md"));
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const userProfile = useQuery(getUserProfileApi());
+  const userProfile = useQuery(api.users.queries.getUserProfile);
   const navItems = createNavItems(userProfile?.weeklyStartDay);
 
   return (

@@ -1,3 +1,4 @@
+import { api } from "../../../../convex/_generated/api";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -12,12 +13,6 @@ import {
   Typography,
 } from "@mui/material";
 import { useMutation, useQuery } from "convex/react";
-import { updateExpenseEntryApi } from "../../../lib/repositories/expenseEntries";
-import { updateReceiptApi } from "../../../lib/repositories/receipts";
-import {
-  getWithItemsApi,
-  updateRegisteredDraftApi,
-} from "../../../lib/repositories/aiExpenseDrafts";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import {
   isValidSignedLineItemAmount,
@@ -46,7 +41,7 @@ function DraftItemsLoader({
   setDraftItems: (items: EditableDraftItem[]) => void;
   setDraftItemsLoading: (loading: boolean) => void;
 }) {
-  const draftDetails = useQuery(getWithItemsApi(), { draftId });
+  const draftDetails = useQuery(api.aiExpenseDrafts.queries.getWithItems, { draftId });
   useEffect(() => {
     if (draftDetails === undefined) return;
     setDraftItems(
@@ -88,9 +83,9 @@ export function ExpenseEntryEditDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const updateExpenseEntry = useMutation(updateExpenseEntryApi());
-  const updateReceipt = useMutation(updateReceiptApi());
-  const updateRegisteredDraft = useMutation(updateRegisteredDraftApi());
+  const updateExpenseEntry = useMutation(api.expenseEntries.mutations.updateExpenseEntry);
+  const updateReceipt = useMutation(api.receipts.crud.updateReceipt);
+  const updateRegisteredDraft = useMutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft);
   const [date, setDate] = useState("");
   const [amountYen, setAmountYen] = useState("");
   const [categoryId, setCategoryId] = useState("");

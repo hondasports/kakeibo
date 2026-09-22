@@ -1,10 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation } from "convex/react";
-import {
-  registerReadyDraftsAsExpenseEntriesApi,
-  resetReceiptToAiInterpretationApi,
-  updateForReviewApi,
-} from "../../../lib/repositories/aiExpenseDrafts";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
@@ -41,9 +37,13 @@ export function useReviewSubmit({
   } | null>(null);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
-  const updateForReview = useMutation(updateForReviewApi());
-  const resetReceiptToAiInterpretation = useMutation(resetReceiptToAiInterpretationApi());
-  const registerReadyDraftsAsExpenseEntries = useMutation(registerReadyDraftsAsExpenseEntriesApi());
+  const updateForReview = useMutation(api.aiExpenseDrafts.mutations.updateForReview);
+  const resetReceiptToAiInterpretation = useMutation(
+    api.aiExpenseDrafts.mutations.resetReceiptToAiInterpretation,
+  );
+  const registerReadyDraftsAsExpenseEntries = useMutation(
+    api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries,
+  );
 
   const handleResetToAiInterpretation = async () => {
     if (!selectedReviewDraftId) {
