@@ -3,7 +3,15 @@ import { getWeekSummaryHandler } from "./summaries";
 import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 import type { ExpenseEntryDoc, ReceiptDoc } from "./testHelpers";
-import { GROUP_ID, OTHER_GROUP_ID, OTHER_USER_ID, USER_ID, createIdentity, createQueryCtx, sampleReceipt } from "./testHelpers";
+import {
+  GROUP_ID,
+  OTHER_GROUP_ID,
+  OTHER_USER_ID,
+  USER_ID,
+  createIdentity,
+  createQueryCtx,
+  sampleReceipt,
+} from "./testHelpers";
 
 describe("getReceiptsByWeek", () => {
   it("正常系: 指定週のレシートが返される", async () => {

@@ -2,7 +2,14 @@ import { getFourWeeksSummaryHandler } from "./summaries";
 import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 import type { CategoryDoc, ReceiptDoc } from "./testHelpers";
-import { GROUP_ID, USER_ID, createIdentity, createQueryCtx, createQueryCtxForSummary, sampleCategory } from "./testHelpers";
+import {
+  GROUP_ID,
+  USER_ID,
+  createIdentity,
+  createQueryCtx,
+  createQueryCtxForSummary,
+  sampleCategory,
+} from "./testHelpers";
 
 describe("getFourWeeksSummaryHandler", () => {
   it("基準週を含む直近4週の合計支出を古い順で返す", async () => {

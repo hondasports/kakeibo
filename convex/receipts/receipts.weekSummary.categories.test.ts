@@ -2,7 +2,14 @@ import { getWeekSummaryWithCategoriesHandler } from "./summaries";
 import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 import type { CategoryDoc, ExpenseEntryDoc, ReceiptDoc } from "./testHelpers";
-import { GROUP_ID, USER_ID, createIdentity, createQueryCtxForSummary, sampleCategory, sampleReceipt } from "./testHelpers";
+import {
+  GROUP_ID,
+  USER_ID,
+  createIdentity,
+  createQueryCtxForSummary,
+  sampleCategory,
+  sampleReceipt,
+} from "./testHelpers";
 
 describe("getWeekSummaryWithCategories", () => {
   it("レシートが0件のとき: 空の集計を返す", async () => {

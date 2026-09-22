@@ -3,7 +3,16 @@ import { createReceipt, deleteReceipt, deleteReceiptsByUser, updateReceipt } fro
 import { ConvexError } from "convex/values";
 import { describe, expect, it, vi } from "vitest";
 import type { CategoryDoc, ReceiptDoc } from "./testHelpers";
-import { GROUP_ID, USER_ID, createIdentity, createMutationCtx, invokeRegisteredMutation, otherGroupReceipt, sampleCategory, sampleReceipt } from "./testHelpers";
+import {
+  GROUP_ID,
+  USER_ID,
+  createIdentity,
+  createMutationCtx,
+  invokeRegisteredMutation,
+  otherGroupReceipt,
+  sampleCategory,
+  sampleReceipt,
+} from "./testHelpers";
 
 describe("updateReceipt", () => {
   it("正常系: receipt が更新される", async () => {

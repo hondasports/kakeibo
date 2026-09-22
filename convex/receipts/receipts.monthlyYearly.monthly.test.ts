@@ -2,7 +2,13 @@ import { getDailySpendingTrendHandler, getMonthlyExpensesSummaryHandler } from "
 import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 import type { UserDoc, ExpenseEntryDoc, ReceiptDoc } from "./testHelpers";
-import { GROUP_ID, USER_ID, createIdentity, createQueryCtx, createQueryCtxForMonthlySummary } from "./testHelpers";
+import {
+  GROUP_ID,
+  USER_ID,
+  createIdentity,
+  createQueryCtx,
+  createQueryCtxForMonthlySummary,
+} from "./testHelpers";
 
 describe("getMonthlyExpensesSummary", () => {
   it("未認証時: ConvexError が throw される", async () => {

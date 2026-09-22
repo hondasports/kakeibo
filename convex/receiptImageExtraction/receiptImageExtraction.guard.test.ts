@@ -35,15 +35,12 @@ describe("real モードのガード", () => {
   });
 
   it("production で mode 未設定の場合は拒否する", async () => {
-    await withEnv(
-      { RECEIPT_IMAGE_EXTRACTOR_MODE: undefined, APP_ENV: "production" },
-      async () => {
-        const ctx = createActionCtx(createIdentity());
-        await expect(
-          extractReceiptFieldsHandler(ctx, { imageDataUrl: VALID_IMAGE_DATA_URL }),
-        ).rejects.toThrow(ConvexError);
-      },
-    );
+    await withEnv({ RECEIPT_IMAGE_EXTRACTOR_MODE: undefined, APP_ENV: "production" }, async () => {
+      const ctx = createActionCtx(createIdentity());
+      await expect(
+        extractReceiptFieldsHandler(ctx, { imageDataUrl: VALID_IMAGE_DATA_URL }),
+      ).rejects.toThrow(ConvexError);
+    });
   });
 
   it("mode が mock / real 以外の場合は拒否する", async () => {

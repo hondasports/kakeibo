@@ -1,7 +1,24 @@
 import { describe, expect, it } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { getDateSpendingEntries, getMonthAggregationEntries, getYearAggregationEntries, MAX_YEAR_RANGE_ENTRIES, getMonthIncomeEntries, getMonthSpendingEntries, getWeekIncomeEntries, getWeekSpendingEntries } from "./spendingEntries";
-import { makeExpenseEntry, makeReceipt, makeSourceDocument, makeAiExpenseDraft, makeAiExpenseDraftItem, createQueryCtx, groupId } from "./testHelpers";
+import {
+  getDateSpendingEntries,
+  getMonthAggregationEntries,
+  getYearAggregationEntries,
+  MAX_YEAR_RANGE_ENTRIES,
+  getMonthIncomeEntries,
+  getMonthSpendingEntries,
+  getWeekIncomeEntries,
+  getWeekSpendingEntries,
+} from "./spendingEntries";
+import {
+  makeExpenseEntry,
+  makeReceipt,
+  makeSourceDocument,
+  makeAiExpenseDraft,
+  makeAiExpenseDraftItem,
+  createQueryCtx,
+  groupId,
+} from "./testHelpers";
 
 describe("getWeekIncomeEntries", () => {
   it("expenseEntries に収入があれば receipt は無視する", async () => {

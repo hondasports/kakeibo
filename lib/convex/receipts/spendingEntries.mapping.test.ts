@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { mapExpenseEntryToSpendingEntry, mapIncomeExpenseEntryToListEntry, mapReceiptToIncomeListEntry, mapReceiptToSpendingEntry } from "./spendingEntries";
+import {
+  mapExpenseEntryToSpendingEntry,
+  mapIncomeExpenseEntryToListEntry,
+  mapReceiptToIncomeListEntry,
+  mapReceiptToSpendingEntry,
+} from "./spendingEntries";
 import { makeExpenseEntry, makeReceipt } from "./testHelpers";
 
 describe("mapReceiptToSpendingEntry", () => {

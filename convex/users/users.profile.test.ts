@@ -1,9 +1,18 @@
 import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 import { getReceiptImageConsentHandler, getUserProfileHandler } from "./queries";
-import { acceptReceiptImageExternalApiConsentHandler, updateMonthlyIncomeHandler, updateWeeklyDaysHandler } from "./mutations";
+import {
+  acceptReceiptImageExternalApiConsentHandler,
+  updateMonthlyIncomeHandler,
+  updateWeeklyDaysHandler,
+} from "./mutations";
 import type { Doc } from "./testHelpers";
-import { createIdentity, createQueryCtxForUsers, createMutationCtxForUpdate, BASE_DOC } from "./testHelpers";
+import {
+  createIdentity,
+  createQueryCtxForUsers,
+  createMutationCtxForUpdate,
+  BASE_DOC,
+} from "./testHelpers";
 
 describe("getUserProfile", () => {
   it("未認証時は ConvexError を throw する", async () => {

@@ -2,7 +2,17 @@ import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 import { createExpenseEntriesFromDraftHandler } from "./mutations";
 import type { AiExpenseDraftDoc } from "./testHelpers";
-import { catFoodId, catDailyId, draftReadyId, OTHER_GROUP_ID, createIdentity, createMutationCtx, activeFoodCategory, activeDailyCategory, readyDraft } from "./testHelpers";
+import {
+  catFoodId,
+  catDailyId,
+  draftReadyId,
+  OTHER_GROUP_ID,
+  createIdentity,
+  createMutationCtx,
+  activeFoodCategory,
+  activeDailyCategory,
+  readyDraft,
+} from "./testHelpers";
 
 describe("createExpenseEntriesFromDraftHandler", () => {
   it("AI下書きのitemsから複数のexpenseEntriesを作成できる", async () => {

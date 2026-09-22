@@ -5,7 +5,15 @@ import { createReceipt } from "./mutations";
 import { ConvexError } from "convex/values";
 import { describe, expect, it, vi } from "vitest";
 import type { ReceiptDoc } from "./testHelpers";
-import { GROUP_ID, USER_ID, createIdentity, createMutationCtx, otherGroupCategory, sampleCategory, sampleReceipt } from "./testHelpers";
+import {
+  GROUP_ID,
+  USER_ID,
+  createIdentity,
+  createMutationCtx,
+  otherGroupCategory,
+  sampleCategory,
+  sampleReceipt,
+} from "./testHelpers";
 
 describe("calculateWeekStartDate", () => {
   it("月曜日の場合: その日が返される", () => {
