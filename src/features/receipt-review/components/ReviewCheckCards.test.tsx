@@ -1,7 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ReviewCheckCards } from "./ReviewCheckCards";
-import type { ReviewAmountCheck, ReviewTaxRateCheck } from "../utils/reviewChecks";
+import type { ReviewAmountCheck } from "../utils/reviewAmountChecks";
+import type { ReviewTaxRateCheck } from "../utils/reviewTaxChecks";
 
 const amountBase: ReviewAmountCheck = { status: "matched", variant: "direct" };
 const taxRateBase: ReviewTaxRateCheck = { status: "matched", rows: [] };

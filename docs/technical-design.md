@@ -97,7 +97,9 @@ src/
       components/                # ReviewDialog, ReviewItemsEditor, ReceiptTaxSummary, ...
       hooks/                     # useReviewDialog, useReviewSubmit, useReviewTaxOverrides, ...
       types/
-      utils/                     # mappers, reviewChecks, taxWarnings, receiptTotalsViewModel, ...
+      utils/                     # mappers, reviewCheckUtils, reviewAmountChecks,
+                               #   reviewTaxChecks, reviewChecks, taxWarnings,
+                               #   receiptTotalsViewModel, ...
     monthly-summary/           # 月次サマリページ
       components/
       lib/
@@ -112,14 +114,16 @@ src/
       index.ts
     expense-search/            # 支出検索ページ
       components/
-      lib/
+      hooks/                   # useExpenseSearchResults
+      lib/                     # searchParams, expenseSearchItems
       pages/
       index.ts
     summary-shared/            # 集計系 feature で共有する表示部品・型・util（index.ts なし）
       components/              # CategoryBreakdownCard, ReceiptListCard, ReceiptRow,
                                #   ReceiptGroupRow, IncomeListCard, MonthlyMetricsPanel,
-                               #   ExpenseEntryEditDialog, ExpenseEntryDeleteDialog,
-                               #   MemoExpandableText, ...
+                               #   ExpenseEntryEditDialog, ExpenseEntryDraftItemsEditor,
+                               #   ExpenseEntryDeleteDialog, MemoExpandableText, ...
+      hooks/                   # useExpenseEntryEditDialogState
       types/                   # CategorySummary, ReceiptItem, ReceiptGroup, IncomeItem, ...
       utils/                   # bulkSelection, memoExpandableTextUtils
     app-shell/                 # レイアウト・公開・異常系ページ
