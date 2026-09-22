@@ -139,6 +139,32 @@ export function readBranchChangedPaths({ base, cwd = process.cwd() } = {}) {
   return output.split("\0").filter(Boolean);
 }
 
+/** Resolve the PR's base ref from the remote default branch (origin/HEAD). */
+export function resolveDefaultBase({ cwd = process.cwd() } = {}) {
+  try {
+    const ref = execFileSync("git", ["rev-parse", "--abbrev-ref", "origin/HEAD"], {
+      cwd,
+      encoding: "utf8",
+    }).trim();
+    if (ref) return ref;
+  } catch {
+    // fall through to the explicit error below
+  }
+  throw new Error("baseを解決できません（origin/HEAD 未設定）。--base <ref> を指定してください");
+}
+
+/**
+ * Union of the committed branch diff and the worktree diff. Used for both skill
+ * suggestions and E2E relevance so the verdict cannot depend on whether the
+ * change happens to be committed yet.
+ */
+export function readChangedPaths({ base, cwd = process.cwd() } = {}) {
+  const resolvedBase = base ?? resolveDefaultBase({ cwd });
+  const committed = readBranchChangedPaths({ base: resolvedBase, cwd });
+  const worktree = readWorktreeChangedPaths({ cwd });
+  return [...new Set([...committed, ...worktree])].sort();
+}
+
 export function parseArguments(args) {
   const parsed = { cwd: process.cwd() };
   for (let index = 0; index < args.length; index += 1) {
@@ -159,8 +185,7 @@ export function parseArguments(args) {
 }
 
 export function runSuggestSkills({ base, paths, cwd } = {}) {
-  const changedPaths =
-    paths ?? (base ? readBranchChangedPaths({ base, cwd }) : readWorktreeChangedPaths({ cwd }));
+  const changedPaths = paths ?? readChangedPaths({ base, cwd });
   const result = suggestSkillsForPaths(changedPaths);
 
   console.log("SKILL_SUGGEST status: PASS");
