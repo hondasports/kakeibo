@@ -3,7 +3,7 @@ import { Button, Stack, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
 import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
-import { isDiscountLine } from "../../receipt-review/utils/discountItems";
+import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { ReviewItemCard } from "./ReviewItemCard";
 
 export function ReviewItemsEditor({

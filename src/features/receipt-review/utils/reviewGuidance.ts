@@ -1,12 +1,15 @@
 import { parseExpenseAmountString } from "../../../../lib/domain/expenseEntries/expenseEntryItem";
 import { isValidIsoDateString } from "../../../../lib/domain/week/weekDates";
-import { isDiscountLine, isValidReviewItemAmount } from "./discountItems";
+import {
+  isDiscountLine,
+  isValidSignedLineItemAmount,
+} from "../../../../lib/domain/receipt/discountItems";
 import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "../types/types";
 import {
-  getReviewDocumentTypeError,
-  getReviewItemsError,
-  getReviewCategoryAggregateError,
-} from "./reviewValidation";
+  getReviewDocumentTypeErrorMessage,
+  getReviewItemsErrorMessage,
+  getReviewCategoryAggregateErrorMessage,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
 
 export type ReviewGuidanceItem = {
@@ -32,7 +35,7 @@ export function getReviewGuidance(
   const issues: ReviewGuidanceItem[] = [];
   const add = (id: string, message: string, target: string, required: boolean) =>
     issues.push({ id, message, target, required });
-  const documentError = getReviewDocumentTypeError(form.documentType);
+  const documentError = getReviewDocumentTypeErrorMessage(form.documentType);
   if (documentError) add("document", documentError, "document", true);
   if (!form.shopName.trim()) add("shopName", "店名・内容を入力してください。", "shopName", true);
   if (!isValidIsoDateString(form.date)) add("date", "支出日を確認してください。", "date", true);
@@ -99,7 +102,7 @@ export function getReviewGuidance(
         );
       else if (!item.itemName.trim())
         add("name-" + item.id, "明細名を入力してください。", item.id, true);
-      else if (!isValidReviewItemAmount(item.itemName, Number(item.amountYen), item.lineType))
+      else if (!isValidSignedLineItemAmount(item.itemName, Number(item.amountYen), item.lineType))
         add("amount-" + item.id, "「" + name + "」：明細金額を確認してください。", item.id, true);
       else if (!item.categoryId)
         add("category-" + item.id, "「" + name + "」：カテゴリを選択してください。", item.id, true);
@@ -112,8 +115,8 @@ export function getReviewGuidance(
         );
       }
     }
-    if (!items.some((item) => getReviewItemsError([item]))) {
-      const aggregateError = getReviewCategoryAggregateError(items);
+    if (!items.some((item) => getReviewItemsErrorMessage([item]))) {
+      const aggregateError = getReviewCategoryAggregateErrorMessage(items);
       if (aggregateError) add("aggregate", aggregateError, "items", true);
     }
   }

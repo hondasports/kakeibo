@@ -22,7 +22,7 @@ import {
   validateProductionProductUpdates,
   type ProductionProductUpdates,
   type PullRequestDecision,
-} from "../src/lib/productUpdates.ts";
+} from "../lib/domain/productUpdates.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");

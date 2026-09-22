@@ -1,5 +1,5 @@
 import type { ReviewItemValues } from "../types/types";
-import { isDiscountLine } from "./discountItems";
+import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 
 function isProductItem(item: ReviewItemValues) {
   return !isDiscountLine(item.itemName, item.lineType);

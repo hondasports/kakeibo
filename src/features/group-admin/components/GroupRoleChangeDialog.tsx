@@ -1,5 +1,5 @@
 import { ConfirmDangerousActionDialog } from "./ConfirmDangerousActionDialog";
-import { formatGroupRoleLabel } from "../utils/groupRoleDisplay";
+import { formatGroupRoleLabel } from "../../../../lib/domain/groups/role";
 
 type PendingRoleChange = {
   userId: string;

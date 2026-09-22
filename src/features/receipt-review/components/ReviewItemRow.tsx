@@ -3,7 +3,7 @@ import { Box, Stack, Typography } from "@mui/material";
 import { formatYen } from "../../../utils/currency";
 import type { ReviewItemValues } from "../types/types";
 import type { ReviewGuidanceItem } from "../utils/reviewGuidance";
-import { isDiscountLine } from "../../receipt-review/utils/discountItems";
+import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { buildTaxContextFromReviewItem } from "../utils/receiptItemTaxViewModel";
 
 function amountLabel(item: ReviewItemValues): string {

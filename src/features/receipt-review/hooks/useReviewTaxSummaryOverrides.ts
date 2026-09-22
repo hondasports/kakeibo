@@ -8,7 +8,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { mapConvexDraftToAiExpenseDraft, mapDraftItemsToReviewItems } from "../utils/mappers";
 import type { AmountBasis, TaxMode, TaxRatePercent } from "../../../../lib/receiptTax/types";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import { toUserFacingReviewError } from "../../receipt-review/utils/userFacingErrors";
+import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 
 export type TaxSummaryOverrideFields = {
   taxRatePercent?: TaxRatePercent;
@@ -69,7 +69,8 @@ export function useReviewTaxSummaryOverrides({
       if (requestId !== taxSummaryOverrideRequestIdRef.current) {
         return;
       }
-      setReviewError(toUserFacingReviewError(error));
+      console.error("AI expense queue review failed", error);
+      setReviewError(getAiExpenseQueueReviewErrorMessage());
     } finally {
       if (requestId === taxSummaryOverrideRequestIdRef.current) {
         setTaxSummaryUpdatingIndex(null);

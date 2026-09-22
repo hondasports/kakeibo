@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ReviewFormValues, ReviewItemValues } from "../types/types";
 import { effectiveReviewMode, getReviewGuidance } from "./reviewGuidance";
 import { buildAmountCheck } from "./reviewChecks";
-import { getReviewSubmitError } from "./reviewValidation";
+import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 
 const form: ReviewFormValues = {
   documentType: "receipt",
@@ -38,12 +38,12 @@ describe("下書きの修正状態と保存内容", () => {
       ]),
     );
     // 確認項目を残したまま下書きを保存できる
-    expect(getReviewSubmitError(form, [product, discount])).toBeNull();
+    expect(getReviewSubmitErrorMessage(form, [product, discount])).toBeNull();
     const linked = { ...discount, discountTargetItemId: "product" };
     expect(getReviewGuidance(form, [product, linked]).filter((issue) => issue.required)).toEqual(
       [],
     );
-    expect(getReviewSubmitError(form, [product, linked])).toBeNull();
+    expect(getReviewSubmitErrorMessage(form, [product, linked])).toBeNull();
     expect(
       buildAmountCheck({
         items: [product, linked],
@@ -60,7 +60,7 @@ describe("下書きの修正状態と保存内容", () => {
     [form, [{ ...product, categoryId: "" }], "product"],
     [form, [product, { ...discount, amountYen: "-116", discountTargetItemId: "product" }], "items"],
   ])("保存を妨げる入力には修正先がある", (values, items, target) => {
-    expect(getReviewSubmitError(values, items)).not.toBeNull();
+    expect(getReviewSubmitErrorMessage(values, items)).not.toBeNull();
     expect(getReviewGuidance(values, items).filter((issue) => issue.required)).toEqual(
       expect.arrayContaining([expect.objectContaining({ target })]),
     );

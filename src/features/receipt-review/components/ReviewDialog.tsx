@@ -26,8 +26,8 @@ import { ReviewStatusBanner } from "./ReviewStatusBanner";
 import { getReviewGuidance, effectiveReviewMode } from "../utils/reviewGuidance";
 import { buildReviewChecks } from "../utils/reviewChecks";
 import { buildTaxContextFromReviewItem } from "../utils/receiptItemTaxViewModel";
-import { isDiscountLine } from "../utils/discountItems";
-import { getReviewSubmitError } from "../utils/reviewValidation";
+import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
+import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 
 export type ReviewDialogProps = {
   open: boolean;
@@ -178,7 +178,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
     setExpanded((current) => ({ ...current, [key]: !current[key] }));
   const openExpanded = (key: string) => setExpanded((current) => ({ ...current, [key]: true }));
   const save = () => {
-    const validation = getReviewSubmitError(
+    const validation = getReviewSubmitErrorMessage(
       { ...form, registrationMode: effectiveReviewMode(form) },
       items,
     );

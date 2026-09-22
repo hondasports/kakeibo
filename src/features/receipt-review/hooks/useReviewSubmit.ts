@@ -6,8 +6,8 @@ import {
   updateForReviewApi,
 } from "../../../lib/repositories/aiExpenseDrafts";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { getReviewSubmitError } from "../../receipt-review/utils/reviewValidation";
-import { toUserFacingReviewError } from "../../receipt-review/utils/userFacingErrors";
+import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
+import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 import type { ReviewFormValues, ReviewItemValues } from "../types/types";
 import type { AiExpenseQueuePanelProps } from "../../ai-expense-queue/types/types";
 import { prepareReviewItemsForSubmit } from "../utils/reviewItemCategories";
@@ -63,7 +63,8 @@ export function useReviewSubmit({
       clearSelection();
       resetForm();
     } catch (error) {
-      const message = toUserFacingReviewError(error);
+      console.error("AI expense queue review failed", error);
+      const message = getAiExpenseQueueReviewErrorMessage();
       setReviewError(message);
       setReviewSaveFeedback({ message, severity: "error" });
     } finally {
@@ -87,7 +88,7 @@ export function useReviewSubmit({
     if (effectiveRegistrationMode !== undefined) {
       setReviewForm((current) => ({ ...current, registrationMode: effectiveRegistrationMode }));
     }
-    const validationError = getReviewSubmitError(submittedForm, reviewItems);
+    const validationError = getReviewSubmitErrorMessage(submittedForm, reviewItems);
     if (validationError) {
       setReviewError(validationError);
       return;
@@ -182,7 +183,8 @@ export function useReviewSubmit({
         resetForm();
       }
     } catch (error) {
-      const message = toUserFacingReviewError(error);
+      console.error("AI expense queue review failed", error);
+      const message = getAiExpenseQueueReviewErrorMessage();
       setReviewError(message);
       setReviewSaveFeedback({ message, severity: "error" });
     } finally {
