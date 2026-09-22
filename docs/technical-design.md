@@ -81,31 +81,22 @@ src/
   routing/                     # E2E 専用ルート（e2eRoutes.tsx, e2eFixtures.ts）
   test/                        # テスト共通ユーティリティ
   features/                    # 機能単位（Feature-based）
-    ai-expense-queue/
+    ai-expense-queue/            # AI下書きキュー（一覧・アップロード・一括登録）
       components/
-        queue/                 # QueueHeader, QueueSection, QueueItemCard, QueueContent 等
-        review/                # ReviewDialog, ReviewItemCard, ReviewItemTaxDetails, ...
+        queue/                   # QueueItemCard, QueueSection, QueueStatusHeader 等のキュー表示部品
         AiExpenseQueuePanel.tsx
-        BulkRegisterConfirmDialog.tsx
-        ImageInputButton.tsx
-        QueueEmptyState.tsx
-        QueueHeader.tsx
-        QueuePanelSlots.tsx
-        ReviewReasonChips.tsx
-        StatusChip.tsx
-      context/                 # AiExpenseQueuePanelContext
-      hooks/
-        review/                # useReviewTaxOverrides, useReviewTaxSummaryOverrides, ...
-        useAiExpenseQueuePanel.ts
-        useAiExpenseQueueData.ts
-        useQueueDelete.ts
-        useBulkRegister.ts
-        useImageUpload.ts
-        useRetry.ts
-        useReviewDialog.ts
+        QueueContent.tsx
+        ...
+      context/                   # AiExpenseQueuePanelContext
+      hooks/                     # useAiExpenseQueueData, useQueueDelete, useBulkRegister, ...
       types/
-      utils/                   # discountItems, taxWarnings, mappers, reviewValidation, ...
+      utils/                     # queueContent（キュー表示導出）
       index.ts
+    receipt-review/              # AI下書きレビュー（単票レビューダイアログ・税補正）
+      components/                # ReviewDialog, ReviewItemsEditor, ReceiptTaxSummary, ...
+      hooks/                     # useReviewDialog, useReviewSubmit, useReviewTaxOverrides, ...
+      types/
+      utils/                     # mappers, reviewChecks, taxWarnings, receiptTotalsViewModel, ...
     app-shell/                 # レイアウト・公開・異常系ページ
       components/              # AppLayout, AppDrawer, AppBottomNav, UserMenu, ...
       lib/                     # publicPaths, navigationConfig, siteMetadata, maintenanceMode
@@ -772,7 +763,31 @@ domain へ分離済み。
   `persistReceiptUserOverrideSnapshot` / `snapshotReceiptDraftValues` /
   `resetReceiptToAiInterpretationHandler` の公開シグネチャは不変とする。
 
-### 5.4 スタイリング責務
+### 5.4 feature 内 utils と Convex API 参照の配置契約
+
+`src/features/<feature>/utils/` には、その feature の component / hook / page
+だけが使う **プレゼンテーション層の純粋関数**（ViewModel 生成・表示整形・UI 状態導出）だけを置く。
+
+- ドメインルール（バリデーション、税・金額計算、ユーザー向け業務メッセージ等の業務判断）は
+  `lib/domain/<domain>/` に置く。feature 内 utils が `lib/domain` の関数を
+  **改名して転送するだけのラッパー・re-export は作らない**。呼び出し側が
+  `lib/domain` を直接 import する。ドメイン関数と feature 固有の整形を合成する
+  実処理を持つ層は utils に置いてよい。
+- 複数 feature から使う純粋関数は `src/utils/`、ドメインルールとして共有するものは
+  `lib/domain/<domain>/` に置く。
+- API データから component props への変換・表示専用の導出（ViewModel）は
+  feature 内 utils の正当な置き場所とする。
+- feature はユーザー向けの機能単位で切る。内部のサブ領域が独立した機能として
+  成立するほど育った場合は、別 feature へ分離してよい（feature の巨大化を
+  1 つのディレクトリで吸収しない）。
+
+Convex API の参照は `convex/_generated/api.js` の `api` を直接使う
+（`useQuery(api.users.queries.getUserProfile)`）。`api.x.y` を返すだけの
+間接層は設けず、旧 repositories 層は廃止済みであり `api` を直接参照する。
+単体テストの mock 境界は `convex/_generated/api.js` であり、`vi.mock` で
+`api` ツリーを差し替える。
+
+### 5.5 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
 
