@@ -1,5 +1,6 @@
 import type { UserIdentity } from "convex/server";
 import { vi } from "vitest";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { requireAuthenticatedUserId } from "./auth";
 
 export type AuthContext = Parameters<typeof requireAuthenticatedUserId>[0];
