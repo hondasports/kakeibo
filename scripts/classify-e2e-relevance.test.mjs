@@ -35,6 +35,12 @@ describe("E2E relevance path classification", () => {
       "scripts/review-depth.mjs",
       "scripts/review-depth.test.mjs",
       "scripts/check-task-worktree.mjs",
+      "scripts/check-loop-docs.mjs",
+      "scripts/check-loop-docs.test.mjs",
+      "scripts/collect-pr-findings.mjs",
+      "scripts/collect-pr-findings.test.mjs",
+      "scripts/suggest-skills.mjs",
+      "scripts/suggest-skills.test.mjs",
     ];
 
     for (const filePath of processOnlyPaths) {

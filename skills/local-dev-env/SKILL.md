@@ -25,4 +25,4 @@ license: Apache-2.0
 
 - secretやissuerの実値をchat・Issue・PR・log・commitへ出さない
 - Windowsの既知パターン: Convex CLIが設定成功後の終了処理だけassertするケースでは、成功メッセージだけでPASSにせず最後のcleanup認証HTTPが200になるまで確認する
-- 詳細は `docs/development-process.md` §3・§7、`docs/environment-variables.md`
+- 詳細は `docs/development-process.md` §3・§6、`docs/environment-variables.md`
