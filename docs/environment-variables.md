@@ -40,6 +40,8 @@ Local / DEV / Preview / CI では未設定時の既定を `LINE_INTEGRATION_MODE
 | `E2E_CLERK_USER_EMAIL`       | E2Eテスト用メール              | ✅    | ✅             | 任意       | ❌   | ✅         | .env.local / GitHub Actions Secret  |
 | `E2E_CLERK_USER_PASSWORD`    | E2Eテスト用パスワード（レガシー） | 任意  | 任意           | 任意       | ❌   | ✅         | `.env.example` に残存。**現行 E2E auth helper（`e2e/helpers/auth.ts`）では未使用** |
 
+Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email_address}}`）と `name`（`{{user.full_name}}`）claim が必要。未設定だと `identity.email` / `identity.name` が空になり、`users.email` / `users.displayName` が補完されない。特に `users.email` が空のユーザーはトランザクションメールの宛先解決でスキップされるため、メール通知が一切 enqueue されない。Dev / Production 両 instance で設定する。
+
 ### Convex関連
 
 | 変数名                 | 用途                                     | Local | DEV/PR Preview | PREVIEW RC | PROD | Secret扱い | 設定場所                           |
@@ -78,6 +80,8 @@ Local / DEV / Preview / CI では未設定時の既定を `LINE_INTEGRATION_MODE
 > `RESEND_API_KEY` と `RESEND_WEBHOOK_SECRET` は Convex Action 内（サーバー側）でのみ使用する。フロントエンドには渡さない。
 > `APP_ENV` が `production` 以外の場合、`RESEND_API_KEY` を使っても実メールは送信されず、モック応答（`providerMessageId` に `mock-` 接頭辞）が返る。Local / DEV / PREVIEW / CI では実メールを送らない。
 > `RESEND_FROM_ADDRESS` に設定するドメインは Resend Dashboard で verified domain にする必要がある。
+> `RESEND_WEBHOOK_SECRET` による署名検証は、Resend が送信する `svix-id` / `svix-timestamp` / `svix-signature` ヘッダを対象にする（`webhook-*` もフォールバックとして受理）。
+> メール通知の宛先は `users.email` から解決する。`users.email` はログイン時の `upsertUser` が Clerk JWT の `email` claim から格納するため、JWT template の `email` claim が前提になる（Clerk 節を参照）。
 
 > `OPENAI_API_KEY` は Convex Action 内（サーバー側）でのみ使用する。フロントエンドには渡さない。
 > ローカル・PR・Preview・CI では `RECEIPT_IMAGE_EXTRACTOR_MODE=mock` を使い、OpenAI API を呼ばない。
