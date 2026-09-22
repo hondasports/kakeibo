@@ -18,9 +18,9 @@ import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
 import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
 import {
   isDiscountLine,
-  isValidReviewItemAmount,
+  isValidSignedLineItemAmount,
   sanitizeSignedYenInput,
-} from "../../receipt-review/utils/discountItems";
+} from "../../../../lib/domain/receipt/discountItems";
 import { isLowConfidenceItem } from "../utils/reviewDialogUtils";
 import {
   buildTaxContextFromReviewItem,
@@ -159,7 +159,7 @@ export function ReviewItemCard({
             label="レシートの金額"
             error={
               !item.amountYen.trim() ||
-              !isValidReviewItemAmount(item.itemName, Number(item.amountYen), item.lineType)
+              !isValidSignedLineItemAmount(item.itemName, Number(item.amountYen), item.lineType)
             }
             onChange={(event) =>
               onItemChange(

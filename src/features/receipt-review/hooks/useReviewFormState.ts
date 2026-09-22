@@ -19,7 +19,7 @@ import {
   initializeReviewCategoryState,
   prepareReviewItemsForSubmit,
 } from "../utils/reviewItemCategories";
-import { isDiscountItemName, isDiscountLine } from "../../receipt-review/utils/discountItems";
+import { isDiscountItemName, isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { applyReviewItemsTaxPreview } from "../utils/reviewItemsTaxPreview";
 import { reconcileNegativeLineWarnings } from "../utils/negativeLineWarnings";
 

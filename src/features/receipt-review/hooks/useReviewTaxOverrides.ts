@@ -11,7 +11,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { mapConvexDraftToAiExpenseDraft, mapDraftItemsToReviewItems } from "../utils/mappers";
 import type { AmountBasis } from "../../../../lib/receiptTax/types";
 import type { ReviewItemValues, AiExpenseDraft } from "../types/types";
-import { toUserFacingReviewError } from "../../receipt-review/utils/userFacingErrors";
+import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 
 export function useReviewTaxOverrides({
   selectedReviewDraftId,
@@ -67,7 +67,8 @@ export function useReviewTaxOverrides({
       if (requestId !== taxOverrideRequestIdRef.current) {
         return;
       }
-      setReviewError(toUserFacingReviewError(error));
+      console.error("AI expense queue review failed", error);
+      setReviewError(getAiExpenseQueueReviewErrorMessage());
     } finally {
       if (requestId === taxOverrideRequestIdRef.current) {
         setTaxUpdatingItemId(null);
@@ -104,7 +105,8 @@ export function useReviewTaxOverrides({
       if (requestId !== taxOverrideRequestIdRef.current) {
         return;
       }
-      setReviewError(toUserFacingReviewError(error));
+      console.error("AI expense queue review failed", error);
+      setReviewError(getAiExpenseQueueReviewErrorMessage());
     } finally {
       if (requestId === taxOverrideRequestIdRef.current) {
         setIsApplyingReceiptTax(false);

@@ -1,7 +1,7 @@
 import type { ReceiptRawObservation } from "../../../../lib/domain/receipt/observations";
 import type { AmountBasis, TaxMode, TaxRatePercent } from "../../../../lib/receiptTax/types";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import { isDiscountLine } from "./discountItems";
+import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
 
 /** 金額確認・税率別集計それぞれの判定状態。 */

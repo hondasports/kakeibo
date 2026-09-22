@@ -3,7 +3,7 @@ import { useQuery } from "convex/react";
 import { getGroupDeletionPreviewApi } from "../../../../lib/repositories/groups";
 import { ConfirmDangerousActionDialog } from "../ConfirmDangerousActionDialog";
 import { ConfirmDeleteGroupDialog } from "../ConfirmDeleteGroupDialog";
-import { formatGroupRoleLabel } from "../../utils/groupRoleDisplay";
+import { formatGroupRoleLabel } from "../../../../../lib/domain/groups/role";
 import type { PendingMember } from "./types";
 
 type GroupDangerZoneDialogsProps = {
