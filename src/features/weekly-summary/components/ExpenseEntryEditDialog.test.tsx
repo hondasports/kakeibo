@@ -17,15 +17,15 @@ const {
 }));
 
 vi.mock("convex/react", () => ({ useMutation: useMutationMock, useQuery: useQueryMock }));
-vi.mock("../../../lib/repositories/expenseEntries", () => ({
-  updateExpenseEntryApi: () => "updateExpenseEntry",
-}));
-vi.mock("../../../lib/repositories/receipts", () => ({
-  updateReceiptApi: () => "updateReceipt",
-}));
-vi.mock("../../../lib/repositories/aiExpenseDrafts", () => ({
-  getWithItemsApi: () => "getWithItems",
-  updateRegisteredDraftApi: () => "updateRegisteredDraft",
+vi.mock("../../../../convex/_generated/api", () => ({
+  api: {
+    aiExpenseDrafts: {
+      mutations: { updateRegisteredDraft: "updateRegisteredDraft" },
+      queries: { getWithItems: "getWithItems" },
+    },
+    expenseEntries: { mutations: { updateExpenseEntry: "updateExpenseEntry" } },
+    receipts: { crud: { updateReceipt: "updateReceipt" } },
+  },
 }));
 
 describe("ExpenseEntryEditDialog AI draft history", () => {

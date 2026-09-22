@@ -1,11 +1,8 @@
+import { api } from "../../../../convex/_generated/api";
 import { applyReviewItemsTaxPreview } from "../utils/reviewItemsTaxPreview";
 import type { Dispatch, SetStateAction } from "react";
 import { mergeReviewTaxItems } from "../utils/reviewTaxItemMerge";
 import { useMutation } from "convex/react";
-import {
-  applyReceiptTaxSettingsApi,
-  updateDraftItemTaxOverridesApi,
-} from "../../../lib/repositories/aiExpenseDrafts";
 import { useRef, useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { mapConvexDraftToAiExpenseDraft, mapDraftItemsToReviewItems } from "../utils/mappers";
@@ -27,8 +24,12 @@ export function useReviewTaxOverrides({
   const [taxUpdatingItemId, setTaxUpdatingItemId] = useState<string | null>(null);
   const [isApplyingReceiptTax, setIsApplyingReceiptTax] = useState(false);
   const taxOverrideRequestIdRef = useRef(0);
-  const updateDraftItemTaxOverrides = useMutation(updateDraftItemTaxOverridesApi());
-  const applyReceiptTaxSettings = useMutation(applyReceiptTaxSettingsApi());
+  const updateDraftItemTaxOverrides = useMutation(
+    api.aiExpenseDrafts.mutations.updateDraftItemTaxOverrides,
+  );
+  const applyReceiptTaxSettings = useMutation(
+    api.aiExpenseDrafts.mutations.applyReceiptTaxSettings,
+  );
 
   const applyTaxOverride = async (
     itemId: string,

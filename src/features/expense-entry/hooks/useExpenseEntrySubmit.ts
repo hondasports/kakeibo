@@ -1,6 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useMutation } from "convex/react";
-import { createExpenseEntriesApi } from "../../../lib/repositories/expenseEntries";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import {
   validateExpenseItems,
@@ -50,7 +50,7 @@ export function useExpenseEntrySubmit({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingDifference, setPendingDifference] = useState(0);
 
-  const createExpenseEntries = useMutation(createExpenseEntriesApi());
+  const createExpenseEntries = useMutation(api.expenseEntries.mutations.createExpenseEntries);
 
   const doSave = async () => {
     setStatus("submitting");

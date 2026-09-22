@@ -1,12 +1,11 @@
+import { api } from "../../../../convex/_generated/api";
 import { useEffect, useRef } from "react";
 import { useAction } from "convex/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Box, CircularProgress, Typography } from "@mui/material";
-import { completeLineLinkApi } from "../../../lib/repositories/lineLink";
-
 export function LineLinkCallbackPage() {
   const [searchParams] = useSearchParams();
-  const complete = useAction(completeLineLinkApi());
+  const complete = useAction(api.lineLink.actions.complete);
   const navigate = useNavigate();
   const hasStarted = useRef(false);
 

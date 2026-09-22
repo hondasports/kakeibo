@@ -1,3 +1,4 @@
+import { api } from "../../../../convex/_generated/api";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "convex/react";
@@ -7,9 +8,6 @@ import type {
   ExpenseSearchReceipt,
   ExpenseSearchResult,
 } from "../../../../lib/convex/expenseSearch/searchExpenses";
-import { listActiveApi } from "../../../lib/repositories/categories";
-import { searchExpensesApi } from "../../../lib/repositories/expenseSearch";
-import { getUserProfileApi } from "../../../lib/repositories/users";
 import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
 import { SuzumemoLoadingState } from "../../ui";
 import { getCurrentWeekStartDate } from "../../week";
@@ -87,8 +85,8 @@ export function ExpenseSearchPage() {
   const [lastSearchResult, setLastSearchResult] = useState<ExpenseSearchResult | null>(null);
   const [initialSearchResult, setInitialSearchResult] = useState<ExpenseSearchResult | null>(null);
   const [searchRequestId, setSearchRequestId] = useState(0);
-  const userProfile = useQuery(getUserProfileApi());
-  const categoriesQuery = useQuery(listActiveApi());
+  const userProfile = useQuery(api.users.queries.getUserProfile);
+  const categoriesQuery = useQuery(api.categories.queries.listActive);
   const categories = Array.isArray(categoriesQuery) ? categoriesQuery : [];
   const parsed = parseExpenseSearchFormState(applied);
   const queryArgs = toExpenseSearchQueryArgs(applied);
@@ -132,7 +130,7 @@ export function ExpenseSearchPage() {
         ? {}
         : {
             [searchQueryKey]: {
-              query: searchExpensesApi(),
+              query: api.expenseSearch.searchExpenses,
               args: searchQueryArgs,
             },
           },

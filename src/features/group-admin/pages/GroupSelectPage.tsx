@@ -1,6 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation } from "convex/react";
-import { setActiveGroupApi } from "../../../lib/repositories/groups";
 import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useGroupMembership } from "../hooks/useGroupMembership";
@@ -17,7 +17,7 @@ type MyGroup = {
 export function GroupSelectPage() {
   const navigate = useNavigate();
   const { groups, hasGroups, isLoading } = useGroupMembership();
-  const setActiveGroup = useMutation(setActiveGroupApi());
+  const setActiveGroup = useMutation(api.groups.mutations.setActiveGroup);
 
   if (isLoading) {
     return (

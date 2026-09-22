@@ -1,8 +1,8 @@
+import { api } from "../../../../convex/_generated/api";
 import { applyReviewItemsTaxPreview } from "../utils/reviewItemsTaxPreview";
 import type { Dispatch, SetStateAction } from "react";
 import { mergeReviewTaxItems } from "../utils/reviewTaxItemMerge";
 import { useMutation } from "convex/react";
-import { updateSummaryTaxOverridesApi } from "../../../lib/repositories/aiExpenseDrafts";
 import { useRef, useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { mapConvexDraftToAiExpenseDraft, mapDraftItemsToReviewItems } from "../utils/mappers";
@@ -32,7 +32,9 @@ export function useReviewTaxSummaryOverrides({
 }) {
   const [taxSummaryUpdatingIndex, setTaxSummaryUpdatingIndex] = useState<number | null>(null);
   const taxSummaryOverrideRequestIdRef = useRef(0);
-  const updateSummaryTaxOverrides = useMutation(updateSummaryTaxOverridesApi());
+  const updateSummaryTaxOverrides = useMutation(
+    api.aiExpenseDrafts.mutations.updateSummaryTaxOverrides,
+  );
 
   const applyTaxSummaryOverride = async (
     summaryIndex: number,

@@ -1,20 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { createContext, type ReactNode, useContext } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
-import {
-  cancelPendingGroupInvitationApi,
-  changeMemberRoleApi,
-  getGroupMembersApi,
-  getMyGroupApi,
-  inviteMemberApi,
-  listManagementAuditLogsApi,
-  listMyGroupsApi,
-  listPendingGroupInvitationsApi,
-  removeMemberApi,
-  requestGroupDeletionApi,
-  setActiveGroupApi,
-  transferGroupOwnershipApi,
-  updateGroupNameApi,
-} from "../../../lib/repositories/groups";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { GroupMemberListItem } from "../utils/groupMemberDisplay";
 import type { GroupPendingInvitationListItem } from "../utils/groupInvitationDisplay";
@@ -35,15 +21,15 @@ type GroupListItem = {
 };
 
 function useGroupSettingsValue() {
-  const group = useQuery(getMyGroupApi()) as GroupInfo | null | undefined;
-  const groups = useQuery(listMyGroupsApi()) as GroupListItem[] | undefined;
-  const members = useQuery(getGroupMembersApi()) as GroupMemberListItem[] | undefined;
+  const group = useQuery(api.groups.queries.getMyGroup) as GroupInfo | null | undefined;
+  const groups = useQuery(api.groups.queries.listMyGroups) as GroupListItem[] | undefined;
+  const members = useQuery(api.groups.queries.getGroupMembers) as GroupMemberListItem[] | undefined;
   const pendingInvitations = useQuery(
-    listPendingGroupInvitationsApi(),
+    api.groups.queries.listPendingGroupInvitations,
     group?.role === "owner" ? {} : "skip",
   ) as GroupPendingInvitationListItem[] | undefined;
   const managementAuditLogs = useQuery(
-    listManagementAuditLogsApi(),
+    api.groups.auditLogs.listManagementAuditLogs,
     group?.role === "owner" ? {} : "skip",
   ) as GroupManagementAuditLogListItem[] | undefined;
 
@@ -53,14 +39,16 @@ function useGroupSettingsValue() {
     members,
     pendingInvitations,
     managementAuditLogs,
-    setActiveGroup: useMutation(setActiveGroupApi()),
-    removeMember: useMutation(removeMemberApi()),
-    changeMemberRole: useMutation(changeMemberRoleApi()),
-    transferGroupOwnership: useMutation(transferGroupOwnershipApi()),
-    requestGroupDeletion: useMutation(requestGroupDeletionApi()),
-    updateGroupName: useMutation(updateGroupNameApi()),
-    inviteMember: useAction(inviteMemberApi()),
-    cancelPendingGroupInvitation: useAction(cancelPendingGroupInvitationApi()),
+    setActiveGroup: useMutation(api.groups.mutations.setActiveGroup),
+    removeMember: useMutation(api.groups.members.removeMember),
+    changeMemberRole: useMutation(api.groups.members.changeMemberRole),
+    transferGroupOwnership: useMutation(api.groups.members.transferGroupOwnership),
+    requestGroupDeletion: useMutation(api.groups.deletion.requestGroupDeletion),
+    updateGroupName: useMutation(api.groups.mutations.updateGroupName),
+    inviteMember: useAction(api.groups.clerkInvitations.inviteMember),
+    cancelPendingGroupInvitation: useAction(
+      api.groups.clerkInvitations.cancelPendingGroupInvitation,
+    ),
   };
 }
 

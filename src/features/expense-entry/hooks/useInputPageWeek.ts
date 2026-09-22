@@ -1,7 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { getUserProfileApi } from "../../../lib/repositories/users";
-import { getOrCreateWeekSessionApi } from "../../../lib/repositories/weekSessions";
 import { addWeeks, getCurrentWeekStartDate, getWeekEndDate, isFutureWeek } from "../../week";
 
 export type InputPageWeekSession = {
@@ -16,8 +15,8 @@ export type InputPageWeekSession = {
  * 前週・次週ナビゲーションもサポートする。
  */
 export function useInputPageWeek() {
-  const userProfile = useQuery(getUserProfileApi());
-  const getOrCreateSession = useMutation(getOrCreateWeekSessionApi());
+  const userProfile = useQuery(api.users.queries.getUserProfile);
+  const getOrCreateSession = useMutation(api.weekSessions.mutations.getOrCreateWeekSession);
 
   const weeklyStartDay = userProfile?.weeklyStartDay ?? 1;
   const currentWeekStartDate = useMemo(

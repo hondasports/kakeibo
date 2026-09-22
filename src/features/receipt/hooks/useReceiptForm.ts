@@ -1,6 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
-import { createReceiptApi } from "../../../lib/repositories/receipts";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { validateReceiptForm, type ReceiptFormErrors } from "../validation/receipt";
 import type { ExtractedReceiptResult } from "../hooks/useReceiptImageExtraction";
@@ -56,7 +56,7 @@ export function useReceiptForm({ weekStartDate, weekEndDate, categories }: UseRe
     message: string;
   }>({ open: false, severity: "success", message: "" });
 
-  const createReceipt = useMutation(createReceiptApi());
+  const createReceipt = useMutation(api.receipts.crud.createReceipt);
 
   const firstCategoryId = categories[0]?._id ?? "";
   const selectedCategoryId =
