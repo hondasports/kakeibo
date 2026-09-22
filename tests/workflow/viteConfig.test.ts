@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { resolveAppVersion } from "../vite.config";
+import { resolveAppVersion } from "../../vite.config";
 
 describe("Vite config", () => {
   test("uses a local app version when no release version is provided", () => {

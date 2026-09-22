@@ -75,7 +75,6 @@ src/
   theme.ts
   designTokens.ts              # MUI sx 用デザイントークン（feature 横断）
   designTokens.test.ts
-  productionReleaseWorkflow.test.ts
   index.css
   utils/                       # feature 横断ユーティリティ（例: imageDataUrl）
   lib/                         # 横断ユーティリティ（例: weekComparison）
@@ -262,6 +261,9 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
     receiptImageExtraction/    # analyzeReceiptImageCore, openaiClient, parse, validators, ...
     receipts/                  # insert, queries, summaryLib, spendingEntries.ts
   domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
+
+tests/
+  workflow/                    # CI workflow・デプロイ設定などの検証系テスト（Vitest）
 ```
 
 フロントエンドは **Feature-based Architecture** を採用する。各 feature は `src/features/<feature-name>/`

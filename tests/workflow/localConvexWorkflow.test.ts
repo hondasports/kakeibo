@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import { isLocalConvexEnvironment } from "../scripts/sync-e2e-env.mjs";
+import { isLocalConvexEnvironment } from "../../scripts/sync-e2e-env.mjs";
 
 const readPackageJson = () =>
   JSON.parse(readFileSync("package.json", "utf8")) as {
