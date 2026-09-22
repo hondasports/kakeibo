@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
 import { theme } from "../../../theme";
 import { AiExpenseQueuePanel } from "./AiExpenseQueuePanel";
-import { categories, queueItems, rejectImageDecoding } from "../utils/testFixtures";
+import {
+  categories,
+  queueItems,
+  rejectImageDecoding,
+} from "../../receipt-review/utils/testFixtures";
 
 const {
   registerReadyDraftsAsExpenseEntriesMock,

@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
-import { queueSectionDescriptions, queueSectionLabels } from "../labels";
+import {
+  queueSectionDescriptions,
+  queueSectionLabels,
+} from "../../../receipt-review/components/labels";
 import type { AiExpenseQueueItem, QueueSectionKey } from "../../types/types";
 import { QueueItemCard } from "./QueueItemCard";
 

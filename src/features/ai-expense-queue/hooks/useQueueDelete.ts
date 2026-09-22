@@ -4,7 +4,7 @@ import { deleteDraftApi } from "../../../lib/repositories/aiExpenseDrafts";
 import { cancelImageJobApi } from "../../../lib/repositories/receiptAnalysisJobs";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { AiExpenseQueueItem } from "../types/types";
-import { toUserFacingDeleteError } from "../utils/userFacingErrors";
+import { toUserFacingDeleteError } from "../../receipt-review/utils/userFacingErrors";
 
 export function useQueueDelete() {
   const [deletingIds, setDeletingIds] = useState<string[]>([]);
