@@ -526,9 +526,15 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   （APP_ENV/RESEND_API_KEY/RESEND_FROM_ADDRESS）、from解決、httpActionの
   event submitter、依存組み立て。
 - **プレゼンテーション**: `convex/email/*.ts` はendpoint宣言・validator・
-  HTTP境界（署名検証・status応答）・互換handlerのみ。endpoint名、args/returns、
-  エラー文言、HTTP status、dedupe・retry間隔・30日保持・batch100・呼出順序は
-  不変とする。
+  HTTP境界（`svix-*`署名ヘッダ検証・status応答。`webhook-*`はフォールバック受理）・
+  互換handlerのみ。endpoint名、args/returns、エラー文言、HTTP status、
+  dedupe・retry間隔・30日保持・batch100・呼出順序は不変とする。
+
+通知の宛先は caller が `users.email` から解決する。`users.email` はログイン時の
+`upsertUser` が Clerk JWT の `email` claim から格納するため、Clerk JWT template
+`convex` の `email` / `name` claim 設定が前提になる（詳細は
+`docs/environment-variables.md` を参照）。email未保持ユーザーは enqueue 自体が
+スキップされる。
 
 `categories`（グループ共有カテゴリの CRUD・デフォルト seed・E2E cleanup）も
 4層へ移行済み。既存の `lib/domain/categories/`（normalize・defaults・usability・
