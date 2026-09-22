@@ -139,18 +139,41 @@ export function readBranchChangedPaths({ base, cwd = process.cwd() } = {}) {
   return output.split("\0").filter(Boolean);
 }
 
-/** Resolve the PR's base ref from the remote default branch (origin/HEAD). */
-export function resolveDefaultBase({ cwd = process.cwd() } = {}) {
+function refExists(ref, cwd) {
   try {
-    const ref = execFileSync("git", ["rev-parse", "--abbrev-ref", "origin/HEAD"], {
-      cwd,
-      encoding: "utf8",
-    }).trim();
-    if (ref) return ref;
+    execFileSync("git", ["rev-parse", "--verify", "--quiet", ref], { cwd });
+    return true;
   } catch {
-    // fall through to the explicit error below
+    return false;
   }
-  throw new Error("baseを解決できません（origin/HEAD 未設定）。--base <ref> を指定してください");
+}
+
+/**
+ * Resolve the PR's base from its actual baseRefName — never the remote default
+ * branch, which is unrelated to the PR's base. Throws unless a base is found;
+ * pass --base explicitly when no PR exists for the current branch.
+ */
+export function resolvePrBase({ cwd = process.cwd(), execGh } = {}) {
+  const runGh = execGh ?? ((args) => execFileSync("gh", args, { cwd, encoding: "utf8" }));
+  let baseRefName = null;
+  try {
+    baseRefName = String(
+      JSON.parse(runGh(["pr", "view", "--json", "baseRefName"]))?.baseRefName ?? "",
+    ).trim();
+  } catch {
+    // no gh / no PR for this branch — fall through to the explicit error below
+  }
+  if (!baseRefName || !COMMIT_REF_PATTERN.test(baseRefName)) {
+    throw new Error(
+      "PRのbaseを解決できません（このbranchに紐付くPRがありません）。--base <ref> を指定してください",
+    );
+  }
+  const remoteRef = `origin/${baseRefName}`;
+  if (refExists(remoteRef, cwd)) return remoteRef;
+  if (refExists(baseRefName, cwd)) return baseRefName;
+  throw new Error(
+    `PRのbase ${baseRefName} に対応するrefがローカルにありません。--base <ref> を指定してください`,
+  );
 }
 
 /**
@@ -158,8 +181,8 @@ export function resolveDefaultBase({ cwd = process.cwd() } = {}) {
  * suggestions and E2E relevance so the verdict cannot depend on whether the
  * change happens to be committed yet.
  */
-export function readChangedPaths({ base, cwd = process.cwd() } = {}) {
-  const resolvedBase = base ?? resolveDefaultBase({ cwd });
+export function readChangedPaths({ base, cwd = process.cwd(), execGh } = {}) {
+  const resolvedBase = base ?? resolvePrBase({ cwd, execGh });
   const committed = readBranchChangedPaths({ base: resolvedBase, cwd });
   const worktree = readWorktreeChangedPaths({ cwd });
   return [...new Set([...committed, ...worktree])].sort();

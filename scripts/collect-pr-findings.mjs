@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,6 +28,7 @@ const THREADS_PAGE_QUERY = `query($owner: String!, $name: String!, $number: Int!
               body
               url
               createdAt
+              updatedAt
             }
           }
         }
@@ -46,6 +48,7 @@ const REVIEWS_PAGE_QUERY = `query($owner: String!, $name: String!, $number: Int!
           body
           url
           submittedAt
+          updatedAt
           author { login }
         }
       }
@@ -63,6 +66,7 @@ const ISSUE_COMMENTS_PAGE_QUERY = `query($owner: String!, $name: String!, $numbe
           body
           url
           createdAt
+          updatedAt
           author { login }
         }
       }
@@ -71,7 +75,46 @@ const ISSUE_COMMENTS_PAGE_QUERY = `query($owner: String!, $name: String!, $numbe
 }`;
 
 const COLLECTION_SCOPE =
-  "inline review threads (unresolved) + non-empty review bodies (CHANGES_REQUESTED/COMMENTED) + PR issue comments";
+  "inline review threads (unresolved) + non-empty submitted review bodies (all states) + PR issue comments";
+
+function toCommentSummary(comment) {
+  const body = String(comment?.body ?? "");
+  return {
+    author: comment?.author?.login ?? null,
+    url: comment?.url ?? null,
+    createdAt: comment?.createdAt ?? null,
+    updatedAt: comment?.updatedAt ?? null,
+    bodyTruncated: body.length > FINDING_BODY_LIMIT,
+    body: body.slice(0, FINDING_BODY_LIMIT),
+  };
+}
+
+/**
+ * Read a handled-findings record: lines of `<finding id>` optionally followed
+ * by whitespace and the last-seen updatedAt. A candidate is unhandled when its
+ * id is absent, or when a recorded updatedAt differs from the candidate's
+ * (the body/comment was edited after the recorded handling).
+ */
+export function parseHandledContent(content) {
+  const handled = new Map();
+  for (const line of String(content ?? "").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const [id, updatedAt] = trimmed.split(/\s+/, 2);
+    handled.set(id, updatedAt ?? null);
+  }
+  return handled;
+}
+
+export function readHandledFile(handledPath) {
+  return parseHandledContent(readFileSync(handledPath, "utf8"));
+}
+
+function isUnhandled(finding, handled) {
+  if (!handled.has(finding.id)) return true;
+  const recorded = handled.get(finding.id);
+  return Boolean(recorded && finding.updatedAt && finding.updatedAt !== recorded);
+}
 
 /**
  * Fetch every page of a PR connection. Returns the full node list plus the last
@@ -103,7 +146,7 @@ export function fetchConnectionPages({ query, variables, select, execGraphql }) 
  * the GitHub node id, which never changes when other findings are resolved or
  * added; `seq` (f1..fn, ordered by first activity) is display-only.
  */
-export function toFindings({ reviewThreads = [], reviews = [], comments = [] } = {}) {
+export function toFindings({ reviewThreads = [], reviews = [], comments = [], handled } = {}) {
   let resolvedThreadCount = 0;
   let outdatedThreadCount = 0;
   let truncatedCommentThreads = 0;
@@ -117,60 +160,83 @@ export function toFindings({ reviewThreads = [], reviews = [], comments = [] } =
     if (thread.isOutdated) outdatedThreadCount += 1;
     const commentsTruncated = Boolean(thread.comments?.pageInfo?.hasNextPage);
     if (commentsTruncated) truncatedCommentThreads += 1;
-    const firstComment = thread.comments?.nodes?.[0] ?? null;
+    const commentNodes = thread.comments?.nodes ?? [];
+    const firstComment = toCommentSummary(commentNodes[0] ?? null);
     threadFindings.push({
       kind: "review_thread",
       id: thread.id,
       path: thread.path,
       line: thread.line,
-      author: firstComment?.author?.login ?? null,
-      url: firstComment?.url ?? null,
+      author: firstComment.author,
+      url: firstComment.url,
       outdated: Boolean(thread.isOutdated),
       commentsTruncated,
-      commentCount: thread.comments?.nodes?.length ?? 0,
-      createdAt: firstComment?.createdAt ?? null,
-      body: String(firstComment?.body ?? "").slice(0, FINDING_BODY_LIMIT),
+      commentCount: commentNodes.length,
+      createdAt: firstComment.createdAt,
+      updatedAt: firstComment.updatedAt,
+      bodyTruncated: firstComment.bodyTruncated,
+      body: firstComment.body,
+      replies: commentNodes.slice(1).map(toCommentSummary),
     });
   }
 
   const reviewFindings = reviews
-    .filter(
-      (review) =>
-        String(review.body ?? "").trim() !== "" &&
-        (review.state === "CHANGES_REQUESTED" || review.state === "COMMENTED"),
-    )
-    .map((review) => ({
-      kind: "review",
-      id: review.id,
-      state: review.state,
-      author: review.author?.login ?? null,
-      url: review.url ?? null,
-      createdAt: review.submittedAt ?? null,
-      body: String(review.body ?? "").slice(0, FINDING_BODY_LIMIT),
-    }));
+    .filter((review) => String(review.body ?? "").trim() !== "")
+    .map((review) => {
+      const body = String(review.body ?? "");
+      return {
+        kind: "review",
+        id: review.id,
+        state: review.state,
+        author: review.author?.login ?? null,
+        url: review.url ?? null,
+        createdAt: review.submittedAt ?? null,
+        updatedAt: review.updatedAt ?? review.submittedAt ?? null,
+        bodyTruncated: body.length > FINDING_BODY_LIMIT,
+        body: body.slice(0, FINDING_BODY_LIMIT),
+      };
+    });
 
-  const commentFindings = comments.map((comment) => ({
-    kind: "issue_comment",
-    id: comment.id,
-    author: comment.author?.login ?? null,
-    url: comment.url ?? null,
-    createdAt: comment.createdAt ?? null,
-    body: String(comment.body ?? "").slice(0, FINDING_BODY_LIMIT),
-  }));
+  const commentFindings = comments.map((comment) => {
+    const summary = toCommentSummary(comment);
+    return {
+      kind: "issue_comment",
+      id: comment.id,
+      author: summary.author,
+      url: summary.url,
+      createdAt: summary.createdAt,
+      updatedAt: summary.updatedAt,
+      bodyTruncated: summary.bodyTruncated,
+      body: summary.body,
+    };
+  });
 
   const findings = [...threadFindings, ...reviewFindings, ...commentFindings]
     .sort((a, b) => String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? "")))
     .map((finding, index) => ({ seq: `f${index + 1}`, ...finding }));
 
+  const handledMap = handled ?? new Map();
+  const unhandled = findings.filter((finding) => isUnhandled(finding, handledMap));
+
   return {
     scope: COLLECTION_SCOPE,
-    collectionComplete: true,
+    pagesComplete: true,
+    handledProvided: handled !== undefined,
     unresolvedThreadCount: threadFindings.length,
     resolvedThreadCount,
     outdatedThreadCount,
     reviewFindingCount: reviewFindings.length,
     issueCommentCount: commentFindings.length,
     truncatedCommentThreads,
+    unhandledCount: unhandled.length,
+    unhandled: unhandled.map((finding) => ({
+      kind: finding.kind,
+      id: finding.id,
+      url: finding.url,
+      author: finding.author,
+      bodyTruncated: finding.bodyTruncated || undefined,
+      commentsTruncated: finding.commentsTruncated || undefined,
+    })),
     findings,
   };
 }
@@ -244,6 +310,9 @@ export function parseArguments(args) {
     } else if (args[index] === "--repo") {
       parsed.repo = args[index + 1];
       index += 1;
+    } else if (args[index] === "--handled") {
+      parsed.handled = args[index + 1];
+      index += 1;
     } else {
       throw new Error(`未知の引数: ${args[index]}`);
     }
@@ -251,7 +320,7 @@ export function parseArguments(args) {
   return parsed;
 }
 
-export function runCollectPrFindings({ pr, repo, cwd, execGraphql } = {}) {
+export function runCollectPrFindings({ pr, repo, cwd, execGraphql, handled } = {}) {
   const repository = resolveRepository({ repo, cwd });
   const number = resolvePullRequest({ pr, cwd });
   const { pullRequest, reviewThreads, reviews, comments } = fetchPullRequestFindings({
@@ -260,7 +329,8 @@ export function runCollectPrFindings({ pr, repo, cwd, execGraphql } = {}) {
     cwd,
     execGraphql,
   });
-  const result = toFindings({ reviewThreads, reviews, comments });
+  const handledMap = handled === undefined ? undefined : readHandledFile(handled);
+  const result = toFindings({ reviewThreads, reviews, comments, handled: handledMap });
 
   const report = {
     repo: `${repository.owner}/${repository.name}`,

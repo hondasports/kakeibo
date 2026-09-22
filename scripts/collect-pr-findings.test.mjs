@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fetchConnectionPages, toFindings } from "./collect-pr-findings.mjs";
+import { fetchConnectionPages, parseHandledContent, toFindings } from "./collect-pr-findings.mjs";
 
 function thread(overrides = {}) {
   return {
@@ -138,7 +138,7 @@ describe("toFindings", () => {
     expect(result.findings[1].commentsTruncated).toBe(false);
   });
 
-  it("includes non-empty CHANGES_REQUESTED and COMMENTED review bodies", () => {
+  it("collects non-empty review bodies in all states, including APPROVED", () => {
     const result = toFindings({
       reviews: [
         {
@@ -157,15 +157,34 @@ describe("toFindings", () => {
           submittedAt: "2026-01-04T00:00:00Z",
           author: { login: "bot" },
         },
-        { id: "PRR_3", state: "APPROVED", body: "LGTM", url: "u3", author: { login: "h" } },
-        { id: "PRR_4", state: "COMMENTED", body: "", url: "u4", author: { login: "h" } },
+        {
+          id: "PRR_3",
+          state: "APPROVED",
+          body: "LGTM",
+          url: "u3",
+          submittedAt: "2026-01-05T00:00:00Z",
+          author: { login: "h" },
+        },
+        {
+          id: "PRR_4",
+          state: "APPROVED",
+          body: "承認します。この誤字は直してください",
+          url: "u4",
+          submittedAt: "2026-01-06T00:00:00Z",
+          author: { login: "h" },
+        },
+        { id: "PRR_5", state: "COMMENTED", body: "", url: "u5", author: { login: "h" } },
       ],
     });
 
-    expect(result.reviewFindingCount).toBe(2);
+    expect(result.reviewFindingCount).toBe(4);
     const reviewFindings = result.findings.filter((f) => f.kind === "review");
-    expect(reviewFindings.map((f) => f.id)).toEqual(["PRR_1", "PRR_2"]);
-    expect(reviewFindings[0].state).toBe("CHANGES_REQUESTED");
+    expect(reviewFindings.map((f) => f.id)).toEqual(["PRR_1", "PRR_2", "PRR_3", "PRR_4"]);
+    const approved = reviewFindings.filter((f) => f.state === "APPROVED");
+    expect(approved).toHaveLength(2);
+    // APPROVED+LGTM is collected as a candidate; whether it needs action is a
+    // managed-finding decision recorded via the handled list, not a filter here.
+    expect(approved.find((f) => f.id === "PRR_3").body).toBe("LGTM");
   });
 
   it("includes PR issue comments as findings", () => {
@@ -186,12 +205,13 @@ describe("toFindings", () => {
     expect(result.findings[0].id).toBe("IC_1");
   });
 
-  it("declares the collection scope and completeness in the output", () => {
+  it("declares the collection scope and page completeness in the output", () => {
     const result = toFindings({});
     expect(result.scope).toContain("review threads");
     expect(result.scope).toContain("review bodies");
     expect(result.scope).toContain("issue comments");
-    expect(result.collectionComplete).toBe(true);
+    expect(result.pagesComplete).toBe(true);
+    expect(result.unhandledCount).toBe(0);
     expect(result.findings).toEqual([]);
   });
 
@@ -202,7 +222,7 @@ describe("toFindings", () => {
     expect(result.findings[0]).toMatchObject({ id: "t1", author: null, body: "", commentCount: 0 });
   });
 
-  it("truncates long bodies", () => {
+  it("truncates long bodies and flags them with the URL for the full text", () => {
     const longBody = "x".repeat(2000);
     const result = toFindings({
       reviewThreads: [
@@ -222,5 +242,95 @@ describe("toFindings", () => {
       ],
     });
     expect(result.findings[0].body).toHaveLength(1000);
+    expect(result.findings[0].bodyTruncated).toBe(true);
+    expect(result.findings[0].url).toBe("u");
+  });
+
+  it("keeps thread replies visible instead of dropping everything after the first comment", () => {
+    const result = toFindings({
+      reviewThreads: [
+        thread({
+          id: "t1",
+          comments: {
+            pageInfo: { hasNextPage: false },
+            nodes: [
+              {
+                author: { login: "bot" },
+                body: "指摘1",
+                url: "u1",
+                createdAt: "2026-01-01T00:00:00Z",
+                updatedAt: "2026-01-01T00:00:00Z",
+              },
+              {
+                author: { login: "devin" },
+                body: "修正しましたが、こちらは未対応です",
+                url: "u2",
+                createdAt: "2026-01-01T01:00:00Z",
+                updatedAt: "2026-01-01T01:00:00Z",
+              },
+            ],
+          },
+        }),
+      ],
+    });
+
+    expect(result.findings[0].replies).toHaveLength(1);
+    expect(result.findings[0].replies[0].body).toContain("未対応");
+    expect(result.findings[0].replies[0].url).toBe("u2");
+  });
+
+  it("counts only unhandled candidates so a PR with notifications can still converge", () => {
+    const input = {
+      reviews: [
+        {
+          id: "PRR_1",
+          state: "CHANGES_REQUESTED",
+          body: "修正してください",
+          url: "u1",
+          submittedAt: "2026-01-03T00:00:00Z",
+          updatedAt: "2026-01-03T00:00:00Z",
+          author: { login: "h" },
+        },
+      ],
+      comments: [
+        {
+          id: "IC_vercel",
+          body: "preview deployed",
+          url: "u2",
+          createdAt: "2026-01-04T00:00:00Z",
+          updatedAt: "2026-01-04T00:00:00Z",
+          author: { login: "vercel" },
+        },
+      ],
+    };
+    const everything = toFindings(input);
+    expect(everything.unhandledCount).toBe(2);
+
+    const handled = parseHandledContent(
+      "PRR_1 2026-01-03T00:00:00Z\nIC_vercel 2026-01-04T00:00:00Z\n",
+    );
+    const converged = toFindings({ ...input, handled });
+    expect(converged.unhandledCount).toBe(0);
+    expect(converged.findings).toHaveLength(2);
+  });
+
+  it("resurfaces a handled finding when its body was edited after the recorded updatedAt", () => {
+    const input = {
+      comments: [
+        {
+          id: "IC_1",
+          body: "edited comment",
+          url: "u",
+          createdAt: "2026-01-05T00:00:00Z",
+          updatedAt: "2026-01-06T09:00:00Z",
+          author: { login: "h" },
+        },
+      ],
+    };
+    const handled = parseHandledContent("IC_1 2026-01-05T00:00:00Z\n");
+    const result = toFindings({ ...input, handled });
+
+    expect(result.unhandledCount).toBe(1);
+    expect(result.unhandled[0].id).toBe("IC_1");
   });
 });
