@@ -1,5 +1,5 @@
 import { Chip, Stack } from "@mui/material";
-import type { AiExpenseQueueStatus } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueStatus } from "../../../types/aiExpenseQueue";
 import { getReviewReasonLabel } from "./labels";
 
 export function ReviewReasonChips({

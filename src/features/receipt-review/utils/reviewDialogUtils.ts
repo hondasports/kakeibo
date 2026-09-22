@@ -1,5 +1,5 @@
 import type { ReviewFormValues, ReviewItemValues } from "../types/types";
-import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { formatYen } from "../../../utils/currency";
 import { hasLowConfidenceItem } from "../../../../lib/domain/aiExpenseDrafts/reviewItems";
 import {

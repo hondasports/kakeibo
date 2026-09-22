@@ -2,7 +2,7 @@ import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
 import { Alert, Box, Stack, Typography, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { CategoryBreakdownCard } from "../../weekly-summary/components/CategoryBreakdownCard";
+import { CategoryBreakdownCard } from "../../summary-shared/components/CategoryBreakdownCard";
 import { SuzumemoLoadingState } from "../../ui";
 import { DashboardInputPanel } from "../components/DashboardInputPanel";
 import { DashboardMonthlySummaryLink } from "../components/DashboardMonthlySummaryLink";

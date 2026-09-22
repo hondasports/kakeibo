@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ReviewReasonChips } from "./ReviewReasonChips";
 import { StatusChip } from "./StatusChip";
 import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "../types/types";
-import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { formatReviewDraftHeader, resolveReviewShopName } from "../utils/reviewDialogUtils";
 import { deriveVisibleReviewReasons, getPrimaryReviewReason } from "../utils/reviewFeedback";
 import { ReceiptTotalsPanel } from "./ReceiptTotalsPanel";

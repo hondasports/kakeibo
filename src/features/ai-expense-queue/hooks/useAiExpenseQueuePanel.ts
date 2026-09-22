@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { AiExpenseQueueItem, AiExpenseQueuePanelProps } from "../types/types";
+import type { AiExpenseQueueItem, AiExpenseQueuePanelProps } from "../../../types/aiExpenseQueue";
 import { useAiExpenseQueueData } from "./useAiExpenseQueueData";
 import { useBulkRegister } from "./useBulkRegister";
 import { useImageUpload } from "./useImageUpload";

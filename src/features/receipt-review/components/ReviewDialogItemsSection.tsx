@@ -1,6 +1,6 @@
 import { Alert, Box, Button, Stack, Typography } from "@mui/material";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import type { ReviewGuidanceItem } from "../utils/reviewGuidance";
 import type { AmountBasis } from "../../../../lib/receiptTax/types";
 import { ReviewItemCard } from "./ReviewItemCard";

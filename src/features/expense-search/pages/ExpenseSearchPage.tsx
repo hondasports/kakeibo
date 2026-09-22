@@ -11,9 +11,9 @@ import type {
 import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
 import { SuzumemoLoadingState } from "../../ui";
 import { getCurrentWeekStartDate } from "../../week";
-import { IncomeListCard } from "../../weekly-summary/components/IncomeListCard";
-import { ReceiptListCard } from "../../weekly-summary/components/ReceiptListCard";
-import type { IncomeItem, ReceiptItem } from "../../weekly-summary/types/types";
+import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
+import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
+import type { IncomeItem, ReceiptItem } from "../../summary-shared/types/types";
 import { AppliedSearchFilters } from "../components/AppliedSearchFilters";
 import { ExpenseSearchFilters } from "../components/ExpenseSearchFilters";
 import { HistoryCategoryChart } from "../components/HistoryCategoryChart";

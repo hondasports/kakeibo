@@ -1,12 +1,12 @@
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Alert, Box, Snackbar, Stack } from "@mui/material";
-import { AiExpenseQueuePanelProvider } from "../../ai-expense-queue/context/AiExpenseQueuePanelContext";
 import {
+  AiExpenseQueuePanelProvider,
   QueuePanelActive,
   QueuePanelDialogs,
   QueuePanelHeader,
   QueuePanelRegistered,
-} from "../../ai-expense-queue/components/QueuePanelSlots";
+} from "../../ai-expense-queue";
 import { ConfirmDifferenceDialog } from "./ConfirmDifferenceDialog";
 import { ExpenseFormActions } from "./ExpenseFormActions";
 import { ExpenseFormHeading } from "./ExpenseFormHeading";

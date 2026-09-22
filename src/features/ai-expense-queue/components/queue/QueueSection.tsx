@@ -4,7 +4,7 @@ import {
   queueSectionDescriptions,
   queueSectionLabels,
 } from "../../../receipt-review/components/labels";
-import type { AiExpenseQueueItem, QueueSectionKey } from "../../types/types";
+import type { AiExpenseQueueItem, QueueSectionKey } from "../../../../types/aiExpenseQueue";
 import { QueueItemCard } from "./QueueItemCard";
 
 export function QueueSection({

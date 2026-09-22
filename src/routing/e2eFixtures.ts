@@ -1,4 +1,4 @@
-import type { AiExpenseQueueItem } from "../features/ai-expense-queue/types/types";
+import type { AiExpenseQueueItem } from "../types/aiExpenseQueue";
 
 export const devAiExpenseQueueItems: AiExpenseQueueItem[] = [
   {

@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { AiExpenseQueueItem } from "../../types/types";
+import type { AiExpenseQueueItem } from "../../../../types/aiExpenseQueue";
 import { QueueStatusHeader } from "./QueueStatusHeader";
 
 const reviewItem = { id: "review-1", status: "needs_review" } as AiExpenseQueueItem;

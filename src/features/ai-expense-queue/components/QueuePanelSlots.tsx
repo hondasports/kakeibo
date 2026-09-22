@@ -1,7 +1,7 @@
 import { Alert, Box, Snackbar } from "@mui/material";
 import { designTokens } from "../../../designTokens";
 import { useAiExpenseQueuePanelContext } from "../context/AiExpenseQueuePanelContext";
-import type { AiExpenseQueueCategory } from "../types/types";
+import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { QueueActiveContent, QueueRegisteredContent } from "./QueueContent";
 import { QueueEmptyState } from "./QueueEmptyState";
 import { QueueHeader } from "./QueueHeader";

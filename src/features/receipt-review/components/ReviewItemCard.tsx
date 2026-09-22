@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import { formatYen } from "../../../utils/currency";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import {
   isDiscountLine,
   isValidSignedLineItemAmount,

@@ -1,6 +1,6 @@
 import { Autocomplete, MenuItem, TextField, Typography } from "@mui/material";
 import type { ReviewItemValues } from "../types/types";
-import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 
 export type ReviewItemCategoryControlProps = {

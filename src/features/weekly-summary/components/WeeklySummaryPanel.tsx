@@ -1,11 +1,15 @@
 import { Box, Stack } from "@mui/material";
 import { WeeklyTrendChart } from "./WeeklyTrendChart";
-import { ReceiptListCard } from "./ReceiptListCard";
-import { IncomeListCard } from "./IncomeListCard";
+import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
+import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
 import { SummaryMetricsPanel } from "./SummaryMetricsPanel";
 import { WeeklyCategoryBreakdown } from "./WeeklyCategoryBreakdown";
 import type { WeeklySummaryPanelProps } from "../types/types";
-import { incomeItemToReceiptItem, type IncomeItem, type ReceiptItem } from "../types/types";
+import {
+  incomeItemToReceiptItem,
+  type IncomeItem,
+  type ReceiptItem,
+} from "../../summary-shared/types/types";
 
 function mapIncomeHandler(
   handler: ((receipt: ReceiptItem) => void) | undefined,

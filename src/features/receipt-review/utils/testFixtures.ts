@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { AiExpenseQueueItem } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
 
 export const categories = [
   { _id: "cat-food", name: "食費", color: "#AAB7C4" },

@@ -1,6 +1,6 @@
 import { Box, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import type { ReviewFormValues } from "../types/types";
-import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { documentTypeLabels, reviewDocumentTypeOptions } from "./labels";
 
 export type ReviewDialogBasicsSectionProps = {

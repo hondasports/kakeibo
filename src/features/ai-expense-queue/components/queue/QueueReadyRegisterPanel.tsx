@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Button, Stack, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import type { AiExpenseQueueBatchSummary, AiExpenseQueueItem } from "../../types/types";
+import type { AiExpenseQueueItem } from "../../../../types/aiExpenseQueue";
+import type { AiExpenseQueueBatchSummary } from "../../types/types";
 import { formatYen } from "../../../../utils/currency";
 import { BulkRegisterConfirmDialog } from "../BulkRegisterConfirmDialog";
 
