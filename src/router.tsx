@@ -1,3 +1,4 @@
+import { api } from "../convex/_generated/api";
 import { createBrowserRouter, Navigate, type RouteObject } from "react-router-dom";
 import {
   AppLayout,
@@ -25,7 +26,6 @@ import { AccountDeletionPage, AccountDeletionStatusPage } from "./features/accou
 import { SuzumemoLoadingState } from "./features/ui";
 import { e2eRoutes, shouldEnableE2eRoutes } from "./routing/e2eRoutes";
 import { useConvexAuth, useQuery } from "convex/react";
-import { getMyAccountDeletionStatusApi } from "./lib/repositories/accountDeletion";
 import {
   SystemAdminGroupDetailPage,
   SystemAdminGroupDeletionPage,
@@ -41,7 +41,10 @@ import {
 export function GroupRouteGuard() {
   const { hasGroups, needsSelection, isLoading } = useGroupMembership();
   const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
-  const deletionStatus = useQuery(getMyAccountDeletionStatusApi(), isAuthenticated ? {} : "skip");
+  const deletionStatus = useQuery(
+    api.accountDeletion.getMyAccountDeletionStatus,
+    isAuthenticated ? {} : "skip",
+  );
 
   if (isAuthLoading || isLoading || (isAuthenticated && deletionStatus === undefined)) {
     return (

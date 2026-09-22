@@ -2,7 +2,7 @@ import {
   getQueueContentSummary as getQueueContentSummaryDomain,
   getReviewPriority,
 } from "../../../../lib/domain/aiExpenseDrafts/queue";
-import type { AiExpenseQueueItem } from "../types/types";
+import type { AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
 
 export function reviewPriority(item: AiExpenseQueueItem): number {
   return getReviewPriority(item);

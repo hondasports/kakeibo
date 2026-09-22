@@ -3,20 +3,20 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExpenseSearchResult } from "../../../../lib/convex/expenseSearch/searchExpenses";
+import { apiMockWith } from "../../../test/apiMock";
 import { renderWithDatePickers } from "../../../test/render";
 import { getCurrentWeekStartDate } from "../../week";
 import { ExpenseSearchPage } from "./ExpenseSearchPage";
 
 const useQueryMock = vi.fn();
 const useQueriesMock = vi.fn();
-const getUserProfileApiMock = vi.hoisted(() => vi.fn(() => "get-user-profile"));
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
   useQueries: (queries: Record<string, { args: unknown }>) => useQueriesMock(queries),
 }));
 
-vi.mock("../../../lib/repositories/users", () => ({
-  getUserProfileApi: getUserProfileApiMock,
+vi.mock("../../../../convex/_generated/api", () => ({
+  api: apiMockWith({ "users.queries.getUserProfile": "get-user-profile" }),
 }));
 
 function LocationProbe() {

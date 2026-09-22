@@ -329,3 +329,34 @@ describe("account deletion group purge orchestration", () => {
     expect(remaining).toHaveLength(0);
   });
 });
+
+describe("getMyAccountDeletionStatus", () => {
+  it("退会完了直後の未認証呼び出しは例外ではなく null を返す", async () => {
+    const t = convexTest(schema, convexTestModules);
+    await expect(t.query(api.accountDeletion.getMyAccountDeletionStatus, {})).resolves.toBeNull();
+  });
+
+  it("進行中の削除要求があるとステータスを返す", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const userId = "https://clerk.example.test|account-delete-status";
+    await t.run(async (ctx) => {
+      await ctx.db.insert("accountDeletionRequests", {
+        userId,
+        clerkUserId: "clerk-account-delete-status",
+        status: "purging_groups",
+        leftGroupCount: 0,
+        deletedGroupCount: 0,
+        attemptCount: 0,
+        maxAttempts: 6,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    });
+
+    await expect(
+      t
+        .withIdentity({ tokenIdentifier: userId, subject: "clerk-account-delete-status" })
+        .query(api.accountDeletion.getMyAccountDeletionStatus, {}),
+    ).resolves.toMatchObject({ status: "purging_groups" });
+  });
+});

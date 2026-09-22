@@ -1,11 +1,11 @@
 import { useEffect } from "react";
-import type { AiExpenseQueueItem, AiExpenseQueuePanelProps } from "../types/types";
+import type { AiExpenseQueueItem, AiExpenseQueuePanelProps } from "../../../types/aiExpenseQueue";
 import { useAiExpenseQueueData } from "./useAiExpenseQueueData";
 import { useBulkRegister } from "./useBulkRegister";
 import { useImageUpload } from "./useImageUpload";
 import { useQueueDelete } from "./useQueueDelete";
 import { useRetry } from "./useRetry";
-import { useReviewDialog } from "./useReviewDialog";
+import { useReviewDialog } from "../../receipt-review/hooks/useReviewDialog";
 
 export function useAiExpenseQueuePanel({
   initialItems,

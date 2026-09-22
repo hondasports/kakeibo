@@ -6,9 +6,9 @@ import {
   QueuePanelHeader,
   QueuePanelRegistered,
 } from "./QueuePanelSlots";
-import type { AiExpenseQueuePanelProps } from "../types/types";
+import type { AiExpenseQueuePanelProps } from "../../../types/aiExpenseQueue";
 
-export type { AiExpenseQueueItem } from "../types/types";
+export type { AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
 
 export function AiExpenseQueuePanel(props: AiExpenseQueuePanelProps) {
   return (

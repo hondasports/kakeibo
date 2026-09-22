@@ -1,15 +1,16 @@
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { Alert, Box, Button, CircularProgress, Paper, Stack, Typography } from "@mui/material";
-import { useMutation, useQuery } from "convex/react";
-import {
-  getMyAccountDeletionStatusApi,
-  retryAccountDeletionApi,
-} from "../../../lib/repositories/accountDeletion";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useNavigate } from "react-router-dom";
 
 export function AccountDeletionStatusPage() {
-  const status = useQuery(getMyAccountDeletionStatusApi());
-  const retry = useMutation(retryAccountDeletionApi());
+  const { isAuthenticated } = useConvexAuth();
+  const status = useQuery(
+    api.accountDeletion.getMyAccountDeletionStatus,
+    isAuthenticated ? {} : "skip",
+  );
+  const retry = useMutation(api.accountDeletion.retryAccountDeletion);
   const navigate = useNavigate();
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState("");

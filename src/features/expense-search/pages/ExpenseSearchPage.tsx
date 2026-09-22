@@ -1,75 +1,28 @@
-import { useMemo, useState } from "react";
+import { api } from "../../../../convex/_generated/api";
+import { useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useQueries, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { Alert, Box, Button, Stack, Typography } from "@mui/material";
 import { getCurrentMonth } from "../../../../lib/domain/common/month";
-import type {
-  ExpenseSearchReceipt,
-  ExpenseSearchResult,
-} from "../../../../lib/convex/expenseSearch/searchExpenses";
-import { listActiveApi } from "../../../lib/repositories/categories";
-import { searchExpensesApi } from "../../../lib/repositories/expenseSearch";
-import { getUserProfileApi } from "../../../lib/repositories/users";
 import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
 import { SuzumemoLoadingState } from "../../ui";
 import { getCurrentWeekStartDate } from "../../week";
-import { IncomeListCard } from "../../weekly-summary/components/IncomeListCard";
-import { ReceiptListCard } from "../../weekly-summary/components/ReceiptListCard";
-import type { IncomeItem, ReceiptItem } from "../../weekly-summary/types/types";
+import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
+import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
 import { AppliedSearchFilters } from "../components/AppliedSearchFilters";
 import { ExpenseSearchFilters } from "../components/ExpenseSearchFilters";
 import { HistoryCategoryChart } from "../components/HistoryCategoryChart";
 import { HistoryComparisonCard } from "../components/HistoryComparisonCard";
 import { HistoryMetricsPanel } from "../components/HistoryMetricsPanel";
 import { HistoryTrendChart } from "../components/HistoryTrendChart";
+import { useExpenseSearchResults } from "../hooks/useExpenseSearchResults";
+import { toIncomeItem, toReceiptItem } from "../lib/expenseSearchItems";
 import {
   EMPTY_EXPENSE_SEARCH_FORM,
   expenseSearchPath,
-  parseExpenseSearchFormState,
   readExpenseSearchFormState,
-  toExpenseSearchQueryArgs,
   type ExpenseSearchFormState,
 } from "../lib/searchParams";
-
-const PAGE_SIZE = 100;
-
-function mergeSearchPage(current: ExpenseSearchReceipt[], next: ExpenseSearchReceipt[]) {
-  const itemKey = (item: ExpenseSearchReceipt) => `${item.recordType}:${item._id}`;
-  const items = new Map(current.map((item) => [itemKey(item), item]));
-  next.forEach((item) => items.set(itemKey(item), item));
-  return Array.from(items.values());
-}
-
-function toReceiptItem(item: ExpenseSearchReceipt): ReceiptItem {
-  return {
-    _id: item._id,
-    date: item.date,
-    type: "expense",
-    shopName: item.shopName,
-    amountYen: item.amountYen,
-    categoryId: item.categoryId ?? "",
-    categoryName: item.categoryName ?? "不明",
-    categoryColor: item.categoryColor ?? "#AAB7C4",
-    memo: item.memo,
-    recordType: item.recordType,
-    itemName: item.itemName,
-    receiptGroupId: item.receiptGroupId,
-    receiptShopName: item.receiptShopName,
-    receiptTotalAmountYen: item.receiptTotalAmountYen,
-  };
-}
-
-function toIncomeItem(item: ExpenseSearchReceipt): IncomeItem {
-  return {
-    _id: item._id,
-    date: item.date,
-    type: "income",
-    bankName: item.bankName,
-    amountYen: item.amountYen,
-    memo: item.memo,
-    recordType: item.recordType,
-  };
-}
 
 export function ExpenseSearchPage() {
   const location = useLocation();
@@ -79,131 +32,29 @@ export function ExpenseSearchPage() {
   const applied = readExpenseSearchFormState(searchParams);
   const [draftKey, setDraftKey] = useState(appliedKey);
   const [draft, setDraft] = useState<ExpenseSearchFormState>(applied);
-  const [loadedKey, setLoadedKey] = useState(appliedKey);
-  const [paginationCursor, setPaginationCursor] = useState<string | null>(null);
-  const [loadedCursor, setLoadedCursor] = useState<string | null>(null);
-  const [hasLoadedPage, setHasLoadedPage] = useState(false);
-  const [loadedItems, setLoadedItems] = useState<ExpenseSearchReceipt[]>([]);
-  const [lastSearchResult, setLastSearchResult] = useState<ExpenseSearchResult | null>(null);
-  const [initialSearchResult, setInitialSearchResult] = useState<ExpenseSearchResult | null>(null);
-  const [searchRequestId, setSearchRequestId] = useState(0);
-  const userProfile = useQuery(getUserProfileApi());
-  const categoriesQuery = useQuery(listActiveApi());
+  const userProfile = useQuery(api.users.queries.getUserProfile);
+  const categoriesQuery = useQuery(api.categories.queries.listActive);
   const categories = Array.isArray(categoriesQuery) ? categoriesQuery : [];
-  const parsed = parseExpenseSearchFormState(applied);
-  const queryArgs = toExpenseSearchQueryArgs(applied);
-  const activeCursor = loadedKey === appliedKey ? paginationCursor : null;
-  const searchQueryKey = `historySearch:${searchRequestId}`;
-  const searchEntryType = queryArgs.ok ? queryArgs.args.entryType : undefined;
-  const searchShopQuery = queryArgs.ok ? queryArgs.args.shopQuery : undefined;
-  const searchCategoryId = queryArgs.ok ? queryArgs.args.categoryId : undefined;
-  const searchMinAmountYen = queryArgs.ok ? queryArgs.args.minAmountYen : undefined;
-  const searchMaxAmountYen = queryArgs.ok ? queryArgs.args.maxAmountYen : undefined;
-  const searchStartDate = queryArgs.ok ? queryArgs.args.startDate : undefined;
-  const searchEndDate = queryArgs.ok ? queryArgs.args.endDate : undefined;
-  const searchQueryArgs = useMemo(() => {
-    if (!queryArgs.ok) {
-      return null;
-    }
-    return {
-      paginationOpts: { numItems: PAGE_SIZE, cursor: activeCursor },
-      ...(searchEntryType !== undefined ? { entryType: searchEntryType } : {}),
-      ...(searchShopQuery !== undefined ? { shopQuery: searchShopQuery } : {}),
-      ...(searchCategoryId !== undefined ? { categoryId: searchCategoryId } : {}),
-      ...(searchMinAmountYen !== undefined ? { minAmountYen: searchMinAmountYen } : {}),
-      ...(searchMaxAmountYen !== undefined ? { maxAmountYen: searchMaxAmountYen } : {}),
-      ...(searchStartDate !== undefined ? { startDate: searchStartDate } : {}),
-      ...(searchEndDate !== undefined ? { endDate: searchEndDate } : {}),
-    };
-  }, [
-    activeCursor,
-    queryArgs.ok,
-    searchCategoryId,
-    searchEndDate,
-    searchEntryType,
-    searchMaxAmountYen,
-    searchMinAmountYen,
-    searchShopQuery,
-    searchStartDate,
-  ]);
-  const searchQueries = useMemo(
-    () =>
-      searchQueryArgs === null
-        ? {}
-        : {
-            [searchQueryKey]: {
-              query: searchExpensesApi(),
-              args: searchQueryArgs,
-            },
-          },
-    [searchQueryArgs, searchQueryKey],
-  );
-  const searchQueryResults = useQueries(searchQueries);
-  const searchQueryValue = searchQueryResults[searchQueryKey] as
-    | ExpenseSearchResult
-    | Error
-    | undefined;
-  const searchResult = searchQueryValue instanceof Error ? undefined : searchQueryValue;
-  const searchError = searchQueryValue instanceof Error ? searchQueryValue : null;
+  const {
+    loadedItems,
+    displayResult,
+    searchError,
+    isLoadingMore,
+    isAdditionalSearchError,
+    parsedError,
+    retrySearch,
+    loadMore,
+  } = useExpenseSearchResults(applied, appliedKey);
 
   if (draftKey !== appliedKey) {
     setDraftKey(appliedKey);
     setDraft(applied);
   }
 
-  if (loadedKey !== appliedKey) {
-    setLoadedKey(appliedKey);
-    setPaginationCursor(null);
-    setLoadedCursor(null);
-    setHasLoadedPage(false);
-    setLoadedItems([]);
-    setLastSearchResult(null);
-    setInitialSearchResult(null);
-  }
-
-  if (
-    searchResult !== undefined &&
-    loadedKey === appliedKey &&
-    !(activeCursor === null && hasLoadedPage) &&
-    !(
-      activeCursor !== null &&
-      (loadedCursor === activeCursor || searchResult.continueCursor === activeCursor)
-    )
-  ) {
-    setHasLoadedPage(true);
-    setLoadedItems((current) =>
-      activeCursor === null ? searchResult.page : mergeSearchPage(current, searchResult.page),
-    );
-    setLoadedCursor(activeCursor);
-    setLastSearchResult(searchResult);
-    if (activeCursor === null) {
-      setInitialSearchResult(searchResult);
-    }
-  }
-
   const currentSearchPath = `${location.pathname}${location.search}`;
   const categoryName = categories.find((category) => category._id === applied.categoryId)?.name;
   const expenseItems = loadedItems.filter((item) => item.type === "expense").map(toReceiptItem);
   const incomeItems = loadedItems.filter((item) => item.type === "income").map(toIncomeItem);
-  const currentDisplayResult = searchResult ?? lastSearchResult;
-  const displayResult =
-    loadedKey !== appliedKey || currentDisplayResult === null
-      ? null
-      : activeCursor !== null && initialSearchResult !== null
-        ? {
-            ...currentDisplayResult,
-            comparison: initialSearchResult.comparison,
-            comparisonTruncated: initialSearchResult.comparisonTruncated,
-          }
-        : currentDisplayResult;
-  const isLoadingMore =
-    loadedKey === appliedKey &&
-    paginationCursor !== null &&
-    paginationCursor !== loadedCursor &&
-    searchError === null;
-  const isAdditionalSearchError = searchError !== null && activeCursor !== null;
-
-  const retrySearch = () => setSearchRequestId((current) => current + 1);
 
   const handleApply = (next: ExpenseSearchFormState = draft) => {
     navigate(expenseSearchPath(next));
@@ -254,9 +105,9 @@ export function ExpenseSearchPage() {
           onChange={handleAppliedFilterChange}
         />
 
-        {!parsed.ok ? (
+        {parsedError !== null ? (
           <Alert severity="error" variant="outlined">
-            {parsed.error}
+            {parsedError}
           </Alert>
         ) : displayResult === null && searchError !== null ? (
           <Alert
@@ -360,7 +211,7 @@ export function ExpenseSearchPage() {
                 ) : null}
                 <Button
                   disabled={isLoadingMore}
-                  onClick={() => setPaginationCursor(displayResult.continueCursor)}
+                  onClick={loadMore}
                   sx={{ alignSelf: "center", minHeight: 44 }}
                   variant="outlined"
                 >

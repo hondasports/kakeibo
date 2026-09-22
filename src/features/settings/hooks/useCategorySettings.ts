@@ -1,11 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { type FormEvent, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import {
-  createCategoryApi,
-  deactivateCategoryApi,
-  listForSettingsApi,
-  updateCategoryApi,
-} from "../../../lib/repositories/categories";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { designTokens } from "../../../designTokens";
 import { getConvexErrorMessage } from "../../auth";
@@ -26,10 +21,10 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export function useCategorySettings() {
-  const categories = useQuery(listForSettingsApi()) as Category[] | undefined;
-  const createCategory = useMutation(createCategoryApi());
-  const updateCategory = useMutation(updateCategoryApi());
-  const deactivateCategory = useMutation(deactivateCategoryApi());
+  const categories = useQuery(api.categories.queries.listForSettings) as Category[] | undefined;
+  const createCategory = useMutation(api.categories.mutations.createCategory);
+  const updateCategory = useMutation(api.categories.mutations.updateCategory);
+  const deactivateCategory = useMutation(api.categories.mutations.deactivateCategory);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");

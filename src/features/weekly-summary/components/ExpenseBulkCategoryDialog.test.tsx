@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
-import type { ReceiptItem } from "../types/types";
+import type { ReceiptItem } from "../../summary-shared/types/types";
 import { ExpenseBulkCategoryDialog } from "./ExpenseBulkCategoryDialog";
 
 const selectedReceipts: ReceiptItem[] = [

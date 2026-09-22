@@ -18,4 +18,4 @@ license: Apache-2.0
 - browser層の受入条件がある変更だけ対象specをlocal実行する。`src/**`・`e2e/**` のpathだけを理由にローカル全E2Eは要求しない
 - PR上のE2E要否は `scripts/classify-e2e-relevance.mjs` が機械判定するので、手動でskip判断しない
 
-実行手順は `skills/local-dev-env`、詳細は `docs/development-process.md` §7。
+実行手順は `skills/local-dev-env`、詳細は `docs/development-process.md` §6。

@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
-import { queueSectionDescriptions, queueSectionLabels } from "../labels";
-import type { AiExpenseQueueItem, QueueSectionKey } from "../../types/types";
+import {
+  queueSectionDescriptions,
+  queueSectionLabels,
+} from "../../../receipt-review/components/labels";
+import type { AiExpenseQueueItem, QueueSectionKey } from "../../../../types/aiExpenseQueue";
 import { QueueItemCard } from "./QueueItemCard";
 
 export function QueueSection({

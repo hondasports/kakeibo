@@ -14,12 +14,12 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
-import { documentTypeLabels, getSectionKey } from "../labels";
-import { ReviewReasonChips } from "../ReviewReasonChips";
-import { StatusChip } from "../StatusChip";
-import type { AiExpenseQueueItem } from "../../types/types";
+import { documentTypeLabels, getSectionKey } from "../../../receipt-review/components/labels";
+import { ReviewReasonChips } from "../../../receipt-review/components/ReviewReasonChips";
+import { StatusChip } from "../../../receipt-review/components/StatusChip";
+import type { AiExpenseQueueItem } from "../../../../types/aiExpenseQueue";
 import { formatYen } from "../../../../utils/currency";
-import { getPrimaryReviewReason } from "../../utils/reviewFeedback";
+import { getPrimaryReviewReason } from "../../../receipt-review/utils/reviewFeedback";
 import { formatQueueDate } from "./queueDisplayFormatters";
 import { QueueItemActions } from "./QueueItemActions";
 

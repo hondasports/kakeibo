@@ -75,38 +75,57 @@ src/
   theme.ts
   designTokens.ts              # MUI sx 用デザイントークン（feature 横断）
   designTokens.test.ts
-  productionReleaseWorkflow.test.ts
   index.css
   utils/                       # feature 横断ユーティリティ（例: imageDataUrl）
   lib/                         # 横断ユーティリティ（例: weekComparison）
   routing/                     # E2E 専用ルート（e2eRoutes.tsx, e2eFixtures.ts）
   test/                        # テスト共通ユーティリティ
+  types/                       # feature 横断の受け渡し型（例: aiExpenseQueue）
   features/                    # 機能単位（Feature-based）
-    ai-expense-queue/
+    ai-expense-queue/            # AI下書きキュー（一覧・アップロード・一括登録）
       components/
-        queue/                 # QueueHeader, QueueSection, QueueItemCard, QueueContent 等
-        review/                # ReviewDialog, ReviewItemCard, ReviewItemTaxDetails, ...
+        queue/                   # QueueItemCard, QueueSection, QueueStatusHeader 等のキュー表示部品
         AiExpenseQueuePanel.tsx
-        BulkRegisterConfirmDialog.tsx
-        ImageInputButton.tsx
-        QueueEmptyState.tsx
-        QueueHeader.tsx
-        QueuePanelSlots.tsx
-        ReviewReasonChips.tsx
-        StatusChip.tsx
-      context/                 # AiExpenseQueuePanelContext
-      hooks/
-        review/                # useReviewTaxOverrides, useReviewTaxSummaryOverrides, ...
-        useAiExpenseQueuePanel.ts
-        useAiExpenseQueueData.ts
-        useQueueDelete.ts
-        useBulkRegister.ts
-        useImageUpload.ts
-        useRetry.ts
-        useReviewDialog.ts
+        QueueContent.tsx
+        ...
+      context/                   # AiExpenseQueuePanelContext
+      hooks/                     # useAiExpenseQueueData, useQueueDelete, useBulkRegister, ...
       types/
-      utils/                   # discountItems, taxWarnings, mappers, reviewValidation, ...
+      utils/                     # queueContent（キュー表示導出）
       index.ts
+    receipt-review/              # AI下書きレビュー（単票レビューダイアログ・税補正）
+      components/                # ReviewDialog, ReviewItemsEditor, ReceiptTaxSummary, ...
+      hooks/                     # useReviewDialog, useReviewSubmit, useReviewTaxOverrides, ...
+      types/
+      utils/                     # mappers, reviewCheckUtils, reviewAmountChecks,
+                               #   reviewTaxChecks, reviewChecks, taxWarnings,
+                               #   receiptTotalsViewModel, ...
+    monthly-summary/           # 月次サマリページ
+      components/
+      lib/
+      pages/
+      utils/
+      index.ts
+    yearly-summary/            # 年次サマリページ
+      components/
+      lib/
+      pages/
+      utils/
+      index.ts
+    expense-search/            # 支出検索ページ
+      components/
+      hooks/                   # useExpenseSearchResults
+      lib/                     # searchParams, expenseSearchItems
+      pages/
+      index.ts
+    summary-shared/            # 集計系 feature で共有する表示部品・型・util（index.ts なし）
+      components/              # CategoryBreakdownCard, ReceiptListCard, ReceiptRow,
+                               #   ReceiptGroupRow, IncomeListCard, MonthlyMetricsPanel,
+                               #   ExpenseEntryEditDialog, ExpenseEntryDraftItemsEditor,
+                               #   ExpenseEntryDeleteDialog, MemoExpandableText, ...
+      hooks/                   # useExpenseEntryEditDialogState
+      types/                   # CategorySummary, ReceiptItem, ReceiptGroup, IncomeItem, ...
+      utils/                   # bulkSelection, memoExpandableTextUtils
     app-shell/                 # レイアウト・公開・異常系ページ
       components/              # AppLayout, AppDrawer, AppBottomNav, UserMenu, ...
       lib/                     # publicPaths, navigationConfig, siteMetadata, maintenanceMode
@@ -154,11 +173,13 @@ src/
       components/
       lib/
       index.ts
-    weekly-summary/
-      components/
+    weekly-summary/            # 週次サマリページ
+      components/              # WeeklySummaryPanel, TotalSummaryCard, SummaryMetricsPanel,
+                               #   WeeklyCategoryBreakdown, PreviousWeekComparison,
+                               #   ExpenseBulkCategoryDialog, ExpenseBulkDeleteDialog, ...
       pages/
-      types/
-      utils/
+      types/                   # WeeklySummaryPanelProps（共有表示型は summary-shared/types 参照）
+      utils/                   # weeklyExpenseChartData
       index.ts
     account-deletion/          # アカウント削除リクエスト・status UI
       pages/
@@ -261,7 +282,10 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
       invitationHandlers/
     receiptImageExtraction/    # analyzeReceiptImageCore, openaiClient, parse, validators, ...
     receipts/                  # insert, queries, summaryLib, spendingEntries.ts
-  receiptTax/                  # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
+  domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
+
+tests/
+  workflow/                    # CI workflow・デプロイ設定などの検証系テスト（Vitest）
 ```
 
 フロントエンドは **Feature-based Architecture** を採用する。各 feature は `src/features/<feature-name>/`
@@ -273,6 +297,11 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
 
 `theme.ts` と `designTokens.ts` は MUI theme / sx 用の横断定義として `src/` 直下に置く。
 画像リサイズ等、複数 feature から使う純粋関数は `src/utils/` に置く（例: `imageDataUrl.ts`）。
+複数 feature 間で受け渡す型（ある feature の画面部品へ渡す表示用データ型等）は `src/types/` に置く
+（例: `aiExpenseQueue.ts`）。複数 feature が共通して使う component・型・util の集合は、共有用の
+feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表示 feature（`weekly-summary` 等）
+からの横断 import を許さない。共有 feature は barrel（`index.ts`）を持たず、中身のファイルを
+直接 import する。
 
 ### 5.1 feature 間の import 方針
 
@@ -280,6 +309,8 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   `features/<name>/index.ts`（barrel）経由にする。
 - **feature 同士**の参照も barrel 経由とする（例: `import { WeekNavigator } from "../../week"`）。
   feature 内のファイルパス（`../../week/components/...`）への直接 import は避ける。
+  ただし barrel を持たない共有 feature（`summary-shared`、`receipt-review`）は、中身の
+  ファイルを直接 import する。
 - **feature 内**では相対パス（`../components/`、`../hooks/` 等）を使う。
 - **同一 feature 内**で barrel（`index.ts`）を経由して自分自身を import しない。
   共有 lib は `../lib/<module>` のように直接 import する（循環参照防止）。
@@ -288,9 +319,11 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
 
 | 依存元 | 依存先 | 用途 |
 | --- | --- | --- |
-| `app-shell` | `week`, `auth`, `ui` | レイアウト・ナビ・ユーザー表示 |
+| `app-shell` | `week`, `auth`, `ui`, `expense-search` | レイアウト・ナビ・ユーザー表示・検索ボックス |
 | `settings` | `group-admin` | グループ設定パネル |
 | `receipt`, `expense-entry` | `ai-expense-queue`, `ui`, `week` | AI キュー UI・共通 UI・週選択 |
+| `ai-expense-queue` | `receipt-review`, `src/types` | レビューダイアログ・受け渡し型 |
+| `weekly-summary`, `monthly-summary`, `yearly-summary`, `dashboard`, `expense-search` | `summary-shared`, `week`, `ui` | 集計表示部品・週ユーティリティ |
 
 `CategoriesPage.tsx` は存在するが、現行ルーターでは `/categories` も `SettingsPage` へ向ける。
 
@@ -770,7 +803,31 @@ domain へ分離済み。
   `persistReceiptUserOverrideSnapshot` / `snapshotReceiptDraftValues` /
   `resetReceiptToAiInterpretationHandler` の公開シグネチャは不変とする。
 
-### 5.4 スタイリング責務
+### 5.4 feature 内 utils と Convex API 参照の配置契約
+
+`src/features/<feature>/utils/` には、その feature の component / hook / page
+だけが使う **プレゼンテーション層の純粋関数**（ViewModel 生成・表示整形・UI 状態導出）だけを置く。
+
+- ドメインルール（バリデーション、税・金額計算、ユーザー向け業務メッセージ等の業務判断）は
+  `lib/domain/<domain>/` に置く。feature 内 utils が `lib/domain` の関数を
+  **改名して転送するだけのラッパー・re-export は作らない**。呼び出し側が
+  `lib/domain` を直接 import する。ドメイン関数と feature 固有の整形を合成する
+  実処理を持つ層は utils に置いてよい。
+- 複数 feature から使う純粋関数は `src/utils/`、ドメインルールとして共有するものは
+  `lib/domain/<domain>/` に置く。
+- API データから component props への変換・表示専用の導出（ViewModel）は
+  feature 内 utils の正当な置き場所とする。
+- feature はユーザー向けの機能単位で切る。内部のサブ領域が独立した機能として
+  成立するほど育った場合は、別 feature へ分離してよい（feature の巨大化を
+  1 つのディレクトリで吸収しない）。
+
+Convex API の参照は `convex/_generated/api.js` の `api` を直接使う
+（`useQuery(api.users.queries.getUserProfile)`）。`api.x.y` を返すだけの
+間接層は設けず、旧 repositories 層は廃止済みであり `api` を直接参照する。
+単体テストの mock 境界は `convex/_generated/api.js` であり、`vi.mock` で
+`api` ツリーを差し替える。
+
+### 5.5 スタイリング責務
 
 MUIとTailwind CSSは併用するが、責務を分ける。
 
@@ -1315,14 +1372,14 @@ Convexにも引数validatorがあるため、Valibotだけに依存しない。�
 
 ### 12.4 レシート税情報の正規化
 
-AI 画像解析では印字事実を抽出し、`lib/receiptTax/interpretReceiptTax.ts` で税率別集計との整合性から税コンテキストを解決・正規化する。
+AI 画像解析では印字事実を抽出し、`lib/domain/receipt/tax/interpretReceiptTax.ts` で税率別集計との整合性から税コンテキストを解決・正規化する。
 
 - 外税・内税・混在を `amountBasis` と `taxSummaries` に分離する
 - 登録額は `normalizedAmountYen` を正本とし、未設定時は `amountYen` にフォールバックする
 - 税額集計行は明細として登録しない
 - マーカーは印字文字列とレシート内の凡例を補助証拠として扱い、単独では税率を確定しない
 - 一意に解決できない税率・税込税抜区分は未解決のまま確認対象にする
-- 警告コード（`unresolved_tax_rate:items[i]`, `unresolved_amount_basis:items[i]`, `taxable_amount_mismatch`, `missing_tax_items` 等）は下書き・明細の `warnings` に保存し、UI では `src/features/ai-expense-queue/utils/taxWarnings.ts` で日本語化する
+- 警告コード（`unresolved_tax_rate:items[i]`, `unresolved_amount_basis:items[i]`, `taxable_amount_mismatch`, `missing_tax_items` 等）は下書き・明細の `warnings` に保存し、UI では `src/features/receipt-review/utils/taxWarnings.ts` で日本語化する
 
 ## 13. CSVエクスポート設計
 

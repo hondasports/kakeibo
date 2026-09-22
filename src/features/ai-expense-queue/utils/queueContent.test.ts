@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AiExpenseQueueItem } from "../types/types";
+import type { AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
 import { getQueueContentSummary, reviewPriority } from "./queueContent";
 
 function makeItem(

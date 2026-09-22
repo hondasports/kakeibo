@@ -18,7 +18,7 @@ import {
   isCurrentUserMember,
   type GroupMemberListItem,
 } from "../utils/groupMemberDisplay";
-import { formatGroupRoleLabel } from "../utils/groupRoleDisplay";
+import { formatGroupRoleLabel } from "../../../../lib/domain/groups/role";
 
 type GroupMemberListProps = {
   members: GroupMemberListItem[];

@@ -1,9 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useRef, useState, type ChangeEvent } from "react";
 import { useAction, useMutation } from "convex/react";
-import {
-  analyzeImageJobApi,
-  retryImageJobApi,
-} from "../../../lib/repositories/receiptAnalysisJobs";
 import type { Doc } from "../../../../convex/_generated/dataModel";
 import { getImageFileErrorMessage, resizeImageFileToDataUrl } from "../../../utils/imageDataUrl";
 
@@ -21,8 +18,8 @@ export function useRetry({
     null,
   );
 
-  const retryImageJob = useMutation(retryImageJobApi());
-  const analyzeImageJob = useAction(analyzeImageJobApi());
+  const retryImageJob = useMutation(api.receiptAnalysisJobs.mutations.retryImageJob);
+  const analyzeImageJob = useAction(api.receiptAnalysisJobs.actions.analyzeImageJob);
 
   const runRetry = async (job: Doc<"receiptAnalysisImageJobs">, imageDataUrl: string) => {
     setRetryError("");

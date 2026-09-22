@@ -1,6 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { getUserProfileApi, updateWeeklyDaysApi } from "../../../lib/repositories/users";
 import {
   Alert,
   Box,
@@ -29,8 +29,8 @@ const DAY_OPTIONS = [
 ];
 
 export function WeekDaySettingsPanel() {
-  const userProfile = useQuery(getUserProfileApi());
-  const updateWeeklyDays = useMutation(updateWeeklyDaysApi());
+  const userProfile = useQuery(api.users.queries.getUserProfile);
+  const updateWeeklyDays = useMutation(api.users.mutations.updateWeeklyDays);
   const [startDay, setStartDay] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{

@@ -93,8 +93,13 @@ export const getAccountDeletionPreview = query({
 export const getMyAccountDeletionStatus = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuthenticatedUserId(ctx);
-    return await getMyAccountDeletionStatusUsecase(createAccountDeletionQueryDeps(ctx), userId);
+    // 認証状態の遷移中（退会完了直後など）も呼ばれるため、identity未解決は例外ではなく null を返す。
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    return await getMyAccountDeletionStatusUsecase(
+      createAccountDeletionQueryDeps(ctx),
+      identity.tokenIdentifier,
+    );
   },
 });
 

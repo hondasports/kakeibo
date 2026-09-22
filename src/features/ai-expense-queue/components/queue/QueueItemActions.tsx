@@ -1,7 +1,7 @@
 import ReplayIcon from "@mui/icons-material/Replay";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import { Button, Stack } from "@mui/material";
-import type { AiExpenseQueueItem } from "../../types/types";
+import type { AiExpenseQueueItem } from "../../../../types/aiExpenseQueue";
 import { DeleteQueueButton } from "./DeleteQueueButton";
 
 export function QueueItemActions({

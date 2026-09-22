@@ -1,19 +1,8 @@
+import { api } from "../../../../convex/_generated/api";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
-import { listActiveApi } from "../../../lib/repositories/categories";
-import {
-  bulkDeleteSpendingRecordsApi,
-  bulkUpdateSpendingCategoriesApi,
-  deleteExpenseEntryApi,
-} from "../../../lib/repositories/expenseEntries";
-import {
-  deleteReceiptApi,
-  getFourWeeksSummaryApi,
-  getWeekSummaryWithCategoriesApi,
-} from "../../../lib/repositories/receipts";
-import { getUserProfileApi } from "../../../lib/repositories/users";
 import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { formatYearLabel } from "../../../../lib/domain/common/year";
@@ -22,12 +11,12 @@ import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation"
 import { WeeklySummaryPanel } from "../components/WeeklySummaryPanel";
 import { ExpenseBulkCategoryDialog } from "../components/ExpenseBulkCategoryDialog";
 import { ExpenseBulkDeleteDialog } from "../components/ExpenseBulkDeleteDialog";
-import { ExpenseEntryDeleteDialog } from "../components/ExpenseEntryDeleteDialog";
-import { ExpenseEntryEditDialog } from "../components/ExpenseEntryEditDialog";
-import type { CategoryPreview } from "../components/ReceiptRow";
+import { ExpenseEntryDeleteDialog } from "../../summary-shared/components/ExpenseEntryDeleteDialog";
+import { ExpenseEntryEditDialog } from "../../summary-shared/components/ExpenseEntryEditDialog";
+import type { CategoryPreview } from "../../summary-shared/components/ReceiptRow";
 import { useWeeklyBulkSelection } from "../hooks/useWeeklyBulkSelection";
 import { SuzumemoLoadingState } from "../../ui";
-import type { ReceiptItem } from "../types/types";
+import type { ReceiptItem } from "../../summary-shared/types/types";
 
 const EMPTY_RECEIPTS: ReceiptItem[] = [];
 import { buildWeeklyExpenseChartData } from "../utils/weeklyExpenseChartData";
@@ -52,12 +41,16 @@ export function SummaryPage() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [previewCategory, setPreviewCategory] = useState<CategoryPreview | null>(null);
 
-  const deleteExpenseEntry = useMutation(deleteExpenseEntryApi());
-  const deleteReceipt = useMutation(deleteReceiptApi());
-  const bulkUpdateSpendingCategories = useMutation(bulkUpdateSpendingCategoriesApi());
-  const bulkDeleteSpendingRecords = useMutation(bulkDeleteSpendingRecordsApi());
-  const userProfile = useQuery(getUserProfileApi());
-  const categoriesQuery = useQuery(listActiveApi());
+  const deleteExpenseEntry = useMutation(api.expenseEntries.mutations.deleteExpenseEntry);
+  const deleteReceipt = useMutation(api.receipts.crud.deleteReceipt);
+  const bulkUpdateSpendingCategories = useMutation(
+    api.expenseEntries.mutations.bulkUpdateSpendingCategories,
+  );
+  const bulkDeleteSpendingRecords = useMutation(
+    api.expenseEntries.mutations.bulkDeleteSpendingRecords,
+  );
+  const userProfile = useQuery(api.users.queries.getUserProfile);
+  const categoriesQuery = useQuery(api.categories.queries.listActive);
   const categories = Array.isArray(categoriesQuery) ? categoriesQuery : [];
 
   const weeklyStartDay = userProfile?.weeklyStartDay ?? 1;
@@ -90,11 +83,11 @@ export function SummaryPage() {
   }, [rawWeekStartDate, userProfile, weekStartDate, navigate]);
 
   const weeklySummary = useQuery(
-    getWeekSummaryWithCategoriesApi(),
+    api.receipts.summaries.getWeekSummaryWithCategories,
     userProfile === undefined ? "skip" : { weekStartDate },
   );
   const fourWeeksSummary = useQuery(
-    getFourWeeksSummaryApi(),
+    api.receipts.summaries.getFourWeeksSummary,
     userProfile === undefined ? "skip" : { weekStartDate },
   );
   const weeklyExpenseTrend =

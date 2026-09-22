@@ -1,6 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useAction } from "convex/react";
-import { searchGroupsApi } from "../../../lib/repositories/systemAdmin";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Alert,
@@ -25,7 +25,7 @@ import type { GroupSearchItem, PageResult } from "../types";
 type GroupQueryType = "name" | "groupId";
 
 export function SystemAdminGroupSearchPage() {
-  const searchGroups = useAction(searchGroupsApi());
+  const searchGroups = useAction(api.systemAdminSearch.searchGroups);
   const [query, setQuery] = useState("");
   const [queryType, setQueryType] = useState<GroupQueryType>("name");
   const [result, setResult] = useState<PageResult<GroupSearchItem> | null>(null);

@@ -1,12 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
-import {
-  getMySystemAdminContextApi,
-  grantSystemAdminApi,
-  listSystemAdminsApi,
-  revokeSystemAdminApi,
-  searchUsersApi,
-} from "../../../lib/repositories/systemAdmin";
 import type { SystemAdminAction } from "../components/SystemAdminActionDialog";
 import type { SystemAdminListItem, UserSearchItem } from "../types";
 
@@ -20,7 +14,7 @@ type ManagementContext = {
 } | null;
 
 export function useSystemAdminManagement() {
-  const context = useQuery(getMySystemAdminContextApi(), {}) as ManagementContext;
+  const context = useQuery(api.systemAdmins.getMySystemAdminContext, {}) as ManagementContext;
   const [statusFilter, setStatusFilterState] = useState<StatusFilter>("active");
   const [cursor, setCursor] = useState<string | null>(null);
   const [searchType, setSearchType] = useState<SearchType>("displayName");
@@ -38,13 +32,13 @@ export function useSystemAdminManagement() {
   const [snackbar, setSnackbar] = useState("");
 
   const environment = context?.environment ?? "development";
-  const list = useQuery(listSystemAdminsApi(), {
+  const list = useQuery(api.systemAdmins.listSystemAdmins, {
     paginationOpts: { numItems: 20, cursor },
     status: statusFilter,
   });
-  const searchUsers = useAction(searchUsersApi());
-  const grant = useMutation(grantSystemAdminApi());
-  const revoke = useMutation(revokeSystemAdminApi());
+  const searchUsers = useAction(api.systemAdminSearch.searchUsers);
+  const grant = useMutation(api.systemAdmins.grantSystemAdmin);
+  const revoke = useMutation(api.systemAdmins.revokeSystemAdmin);
 
   const setStatusFilter = (value: StatusFilter) => {
     setStatusFilterState(value);

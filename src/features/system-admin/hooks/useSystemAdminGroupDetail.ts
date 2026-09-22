@@ -1,12 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useCallback, useEffect, useState } from "react";
 import { useAction, useMutation } from "convex/react";
-import {
-  getGroupDetailApi,
-  recoverOwnerlessGroupApi,
-  systemAdminMembershipOperationApi,
-  systemAdminPendingInvitationRevokeApi,
-  systemAdminRoleOperationApi,
-} from "../../../lib/repositories/systemAdmin";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
 export type GroupDetail = {
@@ -30,11 +24,13 @@ export type GroupDetailMember = GroupDetail["members"][number];
 export type GroupDetailInvitation = GroupDetail["invitations"][number];
 
 export function useSystemAdminGroupDetail(groupId: string | undefined) {
-  const getGroupDetail = useAction(getGroupDetailApi());
-  const revokeInvitation = useAction(systemAdminPendingInvitationRevokeApi());
-  const operate = useMutation(systemAdminMembershipOperationApi());
-  const roleOperate = useMutation(systemAdminRoleOperationApi());
-  const recoverOwnerless = useMutation(recoverOwnerlessGroupApi());
+  const getGroupDetail = useAction(api.systemAdminSearch.getGroupDetail);
+  const revokeInvitation = useAction(
+    api.systemAdminPendingInvitationAction.systemAdminPendingInvitationRevoke,
+  );
+  const operate = useMutation(api.systemAdminMembership.systemAdminMembershipOperation);
+  const roleOperate = useMutation(api.systemAdminRoleOperations.systemAdminRoleOperation);
+  const recoverOwnerless = useMutation(api.systemAdminOwnerlessGroupRecovery.recoverOwnerlessGroup);
 
   const [detail, setDetail] = useState<GroupDetail | null | undefined>(undefined);
   const [error, setError] = useState(false);

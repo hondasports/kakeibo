@@ -1,4 +1,4 @@
-import type { AiExpenseQueueItem } from "../../types/types";
+import type { AiExpenseQueueItem } from "../../../../types/aiExpenseQueue";
 import { QueueSection } from "./QueueSection";
 
 type QueueActiveSectionsProps = {

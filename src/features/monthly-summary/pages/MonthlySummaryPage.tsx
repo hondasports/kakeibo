@@ -1,27 +1,21 @@
+import { api } from "../../../../convex/_generated/api";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { listActiveApi } from "../../../lib/repositories/categories";
-import { deleteExpenseEntryApi } from "../../../lib/repositories/expenseEntries";
-import { getUserProfileApi } from "../../../lib/repositories/users";
-import {
-  deleteReceiptApi,
-  getMonthSummaryWithCategoriesApi,
-} from "../../../lib/repositories/receipts";
-import { ExpenseEntryDeleteDialog } from "../../weekly-summary/components/ExpenseEntryDeleteDialog";
-import { ExpenseEntryEditDialog } from "../../weekly-summary/components/ExpenseEntryEditDialog";
-import { CategoryBreakdownCard } from "../../weekly-summary/components/CategoryBreakdownCard";
-import { IncomeListCard } from "../../weekly-summary/components/IncomeListCard";
-import { ReceiptListCard } from "../../weekly-summary/components/ReceiptListCard";
-import { incomeItemToReceiptItem, type ReceiptItem } from "../../weekly-summary/types/types";
+import { ExpenseEntryDeleteDialog } from "../../summary-shared/components/ExpenseEntryDeleteDialog";
+import { ExpenseEntryEditDialog } from "../../summary-shared/components/ExpenseEntryEditDialog";
+import { CategoryBreakdownCard } from "../../summary-shared/components/CategoryBreakdownCard";
+import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
+import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
+import { incomeItemToReceiptItem, type ReceiptItem } from "../../summary-shared/types/types";
 import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
 import { getCurrentWeekStartDate } from "../../week";
 import { formatJapaneseDate } from "../../../utils/date";
 import { MonthlySpendingCalendar } from "../components/MonthlySpendingCalendar";
 import { MonthNavigator } from "../components/MonthNavigator";
-import { MonthlyMetricsPanel } from "../components/MonthlyMetricsPanel";
+import { MonthlyMetricsPanel } from "../../summary-shared/components/MonthlyMetricsPanel";
 import { formatYearLabel } from "../../../../lib/domain/common/year";
 import { addMonths, getCurrentMonth, isFutureMonth, normalizeMonth } from "../lib/monthNavigation";
 import { isDateInMonth } from "../utils/monthlySpendingCalendar";
@@ -43,11 +37,11 @@ export function MonthlySummaryPage() {
       ? normalizedMonth
       : currentMonth;
 
-  const deleteExpenseEntry = useMutation(deleteExpenseEntryApi());
-  const deleteReceipt = useMutation(deleteReceiptApi());
-  const userProfile = useQuery(getUserProfileApi());
-  const categoriesQuery = useQuery(listActiveApi());
-  const monthlySummary = useQuery(getMonthSummaryWithCategoriesApi(), { month });
+  const deleteExpenseEntry = useMutation(api.expenseEntries.mutations.deleteExpenseEntry);
+  const deleteReceipt = useMutation(api.receipts.crud.deleteReceipt);
+  const userProfile = useQuery(api.users.queries.getUserProfile);
+  const categoriesQuery = useQuery(api.categories.queries.listActive);
+  const monthlySummary = useQuery(api.receipts.summaries.getMonthSummaryWithCategories, { month });
   const categories = Array.isArray(categoriesQuery) ? categoriesQuery : [];
   const isSummaryLoading = monthlySummary === undefined;
   const summary = monthlySummary ?? {

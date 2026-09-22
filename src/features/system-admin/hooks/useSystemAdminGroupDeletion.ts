@@ -1,9 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import {
-  listGroupDeletionJobsApi,
-  resumeGroupDeletionApi,
-} from "../../../lib/repositories/systemAdmin";
 import type { AppEnvironment } from "../types";
 
 type StatusFilter = "" | "running" | "retry_wait" | "failed" | "completed";
@@ -25,11 +22,11 @@ export function useSystemAdminGroupDeletion() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const list = useQuery(listGroupDeletionJobsApi(), {
+  const list = useQuery(api.systemAdminGroupDeletion.listGroupDeletionJobs, {
     paginationOpts: { numItems: 20, cursor },
     status: status || undefined,
   });
-  const resume = useMutation(resumeGroupDeletionApi());
+  const resume = useMutation(api.systemAdminGroupDeletion.resumeGroupDeletion);
 
   const selected = list?.page.find((job) => job.jobId === selectedJobId);
   const environment = (list?.environment ?? "development") as AppEnvironment;

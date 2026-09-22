@@ -1,8 +1,8 @@
+import { api } from "../../../../convex/_generated/api";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth, useClerk, useSignIn, useSignUp } from "@clerk/react";
 import { useAction, useConvexAuth } from "convex/react";
-import { acceptInvitationApi } from "../../../lib/repositories/groups";
 import {
   buildInvitationFallbackUrl,
   CLERK_STATUS_SIGN_IN,
@@ -28,7 +28,7 @@ export function useGroupInvitationAccept() {
   const signIn = rawSignIn as unknown as ClerkSignIn | undefined;
   const signUp = rawSignUp as unknown as ClerkSignUp | undefined;
   const { isAuthenticated } = useConvexAuth();
-  const acceptInvitation = useAction(acceptInvitationApi());
+  const acceptInvitation = useAction(api.groups.clerkInvitations.acceptInvitation);
   const [error, setError] = useState("");
   const [needsProfileDetails, setNeedsProfileDetails] = useState(false);
   const [missingProfileFields, setMissingProfileFields] = useState<string[]>([]);

@@ -1,3 +1,4 @@
+import { api } from "../../../../convex/_generated/api";
 import { useEffect, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -14,12 +15,6 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import {
-  getLineLinkStatusApi,
-  startLineLinkApi,
-  unlinkLineLinkApi,
-} from "../../../lib/repositories/lineLink";
-
 type FeedbackCode = "success" | "expired" | "invalid" | "conflict" | "failed";
 type LineLinkNavigationState = { lineLinkFeedback?: unknown };
 
@@ -51,9 +46,9 @@ function getNavigationFeedback(state: unknown): FeedbackCode | null {
 }
 
 export function LineLinkSettingsPanel() {
-  const status = useQuery(getLineLinkStatusApi());
-  const start = useAction(startLineLinkApi());
-  const unlink = useMutation(unlinkLineLinkApi());
+  const status = useQuery(api.lineLink.queries.getStatus);
+  const start = useAction(api.lineLink.actions.start);
+  const unlink = useMutation(api.lineLink.mutations.unlink);
   const [searchParams] = useSearchParams();
   const feedbackQuery = searchParams.get("line");
   const location = useLocation();

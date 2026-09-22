@@ -1,5 +1,5 @@
 import { Box, Stack, Typography } from "@mui/material";
-import type { ProductUpdate } from "../../../lib/productUpdates";
+import type { ProductUpdate } from "../../../../lib/domain/productUpdates";
 import { formatJapaneseDate } from "../../../utils/date";
 
 export type ProductUpdateItemProps = {
