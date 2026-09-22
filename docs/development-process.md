@@ -9,7 +9,7 @@
 - Workspace preflight: `node scripts/check-task-worktree.mjs --require-clean`
 - ループ文書の機械検査: `node scripts/check-loop-docs.mjs`
 - 差分からのスキル推奨・E2E要否: `node scripts/suggest-skills.mjs`
-- PR上の未解決指摘の収集: `node scripts/collect-pr-findings.mjs --pr <番号>`
+- PR上の未対応指摘の収集・照合: `node scripts/collect-pr-findings.mjs --pr <番号> [--handled <ファイル>]`
 - 各工程の手順: `skills/*/SKILL.md`
 - 技術設計: `docs/technical-design.md`
 - 認証: `docs/auth-guard.md`
@@ -301,7 +301,7 @@ required environment不足、env sync失敗、Convex CLI未反映を「未実行
 
 ## 7. Review / Delivery
 
-ユーザー指定の完了地点に従う。PR指摘は `node scripts/collect-pr-findings.mjs` で機械収集して全件確認し（inlineスレッド・レビュー本文・PR会話コメント）、修正 or 棄却の根拠を残す。指摘対応はまとめて1 pushで行い、pushごとのCI起動を抑える。観測した最新HEADに対して実行中は再観測、失敗は修正・再検証・push、新規指摘は修正ループ、必要承認だけ不足は人間待ち、必要条件充足はHEAD不変を再確認して完了とする判断表に従う（`skills/pr-aftercare/SKILL.md`）。GitHubの承認・branch保護条件を満たす。
+ユーザー指定の完了地点に従う。PR指摘は `node scripts/collect-pr-findings.mjs` で機械収集して全件確認し（inlineスレッド・全stateの非空レビュー本文・PR会話コメント）、修正 or 棄却の根拠を残す。レビュー本文と会話コメントはresolve状態を持たないため、対応済みのfinding idと最終確認時刻をIssue/PRの記録に残し、`--handled` で `unhandledCount: 0` を「指摘なし」と判定する。`bodyTruncated`・`commentsTruncated` の項目は記載URLの全文を読むまで確認済みとしない。指摘対応はまとめて1 pushで行い、pushごとのCI起動を抑える。観測した最新HEADに対して実行中は再観測、失敗は修正・再検証・push、新規指摘は修正ループ、必要承認だけ不足は人間待ち、必要条件充足はHEAD不変を再確認して完了とする判断表に従う（`skills/pr-aftercare/SKILL.md`）。GitHubの承認・branch保護条件を満たす。
 
 ## 8. CI / マージ条件
 

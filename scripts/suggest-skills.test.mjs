@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { readChangedPaths, resolveDefaultBase, suggestSkillsForPaths } from "./suggest-skills.mjs";
+import { readChangedPaths, resolvePrBase, suggestSkillsForPaths } from "./suggest-skills.mjs";
 
 function suggestedSkills(result) {
   return result.suggestions.map((s) => s.skill);
@@ -125,10 +125,39 @@ describe("readChangedPaths", () => {
     expect(paths).toEqual(expect.arrayContaining(["process.md", "App.tsx", "newfile.ts"]));
   });
 
-  it("fails explicitly when no base can be resolved", () => {
+  it("fails explicitly when no PR base can be resolved", () => {
     const { dir } = gitRepo();
     writeFileSync(path.join(dir, "README.md"), "x");
-    expect(() => resolveDefaultBase({ cwd: dir })).toThrow(/baseを解決できません/);
-    expect(() => readChangedPaths({ cwd: dir })).toThrow(/baseを解決できません/);
+    expect(() => resolvePrBase({ cwd: dir, execGh: () => "{}" })).toThrow(
+      /PRのbaseを解決できません/,
+    );
+    expect(() => readChangedPaths({ cwd: dir, execGh: () => "{}" })).toThrow(
+      /PRのbaseを解決できません/,
+    );
+  });
+
+  it("uses the PR baseRefName even when it differs from the remote default", () => {
+    const { dir, git } = gitRepo();
+    writeFileSync(path.join(dir, "README.md"), "base");
+    commitAll(git, "base");
+    // preview -> main promotion: remote default is preview, the PR base is main.
+    git(["branch", "main"]);
+    git(["checkout", "-b", "feature/app"]);
+    writeFileSync(path.join(dir, "App.tsx"), "app change");
+    commitAll(git, "app change");
+
+    const execGh = () => JSON.stringify({ baseRefName: "main" });
+    expect(resolvePrBase({ cwd: dir, execGh })).toBe("main");
+    const paths = readChangedPaths({ cwd: dir, execGh });
+    expect(paths).toContain("App.tsx");
+  });
+
+  it("prefers the remote-tracking ref when it exists", () => {
+    const { dir, git } = gitRepo();
+    writeFileSync(path.join(dir, "README.md"), "base");
+    commitAll(git, "base");
+    git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    const execGh = () => JSON.stringify({ baseRefName: "main" });
+    expect(resolvePrBase({ cwd: dir, execGh })).toBe("origin/main");
   });
 });
