@@ -27,6 +27,6 @@ license: Apache-2.0
 
 ## リモートの指摘
 
-PR上のボット・人間の指摘も同じ型で扱う。`node scripts/collect-pr-findings.mjs --pr <番号>` でinlineスレッド・全stateの非空レビュー本文・PR会話コメントを機械収集し（収集範囲は出力の `scope` に明記）、各件を修正 or 棄却（根拠）で閉じる。レビュー本文と会話コメントにはresolve状態がないため、対応済みのfinding idと最終確認時刻を記録としてIssue/PRに残し、`--handled <ファイル>` で `unhandledCount: 0` を収束判定とする。「指摘なし」は未対応0件の場合に限る（通知だけ残るPRでも収束できる）。本文やコメントが後から編集された場合はupdatedAtの不一致で再浮上する。`bodyTruncated`・`commentsTruncated` の項目は記載のURLで全文を読むまで確認済みとしない。詳細は `skills/pr-aftercare`。
+PR上のボット・人間の指摘も同じ型で扱う。`node scripts/collect-pr-findings.mjs --pr <番号>` でinlineスレッド・全stateの非空レビュー本文・PR会話コメントを機械収集し（収集範囲は出力の `scope` に明記）、各件を修正 or 棄却（根拠）で閉じる。レビュー本文と会話コメントにはresolve状態がないため、対応済みのfinding idと確認した候補のupdatedAt（内容識別であり時計時刻ではない）を記録としてIssue/PRに残し、`--handled <ファイル>` で `unhandledCount: 0` を収束判定とする。`--handled` はレビュー本文・会話コメントにのみ適用し、未解決threadは返信追加・編集が最初のコメントのupdatedAtを変えないため常に未対応として残る（GitHub側でresolveするまで閉じない）。「指摘なし」は未対応0件の場合に限る（通知だけ残るPRでも収束できる）。本文やコメントが後から編集された場合はupdatedAtの不一致で再浮上する。`bodyTruncated`・`commentsTruncated` の項目は記載のURLで全文を読むまで確認済みとしない。詳細は `skills/pr-aftercare`。
 
 レビュー結果として、元要求、差分の要求対応、検証の妥当性、manual確認結果、残findingをPR・作業報告へ記録する。

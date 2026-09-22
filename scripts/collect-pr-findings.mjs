@@ -90,10 +90,12 @@ function toCommentSummary(comment) {
 }
 
 /**
- * Read a handled-findings record: lines of `<finding id>` optionally followed
- * by whitespace and the last-seen updatedAt. A candidate is unhandled when its
- * id is absent, or when a recorded updatedAt differs from the candidate's
- * (the body/comment was edited after the recorded handling).
+ * Read a handled-findings record: lines of `<finding id> <updatedAt>` where the
+ * version is the candidate's updatedAt at the time it was verified (a content
+ * identifier, not a wall-clock timestamp). The version is required — an id-only
+ * record could never expire and is rejected as invalid input. Handled records
+ * apply only to reviews and issue comments; unresolved threads stay unhandled
+ * until resolved on GitHub.
  */
 export function parseHandledContent(content) {
   const handled = new Map();
@@ -101,7 +103,12 @@ export function parseHandledContent(content) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
     const [id, updatedAt] = trimmed.split(/\s+/, 2);
-    handled.set(id, updatedAt ?? null);
+    if (!updatedAt) {
+      throw new Error(
+        `handled記録の形式が不正です: "${trimmed}"（確認した候補の updatedAt を必ず付けてください）`,
+      );
+    }
+    handled.set(id, updatedAt);
   }
   return handled;
 }
@@ -111,9 +118,11 @@ export function readHandledFile(handledPath) {
 }
 
 function isUnhandled(finding, handled) {
-  if (!handled.has(finding.id)) return true;
-  const recorded = handled.get(finding.id);
-  return Boolean(recorded && finding.updatedAt && finding.updatedAt !== recorded);
+  // A thread's own resolve state on GitHub is its handled marker: an unresolved
+  // thread always counts as unhandled, since replies can be added or edited
+  // without changing the first comment's version.
+  if (finding.kind === "review_thread") return true;
+  return handled.get(finding.id) !== finding.updatedAt;
 }
 
 /**

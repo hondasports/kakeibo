@@ -333,4 +333,60 @@ describe("toFindings", () => {
     expect(result.unhandledCount).toBe(1);
     expect(result.unhandled[0].id).toBe("IC_1");
   });
+
+  it("rejects an id-only handled record since it could never expire", () => {
+    expect(() => parseHandledContent("IC_1\n")).toThrow(/updatedAt/);
+  });
+
+  it("keeps a candidate unhandled when its own updatedAt is missing", () => {
+    const input = {
+      comments: [
+        {
+          id: "IC_1",
+          body: "comment without updatedAt",
+          url: "u",
+          createdAt: "2026-01-05T00:00:00Z",
+          author: { login: "h" },
+        },
+      ],
+    };
+    const handled = parseHandledContent("IC_1 2026-01-05T00:00:00Z\n");
+    expect(toFindings({ ...input, handled }).unhandledCount).toBe(1);
+  });
+
+  it("always counts unresolved threads as unhandled even with a handled record", () => {
+    // A reply added or edited later does not change the first comment's
+    // updatedAt, so only GitHub's resolve state can mark a thread handled.
+    const input = {
+      reviewThreads: [
+        thread({
+          id: "PRRT_t1",
+          comments: {
+            pageInfo: { hasNextPage: false },
+            nodes: [
+              {
+                author: { login: "bot" },
+                body: "指摘",
+                url: "u1",
+                createdAt: "2026-01-01T00:00:00Z",
+                updatedAt: "2026-01-01T00:00:00Z",
+              },
+              {
+                author: { login: "human" },
+                body: "修正では直っていません",
+                url: "u2",
+                createdAt: "2026-01-01T01:00:00Z",
+                updatedAt: "2026-01-01T01:00:00Z",
+              },
+            ],
+          },
+        }),
+      ],
+    };
+    const handled = parseHandledContent("PRRT_t1 2026-01-01T00:00:00Z\n");
+    const result = toFindings({ ...input, handled });
+
+    expect(result.unhandledCount).toBe(1);
+    expect(result.unhandled[0].id).toBe("PRRT_t1");
+  });
 });
