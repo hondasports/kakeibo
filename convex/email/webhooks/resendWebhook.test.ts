@@ -55,9 +55,9 @@ describe("createResendWebhookHandler", () => {
     const req = createRequest({
       body: "{}",
       headers: {
-        "webhook-id": "id-1",
-        "webhook-timestamp": "1000",
-        "webhook-signature": "sig",
+        "svix-id": "id-1",
+        "svix-timestamp": "1000",
+        "svix-signature": "sig",
       },
     });
 
@@ -80,9 +80,9 @@ describe("createResendWebhookHandler", () => {
     const req = createRequest({
       body: "{}",
       headers: {
-        "webhook-id": "id-1",
-        "webhook-timestamp": "1000",
-        "webhook-signature": "sig",
+        "svix-id": "id-1",
+        "svix-timestamp": "1000",
+        "svix-signature": "sig",
       },
     });
 
@@ -111,9 +111,9 @@ describe("createResendWebhookHandler", () => {
     const req = createRequest({
       body: "{}",
       headers: {
-        "webhook-id": "id-1",
-        "webhook-timestamp": "1000",
-        "webhook-signature": "sig",
+        "svix-id": "id-1",
+        "svix-timestamp": "1000",
+        "svix-signature": "sig",
       },
     });
 
@@ -130,6 +130,34 @@ describe("createResendWebhookHandler", () => {
     );
   });
 
+  it("accepts webhook-* headers as a fallback", async () => {
+    const handler = createResendWebhookHandler(
+      () =>
+        asAny({
+          type: "email.delivered",
+          data: {},
+        }) as WebhookEventPayload,
+    );
+
+    const ctx = createActionCtx();
+    const req = createRequest({
+      body: "{}",
+      headers: {
+        "webhook-id": "id-fallback",
+        "webhook-timestamp": "1000",
+        "webhook-signature": "sig",
+      },
+    });
+
+    const response = (await asAny(handler)(ctx, req as any)) as MockResponse;
+
+    expect(response.status).toBe(200);
+    expect(ctx.runMutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ svixId: "id-fallback" }),
+    );
+  });
+
   it("returns 200 without processing for unsupported event types", async () => {
     const handler = createResendWebhookHandler(
       () =>
@@ -143,9 +171,9 @@ describe("createResendWebhookHandler", () => {
     const req = createRequest({
       body: "{}",
       headers: {
-        "webhook-id": "id-1",
-        "webhook-timestamp": "1000",
-        "webhook-signature": "sig",
+        "svix-id": "id-1",
+        "svix-timestamp": "1000",
+        "svix-signature": "sig",
       },
     });
 
