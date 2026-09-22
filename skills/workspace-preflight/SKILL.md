@@ -1,6 +1,6 @@
 ---
 name: workspace-preflight
-description: repository変更のPREPARE内で最初の編集前に使うcheap deterministic control。task worktree、非protected branch、clean baselineを強制する。
+description: repository変更の最初の編集前に使うcheap deterministic control。task worktree、非protected branch、clean baselineを強制する。
 license: Apache-2.0
 ---
 
@@ -28,7 +28,9 @@ node scripts/check-task-worktree.mjs --require-clean
 - canonical worktreeとは別の登録済みworktree
 - clean baseline
 
-`task identity == branch` や「差分が他task由来ではない」ことは、このscript単体では判定しない。これらはPREPAREのtask/session bindingとDeliveryのscope integrityで確認し、scriptのPASS証跡として水増ししない。
+`task identity == branch` や「差分が他task由来ではない」ことは、このscript単体では判定しない。これらは要求工程でのタスクとブランチの紐付け確認、および引き渡し時の差分範囲の整合確認で扱い、scriptのPASS証跡として水増ししない。
+
+preflight後、差分候補が見える段階で `node scripts/suggest-skills.mjs` を実行し、条件スキルの読み漏れを機械的に確認する。
 
 ## FAIL
 

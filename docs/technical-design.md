@@ -261,7 +261,7 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
       invitationHandlers/
     receiptImageExtraction/    # analyzeReceiptImageCore, openaiClient, parse, validators, ...
     receipts/                  # insert, queries, summaryLib, spendingEntries.ts
-  receiptTax/                  # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
+  domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
 ```
 
 フロントエンドは **Feature-based Architecture** を採用する。各 feature は `src/features/<feature-name>/`
@@ -1315,7 +1315,7 @@ Convexにも引数validatorがあるため、Valibotだけに依存しない。�
 
 ### 12.4 レシート税情報の正規化
 
-AI 画像解析では印字事実を抽出し、`lib/receiptTax/interpretReceiptTax.ts` で税率別集計との整合性から税コンテキストを解決・正規化する。
+AI 画像解析では印字事実を抽出し、`lib/domain/receipt/tax/interpretReceiptTax.ts` で税率別集計との整合性から税コンテキストを解決・正規化する。
 
 - 外税・内税・混在を `amountBasis` と `taxSummaries` に分離する
 - 登録額は `normalizedAmountYen` を正本とし、未設定時は `amountYen` にフォールバックする
