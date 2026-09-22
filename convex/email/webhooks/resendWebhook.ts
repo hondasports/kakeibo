@@ -17,9 +17,11 @@ export function createResendWebhookHandler(
       return new Response("Missing webhook secret", { status: 500 });
     }
 
-    const id = req.headers.get("webhook-id") ?? "";
-    const timestamp = req.headers.get("webhook-timestamp") ?? "";
-    const signature = req.headers.get("webhook-signature") ?? "";
+    const id = req.headers.get("svix-id") ?? req.headers.get("webhook-id") ?? "";
+    const timestamp =
+      req.headers.get("svix-timestamp") ?? req.headers.get("webhook-timestamp") ?? "";
+    const signature =
+      req.headers.get("svix-signature") ?? req.headers.get("webhook-signature") ?? "";
 
     let event: WebhookEventPayload;
     try {
