@@ -3,20 +3,25 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const FINDING_BODY_LIMIT = 1000;
-const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
+const PAGE_SIZE = 100;
+const THREAD_COMMENT_PAGE_SIZE = 20;
+
+const THREADS_PAGE_QUERY = `query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       number
       url
       title
-      reviewThreads(first: 100) {
+      reviewThreads(first: ${PAGE_SIZE}, after: $after) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           id
           isResolved
           isOutdated
           path
           line
-          comments(first: 20) {
+          comments(first: ${THREAD_COMMENT_PAGE_SIZE}) {
+            pageInfo { hasNextPage }
             nodes {
               author { login }
               body
@@ -30,42 +35,157 @@ const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: In
   }
 }`;
 
-/**
- * Convert GraphQL reviewThread nodes into managed findings.
- * Unresolved threads become findings with stable ids (f1..fn, ordered by first
- * comment time). Resolved and outdated counts are reported for coverage checks.
- */
-export function toFindings(reviewThreads) {
-  const nodes = reviewThreads ?? [];
-  const unresolved = nodes
-    .filter((thread) => !thread.isResolved)
-    .map((thread) => ({ thread, firstComment: thread.comments?.nodes?.[0] ?? null }))
-    .sort((a, b) =>
-      String(a.firstComment?.createdAt ?? "").localeCompare(
-        String(b.firstComment?.createdAt ?? ""),
-      ),
-    );
+const REVIEWS_PAGE_QUERY = `query($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviews(first: ${PAGE_SIZE}, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id
+          state
+          body
+          url
+          submittedAt
+          author { login }
+        }
+      }
+    }
+  }
+}`;
 
-  return {
-    unresolvedCount: unresolved.length,
-    resolvedCount: nodes.filter((thread) => thread.isResolved).length,
-    outdatedCount: nodes.filter((thread) => thread.isOutdated).length,
-    findings: unresolved.map(({ thread, firstComment }, index) => ({
-      id: `f${index + 1}`,
-      threadId: thread.id,
+const ISSUE_COMMENTS_PAGE_QUERY = `query($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      comments(first: ${PAGE_SIZE}, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id
+          body
+          url
+          createdAt
+          author { login }
+        }
+      }
+    }
+  }
+}`;
+
+const COLLECTION_SCOPE =
+  "inline review threads (unresolved) + non-empty review bodies (CHANGES_REQUESTED/COMMENTED) + PR issue comments";
+
+/**
+ * Fetch every page of a PR connection. Returns the full node list plus the last
+ * seen pullRequest object (for top-level fields). Throws when the PR is missing
+ * or a page fetch fails, so a partial collection is never reported as complete.
+ */
+export function fetchConnectionPages({ query, variables, select, execGraphql }) {
+  const nodes = [];
+  let after = null;
+  let pullRequest = null;
+  for (;;) {
+    const data = execGraphql({ query, variables: { ...variables, after } });
+    pullRequest = data?.repository?.pullRequest;
+    if (!pullRequest) {
+      throw new Error(
+        `PR が見つかりません: ${variables.owner}/${variables.name}#${variables.number}`,
+      );
+    }
+    const connection = select(pullRequest);
+    nodes.push(...(connection?.nodes ?? []));
+    if (!connection?.pageInfo?.hasNextPage) break;
+    after = connection.pageInfo.endCursor;
+  }
+  return { nodes, pullRequest };
+}
+
+/**
+ * Convert collected PR data into managed findings. The canonical finding id is
+ * the GitHub node id, which never changes when other findings are resolved or
+ * added; `seq` (f1..fn, ordered by first activity) is display-only.
+ */
+export function toFindings({ reviewThreads = [], reviews = [], comments = [] } = {}) {
+  let resolvedThreadCount = 0;
+  let outdatedThreadCount = 0;
+  let truncatedCommentThreads = 0;
+
+  const threadFindings = [];
+  for (const thread of reviewThreads) {
+    if (thread.isResolved) {
+      resolvedThreadCount += 1;
+      continue;
+    }
+    if (thread.isOutdated) outdatedThreadCount += 1;
+    const commentsTruncated = Boolean(thread.comments?.pageInfo?.hasNextPage);
+    if (commentsTruncated) truncatedCommentThreads += 1;
+    const firstComment = thread.comments?.nodes?.[0] ?? null;
+    threadFindings.push({
+      kind: "review_thread",
+      id: thread.id,
       path: thread.path,
       line: thread.line,
       author: firstComment?.author?.login ?? null,
       url: firstComment?.url ?? null,
       outdated: Boolean(thread.isOutdated),
+      commentsTruncated,
       commentCount: thread.comments?.nodes?.length ?? 0,
+      createdAt: firstComment?.createdAt ?? null,
       body: String(firstComment?.body ?? "").slice(0, FINDING_BODY_LIMIT),
-    })),
+    });
+  }
+
+  const reviewFindings = reviews
+    .filter(
+      (review) =>
+        String(review.body ?? "").trim() !== "" &&
+        (review.state === "CHANGES_REQUESTED" || review.state === "COMMENTED"),
+    )
+    .map((review) => ({
+      kind: "review",
+      id: review.id,
+      state: review.state,
+      author: review.author?.login ?? null,
+      url: review.url ?? null,
+      createdAt: review.submittedAt ?? null,
+      body: String(review.body ?? "").slice(0, FINDING_BODY_LIMIT),
+    }));
+
+  const commentFindings = comments.map((comment) => ({
+    kind: "issue_comment",
+    id: comment.id,
+    author: comment.author?.login ?? null,
+    url: comment.url ?? null,
+    createdAt: comment.createdAt ?? null,
+    body: String(comment.body ?? "").slice(0, FINDING_BODY_LIMIT),
+  }));
+
+  const findings = [...threadFindings, ...reviewFindings, ...commentFindings]
+    .sort((a, b) => String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? "")))
+    .map((finding, index) => ({ seq: `f${index + 1}`, ...finding }));
+
+  return {
+    scope: COLLECTION_SCOPE,
+    collectionComplete: true,
+    unresolvedThreadCount: threadFindings.length,
+    resolvedThreadCount,
+    outdatedThreadCount,
+    reviewFindingCount: reviewFindings.length,
+    issueCommentCount: commentFindings.length,
+    truncatedCommentThreads,
+    findings,
   };
 }
 
 function gh(args, { cwd } = {}) {
   return execFileSync("gh", args, { cwd, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
+}
+
+function ghGraphql({ query, variables, cwd }) {
+  const args = ["api", "graphql", "-f", `query=${query}`];
+  for (const [key, value] of Object.entries(variables)) {
+    if (value === null || value === undefined) continue;
+    args.push(typeof value === "number" ? "-F" : "-f", `${key}=${value}`);
+  }
+  return JSON.parse(gh(args, { cwd })).data;
 }
 
 export function resolveRepository({ repo, cwd } = {}) {
@@ -86,28 +206,33 @@ export function resolvePullRequest({ pr, cwd } = {}) {
   return parsed.number;
 }
 
-export function fetchReviewThreads({ owner, name, number, cwd } = {}) {
-  const output = gh(
-    [
-      "api",
-      "graphql",
-      "-f",
-      `query=${REVIEW_THREADS_QUERY}`,
-      "-f",
-      `owner=${owner}`,
-      "-f",
-      `name=${name}`,
-      "-F",
-      `number=${number}`,
-    ],
-    { cwd },
-  );
-  const parsed = JSON.parse(output);
-  const pullRequest = parsed?.data?.repository?.pullRequest;
-  if (!pullRequest) {
-    throw new Error(`PR が見つかりません: ${owner}/${name}#${number}`);
-  }
-  return pullRequest;
+export function fetchPullRequestFindings({ owner, name, number, cwd, execGraphql } = {}) {
+  const exec = execGraphql ?? (({ query, variables }) => ghGraphql({ query, variables, cwd }));
+  const variables = { owner, name, number };
+  const threadsPage = fetchConnectionPages({
+    query: THREADS_PAGE_QUERY,
+    variables,
+    select: (pr) => pr.reviewThreads,
+    execGraphql: exec,
+  });
+  const reviewsPage = fetchConnectionPages({
+    query: REVIEWS_PAGE_QUERY,
+    variables,
+    select: (pr) => pr.reviews,
+    execGraphql: exec,
+  });
+  const commentsPage = fetchConnectionPages({
+    query: ISSUE_COMMENTS_PAGE_QUERY,
+    variables,
+    select: (pr) => pr.comments,
+    execGraphql: exec,
+  });
+  return {
+    pullRequest: threadsPage.pullRequest,
+    reviewThreads: threadsPage.nodes,
+    reviews: reviewsPage.nodes,
+    comments: commentsPage.nodes,
+  };
 }
 
 export function parseArguments(args) {
@@ -126,11 +251,16 @@ export function parseArguments(args) {
   return parsed;
 }
 
-export function runCollectPrFindings({ pr, repo, cwd } = {}) {
+export function runCollectPrFindings({ pr, repo, cwd, execGraphql } = {}) {
   const repository = resolveRepository({ repo, cwd });
   const number = resolvePullRequest({ pr, cwd });
-  const pullRequest = fetchReviewThreads({ ...repository, number, cwd });
-  const result = toFindings(pullRequest.reviewThreads?.nodes);
+  const { pullRequest, reviewThreads, reviews, comments } = fetchPullRequestFindings({
+    ...repository,
+    number,
+    cwd,
+    execGraphql,
+  });
+  const result = toFindings({ reviewThreads, reviews, comments });
 
   const report = {
     repo: `${repository.owner}/${repository.name}`,

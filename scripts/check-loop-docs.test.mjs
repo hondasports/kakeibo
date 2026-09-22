@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -132,6 +132,33 @@ describe("banned vocabulary", () => {
 
   it("passes on current vocabulary", () => {
     expect(checkBannedVocabulary("docs/x.md", "要求工程と受入条件とHuman Gate")).toHaveLength(0);
+  });
+});
+
+describe("scan scope", () => {
+  it("ignores directories outside docs/skills even when they contain broken symlinks", () => {
+    const repo = makeRepo();
+    write(repo, "AGENTS.md", "no skills referenced");
+    write(repo, "docs/development-process.md", "# doc");
+    mkdirSync(path.join(repo, "node_modules"), { recursive: true });
+    symlinkSync(path.join(repo, "no-such-target"), path.join(repo, "node_modules", "broken"));
+    symlinkSync(repo, path.join(repo, "node_modules", "cycle"));
+
+    const result = checkLoopDocs(repo);
+    expect(result.errors).toEqual([]);
+    expect(result.docFiles).toEqual(["AGENTS.md", "docs/development-process.md"]);
+  });
+
+  it("does not traverse symlinked directories inside docs", () => {
+    const repo = makeRepo();
+    write(repo, "AGENTS.md", "x");
+    write(repo, "docs/development-process.md", "# doc");
+    write(repo, "outside/hidden.md", "PREPARE banned word");
+    symlinkSync(path.join(repo, "outside"), path.join(repo, "docs", "linked"));
+
+    const result = checkLoopDocs(repo);
+    expect(result.docFiles).not.toContain("docs/linked/hidden.md");
+    expect(result.errors.some((e) => e.includes("PREPARE"))).toBe(false);
   });
 });
 

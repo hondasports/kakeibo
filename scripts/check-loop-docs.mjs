@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -35,24 +35,34 @@ function normalizePath(value) {
     .replace(/^\.\/+/, "");
 }
 
+const DOC_SCAN_ROOTS = ["AGENTS.md", "docs", "skills"];
+
 export function listDocFiles(repoRoot) {
   const files = [];
   const walk = (relativeDir) => {
     const absoluteDir = path.join(repoRoot, relativeDir);
-    if (!existsSync(absoluteDir)) return;
-    for (const entry of readdirSync(absoluteDir)) {
-      const relativePath = normalizePath(path.join(relativeDir, entry));
-      const absolutePath = path.join(repoRoot, relativePath);
-      if (statSync(absolutePath).isDirectory()) {
+    for (const entry of readdirSync(absoluteDir, { withFileTypes: true })) {
+      const relativePath = normalizePath(path.join(relativeDir, entry.name));
+      // Dirent kinds do not follow symlinks: a symlinked directory is skipped,
+      // a symlinked file is never isFile(), so no statSync can ENOENT here.
+      if (entry.isDirectory()) {
         walk(relativePath);
         continue;
       }
-      if (DOC_SCAN_GLOBS.some((pattern) => pattern.test(relativePath))) {
+      if (entry.isFile() && DOC_SCAN_GLOBS.some((pattern) => pattern.test(relativePath))) {
         files.push(relativePath);
       }
     }
   };
-  walk(".");
+  for (const root of DOC_SCAN_ROOTS) {
+    const absolute = path.join(repoRoot, root);
+    if (!existsSync(absolute)) continue;
+    if (lstatSync(absolute).isDirectory()) {
+      walk(root);
+    } else if (DOC_SCAN_GLOBS.some((pattern) => pattern.test(root))) {
+      files.push(root);
+    }
+  }
   return files.sort();
 }
 
