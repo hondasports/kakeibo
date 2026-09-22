@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { QueueActiveContent, QueueRegisteredContent } from "./QueueContent";
-import type { AiExpenseQueueItem } from "../types/types";
+import type { AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
 
 const registeredItem: AiExpenseQueueItem = {
   id: "draft-registered-long-name",

@@ -2,7 +2,7 @@ import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import type { AiExpenseQueueItem } from "../types/types";
+import type { AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
 import { getAiExpenseQueueDeleteErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 
 export function useQueueDelete() {

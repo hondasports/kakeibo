@@ -2,7 +2,7 @@ import type { AiExpenseDraft, AiExpenseDraftItem } from "../types/types";
 import type {
   AiExpenseQueuePanelProps,
   AiExpenseQueueCategory,
-} from "../../ai-expense-queue/types/types";
+} from "../../../types/aiExpenseQueue";
 import { useReviewDraftSelection } from "./useReviewDraftSelection";
 import { useReviewFormState } from "./useReviewFormState";
 import { useReviewSubmit } from "./useReviewSubmit";

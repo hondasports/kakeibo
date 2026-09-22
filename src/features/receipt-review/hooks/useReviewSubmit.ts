@@ -5,7 +5,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 import type { ReviewFormValues, ReviewItemValues } from "../types/types";
-import type { AiExpenseQueuePanelProps } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueuePanelProps } from "../../../types/aiExpenseQueue";
 import { prepareReviewItemsForSubmit } from "../utils/reviewItemCategories";
 import { formatReviewSaveMessage } from "../utils/reviewFeedback";
 

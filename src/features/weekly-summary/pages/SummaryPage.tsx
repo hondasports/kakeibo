@@ -11,12 +11,12 @@ import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation"
 import { WeeklySummaryPanel } from "../components/WeeklySummaryPanel";
 import { ExpenseBulkCategoryDialog } from "../components/ExpenseBulkCategoryDialog";
 import { ExpenseBulkDeleteDialog } from "../components/ExpenseBulkDeleteDialog";
-import { ExpenseEntryDeleteDialog } from "../components/ExpenseEntryDeleteDialog";
-import { ExpenseEntryEditDialog } from "../components/ExpenseEntryEditDialog";
-import type { CategoryPreview } from "../components/ReceiptRow";
+import { ExpenseEntryDeleteDialog } from "../../summary-shared/components/ExpenseEntryDeleteDialog";
+import { ExpenseEntryEditDialog } from "../../summary-shared/components/ExpenseEntryEditDialog";
+import type { CategoryPreview } from "../../summary-shared/components/ReceiptRow";
 import { useWeeklyBulkSelection } from "../hooks/useWeeklyBulkSelection";
 import { SuzumemoLoadingState } from "../../ui";
-import type { ReceiptItem } from "../types/types";
+import type { ReceiptItem } from "../../summary-shared/types/types";
 
 const EMPTY_RECEIPTS: ReceiptItem[] = [];
 import { buildWeeklyExpenseChartData } from "../utils/weeklyExpenseChartData";

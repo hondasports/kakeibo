@@ -9,7 +9,7 @@ import type {
   ReviewFormValues,
   ReviewItemValues,
 } from "../types/types";
-import type { AiExpenseQueueItem, AiExpenseQueueStatus } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueItem, AiExpenseQueueStatus } from "../../../types/aiExpenseQueue";
 
 export const emptyReviewForm: ReviewFormValues = {
   documentType: "receipt",

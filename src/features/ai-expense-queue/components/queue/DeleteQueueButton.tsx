@@ -1,6 +1,6 @@
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Button } from "@mui/material";
-import type { AiExpenseQueueItem } from "../../types/types";
+import type { AiExpenseQueueItem } from "../../../../types/aiExpenseQueue";
 
 export function DeleteQueueButton({
   item,

@@ -5,12 +5,8 @@ import type { Doc } from "../../../../convex/_generated/dataModel";
 import { getSectionKey } from "../../receipt-review/components/labels";
 import { getImageCaptureFailureHint } from "../../../../lib/domain/aiExpenseDrafts/failure";
 import { mapDraftToQueueItem } from "../../receipt-review/utils/mappers";
-import type {
-  AiExpenseQueueBatchSummary,
-  AiExpenseQueueCategory,
-  AiExpenseQueueItem,
-  AiExpenseUploadBatch,
-} from "../types/types";
+import type { AiExpenseQueueCategory, AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
+import type { AiExpenseQueueBatchSummary, AiExpenseUploadBatch } from "../types/types";
 import type { AiExpenseDraft } from "../../receipt-review/types/types";
 
 export function useAiExpenseQueueData({

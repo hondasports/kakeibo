@@ -13,7 +13,7 @@ import {
   useTheme,
 } from "@mui/material";
 import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "../types/types";
-import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import type { TaxSummaryChange } from "./ReceiptTaxSummaryEditor";
 import type { AmountBasis } from "../../../../lib/receiptTax/types";
 import { ReviewDialogActions } from "./ReviewDialogActions";

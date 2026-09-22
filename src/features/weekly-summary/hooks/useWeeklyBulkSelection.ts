@@ -4,7 +4,7 @@ import {
   canSelectAnotherSpendingRecord,
   getBulkSpendingLimitErrorMessage,
 } from "../../../../lib/convex/spending/bulkOps";
-import type { ReceiptItem } from "../types/types";
+import type { ReceiptItem } from "../../summary-shared/types/types";
 import {
   getSpendingSelectionKey,
   getVisibleSelectableReceipts,
@@ -12,7 +12,7 @@ import {
   pruneSelectionToVisibleKeys,
   takeKeysUpToLimit,
   type SpendingSelectionKey,
-} from "../utils/bulkSelection";
+} from "../../summary-shared/utils/bulkSelection";
 
 export function useWeeklyBulkSelection(receipts: ReceiptItem[], weekStartDate: string) {
   const [selectedKeys, setSelectedKeys] = useState<Set<SpendingSelectionKey>>(new Set());

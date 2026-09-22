@@ -1,5 +1,6 @@
 import type { useAiExpenseQueuePanel } from "../../hooks/useAiExpenseQueuePanel";
-import type { AiExpenseQueueBatchSummary, AiExpenseQueueItem } from "../../types/types";
+import type { AiExpenseQueueItem } from "../../../../types/aiExpenseQueue";
+import type { AiExpenseQueueBatchSummary } from "../../types/types";
 
 export type QueueContentProps = {
   clearableCount: number;

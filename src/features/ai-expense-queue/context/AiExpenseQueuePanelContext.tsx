@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useAiExpenseQueuePanel } from "../hooks/useAiExpenseQueuePanel";
-import type { AiExpenseQueuePanelProps } from "../types/types";
+import type { AiExpenseQueuePanelProps } from "../../../types/aiExpenseQueue";
 
 type AiExpenseQueuePanelState = ReturnType<typeof useAiExpenseQueuePanel>;
 

@@ -1,5 +1,5 @@
 import { Box, Paper, Skeleton, Typography } from "@mui/material";
-import type { CategorySummary } from "../types/types";
+import type { CategorySummary } from "../../summary-shared/types/types";
 import { formatYen } from "../../../utils/currency";
 
 export function WeeklyCategoryBreakdown({

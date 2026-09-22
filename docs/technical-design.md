@@ -80,6 +80,7 @@ src/
   lib/                         # 横断ユーティリティ（例: weekComparison）
   routing/                     # E2E 専用ルート（e2eRoutes.tsx, e2eFixtures.ts）
   test/                        # テスト共通ユーティリティ
+  types/                       # feature 横断の受け渡し型（例: aiExpenseQueue）
   features/                    # 機能単位（Feature-based）
     ai-expense-queue/            # AI下書きキュー（一覧・アップロード・一括登録）
       components/
@@ -97,6 +98,30 @@ src/
       hooks/                     # useReviewDialog, useReviewSubmit, useReviewTaxOverrides, ...
       types/
       utils/                     # mappers, reviewChecks, taxWarnings, receiptTotalsViewModel, ...
+    monthly-summary/           # 月次サマリページ
+      components/
+      lib/
+      pages/
+      utils/
+      index.ts
+    yearly-summary/            # 年次サマリページ
+      components/
+      lib/
+      pages/
+      utils/
+      index.ts
+    expense-search/            # 支出検索ページ
+      components/
+      lib/
+      pages/
+      index.ts
+    summary-shared/            # 集計系 feature で共有する表示部品・型・util（index.ts なし）
+      components/              # CategoryBreakdownCard, ReceiptListCard, ReceiptRow,
+                               #   ReceiptGroupRow, IncomeListCard, MonthlyMetricsPanel,
+                               #   ExpenseEntryEditDialog, ExpenseEntryDeleteDialog,
+                               #   MemoExpandableText, ...
+      types/                   # CategorySummary, ReceiptItem, ReceiptGroup, IncomeItem, ...
+      utils/                   # bulkSelection, memoExpandableTextUtils
     app-shell/                 # レイアウト・公開・異常系ページ
       components/              # AppLayout, AppDrawer, AppBottomNav, UserMenu, ...
       lib/                     # publicPaths, navigationConfig, siteMetadata, maintenanceMode
@@ -144,11 +169,13 @@ src/
       components/
       lib/
       index.ts
-    weekly-summary/
-      components/
+    weekly-summary/            # 週次サマリページ
+      components/              # WeeklySummaryPanel, TotalSummaryCard, SummaryMetricsPanel,
+                               #   WeeklyCategoryBreakdown, PreviousWeekComparison,
+                               #   ExpenseBulkCategoryDialog, ExpenseBulkDeleteDialog, ...
       pages/
-      types/
-      utils/
+      types/                   # WeeklySummaryPanelProps（共有表示型は summary-shared/types 参照）
+      utils/                   # weeklyExpenseChartData
       index.ts
     account-deletion/          # アカウント削除リクエスト・status UI
       pages/
@@ -266,6 +293,11 @@ tests/
 
 `theme.ts` と `designTokens.ts` は MUI theme / sx 用の横断定義として `src/` 直下に置く。
 画像リサイズ等、複数 feature から使う純粋関数は `src/utils/` に置く（例: `imageDataUrl.ts`）。
+複数 feature 間で受け渡す型（ある feature の画面部品へ渡す表示用データ型等）は `src/types/` に置く
+（例: `aiExpenseQueue.ts`）。複数 feature が共通して使う component・型・util の集合は、共有用の
+feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表示 feature（`weekly-summary` 等）
+からの横断 import を許さない。共有 feature は barrel（`index.ts`）を持たず、中身のファイルを
+直接 import する。
 
 ### 5.1 feature 間の import 方針
 
@@ -273,6 +305,8 @@ tests/
   `features/<name>/index.ts`（barrel）経由にする。
 - **feature 同士**の参照も barrel 経由とする（例: `import { WeekNavigator } from "../../week"`）。
   feature 内のファイルパス（`../../week/components/...`）への直接 import は避ける。
+  ただし barrel を持たない共有 feature（`summary-shared`、`receipt-review`）は、中身の
+  ファイルを直接 import する。
 - **feature 内**では相対パス（`../components/`、`../hooks/` 等）を使う。
 - **同一 feature 内**で barrel（`index.ts`）を経由して自分自身を import しない。
   共有 lib は `../lib/<module>` のように直接 import する（循環参照防止）。
@@ -281,9 +315,11 @@ tests/
 
 | 依存元 | 依存先 | 用途 |
 | --- | --- | --- |
-| `app-shell` | `week`, `auth`, `ui` | レイアウト・ナビ・ユーザー表示 |
+| `app-shell` | `week`, `auth`, `ui`, `expense-search` | レイアウト・ナビ・ユーザー表示・検索ボックス |
 | `settings` | `group-admin` | グループ設定パネル |
 | `receipt`, `expense-entry` | `ai-expense-queue`, `ui`, `week` | AI キュー UI・共通 UI・週選択 |
+| `ai-expense-queue` | `receipt-review`, `src/types` | レビューダイアログ・受け渡し型 |
+| `weekly-summary`, `monthly-summary`, `yearly-summary`, `dashboard`, `expense-search` | `summary-shared`, `week`, `ui` | 集計表示部品・週ユーティリティ |
 
 `CategoriesPage.tsx` は存在するが、現行ルーターでは `/categories` も `SettingsPage` へ向ける。
 

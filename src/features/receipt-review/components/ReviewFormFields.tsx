@@ -1,7 +1,7 @@
 import { Alert, MenuItem, TextField } from "@mui/material";
 import { documentTypeLabels, reviewDocumentTypeOptions } from "./labels";
 import type { AiExpenseQueueDocumentType, ReviewFormValues } from "../types/types";
-import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 
 export function ReviewFormFields({
   categories,

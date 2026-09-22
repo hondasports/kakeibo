@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { ReceiptItem } from "../types/types";
+import type { ReceiptItem } from "../../summary-shared/types/types";
 import { useWeeklyBulkSelection } from "./useWeeklyBulkSelection";
 
 const receipt = (id: string): ReceiptItem => ({

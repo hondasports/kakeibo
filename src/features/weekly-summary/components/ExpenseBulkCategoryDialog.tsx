@@ -11,8 +11,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { hasMultipleSourceCategories } from "../utils/bulkSelection";
-import type { ReceiptItem } from "../types/types";
+import { hasMultipleSourceCategories } from "../../summary-shared/utils/bulkSelection";
+import type { ReceiptItem } from "../../summary-shared/types/types";
 
 type CategoryOption = {
   _id: string;

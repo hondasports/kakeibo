@@ -8,7 +8,7 @@ import {
   isLowConfidenceItem,
 } from "./reviewDialogUtils";
 import type { ReviewItemValues } from "../types/types";
-import type { AiExpenseQueueCategory } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 
 const categories: AiExpenseQueueCategory[] = [
   { _id: "cat-food", name: "食費", color: "#AAB7C4" },

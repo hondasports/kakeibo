@@ -1,5 +1,5 @@
 import { Chip } from "@mui/material";
-import type { AiExpenseQueueStatus } from "../../ai-expense-queue/types/types";
+import type { AiExpenseQueueStatus } from "../../../types/aiExpenseQueue";
 import {
   displayStatusLabels,
   getDisplayStatus,
