@@ -1,5 +1,8 @@
 import { isMap, parseDocument } from "yaml";
-import { PRODUCT_UPDATE_CATEGORIES, type ProductUpdateCategory } from "./productUpdates";
+import {
+  PRODUCT_UPDATE_CATEGORIES,
+  type ProductUpdateCategory,
+} from "../../lib/domain/productUpdates";
 
 export const UPDATE_SPEC_START_MARKER = "<!-- suzumemo-update:start -->";
 export const UPDATE_SPEC_END_MARKER = "<!-- suzumemo-update:end -->";

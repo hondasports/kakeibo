@@ -1,6 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useAuth } from "@clerk/react";
 import { useConvexAuth, useQuery } from "convex/react";
-import { getMySystemAdminContextApi } from "../../../lib/repositories/systemAdmin";
 import { SuzumemoLoadingState } from "../../ui";
 import { SystemAdminAuthState } from "./SystemAdminAuthState";
 import { SystemAdminErrorBoundary } from "./SystemAdminErrorBoundary";
@@ -27,7 +27,7 @@ function SystemAdminRouteGuardContent() {
   const { isLoaded: isClerkLoaded, isSignedIn } = useAuth();
   const { isLoading: isConvexLoading, isAuthenticated } = useConvexAuth();
   const context = useQuery(
-    getMySystemAdminContextApi(),
+    api.systemAdmins.getMySystemAdminContext,
     isClerkLoaded && isSignedIn && isAuthenticated ? {} : "skip",
   );
 

@@ -73,8 +73,10 @@ vi.mock("./features/system-admin", () => ({
   SystemAdminUserDetailPage: Page,
   SystemAdminUserSearchPage: Page,
 }));
-vi.mock("./lib/repositories/accountDeletion", () => ({
-  getMyAccountDeletionStatusApi: () => "account-deletion-status",
+vi.mock("../convex/_generated/api", () => ({
+  api: {
+    accountDeletion: { getMyAccountDeletionStatus: "account-deletion-status" },
+  },
 }));
 
 import { GroupRouteGuard } from "./router";

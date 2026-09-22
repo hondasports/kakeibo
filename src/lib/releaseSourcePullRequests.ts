@@ -1,5 +1,5 @@
 import { sanitizeExternalText } from "./generateProductUpdates";
-import type { ProductUpdateDraft, PullRequestDecision } from "./productUpdates";
+import type { ProductUpdateDraft, PullRequestDecision } from "../../lib/domain/productUpdates";
 import { readProductUpdateSpec, UPDATE_SPEC_START_MARKER } from "./productUpdateSpec";
 
 export type ClassifiedCommit =

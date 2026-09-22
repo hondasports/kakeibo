@@ -21,9 +21,13 @@ vi.mock("react-router-dom", async (importOriginal) => {
   return { ...actual, useNavigate: useNavigateMock };
 });
 
-vi.mock("../../../lib/repositories/accountDeletion", () => ({
-  getMyAccountDeletionStatusApi: () => "account-deletion-status",
-  retryAccountDeletionApi: () => "retry-account-deletion",
+vi.mock("../../../../convex/_generated/api", () => ({
+  api: {
+    accountDeletion: {
+      getMyAccountDeletionStatus: "account-deletion-status",
+      retryAccountDeletion: "retry-account-deletion",
+    },
+  },
 }));
 
 describe("AccountDeletionStatusPage", () => {

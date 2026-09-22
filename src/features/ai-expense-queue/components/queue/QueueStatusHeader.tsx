@@ -1,6 +1,6 @@
 import { Button, Chip, Stack } from "@mui/material";
 import type { AiExpenseQueueItem } from "../../types/types";
-import { displayStatusLabels } from "../labels";
+import { displayStatusLabels } from "../../../receipt-review/components/labels";
 
 type QueueStatusHeaderProps = {
   groupedItems: {

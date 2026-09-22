@@ -6,7 +6,7 @@ import { QueueActiveContent, QueueRegisteredContent } from "./QueueContent";
 import { QueueEmptyState } from "./QueueEmptyState";
 import { QueueHeader } from "./QueueHeader";
 import { ReceiptImageConsentDialog } from "./ReceiptImageConsentDialog";
-import { ReviewDialog } from "./ReviewDialog";
+import { ReviewDialog } from "../../receipt-review/components/ReviewDialog";
 
 function queueContentProps(queue: ReturnType<typeof useAiExpenseQueuePanelContext>) {
   return {

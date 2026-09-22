@@ -1,4 +1,4 @@
-import type { ProductUpdateDraft } from "../lib/productUpdates";
+import type { ProductUpdateDraft } from "../../lib/domain/productUpdates";
 
 // 2026-09-05 以降に本番へ反映されたが、旧自動生成の不具合で掲載されなかった分の回収。
 // 詳細: https://github.com/hondasports/kakeibo/issues/741

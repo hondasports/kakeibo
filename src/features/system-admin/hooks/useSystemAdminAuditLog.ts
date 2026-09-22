@@ -1,6 +1,6 @@
+import { api } from "../../../../convex/_generated/api";
 import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
-import { listSystemAdminAuditLogsApi } from "../../../lib/repositories/systemAdmin";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { SystemAdminAuditAction, SystemAdminAuditItem } from "../types";
 
@@ -49,7 +49,7 @@ export function useSystemAdminAuditLog() {
   const from = useMemo(() => parseDateBoundary(fromDate, false), [fromDate]);
   const to = useMemo(() => parseDateBoundary(toDate, true), [toDate]);
 
-  const logs = useQuery(listSystemAdminAuditLogsApi(), {
+  const logs = useQuery(api.systemAdmins.listSystemAdminAuditLogs, {
     paginationOpts: { numItems: 20, cursor },
     action: action || undefined,
     actorUserId: actor.trim() ? (actor.trim() as Id<"users">) : undefined,

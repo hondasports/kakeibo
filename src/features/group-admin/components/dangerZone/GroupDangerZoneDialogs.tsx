@@ -1,9 +1,9 @@
+import { api } from "../../../../../convex/_generated/api";
 import { Component, type ReactNode } from "react";
 import { useQuery } from "convex/react";
-import { getGroupDeletionPreviewApi } from "../../../../lib/repositories/groups";
 import { ConfirmDangerousActionDialog } from "../ConfirmDangerousActionDialog";
 import { ConfirmDeleteGroupDialog } from "../ConfirmDeleteGroupDialog";
-import { formatGroupRoleLabel } from "../../utils/groupRoleDisplay";
+import { formatGroupRoleLabel } from "../../../../../lib/domain/groups/role";
 import type { PendingMember } from "./types";
 
 type GroupDangerZoneDialogsProps = {
@@ -48,7 +48,10 @@ class PreviewErrorBoundary extends Component<
 }
 
 function DeleteGroupDialogWithPreview(props: DeleteDialogProps) {
-  const preview = useQuery(getGroupDeletionPreviewApi(), props.pendingDeleteGroup ? {} : "skip");
+  const preview = useQuery(
+    api.groups.deletion.getGroupDeletionPreview,
+    props.pendingDeleteGroup ? {} : "skip",
+  );
   return (
     <ConfirmDeleteGroupDialog
       confirmationName={props.deleteConfirmationName}

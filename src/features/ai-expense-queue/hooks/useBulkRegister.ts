@@ -1,8 +1,8 @@
+import { api } from "../../../../convex/_generated/api";
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
-import { registerReadyDraftsAsExpenseEntriesApi } from "../../../lib/repositories/aiExpenseDrafts";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { toUserFacingRegistrationError } from "../utils/userFacingErrors";
+import { getAiExpenseQueueRegistrationErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 
 export function useBulkRegister({ readyItemIds }: { readyItemIds: string[] }) {
   const previousReadyItemIdsRef = useRef<string[]>([]);
@@ -10,7 +10,9 @@ export function useBulkRegister({ readyItemIds }: { readyItemIds: string[] }) {
   const [registeringIds, setRegisteringIds] = useState<string[]>([]);
   const [registrationError, setRegistrationError] = useState("");
 
-  const registerReadyDraftsAsExpenseEntries = useMutation(registerReadyDraftsAsExpenseEntriesApi());
+  const registerReadyDraftsAsExpenseEntries = useMutation(
+    api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries,
+  );
 
   useEffect(() => {
     const previousReadyItemIds = previousReadyItemIdsRef.current;
@@ -49,7 +51,8 @@ export function useBulkRegister({ readyItemIds }: { readyItemIds: string[] }) {
       });
       setSelectedReadyIds((current) => current.filter((id) => !draftIds.includes(id)));
     } catch (error) {
-      setRegistrationError(toUserFacingRegistrationError(error));
+      console.error("AI expense queue registration failed", error);
+      setRegistrationError(getAiExpenseQueueRegistrationErrorMessage());
     } finally {
       setRegisteringIds([]);
     }

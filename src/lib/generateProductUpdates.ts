@@ -1,4 +1,4 @@
-import type { ProductUpdate } from "./productUpdates";
+import type { ProductUpdate } from "../../lib/domain/productUpdates";
 
 export type MergedPullRequest = {
   number: number;

@@ -1,7 +1,7 @@
+import { api } from "../../../../convex/_generated/api";
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "convex/react";
-import { createGroupApi } from "../../../lib/repositories/groups";
 import {
   Alert,
   Box,
@@ -21,7 +21,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export function GroupSetupPage() {
   const navigate = useNavigate();
-  const createGroup = useMutation(createGroupApi());
+  const createGroup = useMutation(api.groups.mutations.createGroup);
   const [groupName, setGroupName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");

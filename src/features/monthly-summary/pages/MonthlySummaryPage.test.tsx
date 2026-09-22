@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { getCurrentMonth } from "../../../../lib/domain/common/month";
+import { apiMockWith } from "../../../test/apiMock";
 import { renderWithProviders } from "../../../test/render";
 import { getCurrentWeekStartDate } from "../../week";
 import { MonthlySummaryPage } from "./MonthlySummaryPage";
@@ -13,7 +14,6 @@ const useQueryMock = vi.hoisted(() => vi.fn());
 const useMutationMock = vi.hoisted(() => vi.fn(() => vi.fn()));
 const navigateMock = vi.hoisted(() => vi.fn());
 const routeMonth = vi.hoisted(() => ({ value: "2026-07" as string | undefined }));
-const getUserProfileApiMock = vi.hoisted(() => vi.fn(() => "get-user-profile"));
 
 vi.mock("../../../../lib/domain/common/month", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../../lib/domain/common/month")>();
@@ -25,8 +25,8 @@ vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
 }));
 
-vi.mock("../../../lib/repositories/users", () => ({
-  getUserProfileApi: getUserProfileApiMock,
+vi.mock("../../../../convex/_generated/api", () => ({
+  api: apiMockWith({ "users.queries.getUserProfile": "get-user-profile" }),
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {

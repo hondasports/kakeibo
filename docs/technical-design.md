@@ -75,38 +75,28 @@ src/
   theme.ts
   designTokens.ts              # MUI sx 用デザイントークン（feature 横断）
   designTokens.test.ts
-  productionReleaseWorkflow.test.ts
   index.css
   utils/                       # feature 横断ユーティリティ（例: imageDataUrl）
   lib/                         # 横断ユーティリティ（例: weekComparison）
   routing/                     # E2E 専用ルート（e2eRoutes.tsx, e2eFixtures.ts）
   test/                        # テスト共通ユーティリティ
   features/                    # 機能単位（Feature-based）
-    ai-expense-queue/
+    ai-expense-queue/            # AI下書きキュー（一覧・アップロード・一括登録）
       components/
-        queue/                 # QueueHeader, QueueSection, QueueItemCard, QueueContent 等
-        review/                # ReviewDialog, ReviewItemCard, ReviewItemTaxDetails, ...
+        queue/                   # QueueItemCard, QueueSection, QueueStatusHeader 等のキュー表示部品
         AiExpenseQueuePanel.tsx
-        BulkRegisterConfirmDialog.tsx
-        ImageInputButton.tsx
-        QueueEmptyState.tsx
-        QueueHeader.tsx
-        QueuePanelSlots.tsx
-        ReviewReasonChips.tsx
-        StatusChip.tsx
-      context/                 # AiExpenseQueuePanelContext
-      hooks/
-        review/                # useReviewTaxOverrides, useReviewTaxSummaryOverrides, ...
-        useAiExpenseQueuePanel.ts
-        useAiExpenseQueueData.ts
-        useQueueDelete.ts
-        useBulkRegister.ts
-        useImageUpload.ts
-        useRetry.ts
-        useReviewDialog.ts
+        QueueContent.tsx
+        ...
+      context/                   # AiExpenseQueuePanelContext
+      hooks/                     # useAiExpenseQueueData, useQueueDelete, useBulkRegister, ...
       types/
-      utils/                   # discountItems, taxWarnings, mappers, reviewValidation, ...
+      utils/                     # queueContent（キュー表示導出）
       index.ts
+    receipt-review/              # AI下書きレビュー（単票レビューダイアログ・税補正）
+      components/                # ReviewDialog, ReviewItemsEditor, ReceiptTaxSummary, ...
+      hooks/                     # useReviewDialog, useReviewSubmit, useReviewTaxOverrides, ...
+      types/
+      utils/                     # mappers, reviewChecks, taxWarnings, receiptTotalsViewModel, ...
     app-shell/                 # レイアウト・公開・異常系ページ
       components/              # AppLayout, AppDrawer, AppBottomNav, UserMenu, ...
       lib/                     # publicPaths, navigationConfig, siteMetadata, maintenanceMode
@@ -262,6 +252,9 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
     receiptImageExtraction/    # analyzeReceiptImageCore, openaiClient, parse, validators, ...
     receipts/                  # insert, queries, summaryLib, spendingEntries.ts
   domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
+
+tests/
+  workflow/                    # CI workflow・デプロイ設定などの検証系テスト（Vitest）
 ```
 
 フロントエンドは **Feature-based Architecture** を採用する。各 feature は `src/features/<feature-name>/`
@@ -790,7 +783,7 @@ domain へ分離済み。
 
 Convex API の参照は `convex/_generated/api.js` の `api` を直接使う
 （`useQuery(api.users.queries.getUserProfile)`）。`api.x.y` を返すだけの
-間接層は設けず、`src/lib/repositories/` は廃止して `api` 直参照へ移行する。
+間接層は設けず、旧 repositories 層は廃止済みであり `api` を直接参照する。
 単体テストの mock 境界は `convex/_generated/api.js` であり、`vi.mock` で
 `api` ツリーを差し替える。
 
@@ -1346,7 +1339,7 @@ AI 画像解析では印字事実を抽出し、`lib/domain/receipt/tax/interpre
 - 税額集計行は明細として登録しない
 - マーカーは印字文字列とレシート内の凡例を補助証拠として扱い、単独では税率を確定しない
 - 一意に解決できない税率・税込税抜区分は未解決のまま確認対象にする
-- 警告コード（`unresolved_tax_rate:items[i]`, `unresolved_amount_basis:items[i]`, `taxable_amount_mismatch`, `missing_tax_items` 等）は下書き・明細の `warnings` に保存し、UI では `src/features/ai-expense-queue/utils/taxWarnings.ts` で日本語化する
+- 警告コード（`unresolved_tax_rate:items[i]`, `unresolved_amount_basis:items[i]`, `taxable_amount_mismatch`, `missing_tax_items` 等）は下書き・明細の `warnings` に保存し、UI では `src/features/receipt-review/utils/taxWarnings.ts` で日本語化する
 
 ## 13. CSVエクスポート設計
 
