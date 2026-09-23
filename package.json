@@ -39,7 +39,7 @@
     "loop:suggest-skills": "node scripts/suggest-skills.mjs"
   },
   "dependencies": {
-    "@clerk/backend": "^3.16.6",
+    "@clerk/backend": "^3.18.1",
     "@clerk/react": "^6.15.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
