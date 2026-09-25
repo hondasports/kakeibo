@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbitのレビュー設定。汎用的な観点はデフォルトに任せ、
+# CodeRabbitが推論できないリポジトリ固有ルールのみを記述する。
+language: ja
+
+reviews:
+  profile: chill
+  path_filters:
+    # 自動生成コード・ロックファイルはレビュー対象外
+    - "!pnpm-lock.yaml"
+    - "!skills-lock.json"
+    - "!convex/_generated/**"
+  path_instructions:
+    - path: "convex/**"
+      instructions: |
+        - convex/_generated/ は自動生成コードなので、直接編集の提案はしない
+        - query/mutation は users.activeGroupId による世帯グループ単位のデータ分離が前提。グループをまたぐ読み書きや分離の抜けがないか確認する
+        - schema.ts の変更は既存データとの後方互換（migrationの要否）を確認する
+        - convex/e2eHttp/ はE2E専用エンドポイント。APP_ENV=development とcleanup secretで保護されている前提が崩れていないか確認する
+        - 税計算（課税/非課税・丸め・配分）の変更は docs/ のドメイン仕様との整合を確認する
+    - path: "e2e/**"
+      instructions: |
+        - 再現性が必要なデータは e2e/helpers/seed.ts の専用helper経由で作成し、specが作ったデータは e2e/helpers/cleanup.ts で後始末する。spec間で状態を共有しない
+        - waitForTimeout などの固定sleepは使わず web-first assertion で待機する
+        - specのprojectタグ（@smoke / @public）は既存specの付与規約に従う
+        - レシート抽出は RECEIPT_IMAGE_EXTRACTOR_MODE=mock 前提。実OpenAI APIを呼ぶコードは不可
+    - path: "**/*.test.*"
+      instructions: |
+        - Vitestのテストは実装ファイルと同じディレクトリにcolocateする（src/・convex/・tests/ の既存規約に従う）
+        - 「例外が出ない」だけの形骸テストや、モック自体をテストしているだけのものは指摘する
+    - path: ".github/workflows/**"
+      instructions: |
+        - secretsの受け渡しとpermissionsの最小化、previewとproductionの環境分離を確認する
+    - path: "skills/**"
+      instructions: |
+        - skills/ と AGENTS.md はagentループの制御文書。既存ルールや AGENTS.md との重複・矛盾があれば指摘する
+    - path: "AGENTS.md"
+      instructions: |
+        - 変更が入口の追加・整理に限定されているか、skills/ 配下の各SKILL.mdと矛盾しないかを確認する
+    - path: "docs/**"
+      instructions: |
+        - ドキュメントは実装と同じPRで更新する規約。記載のコマンド・パスが現状と一致しているかを確認する
