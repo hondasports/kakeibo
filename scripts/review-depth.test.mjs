@@ -136,6 +136,8 @@ describe("stateless CLI", () => {
     });
     expect(run([]).usage).toContain("risk_assessment");
     expect(run(["--help"]).usage).toContain("risk_assessment");
+    expect(run(["--help"]).usage).toContain("skills/code-review/SKILL.md");
+    expect(run(["--help"]).usage).toContain("Agentが実差分");
   });
 
   it("accepts inline JSON or a file path and rejects extras", () => {
