@@ -125,6 +125,7 @@ describe("banned vocabulary", () => {
       "docs/superpowers/",
       "task/session binding",
       ".loop/state",
+      "委譲用workflowは使用しません",
     ]) {
       expect(checkBannedVocabulary("docs/x.md", `これは ${word} です`)).toHaveLength(1);
     }
@@ -136,6 +137,26 @@ describe("banned vocabulary", () => {
 });
 
 describe("scan scope", () => {
+  it("scans README for broken links and outdated process policies", () => {
+    const repo = makeRepo();
+    write(repo, "AGENTS.md", "no skills referenced");
+    write(repo, "docs/development-process.md", "# doc");
+    write(
+      repo,
+      "README.md",
+      "[missing](docs/missing.md)\n通常は単独エージェントです。委譲用workflowは使用しません。",
+    );
+
+    const result = checkLoopDocs(repo);
+    expect(result.docFiles).toContain("README.md");
+    expect(
+      result.errors.some((error) => error.includes("README.md") && error.includes("missing")),
+    ).toBe(true);
+    expect(result.errors.some((error) => error.includes("委譲用workflowは使用しません"))).toBe(
+      true,
+    );
+  });
+
   it("ignores directories outside docs/skills even when they contain broken symlinks", () => {
     const repo = makeRepo();
     write(repo, "AGENTS.md", "no skills referenced");

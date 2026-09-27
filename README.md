@@ -122,9 +122,9 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 
 ## エージェント作業
 
-[AGENTS.md](AGENTS.md)を入口に、実装・検証・セルフレビュー・引き渡しを進めます。セルフレビューの最低深度は `scripts/review-depth.mjs` が実差分のリスク評価から機械算出します。
+[AGENTS.md](AGENTS.md)を入口に、実装・検証・レビュー・引き渡しを進めます。リスク評価に基づくセルフレビューの最低深度は `scripts/review-depth.mjs` が機械算出しますが、軸の評価と根拠はAgentが判断します。
 
-通常は単独エージェントで作業し、完了地点はユーザーの指定に従います。委譲用workflowは使用しません。
+通常は単独エージェントで作業します。T3、およびT2で未解決の挙動前提がある場合は、同一セッション内で別エージェントによる独立レビューを行います。軸の評価基準、レビューの受け渡し方、代替レビューがない場合の扱いは [`skills/code-review/SKILL.md`](skills/code-review/SKILL.md) を参照してください。完了地点はユーザーの指定に従います。
 
 ## ローカル状態とsecret
 

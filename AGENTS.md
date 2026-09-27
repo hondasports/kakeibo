@@ -1,6 +1,6 @@
 # Suzumemo Agent Guide
 
-ユーザーの目的と停止条件を優先し、許可済みの実装・検証・修正・PR作成を完了まで進める。通常は単独エージェント。サブエージェントは明示依頼時のみ。
+ユーザーの目的と停止条件を優先し、許可済みの実装・検証・修正・PR作成を完了まで進める。通常は単独エージェント。T3、またはT2で未解決の挙動前提がある場合は独立レビュー担当を使い、それ以外の委譲は明示依頼時のみ。
 
 標準ループはターン型。プロンプトで開始し、完了地点（ユーザー指定、既定 merge_ready 相当）まで作業・検証・レビューを反復する。タスクの状態は専用JSONを持たず Issue / PR に外部化する。
 
@@ -8,7 +8,8 @@
 
 - repositoryを編集する場合は、最初の編集前に `node scripts/check-task-worktree.mjs --require-clean` で専用worktree・非保護branch・clean baselineを確認する（`skills/workspace-preflight`）。差分候補に応じたスキル推奨は `node scripts/suggest-skills.mjs`。
 - 実装・検証・レビュー・公開の各工程で必要な `skills/` を読み適用する。読込済みなら再読しない。
-- 実装後のセルフレビュー直前に `node scripts/review-depth.mjs` へ実差分（未コミット・未追跡を含む）のリスク評価を渡し、返された最低深度（T1/T2/T3）と確認項目でレビューする（`skills/code-review`）。
+- 実差分・共有caller・検証結果を4軸と強制条件で評価し、各値の根拠を `tier_rationale` に記録して `node scripts/review-depth.mjs` へ渡す。返された最低深度（T1/T2/T3）と確認項目でレビューする（`skills/code-review`）。
+- T1は実装担当がセルフレビューする。T2で `uncertainty=some_unknowns`、またはT3は、同一セッション内の新しいコンテキストで独立レビューを行う。別担当がいない場合は利用可能な人間・ボットへ渡し、どちらもなければ必須レビュー待ちとして完了扱いにしない。詳細は `skills/code-review`。
 - レビューと修正は、open findingが0件になるまで反復する。進展がある間は制約・実行予算内で継続し、3ラウンドごとに方針を再評価する。上限到達は未完了として報告し、新証拠なしの同一再発はincidentへ切り替える。再レビュー対象は変更hunk・影響項目・前回open findingsに限定し、共有契約や前提の変化時だけ範囲を広げる（`skills/code-review`）。
 - PR作成後はCI・承認・競合まで確認する（`skills/pr-aftercare`）。
 

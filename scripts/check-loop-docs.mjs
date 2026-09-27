@@ -2,7 +2,12 @@ import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DOC_SCAN_GLOBS = [/^AGENTS\.md$/, /^docs\/.*\.md$/, /^skills\/[^/]+\/SKILL\.md$/];
+const DOC_SCAN_GLOBS = [
+  /^AGENTS\.md$/,
+  /^README\.md$/,
+  /^docs\/.*\.md$/,
+  /^skills\/[^/]+\/SKILL\.md$/,
+];
 
 const REQUIRED_FRONTMATTER_KEYS = ["name", "description", "license"];
 
@@ -16,6 +21,7 @@ const BANNED_VOCABULARY = [
   /docs\/superpowers/,
   /\.loop\//,
   /task-loop\.mjs/,
+  /委譲用workflowは使用しません/,
 ];
 
 const PATH_REFERENCE_PATTERN =
@@ -35,7 +41,7 @@ function normalizePath(value) {
     .replace(/^\.\/+/, "");
 }
 
-const DOC_SCAN_ROOTS = ["AGENTS.md", "docs", "skills"];
+const DOC_SCAN_ROOTS = ["AGENTS.md", "README.md", "docs", "skills"];
 
 export function listDocFiles(repoRoot) {
   const files = [];
