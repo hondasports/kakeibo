@@ -20,9 +20,9 @@ describe("resolveLoopStep", () => {
   });
 
   it("rejects review clean without validated exit evidence", () => {
-    expect(() =>
-      resolveLoopStep({ state: "review", event: "clean", model: "gpt-6-sol" }),
-    ).toThrow("review clean requires exit evidence");
+    expect(() => resolveLoopStep({ state: "review", event: "clean", model: "gpt-6-sol" })).toThrow(
+      "review clean requires exit evidence",
+    );
 
     expect(() =>
       resolveLoopStep({
