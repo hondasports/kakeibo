@@ -58,9 +58,7 @@ describe("resolveLoopStep", () => {
   it("rejects missing CLI option values", () => {
     for (const option of ["--state", "--event", "--model", "--runtime", "--exit"]) {
       expect(() => parseArguments([option])).toThrow(`${option} requires a value`);
-      expect(() => parseArguments([option, "--next-option"])).toThrow(
-        `${option} requires a value`,
-      );
+      expect(() => parseArguments([option, "--next-option"])).toThrow(`${option} requires a value`);
     }
   });
 });
