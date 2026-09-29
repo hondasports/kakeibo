@@ -6,6 +6,7 @@ import YAML from "yaml";
 
 import { resolveAgentProfile } from "./resolve-agent-profile.mjs";
 
+/** Validate evidence required for guarded state transitions. */
 function validateTransitionEvidence({ state, event, exit }) {
   if (!exit) {
     if (state === "review" && event === "clean") {
@@ -28,6 +29,7 @@ function validateTransitionEvidence({ state, event, exit }) {
   }
 }
 
+/** Resolve the current workflow state or an allowed next-state transition. */
 export function resolveLoopStep({
   state,
   event = null,
@@ -57,6 +59,7 @@ export function resolveLoopStep({
   return { state: currentState, event, nextState, ...resolved };
 }
 
+/** Parse CLI arguments for workflow state resolution. */
 function parseArgs(args) {
   const out = { state: null, event: null, model: "", runtime: null, exit: null };
 

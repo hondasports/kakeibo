@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import YAML from "yaml";
 
+/** Recursively merge a model profile override onto its default profile. */
 const merge = (base, override) => {
   if (!base || typeof base !== "object" || Array.isArray(base)) {
     return override;
@@ -19,11 +20,13 @@ const merge = (base, override) => {
   return out;
 };
 
+/** Match a model name against a simple asterisk wildcard pattern. */
 const wildcard = (pattern, value) => {
   const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*");
   return new RegExp(`^${escaped}$`, "i").test(value);
 };
 
+/** Resolve the effective model profile and optional runtime adapter configuration. */
 export function resolveAgentProfile({ model, runtime = null, root = process.cwd() }) {
   const profileDir = path.join(root, ".agent", "profiles");
   const runtimeDir = path.join(root, ".agent", "runtime");
@@ -59,6 +62,7 @@ export function resolveAgentProfile({ model, runtime = null, root = process.cwd(
   };
 }
 
+/** Parse CLI arguments for model profile resolution. */
 function parseArgs(args) {
   let model = "";
   let runtime = null;
