@@ -2,10 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Suzumemo State Exit",
   "type": "object",
-  "required": [
-    "state",
-    "event"
-  ],
+  "required": ["state", "event"],
   "properties": {
     "state": {
       "type": "string"
