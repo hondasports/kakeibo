@@ -1,0 +1,17 @@
+name: gpt-6-astra
+match:
+  - gpt-6-astra
+scaffolding: thin
+context:
+  strategy: on_demand
+refine:
+  autonomy: high
+  require_spec_contract: false
+execute:
+  prefer_long_run: true
+review:
+  independent_minimum: T3
+verification:
+  explicit_floor: true
+incident:
+  escalation_after: 3

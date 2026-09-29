@@ -1,0 +1,17 @@
+name: gpt-6-sol
+match:
+  - gpt-6-sol
+scaffolding: standard
+context:
+  strategy: curated
+refine:
+  autonomy: high
+  require_spec_contract: true
+execute:
+  prefer_long_run: true
+review:
+  independent_minimum: T2_unknown
+verification:
+  explicit_floor: true
+incident:
+  escalation_after: 2

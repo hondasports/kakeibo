@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Suzumemo Loop State",
+  "type": "object",
+  "required": [
+    "version",
+    "state",
+    "attempt"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "state": {
+      "enum": [
+        "refine",
+        "execute",
+        "review",
+        "aftercare",
+        "incident",
+        "human_gate",
+        "done"
+      ]
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "head": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "risk": {
+      "enum": [
+        "T1",
+        "T2",
+        "T3"
+      ]
+    },
+    "openFindings": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}
