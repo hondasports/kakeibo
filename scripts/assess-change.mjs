@@ -6,10 +6,13 @@ import { machineRiskForPaths } from "./machine-risk.mjs";
 import { assessReviewDepth, REVIEW_TIERS } from "./review-depth.mjs";
 import { suggestSkillsForPaths } from "./suggest-skills.mjs";
 
+/** Return the ordering index for a review tier. */
 const tierIndex = (tier) => REVIEW_TIERS.indexOf(tier);
+/** Return the highest review tier from the provided candidates. */
 const highestTier = (...tiers) =>
   tiers.filter(Boolean).sort((a, b) => tierIndex(b) - tierIndex(a))[0] ?? "T1";
 
+/** Assess changed paths and combine machine, predicted, and agent review floors. */
 export function assessChange({ paths = [], predictedRisk = "T1", agentAssessment = null } = {}) {
   const classification = classifyChangedFiles(paths);
   const machine = machineRiskForPaths(paths);
@@ -39,6 +42,7 @@ export function assessChange({ paths = [], predictedRisk = "T1", agentAssessment
   };
 }
 
+/** Parse CLI arguments for change assessment. */
 function parseArgs(args) {
   const out = { paths: [], predictedRisk: "T1", agentAssessment: null };
 

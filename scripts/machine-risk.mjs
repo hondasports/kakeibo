@@ -31,6 +31,7 @@ const RULES = [
   },
 ];
 
+/** Compute the machine-enforced minimum review tier for changed paths. */
 export function machineRiskForPaths(paths = []) {
   const changedPaths = [...new Set(paths.map(normalizeChangedPath).filter(Boolean))];
   const triggers = [];
