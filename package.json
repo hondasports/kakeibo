@@ -10,7 +10,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "format": "oxfmt",
-    "format:check": "oxfmt && git diff --exit-code",
+    "format:check": "oxfmt --check",
     "preview": "vite preview",
     "pretest": "node scripts/check-test-environment.mjs",
     "test": "vitest --maxWorkers=4",

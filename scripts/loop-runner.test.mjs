@@ -14,9 +14,9 @@ describe("resolveLoopStep", () => {
   });
 
   it("rejects undefined transitions", () => {
-    expect(() =>
-      resolveLoopStep({ state: "refine", event: "clean", model: "gpt-6-sol" }),
-    ).toThrow("event clean is not allowed from refine");
+    expect(() => resolveLoopStep({ state: "refine", event: "clean", model: "gpt-6-sol" })).toThrow(
+      "event clean is not allowed from refine",
+    );
   });
 
   it("rejects review clean without validated exit evidence", () => {
