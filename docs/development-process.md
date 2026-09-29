@@ -387,7 +387,7 @@ AGENTS.mdのルールが独自に「常に1 approval」を追加しない。
 - test adequacy
 - existing pattern consistency
 
-レビュー直前に実差分を4軸と強制条件で評価し、`scripts/review-depth.mjs` が算出する最低深度（T1/T2/T3）以上でレビューする。T1はセルフレビュー、T2のうち不確実性が残るものとT3は独立レビューも必須とする。軸の選択根拠とレビュー担当の条件は `skills/code-review/SKILL.md` を参照する。評価の妥当性とレビューの実施はAgentの責任。
+レビュー直前に実差分を4軸と強制条件で評価し、`scripts/review-depth.mjs` が算出する最低深度（T1/T2/T3）以上でレビューする。T1はセルフレビュー、T2のうち不確実性が残るものとT3は独立レビューも必須とする。軸の選択根拠とレビュー担当の条件は `.agent/workflow/review.md` を参照する。評価の妥当性とレビューの実施はAgentの責任。
 
 ---
 
