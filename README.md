@@ -113,19 +113,28 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 | 用途                           | 参照先                          |
 | ------------------------------ | ------------------------------- |
 | エージェントの常時適用ルール   | `AGENTS.md`                     |
-| レビュー深度の機械算出         | `scripts/review-depth.mjs`      |
-| 工程別Agent Skill              | `skills/*/SKILL.md`             |
-| 開発プロセス、PR、CI、レビュー | `docs/development-process.md`   |
+| Agent State Machine            | `.agent/process.yaml`           |
+| 変更Risk・必須検証の統合判定   | `scripts/assess-change.mjs`     |
+| Model Profile                   | `.agent/profiles/`              |
+| Capability Skill                | `skills/*/SKILL.md`             |
+| 開発プロセス、PR、CI            | `docs/development-process.md`   |
 | 認証ガード設計                 | `docs/auth-guard.md`            |
 | 環境変数一覧                   | `docs/environment-variables.md` |
 | QAチェックリスト               | `docs/qa-checklist.md`          |
 
 ## エージェント作業
 
-[AGENTS.md](AGENTS.md)を入口に、実装・検証・レビュー・引き渡しを進めます。リスク評価に基づくセルフレビューの最低深度は `scripts/review-depth.mjs` が機械算出しますが、軸の評価と根拠はAgentが判断します。
+SuzumemoはVendor-neutralなAgent Harnessをrepository側に持ちます。`AGENTS.md` は共通契約、`.agent/process.yaml` はState Machine、`.agent/profiles/` はモデル別の足場、`.agent/runtime/` はCodex / Devin等のRuntime差分を定義します。
 
-通常は単独エージェントで作業します。T3、およびT2で未解決の挙動前提がある場合は、同一セッション内で別エージェントによる独立レビューを行います。軸の評価基準、レビューの受け渡し方、代替レビューがない場合の扱いは [`skills/code-review/SKILL.md`](skills/code-review/SKILL.md) を参照してください。完了地点はユーザーの指定に従います。
+基本Stateは `REFINE → EXECUTE → REVIEW → AFTERCARE → DONE` です。Issueは詳細仕様を必須とせず、REFINEでrepositoryを調査してAcceptance Criteriaを補完します。Machine Risk Floor・必須検証・Required SkillsはAgent判断で引き下げられません。
 
+既知モデルは専用Profileを使い、未登録モデルは `.agent/profiles/default.yaml` の `safe-standard` へフォールバックします。
+
+```bash
+pnpm loop:profile -- --model gpt-6-sol --runtime codex
+pnpm loop:assess -- --paths convex/schema.ts --predicted-risk T1
+pnpm loop:state -- --model gpt-6-sol --runtime codex --state refine --event ready
+```
 ## ローカル状態とsecret
 
 主要なローカルsecretとサービス状態はGit管理外です。

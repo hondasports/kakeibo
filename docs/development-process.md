@@ -5,12 +5,14 @@
 エージェント作業の詳細をここへ二重定義しない。この文書は非normativeな運用説明で、内容が衝突した場合は次を正本とする。
 
 - Agent実行契約: `AGENTS.md`
-- レビュー深度の機械算出: `node scripts/review-depth.mjs --help`
+- Agent State Machine: `.agent/process.yaml`
+- Stateごとの実行契約: `.agent/workflow/*.md`
+- Model Profile / Runtime差分: `.agent/profiles/`, `.agent/runtime/`
+- Change Assessment: `node scripts/assess-change.mjs`
 - Workspace preflight: `node scripts/check-task-worktree.mjs --require-clean`
 - ループ文書の機械検査: `node scripts/check-loop-docs.mjs`
-- 差分からのスキル推奨・E2E要否: `node scripts/suggest-skills.mjs`
 - PR上の未対応指摘の収集・照合: `node scripts/collect-pr-findings.mjs --pr <番号> [--handled <ファイル>]`
-- 各工程の手順: `skills/*/SKILL.md`
+- 専門能力: `skills/*/SKILL.md`
 - 技術設計: `docs/technical-design.md`
 - 認証: `docs/auth-guard.md`
 - UI/UX: `docs/ui-ux-design.md`
@@ -195,26 +197,39 @@ Agent taskで残す価値があるもの:
 
 ---
 
-## 5. Agent の工程
+## 5. Agent Harness
 
-[AGENTS.md](../AGENTS.md)を入口に、工程に応じたskills/だけを読む。標準ループはターン型: ユーザーのプロンプトで開始し、完了地点（ユーザー指定、既定 merge_ready 相当）まで実装・検証・レビュー・引き渡しを反復する。タスクの状態・判断履歴は専用の状態JSONを持たず Issue / PR に外部化する。ゴール型・時間型・自動トリガーのループは未採用。
+`AGENTS.md` はRuntime共通契約、`.agent/process.yaml` はState Transitionの正本とする。基本Stateは `REFINE / EXECUTE / REVIEW / AFTERCARE`、例外Stateは `INCIDENT / HUMAN_GATE`。Workflow本体をCodexやDevinの個別設定へ複製しない。
 
-### リスク判定とレビュー担当
+### REFINE
 
-リスク軸の選び方・証拠の残し方・独立レビュー手順は [`skills/code-review/SKILL.md`](../skills/code-review/SKILL.md) を正本とする。`scripts/review-depth.mjs` はAgentが評価した値から最低深度を算出するもので、差分や根拠の妥当性を機械判定しない。
+Issueは詳細仕様を必須としない。Agentはrepository、既存仕様、テストを調査してHuman Requestを実装可能なAgent Specへ育てる。調査で解ける疑問は自力で解決し、既存patternに沿う可逆・低影響な判断はAssumptionとして記録する。Product / UX / Security / Data semanticsをmaterially変える未確定事項だけHUMAN_GATEへ送る。
 
-- T1は実装担当がセルフレビューする。
-- T2のうち `uncertainty=some_unknowns`（未解決の挙動前提を含むもの）とT3は、別エージェントによる独立レビューを必須とする。その他のT2では必須にしない。
-- 独立レビュー担当は同一セッションの新しいコンテキストで、目的・受入条件・差分・検証結果・関連caller/契約を受け取る。実装担当のリスク評価と結論は見ずに、リスク軸・強制条件・コード差分を読み取り専用で評価する。
-- 両者の評価が異なる場合、軸ごとに高い評価を採用し、強制条件を合算してCLIを再実行する。深度が上がれば、その深度の確認を完了する。独立レビュー担当は実装担当の修正後、該当hunkと影響項目を再確認する。
-- 別エージェントを使えない場合は利用可能な人間・ボットレビューを代替にする。代替もなければIssue/PRまたは作業報告に必須レビュー待ちと次の手を残し、要求された完了地点に到達したとは報告しない。
+Spec GateはGoal、1件以上のAcceptance Criteria、Non-goals、Assumptions、Verification Strategy、material open decisionが0件であることを要求する。
 
-レビューと修正の反復は「open findingが0件で収束・進展がある間は制約・実行予算内で継続・3ラウンドごとに方針再評価・上限到達は未完了として報告・再レビューは変更hunkと影響項目に限定し共有契約や前提の変化時だけ範囲を広げる」のプロトコルに従う。findingは再現条件での再検証・再レビューまでopenのままとし、閉じる根拠に修正commit・差分と確認結果を残す。受入条件を満たせない指摘の先送りは収束に数えない（詳細は `skills/code-review/SKILL.md`）。
+### EXECUTE
 
-Checkerは必須条件（セルフレビュー、独立レビュー、repository policy・ユーザー指定のCIと承認）と補助観点（利用可能なボット指摘）に分ける。独立エージェントレビューはGitHubのowner approval等を代替しない。失敗側の停止条件は、同一原因の失敗3回・検証手段なし・要求矛盾で停止して報告する。ユーザーの訂正・繰り返しの失敗・制御の穴は、一時的な環境要因か再利用可能な制御の穴かを分け、後者のみ同じPRで skills/・AGENTS.md・docs/ へ書き戻す。区切り・待機時はIssue/PRに再開情報（目的と完了地点・branch/HEAD・未コミット作業・未解決finding・証跡・次の1手・外部待ち解除条件）を残し、再開時は要約と実状態を照合してから続行する。
+実装・targeted test・debug・修正・再検証は同じAgent Run内で回す。HarnessはHOWを細分化せず、Machine FloorとExit Contractだけを強制する。
 
-ループ文書自身（AGENTS.md・README・skills/・この文書）の整合は `node scripts/check-loop-docs.mjs` が機械検査する。スキル参照・frontmatter・内部リンク・節番号・廃止語彙を静的に確認し、文書のズレを検知する。
+### Machine Floor
 
+`scripts/assess-change.mjs` はPredicted Risk、差分からのMachine Risk、Agent Assessmentを統合する。Final Riskは最も高いTierを採用し、Agentは最低条件を引き下げられない。同じ考え方をRequired SkillsとVerification Floorにも適用する。
+
+Machine Riskはschema/migration、認証・認可、削除/retention、Agent orchestration、外部write/webhook等を決定論的にT3 floorへ引き上げる。より高いRiskが必要とAgentまたはReviewerが判断した場合は上積みする。
+
+### REVIEW
+
+T1はセルフレビュー可。T2で未解決の挙動前提がある場合とT3は独立Reviewerを必須とする。Reviewerはfresh contextで目的・Acceptance Criteria・差分・検証結果・関連caller/契約を読み、実装担当の結論を先に見ずに独立評価する。
+
+### AFTERCARE / Persistent State
+
+PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest HEADで確認する。タスク状態はIssue / PRを正本とし、Human Requestは保持する。Agent Spec・Machine-readable state・検証証跡を分離して残し、別SessionでもGitHubと実HEADを照合して再開できるようにする。
+
+### Model Profile
+
+Core Harnessはモデル非依存。`.agent/profiles/` はscaffolding量・context戦略・autonomy等だけを調整し、Risk Floor・Human Gate・State Transitionは変更しない。未登録モデルは `default.yaml` の `safe-standard` を利用する。Runtime固有設定は `.agent/runtime/` に置く。
+
+ループ文書自身（AGENTS.md・README・`.agent/workflow/`・skills/・この文書）の整合は `node scripts/check-loop-docs.mjs` が機械検査する。
 ## 6. Verification
 
 「全コマンドを毎回実行する」ことではなく、受入条件と関連する不変条件、必須確認を証明する。受入条件は要求工程でbullet化したものを全件照合し、`受入条件 → 確認方法 → 期待結果/実結果 → 対象commit → 証跡` の対応とともに検証した内容・未検証・残課題をPR・作業報告へ記録する。変更後は影響する条件を未検証に戻し、無関係な証跡は理由付きで再利用する。
