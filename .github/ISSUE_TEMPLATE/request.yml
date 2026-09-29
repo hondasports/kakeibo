@@ -1,0 +1,29 @@
+name: やりたいこと
+description: 新機能・改善・調査・設計など、実現したいことを気軽に書く
+title: ""
+body:
+  - type: markdown
+    attributes:
+      value: |
+        やりたいことを分かる範囲で書いてください。詳細な仕様・影響範囲・完了条件はAgentのREFINE工程でrepositoryを調査して整理します。
+
+  - type: textarea
+    id: request
+    attributes:
+      label: やりたいこと
+      description: 雑な内容でも構いません。
+      placeholder: 例）週入力画面で前週のカテゴリをコピーできるようにしたい。
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: 絶対に守りたいこと
+      description: 変更してほしくない仕様、制約、判断済み事項があれば記載してください。
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 補足・参考資料
+      description: スクリーンショット、関連Issue、参考URLなどがあれば記載してください。
