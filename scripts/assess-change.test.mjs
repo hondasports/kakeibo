@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assessChange } from "./assess-change.mjs";
+import { assessChange, parseArguments } from "./assess-change.mjs";
 
 describe("assessChange", () => {
   it("does not allow agent assessment to lower the machine floor", () => {
@@ -31,5 +31,14 @@ describe("assessChange", () => {
 
     expect(result.risk.final).toBe("T2");
     expect(result.review.independent).toBe(true);
+  });
+
+  it("rejects missing CLI option values", () => {
+    for (const option of ["--paths", "--predicted-risk", "--agent-assessment"]) {
+      expect(() => parseArguments([option])).toThrow(`${option} requires a value`);
+      expect(() => parseArguments([option, "--next-option"])).toThrow(
+        `${option} requires a value`,
+      );
+    }
   });
 });
