@@ -36,6 +36,7 @@ const MARKDOWN_LINK_PATTERN = /\[[^\]]*\]\(([^)\s]+)\)/g;
 const SKILL_NAME_PATTERN = /^skills\/([a-z0-9-]+)\/SKILL\.md$/;
 const SECTION_HEADING_PATTERN = /^## (\d+)\. /gm;
 
+/** Normalize repository paths before validation. */
 function normalizePath(value) {
   return String(value)
     .replaceAll("\\", "/")
@@ -44,6 +45,7 @@ function normalizePath(value) {
 
 const DOC_SCAN_ROOTS = ["AGENTS.md", "README.md", "docs", "skills", ".agent/workflow"];
 
+/** List documentation and workflow files covered by loop consistency checks. */
 export function listDocFiles(repoRoot) {
   const files = [];
   const walk = (relativeDir) => {
@@ -199,6 +201,7 @@ export function checkBannedVocabulary(docPath, content) {
   return errors;
 }
 
+/** Run all repository-level Agent Harness documentation consistency checks. */
 export function checkLoopDocs(repoRoot) {
   const errors = [];
   const docFiles = listDocFiles(repoRoot);

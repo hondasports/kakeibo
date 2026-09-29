@@ -59,26 +59,35 @@ export function resolveLoopStep({
   return { state: currentState, event, nextState, ...resolved };
 }
 
+/** Read a required CLI option value without consuming another flag. */
+function readOptionValue(args, index, optionName) {
+  const value = args[index + 1];
+  if (!value || value.startsWith("-")) {
+    throw new Error(`${optionName} requires a value`);
+  }
+  return value;
+}
+
 /** Parse CLI arguments for workflow state resolution. */
-function parseArgs(args) {
+export function parseArguments(args) {
   const out = { state: null, event: null, model: "", runtime: null, exit: null };
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--state") {
-      out.state = args[index + 1] ?? null;
+      out.state = readOptionValue(args, index, arg);
       index += 1;
     } else if (arg === "--event") {
-      out.event = args[index + 1] ?? null;
+      out.event = readOptionValue(args, index, arg);
       index += 1;
     } else if (arg === "--model") {
-      out.model = args[index + 1] ?? "";
+      out.model = readOptionValue(args, index, arg);
       index += 1;
     } else if (arg === "--runtime") {
-      out.runtime = args[index + 1] ?? null;
+      out.runtime = readOptionValue(args, index, arg);
       index += 1;
     } else if (arg === "--exit") {
-      out.exit = JSON.parse(args[index + 1] ?? "null");
+      out.exit = JSON.parse(readOptionValue(args, index, arg));
       index += 1;
     } else {
       throw new Error(`unknown option: ${arg}`);
@@ -94,7 +103,7 @@ function parseArgs(args) {
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
 if (invokedPath === fileURLToPath(import.meta.url)) {
   try {
-    console.log(JSON.stringify(resolveLoopStep(parseArgs(process.argv.slice(2))), null, 2));
+    console.log(JSON.stringify(resolveLoopStep(parseArguments(process.argv.slice(2))), null, 2));
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

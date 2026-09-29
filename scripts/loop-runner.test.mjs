@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveLoopStep } from "./loop-runner.mjs";
+import { parseArguments, resolveLoopStep } from "./loop-runner.mjs";
 
 describe("resolveLoopStep", () => {
   it("resolves an allowed state transition", () => {
@@ -16,7 +16,7 @@ describe("resolveLoopStep", () => {
   it("rejects undefined transitions", () => {
     expect(() =>
       resolveLoopStep({ state: "refine", event: "clean", model: "gpt-6-sol" }),
-    ).toThrow();
+    ).toThrow("event clean is not allowed from refine");
   });
 
   it("rejects review clean without validated exit evidence", () => {
@@ -53,5 +53,14 @@ describe("resolveLoopStep", () => {
     });
 
     expect(result.nextState).toBe("aftercare");
+  });
+
+  it("rejects missing CLI option values", () => {
+    for (const option of ["--state", "--event", "--model", "--runtime", "--exit"]) {
+      expect(() => parseArguments([option])).toThrow(`${option} requires a value`);
+      expect(() => parseArguments([option, "--next-option"])).toThrow(
+        `${option} requires a value`,
+      );
+    }
   });
 });
