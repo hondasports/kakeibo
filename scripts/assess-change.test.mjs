@@ -36,9 +36,7 @@ describe("assessChange", () => {
   it("rejects missing CLI option values", () => {
     for (const option of ["--paths", "--predicted-risk", "--agent-assessment"]) {
       expect(() => parseArguments([option])).toThrow(`${option} requires a value`);
-      expect(() => parseArguments([option, "--next-option"])).toThrow(
-        `${option} requires a value`,
-      );
+      expect(() => parseArguments([option, "--next-option"])).toThrow(`${option} requires a value`);
     }
   });
 });
