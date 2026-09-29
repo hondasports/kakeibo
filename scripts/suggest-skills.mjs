@@ -6,9 +6,8 @@ import { classifyChangedFiles } from "./classify-e2e-relevance.mjs";
 const COMMIT_REF_PATTERN = /^[0-9a-zA-Z][0-9a-zA-Z._/-]{0,127}$/;
 
 /**
- * Path-derived conditional-skill suggestions. Generic stage skills
- * (implementation / verification / code-review / delivery / pr-aftercare) are
- * always required and are not listed; judgement still applies on top.
+ * Path-derived capability-skill suggestions. Workflow stages are managed by
+ * .agent/process.yaml and are not represented as skills; judgement still applies on top.
  */
 const SKILL_SUGGESTION_RULES = [
   {

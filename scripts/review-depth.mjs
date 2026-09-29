@@ -108,7 +108,7 @@ const USAGE = `使い方: node scripts/review-depth.mjs <入力>
       "applied_tier": "T1 | T2 | T3 (省略時は最低深度。引き上げのみ可)"
     }
   --vocabulary: 評価語彙（軸・強制条件・ティア）を返す
-  軸ごとの評価基準と独立レビュー手順: skills/code-review/SKILL.md
+  独立レビュー手順: .agent/workflow/review.md
 
 出力: { minimum_tier, applied_tier, requirements }
   Agentが実差分（未コミット・未追跡を含む）を評価し、applied_tierの確認項目でセルフレビューする。
