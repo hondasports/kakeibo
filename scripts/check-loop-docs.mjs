@@ -203,8 +203,16 @@ export function checkLoopDocs(repoRoot) {
   const errors = [];
   const docFiles = listDocFiles(repoRoot);
   if (existsSync(path.join(repoRoot, ".agent"))) {
-    for (const required of [".agent/process.yaml", ".agent/profiles/default.yaml", ".agent/workflow/refine.md", ".agent/workflow/execute.md", ".agent/workflow/review.md", ".agent/workflow/aftercare.md"]) {
-      if (!existsSync(path.join(repoRoot, required))) errors.push(`Agent Harness必須ファイル ${required} が存在しません`);
+    for (const required of [
+      ".agent/process.yaml",
+      ".agent/profiles/default.yaml",
+      ".agent/workflow/refine.md",
+      ".agent/workflow/execute.md",
+      ".agent/workflow/review.md",
+      ".agent/workflow/aftercare.md",
+    ]) {
+      if (!existsSync(path.join(repoRoot, required)))
+        errors.push(`Agent Harness必須ファイル ${required} が存在しません`);
     }
   }
 
