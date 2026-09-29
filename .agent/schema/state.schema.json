@@ -8,15 +8,7 @@
       "const": 1
     },
     "state": {
-      "enum": [
-        "refine",
-        "execute",
-        "review",
-        "aftercare",
-        "incident",
-        "human_gate",
-        "done"
-      ]
+      "enum": ["refine", "execute", "review", "aftercare", "incident", "human_gate", "done"]
     },
     "attempt": {
       "type": "integer",
