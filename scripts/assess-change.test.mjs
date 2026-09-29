@@ -22,4 +22,14 @@ describe("assessChange", () => {
     expect(result.risk.final).toBe("T3");
     expect(result.review.independent).toBe(true);
   });
+
+  it("requires independent review when T2 has no agent assessment", () => {
+    const result = assessChange({
+      paths: ["src/features/foo/Foo.tsx"],
+      predictedRisk: "T2",
+    });
+
+    expect(result.risk.final).toBe("T2");
+    expect(result.review.independent).toBe(true);
+  });
 });
