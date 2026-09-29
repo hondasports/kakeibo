@@ -7,6 +7,7 @@ const DOC_SCAN_GLOBS = [
   /^README\.md$/,
   /^docs\/.*\.md$/,
   /^skills\/[^/]+\/SKILL\.md$/,
+  /^\.agent\/workflow\/.*\.md$/,
 ];
 
 const REQUIRED_FRONTMATTER_KEYS = ["name", "description", "license"];
@@ -25,7 +26,7 @@ const BANNED_VOCABULARY = [
 ];
 
 const PATH_REFERENCE_PATTERN =
-  /^(?:AGENTS\.md|\.env\.local|(?:docs|skills|scripts|e2e|convex|lib|src|\.github|\.windsurf|\.husky)\/[^\s"'`()[\]{}<>|*$]+)$/;
+  /^(?:AGENTS\.md|\.env\.local|(?:docs|skills|scripts|e2e|convex|lib|src|\.agent|\.github|\.windsurf|\.husky)\/[^\s"'`()[\]{}<>|*$]+)$/;
 
 const CODE_SPAN_PATTERN = /`([^`\n]+)`/g;
 
@@ -41,7 +42,7 @@ function normalizePath(value) {
     .replace(/^\.\/+/, "");
 }
 
-const DOC_SCAN_ROOTS = ["AGENTS.md", "README.md", "docs", "skills"];
+const DOC_SCAN_ROOTS = ["AGENTS.md", "README.md", "docs", "skills", ".agent/workflow"];
 
 export function listDocFiles(repoRoot) {
   const files = [];
@@ -201,6 +202,9 @@ export function checkBannedVocabulary(docPath, content) {
 export function checkLoopDocs(repoRoot) {
   const errors = [];
   const docFiles = listDocFiles(repoRoot);
+  for (const required of [".agent/process.yaml", ".agent/profiles/default.yaml", ".agent/workflow/refine.md", ".agent/workflow/execute.md", ".agent/workflow/review.md", ".agent/workflow/aftercare.md"]) {
+    if (!existsSync(path.join(repoRoot, required))) errors.push(`Agent Harness必須ファイル ${required} が存在しません`);
+  }
 
   errors.push(...checkAgentsSkillReferences(repoRoot));
 
