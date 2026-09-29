@@ -13,9 +13,7 @@ export function resolveLoopStep({
   runtime = null,
   root = process.cwd(),
 }) {
-  const processConfig = YAML.parse(
-    readFileSync(path.join(root, ".agent", "process.yaml"), "utf8"),
-  );
+  const processConfig = YAML.parse(readFileSync(path.join(root, ".agent", "process.yaml"), "utf8"));
   const currentState = state ?? processConfig.initial;
   const stateConfig = processConfig.states?.[currentState];
   if (!stateConfig) {

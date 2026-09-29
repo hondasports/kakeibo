@@ -27,9 +27,7 @@ const wildcard = (pattern, value) => {
 export function resolveAgentProfile({ model, runtime = null, root = process.cwd() }) {
   const profileDir = path.join(root, ".agent", "profiles");
   const runtimeDir = path.join(root, ".agent", "runtime");
-  const defaultProfile = YAML.parse(
-    readFileSync(path.join(profileDir, "default.yaml"), "utf8"),
-  );
+  const defaultProfile = YAML.parse(readFileSync(path.join(profileDir, "default.yaml"), "utf8"));
   let selected = null;
   let selectedFile = null;
 

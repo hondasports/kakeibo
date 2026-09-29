@@ -10,19 +10,14 @@ const tierIndex = (tier) => REVIEW_TIERS.indexOf(tier);
 const highestTier = (...tiers) =>
   tiers.filter(Boolean).sort((a, b) => tierIndex(b) - tierIndex(a))[0] ?? "T1";
 
-export function assessChange({
-  paths = [],
-  predictedRisk = "T1",
-  agentAssessment = null,
-} = {}) {
+export function assessChange({ paths = [], predictedRisk = "T1", agentAssessment = null } = {}) {
   const classification = classifyChangedFiles(paths);
   const machine = machineRiskForPaths(paths);
   const skillResult = suggestSkillsForPaths(paths);
   const agent = agentAssessment ? assessReviewDepth(agentAssessment) : null;
   const finalTier = highestTier(predictedRisk, machine.minimumTier, agent?.applied_tier);
   const uncertainty = agentAssessment?.risk_assessment?.uncertainty;
-  const independent =
-    finalTier === "T3" || (finalTier === "T2" && uncertainty === "some_unknowns");
+  const independent = finalTier === "T3" || (finalTier === "T2" && uncertainty === "some_unknowns");
   const verification = classification.runtimeRelevant
     ? { process: true, lint: true, unit: true, build: true, e2e: true }
     : { process: true, lint: false, unit: false, build: false, e2e: false };
