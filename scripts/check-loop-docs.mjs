@@ -210,6 +210,7 @@ export function checkLoopDocs(repoRoot) {
       ".agent/workflow/execute.md",
       ".agent/workflow/review.md",
       ".agent/workflow/aftercare.md",
+      ".agent/workflow/incident.md",
     ]) {
       if (!existsSync(path.join(repoRoot, required)))
         errors.push(`Agent Harness必須ファイル ${required} が存在しません`);

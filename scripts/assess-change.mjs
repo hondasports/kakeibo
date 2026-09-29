@@ -17,7 +17,9 @@ export function assessChange({ paths = [], predictedRisk = "T1", agentAssessment
   const agent = agentAssessment ? assessReviewDepth(agentAssessment) : null;
   const finalTier = highestTier(predictedRisk, machine.minimumTier, agent?.applied_tier);
   const uncertainty = agentAssessment?.risk_assessment?.uncertainty;
-  const independent = finalTier === "T3" || (finalTier === "T2" && uncertainty === "some_unknowns");
+  const independent =
+    finalTier === "T3" ||
+    (finalTier === "T2" && (!agentAssessment || uncertainty === "some_unknowns"));
   const verification = classification.runtimeRelevant
     ? { process: true, lint: true, unit: true, build: true, e2e: true }
     : { process: true, lint: false, unit: false, build: false, e2e: false };

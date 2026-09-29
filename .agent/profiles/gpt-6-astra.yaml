@@ -6,7 +6,7 @@ context:
   strategy: on_demand
 refine:
   autonomy: high
-  require_spec_contract: false
+  require_spec_contract: true
 execute:
   prefer_long_run: true
 review:
