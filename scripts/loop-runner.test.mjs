@@ -2,25 +2,27 @@ import { describe, expect, it } from "vitest";
 
 import { parseArguments, resolveLoopStep } from "./loop-runner.mjs";
 
+const MODEL = "gpt-6.1-sol";
+
 describe("resolveLoopStep", () => {
   it("resolves an allowed state transition", () => {
     const result = resolveLoopStep({
       state: "refine",
       event: "ready",
-      model: "gpt-6.1-sol",
+      model: MODEL,
       runtime: "codex",
     });
     expect(result.nextState).toBe("execute");
   });
 
   it("rejects undefined transitions", () => {
-    expect(() => resolveLoopStep({ state: "refine", event: "clean", model: "gpt-6.1-sol" })).toThrow(
+    expect(() => resolveLoopStep({ state: "refine", event: "clean", model: MODEL })).toThrow(
       "event clean is not allowed from refine",
     );
   });
 
   it("rejects review clean without validated exit evidence", () => {
-    expect(() => resolveLoopStep({ state: "review", event: "clean", model: "gpt-6.1-sol" })).toThrow(
+    expect(() => resolveLoopStep({ state: "review", event: "clean", model: MODEL })).toThrow(
       "review clean requires exit evidence",
     );
 
@@ -28,7 +30,7 @@ describe("resolveLoopStep", () => {
       resolveLoopStep({
         state: "review",
         event: "clean",
-        model: "gpt-6.1-sol",
+        model: MODEL,
         exit: {
           state: "review",
           event: "clean",
@@ -43,7 +45,7 @@ describe("resolveLoopStep", () => {
     const result = resolveLoopStep({
       state: "review",
       event: "clean",
-      model: "gpt-6.1-sol",
+      model: MODEL,
       exit: {
         state: "review",
         event: "clean",
