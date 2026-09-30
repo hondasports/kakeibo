@@ -34,6 +34,7 @@ export function resolveLoopStep({
   state,
   event = null,
   model,
+  profile = null,
   runtime = null,
   exit = null,
   root = process.cwd(),
@@ -45,7 +46,7 @@ export function resolveLoopStep({
     throw new Error(`unknown state: ${currentState}`);
   }
 
-  const resolved = resolveAgentProfile({ model, runtime, root });
+  const resolved = resolveAgentProfile({ model, profile, runtime, root });
   if (!event) {
     return { state: currentState, stateConfig, ...resolved };
   }
@@ -70,7 +71,7 @@ function readOptionValue(args, index, optionName) {
 
 /** Parse CLI arguments for workflow state resolution. */
 export function parseArguments(args) {
-  const out = { state: null, event: null, model: "", runtime: null, exit: null };
+  const out = { state: null, event: null, model: "", profile: null, runtime: null, exit: null };
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -82,6 +83,9 @@ export function parseArguments(args) {
       index += 1;
     } else if (arg === "--model") {
       out.model = readOptionValue(args, index, arg);
+      index += 1;
+    } else if (arg === "--profile") {
+      out.profile = readOptionValue(args, index, arg);
       index += 1;
     } else if (arg === "--runtime") {
       out.runtime = readOptionValue(args, index, arg);
