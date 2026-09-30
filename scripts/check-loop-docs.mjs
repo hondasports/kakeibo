@@ -209,6 +209,8 @@ export function checkLoopDocs(repoRoot) {
     for (const required of [
       ".agent/process.yaml",
       ".agent/profiles/default.yaml",
+      ".agent/profiles/standard.yaml",
+      ".agent/models/default.yaml",
       ".agent/workflow/refine.md",
       ".agent/workflow/execute.md",
       ".agent/workflow/review.md",
