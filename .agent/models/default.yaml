@@ -1,0 +1,13 @@
+name: default
+match:
+  - "*"
+provider: unknown
+recommended_profile: standard
+capabilities:
+  coding: unknown
+  agentic: unknown
+  tool_use: unknown
+effort:
+  parameter: null
+  supported: []
+  mapping: {}
