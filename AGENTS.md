@@ -32,6 +32,6 @@
 
 ## Runtime
 
-Codex / DevinなどのRuntime固有設定は `.agent/runtime/`、モデル固有の足場は `.agent/profiles/` に置く。Profileが存在しないモデルは `default.yaml` にフォールバックする。Core HarnessのRisk Floor・Human Gate・State TransitionはProfileで上書きしない。
+Codex / DevinなどのRuntime固有設定は `.agent/runtime/`、タスク強度は `.agent/profiles/`、モデル固有の能力・effort差分は `.agent/models/` に置く。Model名でProfileを増やさない。Profile未指定時はModel Registryの `recommended_profile`、未知モデルは `standard` にフォールバックする。Core HarnessのRisk Floor・Human Gate・State TransitionはProfile / Model Registryで上書きしない。
 
 環境・公開手順は `docs/development-process.md` を参照する。
