@@ -7,20 +7,20 @@ describe("resolveLoopStep", () => {
     const result = resolveLoopStep({
       state: "refine",
       event: "ready",
-      model: "gpt-6-sol",
+      model: "gpt-6.1-sol",
       runtime: "codex",
     });
     expect(result.nextState).toBe("execute");
   });
 
   it("rejects undefined transitions", () => {
-    expect(() => resolveLoopStep({ state: "refine", event: "clean", model: "gpt-6-sol" })).toThrow(
+    expect(() => resolveLoopStep({ state: "refine", event: "clean", model: "gpt-6.1-sol" })).toThrow(
       "event clean is not allowed from refine",
     );
   });
 
   it("rejects review clean without validated exit evidence", () => {
-    expect(() => resolveLoopStep({ state: "review", event: "clean", model: "gpt-6-sol" })).toThrow(
+    expect(() => resolveLoopStep({ state: "review", event: "clean", model: "gpt-6.1-sol" })).toThrow(
       "review clean requires exit evidence",
     );
 
@@ -28,7 +28,7 @@ describe("resolveLoopStep", () => {
       resolveLoopStep({
         state: "review",
         event: "clean",
-        model: "gpt-6-sol",
+        model: "gpt-6.1-sol",
         exit: {
           state: "review",
           event: "clean",
@@ -43,7 +43,7 @@ describe("resolveLoopStep", () => {
     const result = resolveLoopStep({
       state: "review",
       event: "clean",
-      model: "gpt-6-sol",
+      model: "gpt-6.1-sol",
       exit: {
         state: "review",
         event: "clean",
@@ -56,7 +56,7 @@ describe("resolveLoopStep", () => {
   });
 
   it("rejects missing CLI option values", () => {
-    for (const option of ["--state", "--event", "--model", "--runtime", "--exit"]) {
+    for (const option of ["--state", "--event", "--model", "--profile", "--runtime", "--exit"]) {
       expect(() => parseArguments([option])).toThrow(`${option} requires a value`);
       expect(() => parseArguments([option, "--next-option"])).toThrow(`${option} requires a value`);
     }
