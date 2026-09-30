@@ -115,7 +115,8 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 | エージェントの常時適用ルール   | `AGENTS.md`                     |
 | Agent State Machine            | `.agent/process.yaml`           |
 | 変更Risk・必須検証の統合判定   | `scripts/assess-change.mjs`     |
-| Model Profile                   | `.agent/profiles/`              |
+| Task Profile                    | `.agent/profiles/`              |
+| Model Registry                   | `.agent/models/`                |
 | Capability Skill                | `skills/*/SKILL.md`             |
 | 開発プロセス、PR、CI            | `docs/development-process.md`   |
 | 認証ガード設計                 | `docs/auth-guard.md`            |
@@ -124,16 +125,16 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 
 ## エージェント作業
 
-SuzumemoはVendor-neutralなAgent Harnessをrepository側に持ちます。`AGENTS.md` は共通契約、`.agent/process.yaml` はState Machine、`.agent/profiles/` はモデル別の足場、`.agent/runtime/` はCodex / Devin等のRuntime差分を定義します。
+SuzumemoはVendor-neutralなAgent Harnessをrepository側に持ちます。`AGENTS.md` は共通契約、`.agent/process.yaml` はState Machine、`.agent/profiles/` はタスク強度、`.agent/models/` はモデル能力とeffort差分、`.agent/runtime/` はCodex / Devin等のRuntime差分を定義します。
 
 基本Stateは `REFINE → EXECUTE → REVIEW → AFTERCARE → DONE` です。Issueは詳細仕様を必須とせず、REFINEでrepositoryを調査してAcceptance Criteriaを補完します。Machine Risk Floor・必須検証・Required SkillsはAgent判断で引き下げられません。
 
-既知モデルは専用Profileを使い、未登録モデルは `.agent/profiles/default.yaml` の `safe-standard` へフォールバックします。
+Profileは `fast / standard / deep / max` の共通4段階とし、Model名ごとのProfileは作りません。Profile未指定時は `.agent/models/` の `recommended_profile` を使い、未知モデルは `standard` へフォールバックします。Model Registryはprovider固有のeffort対応だけを吸収し、Core HarnessのRisk FloorやState Transitionは変更しません。
 
 ```bash
-pnpm loop:profile -- --model gpt-6-sol --runtime codex
+pnpm loop:profile -- --model gpt-6.1-sol --profile deep --runtime codex
 pnpm loop:assess -- --paths convex/schema.ts --predicted-risk T1
-pnpm loop:state -- --model gpt-6-sol --runtime codex --state refine --event ready
+pnpm loop:state -- --model swe-2 --profile standard --runtime devin --state refine --event ready
 ```
 ## ローカル状態とsecret
 
