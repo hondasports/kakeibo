@@ -4,76 +4,124 @@ import { fileURLToPath } from "node:url";
 
 import YAML from "yaml";
 
-/** Recursively merge a model profile override onto its default profile. */
-const merge = (base, override) => {
-  if (!base || typeof base !== "object" || Array.isArray(base)) {
-    return override;
-  }
-
-  const out = { ...base };
-  for (const [key, value] of Object.entries(override ?? {})) {
-    out[key] =
-      value && typeof value === "object" && !Array.isArray(value)
-        ? merge(base[key] ?? {}, value)
-        : value;
-  }
-  return out;
-};
-
 /** Match a model name against a simple asterisk wildcard pattern. */
 const wildcard = (pattern, value) => {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*");
+  const escaped = pattern.replace(/[.+?^$()|[\]\\]/g, "\\$&").replaceAll("*", ".*");
   return new RegExp(`^${escaped}$`, "i").test(value);
 };
 
-/** Resolve the effective model profile and optional runtime adapter configuration. */
-export function resolveAgentProfile({ model, runtime = null, root = process.cwd() }) {
-  const profileDir = path.join(root, ".agent", "profiles");
-  const runtimeDir = path.join(root, ".agent", "runtime");
-  const defaultProfile = YAML.parse(readFileSync(path.join(profileDir, "default.yaml"), "utf8"));
-  let selected = null;
-  let selectedFile = null;
+/** Read a YAML file from the Agent Harness. */
+const readYaml = (filePath) => YAML.parse(readFileSync(filePath, "utf8"));
 
-  for (const file of readdirSync(profileDir).filter(
+/** Resolve a model definition, falling back to the vendor-neutral default. */
+function resolveModelDefinition({ model, modelDir }) {
+  const fallback = readYaml(path.join(modelDir, "default.yaml"));
+
+  for (const file of readdirSync(modelDir).filter(
     (name) => name.endsWith(".yaml") && name !== "default.yaml",
   )) {
-    const candidate = YAML.parse(readFileSync(path.join(profileDir, file), "utf8"));
+    const candidate = readYaml(path.join(modelDir, file));
     if ((candidate.match ?? []).some((pattern) => wildcard(pattern, model))) {
-      selected = candidate;
-      selectedFile = file;
-      break;
+      return { modelSource: file, modelConfig: candidate };
     }
   }
 
-  const profile = merge(defaultProfile, selected ?? {});
+  return { modelSource: "default.yaml", modelConfig: fallback };
+}
+
+/** Resolve abstract task effort into the provider/model-specific effort level. */
+function resolveEffort({ model, modelSource, modelConfig, requested }) {
+  const supported = modelConfig.effort?.supported ?? [];
+  const mapping = modelConfig.effort?.mapping ?? {};
+  const resolved = mapping[requested] ?? (supported.includes(requested) ? requested : null);
+
+  if (modelSource !== "default.yaml" && requested && !resolved) {
+    throw new Error(`model ${model} cannot resolve effort ${requested}`);
+  }
+
+  return {
+    requested: requested ?? null,
+    resolved,
+    parameter: modelConfig.effort?.parameter ?? null,
+    supported,
+  };
+}
+
+/** Resolve task profile, model registry entry, effort mapping, and runtime adapter. */
+export function resolveAgentProfile({
+  model,
+  profile: requestedProfile = null,
+  runtime = null,
+  root = process.cwd(),
+}) {
+  const profileDir = path.join(root, ".agent", "profiles");
+  const modelDir = path.join(root, ".agent", "models");
+  const runtimeDir = path.join(root, ".agent", "runtime");
+  const profileIndex = readYaml(path.join(profileDir, "default.yaml"));
+  const { modelSource, modelConfig } = resolveModelDefinition({ model, modelDir });
+
+  const profileName =
+    requestedProfile ?? modelConfig.recommended_profile ?? profileIndex.default_profile;
+  if (!(profileIndex.available ?? []).includes(profileName)) {
+    throw new Error(`unknown profile: ${profileName}`);
+  }
+
+  const profilePath = path.join(profileDir, `${profileName}.yaml`);
+  if (!existsSync(profilePath)) {
+    throw new Error(`profile file not found: ${profileName}.yaml`);
+  }
+  const profile = readYaml(profilePath);
+  const effort = resolveEffort({
+    model,
+    modelSource,
+    modelConfig,
+    requested: profile.effort,
+  });
+
   let runtimeConfig = null;
   if (runtime) {
     const runtimePath = path.join(runtimeDir, `${runtime}.yaml`);
     if (existsSync(runtimePath)) {
-      runtimeConfig = YAML.parse(readFileSync(runtimePath, "utf8"));
+      runtimeConfig = readYaml(runtimePath);
     }
   }
 
   return {
     model,
-    profileSource: selectedFile ?? "default.yaml",
+    modelSource,
+    modelConfig,
+    profileSource: `${profileName}.yaml`,
     profile,
+    effort,
     runtime: runtimeConfig,
   };
 }
 
-/** Parse CLI arguments for model profile resolution. */
-function parseArgs(args) {
+/** Read a required CLI option value without consuming another flag. */
+function readOptionValue(args, index, optionName) {
+  const value = args[index + 1];
+  if (!value || value.startsWith("-")) {
+    throw new Error(`${optionName} requires a value`);
+  }
+  return value;
+}
+
+/** Parse CLI arguments for task profile and model resolution. */
+export function parseArgs(args) {
   let model = "";
+  let profile = null;
   let runtime = null;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--model") {
-      model = args[index + 1] ?? "";
+      model = readOptionValue(args, index, arg);
+      index += 1;
+    } else if (arg === "--profile") {
+      profile = readOptionValue(args, index, arg);
       index += 1;
     } else if (arg === "--runtime") {
-      runtime = args[index + 1] ?? null;
+      runtime = readOptionValue(args, index, arg);
       index += 1;
     } else {
       throw new Error(`unknown option: ${arg}`);
@@ -83,7 +131,7 @@ function parseArgs(args) {
   if (!model) {
     throw new Error("--model is required");
   }
-  return { model, runtime };
+  return { model, profile, runtime };
 }
 
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
