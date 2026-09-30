@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { classifyChangedFiles } from "./classify-e2e-relevance.mjs";
 import { machineRiskForPaths } from "./machine-risk.mjs";
 import { assessReviewDepth, REVIEW_TIERS } from "./review-depth.mjs";
-import { suggestSkillsForPaths } from "./suggest-skills.mjs";
+import { readChangedPaths, suggestSkillsForPaths } from "./suggest-skills.mjs";
 
 /** Return the ordering index for a review tier. */
 const tierIndex = (tier) => REVIEW_TIERS.indexOf(tier);
@@ -13,16 +13,30 @@ const highestTier = (...tiers) =>
   tiers.filter(Boolean).sort((a, b) => tierIndex(b) - tierIndex(a))[0] ?? "T1";
 
 /** Assess changed paths and combine machine, predicted, and agent review floors. */
-export function assessChange({ paths = [], predictedRisk = "T1", agentAssessment = null } = {}) {
+export function assessChange({
+  paths = [],
+  predictedRisk = "T1",
+  agentAssessment = null,
+  reviewerAssessment = null,
+} = {}) {
   const classification = classifyChangedFiles(paths);
   const machine = machineRiskForPaths(paths);
   const skillResult = suggestSkillsForPaths(paths);
   const agent = agentAssessment ? assessReviewDepth(agentAssessment) : null;
-  const finalTier = highestTier(predictedRisk, machine.minimumTier, agent?.applied_tier);
+  const reviewer = reviewerAssessment ? assessReviewDepth(reviewerAssessment) : null;
+  const finalTier = highestTier(
+    predictedRisk,
+    machine.minimumTier,
+    agent?.applied_tier,
+    reviewer?.applied_tier,
+  );
   const uncertainty = agentAssessment?.risk_assessment?.uncertainty;
   const independent =
     finalTier === "T3" ||
-    (finalTier === "T2" && (!agentAssessment || uncertainty === "some_unknowns"));
+    (finalTier === "T2" &&
+      (!agentAssessment ||
+        uncertainty === "some_unknowns" ||
+        reviewerAssessment?.risk_assessment?.uncertainty === "some_unknowns"));
   const verification = classification.runtimeRelevant
     ? { process: true, lint: true, unit: true, build: true, e2e: true }
     : { process: true, lint: false, unit: false, build: false, e2e: false };
@@ -33,6 +47,7 @@ export function assessChange({ paths = [], predictedRisk = "T1", agentAssessment
       machine: machine.minimumTier,
       machineFloorTriggers: machine.floorTriggers,
       agent: agent?.applied_tier ?? null,
+      reviewer: reviewer?.applied_tier ?? null,
       final: finalTier,
     },
     requiredSkills: skillResult.suggestions.map((item) => item.skill),
@@ -53,12 +68,15 @@ function readOptionValue(args, index, optionName) {
 
 /** Parse CLI arguments for change assessment. */
 export function parseArguments(args) {
-  const out = { paths: [], predictedRisk: "T1", agentAssessment: null };
+  const out = { predictedRisk: "T1", agentAssessment: null };
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--paths") {
       out.paths = readOptionValue(args, index, arg).split(",").filter(Boolean);
+      index += 1;
+    } else if (arg === "--base") {
+      out.base = readOptionValue(args, index, arg);
       index += 1;
     } else if (arg === "--predicted-risk") {
       out.predictedRisk = readOptionValue(args, index, arg);
@@ -80,7 +98,9 @@ export function parseArguments(args) {
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
 if (invokedPath === fileURLToPath(import.meta.url)) {
   try {
-    console.log(JSON.stringify(assessChange(parseArguments(process.argv.slice(2))), null, 2));
+    const args = parseArguments(process.argv.slice(2));
+    const paths = args.paths ?? readChangedPaths({ base: args.base });
+    console.log(JSON.stringify(assessChange({ ...args, paths }), null, 2));
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

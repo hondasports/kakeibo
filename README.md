@@ -131,10 +131,12 @@ SuzumemoはVendor-neutralなAgent Harnessをrepository側に持ちます。`AGEN
 
 Profileは `fast / standard / deep / max` の共通4段階とし、Model名ごとのProfileは作りません。Profile未指定時は `.agent/models/` の `recommended_profile` を使い、未知モデルは `standard` へフォールバックします。Model Registryはprovider固有のeffort対応だけを吸収し、Core HarnessのRisk FloorやState Transitionは変更しません。
 
+開始・再開・検証・PRへの状態保存は [Agent Harness操作手順](docs/agent-harness.md) に従います。`loop:profile` は設定確認用、タスクの入口は `loop:state` です。
+
 ```bash
-pnpm loop:profile -- --model gpt-6.1-sol --profile deep --runtime codex
-pnpm loop:assess -- --paths convex/schema.ts --predicted-risk T1
-pnpm loop:state -- --model swe-2 --profile standard --runtime devin --state refine --event ready
+node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --model unknown --runtime codex --implementer session-id
+node scripts/loop-runner.mjs
+node scripts/assess-change.mjs --base origin/preview
 ```
 ## ローカル状態とsecret
 

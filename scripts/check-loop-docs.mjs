@@ -208,6 +208,12 @@ export function checkLoopDocs(repoRoot) {
   if (existsSync(path.join(repoRoot, ".agent"))) {
     for (const required of [
       ".agent/process.yaml",
+      ".agent/schema/spec.schema.json",
+      ".agent/schema/state.schema.json",
+      ".agent/schema/exit.schema.json",
+      ".agent/schema/assessment.schema.json",
+      ".agent/runtime/codex.yaml",
+      ".agent/runtime/devin.yaml",
       ".agent/profiles/default.yaml",
       ".agent/profiles/standard.yaml",
       ".agent/models/default.yaml",
