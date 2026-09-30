@@ -1,0 +1,7 @@
+name: fast
+effort: low
+autonomy: high
+delegation: minimal
+verification: targeted
+context:
+  strategy: targeted
