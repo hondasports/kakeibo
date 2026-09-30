@@ -1,0 +1,24 @@
+name: gpt-6-astra
+match:
+  - gpt-6-astra
+  - gpt-6-astra-*
+provider: openai
+recommended_profile: standard
+capabilities:
+  coding: true
+  agentic: true
+  tool_use: true
+  computer_use: true
+effort:
+  parameter: reasoning.effort
+  supported:
+    - low
+    - medium
+    - high
+    - xhigh
+    - max
+  mapping:
+    low: low
+    medium: medium
+    high: high
+    max: max
