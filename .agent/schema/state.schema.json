@@ -1,28 +1,123 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Suzumemo Loop State",
+  "title": "Persistent Agent Task",
   "type": "object",
-  "required": ["version", "state", "attempt"],
+  "required": [
+    "version",
+    "taskId",
+    "implementer",
+    "state",
+    "head",
+    "baseRef",
+    "baseHead",
+    "branch",
+    "risk",
+    "attempt",
+    "spec",
+    "configuration",
+    "skills",
+    "verification",
+    "counters",
+    "history"
+  ],
   "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "head": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseHead": {
+      "type": "string",
+      "minLength": 1
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1
+    },
     "version": {
-      "const": 1
+      "const": 2
     },
     "state": {
       "enum": ["refine", "execute", "review", "aftercare", "incident", "human_gate", "done"]
+    },
+    "risk": {
+      "enum": ["T1", "T2", "T3"]
     },
     "attempt": {
       "type": "integer",
       "minimum": 0
     },
-    "head": {
-      "type": ["string", "null"]
+    "spec": {
+      "type": "object"
     },
-    "risk": {
-      "enum": ["T1", "T2", "T3"]
+    "configuration": {
+      "type": "object"
     },
-    "openFindings": {
-      "type": "integer",
-      "minimum": 0
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verification": {
+      "type": "object"
+    },
+    "counters": {
+      "type": "object",
+      "required": ["review", "ci", "sameFailure"],
+      "properties": {
+        "review": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ci": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sameFailure": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "assessment": {
+      "type": ["object", "null"]
+    },
+    "agentAssessment": {
+      "type": ["object", "null"]
+    },
+    "review": {
+      "type": ["object", "null"]
+    },
+    "aftercare": {
+      "type": ["object", "null"]
+    },
+    "lastFailure": {
+      "type": ["object", "null"]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
     }
   },
   "additionalProperties": false

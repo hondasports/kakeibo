@@ -201,6 +201,8 @@ Agent taskで残す価値があるもの:
 
 `AGENTS.md` はRuntime共通契約、`.agent/process.yaml` はState Transitionの正本とする。基本Stateは `REFINE / EXECUTE / REVIEW / AFTERCARE`、例外Stateは `INCIDENT / HUMAN_GATE`。Workflow本体をCodexやDevinの個別設定へ複製しない。
 
+具体的な開始・再開・状態保存は [Agent Harness操作手順](agent-harness.md) を参照する。
+
 ### REFINE
 
 Issueは詳細仕様を必須としない。Agentはrepository、既存仕様、テストを調査してHuman Requestを実装可能なAgent Specへ育てる。調査で解ける疑問は自力で解決し、既存patternに沿う可逆・低影響な判断はAssumptionとして記録する。Product / UX / Security / Data semanticsをmaterially変える未確定事項だけHUMAN_GATEへ送る。
@@ -215,6 +217,8 @@ Spec GateはGoal、1件以上のAcceptance Criteria、Non-goals、Assumptions、
 
 `scripts/assess-change.mjs` はPredicted Risk、差分からのMachine Risk、Agent Assessmentを統合する。Final Riskは最も高いTierを採用し、Agentは最低条件を引き下げられない。同じ考え方をRequired SkillsとVerification Floorにも適用する。
 
+評価CLIは引数省略時にPR baseまたは明示されたbaseからcommit済み・未commit・未追跡の差分を取得する。`--paths` は診断用途のみで、タスクとCIのゲートはGit実差分を再取得する。
+
 Machine Riskはschema/migration、認証・認可、削除/retention、Agent orchestration、外部write/webhook等を決定論的にT3 floorへ引き上げる。より高いRiskが必要とAgentまたはReviewerが判断した場合は上積みする。
 
 ### REVIEW
@@ -223,7 +227,7 @@ T1はセルフレビュー可。T2で未解決の挙動前提がある場合とT
 
 ### AFTERCARE / Persistent State
 
-PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest HEADで確認する。タスク状態はIssue / PRを正本とし、Human Requestは保持する。Agent Spec・Machine-readable state・検証証跡を分離して残し、別SessionでもGitHubと実HEADを照合して再開できるようにする。
+PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest HEADで確認する。タスク状態はIssue / PRを正本とし、Human Requestは保持する。Agent Spec・Machine-readable state・検証証跡を分離して残し、別SessionでもGitHubと実HEADを照合して再開できるようにする。状態はGitメタデータ内に作業キャッシュを保存し、PR本文の状態ブロックへ同期する。HEADまたはbase更新時は検証・レビューを失効させる。ブラウザ受入条件のない変更のE2EはPR CIで実行し、AFTERCAREの必須チェックとして成功を要求する。
 
 ### Task Profile / Model Registry
 

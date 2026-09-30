@@ -11,4 +11,6 @@ Acceptance Criteriaを満たす最小差分を実装し、必要な検証が通�
 
 ## Exit
 
-実装と要求検証が揃い、未解決blockerがなければ `ready`。仕様判断が必要なら `decision_required`。
+`loop-runner --verify` でHEADに紐づくprocess・必要なlint/unit/buildを記録する。ブラウザ受入条件がある場合は対象E2Eをlocal実行する。PR CI担当のE2Eはpendingとして残し、AFTERCAREで成功を必須とする。
+
+実装とこの工程の要求検証が揃い、未解決blockerがなければ `ready`。仕様判断が必要なら `decision_required`。

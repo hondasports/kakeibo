@@ -20,6 +20,7 @@ states:
     on:
       clean: aftercare
       findings: execute
+      repeated_failure: incident
       decision_required: human_gate
 
   aftercare:
@@ -28,6 +29,7 @@ states:
       ready: done
       ci_failure: execute
       findings: execute
+      repeated_failure: incident
       decision_required: human_gate
 
   incident:

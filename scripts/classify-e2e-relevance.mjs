@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const PROCESS_ONLY_SCRIPT_PATTERN =
-  /^scripts\/(?:review-depth|check-task-worktree|check-loop-docs|collect-pr-findings|suggest-skills|machine-risk|assess-change|resolve-agent-profile|loop-runner)(?:\.test)?\.mjs$/;
+  /^scripts\/(?:review-depth|check-task-worktree|check-loop-docs|collect-pr-findings|suggest-skills|machine-risk|assess-change|resolve-agent-profile|loop-(?:runner|policy|schema|pr-check|test-fixtures))(?:\.test)?\.mjs$/;
 
 /** Normalize a Git path to a stable repository-relative form. */
 export function normalizeChangedPath(filePath) {

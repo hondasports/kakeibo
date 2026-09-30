@@ -25,6 +25,32 @@
     "openFindings": {
       "type": "integer",
       "minimum": 0
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resolution": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reassessment": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approval": {
+      "type": "object",
+      "required": ["source", "reference"],
+      "properties": {
+        "source": {
+          "const": "user"
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

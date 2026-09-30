@@ -81,6 +81,7 @@ export function resolveAgentProfile({
   let runtimeConfig = null;
   if (runtime) {
     const runtimePath = path.join(runtimeDir, `${runtime}.yaml`);
+    if (!existsSync(runtimePath)) throw new Error(`unknown runtime: ${runtime}`);
     if (existsSync(runtimePath)) {
       runtimeConfig = readYaml(runtimePath);
     }
