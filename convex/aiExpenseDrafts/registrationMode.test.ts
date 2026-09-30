@@ -121,6 +121,57 @@ async function seed(t: ReturnType<typeof convexTest>) {
 }
 
 describe("registrationMode persistence and aggregation", () => {
+  it.each(["updateRegisteredDraft", "updateForReview"] as const)(
+    "%s は101件の保存済み明細を全件使って登録済み支出を更新する",
+    async (mutation) => {
+      const t = convexTest(schema, convexTestModules);
+      const ids = await seed(t);
+      await t.run(async (ctx) => {
+        for (let index = 0; index < 99; index += 1) {
+          await ctx.db.insert("aiExpenseDraftItems", {
+            groupId: ids.groupId,
+            draftId: ids.draftId,
+            itemName: `追加明細${index}`,
+            amountYen: 10,
+            categoryId: index % 2 === 0 ? ids.foodId : ids.dailyId,
+            confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+            createdAt: index + 2,
+            updatedAt: index + 2,
+          });
+        }
+      });
+      const authed = t.withIdentity(identity);
+      const base = {
+        draftId: ids.draftId,
+        date: "2026-08-26",
+        amountYen: 2190,
+        categoryId: ids.foodId,
+        shopName: "スーパー青葉",
+        registrationMode: "detailed" as const,
+      };
+      if (mutation === "updateRegisteredDraft") {
+        await authed.mutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft, base);
+      } else {
+        await authed.mutation(api.aiExpenseDrafts.mutations.updateForReview, {
+          ...base,
+          documentType: "receipt",
+        });
+      }
+
+      const entries = await t.run(async (ctx) =>
+        ctx.db
+          .query("expenseEntries")
+          .withIndex("by_group_id_and_ai_expense_draft_id", (q) =>
+            q.eq("groupId", ids.groupId).eq("aiExpenseDraftId", ids.draftId),
+          )
+          .collect(),
+      );
+      expect(entries).toHaveLength(2);
+      expect(entries.find((entry) => entry.categoryId === ids.foodId)?.amount).toBe(900);
+      expect(entries.find((entry) => entry.categoryId === ids.dailyId)?.amount).toBe(1290);
+    },
+  );
+
   it("切替・再送・集計で同じ支出を一度だけ扱い、OCR明細を保持する", async () => {
     const t = convexTest(schema, convexTestModules);
     const ids = await seed(t);
