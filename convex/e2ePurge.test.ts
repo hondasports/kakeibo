@@ -450,6 +450,27 @@ describe("e2ePurge orphan purge", () => {
     );
   });
 
+  it("runOrphanPurge は APP_ENV=development 以外で no-op（skipped）になる", async () => {
+    process.env.APP_ENV = "production";
+    const t = convexTest(schema, convexTestModules);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("groups", {
+        name: "orphan-group",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    });
+
+    const result = await t.action(internal.e2ePurge.runOrphanPurge, {});
+
+    expect(result.skipped).toBe(true);
+    expect(result.hasMore).toBe(false);
+    expect(result.stats.groupsDeleted).toBe(0);
+    const groups = await t.run(async (ctx) => ctx.db.query("groups").collect());
+    expect(groups).toHaveLength(1);
+  });
+
   it("ページング: numItems を超える group がある場合は isDone=false と cursor を返す", async () => {
     const t = convexTest(schema, convexTestModules);
     await t.run(async (ctx) => {

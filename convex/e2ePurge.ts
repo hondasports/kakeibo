@@ -25,6 +25,8 @@ import { TERMINAL_EMAIL_JOB_STATUSES } from "../lib/domain/email/rules";
 const PURGE_BATCH_LIMIT = 200;
 const GROUP_DELETE_BATCH = 25;
 const PURGE_ACTION_BUDGET_MS = 8 * 60 * 1000;
+// 残留が purge 速度を上回る暴走を防ぐ self-reschedule の連鎖上限。
+const MAX_PURGE_CHAIN_DEPTH = 10;
 
 const stepResultValidator = v.object({
   deletedCount: v.number(),
@@ -34,33 +36,39 @@ const stepResultValidator = v.object({
 
 const purgeStatsValidator = v.object({
   groupsDeleted: v.number(),
+  groupsSkipped: v.number(),
   groupDeleteFailed: v.number(),
   orphanGroupDocsDeleted: v.number(),
   deletionJobsDeleted: v.number(),
   emailJobsDeleted: v.number(),
   emailEventsDeleted: v.number(),
   seedUsersDeleted: v.number(),
+  stepFailures: v.number(),
 });
 
 export type OrphanPurgeStats = {
   groupsDeleted: number;
+  groupsSkipped: number;
   groupDeleteFailed: number;
   orphanGroupDocsDeleted: number;
   deletionJobsDeleted: number;
   emailJobsDeleted: number;
   emailEventsDeleted: number;
   seedUsersDeleted: number;
+  stepFailures: number;
 };
 
 function emptyStats(): OrphanPurgeStats {
   return {
     groupsDeleted: 0,
+    groupsSkipped: 0,
     groupDeleteFailed: 0,
     orphanGroupDocsDeleted: 0,
     deletionJobsDeleted: 0,
     emailJobsDeleted: 0,
     emailEventsDeleted: 0,
     seedUsersDeleted: 0,
+    stepFailures: 0,
   };
 }
 
@@ -309,15 +317,22 @@ async function drainPurgeSteps(
       if (overDeadline()) {
         break;
       }
-      const res: {
-        deletedCount: number;
-        skippedCount: number;
-        failedCount: number;
-      } = await ctx.runMutation(internal.e2ePurge.purgeGroupsBatch, {
-        groupIds: scan.orphanIds.slice(index, index + GROUP_DELETE_BATCH),
-      });
-      stats.groupsDeleted += res.deletedCount;
-      stats.groupDeleteFailed += res.failedCount;
+      try {
+        const res: {
+          deletedCount: number;
+          skippedCount: number;
+          failedCount: number;
+        } = await ctx.runMutation(internal.e2ePurge.purgeGroupsBatch, {
+          groupIds: scan.orphanIds.slice(index, index + GROUP_DELETE_BATCH),
+        });
+        stats.groupsDeleted += res.deletedCount;
+        stats.groupsSkipped += res.skippedCount;
+        stats.groupDeleteFailed += res.failedCount;
+      } catch {
+        // バッチ自体の失敗（commit時エラー等）で drain 全体を止めない。
+        // cursor は進んでいるので、失敗分は次回 scan で再検出される。
+        stats.stepFailures += 1;
+      }
     }
   }
 
@@ -327,14 +342,21 @@ async function drainPurgeSteps(
     let done = false;
     let cursor: string | null = null;
     while (!done && !overDeadline()) {
-      const res: { deletedCount: number; isDone: boolean; continueCursor: string } =
-        await ctx.runMutation(internal.e2ePurge.purgeOrphanGroupScopedDocsStep, {
-          table,
-          paginationOpts: { numItems: PURGE_BATCH_LIMIT, cursor },
-        });
-      stats.orphanGroupDocsDeleted += res.deletedCount;
-      done = res.isDone;
-      cursor = res.continueCursor;
+      try {
+        const res: { deletedCount: number; isDone: boolean; continueCursor: string } =
+          await ctx.runMutation(internal.e2ePurge.purgeOrphanGroupScopedDocsStep, {
+            table,
+            paginationOpts: { numItems: PURGE_BATCH_LIMIT, cursor },
+          });
+        stats.orphanGroupDocsDeleted += res.deletedCount;
+        done = res.isDone;
+        cursor = res.continueCursor;
+      } catch {
+        // 同じ cursor で再実行しても失敗する poisoned batch を避けてこのテーブルを諦める。
+        stats.stepFailures += 1;
+        hasMore = true;
+        break;
+      }
     }
     if (!done) {
       hasMore = true;
@@ -353,13 +375,19 @@ async function drainPurgeSteps(
     let done = false;
     let cursor: string | null = null;
     while (!done && !overDeadline()) {
-      const res: { deletedCount: number; isDone: boolean; continueCursor: string } =
-        await ctx.runMutation(step.fn, {
-          paginationOpts: { numItems: PURGE_BATCH_LIMIT, cursor },
-        });
-      stats[step.key] += res.deletedCount;
-      done = res.isDone;
-      cursor = res.continueCursor;
+      try {
+        const res: { deletedCount: number; isDone: boolean; continueCursor: string } =
+          await ctx.runMutation(step.fn, {
+            paginationOpts: { numItems: PURGE_BATCH_LIMIT, cursor },
+          });
+        stats[step.key] += res.deletedCount;
+        done = res.isDone;
+        cursor = res.continueCursor;
+      } catch {
+        stats.stepFailures += 1;
+        hasMore = true;
+        break;
+      }
     }
     if (!done) {
       hasMore = true;
@@ -372,21 +400,24 @@ async function drainPurgeSteps(
 // 日次 cron 用の internal action。development 以外では no-op。
 // バジェット超過で残りがある場合は self-schedule して処理を継続する。
 export const runOrphanPurge = internalAction({
-  args: {},
+  args: { chainDepth: v.optional(v.number()) },
   returns: v.object({
     skipped: v.boolean(),
     hasMore: v.boolean(),
     stats: purgeStatsValidator,
   }),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     if (!isE2eAppEnvironment()) {
       return { skipped: true, hasMore: false, stats: emptyStats() };
     }
 
+    const chainDepth = args.chainDepth ?? 0;
     const stats = emptyStats();
     const hasMore = await drainPurgeSteps(ctx, stats, PURGE_ACTION_BUDGET_MS);
-    if (hasMore) {
-      await ctx.scheduler.runAfter(0, internal.e2ePurge.runOrphanPurge, {});
+    if (hasMore && chainDepth < MAX_PURGE_CHAIN_DEPTH) {
+      await ctx.scheduler.runAfter(0, internal.e2ePurge.runOrphanPurge, {
+        chainDepth: chainDepth + 1,
+      });
     }
     return { skipped: false, hasMore, stats };
   },
