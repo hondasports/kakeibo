@@ -4,6 +4,7 @@ import { resendWebhookHandler } from "./email/webhooks/resendWebhook";
 import { lineWebhookHandler } from "./lineWebhook/webhook";
 import { e2eCleanupHandler } from "./e2eHttp/e2eCleanup";
 import { e2eCleanupAuthCheckHandler } from "./e2eHttp/e2eAuth";
+import { e2ePurgeOrphansHandler } from "./e2ePurge";
 import {
   cleanupSystemAdminMembershipHandler,
   seedSystemAdminMembershipHandler,
@@ -35,6 +36,11 @@ http.route({
   path: "/e2e/cleanup",
   method: "POST",
   handler: e2eCleanupHandler,
+});
+http.route({
+  path: "/e2e/purge-orphans",
+  method: "POST",
+  handler: e2ePurgeOrphansHandler,
 });
 http.route({
   path: "/e2e/seed-system-admin-membership",
