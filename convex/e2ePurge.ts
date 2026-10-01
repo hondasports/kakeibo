@@ -35,7 +35,7 @@ const stepResultValidator = v.object({
 const purgeStatsValidator = v.object({
   groupsDeleted: v.number(),
   groupDeleteFailed: v.number(),
-  auditLogsDeleted: v.number(),
+  orphanGroupDocsDeleted: v.number(),
   deletionJobsDeleted: v.number(),
   emailJobsDeleted: v.number(),
   emailEventsDeleted: v.number(),
@@ -45,7 +45,7 @@ const purgeStatsValidator = v.object({
 export type OrphanPurgeStats = {
   groupsDeleted: number;
   groupDeleteFailed: number;
-  auditLogsDeleted: number;
+  orphanGroupDocsDeleted: number;
   deletionJobsDeleted: number;
   emailJobsDeleted: number;
   emailEventsDeleted: number;
@@ -56,13 +56,30 @@ function emptyStats(): OrphanPurgeStats {
   return {
     groupsDeleted: 0,
     groupDeleteFailed: 0,
-    auditLogsDeleted: 0,
+    orphanGroupDocsDeleted: 0,
     deletionJobsDeleted: 0,
     emailJobsDeleted: 0,
     emailEventsDeleted: 0,
     seedUsersDeleted: 0,
   };
 }
+
+// 物理削除済み group を指す group-scoped ドキュメントを掃除する対象テーブル。
+// 全テーブルで `groupId: v.id("groups")` が必須フィールドであることが前提。
+const ORPHAN_GROUP_SCOPED_TABLES = [
+  "groupMembers",
+  "groupInvitations",
+  "managementAuditLogs",
+  "sourceDocuments",
+  "expenseEntries",
+  "receipts",
+  "weekSessions",
+  "categories",
+  "aiExpenseDrafts",
+  "aiExpenseDraftItems",
+  "receiptAnalysisBatches",
+  "receiptAnalysisImageJobs",
+] as const;
 
 type DbReader = Pick<QueryCtx, "db">["db"];
 
@@ -133,18 +150,48 @@ export const purgeGroupsBatch = internalMutation({
   },
 });
 
-// 参照先 group が物理削除済みの managementAuditLogs を掃除する。
-export const purgeOrphanAuditLogsStep = internalMutation({
-  args: { paginationOpts: paginationOptsValidator },
+// 参照先 group が物理削除済みの group-scoped ドキュメントを掃除する。
+// purge の group cascade と併用し、過去の不完全削除や並行 E2E 実行で残った
+// 孤児ドキュメント（死んだ groupId を指す doc）を除去する。
+export const purgeOrphanGroupScopedDocsStep = internalMutation({
+  args: {
+    table: v.union(
+      v.literal("groupMembers"),
+      v.literal("groupInvitations"),
+      v.literal("managementAuditLogs"),
+      v.literal("sourceDocuments"),
+      v.literal("expenseEntries"),
+      v.literal("receipts"),
+      v.literal("weekSessions"),
+      v.literal("categories"),
+      v.literal("aiExpenseDrafts"),
+      v.literal("aiExpenseDraftItems"),
+      v.literal("receiptAnalysisBatches"),
+      v.literal("receiptAnalysisImageJobs"),
+    ),
+    paginationOpts: paginationOptsValidator,
+  },
   returns: stepResultValidator,
   handler: async (ctx, args) => {
-    const result = await ctx.db.query("managementAuditLogs").paginate(args.paginationOpts);
+    const result = await ctx.db.query(args.table).paginate(args.paginationOpts);
     let deletedCount = 0;
-    for (const log of result.page) {
-      if ((await ctx.db.get(log.groupId)) === null) {
-        await ctx.db.delete(log._id);
-        deletedCount += 1;
+    for (const doc of result.page) {
+      const record = doc as { groupId?: Id<"groups">; imageStorageId?: Id<"_storage"> };
+      if (record.groupId === undefined || (await ctx.db.get(record.groupId)) !== null) {
+        continue;
       }
+      if (record.imageStorageId !== undefined) {
+        const metadata = await ctx.db.system.get("_storage", record.imageStorageId);
+        if (metadata !== null) {
+          try {
+            await ctx.storage.delete(record.imageStorageId);
+          } catch {
+            // storage 削除失敗でも doc 削除は続行する。
+          }
+        }
+      }
+      await ctx.db.delete(doc._id);
+      deletedCount += 1;
     }
     return { deletedCount, isDone: result.isDone, continueCursor: result.continueCursor };
   },
@@ -274,16 +321,34 @@ async function drainPurgeSteps(
     }
   }
 
-  // 2. 参照先 group が消えた運用レコードの掃除
+  // 2. 死んだ groupId を指す group-scoped ドキュメントを全対象テーブルで掃除
+  let hasMore = !groupScanDone;
+  for (const table of ORPHAN_GROUP_SCOPED_TABLES) {
+    let done = false;
+    let cursor: string | null = null;
+    while (!done && !overDeadline()) {
+      const res: { deletedCount: number; isDone: boolean; continueCursor: string } =
+        await ctx.runMutation(internal.e2ePurge.purgeOrphanGroupScopedDocsStep, {
+          table,
+          paginationOpts: { numItems: PURGE_BATCH_LIMIT, cursor },
+        });
+      stats.orphanGroupDocsDeleted += res.deletedCount;
+      done = res.isDone;
+      cursor = res.continueCursor;
+    }
+    if (!done) {
+      hasMore = true;
+    }
+  }
+
+  // 3. 参照先を失った運用レコード・メール記録の掃除
   const tableSteps = [
-    { fn: internal.e2ePurge.purgeOrphanAuditLogsStep, key: "auditLogsDeleted" },
     { fn: internal.e2ePurge.purgeOrphanDeletionJobsStep, key: "deletionJobsDeleted" },
     { fn: internal.e2ePurge.purgeTerminalEmailJobsStep, key: "emailJobsDeleted" },
     { fn: internal.e2ePurge.purgeEmailWebhookEventsStep, key: "emailEventsDeleted" },
     { fn: internal.e2ePurge.purgeOrphanSeedUsersStep, key: "seedUsersDeleted" },
   ] as const;
 
-  let hasMore = !groupScanDone;
   for (const step of tableSteps) {
     let done = false;
     let cursor: string | null = null;

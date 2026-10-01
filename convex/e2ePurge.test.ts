@@ -232,6 +232,22 @@ describe("e2ePurge orphan purge", () => {
         targetKind: "member",
         createdAt: 1,
       });
+      const orphanWeekSessionId = await ctx.db.insert("weekSessions", {
+        groupId: deadGroupId,
+        weekStartDate: "2026-01-05",
+        weekEndDate: "2026-01-11",
+        status: "draft",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const liveWeekSessionId = await ctx.db.insert("weekSessions", {
+        groupId: liveGroupId,
+        weekStartDate: "2026-01-05",
+        weekEndDate: "2026-01-11",
+        status: "draft",
+        createdAt: 1,
+        updatedAt: 1,
+      });
 
       const orphanJobId = await ctx.db.insert("groupDeletionJobs", {
         targetGroupIdSnapshot: deadGroupId,
@@ -286,6 +302,8 @@ describe("e2ePurge orphan purge", () => {
         deadGroupId,
         orphanAuditLogId,
         liveAuditLogId,
+        orphanWeekSessionId,
+        liveWeekSessionId,
         orphanJobId,
         liveJobId,
         runningJobId,
@@ -297,11 +315,19 @@ describe("e2ePurge orphan purge", () => {
       await ctx.db.delete(ids.deadGroupId);
     });
 
-    const auditResult = await t.mutation(internal.e2ePurge.purgeOrphanAuditLogsStep, {
+    const auditResult = await t.mutation(internal.e2ePurge.purgeOrphanGroupScopedDocsStep, {
+      table: "managementAuditLogs",
       paginationOpts: { numItems: 100, cursor: null },
     });
     expect(auditResult.deletedCount).toBe(1);
     expect(auditResult.isDone).toBe(true);
+
+    const weekSessionResult = await t.mutation(internal.e2ePurge.purgeOrphanGroupScopedDocsStep, {
+      table: "weekSessions",
+      paginationOpts: { numItems: 100, cursor: null },
+    });
+    expect(weekSessionResult.deletedCount).toBe(1);
+    expect(weekSessionResult.isDone).toBe(true);
 
     const jobResult = await t.mutation(internal.e2ePurge.purgeOrphanDeletionJobsStep, {
       paginationOpts: { numItems: 100, cursor: null },
@@ -311,10 +337,12 @@ describe("e2ePurge orphan purge", () => {
 
     const remaining = await t.run(async (ctx) => ({
       auditLogs: await ctx.db.query("managementAuditLogs").collect(),
+      weekSessions: await ctx.db.query("weekSessions").collect(),
       jobs: await ctx.db.query("groupDeletionJobs").collect(),
       recipients: await ctx.db.query("groupDeletionNotificationRecipients").collect(),
     }));
     expect(remaining.auditLogs.map((l) => l._id)).toEqual([ids.liveAuditLogId]);
+    expect(remaining.weekSessions.map((w) => w._id)).toEqual([ids.liveWeekSessionId]);
     expect(remaining.jobs.map((j) => j._id)).toEqual(
       expect.arrayContaining([ids.liveJobId, ids.runningJobId]),
     );
