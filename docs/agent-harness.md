@@ -6,6 +6,8 @@
 
 ## 開始と再開
 
+`AGENTS.md` はGit管理された実行契約であり、worktree作成時にGitが対象branchの版を展開する。Agentが毎回新規作成するSkillではない。作業先worktreeの版を参照し、同じSession内では同一内容をcanonical checkoutから重複して読み込まず、既読・未変更の内容も再読しない。checkoutや更新で契約内容が変わった場合は読み直す。
+
 1. 専用worktreeでclean baselineを確認する。
 2. 作業仕様JSONをリポジトリ外（例: `/tmp/spec.json`）に作る。必須フィールドは `.agent/schema/spec.schema.json` を参照。`predictedRisk` も必須。Human Requestを改変せずGoal/AC/Non-goals/Assumptions/Verification Strategyを整理する。
 3. 次を実行し、解決されたProfileと現在のworkflowを読む。正確なモデルIDが取得できない場合は `unknown` を渡し、standardへフォールバックした事実を報告する。
@@ -39,7 +41,7 @@ node scripts/loop-runner.mjs --verify build
 node scripts/loop-runner.mjs --event ready
 ```
 
-必要な検証のみ実行する。固定コマンドをCLIが起動し、終了結果を現在HEAD/baseへ紐づける。processはドキュメント整合とprocessテスト、lintはlintとformat、unitはVitest全体、buildは本番ビルド。dirty treeでは証跡を確定しない。HEAD/base更新で古い検証・レビューは失効する。`git fetch origin` 後も状態を再確認する。
+必要な検証のみ実行する。固定コマンドをCLIが起動し、終了結果を現在HEAD/baseへ紐づける。processはドキュメント整合とprocessテスト、lintはlintとformat、unitはVitest全体、buildは本番ビルド。dirty treeでは証跡を確定しない。HEAD/base更新で古い検証・レビューは失効する。不変性を証明した検証証跡の再利用は未実装であり、過去の結果を現在HEAD/baseの検証成功として扱わない。`git fetch origin` 後も状態を再確認する。
 
 同じ検証コマンド・終了コードが連続して3回失敗した場合はINCIDENTへ停止する。修正前後で原因が変わったと判断する場合も、INCIDENTのresolutionに切り分け証拠を記録して解除する。単なる再試行でカウンタをリセットしない。
 
