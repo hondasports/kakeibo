@@ -11,6 +11,6 @@ Acceptance Criteriaを満たす最小差分を実装し、必要な検証が通�
 
 ## Exit
 
-`loop-runner --verify` でHEADに紐づくprocess・必要なlint/unit/buildを記録する。ブラウザ受入条件がある場合は対象E2Eをlocal実行する。PR CI担当のE2Eはpendingとして残し、AFTERCAREで成功を必須とする。
+`loop-runner --verify` でHEADに紐づくprocess・必要なlint/unit/buildを記録する。ブラウザ受入条件がある場合は対象E2Eをlocal実行する。E2Eが必須と判定され、PR CIで確認する場合はpendingとして残し、AFTERCAREでpublic/authenticated両方の成功を要求する。文書・工程管理のみなど差分判定でE2E対象外となる変更には、このCI待ちを追加しない。実行対象の判定は `docs/development-process.md` の「PR CI E2Eの差分判定」に従う。
 
 実装とこの工程の要求検証が揃い、未解決blockerがなければ `ready`。仕様判断が必要なら `decision_required`。
