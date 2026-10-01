@@ -203,6 +203,8 @@ Agent taskで残す価値があるもの:
 
 具体的な開始・再開・状態保存は [Agent Harness操作手順](agent-harness.md) を参照する。
 
+軽量化とREFINE終了時のProfile自動判定を実装する際は [Agent Harness設計](agent-harness-design.md) を正本とする。この設計は未実装であり、本節の現行運用とState Transitionを設計文書だけで変更しない。
+
 ### REFINE
 
 Issueは詳細仕様を必須としない。Agentはrepository、既存仕様、テストを調査してHuman Requestを実装可能なAgent Specへ育てる。調査で解ける疑問は自力で解決し、既存patternに沿う可逆・低影響な判断はAssumptionとして記録する。Product / UX / Security / Data semanticsをmaterially変える未確定事項だけHUMAN_GATEへ送る。
