@@ -133,6 +133,8 @@ Profileは `fast / standard / deep / max` の共通4段階とし、Model名ご�
 
 開始・再開・検証・PRへの状態保存は [Agent Harness操作手順](docs/agent-harness.md) に従います。`loop:profile` は設定確認用、タスクの入口は `loop:state` です。
 
+軽量化とREFINE終了時のProfile自動判定の実装仕様は [Agent Harness設計](docs/agent-harness-design.md) を参照してください。これは未実装の設計で、現在のCLIや安全ゲートを変更するものではありません。
+
 ```bash
 node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --model unknown --runtime codex --implementer session-id
 node scripts/loop-runner.mjs

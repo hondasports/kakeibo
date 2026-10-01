@@ -38,4 +38,6 @@ repository編集タスクの開始時は `docs/agent-harness.md` の入口手順
 
 Codex / DevinなどのRuntime固有設定は `.agent/runtime/`、タスク強度は `.agent/profiles/`、モデル固有の能力・effort差分は `.agent/models/` に置く。Model名でProfileを増やさない。Profile未指定時はModel Registryの `recommended_profile`、未知モデルは `standard` にフォールバックする。Core HarnessのRisk Floor・Human Gate・State TransitionはProfile / Model Registryで上書きしない。
 
+軽量化・REFINE終了時のProfile自動判定の実装仕様は `docs/agent-harness-design.md`（未実装）。現行操作は `docs/agent-harness.md` に従う。
+
 環境・公開手順は `docs/development-process.md` を参照する。

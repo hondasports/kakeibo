@@ -2,6 +2,8 @@
 
 このCLIはタスクごとの仕様・Profile・評価・検証・レビュー・停止条件を接続する。AGENTS.mdを入口としてAgentが起動する。Codex/Devin自体を自動起動したり、実行中のモデルのreasoning effortを変更する機能はない。Profileのeffortはruntimeへ渡す推奨値であり、ホスト側の適用を確認できない場合は適用済みと報告しない。autonomy/delegation/contextはAgentが遵守する方針、verification=thoroughは追加のlocal検証として機械適用する。
 
+本書は現行CLIの操作手順を記載する。軽量化・REFINE終了時のProfile自動判定の実装仕様は [Agent Harness設計](agent-harness-design.md) を参照する。自動判定、Runtimeへの設定適用、出力・検証・証跡管理の変更は未実装であり、現在は本書の手順を使う。
+
 ## 開始と再開
 
 1. 専用worktreeでclean baselineを確認する。
