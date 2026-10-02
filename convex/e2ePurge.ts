@@ -194,7 +194,8 @@ export const purgeOrphanGroupScopedDocsStep = internalMutation({
           try {
             await ctx.storage.delete(record.imageStorageId);
           } catch {
-            // storage 削除失敗でも doc 削除は続行する。
+            // storage 削除に成功するまで参照を保持し、次回の purge で再試行する。
+            continue;
           }
         }
       }
@@ -296,12 +297,15 @@ async function drainPurgeSteps(
   ctx: RunnerCtx,
   stats: OrphanPurgeStats,
   budgetMs: number,
-): Promise<boolean> {
+): Promise<{ hasMore: boolean; shouldReschedule: boolean }> {
   const deadline = Date.now() + budgetMs;
   const overDeadline = () => Date.now() >= deadline;
+  // 時間予算超過で残った step だけ self-reschedule 対象。失敗 step は次回 cron に委ねる。
+  let shouldReschedule = false;
 
   // 1. memberless groups の cascade 削除
   let groupScanDone = false;
+  let groupScanFailed = false;
   let groupCursor: string | null = null;
   while (!groupScanDone && !overDeadline()) {
     const scan: {
@@ -332,14 +336,22 @@ async function drainPurgeSteps(
         // バッチ自体の失敗（commit時エラー等）で drain 全体を止めない。
         // cursor は進んでいるので、失敗分は次回 scan で再検出される。
         stats.stepFailures += 1;
+        groupScanFailed = true;
       }
     }
   }
 
   // 2. 死んだ groupId を指す group-scoped ドキュメントを全対象テーブルで掃除
-  let hasMore = !groupScanDone;
+  let hasMore = false;
+  if (!groupScanDone) {
+    hasMore = true;
+    if (!groupScanFailed) {
+      shouldReschedule = true;
+    }
+  }
   for (const table of ORPHAN_GROUP_SCOPED_TABLES) {
     let done = false;
+    let failed = false;
     let cursor: string | null = null;
     while (!done && !overDeadline()) {
       try {
@@ -354,12 +366,15 @@ async function drainPurgeSteps(
       } catch {
         // 同じ cursor で再実行しても失敗する poisoned batch を避けてこのテーブルを諦める。
         stats.stepFailures += 1;
-        hasMore = true;
+        failed = true;
         break;
       }
     }
     if (!done) {
       hasMore = true;
+      if (!failed) {
+        shouldReschedule = true;
+      }
     }
   }
 
@@ -373,6 +388,7 @@ async function drainPurgeSteps(
 
   for (const step of tableSteps) {
     let done = false;
+    let failed = false;
     let cursor: string | null = null;
     while (!done && !overDeadline()) {
       try {
@@ -385,16 +401,19 @@ async function drainPurgeSteps(
         cursor = res.continueCursor;
       } catch {
         stats.stepFailures += 1;
-        hasMore = true;
+        failed = true;
         break;
       }
     }
     if (!done) {
       hasMore = true;
+      if (!failed) {
+        shouldReschedule = true;
+      }
     }
   }
 
-  return hasMore;
+  return { hasMore, shouldReschedule };
 }
 
 // 日次 cron 用の internal action。development 以外では no-op。
@@ -413,8 +432,8 @@ export const runOrphanPurge = internalAction({
 
     const chainDepth = args.chainDepth ?? 0;
     const stats = emptyStats();
-    const hasMore = await drainPurgeSteps(ctx, stats, PURGE_ACTION_BUDGET_MS);
-    if (hasMore && chainDepth < MAX_PURGE_CHAIN_DEPTH) {
+    const { hasMore, shouldReschedule } = await drainPurgeSteps(ctx, stats, PURGE_ACTION_BUDGET_MS);
+    if (shouldReschedule && chainDepth < MAX_PURGE_CHAIN_DEPTH) {
       await ctx.scheduler.runAfter(0, internal.e2ePurge.runOrphanPurge, {
         chainDepth: chainDepth + 1,
       });
@@ -430,7 +449,7 @@ export const e2ePurgeOrphansHandler = httpAction(async (ctx, req) => {
   }
 
   const stats = emptyStats();
-  const hasMore = await drainPurgeSteps(ctx, stats, PURGE_ACTION_BUDGET_MS);
+  const { hasMore } = await drainPurgeSteps(ctx, stats, PURGE_ACTION_BUDGET_MS);
 
   return new Response(JSON.stringify({ ok: true, hasMore, stats }), {
     status: 200,

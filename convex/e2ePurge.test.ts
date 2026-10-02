@@ -555,4 +555,28 @@ describe("e2ePurgeOrphansHandler", () => {
     expect(ctx.runQuery).toHaveBeenCalled();
     expect(ctx.runMutation).toHaveBeenCalled();
   });
+
+  it("step のバッチ失敗は握りつぶさず hasMore=true と stepFailures を返す", async () => {
+    process.env.APP_ENV = "development";
+    process.env.E2E_CLEANUP_SECRET = E2E_SECRET;
+    const ctx = {
+      runQuery: vi.fn().mockResolvedValue({ orphanIds: [], isDone: true, continueCursor: "" }),
+      runMutation: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("poisoned batch"))
+        .mockResolvedValue({ deletedCount: 0, isDone: true, continueCursor: "" }),
+    } as unknown as ActionCtx;
+
+    const response = await e2ePurgeOrphansHandler(ctx, purgeRequest());
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      ok: boolean;
+      hasMore: boolean;
+      stats: Record<string, number>;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.hasMore).toBe(true);
+    expect(body.stats.stepFailures).toBe(1);
+  });
 });
