@@ -2,7 +2,6 @@ import type { UserIdentity } from "convex/server";
 import { vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { createExpenseEntries } from "./mutations";
 
 // ---------------------------------------------------------------------------
 // テスト用型定義
