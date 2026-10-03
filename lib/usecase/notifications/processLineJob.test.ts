@@ -68,6 +68,28 @@ describe("processLineNotificationJob", () => {
     expect(runner.completeJob).not.toHaveBeenCalled();
   });
 
+  it("does not send from a send-authorization response received after its lease expired", async () => {
+    let current = 10_000;
+    const job = makeJob({ leaseUntil: 40_000 });
+    const runner = {
+      claimJob: vi.fn().mockResolvedValue({ claimed: true, job }),
+      authorizeSend: vi.fn().mockImplementation(async () => {
+        current = 50_000;
+        return { claimed: true, job };
+      }),
+      completeJob: vi.fn().mockResolvedValue(undefined),
+    };
+    const sender = { send: vi.fn().mockResolvedValue({ kind: "sent" }) };
+
+    await processLineNotificationJob(
+      { runner, sender, now: () => current },
+      { jobId: "job-1", retryKeyCandidate: RETRY_KEY },
+    );
+
+    expect(sender.send).not.toHaveBeenCalled();
+    expect(runner.completeJob).not.toHaveBeenCalled();
+  });
+
   it("sends the snapshot text/recipient with the persisted retryKey and marks sent", async () => {
     const { deps, sender, runner } = makeDeps({});
     await processLineNotificationJob(deps, { jobId: "job-1", retryKeyCandidate: RETRY_KEY });
@@ -160,7 +182,11 @@ describe("processLineNotificationJob", () => {
       const { deps, runner } = makeDeps({
         claimResult: {
           claimed: true,
-          job: makeJob({ attemptCount: 4, firstAttemptAt: 0 }),
+          job: makeJob({
+            attemptCount: 4,
+            firstAttemptAt: 0,
+            leaseUntil: now + 30_000,
+          }),
         },
         sendResult: { kind: "retryable", errorCode: "provider_unavailable" },
         now: () => now,
@@ -177,7 +203,7 @@ describe("processLineNotificationJob", () => {
   it("fails without sending when the post-claim clock has passed the retry-key deadline", async () => {
     const deadline = 24 * 60 * 60 * 1000;
     let current = deadline - 1_000;
-    const job = makeJob({ firstAttemptAt: 0 });
+    const job = makeJob({ firstAttemptAt: 0, leaseUntil: deadline + 30_000 });
     const runner = {
       claimJob: vi.fn().mockImplementation(async () => {
         current = deadline + 2_000;
@@ -205,7 +231,7 @@ describe("processLineNotificationJob", () => {
   it("fails without sending when the post-claim clock lands exactly on the deadline", async () => {
     const deadline = 24 * 60 * 60 * 1000;
     let current = deadline - 1;
-    const job = makeJob({ firstAttemptAt: 0 });
+    const job = makeJob({ firstAttemptAt: 0, leaseUntil: deadline + 30_000 });
     const runner = {
       claimJob: vi.fn().mockImplementation(async () => {
         current = deadline;
@@ -232,7 +258,7 @@ describe("processLineNotificationJob", () => {
   it("still sends when the post-claim clock is one ms before the deadline", async () => {
     const deadline = 24 * 60 * 60 * 1000;
     let current = deadline - 2;
-    const job = makeJob({ firstAttemptAt: 0 });
+    const job = makeJob({ firstAttemptAt: 0, leaseUntil: deadline + 30_000 });
     const runner = {
       claimJob: vi.fn().mockImplementation(async () => {
         current = deadline - 1;
@@ -261,7 +287,11 @@ describe("processLineNotificationJob", () => {
   it("still sends on the 6th claim while within the retry-key TTL", async () => {
     const deadline = 24 * 60 * 60 * 1000;
     let current = deadline - 500;
-    const job = makeJob({ attemptCount: 6, firstAttemptAt: 0 });
+    const job = makeJob({
+      attemptCount: 6,
+      firstAttemptAt: 0,
+      leaseUntil: deadline + 30_000,
+    });
     const runner = {
       claimJob: vi.fn().mockImplementation(async () => {
         current = deadline - 1;

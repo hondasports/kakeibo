@@ -7,19 +7,23 @@ function createDeps({
   job,
   suppression = null,
   deliveryDecision = { enabled: true },
+  deliveryDecisionError,
   sendResult = { ok: true as const, providerMessageId: "msg-1" },
   now = () => 5000,
 }: {
   job: Record<string, unknown> | null;
   suppression?: Record<string, unknown> | null;
   deliveryDecision?: { enabled: boolean; reason?: string };
+  deliveryDecisionError?: Error;
   sendResult?: { ok: true; providerMessageId: string } | { ok: false; error: EmailProviderError };
   now?: () => number;
 }) {
   const runner: EmailJobActionRunner = {
     getJob: vi.fn().mockResolvedValue(job),
     findSuppression: vi.fn().mockResolvedValue(suppression),
-    getNotificationDeliveryDecision: vi.fn().mockResolvedValue(deliveryDecision),
+    getNotificationDeliveryDecision: deliveryDecisionError
+      ? vi.fn().mockRejectedValue(deliveryDecisionError)
+      : vi.fn().mockResolvedValue(deliveryDecision),
     markJobSent: vi.fn().mockResolvedValue(undefined),
     markJobRetrying: vi.fn().mockResolvedValue(undefined),
     markJobTerminal: vi.fn().mockResolvedValue(undefined),
@@ -132,6 +136,45 @@ describe("processEmailJob", () => {
       userId: "user-1",
     });
     expect(deps.sender.send).toHaveBeenCalled();
+  });
+
+  it("marks retrying and reschedules without sending when the policy check is temporarily unavailable", async () => {
+    const deps = createDeps({
+      job: queuedJob,
+      deliveryDecisionError: new Error("temporary query failure"),
+    });
+    await processEmailJob(deps, { jobId: "job-1" });
+
+    expect(deps.sender.send).not.toHaveBeenCalled();
+    expect(deps.runner.markJobRetrying).toHaveBeenCalledWith({
+      jobId: "job-1",
+      status: "retrying",
+      attemptCount: 1,
+      nextRetryAt: 5000 + 60 * 1000,
+      errorMessage: "Notification delivery decision unavailable",
+      errorCode: "notification_decision_unavailable",
+      updatedAt: 5000,
+    });
+    expect(deps.scheduler.scheduleProcessJob).toHaveBeenCalledWith(60 * 1000, "job-1");
+    expect(deps.runner.markJobTerminal).not.toHaveBeenCalled();
+  });
+
+  it("fails without sending when the policy check is unavailable at the attempt limit", async () => {
+    const deps = createDeps({
+      job: { ...queuedJob, status: "retrying", attemptCount: 5 },
+      deliveryDecisionError: new Error("temporary query failure"),
+    });
+    await processEmailJob(deps, { jobId: "job-1" });
+
+    expect(deps.sender.send).not.toHaveBeenCalled();
+    expect(deps.runner.markJobTerminal).toHaveBeenCalledWith({
+      jobId: "job-1",
+      status: "failed",
+      errorMessage: "Notification delivery decision unavailable",
+      errorCode: "notification_decision_unavailable",
+      updatedAt: 5000,
+    });
+    expect(deps.scheduler.scheduleProcessJob).not.toHaveBeenCalled();
   });
 
   it("fails the job on invalid payload JSON", async () => {

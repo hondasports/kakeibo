@@ -43,6 +43,9 @@ export async function processLineNotificationJob(
   if (!sendAuthorization.claimed) return;
 
   const sendJob = sendAuthorization.job;
+  if (sendJob.leaseUntil === undefined || now() >= sendJob.leaseUntil) {
+    return;
+  }
   if (
     sendJob.firstAttemptAt !== undefined &&
     now() >= sendJob.firstAttemptAt + LINE_RETRY_KEY_TTL_MS
