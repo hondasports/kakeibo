@@ -203,6 +203,42 @@ describe("command reference checks", () => {
     expect(errors).toHaveLength(0);
   });
 
+  it("skips flags before the script name in pnpm run calls", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "`pnpm run --if-present e2e:smoke` と `pnpm run -r dev`",
+      scripts,
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it("still validates the script name after pnpm run flags", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "`pnpm run --if-present missing-script`",
+      scripts,
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("missing-script");
+  });
+
+  it("strips full-width punctuation after a script path", () => {
+    const repo = makeRepo();
+    write(repo, "package.json", JSON.stringify({ scripts: {} }));
+    write(repo, "AGENTS.md", "x");
+    write(repo, "scripts/real.mjs", "export {}");
+    write(
+      repo,
+      "docs/guide.md",
+      "（node scripts/real.mjs）で確認する。node scripts/gone.mjs。は失敗",
+    );
+    const result = checkLoopDocs(repo);
+    expect(result.errors.some((e) => e.includes("scripts/real.mjs"))).toBe(false);
+    expect(result.errors.some((e) => e.includes("scripts/gone.mjs"))).toBe(true);
+  });
+
   it("fails on a missing node/tsx script path", () => {
     const repo = makeRepo();
     write(repo, "package.json", JSON.stringify({ scripts: {} }));

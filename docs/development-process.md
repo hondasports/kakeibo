@@ -104,7 +104,7 @@ PASS条件:
 
 FAILしたまま編集しない。
 
-`docs/`、`README.md`、`CHANGELOG.md`だけのpure docsは理由を記録して例外にできる。ただし次はpure docs扱いしない。
+`docs/`、`README.md`だけのpure docsは理由を記録して例外にできる。ただし次はpure docs扱いしない。
 
 - `AGENTS.md`
 - `skills/`

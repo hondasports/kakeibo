@@ -36,9 +36,9 @@ const CODE_SPAN_PATTERN = /`([^`\n]+)`/g;
 
 // Command references (inline or fenced code) — unlike code-span paths these are
 // matched in the whole document text so they are checked wherever they appear.
-const PNPM_RUN_PATTERN = /\bpnpm run\s+([a-zA-Z0-9:._-]+)/g;
+const PNPM_RUN_PATTERN = /\bpnpm run(?:\s+-{1,2}[a-zA-Z][a-zA-Z0-9-]*)*\s+([a-zA-Z0-9:._-]+)/g;
 const PNPM_COLON_SCRIPT_PATTERN = /\bpnpm\s+([a-zA-Z0-9._-]+:[a-zA-Z0-9:._-]+)/g;
-const NODE_SCRIPT_PATTERN = /\b(?:node|tsx)\s+(scripts\/[^\s"'`]+)/g;
+const NODE_SCRIPT_PATTERN = /\b(?:node|tsx)\s+(scripts\/[a-zA-Z0-9/._-]+)/g;
 
 /** Referenced but not required to exist (gitignored, or documented as removed). */
 const REFERENCE_ALLOWLIST = [/^\.env\.local$/, /^docs\/generated\//, /^convex\/export\.ts$/];
@@ -244,6 +244,8 @@ export function checkCommandReferences(repoRoot, docPath, content, packageScript
   const text = String(content);
   if (packageScripts !== null) {
     for (const match of text.matchAll(PNPM_RUN_PATTERN)) {
+      // A leading dash means the capture is a flag token (e.g. `pnpm run -- foo`), not a script name.
+      if (match[1].startsWith("-")) continue;
       if (!packageScripts.has(match[1])) {
         errors.push(`${docPath}: pnpm run ${match[1]} は package.json のscriptsに存在しません`);
       }
@@ -255,7 +257,7 @@ export function checkCommandReferences(repoRoot, docPath, content, packageScript
     }
   }
   for (const match of text.matchAll(NODE_SCRIPT_PATTERN)) {
-    const candidate = match[1].replace(/[)\],;.]+$/, "");
+    const candidate = match[1].replace(/[.)\],;/]+$/, "");
     if (!existsSync(path.join(repoRoot, candidate))) {
       errors.push(`${docPath}: 参照スクリプト ${candidate} が存在しません`);
     }
