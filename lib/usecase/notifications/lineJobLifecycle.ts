@@ -175,12 +175,6 @@ export async function authorizeLineNotificationSend(
     return { claimed: false };
   }
 
-  const leaseUntil = args.now + args.leaseMs;
-  await deps.jobs.patch(args.jobId, {
-    leaseUntil,
-    updatedAt: args.now,
-  });
-
   const suppressionErrorCode = await evaluateSuppressionErrorCode(deps, job);
   if (suppressionErrorCode !== null) {
     await deps.jobs.patch(args.jobId, {
@@ -192,6 +186,14 @@ export async function authorizeLineNotificationSend(
     });
     return { claimed: false };
   }
+
+  const leaseUntil = args.now + args.leaseMs;
+  await deps.jobs.patch(args.jobId, {
+    leaseUntil,
+    updatedAt: args.now,
+  });
+  await deps.scheduler.scheduleLeaseRecovery(args.jobId, args.attemptCount, leaseUntil);
+
   return {
     claimed: true,
     job: {
@@ -299,23 +301,20 @@ export async function recoverStaleLineNotificationJobs(
     await deps.scheduler.scheduleProcessJob(0, job.id);
   }
 
-  const staleRetryingJobs = await deps.jobs.listJobsByStatusUpdatedBefore(
-    "retrying",
-    staleBefore,
+  const dueRetryingJobs = await deps.jobs.listDueRetryingJobs(
+    now,
     LINE_NOTIFICATION_CLEANUP_BATCH_SIZE,
   );
-  for (const job of staleRetryingJobs) {
-    if (job.nextRetryAt === undefined || job.nextRetryAt > now) continue;
+  for (const job of dueRetryingJobs) {
     await deps.jobs.patch(job.id, { updatedAt: now });
     await deps.scheduler.scheduleProcessJob(0, job.id);
   }
 
-  const staleProcessingJobs = await deps.jobs.listJobsByStatusUpdatedBefore(
-    "processing",
-    staleBefore,
+  const expiredProcessingJobs = await deps.jobs.listExpiredProcessingJobs(
+    now,
     LINE_NOTIFICATION_CLEANUP_BATCH_SIZE,
   );
-  for (const job of staleProcessingJobs) {
+  for (const job of expiredProcessingJobs) {
     await recoverLineNotificationLease(
       deps,
       { jobId: job.id, attemptCount: job.attemptCount },

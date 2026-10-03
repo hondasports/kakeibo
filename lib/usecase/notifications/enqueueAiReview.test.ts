@@ -132,6 +132,8 @@ function makeDeps({
       findByBatchId: vi.fn().mockResolvedValue(existingLineJob),
       listTerminalJobsUpdatedBefore: vi.fn().mockResolvedValue([]),
       listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([]),
+      listDueRetryingJobs: vi.fn().mockResolvedValue([]),
+      listExpiredProcessingJobs: vi.fn().mockResolvedValue([]),
       insert: vi.fn(async (fields: Record<string, unknown>) => {
         lineJobs.inserted.push(fields);
         return "line-job-1";

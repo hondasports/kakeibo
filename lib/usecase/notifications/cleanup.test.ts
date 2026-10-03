@@ -25,6 +25,8 @@ function makeDeps({
     findByBatchId: vi.fn(),
     listTerminalJobsUpdatedBefore,
     listJobsByStatusUpdatedBefore: vi.fn(),
+    listDueRetryingJobs: vi.fn(),
+    listExpiredProcessingJobs: vi.fn(),
     insert: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn().mockResolvedValue(undefined),
