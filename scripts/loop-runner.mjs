@@ -167,6 +167,11 @@ function invalidateRevision(task, root, head, baseHead) {
       !fingerprintReusable &&
       metadataOnlyIncrement &&
       kind !== "process" &&
+      // lint runs `oxfmt --check`, which observes YAML/JSON inside
+      // .github/ISSUE_TEMPLATE/ — only .md (ignored) and extensionless
+      // .husky hooks are provably invisible to it.
+      (kind !== "lint" ||
+        incrementPaths.every((p) => p.endsWith(".md") || p.startsWith(".husky/"))) &&
       evidence?.success === true &&
       evidence?.appliesTo?.contractVersion === EVIDENCE_CONTRACT_VERSION &&
       evidence?.appliesTo?.head === task.head &&

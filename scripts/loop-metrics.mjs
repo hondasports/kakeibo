@@ -21,7 +21,12 @@ export function readMetricsEntries(file) {
   for (const line of readFileSync(file, "utf8").split("\n")) {
     if (!line) continue;
     try {
-      entries.push(JSON.parse(line));
+      const parsed = JSON.parse(line);
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        parseErrors += 1;
+        continue;
+      }
+      entries.push(parsed);
     } catch {
       parseErrors += 1;
     }
@@ -36,7 +41,8 @@ const bump = (bucket, key) => {
 /** Aggregate JSONL entries into per-action counts, durations and totals. */
 export function aggregateMetrics(entries, { taskId = null } = {}) {
   const filtered = taskId ? entries.filter((entry) => entry.taskId === taskId) : entries;
-  const actions = {};
+  // Untrusted JSONL keys (e.g. "__proto__") must not resolve to shared prototypes.
+  const actions = Object.create(null);
   for (const entry of filtered) {
     if (typeof entry?.action !== "string") continue;
     const action = (actions[entry.action] ??= { count: 0 });
@@ -44,7 +50,7 @@ export function aggregateMetrics(entries, { taskId = null } = {}) {
     if (typeof entry.durationMs === "number")
       action.durationMs = (action.durationMs ?? 0) + entry.durationMs;
     if (entry.action === "verify") {
-      action.byKind ??= {};
+      action.byKind ??= Object.create(null);
       const kind = (action.byKind[entry.kind] ??= {
         count: 0,
         pass: 0,
@@ -56,7 +62,7 @@ export function aggregateMetrics(entries, { taskId = null } = {}) {
       if (entry.result === "pass") kind.pass += 1;
       if (entry.result === "fail") kind.fail += 1;
       if (entry.scope) {
-        action.byScope ??= {};
+        action.byScope ??= Object.create(null);
         bump(action.byScope, entry.scope);
       }
     }
@@ -65,7 +71,7 @@ export function aggregateMetrics(entries, { taskId = null } = {}) {
       action.invalidated = (action.invalidated ?? 0) + (entry.invalidated ?? 0);
     }
     if (entry.action === "transition") {
-      action.events ??= {};
+      action.events ??= Object.create(null);
       bump(action.events, entry.event);
     }
     if (entry.action === "watch_aftercare") {

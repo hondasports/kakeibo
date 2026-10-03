@@ -949,6 +949,24 @@ describe("increment reuse and loop ergonomics", () => {
     );
     expect(refreshed.history.at(-1).reusedVerification).not.toContain("process");
   });
+  it("does not extend lint evidence when a metadata increment has oxfmt-checked files", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit", "build"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".github", "ISSUE_TEMPLATE"), { recursive: true });
+    writeFileSync(path.join(dir, ".github", "ISSUE_TEMPLATE", "bug.yml"), "name: bug\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "issue template yaml");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint).toBeUndefined();
+    for (const kind of ["unit", "build"]) {
+      expect(refreshed.verification[kind].reuse).toMatchObject({
+        basis: "metadata_only_increment",
+      });
+      expect(refreshed.verification[kind].appliesTo.head).toBe(refreshed.head);
+    }
+  });
   it("drops evidence when an increment touches runtime paths or the base moved", () => {
     const { dir, git, task } = repository();
     for (const kind of ["lint", "unit", "build"])

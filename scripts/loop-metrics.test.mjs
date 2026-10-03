@@ -112,4 +112,24 @@ describe("agent metrics aggregation", () => {
     expect(result.actions.transition.events).toEqual({ findings: 1 });
     expect(result.actions.undefined).toBeUndefined();
   });
+  it("treats non-object JSON values as parse errors", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "loop-metrics-scalar-"));
+    dirs.push(dir);
+    const file = path.join(dir, "agent-metrics.jsonl");
+    writeFileSync(file, ["null", "[1,2]", "42", '"x"', JSON.stringify(entries[0])].join("\n"));
+    const result = run({ path: file }, dir);
+    expect(result.parseErrors).toBe(4);
+    expect(result.entries).toBe(1);
+  });
+  it("keeps untrusted JSONL keys off shared prototypes", () => {
+    const result = aggregateMetrics([
+      { taskId: "t1", action: "__proto__" },
+      { taskId: "t1", action: "verify", kind: "__proto__", result: "pass", scope: "full" },
+      { taskId: "t1", action: "transition", event: "__proto__" },
+    ]);
+    expect(result.actions["__proto__"]).toEqual({ count: 1 });
+    expect(result.actions.verify.byKind["__proto__"].count).toBe(1);
+    expect(result.actions.transition.events["__proto__"]).toBe(1);
+    expect(Object.prototype.count).toBeUndefined();
+  });
 });
