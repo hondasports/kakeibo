@@ -1,5 +1,6 @@
 import { Body, Container, Head, Html, Preview, Section, Text } from "react-email";
 import type { AccountDeletionCompletedPayload } from "../model";
+import { EmailFooter } from "./Footer";
 
 export function AccountDeletionCompleted({
   leftGroupCount,
@@ -27,6 +28,9 @@ export function AccountDeletionCompleted({
               このメールは、Suzumemoの退会手続き完了をお知らせするために送信しています。{"\n\n"}©
               Suzumemo
             </Text>
+          </Section>
+          <Section>
+            <EmailFooter settingsActiveAccountOnly />
           </Section>
         </Container>
       </Body>

@@ -323,32 +323,74 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
     );
   }
 }
-/**
- * Retried checks (flake rerun, ready_for_review re-trigger) leave superseded
- * runs in the rollup; only the latest dated run per check name is authoritative.
- * Entries we cannot order (no name/context or no timestamp) are always kept so a
- * failed or pending run is never hidden behind an older success — fail-closed.
- */
+/** Start-time key: when the run began, not when it finished. */
+const checkStartKey = (check) =>
+  check.startedAt ?? check.started_at ?? check.createdAt ?? check.created_at ?? "";
+/** Ordering key for a check entry: run start preferred, completion as fallback. */
+export function checkRecencyKey(check) {
+  return checkStartKey(check) || (check.completedAt ?? check.completed_at ?? "");
+}
+export function isPendingCheck(check) {
+  if (check.status) return check.status !== "COMPLETED";
+  return ["PENDING", "EXPECTED", "QUEUED", "IN_PROGRESS", "WAITING", "REQUESTED"].includes(
+    check.state,
+  );
+}
+const isSuccessfulCheck = (check) =>
+  (!check.status || check.status === "COMPLETED") &&
+  ["SUCCESS", "NEUTRAL", "SKIPPED"].includes(check.conclusion ?? check.state);
+// Retried checks (flake rerun, ready_for_review re-trigger) leave superseded
+// runs in the rollup; only the latest run per check name is authoritative.
+// A pending run is superseded only by a completed run whose start is strictly
+// newer — a completion time alone cannot prove the pending attempt is older,
+// because the completed run may have started before it. Among completed runs,
+// start-keyed entries order by their start; completion-only entries cannot be
+// compared against start times, so they stay evaluated (fail-closed) unless
+// every completed run lacks a start time, where completion time is the only
+// ordering signal. Entries we cannot order (no name/context or no timestamp)
+// are always kept so a failed or pending run is never hidden behind an older
+// success — fail-closed.
 export function selectChecks(rawChecks) {
-  const latestByName = new Map();
-  const unorderable = [];
+  const groups = new Map();
+  const selected = [];
   for (const check of rawChecks) {
-    const key = check.name ?? check.context;
-    const at =
-      check.completedAt ??
-      check.completed_at ??
-      check.createdAt ??
-      check.created_at ??
-      check.startedAt ??
-      "";
-    if (!key || !at) {
-      unorderable.push(check);
+    const name = check.name ?? check.context;
+    const at = checkRecencyKey(check);
+    if (!name || !at) {
+      selected.push(check);
       continue;
     }
-    const prev = latestByName.get(key);
-    if (!prev || at >= prev.at) latestByName.set(key, { check, at });
+    const group = groups.get(name) ?? [];
+    group.push({ check, at });
+    groups.set(name, group);
   }
-  return [...latestByName.values()].map((entry) => entry.check).concat(unorderable);
+  for (const group of groups.values()) {
+    const completed = group.filter((entry) => !isPendingCheck(entry.check));
+    const startKeyed = completed.filter((entry) => checkStartKey(entry.check));
+    const orderable = startKeyed.length > 0 ? startKeyed : completed;
+    const latest = orderable.reduce((best, entry) => {
+      if (!best) return entry;
+      if (entry.at > best.at) return entry;
+      if (entry.at === best.at && !isSuccessfulCheck(entry.check) && isSuccessfulCheck(best.check))
+        return entry;
+      return best;
+    }, null);
+    if (startKeyed.length > 0)
+      selected.push(
+        ...completed.filter((entry) => !checkStartKey(entry.check)).map((entry) => entry.check),
+      );
+    const blocking = group.filter(
+      (entry) =>
+        isPendingCheck(entry.check) &&
+        !completed.some((other) => {
+          const start = checkStartKey(other.check);
+          return start && start > entry.at;
+        }),
+    );
+    selected.push(...blocking.map((entry) => entry.check));
+    if (latest) selected.push(latest.check);
+  }
+  return selected;
 }
 export function checkAftercare(pr, task, findings) {
   requireValue(
@@ -369,14 +411,11 @@ export function checkAftercare(pr, task, findings) {
   const rawChecks = pr.statusCheckRollup ?? [];
   requireValue(rawChecks.length > 0, "No CI checks observed");
   const checks = selectChecks(rawChecks);
-  for (const check of checks) {
-    const status = check.conclusion ?? check.state;
+  for (const check of checks)
     requireValue(
-      (!check.status || check.status === "COMPLETED") &&
-        ["SUCCESS", "NEUTRAL", "SKIPPED"].includes(status),
+      isSuccessfulCheck(check),
       `Unsuccessful or pending check: ${check.name ?? check.context}`,
     );
-  }
   const expected = ["Agent harness"];
   const names = { lint: "Lint", build: "Build", unit: "Test" };
   for (const [kind, name] of Object.entries(names))

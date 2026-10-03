@@ -22,6 +22,12 @@ export function createEmailJobActionRunner(
       });
       return doc ? toEmailSuppressionRecord(doc) : null;
     },
+    async getNotificationDeliveryDecision(args) {
+      return await ctx.runQuery(internal.notifications.internal.getEmailDeliveryDecision, {
+        type: args.type,
+        ...(args.userId === undefined ? {} : { userId: args.userId }),
+      });
+    },
     async markJobSent(args) {
       await ctx.runMutation(internal.email.internal.updateJobForSend, {
         jobId: args.jobId as Id<"transactionalEmailJobs">,

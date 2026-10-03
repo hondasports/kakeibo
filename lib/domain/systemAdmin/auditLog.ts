@@ -21,10 +21,16 @@ export type SystemAdminAuditAction =
   | "system_admin_ownerless_group_recovered"
   | "system_admin_group_role_changed"
   | "system_admin_group_owner_transferred"
-  | "system_admin_group_invitation_revoked";
+  | "system_admin_group_invitation_revoked"
+  | "system_admin_notification_setting_changed";
 
 export type SystemAdminAuditActorType = "system" | "system_admin";
-export type SystemAdminAuditTargetKind = "system_admin" | "user" | "group" | "invitation";
+export type SystemAdminAuditTargetKind =
+  | "system_admin"
+  | "user"
+  | "group"
+  | "invitation"
+  | "notification_setting";
 export type SystemAdminAuditResult = "success" | "denied";
 
 /** systemAdminAuditLogs ドキュメントのフィールド（書き込み用）。 */
@@ -54,6 +60,8 @@ export type SystemAdminAuditLogFields = {
   afterActiveGroupId?: string;
   beforeOwnerCount?: number;
   afterOwnerCount?: number;
+  beforeNotificationEnabled?: boolean;
+  afterNotificationEnabled?: boolean;
   result?: SystemAdminAuditResult;
   createdAt: number;
 };

@@ -24,6 +24,20 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "recover stale LINE notification jobs",
+  { minutes: 1 },
+  internal.notifications.internal.recoverStaleLineNotificationJobs,
+  {},
+);
+
+crons.interval(
+  "cleanup LINE notification jobs",
+  { hours: 24 },
+  internal.notifications.cleanup.cleanupOldLineNotificationJobs,
+  {},
+);
+
 // E2E 残滓（memberless groups と orphan 運用レコード）の日次掃除。
 // 内部で APP_ENV=development を確認するため、production では no-op。
 crons.interval("purge e2e orphan data", { hours: 24 }, internal.e2ePurge.runOrphanPurge, {});

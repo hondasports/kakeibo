@@ -52,6 +52,7 @@ const systemAdminAuditActionValidator = v.union(
   v.literal("system_admin_group_role_changed"),
   v.literal("system_admin_group_owner_transferred"),
   v.literal("system_admin_group_invitation_revoked"),
+  v.literal("system_admin_notification_setting_changed"),
 );
 const systemAdminContextValidator = v.union(
   v.object({ status: v.literal("active"), environment: v.string(), userId: v.id("users") }),
@@ -101,6 +102,8 @@ const systemAdminAuditItemValidator = v.object({
   afterActiveGroupId: v.optional(v.id("groups")),
   beforeOwnerCount: v.optional(v.number()),
   afterOwnerCount: v.optional(v.number()),
+  beforeNotificationEnabled: v.optional(v.boolean()),
+  afterNotificationEnabled: v.optional(v.boolean()),
   createdAt: v.number(),
 });
 const listSystemAdminsResultValidator = v.object({

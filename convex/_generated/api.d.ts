@@ -101,6 +101,13 @@ import type * as lineWebhook_richMenuClient from "../lineWebhook/richMenuClient.
 import type * as lineWebhook_signature from "../lineWebhook/signature.js";
 import type * as lineWebhook_summary from "../lineWebhook/summary.js";
 import type * as lineWebhook_webhook from "../lineWebhook/webhook.js";
+import type * as notificationSettings from "../notificationSettings.js";
+import type * as notifications_cleanup from "../notifications/cleanup.js";
+import type * as notifications_internal from "../notifications/internal.js";
+import type * as notifications_lineActions from "../notifications/lineActions.js";
+import type * as notifications_model from "../notifications/model.js";
+import type * as notifications_mutations from "../notifications/mutations.js";
+import type * as notifications_queries from "../notifications/queries.js";
 import type * as receiptAnalysisJobs_actions from "../receiptAnalysisJobs/actions.js";
 import type * as receiptAnalysisJobs_internal from "../receiptAnalysisJobs/internal.js";
 import type * as receiptAnalysisJobs_mutations from "../receiptAnalysisJobs/mutations.js";
@@ -232,6 +239,13 @@ declare const fullApi: ApiFromModules<{
   "lineWebhook/signature": typeof lineWebhook_signature;
   "lineWebhook/summary": typeof lineWebhook_summary;
   "lineWebhook/webhook": typeof lineWebhook_webhook;
+  notificationSettings: typeof notificationSettings;
+  "notifications/cleanup": typeof notifications_cleanup;
+  "notifications/internal": typeof notifications_internal;
+  "notifications/lineActions": typeof notifications_lineActions;
+  "notifications/model": typeof notifications_model;
+  "notifications/mutations": typeof notifications_mutations;
+  "notifications/queries": typeof notifications_queries;
   "receiptAnalysisJobs/actions": typeof receiptAnalysisJobs_actions;
   "receiptAnalysisJobs/internal": typeof receiptAnalysisJobs_internal;
   "receiptAnalysisJobs/mutations": typeof receiptAnalysisJobs_mutations;
