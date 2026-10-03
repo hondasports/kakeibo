@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const PROCESS_ONLY_SCRIPT_PATTERN =
-  /^scripts\/(?:review-depth|check-task-worktree|check-loop-docs|collect-pr-findings|suggest-skills|machine-risk|assess-change|resolve-agent-profile|loop-(?:runner|policy|schema|pr-check|test-fixtures))(?:\.test)?\.mjs$/;
+  /^scripts\/(?:review-depth|check-task-worktree|check-loop-docs|collect-pr-findings|suggest-skills|machine-risk|assess-change|resolve-agent-profile|loop-(?:runner|policy|schema|pr-check|test-fixtures|metrics))(?:\.test)?\.mjs$/;
 
 /** Normalize a Git path to a stable repository-relative form. */
 export function normalizeChangedPath(filePath) {
@@ -38,6 +38,24 @@ export function isProcessOnlyPath(filePath) {
   }
 
   return PROCESS_ONLY_SCRIPT_PATTERN.test(normalized);
+}
+
+/**
+ * Paths whose content cannot change lint/unit/build outcomes: Markdown prose,
+ * issue templates, and local git hooks. Process verification still covers
+ * docs/script integrity, so `process` evidence is never extended through
+ * these paths — this predicate is stricter than isProcessOnlyPath on purpose.
+ */
+export function isMetadataOnlyPath(filePath) {
+  const normalized = normalizeChangedPath(filePath);
+  if (!normalized || normalized.includes("/../") || normalized.startsWith("../")) {
+    return false;
+  }
+  return (
+    normalized.endsWith(".md") ||
+    normalized.startsWith(".github/ISSUE_TEMPLATE/") ||
+    normalized.startsWith(".husky/")
+  );
 }
 
 /** Classify a changed-path set and return the machine-readable E2E decision. */

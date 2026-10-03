@@ -31,7 +31,12 @@ import {
   watchAftercare,
 } from "./loop-runner.mjs";
 import { taskFixture, reviewFixture, verificationManifestFixture } from "./loop-test-fixtures.mjs";
-import { computeAssessment, currentEvidence, verificationSummary } from "./loop-policy.mjs";
+import {
+  computeAssessment,
+  currentEvidence,
+  validateReview,
+  verificationSummary,
+} from "./loop-policy.mjs";
 const root = process.cwd();
 const dirs = [];
 afterEach(() => {
@@ -902,5 +907,152 @@ describe("persistent task gates", () => {
     refreshTask(loadTask(dir), dir);
     const revision = readMetrics().at(-1);
     expect(revision).toMatchObject({ action: "revision_changed", reused: 1, invalidated: 0 });
+  });
+});
+
+describe("increment reuse and loop ergonomics", () => {
+  /** Move `preview` one commit ahead on the given file, then switch back. */
+  const upstreamCommit = (dir, git, file, content = "upstream\n") => {
+    git("switch", "preview");
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), content);
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", `upstream ${file}`);
+    git("switch", "codex/task");
+  };
+  it("extends non-process evidence through metadata-only increments", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    for (const kind of ["lint", "unit", "build"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, "docs"), { recursive: true });
+    writeFileSync(path.join(dir, "docs", "note.md"), "docs\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs fix");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.process).toBeUndefined();
+    for (const kind of ["lint", "unit", "build"]) {
+      const evidence = refreshed.verification[kind];
+      expect(evidence.appliesTo.head).toBe(refreshed.head);
+      expect(evidence.reuse).toMatchObject({ basis: "metadata_only_increment" });
+      expect(evidence.reuse.incrementPaths).toEqual(["docs/note.md"]);
+    }
+    expect(refreshed.history.at(-1).reusedVerification).toEqual(
+      expect.arrayContaining(["lint", "unit", "build"]),
+    );
+    expect(refreshed.history.at(-1).reusedVerification).not.toContain("process");
+  });
+  it("drops evidence when an increment touches runtime paths or the base moved", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit", "build"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, "docs"), { recursive: true });
+    writeFileSync(path.join(dir, "docs", "note.md"), "docs\n");
+    writeFileSync(path.join(dir, "scripts", "feature.ts"), "export {};\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs + code");
+    expect(refreshTask(loadTask(dir), dir).verification).toEqual({});
+  });
+  it("does not take the increment path when only the base moved", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"]) runVerification(task, kind, dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "docs/upstream.md", "upstream\n");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint.reuse.basis).toBe("identical_patch_and_tree");
+    expect(refreshed.verification.unit.reuse.basis).toBe("identical_patch_and_tree");
+  });
+  it("keeps verification and assessment through findings and ci_failure transitions", () => {
+    const { dir, task } = repository();
+    task.verification.process = { head: task.head, baseHead: task.baseHead, success: true };
+    task.state = "review";
+    task.review = reviewFixture(task, {
+      findings: [{ id: "F1", status: "open", evidence: "edge" }],
+    });
+    task.findings = task.review.findings;
+    transitionTask(task, "findings", { reason: "fix F1" }, dir);
+    expect(task.state).toBe("execute");
+    expect(task.verification.process).toBeDefined();
+    expect(task.agentAssessment).toBeTruthy();
+    task.state = "aftercare";
+    transitionTask(task, "ci_failure", { reason: "lint failed" }, dir);
+    expect(task.verification.process).toBeDefined();
+    expect(task.agentAssessment).toBeTruthy();
+  });
+  it("runs vitest related for --scope affected over changed runtime paths", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "src-feature.ts"), "export {};\n");
+    mkdirSync(path.join(dir, "e2e"), { recursive: true });
+    writeFileSync(path.join(dir, "e2e", "new.spec.ts"), "// playwright\n");
+    mkdirSync(path.join(dir, "docs"), { recursive: true });
+    writeFileSync(path.join(dir, "docs", "note.md"), "docs\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    refreshTask(task, dir);
+    const commands = [];
+    runVerification(
+      task,
+      "unit",
+      dir,
+      (command) => {
+        commands.push(command);
+        return { status: 0 };
+      },
+      { scope: "affected" },
+    );
+    expect(commands).toHaveLength(1);
+    expect(commands[0].slice(0, 4)).toEqual(["pnpm", "exec", "vitest", "related"]);
+    expect(commands[0]).toContain("src-feature.ts");
+    expect(task.verification.unit.run.scope).toBe("affected");
+    expect(task.verification.unit.run.affectedFiles).toEqual(["src-feature.ts"]);
+  });
+  it("falls back to the full suite when no runtime files changed and rejects scope misuse", () => {
+    const { dir, task } = repository();
+    const commands = [];
+    runVerification(
+      task,
+      "unit",
+      dir,
+      (command) => {
+        commands.push(command);
+        return { status: 0 };
+      },
+      { scope: "affected" },
+    );
+    expect(commands[0]).toEqual(["pnpm", "exec", "vitest", "run"]);
+    expect(task.verification.unit.run.scope).toBe("full");
+    expect(() =>
+      runVerification(task, "lint", dir, () => ({ status: 0 }), { scope: "affected" }),
+    ).toThrow("unit only");
+    saveTask(task, dir);
+    expect(() => run({ scope: "affected" }, dir)).toThrow("--scope requires --verify");
+  });
+  it("accepts deltaFrom only for previously reviewed heads", () => {
+    const { task } = repository();
+    task.state = "review";
+    const priorHead = "c".repeat(40);
+    task.history.push({
+      state: "review",
+      event: "review_recorded",
+      head: priorHead,
+      at: "2026-01-01T00:00:00.000Z",
+    });
+    expect(() => validateReview(task, reviewFixture(task, { deltaFrom: priorHead }))).not.toThrow();
+    for (const bad of ["not-a-sha", task.head, "d".repeat(40)])
+      expect(() => validateReview(task, reviewFixture(task, { deltaFrom: bad }))).toThrow(
+        "deltaFrom",
+      );
+  });
+  it("records friction notes into task state, history and the state block", () => {
+    const { dir, task } = repository();
+    saveTask(task, dir);
+    const result = run({ "friction-note": " per-kind verify reruns felt heavy " }, dir);
+    expect(result.frictionNote).toBe("per-kind verify reruns felt heavy");
+    const saved = loadTask(dir);
+    expect(saved.history.at(-1)).toMatchObject({ event: "friction_note" });
+    expect(stateBlock(saved)).toContain("per-kind verify");
+    expect(() => run({ "friction-note": "   " }, dir)).toThrow("requires non-empty");
   });
 });

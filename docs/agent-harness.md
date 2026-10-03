@@ -55,9 +55,17 @@ node scripts/loop-runner.mjs --event ready
 
 必要な検証のみ実行する。固定コマンドをCLIが起動し、終了結果を現在HEAD/baseへ紐づける。processはドキュメント整合とprocessテスト、lintはlintとformat、unitはVitest全体、buildは本番ビルド。dirty treeでは証跡を確定しない。
 
+unitだけ `--scope affected` で差分連動にできる。変更ファイルのうちvitestが関連テストを解決できるもの（テスト可能な拡張子・`e2e/`・metadata-only以外・存在するファイル）へ `vitest related` を実行し、証跡にはscopeと対象ファイルを記録する。関連テストが存在しない変更ではvitestが `No test files found` で失敗するため、その場合はfull scopeで再実行する。候補が0件の場合はfull commandへ戻り、証跡は `scope: "full"` と記録される。既定はfullであり、CIは常にfull suiteを実行する。
+
+```bash
+node scripts/loop-runner.mjs --verify unit --scope affected
+```
+
 検証ログは `git rev-parse --git-path agent-evidence` 配下にartifactとして保存され、worktreeを汚さない。証跡manifestは実実行の `run`（HEAD/base・時刻・時間）と適用対象の `appliesTo`（HEAD/base・head tree・feature patch SHA-256・contract version）を分けて記録し、exit summary・artifactのpath/SHA-256/bytesを保持する。成功時のログ本文は通常出力に含めない。失敗時のエラーはexit code・artifact path・末尾行だけを返し、全文はartifactを参照する。
 
 HEAD/base更新で古い検証・レビューは失効するが、verification証跡だけは安全に部分再利用できる。feature patch（merge-base差分のSHA-256）と検証対象のhead treeがともに不変な場合のみ `appliesTo` を新revisionへ更新し、`reuse.from` に元revisionを記録する。同一のtree入力には同一の結果を再現できる——入力推論は行わない。ツールチェーン・gitignore済みファイルなどtree外の入力はfingerprintできない残差だが、必須確認はCIが実HEAD上で再実行するため再利用はローカル短絡に留まる。`run` は実実行の記録のまま書き換えない。fingerprintの計算不能・contract version不一致・必須metadata欠落はすべてfail-closedで失効する。review・aftercare・assessment・skillsは再利用しない。`git fetch origin` 後も状態を再確認する。
+
+base不変の前向き増分（新規commit）については第2の再利用経路がある。増分差分 `旧HEAD..新HEAD` の全pathがmetadata-only（Markdown・`.github/ISSUE_TEMPLATE/`・`.husky/`）の場合、lint/unit/buildの入力は不変なのでprocess以外の証跡の `appliesTo` を延長する。`reuse.basis` は `identical_patch_and_tree` または `metadata_only_increment` を記録し、後者は増分path一覧も保持する。増分が取得不能・空・非metadataを含む場合はこの経路を使わない。process証跡はdocs整合を検査するためmetadata変更でも再実行する。
 
 同じ検証コマンド・終了コードが連続して3回失敗した場合はINCIDENTへ停止する。修正前後で原因が変わったと判断する場合も、INCIDENTのresolutionに切り分け証拠を記録して解除する。単なる再試行でカウンタをリセットしない。
 
@@ -72,6 +80,7 @@ Reviewerへ目的・AC・実差分・検証結果・関連契約を渡す。T3�
 - `evidence`: レビュー範囲と根拠の文字列配列
 - `acceptanceCriteria`: 全ACの `{id, evidence}` 配列
 - `findings`: `{id, status: open | fixed | dismissed, evidence}` 配列（0件は空配列）
+- `deltaFrom`（任意）: 増分レビューの起点とする、過去のレビュー記録済みhead。現在HEADや未記録のSHAは拒否される
 
 ```bash
 node scripts/loop-runner.mjs --review /tmp/review.json
@@ -87,7 +96,7 @@ node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet
 # dirはworktree外を推奨する（内側だと生成後にtreeが汚れる）
 ```
 
-指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、3roundごとにreassessmentを要求する。9round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。
+指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、3roundごとにreassessmentを要求する。9round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。遷移時に証跡を無条件失効させることはない——証跡の失効は実際のHEAD/base変更時だけ判定する。却下で終わる指摘やmetadata-onlyの修正で全検証をやり直させないためである。同じラウンドのopen findingはまとめて修正・再検証する（`.agent/workflow/review.md` 参照）。
 
 ## PRとAFTERCARE
 
@@ -98,7 +107,15 @@ node scripts/loop-runner.mjs --export-file /tmp/agent-state.md
 
 `--export` は標準出力、`--export-file <path>` は指定ファイルへ同じ状態ブロックを書き出す。この状態ブロックをPR本文へ含める。Human Request、説明、更新履歴ブロックとは分離する。PR作成後・状態更新後は `--sync-pr <番号>` で既存本文を保持してブロックを更新する。この操作はGitHubへのwriteであり、ユーザーが許可したPR作業の範囲でのみ実行する。
 
-観測用のmetricsは `git rev-parse --git-common-dir` 配下の `agent-metrics.jsonl` へ1行JSONで追記する。verify（kind・durationMs・result・artifactBytes・失敗signature）、revision_changed（reused/invalidated件数）、transition、aftercare、watch_aftercare（poll回数）、review_packetを記録する。common dir配下なのでlinked worktreeを跨いで集計でき、worktreeは汚れない。追記はbest-effortであり、失敗しても本処理を止めない。
+観測用のmetricsは `git rev-parse --git-common-dir` 配下の `agent-metrics.jsonl` へ1行JSONで追記する。verify（kind・durationMs・result・scope・artifactBytes・失敗signature）、revision_changed（reused/invalidated件数）、transition、aftercare、watch_aftercare（poll回数）、review_packet、friction_noteを記録する。common dir配下なのでlinked worktreeを跨いで集計でき、worktreeは汚れない。追記はbest-effortであり、失敗しても本処理を止めない。
+
+```bash
+node scripts/loop-metrics.mjs            # 全期間の集計
+node scripts/loop-metrics.mjs --task issue-123   # タスク別集計
+node scripts/loop-metrics.mjs --path /tmp/other.jsonl
+```
+
+`loop:metrics` はJSONLを集計し、action別件数・durationMs・verifyのkind別pass/fail・scope別件数・revision_changedのreused/invalidated・transitionイベント別件数を返す。作業中に感じた摩擦は `--friction-note <text>` で `task.frictionNote` へ記録でき、history・metrics・export状態ブロックに残る。ハーネス改善タスクの定性入力として使う。
 
 `Agent harness` CIはMarkdownのみの変更でも動き、実PR HEAD/base・実差分・仕様・検証・レビューを照合する。非bot PRは状態ブロック必須。GitHubが認識するdependabot/github-actionsのBot投稿は例外とし、processテストとドキュメントチェックは実行する。既存PRもこのworkflowが走る時点で状態ブロックが必要になる。CIを必須チェックへ登録するbranch protection設定は別途管理者の操作が必要であり、このPRでは権限設定を変更しない。
 

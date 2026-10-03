@@ -144,6 +144,9 @@
       "items": {
         "type": "object"
       }
+    },
+    "frictionNote": {
+      "type": "string"
     }
   },
   "additionalProperties": false

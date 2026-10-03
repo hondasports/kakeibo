@@ -251,6 +251,21 @@ export function validateReview(task, report) {
     validateAssessment(report.assessment).length === 0,
     "Reviewer assessment is required",
   );
+  if (report.deltaFrom !== undefined) {
+    requireValue(
+      typeof report.deltaFrom === "string" && /^[0-9a-f]{40}$/i.test(report.deltaFrom),
+      "deltaFrom must be a 40-character commit SHA",
+    );
+    const reviewedHeads = new Set(
+      (task.history ?? [])
+        .filter((entry) => entry.event === "review_recorded" && entry.head)
+        .map((entry) => entry.head),
+    );
+    requireValue(
+      report.deltaFrom !== task.head && reviewedHeads.has(report.deltaFrom),
+      "deltaFrom must reference a previously reviewed head",
+    );
+  }
   if (report.independent === true) {
     requireValue(
       report.reviewer !== task.implementer && report.context === "fresh",
