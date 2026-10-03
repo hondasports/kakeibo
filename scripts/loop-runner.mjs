@@ -139,6 +139,41 @@ function incrementChangedPaths(from, to, root) {
  * run decides whether a metadata increment is actually green. The guard test
  * in loop-runner.test.mjs keeps that containment invariant true.
  */
+/** Canonical githooks(5) hook basenames — the only .husky/ files lint cannot observe. */
+const HUSKY_HOOK_NAMES = new Set([
+  "applypatch-msg",
+  "pre-applypatch",
+  "post-applypatch",
+  "pre-commit",
+  "pre-merge-commit",
+  "prepare-commit-msg",
+  "commit-msg",
+  "post-commit",
+  "pre-rebase",
+  "post-checkout",
+  "post-merge",
+  "pre-push",
+  "pre-receive",
+  "update",
+  "proc-receive",
+  "post-receive",
+  "post-update",
+  "reference-transaction",
+  "push-to-checkout",
+  "pre-auto-gc",
+  "post-rewrite",
+  "sendemail-validate",
+  "fsmonitor-watchman",
+  "p4-changelist",
+  "p4-prepare-changelist",
+  "p4-post-changelist",
+  "p4-pre-submit",
+  "post-index-change",
+]);
+/** lint (oxfmt/oxlint) cannot observe .md (ignored) or extensionless hook files. */
+const lintInvisiblePath = (p) =>
+  p.endsWith(".md") || HUSKY_HOOK_NAMES.has(p.slice(".husky/".length));
+
 function invalidateRevision(task, root, head, baseHead) {
   const patchSha256 = featurePatchSha256(task, root, head);
   let headTree = null;
@@ -168,13 +203,10 @@ function invalidateRevision(task, root, head, baseHead) {
       metadataOnlyIncrement &&
       kind !== "process" &&
       // lint runs `oxfmt --check`, which observes YAML/JSON inside
-      // .github/ISSUE_TEMPLATE/ — only .md (ignored) and dot-free
-      // (extensionless) .husky hooks are provably invisible to it.
-      (kind !== "lint" ||
-        incrementPaths.every(
-          (p) =>
-            p.endsWith(".md") || (p.startsWith(".husky/") && !p.split("/").pop().includes(".")),
-        )) &&
+      // .github/ISSUE_TEMPLATE/ and well-known filenames (README,
+      // Jakefile, Pipfile) anywhere — only .md and canonical git hook
+      // basenames under .husky/ are provably invisible to it.
+      (kind !== "lint" || incrementPaths.every(lintInvisiblePath)) &&
       evidence?.success === true &&
       evidence?.appliesTo?.contractVersion === EVIDENCE_CONTRACT_VERSION &&
       evidence?.appliesTo?.head === task.head &&

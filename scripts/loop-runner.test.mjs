@@ -982,6 +982,37 @@ describe("increment reuse and loop ergonomics", () => {
       basis: "metadata_only_increment",
     });
   });
+  it("does not extend lint evidence for well-known filenames under .husky", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".husky"), { recursive: true });
+    writeFileSync(path.join(dir, ".husky", "README"), "# hooks\n");
+    writeFileSync(path.join(dir, ".husky", "pre-commit"), "echo lint\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky readme + hook");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint).toBeUndefined();
+    expect(refreshed.verification.unit.reuse).toMatchObject({
+      basis: "metadata_only_increment",
+    });
+  });
+  it("extends lint evidence for canonical hook basenames under .husky", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".husky"), { recursive: true });
+    writeFileSync(path.join(dir, ".husky", "pre-push"), "echo test\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky hook");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    for (const kind of ["lint", "unit"])
+      expect(refreshed.verification[kind].reuse).toMatchObject({
+        basis: "metadata_only_increment",
+      });
+  });
   it("drops evidence when an increment touches runtime paths or the base moved", () => {
     const { dir, git, task } = repository();
     for (const kind of ["lint", "unit", "build"])
