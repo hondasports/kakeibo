@@ -8,11 +8,16 @@ import { cleanupOldLineNotificationJobs } from "./cleanup";
 
 const NOW = 1_000_000_000_000;
 
-function makeDeps({ terminalJobs = [] as { id: string }[] } = {}) {
+function makeDeps({
+  terminalJobs = [] as { id: string }[],
+  terminalJobsByStatus = {} as Partial<Record<string, { id: string }[]>>,
+} = {}) {
   const listTerminalJobsUpdatedBefore = vi
     .fn()
-    .mockImplementation(async (status: string) =>
-      status === TERMINAL_LINE_NOTIFICATION_JOB_STATUSES[0] ? terminalJobs : [],
+    .mockImplementation(
+      async (status: string) =>
+        terminalJobsByStatus[status] ??
+        (status === TERMINAL_LINE_NOTIFICATION_JOB_STATUSES[0] ? terminalJobs : []),
     );
   const jobs = {
     getJob: vi.fn(),
@@ -65,5 +70,19 @@ describe("cleanupOldLineNotificationJobs", () => {
     await cleanupOldLineNotificationJobs(deps);
     expect(deps.jobs.delete).toHaveBeenCalledTimes(LINE_NOTIFICATION_CLEANUP_BATCH_SIZE);
     expect(scheduler.scheduleCleanup).toHaveBeenCalledWith(0);
+  });
+
+  it("statusをまたいだ合計がbatch sizeに達しても再スケジュールしない", async () => {
+    const { deps, scheduler } = makeDeps({
+      terminalJobsByStatus: {
+        sent: [{ id: "sent-1" }, { id: "sent-2" }],
+        failed: Array.from({ length: LINE_NOTIFICATION_CLEANUP_BATCH_SIZE - 2 }, (_, i) => ({
+          id: `failed-${i}`,
+        })),
+      },
+    });
+    await cleanupOldLineNotificationJobs(deps);
+    expect(deps.jobs.delete).toHaveBeenCalledTimes(LINE_NOTIFICATION_CLEANUP_BATCH_SIZE);
+    expect(scheduler.scheduleCleanup).not.toHaveBeenCalled();
   });
 });

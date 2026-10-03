@@ -11,7 +11,7 @@ export async function cleanupOldLineNotificationJobs(
   const now = (deps.now ?? Date.now)();
   const cutoff = now - LINE_NOTIFICATION_RETENTION_MS;
 
-  let deleted = 0;
+  let hasMore = false;
   for (const status of TERMINAL_LINE_NOTIFICATION_JOB_STATUSES) {
     const batch = await deps.jobs.listTerminalJobsUpdatedBefore(
       status,
@@ -21,10 +21,10 @@ export async function cleanupOldLineNotificationJobs(
     for (const job of batch) {
       await deps.jobs.delete(job.id);
     }
-    deleted += batch.length;
+    hasMore ||= batch.length === LINE_NOTIFICATION_CLEANUP_BATCH_SIZE;
   }
 
-  if (deleted >= LINE_NOTIFICATION_CLEANUP_BATCH_SIZE) {
+  if (hasMore) {
     await deps.scheduler.scheduleCleanup(0);
   }
 }

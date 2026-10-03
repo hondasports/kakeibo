@@ -36,10 +36,10 @@ export async function getMyNotificationSettings(
 ): Promise<MyNotificationSettings> {
   const user = await assertLiveUser(deps, userId);
   const prefs = user.notificationPreferences;
-  const [emailSetting, lineSetting, activeLink] = await Promise.all([
+  const [emailSetting, lineSetting, activeLinks] = await Promise.all([
     deps.settings.findByTypeAndChannel(AI_REVIEW_REQUIRED_NOTIFICATION_TYPE, "email"),
     deps.settings.findByTypeAndChannel(AI_REVIEW_REQUIRED_NOTIFICATION_TYPE, "line"),
-    deps.links.findLatestActiveByUserId(userId),
+    deps.links.listActiveByUserId(userId),
   ]);
   return {
     emailEnabled:
@@ -48,7 +48,7 @@ export async function getMyNotificationSettings(
     lineEnabled:
       prefs?.aiReviewRequiredLineEnabled ??
       DEFAULT_USER_NOTIFICATION_PREFERENCES.aiReviewRequiredLineEnabled,
-    lineLinked: activeLink !== null,
+    lineLinked: activeLinks.length === 1,
     emailGloballyEnabled:
       emailSetting?.enabled ??
       defaultNotificationEnabled(AI_REVIEW_REQUIRED_NOTIFICATION_TYPE, "email"),

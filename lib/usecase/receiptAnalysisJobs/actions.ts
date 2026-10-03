@@ -50,11 +50,9 @@ export async function checkReceiptAiReviewRequired(
   if (!batch?.createdByUserId) return;
   const pendingCount = await runner.countNeedsReviewJobs(batchId);
   if (pendingCount === 0) return;
-  const email = await runner.getUserEmail(batch.createdByUserId);
   await runner.enqueueAiReviewRequiredNotifications({
     batchId,
     userId: batch.createdByUserId,
-    email,
     pendingCount,
   });
 }
