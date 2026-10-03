@@ -162,6 +162,107 @@ describe("GitHub delivery gates", () => {
     };
     expect(() => checkAftercare(pr, task, findings)).toThrow("pending");
   });
+  it("does not let an older run's completion time hide a newer pending run", () => {
+    const task = readyTask();
+    const pr = prFixture(task);
+    pr.statusCheckRollup = [
+      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "SUCCESS",
+        // Long-running attempt: finished after the newer attempt started.
+        startedAt: "2026-10-03T02:00:00Z",
+        completedAt: "2026-10-03T02:30:00Z",
+      },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "IN_PROGRESS",
+        conclusion: "",
+        startedAt: "2026-10-03T02:20:00Z",
+      },
+    ];
+    expect(() => checkAftercare(pr, task, findings)).toThrow("pending");
+    // Same ordering via a QUEUED entry dated only by createdAt.
+    pr.statusCheckRollup[2] = {
+      name: "E2E (Playwright / Chromium / authenticated)",
+      status: "QUEUED",
+      conclusion: "",
+      createdAt: "2026-10-03T02:20:00Z",
+    };
+    expect(() => checkAftercare(pr, task, findings)).toThrow("pending");
+  });
+  it("cannot supersede a pending run with a completion-only completed run", () => {
+    const task = readyTask();
+    const pr = prFixture(task);
+    pr.statusCheckRollup = [
+      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "SUCCESS",
+        completedAt: "2026-10-03T02:30:00Z",
+      },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "QUEUED",
+        conclusion: "",
+        createdAt: "2026-10-03T02:20:00Z",
+      },
+    ];
+    expect(() => checkAftercare(pr, task, findings)).toThrow("pending");
+  });
+  it("lets a newer completed run supersede a stale pending run", () => {
+    const task = readyTask();
+    const pr = prFixture(task);
+    pr.statusCheckRollup = [
+      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "IN_PROGRESS",
+        conclusion: "",
+        // Stale ghost from an older attempt; the retry started strictly later.
+        startedAt: "2026-10-03T02:00:00Z",
+      },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "SUCCESS",
+        startedAt: "2026-10-03T02:10:00Z",
+        completedAt: "2026-10-03T02:20:00Z",
+      },
+    ];
+    expect(checkAftercare(pr, task, findings).ready).toBe(true);
+  });
+  it("keeps pending StatusContext entries visible next to dated successes", () => {
+    const task = readyTask();
+    const pr = prFixture(task);
+    pr.statusCheckRollup = [
+      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      { context: "ci/context-check", state: "SUCCESS", createdAt: "2026-10-03T02:00:00Z" },
+      { context: "ci/context-check", state: "PENDING", createdAt: "2026-10-03T02:10:00Z" },
+    ];
+    expect(() => checkAftercare(pr, task, findings)).toThrow("pending");
+  });
+  it("keeps a named pending run visible when it carries no timestamp", () => {
+    const task = readyTask();
+    const pr = prFixture(task);
+    pr.statusCheckRollup = [
+      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "SUCCESS",
+        completedAt: "2026-10-03T02:00:00Z",
+      },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "QUEUED",
+        conclusion: "",
+      },
+    ];
+    expect(() => checkAftercare(pr, task, findings)).toThrow("pending");
+  });
   it("preserves a reviewer's higher risk and enforces independence", () => {
     const task = readyTask();
     task.review.assessment.applied_tier = "T3";
