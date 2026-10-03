@@ -75,6 +75,7 @@ export function verificationManifestFixture(task, kind = "process", overrides = 
     appliesTo: {
       head: task.head,
       baseHead: task.baseHead,
+      headTree: "c".repeat(40),
       patchSha256: "a".repeat(64),
       contractVersion: 1,
     },

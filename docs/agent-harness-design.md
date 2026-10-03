@@ -1,6 +1,6 @@
 # Agent Harness軽量化とProfile自動判定
 
-**状態: §5のProfile自動判定・§6のProfile適用（モデル・effort機構の撤去を含む）は実装済み。§2以降の出力・検証・証跡管理の変更は実装予定の設計仕様。**
+**状態: §5のProfile自動判定・§6のProfile適用（モデル・effort機構の撤去を含む）は実装済み。§2以降の出力・検証・証跡管理は段階的に実装中であり、実装済みの振る舞いは [Agent Harness操作手順](agent-harness.md) を正本とする。**
 
 この文書を、Harnessの軽量化の設計正本とする。現行の操作手順は [Agent Harness操作手順](agent-harness.md)、現在の実行契約は [AGENTS.md](../AGENTS.md) と `.agent/process.yaml` を参照する。設計を記載しただけで、現在のゲートやCLIの挙動を変更したものとして扱わない。
 
@@ -18,9 +18,9 @@
 |---|---|---|
 | Profile選択 | ~~開始時に明示指定、モデル推奨値、既定値から選択~~ → REFINE終了時にタスク内容から自動判定（実装済み） |
 | モデル・effort機構 | ~~models/でモデル推奨Profile・effort対応値を管理~~ → 機構ごと撤去（実装済み） |
-| 通常出力 | 毎回configurationとassessmentを含むJSONを返す | 現在State・不足条件・次の操作を中心に返す |
-| 検証 | 必要な検証を固定コマンドで実行し、結果を返す | 必須条件を満たす検証計画とcompact出力を使う |
-| 証跡の失効 | HEADまたはbaseの更新で一括失効 | 不変性を証明できる検証だけ再利用し、その他は失効 |
+| 通常出力 | ~~毎回configurationとassessmentを含むJSONを返す~~ → 現在State・不足条件・次の操作を中心に返す（実装済み） |
+| 検証 | ~~必要な検証を固定コマンドで実行し、結果を返す~~ → 必須条件を満たす検証計画とartifact-firstの証跡を使う（実装済み） |
+| 証跡の失効 | ~~HEADまたはbaseの更新で一括失効~~ → feature patchと検証対象treeが同一の検証だけ再利用し、その他は失効。さらにmetadata-only増分ではprocess以外の証跡を延長（いずれも実装済み。lintは `.md`+正規hook名のみ延長——詳細は `docs/agent-harness.md`） |
 
 ## 3. 全体の流れ
 
@@ -121,6 +121,8 @@ findingの修正では、変更箇所・影響するAC・残ったfindingを再�
 - 必須確認の内容や検証契約が変わっていない。
 
 再利用時は元の実行対象・時刻・結果、不変性の根拠、再利用先を保存する。新しいHEADで再実行した結果として偽装しない。判定できない場合は失効させて再実行する。Profile変更では新たに必要な確認を追加し、有効性を証明できる既存証跡まで一括失効させない。
+
+実装済みの再利用経路は2つある。patch+tree二重fingerprint（rebase・mergeで内容が不変な場合）と、base不変かつ増分がmetadata-onlyの場合のprocess以外への延長である。後者はkind別の入力不変性をpath集合で証明する、§9の原則に沿った限定的な入力推論である。unitの延長は「metadataを読むテストは全てprocess suite（延長不可）に所属する」という不変条件の上に成立し、guard testがそれを維持する。
 
 レビュー証跡はlatest HEADの実差分へ結び付ける。過去のレビューを参照しても、必要な独立レビュー・最新差分の確認・全ACの照合を省略しない。
 

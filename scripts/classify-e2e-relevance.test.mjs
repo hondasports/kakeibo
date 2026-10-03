@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyChangedFiles,
+  isMetadataOnlyPath,
   isProcessOnlyPath,
   normalizeChangedPath,
   parseArguments,
@@ -104,6 +105,24 @@ describe("E2E relevance path classification", () => {
     expect(isProcessOnlyPath("scripts/classify-e2e-relevance.mjs")).toBe(false);
     expect(isProcessOnlyPath(".github/workflows/e2e.yml")).toBe(false);
   });
+
+  it("rejects test-pattern basenames inside metadata dirs (vitest discovers dot-dirs)", () => {
+    for (const filePath of [
+      ".husky/probe.test.mjs",
+      ".husky/sub/probe.spec.ts",
+      ".github/ISSUE_TEMPLATE/x.test.tsx",
+      "docs/probe.test.cjs",
+    ])
+      expect(isMetadataOnlyPath(filePath), filePath).toBe(false);
+    for (const filePath of [
+      ".husky/pre-commit",
+      ".github/ISSUE_TEMPLATE/bug.yml",
+      "docs/x.test.md",
+    ])
+      expect(isMetadataOnlyPath(filePath), filePath).toBe(true);
+    // public/ ships verbatim into the build output — a .md there is observable.
+    expect(isMetadataOnlyPath("public/notes.md")).toBe(false);
+  });
 });
 
 describe("E2E workflow classification contract", () => {
@@ -139,6 +158,10 @@ describe("E2E relevance git and output helpers", () => {
     expect(() => parseArguments(["--base", SHA, "--head", SHA, "--github-output"])).toThrow(
       "--github-output requires a non-empty path",
     );
+    expect(parseArguments(["--", "--base", SHA, "--head", SHA])).toMatchObject({
+      baseSha: SHA,
+      headSha: SHA,
+    });
   });
 
   it("reads a NUL-delimited diff and writes stable GitHub outputs", () => {

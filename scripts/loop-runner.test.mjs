@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -26,9 +27,16 @@ import {
   parseStateBlock,
   summarizeTask,
   artifactManifest,
+  buildReviewPacket,
+  watchAftercare,
 } from "./loop-runner.mjs";
 import { taskFixture, reviewFixture, verificationManifestFixture } from "./loop-test-fixtures.mjs";
-import { computeAssessment, currentEvidence, verificationSummary } from "./loop-policy.mjs";
+import {
+  computeAssessment,
+  currentEvidence,
+  validateReview,
+  verificationSummary,
+} from "./loop-policy.mjs";
 const root = process.cwd();
 const dirs = [];
 afterEach(() => {
@@ -54,6 +62,9 @@ function repository() {
     path.join(dir, "package.json"),
     JSON.stringify({ scripts: { "test:process": 'node -e "process.exit(0)"' } }),
   );
+  // pnpm run generates node_modules/ + pnpm-lock.yaml at runtime; the fixture
+  // ignores them like a real repo would so verification keeps the tree clean.
+  writeFileSync(path.join(dir, ".gitignore"), "node_modules/\npnpm-lock.yaml\n");
   git("init", "-b", "preview");
   git("config", "user.email", "test@example.invalid");
   git("config", "user.name", "Test");
@@ -121,114 +132,118 @@ describe("persistent task gates", () => {
     expect(restored.counters.review).toBe(2);
   });
 
-  it("runs the startup-to-PR path through the real CLI in an isolated worktree", () => {
-    const { git } = repository();
-    const parent = mkdtempSync(path.join(tmpdir(), "loop-cli-"));
-    dirs.push(parent);
-    const checkout = path.join(parent, "checkout");
-    git("worktree", "add", "-b", "codex/integration", checkout, "preview");
-    const spec = path.join(parent, "spec.json");
-    writeFileSync(spec, JSON.stringify(taskFixture().spec));
-    const cli = (...args) =>
-      execFileSync(process.execPath, [path.join(root, "scripts/loop-runner.mjs"), ...args], {
-        cwd: checkout,
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
+  it(
+    "runs the startup-to-PR path through the real CLI in an isolated worktree",
+    { timeout: 30000 },
+    () => {
+      const { git } = repository();
+      const parent = mkdtempSync(path.join(tmpdir(), "loop-cli-"));
+      dirs.push(parent);
+      const checkout = path.join(parent, "checkout");
+      git("worktree", "add", "-b", "codex/integration", checkout, "preview");
+      const spec = path.join(parent, "spec.json");
+      writeFileSync(spec, JSON.stringify(taskFixture().spec));
+      const cli = (...args) =>
+        execFileSync(process.execPath, [path.join(root, "scripts/loop-runner.mjs"), ...args], {
+          cwd: checkout,
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      const initial = JSON.parse(
+        cli(
+          "--init",
+          spec,
+          "--task",
+          "integration",
+          "--runtime",
+          "codex",
+          "--implementer",
+          "author",
+          "--base",
+          "preview",
+        ),
+      );
+      // Default CLI output is a compact summary — never the full task document.
+      expect(initial).toMatchObject({
+        taskId: "integration",
+        state: "refine",
+        risk: "T1",
+        profile: { selected: "standard", source: "provisional" },
       });
-    const initial = JSON.parse(
-      cli(
-        "--init",
-        spec,
-        "--task",
-        "integration",
-        "--runtime",
-        "codex",
-        "--implementer",
-        "author",
-        "--base",
-        "preview",
-      ),
-    );
-    // Default CLI output is a compact summary — never the full task document.
-    expect(initial).toMatchObject({
-      taskId: "integration",
-      state: "refine",
-      risk: "T1",
-      profile: { selected: "standard", source: "provisional" },
-    });
-    for (const key of ["configuration", "assessment", "history", "spec"])
-      expect(initial).not.toHaveProperty(key);
-    const provisional = loadTask(checkout).configuration;
-    expect(provisional.profile.name).toBe("standard");
-    expect(provisional.selection).toMatchObject({
-      selected: "standard",
-      source: "provisional",
-    });
-    // Leaving REFINE requires the determination inputs recorded via --assessment.
-    expect(() => cli("--event", "ready")).toThrow();
-    const refineAssessment = path.join(parent, "refine-assessment.json");
-    writeFileSync(
-      refineAssessment,
-      JSON.stringify({
-        ...taskFixture().agentAssessment,
-        verification_load: { level: "routine", rationale: "process checks only" },
-      }),
-    );
-    cli("--assessment", refineAssessment);
-    cli("--event", "ready");
-    const decided = loadTask(checkout).configuration;
-    expect(decided.profile.name).toBe("fast");
-    expect(decided.selection).toMatchObject({
-      selected: "fast",
-      source: "auto",
-      inputs: {
-        blast_radius: "local",
-        uncertainty: "known_pattern",
-        verification_load: "routine",
-      },
-    });
-    writeFileSync(path.join(checkout, "README.md"), "change");
-    execFileSync("git", ["add", "."], { cwd: checkout });
-    execFileSync("git", ["-c", "core.hooksPath=/dev/null", "commit", "-m", "change"], {
-      cwd: checkout,
-      stdio: "pipe",
-    });
-    expect(() => cli("--event", "ready")).toThrow();
-    const assessment = path.join(parent, "assessment.json");
-    writeFileSync(assessment, JSON.stringify(taskFixture().agentAssessment));
-    cli("--assessment", assessment);
-    // The same evaluation inputs must not trigger re-determination.
-    expect(loadTask(checkout).configuration.selection.revisions).toHaveLength(1);
-    cli("--verify", "process");
-    cli("--event", "ready");
-    const task = loadTask(checkout);
-    const report = path.join(parent, "review.json");
-    writeFileSync(report, JSON.stringify(reviewFixture(task)));
-    cli("--review", report);
-    cli("--event", "clean");
-    expect(parseStateBlock(cli("--export")).state).toBe("aftercare");
-    expect(() => cli("--event", "ready")).toThrow();
-    expect(loadTask(checkout).state).toBe("aftercare");
-    // Focused read actions expose decision data without dumping the task.
-    const status = JSON.parse(cli("--status"));
-    expect(status).toMatchObject({ taskId: "integration", state: "aftercare" });
-    expect(status.verification.process).toBe("pass");
-    expect(status).not.toHaveProperty("configuration");
-    const explain = JSON.parse(cli("--explain"));
-    expect(explain.missing).toContain("aftercare");
-    expect(explain.verificationDetail.process.appliesTo.contractVersion).toBe(1);
-    const artifacts = JSON.parse(cli("--artifacts"));
-    expect(artifacts.artifacts.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(artifacts.artifacts.process.artifact.available).toBe(true);
-    // The manifest references the log artifact; it never contains raw log text.
-    const entry = artifacts.artifacts.process.artifact;
-    expect(path.isAbsolute(entry.path)).toBe(false);
-    expect(entry.resolved).toContain("agent-evidence");
-    expect(entry.resolved.startsWith(path.join(checkout, ".git"))).toBe(false);
-    const stateFile = path.join(parent, "state.md");
-    expect(JSON.parse(cli("--export-file", stateFile)).written).toBe(stateFile);
-    expect(parseStateBlock(readFileSync(stateFile, "utf8")).state).toBe("aftercare");
-  });
+      for (const key of ["configuration", "assessment", "history", "spec"])
+        expect(initial).not.toHaveProperty(key);
+      const provisional = loadTask(checkout).configuration;
+      expect(provisional.profile.name).toBe("standard");
+      expect(provisional.selection).toMatchObject({
+        selected: "standard",
+        source: "provisional",
+      });
+      // Leaving REFINE requires the determination inputs recorded via --assessment.
+      expect(() => cli("--event", "ready")).toThrow();
+      const refineAssessment = path.join(parent, "refine-assessment.json");
+      writeFileSync(
+        refineAssessment,
+        JSON.stringify({
+          ...taskFixture().agentAssessment,
+          verification_load: { level: "routine", rationale: "process checks only" },
+        }),
+      );
+      cli("--assessment", refineAssessment);
+      cli("--event", "ready");
+      const decided = loadTask(checkout).configuration;
+      expect(decided.profile.name).toBe("fast");
+      expect(decided.selection).toMatchObject({
+        selected: "fast",
+        source: "auto",
+        inputs: {
+          blast_radius: "local",
+          uncertainty: "known_pattern",
+          verification_load: "routine",
+        },
+      });
+      writeFileSync(path.join(checkout, "README.md"), "change");
+      execFileSync("git", ["add", "."], { cwd: checkout });
+      execFileSync("git", ["-c", "core.hooksPath=/dev/null", "commit", "-m", "change"], {
+        cwd: checkout,
+        stdio: "pipe",
+      });
+      expect(() => cli("--event", "ready")).toThrow();
+      const assessment = path.join(parent, "assessment.json");
+      writeFileSync(assessment, JSON.stringify(taskFixture().agentAssessment));
+      cli("--assessment", assessment);
+      // The same evaluation inputs must not trigger re-determination.
+      expect(loadTask(checkout).configuration.selection.revisions).toHaveLength(1);
+      cli("--verify", "process");
+      cli("--event", "ready");
+      const task = loadTask(checkout);
+      const report = path.join(parent, "review.json");
+      writeFileSync(report, JSON.stringify(reviewFixture(task)));
+      cli("--review", report);
+      cli("--event", "clean");
+      expect(parseStateBlock(cli("--export")).state).toBe("aftercare");
+      expect(() => cli("--event", "ready")).toThrow();
+      expect(loadTask(checkout).state).toBe("aftercare");
+      // Focused read actions expose decision data without dumping the task.
+      const status = JSON.parse(cli("--status"));
+      expect(status).toMatchObject({ taskId: "integration", state: "aftercare" });
+      expect(status.verification.process).toBe("pass");
+      expect(status).not.toHaveProperty("configuration");
+      const explain = JSON.parse(cli("--explain"));
+      expect(explain.missing).toContain("aftercare");
+      expect(explain.verificationDetail.process.appliesTo.contractVersion).toBe(1);
+      const artifacts = JSON.parse(cli("--artifacts"));
+      expect(artifacts.artifacts.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(artifacts.artifacts.process.artifact.available).toBe(true);
+      // The manifest references the log artifact; it never contains raw log text.
+      const entry = artifacts.artifacts.process.artifact;
+      expect(path.isAbsolute(entry.path)).toBe(false);
+      expect(entry.resolved).toContain("agent-evidence");
+      expect(entry.resolved.startsWith(path.join(checkout, ".git"))).toBe(false);
+      const stateFile = path.join(parent, "state.md");
+      expect(JSON.parse(cli("--export-file", stateFile)).written).toBe(stateFile);
+      expect(parseStateBlock(readFileSync(stateFile, "utf8")).state).toBe("aftercare");
+    },
+  );
   it("rejects caller-selected states and missing specs", () => {
     expect(() => resolveLoopStep({ state: "aftercare", event: "ready", root })).toThrow(
       "Persisted task",
@@ -346,6 +361,8 @@ describe("persistent task gates", () => {
     for (const flag of ["--model", "--profile", "--runtime", "--event", "--exit", "--review"])
       expect(() => parseArguments([flag])).toThrow("requires a value");
     expect(() => parseArguments(["--magic"])).toThrow("unknown option");
+    // A bare "--" (forwarded verbatim by pnpm run) is skipped, not an option.
+    expect(parseArguments(["--", "--export"])).toEqual({ export: true });
   });
   it("accepts --model for backward compatibility without recording it", () => {
     const { git } = repository();
@@ -390,6 +407,7 @@ describe("persistent task gates", () => {
       baseHead: task.baseHead,
       contractVersion: 1,
     });
+    expect(evidence.appliesTo.headTree).toMatch(/^[0-9a-f]{40}$/);
     expect(evidence.appliesTo.patchSha256).toMatch(/^[0-9a-f]{64}$/);
     // Persisted artifact paths stay relative to the evidence root so the state
     // block never leaks local filesystem layout into the PR body.
@@ -519,5 +537,660 @@ describe("persistent task gates", () => {
     expect(artifacts.artifacts.process.run.head).toBe(task.head);
     // Read actions must not mutate the persisted state.
     expect(loadTask(dir).head).toBe(task.head);
+  });
+  /** Move `preview` one commit ahead on the given file, then switch back. */
+  const upstreamCommit = (dir, git, file, content = "upstream\n") => {
+    git("switch", "preview");
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), content);
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", `upstream ${file}`);
+    git("switch", "codex/task");
+  };
+  it("reuses verification evidence across base drift when the head tree is unchanged", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    const before = task.verification.process;
+    upstreamCommit(dir, git, "src/app.ts", "export {};\n");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    const evidence = refreshed.verification.process;
+    // The run record stays at the revision that actually executed it.
+    expect(evidence.run.head).toBe(before.run.head);
+    expect(evidence.appliesTo.head).toBe(refreshed.head);
+    expect(evidence.appliesTo.baseHead).toBe(refreshed.baseHead);
+    expect(evidence.appliesTo.baseHead).not.toBe(before.appliesTo.baseHead);
+    expect(evidence.reuse).toMatchObject({
+      from: { head: before.appliesTo.head, baseHead: before.appliesTo.baseHead },
+    });
+    expect(verificationSummary(refreshed).process).toBe("pass(reused)");
+    expect(refreshed.history.at(-1).reusedVerification).toEqual(["process"]);
+  });
+  it("keeps evidence when upstream drift leaves the head tree untouched", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    // Even harness-relevant upstream files cannot invalidate a verification of
+    // this tree — the head does not contain them.
+    upstreamCommit(dir, git, "docs/upstream.md");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.process.reuse).toBeDefined();
+    expect(refreshed.history.at(-1).reusedVerification).toEqual(["process"]);
+  });
+  it("reuses evidence across a message-only amend when the tree is identical", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "feature.txt"), "feature\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    refreshTask(task, dir);
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    git("-c", "core.hooksPath=/dev/null", "commit", "--amend", "-m", "renamed");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    const evidence = refreshed.verification.process;
+    // Same patch, same tree, new commit SHA — evidence carries over.
+    expect(evidence.appliesTo.head).toBe(refreshed.head);
+    expect(evidence.reuse.from.head).not.toBe(refreshed.head);
+    expect(verificationSummary(refreshed).process).toBe("pass(reused)");
+  });
+  it("drops evidence after a rebase even when the feature patch is identical", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "feature.txt"), "feature\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    refreshTask(task, dir);
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "src/upstream.ts", "export {};\n");
+    // Rebasing keeps the patch byte-identical but embeds new base content —
+    // the head tree differs, so verification must re-run on the new content.
+    const beforeSha = task.verification.process.appliesTo.patchSha256;
+    git("-c", "core.hooksPath=/dev/null", "rebase", "preview");
+    // Prove the patch fingerprint held — the drop below must come from the
+    // head-tree fingerprint, not a patch mismatch.
+    const afterSha = createHash("sha256")
+      .update(
+        execFileSync("git", ["diff", "--binary", "--no-renames", "preview...HEAD"], {
+          cwd: dir,
+          encoding: "utf8",
+        }).trim(),
+      )
+      .digest("hex");
+    expect(afterSha).toBe(beforeSha);
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification).toEqual({});
+    expect(refreshed.history.at(-1).reusedVerification).toEqual([]);
+  });
+  it("drops verification evidence when the feature patch changes", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    writeFileSync(path.join(dir, "README.md"), "changed\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature change");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification).toEqual({});
+  });
+  it("drops evidence fail-closed on contract mismatch or missing reuse metadata", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    task.verification.process.appliesTo.contractVersion = 999;
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "src/app.ts", "export {};\n");
+    expect(refreshTask(loadTask(dir), dir).verification).toEqual({});
+    // Legacy flat evidence without appliesTo is never reusable either.
+    const { dir: dir2, git: git2, task: task2 } = repository();
+    task2.verification.process = {
+      head: task2.head,
+      baseHead: task2.baseHead,
+      success: true,
+    };
+    saveTask(task2, dir2);
+    upstreamCommit(dir2, git2, "src/legacy.ts", "export {};\n");
+    expect(refreshTask(loadTask(dir2), dir2).verification).toEqual({});
+  });
+  it("never reuses review or aftercare evidence on revision change", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    task.aftercare = {
+      head: task.head,
+      baseHead: task.baseHead,
+      ready: true,
+      pr: 1,
+      checkedAt: "2026-01-01",
+    };
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "src/app.ts", "export {};\n");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.process).toBeDefined();
+    expect(refreshed.review).toBeNull();
+    expect(refreshed.aftercare).toBeNull();
+    expect(refreshed.state).toBe("execute");
+  });
+  it("records a verification plan with execution, scope, reason and AC references", () => {
+    const task = taskFixture();
+    const processOnly = Object.fromEntries(
+      computeAssessment(task, ["README.md"]).verificationPlan.map((i) => [i.kind, i]),
+    );
+    expect(processOnly.process).toMatchObject({
+      required: true,
+      execution: "local",
+      reason: "required for every change",
+    });
+    expect(processOnly.process.commands[0]).toEqual(["node", "scripts/check-loop-docs.mjs"]);
+    expect(processOnly.e2e).toMatchObject({ required: false, execution: "github" });
+    expect(
+      computeAssessment(task, ["README.md"]).verificationPlan.every((i) => i.acs.includes("AC1")),
+    ).toBe(true);
+    const runtime = Object.fromEntries(
+      computeAssessment(task, ["src/app.ts"]).verificationPlan.map((i) => [i.kind, i]),
+    );
+    expect(runtime.e2e.required).toBe(true);
+    expect(runtime.unit).toMatchObject({
+      required: true,
+      execution: "local",
+      reason: "runtime-relevant paths changed",
+    });
+  });
+  it("builds a review packet with diff, manifest, template and contracts", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "feature.txt"), "feature\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    refreshTask(task, dir);
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    task.state = "review";
+    task.risk = "T3";
+    task.assessment = { ...task.assessment, review: { independent: true } };
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-packet-"));
+    dirs.push(parent);
+    const out = path.join(parent, "packet");
+    const result = buildReviewPacket(task, out, dir);
+    expect(result.files).toBe(5);
+    const packet = JSON.parse(readFileSync(path.join(out, "packet.json"), "utf8"));
+    expect(packet).toMatchObject({
+      taskId: task.taskId,
+      head: task.head,
+      baseHead: task.baseHead,
+      goal: task.spec.goal,
+      risk: "T3",
+    });
+    expect(packet.changedPaths).toContain("feature.txt");
+    expect(packet.acceptanceCriteria[0].id).toBe("AC1");
+    expect(packet.reuseCandidates.featurePatchSha256).toMatch(/^[0-9a-f]{64}$/);
+    const template = JSON.parse(readFileSync(path.join(out, "review-template.json"), "utf8"));
+    expect(template).toMatchObject({
+      head: task.head,
+      independent: true,
+      context: "fresh",
+      findings: [],
+    });
+    expect(template.acceptanceCriteria).toEqual([{ id: "AC1", evidence: "" }]);
+    // _notes carries reviewer-facing contract hints (finding status enum,
+    // deltaFrom, machine floor) — its absence caused an invalid status enum
+    // in a real fresh-context review.
+    expect(template._notes.join(" ")).toContain("open|fixed|dismissed");
+    expect(readFileSync(path.join(out, "diff.patch"), "utf8")).toContain("feature.txt");
+    const manifest = JSON.parse(readFileSync(path.join(out, "verification-manifest.json"), "utf8"));
+    expect(manifest.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.parse(readFileSync(path.join(out, "task-summary.json"), "utf8")).state).toBe(
+      "review",
+    );
+    expect(existsSync(path.join(out, "contracts", "workflow-review.md"))).toBe(true);
+  });
+  it("refuses review packets outside review state or with a dirty tree", () => {
+    const { dir, task } = repository();
+    task.state = "execute";
+    expect(() => buildReviewPacket(task, path.join(dir, "out"), dir)).toThrow("review");
+    task.state = "review";
+    writeFileSync(path.join(dir, "dirty.txt"), "dirty\n");
+    expect(() => buildReviewPacket(task, path.join(dir, "out"), dir)).toThrow("Commit all");
+  });
+  it("emits watch events only on signature changes and records when ready", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const prFields = (checks) => ({
+      number: 7,
+      state: "OPEN",
+      isDraft: false,
+      headRefOid: task.head,
+      baseRefOid: task.baseHead,
+      baseRefName: "preview",
+      mergeable: "MERGEABLE",
+      mergeStateStatus: "CLEAN",
+      reviewDecision: "APPROVED",
+      statusCheckRollup: checks,
+    });
+    const ok = { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" };
+    const pending = { name: "Agent harness", status: "IN_PROGRESS", startedAt: "2026-01-01" };
+    const findings = {
+      pagesComplete: true,
+      unhandledCount: 0,
+      unresolvedThreadCount: 0,
+    };
+    const prPolls = [prFields([pending]), prFields([pending]), prFields([ok])];
+    let recorded = false;
+    const result = watchAftercare(task, 7, dir, {
+      // Same {fetchPr, fetchFindings} shape as the production fetchers.
+      fetchPr: () => prPolls.shift(),
+      fetchFindings: () => findings,
+      sleep: () => {},
+      record: (t) => {
+        recorded = true;
+        t.aftercare = { head: t.head, baseHead: t.baseHead, ready: true, pr: 7 };
+        return t;
+      },
+    });
+    expect(result.ready).toBe(true);
+    expect(recorded).toBe(true);
+    // Two events only: initial pending signature, then the ready change.
+    expect(result.events).toHaveLength(2);
+    expect(result.events[0]).toMatchObject({
+      ready: false,
+      changed: false,
+      pending: ["Agent harness"],
+    });
+    expect(result.events[1]).toMatchObject({ ready: true, changed: true });
+    expect(result.task.aftercare.ready).toBe(true);
+  });
+  it("accepts watch modifiers only with --aftercare", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    saveTask(task, dir);
+    const parsed = parseArguments([
+      "--aftercare",
+      "7",
+      "--watch-aftercare",
+      "--interval-seconds",
+      "30",
+    ]);
+    expect(parsed).toMatchObject({
+      aftercare: "7",
+      "watch-aftercare": true,
+      "interval-seconds": "30",
+    });
+    expect(() => run({ "watch-aftercare": true }, dir)).toThrow("requires --aftercare");
+    expect(() => run({ "interval-seconds": "30" }, dir)).toThrow("requires --watch-aftercare");
+    expect(() =>
+      run({ aftercare: "7", "watch-aftercare": true, "interval-seconds": "x" }, dir),
+    ).toThrow(">= 1");
+  });
+  it("stops watching at the deadline without recording", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    saveTask(task, dir);
+    const pending = {
+      number: 7,
+      headRefOid: task.head,
+      baseRefOid: task.baseHead,
+      statusCheckRollup: [
+        { name: "Agent harness", status: "IN_PROGRESS", startedAt: "2026-01-01" },
+      ],
+    };
+    let t = 0;
+    const result = watchAftercare(task, 7, dir, {
+      maxSeconds: 5,
+      intervalSeconds: 60,
+      fetchPr: () => pending,
+      fetchFindings: () => ({}),
+      now: () => (t += 1000),
+      sleep: () => {},
+      record: () => {
+        throw new Error("must not record");
+      },
+    });
+    expect(result.ready).toBe(false);
+    expect(result.task.aftercare).toBeFalsy();
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0].ready).toBe(false);
+  });
+  it("treats a transient fetch failure as a poll event, then records when ready", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const ready = {
+      number: 7,
+      state: "OPEN",
+      isDraft: false,
+      headRefOid: task.head,
+      baseRefOid: task.baseHead,
+      baseRefName: "preview",
+      mergeable: "MERGEABLE",
+      mergeStateStatus: "CLEAN",
+      reviewDecision: "APPROVED",
+      statusCheckRollup: [{ name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" }],
+    };
+    let calls = 0;
+    const result = watchAftercare(task, 7, dir, {
+      fetchPr: () => {
+        calls += 1;
+        if (calls === 1) throw new Error("gh offline");
+        return ready;
+      },
+      fetchFindings: () => ({
+        pagesComplete: true,
+        unhandledCount: 0,
+        unresolvedThreadCount: 0,
+      }),
+      sleep: () => {},
+      record: (t) => {
+        t.aftercare = { head: t.head, baseHead: t.baseHead, ready: true, pr: 7 };
+        return t;
+      },
+    });
+    expect(result.ready).toBe(true);
+    expect(result.events[0]).toMatchObject({ ready: false, error: "gh offline" });
+    expect(result.events[1]).toMatchObject({ ready: true, changed: true });
+  });
+  it("appends verify and revision metrics to the shared git dir", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    const file = path.join(
+      git("rev-parse", "--path-format=absolute", "--git-common-dir"),
+      "agent-metrics.jsonl",
+    );
+    const readMetrics = () =>
+      readFileSync(file, "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+    const verified = readMetrics().at(-1);
+    expect(verified).toMatchObject({
+      action: "verify",
+      kind: "process",
+      result: "pass",
+      taskId: task.taskId,
+      state: "execute",
+    });
+    expect(verified.artifactBytes).toBeGreaterThan(0);
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "src/app.ts", "export {};\n");
+    refreshTask(loadTask(dir), dir);
+    const revision = readMetrics().at(-1);
+    expect(revision).toMatchObject({ action: "revision_changed", reused: 1, invalidated: 0 });
+  });
+});
+
+describe("increment reuse and loop ergonomics", () => {
+  /** Move `preview` one commit ahead on the given file, then switch back. */
+  const upstreamCommit = (dir, git, file, content = "upstream\n") => {
+    git("switch", "preview");
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), content);
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", `upstream ${file}`);
+    git("switch", "codex/task");
+  };
+  it("extends non-process evidence through metadata-only increments", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    for (const kind of ["lint", "unit", "build"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, "docs"), { recursive: true });
+    writeFileSync(path.join(dir, "docs", "note.md"), "docs\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs fix");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.process).toBeUndefined();
+    for (const kind of ["lint", "unit", "build"]) {
+      const evidence = refreshed.verification[kind];
+      expect(evidence.appliesTo.head).toBe(refreshed.head);
+      expect(evidence.reuse).toMatchObject({ basis: "metadata_only_increment" });
+      expect(evidence.reuse.incrementPaths).toEqual(["docs/note.md"]);
+    }
+    expect(refreshed.history.at(-1).reusedVerification).toEqual(
+      expect.arrayContaining(["lint", "unit", "build"]),
+    );
+    expect(refreshed.history.at(-1).reusedVerification).not.toContain("process");
+  });
+  it("does not extend lint evidence when a metadata increment has oxfmt-checked files", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit", "build"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".github", "ISSUE_TEMPLATE"), { recursive: true });
+    writeFileSync(path.join(dir, ".github", "ISSUE_TEMPLATE", "bug.yml"), "name: bug\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "issue template yaml");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint).toBeUndefined();
+    for (const kind of ["unit", "build"]) {
+      expect(refreshed.verification[kind].reuse).toMatchObject({
+        basis: "metadata_only_increment",
+      });
+      expect(refreshed.verification[kind].appliesTo.head).toBe(refreshed.head);
+    }
+  });
+  it("does not extend lint evidence for extension-bearing files under .husky", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".husky"), { recursive: true });
+    writeFileSync(path.join(dir, ".husky", "hook.json"), "{}\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky json");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint).toBeUndefined();
+    expect(refreshed.verification.unit.reuse).toMatchObject({
+      basis: "metadata_only_increment",
+    });
+  });
+  it("does not extend lint evidence for well-known filenames under .husky", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".husky"), { recursive: true });
+    writeFileSync(path.join(dir, ".husky", "README"), "# hooks\n");
+    writeFileSync(path.join(dir, ".husky", "pre-commit"), "echo lint\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky readme + hook");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint).toBeUndefined();
+    expect(refreshed.verification.unit.reuse).toMatchObject({
+      basis: "metadata_only_increment",
+    });
+  });
+  it("extends lint evidence for canonical hook basenames under .husky", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".husky"), { recursive: true });
+    writeFileSync(path.join(dir, ".husky", "pre-push"), "echo test\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky hook");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    for (const kind of ["lint", "unit"])
+      expect(refreshed.verification[kind].reuse).toMatchObject({
+        basis: "metadata_only_increment",
+      });
+  });
+  it("drops evidence when an increment touches runtime paths or the base moved", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit", "build"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, "docs"), { recursive: true });
+    writeFileSync(path.join(dir, "docs", "note.md"), "docs\n");
+    writeFileSync(path.join(dir, "scripts", "feature.ts"), "export {};\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs + code");
+    expect(refreshTask(loadTask(dir), dir).verification).toEqual({});
+  });
+  it("does not take the increment path when only the base moved", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"]) runVerification(task, kind, dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "docs/upstream.md", "upstream\n");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint.reuse.basis).toBe("identical_patch_and_tree");
+    expect(refreshed.verification.unit.reuse.basis).toBe("identical_patch_and_tree");
+  });
+  it("keeps verification and assessment through findings and ci_failure transitions", () => {
+    const { dir, task } = repository();
+    task.verification.process = { head: task.head, baseHead: task.baseHead, success: true };
+    task.state = "review";
+    task.review = reviewFixture(task, {
+      findings: [{ id: "F1", status: "open", evidence: "edge" }],
+    });
+    task.findings = task.review.findings;
+    transitionTask(task, "findings", { reason: "fix F1" }, dir);
+    expect(task.state).toBe("execute");
+    expect(task.verification.process).toBeDefined();
+    expect(task.agentAssessment).toBeTruthy();
+    task.state = "aftercare";
+    transitionTask(task, "ci_failure", { reason: "lint failed" }, dir);
+    expect(task.verification.process).toBeDefined();
+    expect(task.agentAssessment).toBeTruthy();
+  });
+  it("runs vitest related for --scope affected over changed runtime paths", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "src-feature.ts"), "export {};\n");
+    mkdirSync(path.join(dir, "e2e"), { recursive: true });
+    writeFileSync(path.join(dir, "e2e", "new.spec.ts"), "// playwright\n");
+    mkdirSync(path.join(dir, "docs"), { recursive: true });
+    writeFileSync(path.join(dir, "docs", "note.md"), "docs\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    refreshTask(task, dir);
+    const commands = [];
+    runVerification(
+      task,
+      "unit",
+      dir,
+      (command) => {
+        commands.push(command);
+        return { status: 0 };
+      },
+      { scope: "affected" },
+    );
+    expect(commands).toHaveLength(1);
+    expect(commands[0].slice(0, 4)).toEqual(["pnpm", "exec", "vitest", "related"]);
+    expect(commands[0]).toContain("src-feature.ts");
+    expect(task.verification.unit.run.scope).toBe("affected");
+    expect(task.verification.unit.run.affectedFiles).toEqual(["src-feature.ts"]);
+  });
+  it("falls back to the full suite when no runtime files changed and rejects scope misuse", () => {
+    const { dir, task } = repository();
+    const commands = [];
+    runVerification(
+      task,
+      "unit",
+      dir,
+      (command) => {
+        commands.push(command);
+        return { status: 0 };
+      },
+      { scope: "affected" },
+    );
+    expect(commands[0]).toEqual(["pnpm", "exec", "vitest", "run"]);
+    expect(task.verification.unit.run.scope).toBe("full");
+    expect(() =>
+      runVerification(task, "lint", dir, () => ({ status: 0 }), { scope: "affected" }),
+    ).toThrow("unit only");
+    saveTask(task, dir);
+    expect(() => run({ scope: "affected" }, dir)).toThrow("--scope requires --verify");
+  });
+  it("accepts deltaFrom only for previously reviewed heads", () => {
+    const { task } = repository();
+    task.state = "review";
+    const priorHead = "c".repeat(40);
+    task.history.push({
+      state: "review",
+      event: "review_recorded",
+      head: priorHead,
+      at: "2026-01-01T00:00:00.000Z",
+    });
+    expect(() => validateReview(task, reviewFixture(task, { deltaFrom: priorHead }))).not.toThrow();
+    for (const bad of ["not-a-sha", task.head, "d".repeat(40)])
+      expect(() => validateReview(task, reviewFixture(task, { deltaFrom: bad }))).toThrow(
+        "deltaFrom",
+      );
+  });
+  it("reports finding status enums and assessment failures in review errors", () => {
+    const { task } = repository();
+    task.state = "review";
+    expect(() =>
+      validateReview(
+        task,
+        reviewFixture(task, {
+          findings: [{ id: "F1", status: "closed", evidence: "done" }],
+        }),
+      ),
+    ).toThrow("open|fixed|dismissed");
+    expect(() => validateReview(task, reviewFixture(task, { assessment: undefined }))).toThrow(
+      "Reviewer assessment invalid",
+    );
+  });
+  it("keeps metadata-reading tests inside the mandatory process suite", () => {
+    // `unit` evidence is extended through metadata-only increments only because
+    // every test whose outcome can depend on metadata content runs under the
+    // `process` verification that is never extended. This heuristic guard fails
+    // loudly when a new metadata-referencing test (or test helper) lands
+    // outside the process suite. git pathspec has no brace expansion, so
+    // .test/.spec are listed separately; tests/** covers non-test helpers.
+    const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+    const processTests = new Set(
+      pkg.scripts["test:process"].match(/[\w./-]+\.(?:test|spec)\.(?:mjs|ts|tsx|js)/g) ?? [],
+    );
+    const testFiles = [
+      ...new Set(
+        execFileSync("git", ["ls-files", "**/*.test.*", "**/*.spec.*", "tests/**"], {
+          cwd: root,
+          encoding: "utf8",
+        })
+          .split("\n")
+          .filter(Boolean),
+      ),
+    ];
+    // A quoted metadata path literal: whole-literal .md paths including ?raw
+    // suffixes and ${} interpolation, plus ISSUE_TEMPLATE/.husky tokens
+    // anywhere inside a quoted string. Unquoted property access like
+    // `tokens.space.md` and longer prose containing a path do not match.
+    const METADATA_PATH_REF =
+      /["'`][\w./$*{}-]+\.md(?:\?[^"'`]*)?["'`]|["'`][^"'`]*(?:ISSUE_TEMPLATE|\.husky)[^"'`]*["'`]/;
+    const offenders = testFiles.filter(
+      (file) =>
+        !processTests.has(file) &&
+        !file.startsWith("e2e/") &&
+        METADATA_PATH_REF.test(readFileSync(path.join(root, file), "utf8")),
+    );
+    expect(offenders).toEqual([]);
+
+    // Non-test build/unit-reachable code must not read metadata at all: a
+    // `?raw` .md import (or a metadata-dir reference) inside src/convex would
+    // change build and transitive unit outcomes while evidence is extended.
+    // Scripts are exempt — they are process-domain readers by design and their
+    // tests already live in the process suite.
+    const sourceOffenders = execFileSync("git", ["ls-files", "src/**", "convex/**"], {
+      cwd: root,
+      encoding: "utf8",
+    })
+      .split("\n")
+      .filter(
+        (file) =>
+          /\.(?:[cm]?[jt]sx?)$/.test(file) &&
+          !/\.(?:test|spec)\.[^.]+$/.test(file) &&
+          METADATA_PATH_REF.test(readFileSync(path.join(root, file), "utf8")),
+      );
+    expect(sourceOffenders).toEqual([]);
+  });
+  it("records friction notes into task state, history and the state block", () => {
+    const { dir, task } = repository();
+    saveTask(task, dir);
+    const result = run({ "friction-note": " per-kind verify reruns felt heavy " }, dir);
+    expect(result.frictionNote).toBe("per-kind verify reruns felt heavy");
+    const saved = loadTask(dir);
+    expect(saved.history.at(-1)).toMatchObject({ event: "friction_note" });
+    expect(stateBlock(saved)).toContain("per-kind verify");
+    expect(() => run({ "friction-note": "   " }, dir)).toThrow("requires non-empty");
   });
 });

@@ -313,6 +313,7 @@ export function fetchPullRequestFindings({ owner, name, number, cwd, execGraphql
 export function parseArguments(args) {
   const parsed = { cwd: process.cwd() };
   for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === "--") continue;
     if (args[index] === "--pr") {
       parsed.pr = args[index + 1];
       index += 1;

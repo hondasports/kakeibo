@@ -203,7 +203,7 @@ Agent taskで残す価値があるもの:
 
 具体的な開始・再開・状態保存は [Agent Harness操作手順](agent-harness.md) を参照する。
 
-軽量化とREFINE終了時のProfile自動判定を実装する際は [Agent Harness設計](agent-harness-design.md) を正本とする。この設計は未実装であり、本節の現行運用とState Transitionを設計文書だけで変更しない。
+軽量化とREFINE終了時のProfile自動判定を実装する際は [Agent Harness設計](agent-harness-design.md) を正本とする。この設計は段階的に実装中であり、本節の現行運用とState Transitionを設計文書だけで変更しない。
 
 ### REFINE
 
@@ -229,7 +229,7 @@ T1はセルフレビュー可。T2で未解決の挙動前提がある場合とT
 
 ### AFTERCARE / Persistent State
 
-PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest HEADで確認する。タスク状態はIssue / PRを正本とし、Human Requestは保持する。Agent Spec・Machine-readable state・検証証跡を分離して残し、別SessionでもGitHubと実HEADを照合して再開できるようにする。状態はGitメタデータ内に作業キャッシュを保存し、PR本文の状態ブロックへ同期する。HEADまたはbase更新時は検証・レビューを失効させる。
+PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest HEADで確認する。タスク状態はIssue / PRを正本とし、Human Requestは保持する。Agent Spec・Machine-readable state・検証証跡を分離して残し、別SessionでもGitHubと実HEADを照合して再開できるようにする。状態はGitメタデータ内に作業キャッシュを保存し、PR本文の状態ブロックへ同期する。HEADまたはbase更新時は検証・レビューを失効させるが、CLIが不変性を証明した検証証跡は再利用する（[Agent Harness操作手順](agent-harness.md) 参照）。
 
 E2Eが必須と判定された変更でブラウザ受入条件がない場合は、PR CIで実行し、AFTERCAREでpublic/authenticated両方の成功を要求する。文書・工程管理のみなど差分判定でE2E対象外となる変更には、E2E成功を必須条件として追加しない。実行対象の判定は「PR CI E2Eの差分判定」に従う。
 
@@ -244,7 +244,7 @@ ProfileはREFINE終了時にタスクの評価（`blast_radius`・`uncertainty`�
 
 「全コマンドを毎回実行する」ことではなく、受入条件と関連する不変条件、必須確認を証明する。受入条件は要求工程でbullet化したものを全件照合し、`受入条件 → 確認方法 → 期待結果/実結果 → 対象commit → 証跡` の対応とともに検証した内容・未検証・残課題をPR・作業報告へ記録する。変更後は影響する条件を未検証に戻す。
 
-現行CLIではHEAD/base更新時に検証・レビューを失効させる。過去の結果は調査の参考として参照できるが、旧HEAD/baseの証跡を現在の必須確認の成功として扱わない。不変性をCLIが証明した検証証跡の再利用は、[Agent Harness設計](agent-harness-design.md) の第9節に定める未実装の仕様である。
+現行CLIではHEAD/base更新時に検証・レビューを失効させる。過去の結果は調査の参考として参照でき、feature patchと検証対象treeの両方が不変だとCLIが証明できた検証証跡だけは再利用される（[Agent Harness設計](agent-harness-design.md) 第9節・実装済み）。base不変の増分commitがmetadata-only（`.md`・`.github/ISSUE_TEMPLATE/`・`.husky/`）だけを変更する場合は、process以外の証跡も延長される（実装済み。ただしlintは増分が `.md` と `.husky/` 正規hook名のみの場合に限る——ISSUE_TEMPLATE配下のYAML/JSON等はoxfmtが観測する）。それ以外の旧HEAD/baseの証跡を現在の必須確認の成功として扱わない。
 
 ローカル既定:
 

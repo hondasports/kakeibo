@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { fetchConnectionPages, parseHandledContent, toFindings } from "./collect-pr-findings.mjs";
+import {
+  fetchConnectionPages,
+  parseArguments,
+  parseHandledContent,
+  toFindings,
+} from "./collect-pr-findings.mjs";
 
 function thread(overrides = {}) {
   return {
@@ -388,5 +393,10 @@ describe("toFindings", () => {
 
     expect(result.unhandledCount).toBe(1);
     expect(result.unhandled[0].id).toBe("PRRT_t1");
+  });
+
+  it("skips a bare '--' forwarded by pnpm run", () => {
+    const parsed = parseArguments(["--", "--pr", "123"]);
+    expect(parsed.pr).toBe("123");
   });
 });
