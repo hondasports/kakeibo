@@ -6,11 +6,13 @@ function createActionCtx({
   job,
   suppression,
   deliveryDecision = { enabled: true },
+  deliveryDecisionError,
   mutationResult = undefined,
 }: {
   job: Record<string, unknown> | null;
   suppression?: Record<string, unknown> | null;
   deliveryDecision?: { enabled: boolean; reason?: string };
+  deliveryDecisionError?: Error;
   mutationResult?: unknown;
 }): ActionCtx {
   const runQuery = vi
@@ -27,6 +29,7 @@ function createActionCtx({
           return job;
         }
         if ("type" in args) {
+          if (deliveryDecisionError) throw deliveryDecisionError;
           return deliveryDecision;
         }
         return null;
@@ -111,6 +114,28 @@ describe("processEmailJobHandler", () => {
       expect.anything(),
       expect.objectContaining({ status: "sent" }),
     );
+  });
+
+  it("reschedules the same job when the delivery decision query is temporarily unavailable", async () => {
+    const ctx = createActionCtx({
+      job: queuedJob,
+      deliveryDecisionError: new Error("temporary query failure"),
+    });
+
+    await processEmailJobHandler(ctx, { jobId: "job-123" as any });
+
+    expect(ctx.runMutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        jobId: "job-123",
+        status: "retrying",
+        attemptCount: 1,
+        errorCode: "notification_decision_unavailable",
+      }),
+    );
+    expect(ctx.scheduler.runAfter).toHaveBeenCalledWith(60 * 1000, expect.anything(), {
+      jobId: "job-123",
+    });
   });
 
   it("does nothing when job is already in a terminal state", async () => {
