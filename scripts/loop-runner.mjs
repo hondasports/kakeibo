@@ -196,7 +196,7 @@ export function recordFailure(task, signature, root) {
     task.state = "incident";
 }
 export const EVIDENCE_CONTRACT_VERSION = 1;
-const SAFE_TASK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const SAFE_TASK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const requireSafeTaskId = (taskId) =>
   requireValue(
     typeof taskId === "string" && SAFE_TASK_ID.test(taskId) && !taskId.includes(".."),

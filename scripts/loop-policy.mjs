@@ -90,7 +90,7 @@ export function missingRequirements(task) {
   };
   if (task.state === "refine") {
     if (!task.agentAssessment) missing.push("assessment");
-    else
+    else if (task.configuration?.selection?.source !== "user")
       for (const field of missingProfileInputs(
         profileInputs(task.agentAssessment, {
           fallbackLoad: task.configuration?.selection?.inputs?.verification_load,

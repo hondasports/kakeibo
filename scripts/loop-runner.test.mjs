@@ -475,6 +475,18 @@ describe("persistent task gates", () => {
         dir,
       ),
     ).toThrow("task id");
+    expect(() =>
+      run(
+        {
+          init: spec,
+          task: "x".repeat(300),
+          runtime: "codex",
+          implementer: "author",
+          base: "preview",
+        },
+        dir,
+      ),
+    ).toThrow("task id");
     task.taskId = "../escape";
     expect(() => runVerification(task, "process", dir, () => ({ status: 0 }))).toThrow("task id");
   });
@@ -485,6 +497,10 @@ describe("persistent task gates", () => {
     expect(summarizeTask(task).missing).toEqual([]);
     delete task.agentAssessment.risk_assessment.blast_radius;
     expect(summarizeTask(task).missing).toContain("profile:risk_assessment.blast_radius");
+    // A user-specified profile needs no determination inputs, mirroring the gate.
+    task.configuration.selection.source = "user";
+    expect(summarizeTask(task).missing).toEqual([]);
+    task.configuration.selection.source = "auto";
     task.agentAssessment.risk_assessment.blast_radius = "local";
     task.spec.acceptanceCriteria = [
       { id: "AC1", text: "one" },
