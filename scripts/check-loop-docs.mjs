@@ -136,9 +136,9 @@ export function checkAgentsSkillReferences(repoRoot) {
 /** Content of the `## Capability skills` section only — casual `skills/x` mentions elsewhere do not count as listing. */
 export function extractCapabilitySkillsSection(content) {
   const text = String(content);
-  const start = text.indexOf("## Capability skills");
-  if (start === -1) return "";
-  const rest = text.slice(start);
+  const match = text.match(/^## Capability skills[^\S\n]*$/m);
+  if (!match) return "";
+  const rest = text.slice(match.index);
   const next = rest.indexOf("\n## ");
   return next === -1 ? rest : rest.slice(0, next + 1);
 }
