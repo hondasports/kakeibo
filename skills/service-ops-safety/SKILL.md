@@ -29,6 +29,8 @@ license: Apache-2.0
 
 target environmentが不明ならwriteしない。
 
+外部write・webhook・不可逆操作を伴う変更はfloor trigger語彙の `external_service_write_or_webhook` / `destructive_or_irreversible_operation` 相当として扱い、Machine Floor T3の根拠になる。path ruleで捕捉されないものはAgentがassessmentへ宣言する。
+
 ## Human Gate required
 
 ユーザー明示許可なしに次をwriteしない。
@@ -53,10 +55,9 @@ target environmentが不明ならwriteしない。
 
 ## Convex
 
-- `convex/_generated/ai/guidelines.md` を必要時に確認
-- target deploymentを明示
+- target deployment（local / dev / preview / production）を明示
 - production data operationはHuman Gate
-- Verificationでreflectionが必要なら `pnpm exec convex dev --once`
+- 反映・同期コマンドとschema/migration判断は `skills/convex-local-ops` に従う
 
 ## Clerk / Auth
 
