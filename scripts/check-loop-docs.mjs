@@ -34,6 +34,12 @@ const PATH_REFERENCE_PATTERN =
 
 const CODE_SPAN_PATTERN = /`([^`\n]+)`/g;
 
+// Command references (inline or fenced code) — unlike code-span paths these are
+// matched in the whole document text so they are checked wherever they appear.
+const PNPM_RUN_PATTERN = /\bpnpm run\s+([a-zA-Z0-9:._-]+)/g;
+const PNPM_COLON_SCRIPT_PATTERN = /\bpnpm\s+([a-zA-Z0-9._-]+:[a-zA-Z0-9:._-]+)/g;
+const NODE_SCRIPT_PATTERN = /\b(?:node|tsx)\s+(scripts\/[^\s"'`]+)/g;
+
 /** Referenced but not required to exist (gitignored, or documented as removed). */
 const REFERENCE_ALLOWLIST = [/^\.env\.local$/, /^docs\/generated\//, /^convex\/export\.ts$/];
 const MARKDOWN_LINK_PATTERN = /\[[^\]]*\]\(([^)\s]+)\)/g;
@@ -222,6 +228,41 @@ export function checkPathReferences(repoRoot, docPath, content) {
   return errors;
 }
 
+function loadPackageScripts(repoRoot) {
+  const pkgPath = path.join(repoRoot, "package.json");
+  if (!existsSync(pkgPath)) return null;
+  try {
+    return new Set(Object.keys(JSON.parse(readFileSync(pkgPath, "utf8")).scripts ?? {}));
+  } catch {
+    return new Set();
+  }
+}
+
+/** pnpm run / pnpm <name:...> / node scripts/... references must resolve; stale command docs are drift. */
+export function checkCommandReferences(repoRoot, docPath, content, packageScripts) {
+  const errors = [];
+  const text = String(content);
+  if (packageScripts !== null) {
+    for (const match of text.matchAll(PNPM_RUN_PATTERN)) {
+      if (!packageScripts.has(match[1])) {
+        errors.push(`${docPath}: pnpm run ${match[1]} は package.json のscriptsに存在しません`);
+      }
+    }
+    for (const match of text.matchAll(PNPM_COLON_SCRIPT_PATTERN)) {
+      if (!packageScripts.has(match[1])) {
+        errors.push(`${docPath}: pnpm ${match[1]} は package.json のscriptsに存在しません`);
+      }
+    }
+  }
+  for (const match of text.matchAll(NODE_SCRIPT_PATTERN)) {
+    const candidate = match[1].replace(/[)\],;.]+$/, "");
+    if (!existsSync(path.join(repoRoot, candidate))) {
+      errors.push(`${docPath}: 参照スクリプト ${candidate} が存在しません`);
+    }
+  }
+  return errors;
+}
+
 export function checkSectionNumbering(docPath, content) {
   const numbers = [...String(content).matchAll(SECTION_HEADING_PATTERN)].map((m) => Number(m[1]));
   const firstGap = numbers.findIndex((number, index) => number !== index + 1);
@@ -271,9 +312,11 @@ export function checkLoopDocs(repoRoot) {
   errors.push(...checkAgentsSkillReferences(repoRoot));
   errors.push(...checkSkillsDiscoverability(repoRoot));
 
+  const packageScripts = loadPackageScripts(repoRoot);
   for (const docPath of docFiles) {
     const content = readFileSync(path.join(repoRoot, docPath), "utf8");
     errors.push(...checkPathReferences(repoRoot, docPath, content));
+    errors.push(...checkCommandReferences(repoRoot, docPath, content, packageScripts));
     errors.push(...checkBannedVocabulary(docPath, content));
     if (SKILL_NAME_PATTERN.test(docPath)) {
       errors.push(...checkSkillFrontmatter(repoRoot, docPath));

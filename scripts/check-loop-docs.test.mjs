@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   checkBannedVocabulary,
+  checkCommandReferences,
   checkLoopDocs,
   checkPathReferences,
   checkSectionNumbering,
@@ -154,6 +155,68 @@ describe("path reference checks", () => {
       "`pnpm run build` と `pnpm` と [ext](https://example.com) と `git worktree add ../x/<b>`",
     );
     expect(errors).toHaveLength(0);
+  });
+});
+
+describe("command reference checks", () => {
+  const scripts = new Set(["dev", "e2e:smoke", "test:unit"]);
+
+  it("fails on a missing pnpm run script", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "`pnpm run missing-script` を実行する",
+      scripts,
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("pnpm run missing-script");
+  });
+
+  it("fails on a missing colon-form pnpm script", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "pnpm e2e:missing で確認する",
+      scripts,
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("pnpm e2e:missing");
+  });
+
+  it("ignores pnpm builtins and resolves existing scripts", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "`pnpm run dev` / `pnpm e2e:smoke` / pnpm exec playwright / pnpm install / pnpm test",
+      scripts,
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it("skips script validation when package.json is absent", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "`pnpm run anything` を実行する",
+      null,
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it("fails on a missing node/tsx script path", () => {
+    const repo = makeRepo();
+    write(repo, "package.json", JSON.stringify({ scripts: {} }));
+    write(repo, "AGENTS.md", "x");
+    write(repo, "scripts/real.mjs", "export {}");
+    write(
+      repo,
+      "docs/guide.md",
+      "node scripts/real.mjs は動くが、 node scripts/gone.mjs と tsx scripts/gone.ts は失敗する",
+    );
+    const result = checkLoopDocs(repo);
+    expect(result.errors.some((e) => e.includes("scripts/gone.mjs"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("scripts/gone.ts"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("scripts/real.mjs"))).toBe(false);
   });
 });
 

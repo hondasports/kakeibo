@@ -15,6 +15,6 @@ license: Apache-2.0
 
 ## 注意
 
-- webhook署名・送信元検証・外部write境界の変更は `skills/security-review` を併用する
+- webhook署名・送信元検証・外部write境界の変更は `skills/security-review` を併用する。`convex/lineWebhook/` 等のwebhook関連pathは `scripts/machine-risk.mjs` のpath ruleで `external_service_write_or_webhook` floor trigger相当（T3）になる
 - LINE Developers console・チャネル設定等の外部操作は `skills/service-ops-safety` に従う
 - channel secret・token等の秘密値をログ・PR・commitへ出さない
