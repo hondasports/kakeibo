@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "suzumemo-agent-loop",
-  "version": "0.5.0",
-  "description": "Vendor-neutralなState Machine、Machine Floor、Model Profile、Capability SkillsでCodex/Devin系Agentを制御するSuzumemo Agent Harness。",
+  "version": "0.5.1",
+  "description": "Vendor-neutralなState Machine、Machine Floor、REFINE連動のProfile自動判定、Capability SkillsでCodex/Devin系Agentを制御するSuzumemo Agent Harness。",
   "author": {
     "name": "hondasports"
   },

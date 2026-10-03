@@ -454,4 +454,4 @@ MUIをUIコンポーネントの主軸にする。Tailwind CSSはMUIの代替で
 
 ## 12. 相談元
 
-本方針は、`.agents/roles/optional-ux-ui-designer.md` の役割定義に基づいて、UX/UI Designerエージェントと相談した結果を整理したものである。
+本方針は、UX/UI Designerエージェント向け役割定義（旧 `.agents/roles/`、現在は廃止）に基づく相談結果を整理したものである。

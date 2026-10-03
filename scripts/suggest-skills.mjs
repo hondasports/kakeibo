@@ -8,8 +8,10 @@ const COMMIT_REF_PATTERN = /^[0-9a-zA-Z][0-9a-zA-Z._/-]{0,127}$/;
 /**
  * Path-derived capability-skill suggestions. Workflow stages are managed by
  * .agent/process.yaml and are not represented as skills; judgement still applies on top.
+ *
+ * `match` はパターン判定、`exactPaths` はリテラルpath（実在がテストで検証される）。
  */
-const SKILL_SUGGESTION_RULES = [
+export const SKILL_SUGGESTION_RULES = [
   {
     skills: ["convex-local-ops"],
     reason: "convex/ の変更",
@@ -29,7 +31,8 @@ const SKILL_SUGGESTION_RULES = [
   {
     skills: ["e2e-spec-authoring"],
     reason: "E2E spec・seed・project選択に関わる変更",
-    match: (p) => p.startsWith("e2e/") || p === "playwright.config.ts",
+    exactPaths: ["playwright.config.ts"],
+    match: (p) => p.startsWith("e2e/"),
   },
   {
     skills: ["receipt-tax-domain"],
@@ -48,32 +51,29 @@ const SKILL_SUGGESTION_RULES = [
   {
     skills: ["local-dev-env"],
     reason: "ローカル環境・env・dev起動に関わる変更",
-    match: (p) =>
-      p.startsWith(".env") ||
-      p === "docs/environment-variables.md" ||
-      p === "mise.toml" ||
-      p === "convex.json" ||
-      p === "package.json" ||
-      p === "pnpm-lock.yaml" ||
-      p === "pnpm-workspace.yaml" ||
-      [
-        "scripts/sync-e2e-env.mjs",
-        "scripts/start-local-convex.mjs",
-        "scripts/check-test-environment.mjs",
-        "scripts/refresh-local-runtime-data.mjs",
-      ].includes(p),
+    exactPaths: [
+      "docs/environment-variables.md",
+      "mise.toml",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "scripts/check-test-environment.mjs",
+      "scripts/start-local-convex.mjs",
+      "scripts/sync-e2e-env.mjs",
+    ],
+    match: (p) => p.startsWith(".env"),
   },
   {
     skills: ["service-ops-safety"],
     reason: "env・deploy・外部操作に関わる変更",
-    match: (p) =>
-      p.startsWith(".env") ||
-      p === "docs/environment-variables.md" ||
-      p === "vercel.json" ||
-      p.startsWith(".github/workflows/") ||
-      p === "scripts/sync-e2e-env.mjs",
+    exactPaths: ["docs/environment-variables.md", "vercel.json", "scripts/sync-e2e-env.mjs"],
+    match: (p) => p.startsWith(".env") || p.startsWith(".github/workflows/"),
   },
 ];
+
+function ruleMatches(rule, changedPath) {
+  return rule.exactPaths?.includes(changedPath) || rule.match?.(changedPath) === true;
+}
 
 /** Suggest conditional skills for a changed-path set. */
 export function suggestSkillsForPaths(changedPaths = []) {
@@ -81,7 +81,7 @@ export function suggestSkillsForPaths(changedPaths = []) {
   const suggestions = [];
 
   for (const rule of SKILL_SUGGESTION_RULES) {
-    const matchedPaths = classification.changedPaths.filter(rule.match);
+    const matchedPaths = classification.changedPaths.filter((p) => ruleMatches(rule, p));
     if (matchedPaths.length === 0) continue;
     for (const skill of rule.skills) {
       const existing = suggestions.find((s) => s.skill === skill);

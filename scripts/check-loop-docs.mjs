@@ -133,6 +133,25 @@ export function checkAgentsSkillReferences(repoRoot) {
   return errors;
 }
 
+/** Every capability skill must be listed in AGENTS.md, otherwise it is undiscoverable. */
+export function checkSkillsDiscoverability(repoRoot) {
+  const errors = [];
+  const agentsPath = path.join(repoRoot, "AGENTS.md");
+  const skillsDir = path.join(repoRoot, "skills");
+  if (!existsSync(agentsPath) || !existsSync(skillsDir)) return errors;
+  const referenced = new Set(extractSkillReferences(readFileSync(agentsPath, "utf8")));
+  for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (!existsSync(path.join(skillsDir, entry.name, "SKILL.md"))) continue;
+    if (!referenced.has(entry.name)) {
+      errors.push(
+        `skills/${entry.name}: SKILL.md が存在しますが AGENTS.md のCapability skills一覧から参照されていません`,
+      );
+    }
+  }
+  return errors;
+}
+
 function resolveCandidate(repoRoot, docDir, reference) {
   const relativePath = normalizePath(path.posix.join(docDir, reference));
   return {
@@ -232,6 +251,7 @@ export function checkLoopDocs(repoRoot) {
   }
 
   errors.push(...checkAgentsSkillReferences(repoRoot));
+  errors.push(...checkSkillsDiscoverability(repoRoot));
 
   for (const docPath of docFiles) {
     const content = readFileSync(path.join(repoRoot, docPath), "utf8");
