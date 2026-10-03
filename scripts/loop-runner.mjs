@@ -922,6 +922,7 @@ export function run(args, root = process.cwd(), services = {}) {
       task = result.task;
       saveTask(task, root);
       if (!result.ready) return { taskId: task.taskId, state: task.state, watch: result.events };
+      return { ...summarizeTask(task), watch: result.events };
     } else {
       task = githubAftercare(task, args.aftercare, args.handled, root);
     }
