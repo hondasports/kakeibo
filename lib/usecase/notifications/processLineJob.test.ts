@@ -151,4 +151,114 @@ describe("processLineNotificationJob", () => {
       );
     }
   });
+
+  it("fails without sending when the post-claim clock has passed the retry-key deadline", async () => {
+    const deadline = 24 * 60 * 60 * 1000;
+    let current = deadline - 1_000;
+    const job = makeJob({ firstAttemptAt: 0 });
+    const runner = {
+      claimJob: vi.fn().mockImplementation(async () => {
+        current = deadline + 2_000;
+        return { claimed: true, job };
+      }),
+      completeJob: vi.fn().mockResolvedValue(undefined),
+    };
+    const sender = { send: vi.fn().mockResolvedValue({ kind: "sent" }) };
+
+    await processLineNotificationJob(
+      { runner, sender, now: () => current },
+      { jobId: "job-1", retryKeyCandidate: RETRY_KEY },
+    );
+
+    expect(sender.send).not.toHaveBeenCalled();
+    expect(runner.completeJob).toHaveBeenCalledWith({
+      jobId: "job-1",
+      attemptCount: job.attemptCount,
+      completion: { outcome: "failed", errorCode: "retry_key_expired" },
+      now: deadline + 2_000,
+    });
+  });
+
+  it("fails without sending when the post-claim clock lands exactly on the deadline", async () => {
+    const deadline = 24 * 60 * 60 * 1000;
+    let current = deadline - 1;
+    const job = makeJob({ firstAttemptAt: 0 });
+    const runner = {
+      claimJob: vi.fn().mockImplementation(async () => {
+        current = deadline;
+        return { claimed: true, job };
+      }),
+      completeJob: vi.fn().mockResolvedValue(undefined),
+    };
+    const sender = { send: vi.fn().mockResolvedValue({ kind: "sent" }) };
+
+    await processLineNotificationJob(
+      { runner, sender, now: () => current },
+      { jobId: "job-1", retryKeyCandidate: RETRY_KEY },
+    );
+
+    expect(sender.send).not.toHaveBeenCalled();
+    expect(runner.completeJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        completion: { outcome: "failed", errorCode: "retry_key_expired" },
+      }),
+    );
+  });
+
+  it("still sends when the post-claim clock is one ms before the deadline", async () => {
+    const deadline = 24 * 60 * 60 * 1000;
+    let current = deadline - 2;
+    const job = makeJob({ firstAttemptAt: 0 });
+    const runner = {
+      claimJob: vi.fn().mockImplementation(async () => {
+        current = deadline - 1;
+        return { claimed: true, job };
+      }),
+      completeJob: vi.fn().mockResolvedValue(undefined),
+    };
+    const sender = {
+      send: vi.fn().mockResolvedValue({ kind: "sent", providerRequestId: "req-9" }),
+    };
+
+    await processLineNotificationJob(
+      { runner, sender, now: () => current },
+      { jobId: "job-1", retryKeyCandidate: RETRY_KEY },
+    );
+
+    expect(sender.send).toHaveBeenCalledTimes(1);
+    expect(runner.completeJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        completion: { outcome: "sent", providerRequestId: "req-9" },
+      }),
+    );
+  });
+
+  it("still sends on the 6th claim while within the retry-key TTL", async () => {
+    const deadline = 24 * 60 * 60 * 1000;
+    let current = deadline - 500;
+    const job = makeJob({ attemptCount: 6, firstAttemptAt: 0 });
+    const runner = {
+      claimJob: vi.fn().mockImplementation(async () => {
+        current = deadline - 1;
+        return { claimed: true, job };
+      }),
+      completeJob: vi.fn().mockResolvedValue(undefined),
+    };
+    const sender = {
+      send: vi.fn().mockResolvedValue({ kind: "sent", providerRequestId: "req-6" }),
+    };
+
+    await processLineNotificationJob(
+      { runner, sender, now: () => current },
+      { jobId: "job-1", retryKeyCandidate: RETRY_KEY },
+    );
+
+    expect(sender.send).toHaveBeenCalledTimes(1);
+    expect(runner.completeJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptCount: 6,
+        completion: { outcome: "sent", providerRequestId: "req-6" },
+      }),
+    );
+  });
 });

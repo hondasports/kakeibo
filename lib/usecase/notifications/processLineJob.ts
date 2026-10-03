@@ -1,6 +1,7 @@
 import type { LineNotificationCompletion } from "../../domain/notifications/runner";
 import {
   LINE_NOTIFICATION_LEASE_MS,
+  LINE_RETRY_KEY_TTL_MS,
   isValidRetryKey,
   planLineNotificationRetry,
 } from "../../domain/notifications/rules";
@@ -26,6 +27,16 @@ export async function processLineNotificationJob(
       jobId: args.jobId,
       attemptCount: job.attemptCount,
       completion: { outcome: "failed", errorCode: "invalid_retry_key" },
+      now: now(),
+    });
+    return;
+  }
+
+  if (job.firstAttemptAt !== undefined && now() >= job.firstAttemptAt + LINE_RETRY_KEY_TTL_MS) {
+    await deps.runner.completeJob({
+      jobId: args.jobId,
+      attemptCount: job.attemptCount,
+      completion: { outcome: "failed", errorCode: "retry_key_expired" },
       now: now(),
     });
     return;
