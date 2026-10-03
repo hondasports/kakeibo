@@ -39,9 +39,7 @@ export function isDocumentationOnlyPath(filePath) {
     .replaceAll("\\", "/")
     .replace(/^\.\/+/, "");
 
-  return (
-    normalized === "README.md" || normalized === "CHANGELOG.md" || normalized.startsWith("docs/")
-  );
+  return normalized === "README.md" || normalized.startsWith("docs/");
 }
 
 export function stagedFilesRequireIsolation(files) {
