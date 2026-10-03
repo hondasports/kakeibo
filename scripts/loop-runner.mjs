@@ -1,4 +1,6 @@
 import {
+  appendFileSync,
+  cpSync,
   existsSync,
   readFileSync,
   writeFileSync,
@@ -140,11 +142,17 @@ export function refreshTask(task, root) {
   const head = git(["rev-parse", "HEAD"], root);
   const baseHead = git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root);
   if (head !== task.head || baseHead !== task.baseHead) {
+    const previousVerification = Object.keys(task.verification ?? {}).length;
     const reused = invalidateRevision(task, root, head, baseHead);
     task.head = head;
     task.baseHead = baseHead;
     if (!["refine", "incident", "human_gate"].includes(task.state)) task.state = "execute";
     history(task, "revision_changed", { reusedVerification: reused });
+    recordMetric(task, root, {
+      action: "revision_changed",
+      reused: reused.length,
+      invalidated: previousVerification - reused.length,
+    });
   }
   task.assessment = computeAssessment(task, readChangedPaths({ base: task.baseRef, cwd: root }));
   task.risk = highestTier(task.risk, task.assessment.risk.final);
@@ -214,6 +222,7 @@ export function resolveLoopStep({ task, state, event, exit = {}, root = process.
 }
 export function transitionTask(task, event, exit, root) {
   const step = resolveLoopStep({ task, event, exit, root });
+  const from = task.state;
   // REFINE completion fixes the profile from the recorded evaluation before EXECUTE.
   if (task.state === "refine" && event === "ready")
     decideProfile(task, { root, strict: true, trigger: "refine_ready" });
@@ -232,6 +241,7 @@ export function transitionTask(task, event, exit, root) {
     (event === "ci_failure" && task.counters.ci >= limits.ci_fix_max_rounds)
   )
     task.state = "incident";
+  recordMetric(task, root, { action: "transition", event, from, to: task.state });
   return task;
 }
 export function recordFailure(task, signature, root) {
@@ -244,6 +254,33 @@ export function recordFailure(task, signature, root) {
     task.state = "incident";
 }
 export const EVIDENCE_CONTRACT_VERSION = 1;
+/**
+ * Best-effort metrics sink shared across linked worktrees (the common git
+ * dir), never the worktree-private `--git-path` location. Failures never
+ * block the caller — observability must not become a gate.
+ */
+const metricsPath = (root) =>
+  path.join(
+    git(["rev-parse", "--path-format=absolute", "--git-common-dir"], root),
+    "agent-metrics.jsonl",
+  );
+export function recordMetric(task, root, entry) {
+  try {
+    appendFileSync(
+      metricsPath(root),
+      `${JSON.stringify({
+        at: new Date().toISOString(),
+        taskId: task?.taskId ?? null,
+        state: task?.state ?? null,
+        head: task?.head ?? null,
+        baseHead: task?.baseHead ?? null,
+        ...entry,
+      })}\n`,
+    );
+  } catch {
+    // Metrics are best-effort; a broken sink must not break the loop.
+  }
+}
 const SAFE_TASK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const requireSafeTaskId = (taskId) =>
   requireValue(
@@ -287,13 +324,17 @@ export function runVerification(
       const result = run(command, { fd, artifactPath });
       writeSync(fd, `[exit ${result.status}]\n`);
       if (result.status !== 0) {
-        recordFailure(
-          task,
-          createHash("sha256")
-            .update(JSON.stringify({ kind, command, status: result.status }))
-            .digest("hex"),
-          root,
-        );
+        const signature = createHash("sha256")
+          .update(JSON.stringify({ kind, command, status: result.status }))
+          .digest("hex");
+        recordMetric(task, root, {
+          action: "verify",
+          kind,
+          durationMs: Date.now() - startedAt,
+          result: "fail",
+          signature,
+        });
+        recordFailure(task, signature, root);
         task.lastFailure.kind = kind;
         saveTask(task, root);
         const tail = lastLines(readFileSync(artifactPath, "utf8")).join("\n");
@@ -342,6 +383,13 @@ export function runVerification(
     task.counters.sameFailure = 0;
     task.lastFailure = null;
   }
+  recordMetric(task, root, {
+    action: "verify",
+    kind,
+    durationMs: Date.now() - startedAt,
+    result: "pass",
+    artifactBytes: task.verification[kind].artifact?.bytes ?? null,
+  });
   return task;
 }
 export const STATE_START = "<!-- suzumemo-agent-state:start -->";
@@ -460,22 +508,105 @@ export function parseStateBlock(body) {
 }
 const gh = (args, root) =>
   execFileSync("gh", args, { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
+const AFTERCARE_PR_FIELDS =
+  "number,state,isDraft,headRefOid,baseRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup";
+function aftercareFetchers(pr, handled, root) {
+  return {
+    fetchPr: () => JSON.parse(gh(["pr", "view", String(pr), "--json", AFTERCARE_PR_FIELDS], root)),
+    fetchFindings: () => {
+      const args = ["scripts/collect-pr-findings.mjs", "--pr", String(pr)];
+      if (handled) args.push("--handled", handled);
+      const raw = execFileSync(process.execPath, args, {
+        cwd: root,
+        encoding: "utf8",
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      return JSON.parse(raw.slice(raw.indexOf("{")));
+    },
+  };
+}
+/** Compact per-poll snapshot for --watch-aftercare; never throws on the gate. */
+export function aftercareSnapshot(prFields, task, findings, pr) {
+  const checks = prFields.statusCheckRollup ?? [];
+  const checkName = (check) => check.name ?? check.context ?? "";
+  const pending = checks
+    .filter((check) => check.status && check.status !== "COMPLETED")
+    .map(checkName);
+  const failed = checks
+    .filter(
+      (check) =>
+        !(check.status && check.status !== "COMPLETED") &&
+        !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(check.conclusion ?? check.state),
+    )
+    .map(checkName);
+  let ready = false;
+  try {
+    checkAftercare(prFields, task, findings);
+    ready = true;
+  } catch {
+    ready = false;
+  }
+  return {
+    pr: prFields.number ?? pr,
+    ready,
+    pending,
+    failed,
+    unhandledFindings: findings?.unhandledCount ?? null,
+    unresolvedThreads: findings?.unresolvedThreadCount ?? null,
+    mergeable: prFields.mergeable ?? null,
+    mergeStateStatus: prFields.mergeStateStatus ?? null,
+    reviewDecision: prFields.reviewDecision ?? null,
+    head: prFields.headRefOid ?? null,
+    baseHead: prFields.baseRefOid ?? null,
+  };
+}
+const defaultSleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+/**
+ * Poll the PR until the aftercare gate would pass or `maxSeconds` elapse.
+ * Only signature changes are emitted as events; unchanged polls stay silent.
+ * On success the normal aftercare evidence path runs before returning.
+ */
+export function watchAftercare(
+  task,
+  pr,
+  root,
+  { handled, intervalSeconds = 60, maxSeconds = 900, fetch, now, sleep, record } = {},
+) {
+  requireValue(task.state === "aftercare", "GitHub aftercare runs in aftercare");
+  const tick = now ?? (() => Date.now());
+  const pause = sleep ?? defaultSleep;
+  const fetchers = fetch ?? aftercareFetchers(pr, handled, root);
+  const recordAftercare = record ?? ((t) => githubAftercare(t, pr, handled, root));
+  const events = [];
+  const deadline = tick() + maxSeconds * 1000;
+  let signature = null;
+  let polls = 0;
+  while (true) {
+    const { pr: prFields, findings } = fetchers();
+    polls += 1;
+    const snapshot = aftercareSnapshot(prFields, task, findings, pr);
+    const nextSignature = JSON.stringify(snapshot);
+    if (nextSignature !== signature) events.push({ ...snapshot, changed: signature !== null });
+    signature = nextSignature;
+    if (snapshot.ready) {
+      task = recordAftercare(task);
+      recordMetric(task, root, { action: "watch_aftercare", polls, ready: true });
+      return { task, events, ready: true };
+    }
+    if (tick() >= deadline) {
+      recordMetric(task, root, { action: "watch_aftercare", polls, ready: false });
+      return { task, events, ready: false };
+    }
+    pause(intervalSeconds * 1000);
+  }
+}
 export function githubAftercare(task, pr, handled, root) {
   requireValue(task.state === "aftercare", "GitHub aftercare runs in aftercare");
   task.aftercare = null;
   saveTask(task, root);
-  const fields =
-    "number,state,isDraft,headRefOid,baseRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup";
-  const fetchPr = () => JSON.parse(gh(["pr", "view", String(pr), "--json", fields], root));
+  const { fetchPr, fetchFindings } = aftercareFetchers(pr, handled, root);
   const before = fetchPr();
-  const args = ["scripts/collect-pr-findings.mjs", "--pr", String(pr)];
-  if (handled) args.push("--handled", handled);
-  const raw = execFileSync(process.execPath, args, {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 10 * 1024 * 1024,
-  });
-  const findings = JSON.parse(raw.slice(raw.indexOf("{")));
+  const findings = fetchFindings();
   const evidence = checkAftercare(before, task, findings);
   const after = fetchPr();
   checkAftercare(after, task, findings);
@@ -485,7 +616,105 @@ export function githubAftercare(task, pr, handled, root) {
   );
   task.aftercare = evidence;
   history(task, "github_verified", { pr: pr.number ?? pr });
+  recordMetric(task, root, { action: "aftercare", pr: evidence.pr, ready: evidence.ready });
   return task;
+}
+/**
+ * Bundle everything a fresh-context independent reviewer needs into one
+ * directory: task facts, the exact diff, verification evidence manifest, a
+ * review template matching validateReview(), and the governing contracts.
+ */
+export function buildReviewPacket(task, dir, root) {
+  requireValue(task.state === "review", "Review packets are generated in review state");
+  requireClean(root);
+  mkdirSync(dir, { recursive: true });
+  const written = [];
+  const write = (name, content) => {
+    const file = path.join(dir, name);
+    writeFileSync(file, content, { mode: 0o600 });
+    written.push(file);
+  };
+  const diff = git(["diff", "--binary", "--no-renames", `${task.baseRef}...${task.head}`], root);
+  const changedPaths = git(["diff", "--name-only", `${task.baseRef}...${task.head}`], root)
+    .split("\n")
+    .filter(Boolean);
+  write("diff.patch", `${diff}\n`);
+  write("task-summary.json", `${JSON.stringify(summarizeTask(task), null, 2)}\n`);
+  write("verification-manifest.json", `${JSON.stringify(artifactManifest(task, root), null, 2)}\n`);
+  write(
+    "packet.json",
+    `${JSON.stringify(
+      {
+        taskId: task.taskId,
+        head: task.head,
+        baseHead: task.baseHead,
+        baseRef: task.baseRef,
+        branch: task.branch,
+        goal: task.spec?.goal ?? null,
+        acceptanceCriteria: task.spec?.acceptanceCriteria ?? [],
+        nonGoals: task.spec?.nonGoals ?? [],
+        assumptions: task.spec?.assumptions ?? [],
+        changedPaths,
+        risk: task.risk,
+        requiredSkills: task.assessment?.requiredSkills ?? [],
+        verification: verificationSummary(task),
+        verificationPlan: task.assessment?.verificationPlan ?? null,
+        reuseCandidates: {
+          featurePatchSha256: featurePatchSha256(task, root),
+          reusedVerification: Object.entries(task.verification ?? {})
+            .filter(([, evidence]) => evidence?.reuse)
+            .map(([kind]) => kind),
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  write(
+    "review-template.json",
+    `${JSON.stringify(
+      {
+        head: task.head,
+        baseHead: task.baseHead,
+        reviewer: "",
+        independent: task.assessment?.review?.independent === true,
+        context: "fresh",
+        evidence: [],
+        findings: [],
+        acceptanceCriteria: (task.spec?.acceptanceCriteria ?? []).map((ac) => ({
+          id: ac.id,
+          evidence: "",
+        })),
+        assessment: {
+          risk_assessment: {
+            blast_radius: "",
+            data_security: "",
+            reversibility: "",
+            uncertainty: "",
+            floor_triggers: [],
+          },
+          tier_rationale: "",
+          applied_tier: "",
+          verification_load: { level: "", rationale: "" },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const contracts = path.join(dir, "contracts");
+  mkdirSync(path.join(contracts, "required-skills"), { recursive: true });
+  for (const [source, name] of [
+    [path.join(root, "AGENTS.md"), "AGENTS.md"],
+    [path.join(root, ".agent/workflow/review.md"), "workflow-review.md"],
+  ])
+    if (existsSync(source)) cpSync(source, path.join(contracts, name));
+  for (const skill of task.assessment?.requiredSkills ?? []) {
+    const source = path.join(root, "skills", skill, "SKILL.md");
+    if (existsSync(source)) cpSync(source, path.join(contracts, "required-skills", `${skill}.md`));
+  }
+  recordMetric(task, root, { action: "review_packet", files: written.length });
+  return { taskId: task.taskId, state: task.state, dir, files: written.length };
 }
 function option(args, index) {
   requireValue(
@@ -496,7 +725,14 @@ function option(args, index) {
 }
 export function parseArguments(args) {
   const out = {};
-  const flags = new Set(["--export", "--assert-started", "--status", "--explain", "--artifacts"]);
+  const flags = new Set([
+    "--export",
+    "--assert-started",
+    "--status",
+    "--explain",
+    "--artifacts",
+    "--watch-aftercare",
+  ]);
   const options = new Set([
     "--init",
     "--task",
@@ -518,6 +754,8 @@ export function parseArguments(args) {
     "--restore-pr",
     "--sync-pr",
     "--export-file",
+    "--review-packet",
+    "--interval-seconds",
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -559,12 +797,21 @@ export function run(args, root = process.cwd(), services = {}) {
     "sync-pr",
     "export",
     "export-file",
+    "review-packet",
     "status",
     "explain",
     "artifacts",
     "assert-started",
   ].filter((key) => args[key]);
   requireValue(actions.length <= 1, "Run one task action at a time");
+  requireValue(
+    !args["watch-aftercare"] || args.aftercare,
+    "--watch-aftercare requires --aftercare",
+  );
+  requireValue(
+    args["interval-seconds"] === undefined || args["watch-aftercare"],
+    "--interval-seconds requires --watch-aftercare",
+  );
   if (args.init) return startTask(args, root);
   if (args["restore-pr"]) {
     requireValue(!existsSync(taskPath(root)), "A local task already exists");
@@ -597,6 +844,7 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args.explain) return explainTask(task, root);
   if (args.artifacts)
     return { taskId: task.taskId, state: task.state, artifacts: artifactManifest(task, root) };
+  if (args["review-packet"]) return buildReviewPacket(task, args["review-packet"], root);
   if (args.spec) {
     requireValue(task.state === "refine", "Spec changes require refine state");
     task.spec = readJson(args.spec);
@@ -632,7 +880,23 @@ export function run(args, root = process.cwd(), services = {}) {
   }
   if (args.aftercare) {
     requireClean(root);
-    task = githubAftercare(task, args.aftercare, args.handled, root);
+    if (args["watch-aftercare"]) {
+      const interval = args["interval-seconds"];
+      if (interval !== undefined)
+        requireValue(
+          Number.isFinite(Number(interval)) && Number(interval) >= 1,
+          "--interval-seconds must be a number >= 1",
+        );
+      const result = watchAftercare(task, args.aftercare, root, {
+        handled: args.handled,
+        intervalSeconds: interval === undefined ? undefined : Number(interval),
+      });
+      task = result.task;
+      saveTask(task, root);
+      if (!result.ready) return { taskId: task.taskId, state: task.state, watch: result.events };
+    } else {
+      task = githubAftercare(task, args.aftercare, args.handled, root);
+    }
   }
   if (args.event) {
     if (task.state === "aftercare" && args.event === "ready") {
