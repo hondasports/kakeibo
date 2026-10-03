@@ -163,9 +163,10 @@ export function runWorkspacePreflight({
   }
 }
 
-function parseArguments(args) {
+export function parseArguments(args) {
   const options = { requireClean: false, staged: false };
   for (const arg of args) {
+    if (arg === "--") continue;
     if (arg === "--require-clean") options.requireClean = true;
     else if (arg === "--staged") options.staged = true;
     else throw new Error(`unknown option: ${arg}`);

@@ -230,7 +230,7 @@ export function validateReview(task, report) {
         !ids.has(finding.id) &&
         ["open", "fixed", "dismissed"].includes(finding.status) &&
         text(finding.evidence),
-      "Invalid finding record",
+      "Invalid finding record (unique id, status open|fixed|dismissed, non-empty evidence required)",
     );
     ids.add(finding.id);
   }
@@ -247,10 +247,26 @@ export function validateReview(task, report) {
       `Missing AC evidence: ${ac.id}`,
     );
   }
+  const assessmentErrors = validateAssessment(report.assessment);
   requireValue(
-    validateAssessment(report.assessment).length === 0,
-    "Reviewer assessment is required",
+    assessmentErrors.length === 0,
+    `Reviewer assessment invalid (must satisfy the machine floor): ${assessmentErrors.join("; ")}`,
   );
+  if (report.deltaFrom !== undefined) {
+    requireValue(
+      typeof report.deltaFrom === "string" && /^[0-9a-f]{40}$/i.test(report.deltaFrom),
+      "deltaFrom must be a 40-character commit SHA",
+    );
+    const reviewedHeads = new Set(
+      (task.history ?? [])
+        .filter((entry) => entry.event === "review_recorded" && entry.head)
+        .map((entry) => entry.head),
+    );
+    requireValue(
+      report.deltaFrom !== task.head && reviewedHeads.has(report.deltaFrom),
+      "deltaFrom must reference a previously reviewed head",
+    );
+  }
   if (report.independent === true) {
     requireValue(
       report.reviewer !== task.implementer && report.context === "fresh",

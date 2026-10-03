@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateWorkspaceState,
   isDocumentationOnlyPath,
+  parseArguments,
   parseWorktreeList,
   stagedFilesRequireIsolation,
 } from "./check-task-worktree.mjs";
@@ -114,5 +115,10 @@ describe("documentation-only exceptions", () => {
     expect(stagedFilesRequireIsolation(["docs/guide.md", "README.md"])).toBe(false);
     expect(stagedFilesRequireIsolation(["docs/guide.md", "AGENTS.md"])).toBe(true);
     expect(stagedFilesRequireIsolation([])).toBe(false);
+  });
+
+  it("skips a bare '--' forwarded by pnpm run", () => {
+    expect(parseArguments(["--", "--staged"])).toEqual({ requireClean: false, staged: true });
+    expect(parseArguments(["--"])).toEqual({ requireClean: false, staged: false });
   });
 });

@@ -31,7 +31,12 @@ import {
   watchAftercare,
 } from "./loop-runner.mjs";
 import { taskFixture, reviewFixture, verificationManifestFixture } from "./loop-test-fixtures.mjs";
-import { computeAssessment, currentEvidence, verificationSummary } from "./loop-policy.mjs";
+import {
+  computeAssessment,
+  currentEvidence,
+  validateReview,
+  verificationSummary,
+} from "./loop-policy.mjs";
 const root = process.cwd();
 const dirs = [];
 afterEach(() => {
@@ -356,6 +361,8 @@ describe("persistent task gates", () => {
     for (const flag of ["--model", "--profile", "--runtime", "--event", "--exit", "--review"])
       expect(() => parseArguments([flag])).toThrow("requires a value");
     expect(() => parseArguments(["--magic"])).toThrow("unknown option");
+    // A bare "--" (forwarded verbatim by pnpm run) is skipped, not an option.
+    expect(parseArguments(["--", "--export"])).toEqual({ export: true });
   });
   it("accepts --model for backward compatibility without recording it", () => {
     const { git } = repository();
@@ -721,6 +728,10 @@ describe("persistent task gates", () => {
       findings: [],
     });
     expect(template.acceptanceCriteria).toEqual([{ id: "AC1", evidence: "" }]);
+    // _notes carries reviewer-facing contract hints (finding status enum,
+    // deltaFrom, machine floor) — its absence caused an invalid status enum
+    // in a real fresh-context review.
+    expect(template._notes.join(" ")).toContain("open|fixed|dismissed");
     expect(readFileSync(path.join(out, "diff.patch"), "utf8")).toContain("feature.txt");
     const manifest = JSON.parse(readFileSync(path.join(out, "verification-manifest.json"), "utf8"));
     expect(manifest.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
@@ -902,5 +913,284 @@ describe("persistent task gates", () => {
     refreshTask(loadTask(dir), dir);
     const revision = readMetrics().at(-1);
     expect(revision).toMatchObject({ action: "revision_changed", reused: 1, invalidated: 0 });
+  });
+});
+
+describe("increment reuse and loop ergonomics", () => {
+  /** Move `preview` one commit ahead on the given file, then switch back. */
+  const upstreamCommit = (dir, git, file, content = "upstream\n") => {
+    git("switch", "preview");
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), content);
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", `upstream ${file}`);
+    git("switch", "codex/task");
+  };
+  it("extends non-process evidence through metadata-only increments", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    for (const kind of ["lint", "unit", "build"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, "docs"), { recursive: true });
+    writeFileSync(path.join(dir, "docs", "note.md"), "docs\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs fix");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.process).toBeUndefined();
+    for (const kind of ["lint", "unit", "build"]) {
+      const evidence = refreshed.verification[kind];
+      expect(evidence.appliesTo.head).toBe(refreshed.head);
+      expect(evidence.reuse).toMatchObject({ basis: "metadata_only_increment" });
+      expect(evidence.reuse.incrementPaths).toEqual(["docs/note.md"]);
+    }
+    expect(refreshed.history.at(-1).reusedVerification).toEqual(
+      expect.arrayContaining(["lint", "unit", "build"]),
+    );
+    expect(refreshed.history.at(-1).reusedVerification).not.toContain("process");
+  });
+  it("does not extend lint evidence when a metadata increment has oxfmt-checked files", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit", "build"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".github", "ISSUE_TEMPLATE"), { recursive: true });
+    writeFileSync(path.join(dir, ".github", "ISSUE_TEMPLATE", "bug.yml"), "name: bug\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "issue template yaml");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint).toBeUndefined();
+    for (const kind of ["unit", "build"]) {
+      expect(refreshed.verification[kind].reuse).toMatchObject({
+        basis: "metadata_only_increment",
+      });
+      expect(refreshed.verification[kind].appliesTo.head).toBe(refreshed.head);
+    }
+  });
+  it("does not extend lint evidence for extension-bearing files under .husky", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".husky"), { recursive: true });
+    writeFileSync(path.join(dir, ".husky", "hook.json"), "{}\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky json");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint).toBeUndefined();
+    expect(refreshed.verification.unit.reuse).toMatchObject({
+      basis: "metadata_only_increment",
+    });
+  });
+  it("does not extend lint evidence for well-known filenames under .husky", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".husky"), { recursive: true });
+    writeFileSync(path.join(dir, ".husky", "README"), "# hooks\n");
+    writeFileSync(path.join(dir, ".husky", "pre-commit"), "echo lint\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky readme + hook");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint).toBeUndefined();
+    expect(refreshed.verification.unit.reuse).toMatchObject({
+      basis: "metadata_only_increment",
+    });
+  });
+  it("extends lint evidence for canonical hook basenames under .husky", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".husky"), { recursive: true });
+    writeFileSync(path.join(dir, ".husky", "pre-push"), "echo test\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky hook");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    for (const kind of ["lint", "unit"])
+      expect(refreshed.verification[kind].reuse).toMatchObject({
+        basis: "metadata_only_increment",
+      });
+  });
+  it("drops evidence when an increment touches runtime paths or the base moved", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit", "build"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, "docs"), { recursive: true });
+    writeFileSync(path.join(dir, "docs", "note.md"), "docs\n");
+    writeFileSync(path.join(dir, "scripts", "feature.ts"), "export {};\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs + code");
+    expect(refreshTask(loadTask(dir), dir).verification).toEqual({});
+  });
+  it("does not take the increment path when only the base moved", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"]) runVerification(task, kind, dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "docs/upstream.md", "upstream\n");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint.reuse.basis).toBe("identical_patch_and_tree");
+    expect(refreshed.verification.unit.reuse.basis).toBe("identical_patch_and_tree");
+  });
+  it("keeps verification and assessment through findings and ci_failure transitions", () => {
+    const { dir, task } = repository();
+    task.verification.process = { head: task.head, baseHead: task.baseHead, success: true };
+    task.state = "review";
+    task.review = reviewFixture(task, {
+      findings: [{ id: "F1", status: "open", evidence: "edge" }],
+    });
+    task.findings = task.review.findings;
+    transitionTask(task, "findings", { reason: "fix F1" }, dir);
+    expect(task.state).toBe("execute");
+    expect(task.verification.process).toBeDefined();
+    expect(task.agentAssessment).toBeTruthy();
+    task.state = "aftercare";
+    transitionTask(task, "ci_failure", { reason: "lint failed" }, dir);
+    expect(task.verification.process).toBeDefined();
+    expect(task.agentAssessment).toBeTruthy();
+  });
+  it("runs vitest related for --scope affected over changed runtime paths", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "src-feature.ts"), "export {};\n");
+    mkdirSync(path.join(dir, "e2e"), { recursive: true });
+    writeFileSync(path.join(dir, "e2e", "new.spec.ts"), "// playwright\n");
+    mkdirSync(path.join(dir, "docs"), { recursive: true });
+    writeFileSync(path.join(dir, "docs", "note.md"), "docs\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    refreshTask(task, dir);
+    const commands = [];
+    runVerification(
+      task,
+      "unit",
+      dir,
+      (command) => {
+        commands.push(command);
+        return { status: 0 };
+      },
+      { scope: "affected" },
+    );
+    expect(commands).toHaveLength(1);
+    expect(commands[0].slice(0, 4)).toEqual(["pnpm", "exec", "vitest", "related"]);
+    expect(commands[0]).toContain("src-feature.ts");
+    expect(task.verification.unit.run.scope).toBe("affected");
+    expect(task.verification.unit.run.affectedFiles).toEqual(["src-feature.ts"]);
+  });
+  it("falls back to the full suite when no runtime files changed and rejects scope misuse", () => {
+    const { dir, task } = repository();
+    const commands = [];
+    runVerification(
+      task,
+      "unit",
+      dir,
+      (command) => {
+        commands.push(command);
+        return { status: 0 };
+      },
+      { scope: "affected" },
+    );
+    expect(commands[0]).toEqual(["pnpm", "exec", "vitest", "run"]);
+    expect(task.verification.unit.run.scope).toBe("full");
+    expect(() =>
+      runVerification(task, "lint", dir, () => ({ status: 0 }), { scope: "affected" }),
+    ).toThrow("unit only");
+    saveTask(task, dir);
+    expect(() => run({ scope: "affected" }, dir)).toThrow("--scope requires --verify");
+  });
+  it("accepts deltaFrom only for previously reviewed heads", () => {
+    const { task } = repository();
+    task.state = "review";
+    const priorHead = "c".repeat(40);
+    task.history.push({
+      state: "review",
+      event: "review_recorded",
+      head: priorHead,
+      at: "2026-01-01T00:00:00.000Z",
+    });
+    expect(() => validateReview(task, reviewFixture(task, { deltaFrom: priorHead }))).not.toThrow();
+    for (const bad of ["not-a-sha", task.head, "d".repeat(40)])
+      expect(() => validateReview(task, reviewFixture(task, { deltaFrom: bad }))).toThrow(
+        "deltaFrom",
+      );
+  });
+  it("reports finding status enums and assessment failures in review errors", () => {
+    const { task } = repository();
+    task.state = "review";
+    expect(() =>
+      validateReview(
+        task,
+        reviewFixture(task, {
+          findings: [{ id: "F1", status: "closed", evidence: "done" }],
+        }),
+      ),
+    ).toThrow("open|fixed|dismissed");
+    expect(() => validateReview(task, reviewFixture(task, { assessment: undefined }))).toThrow(
+      "Reviewer assessment invalid",
+    );
+  });
+  it("keeps metadata-reading tests inside the mandatory process suite", () => {
+    // `unit` evidence is extended through metadata-only increments only because
+    // every test whose outcome can depend on metadata content runs under the
+    // `process` verification that is never extended. This heuristic guard fails
+    // loudly when a new metadata-referencing test (or test helper) lands
+    // outside the process suite. git pathspec has no brace expansion, so
+    // .test/.spec are listed separately; tests/** covers non-test helpers.
+    const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+    const processTests = new Set(
+      pkg.scripts["test:process"].match(/[\w./-]+\.(?:test|spec)\.(?:mjs|ts|tsx|js)/g) ?? [],
+    );
+    const testFiles = [
+      ...new Set(
+        execFileSync("git", ["ls-files", "**/*.test.*", "**/*.spec.*", "tests/**"], {
+          cwd: root,
+          encoding: "utf8",
+        })
+          .split("\n")
+          .filter(Boolean),
+      ),
+    ];
+    // A quoted metadata path literal: whole-literal .md paths including ?raw
+    // suffixes and ${} interpolation, plus ISSUE_TEMPLATE/.husky tokens
+    // anywhere inside a quoted string. Unquoted property access like
+    // `tokens.space.md` and longer prose containing a path do not match.
+    const METADATA_PATH_REF =
+      /["'`][\w./$*{}-]+\.md(?:\?[^"'`]*)?["'`]|["'`][^"'`]*(?:ISSUE_TEMPLATE|\.husky)[^"'`]*["'`]/;
+    const offenders = testFiles.filter(
+      (file) =>
+        !processTests.has(file) &&
+        !file.startsWith("e2e/") &&
+        METADATA_PATH_REF.test(readFileSync(path.join(root, file), "utf8")),
+    );
+    expect(offenders).toEqual([]);
+
+    // Non-test build/unit-reachable code must not read metadata at all: a
+    // `?raw` .md import (or a metadata-dir reference) inside src/convex would
+    // change build and transitive unit outcomes while evidence is extended.
+    // Scripts are exempt — they are process-domain readers by design and their
+    // tests already live in the process suite.
+    const sourceOffenders = execFileSync("git", ["ls-files", "src/**", "convex/**"], {
+      cwd: root,
+      encoding: "utf8",
+    })
+      .split("\n")
+      .filter(
+        (file) =>
+          /\.(?:[cm]?[jt]sx?)$/.test(file) &&
+          !/\.(?:test|spec)\.[^.]+$/.test(file) &&
+          METADATA_PATH_REF.test(readFileSync(path.join(root, file), "utf8")),
+      );
+    expect(sourceOffenders).toEqual([]);
+  });
+  it("records friction notes into task state, history and the state block", () => {
+    const { dir, task } = repository();
+    saveTask(task, dir);
+    const result = run({ "friction-note": " per-kind verify reruns felt heavy " }, dir);
+    expect(result.frictionNote).toBe("per-kind verify reruns felt heavy");
+    const saved = loadTask(dir);
+    expect(saved.history.at(-1)).toMatchObject({ event: "friction_note" });
+    expect(stateBlock(saved)).toContain("per-kind verify");
+    expect(() => run({ "friction-note": "   " }, dir)).toThrow("requires non-empty");
   });
 });

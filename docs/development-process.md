@@ -244,7 +244,7 @@ ProfileはREFINE終了時にタスクの評価（`blast_radius`・`uncertainty`�
 
 「全コマンドを毎回実行する」ことではなく、受入条件と関連する不変条件、必須確認を証明する。受入条件は要求工程でbullet化したものを全件照合し、`受入条件 → 確認方法 → 期待結果/実結果 → 対象commit → 証跡` の対応とともに検証した内容・未検証・残課題をPR・作業報告へ記録する。変更後は影響する条件を未検証に戻す。
 
-現行CLIではHEAD/base更新時に検証・レビューを失効させる。過去の結果は調査の参考として参照でき、feature patchと検証対象treeの両方が不変だとCLIが証明できた検証証跡だけは再利用される（[Agent Harness設計](agent-harness-design.md) 第9節・実装済み）。それ以外の旧HEAD/baseの証跡を現在の必須確認の成功として扱わない。
+現行CLIではHEAD/base更新時に検証・レビューを失効させる。過去の結果は調査の参考として参照でき、feature patchと検証対象treeの両方が不変だとCLIが証明できた検証証跡だけは再利用される（[Agent Harness設計](agent-harness-design.md) 第9節・実装済み）。base不変の増分commitがmetadata-only（`.md`・`.github/ISSUE_TEMPLATE/`・`.husky/`）だけを変更する場合は、process以外の証跡も延長される（実装済み。ただしlintは増分が `.md` と `.husky/` 正規hook名のみの場合に限る——ISSUE_TEMPLATE配下のYAML/JSON等はoxfmtが観測する）。それ以外の旧HEAD/baseの証跡を現在の必須確認の成功として扱わない。
 
 ローカル既定:
 

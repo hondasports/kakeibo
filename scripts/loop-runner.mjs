@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { decideProfile, resolveAgentProfile } from "./resolve-agent-profile.mjs";
 import { readChangedPaths } from "./suggest-skills.mjs";
+import { isMetadataOnlyPath, normalizeChangedPath } from "./classify-e2e-relevance.mjs";
 import { validateAssessment } from "./review-depth.mjs";
 import {
   validateTask,
@@ -91,6 +92,34 @@ function featurePatchSha256(task, root, head = task.head) {
   }
 }
 /**
+ * Paths vitest can relate tests to for `--verify unit --scope affected`:
+ * testable source extensions outside e2e/ (Playwright) and metadata-only
+ * paths. Non-matching files drop out of the candidate set; an empty set
+ * reverts to the full suite. A matching file with no related tests (e.g. a
+ * root config) still makes `vitest related` exit non-zero — that loud
+ * failure is intentional; re-run with full scope.
+ */
+const UNIT_RELATED_PATTERN = /\.(?:cjs|js|jsx|mjs|mts|cts|ts|tsx)$/;
+function isUnitRelatedPath(filePath) {
+  const file = normalizeChangedPath(filePath);
+  return !isMetadataOnlyPath(file) && !file.startsWith("e2e/") && UNIT_RELATED_PATTERN.test(file);
+}
+
+/** Increment paths between two commits; null on failure → fail closed. */
+function incrementChangedPaths(from, to, root) {
+  try {
+    return git(
+      ["diff", "--name-only", "--no-renames", "--diff-filter=ACDMRTUXB", "-z", from, to],
+      root,
+    )
+      .split("\0")
+      .map(normalizeChangedPath)
+      .filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+/**
  * Revision-change invalidation: verification evidence may be carried over only
  * when both the feature patch and the verified tree are byte-identical to the
  * new revision — the same commands over the same tree inputs reproduce the
@@ -100,7 +129,51 @@ function featurePatchSha256(task, root, head = task.head) {
  * where the verification actually executed and never gets rewritten.
  * Everything else (review, aftercare, assessment, skills) still invalidates
  * wholesale.
+ *
+ * A second, narrower reuse path covers increments whose paths are all
+ * metadata-only (docs prose, issue templates, git hooks). Lint and build
+ * cannot observe that content at all. Unit CAN: the full vitest suite
+ * includes workflow/docs contract tests that read .md files. That is sound
+ * only because `process` is unconditionally required, never extended, and its
+ * suite contains every metadata-reading test — a mandatory fresh process
+ * run decides whether a metadata increment is actually green. The guard test
+ * in loop-runner.test.mjs keeps that containment invariant true.
  */
+/** Canonical githooks(5) hook basenames — the only .husky/ files lint cannot observe. */
+const HUSKY_HOOK_NAMES = new Set([
+  "applypatch-msg",
+  "pre-applypatch",
+  "post-applypatch",
+  "pre-commit",
+  "pre-merge-commit",
+  "prepare-commit-msg",
+  "commit-msg",
+  "post-commit",
+  "pre-rebase",
+  "post-checkout",
+  "post-merge",
+  "pre-push",
+  "pre-receive",
+  "update",
+  "proc-receive",
+  "post-receive",
+  "post-update",
+  "reference-transaction",
+  "push-to-checkout",
+  "pre-auto-gc",
+  "post-rewrite",
+  "sendemail-validate",
+  "fsmonitor-watchman",
+  "p4-changelist",
+  "p4-prepare-changelist",
+  "p4-post-changelist",
+  "p4-pre-submit",
+  "post-index-change",
+]);
+/** lint (oxfmt/oxlint) cannot observe .md (ignored) or extensionless hook files. */
+const lintInvisiblePath = (p) =>
+  p.endsWith(".md") || HUSKY_HOOK_NAMES.has(p.slice(".husky/".length));
+
 function invalidateRevision(task, root, head, baseHead) {
   const patchSha256 = featurePatchSha256(task, root, head);
   let headTree = null;
@@ -109,21 +182,42 @@ function invalidateRevision(task, root, head, baseHead) {
   } catch {
     headTree = null;
   }
+  const incrementPaths =
+    head !== task.head && baseHead === task.baseHead
+      ? incrementChangedPaths(task.head, head, root)
+      : null;
+  const metadataOnlyIncrement =
+    incrementPaths !== null &&
+    incrementPaths.length > 0 &&
+    incrementPaths.every(isMetadataOnlyPath);
   const kept = {};
   const reused = [];
   for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
-    if (
-      !verificationReusable(evidence, {
-        patchSha256,
-        headTree,
-        contractVersion: EVIDENCE_CONTRACT_VERSION,
-      })
-    )
-      continue;
+    const fingerprintReusable = verificationReusable(evidence, {
+      patchSha256,
+      headTree,
+      contractVersion: EVIDENCE_CONTRACT_VERSION,
+    });
+    const incrementReusable =
+      !fingerprintReusable &&
+      metadataOnlyIncrement &&
+      kind !== "process" &&
+      // lint runs `oxfmt --check`, which observes YAML/JSON inside
+      // .github/ISSUE_TEMPLATE/ and well-known filenames (README,
+      // Jakefile, Pipfile) anywhere — only .md and canonical git hook
+      // basenames under .husky/ are provably invisible to it.
+      (kind !== "lint" || incrementPaths.every(lintInvisiblePath)) &&
+      evidence?.success === true &&
+      evidence?.appliesTo?.contractVersion === EVIDENCE_CONTRACT_VERSION &&
+      evidence?.appliesTo?.head === task.head &&
+      evidence?.appliesTo?.baseHead === task.baseHead;
+    if (!fingerprintReusable && !incrementReusable) continue;
     evidence.reuse = {
+      basis: fingerprintReusable ? "identical_patch_and_tree" : "metadata_only_increment",
       from: { head: evidence.appliesTo.head, baseHead: evidence.appliesTo.baseHead },
       at: new Date().toISOString(),
     };
+    if (incrementReusable) evidence.reuse.incrementPaths = incrementPaths;
     evidence.appliesTo.head = head;
     evidence.appliesTo.baseHead = baseHead;
     kept[kind] = evidence;
@@ -230,7 +324,9 @@ export function transitionTask(task, event, exit, root) {
   history(task, event, { exit });
   if (event === "findings") task.counters.review += 1;
   if (event === "ci_failure") task.counters.ci += 1;
-  if (["findings", "ci_failure"].includes(event)) invalidate(task);
+  // Evidence is not wiped here: nothing has changed yet. Invalidation happens
+  // only on real revision change in refreshTask, so a dismissed finding or a
+  // metadata-only fix does not force full re-verification.
   if (event === "resolved") {
     task.counters.sameFailure = 0;
     task.lastFailure = null;
@@ -316,19 +412,41 @@ export function runVerification(
       cwd: root,
       stdio: ["ignore", context.fd, context.fd],
     }),
+  { scope = "full" } = {},
 ) {
   requireValue(task.state === "execute", "Verification runs in execute");
   requireValue(CHECK_COMMANDS[kind], `Unknown verification kind: ${kind}`);
+  requireValue(["full", "affected"].includes(scope), `Unknown verification scope: ${scope}`);
+  requireValue(
+    scope !== "affected" || kind === "unit",
+    "--scope affected is supported for unit only; CI still runs the full suite",
+  );
   requireClean(root);
   const before = { head: task.head, baseHead: task.baseHead };
   delete task.verification[kind];
+  // --scope affected narrows `unit` to vitest related over the task's changed
+  // paths. Only files vitest can relate tests to are passed (testable source
+  // extensions, present on disk, outside e2e/ and metadata-only paths). A file
+  // with no related tests makes vitest exit non-zero; that is a normal failure,
+  // not an implicit full-suite fallback. An empty candidate set reverts to the
+  // full command list and is recorded as scope "full".
+  let commands = CHECK_COMMANDS[kind];
+  let affectedFiles = null;
+  if (kind === "unit" && scope === "affected") {
+    affectedFiles = readChangedPaths({ base: task.baseRef, cwd: root })
+      .map(normalizeChangedPath)
+      .filter((file) => isUnitRelatedPath(file) && existsSync(path.join(root, file)));
+    if (affectedFiles.length > 0)
+      commands = [["pnpm", "exec", "vitest", "related", ...affectedFiles, "--run"]];
+  }
+  const appliedScope = commands === CHECK_COMMANDS[kind] ? "full" : scope;
   const startedAt = Date.now();
   const dir = evidenceDir(task, root);
   mkdirSync(dir, { recursive: true });
   const artifactPath = path.join(dir, `${kind}-${startedAt}.log`);
   const fd = openSync(artifactPath, "w");
   try {
-    for (const command of CHECK_COMMANDS[kind]) {
+    for (const command of commands) {
       writeSync(fd, `$ ${command.join(" ")}\n`);
       const result = run(command, { fd, artifactPath });
       writeSync(fd, `[exit ${result.status}]\n`);
@@ -343,6 +461,7 @@ export function runVerification(
           kind,
           durationMs: Date.now() - startedAt,
           result: "fail",
+          scope: appliedScope,
           signature,
         });
         saveTask(task, root);
@@ -371,6 +490,8 @@ export function runVerification(
       baseHead: before.baseHead,
       checkedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
+      scope: appliedScope,
+      ...(appliedScope === "affected" ? { affectedFiles } : {}),
     },
     appliesTo: {
       head: before.head,
@@ -380,7 +501,7 @@ export function runVerification(
       contractVersion: EVIDENCE_CONTRACT_VERSION,
     },
     success: true,
-    commands: CHECK_COMMANDS[kind],
+    commands,
     summary: { exitCode: 0, lastLines: lastLines(log, 10) },
     artifact: {
       path: path.relative(evidenceRoot(root), artifactPath),
@@ -397,6 +518,7 @@ export function runVerification(
     kind,
     durationMs: Date.now() - startedAt,
     result: "pass",
+    scope: appliedScope,
     artifactBytes: task.verification[kind].artifact?.bytes ?? null,
   });
   return task;
@@ -707,6 +829,11 @@ export function buildReviewPacket(task, dir, root) {
         reviewer: "",
         independent: task.assessment?.review?.independent === true,
         context: "fresh",
+        _notes: [
+          "finding.status is open|fixed|dismissed (unique id, non-empty evidence); every prior finding id must appear",
+          "deltaFrom (optional): SHA of a previously reviewed head — scopes review to the increment",
+          "assessment must satisfy the machine floor, not merely the reviewer's own rating",
+        ],
         evidence: [],
         findings: [],
         acceptanceCriteria: (task.spec?.acceptanceCriteria ?? []).map((ac) => ({
@@ -784,9 +911,12 @@ export function parseArguments(args) {
     "--export-file",
     "--review-packet",
     "--interval-seconds",
+    "--scope",
+    "--friction-note",
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+    if (arg === "--") continue; // pnpm forwards a bare "--" through to the script
     requireValue(flags.has(arg) || options.has(arg), `unknown option: ${arg}`);
     requireValue(!Object.hasOwn(out, arg.slice(2)), `duplicate option: ${arg}`);
     out[arg.slice(2)] = flags.has(arg) ? true : option(args, i++);
@@ -830,6 +960,7 @@ export function run(args, root = process.cwd(), services = {}) {
     "explain",
     "artifacts",
     "assert-started",
+    "friction-note",
   ].filter((key) => args[key]);
   requireValue(actions.length <= 1, "Run one task action at a time");
   requireValue(
@@ -840,6 +971,7 @@ export function run(args, root = process.cwd(), services = {}) {
     args["interval-seconds"] === undefined || args["watch-aftercare"],
     "--interval-seconds requires --watch-aftercare",
   );
+  requireValue(args.scope === undefined || args.verify, "--scope requires --verify");
   if (args.init) return startTask(args, root);
   if (args["restore-pr"]) {
     requireValue(!existsSync(taskPath(root)), "A local task already exists");
@@ -873,6 +1005,17 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args.artifacts)
     return { taskId: task.taskId, state: task.state, artifacts: artifactManifest(task, root) };
   if (args["review-packet"]) return buildReviewPacket(task, args["review-packet"], root);
+  if (args["friction-note"] !== undefined) {
+    requireValue(
+      typeof args["friction-note"] === "string" && args["friction-note"].trim().length > 0,
+      "--friction-note requires non-empty text",
+    );
+    task.frictionNote = args["friction-note"].trim();
+    history(task, "friction_note", { note: task.frictionNote });
+    recordMetric(task, root, { action: "friction_note" });
+    saveTask(task, root);
+    return task;
+  }
   if (args.spec) {
     requireValue(task.state === "refine", "Spec changes require refine state");
     task.spec = readJson(args.spec);
@@ -895,7 +1038,8 @@ export function run(args, root = process.cwd(), services = {}) {
     if (task.state !== "refine") decideProfile(task, { root, trigger: "assessment" });
     history(task, "assessed");
   }
-  if (args.verify) task = runVerification(task, args.verify, root);
+  if (args.verify)
+    task = runVerification(task, args.verify, root, undefined, { scope: args.scope });
   if (args.review) {
     requireClean(root);
     requireValue(task.state === "review", "Record review in review state");

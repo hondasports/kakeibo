@@ -190,6 +190,7 @@ export function readChangedPaths({ base, cwd = process.cwd(), execGh } = {}) {
 export function parseArguments(args) {
   const parsed = { cwd: process.cwd() };
   for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === "--") continue;
     if (args[index] === "--base") {
       parsed.base = args[index + 1];
       index += 1;

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  parseArguments,
   readChangedPaths,
   resolvePrBase,
   SKILL_SUGGESTION_RULES,
@@ -184,5 +185,10 @@ describe("readChangedPaths", () => {
     git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
     const execGh = () => JSON.stringify({ baseRefName: "main" });
     expect(resolvePrBase({ cwd: dir, execGh })).toBe("origin/main");
+  });
+
+  it("skips a bare '--' forwarded by pnpm run", () => {
+    const parsed = parseArguments(["--", "--base", "main"]);
+    expect(parsed.base).toBe("main");
   });
 });

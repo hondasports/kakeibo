@@ -64,6 +64,10 @@ describe("resolveAgentProfile", () => {
       expect(() => parseArgs([option, "--next-option"])).toThrow(`${option} requires a value`);
     }
     expect(() => parseArgs(["--unknown"])).toThrow("unknown option");
+    expect(parseArgs(["--", "--runtime", "codex"])).toEqual({
+      profile: null,
+      runtime: "codex",
+    });
   });
 });
 

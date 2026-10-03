@@ -72,6 +72,7 @@ export function parseArguments(args) {
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
+    if (arg === "--") continue;
     if (arg === "--paths") {
       out.paths = readOptionValue(args, index, arg).split(",").filter(Boolean);
       index += 1;
