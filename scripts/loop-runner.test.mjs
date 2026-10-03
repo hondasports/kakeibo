@@ -57,6 +57,9 @@ function repository() {
     path.join(dir, "package.json"),
     JSON.stringify({ scripts: { "test:process": 'node -e "process.exit(0)"' } }),
   );
+  // pnpm run generates node_modules/ + pnpm-lock.yaml at runtime; the fixture
+  // ignores them like a real repo would so verification keeps the tree clean.
+  writeFileSync(path.join(dir, ".gitignore"), "node_modules/\npnpm-lock.yaml\n");
   git("init", "-b", "preview");
   git("config", "user.email", "test@example.invalid");
   git("config", "user.name", "Test");
@@ -758,14 +761,12 @@ describe("persistent task gates", () => {
       unhandledCount: 0,
       unresolvedThreadCount: 0,
     };
-    const fetches = [
-      { pr: prFields([pending]), findings },
-      { pr: prFields([pending]), findings },
-      { pr: prFields([ok]), findings },
-    ];
+    const prPolls = [prFields([pending]), prFields([pending]), prFields([ok])];
     let recorded = false;
     const result = watchAftercare(task, 7, dir, {
-      fetch: () => fetches.shift(),
+      // Same {fetchPr, fetchFindings} shape as the production fetchers.
+      fetchPr: () => prPolls.shift(),
+      fetchFindings: () => findings,
       sleep: () => {},
       record: (t) => {
         recorded = true;
@@ -823,7 +824,8 @@ describe("persistent task gates", () => {
     const result = watchAftercare(task, 7, dir, {
       maxSeconds: 5,
       intervalSeconds: 60,
-      fetch: () => ({ pr: pending, findings: {} }),
+      fetchPr: () => pending,
+      fetchFindings: () => ({}),
       now: () => (t += 1000),
       sleep: () => {},
       record: () => {
@@ -834,6 +836,45 @@ describe("persistent task gates", () => {
     expect(result.task.aftercare).toBeFalsy();
     expect(result.events).toHaveLength(1);
     expect(result.events[0].ready).toBe(false);
+  });
+  it("treats a transient fetch failure as a poll event, then records when ready", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const ready = {
+      number: 7,
+      state: "OPEN",
+      isDraft: false,
+      headRefOid: task.head,
+      baseRefOid: task.baseHead,
+      baseRefName: "preview",
+      mergeable: "MERGEABLE",
+      mergeStateStatus: "CLEAN",
+      reviewDecision: "APPROVED",
+      statusCheckRollup: [{ name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" }],
+    };
+    let calls = 0;
+    const result = watchAftercare(task, 7, dir, {
+      fetchPr: () => {
+        calls += 1;
+        if (calls === 1) throw new Error("gh offline");
+        return ready;
+      },
+      fetchFindings: () => ({
+        pagesComplete: true,
+        unhandledCount: 0,
+        unresolvedThreadCount: 0,
+      }),
+      sleep: () => {},
+      record: (t) => {
+        t.aftercare = { head: t.head, baseHead: t.baseHead, ready: true, pr: 7 };
+        return t;
+      },
+    });
+    expect(result.ready).toBe(true);
+    expect(result.events[0]).toMatchObject({ ready: false, error: "gh offline" });
+    expect(result.events[1]).toMatchObject({ ready: true, changed: true });
   });
   it("appends verify and revision metrics to the shared git dir", () => {
     const { dir, git, task } = repository();

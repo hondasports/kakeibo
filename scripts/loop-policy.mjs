@@ -323,28 +323,13 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
     );
   }
 }
-export function checkAftercare(pr, task, findings) {
-  requireValue(
-    pr.headRefOid === task.head && pr.baseRefOid === task.baseHead,
-    "PR HEAD/base changed",
-  );
-  requireValue(
-    pr.state === "OPEN" &&
-      !pr.isDraft &&
-      pr.mergeable === "MERGEABLE" &&
-      pr.mergeStateStatus === "CLEAN",
-    "PR is not merge ready",
-  );
-  requireValue(
-    !["CHANGES_REQUESTED", "REVIEW_REQUIRED"].includes(pr.reviewDecision),
-    "PR approval is outstanding",
-  );
-  const rawChecks = pr.statusCheckRollup ?? [];
-  requireValue(rawChecks.length > 0, "No CI checks observed");
-  // Retried checks (flake rerun, ready_for_review re-trigger) leave superseded
-  // runs in the rollup; only the latest dated run per check name is authoritative.
-  // Entries we cannot order (no name/context or no timestamp) are always kept so a
-  // failed or pending run is never hidden behind an older success — fail-closed.
+/**
+ * Retried checks (flake rerun, ready_for_review re-trigger) leave superseded
+ * runs in the rollup; only the latest dated run per check name is authoritative.
+ * Entries we cannot order (no name/context or no timestamp) are always kept so a
+ * failed or pending run is never hidden behind an older success — fail-closed.
+ */
+export function selectChecks(rawChecks) {
   const latestByName = new Map();
   const unorderable = [];
   for (const check of rawChecks) {
@@ -363,7 +348,27 @@ export function checkAftercare(pr, task, findings) {
     const prev = latestByName.get(key);
     if (!prev || at >= prev.at) latestByName.set(key, { check, at });
   }
-  const checks = [...latestByName.values()].map((entry) => entry.check).concat(unorderable);
+  return [...latestByName.values()].map((entry) => entry.check).concat(unorderable);
+}
+export function checkAftercare(pr, task, findings) {
+  requireValue(
+    pr.headRefOid === task.head && pr.baseRefOid === task.baseHead,
+    "PR HEAD/base changed",
+  );
+  requireValue(
+    pr.state === "OPEN" &&
+      !pr.isDraft &&
+      pr.mergeable === "MERGEABLE" &&
+      pr.mergeStateStatus === "CLEAN",
+    "PR is not merge ready",
+  );
+  requireValue(
+    !["CHANGES_REQUESTED", "REVIEW_REQUIRED"].includes(pr.reviewDecision),
+    "PR approval is outstanding",
+  );
+  const rawChecks = pr.statusCheckRollup ?? [];
+  requireValue(rawChecks.length > 0, "No CI checks observed");
+  const checks = selectChecks(rawChecks);
   for (const check of checks) {
     const status = check.conclusion ?? check.state;
     requireValue(
