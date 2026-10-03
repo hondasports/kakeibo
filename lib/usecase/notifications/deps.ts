@@ -14,7 +14,10 @@ import type {
   NotificationSettingReader,
   NotificationSettingStore,
 } from "../../domain/notifications/store";
-import type { ReceiptAnalysisReader } from "../../domain/receiptAnalysisJobs/store";
+import type {
+  ReceiptAnalysisReader,
+  ReceiptAnalysisStore,
+} from "../../domain/receiptAnalysisJobs/store";
 import type { SystemAdminAuditLogStore } from "../../domain/systemAdmin/auditLog";
 import type { SystemAdminReadStore } from "../../domain/systemAdmin/systemAdminStore";
 import type { EmailJobScheduler, TransactionalEmailJobStore } from "../../domain/email/store";
@@ -51,7 +54,7 @@ export type NotificationAdminMutationDeps = {
 };
 
 export type AiReviewNotificationEnqueueDeps = {
-  batches: Pick<ReceiptAnalysisReader, "getBatch">;
+  batches: Pick<ReceiptAnalysisStore, "getBatch" | "patchBatch">;
   groups: Pick<GroupReadRepository, "get">;
   memberships: Pick<GroupMembershipReadRepository, "findByGroupAndUser">;
   users: Pick<UserStore, "findByUserId">;

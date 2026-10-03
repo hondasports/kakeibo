@@ -56,6 +56,8 @@ export async function enqueueAiReviewNotifications(
     );
   }
 
+  if (batch.aiReviewLineNotificationConsumedAt !== undefined) return;
+
   const lineDedupeKey = buildAiReviewLineDedupeKey(args.batchId);
   const [lineSetting, activeLinks, existingLineJob, existingLineEvent] = await Promise.all([
     deps.settings.findByTypeAndChannel(AI_REVIEW_REQUIRED_NOTIFICATION_TYPE, "line"),
@@ -99,6 +101,9 @@ export async function enqueueAiReviewNotifications(
       updatedAt: now,
     });
   }
+  await deps.batches.patchBatch(args.batchId, {
+    aiReviewLineNotificationConsumedAt: now,
+  });
   if (existingLineEvent || existingLineJob || outcome === "skipped") return;
 
   const link = activeLinks[0];

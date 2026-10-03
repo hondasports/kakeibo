@@ -72,6 +72,19 @@ export function getLineNotificationExhaustionErrorCode(
   return null;
 }
 
+export function getLineNotificationSendAuthorizationErrorCode(
+  job: Pick<LineNotificationJobRecord, "attemptCount" | "firstAttemptAt">,
+  now: number,
+): "max_attempts_reached" | "retry_key_expired" | null {
+  if (job.attemptCount > DEFAULT_MAX_RETRY_ATTEMPTS) {
+    return "max_attempts_reached";
+  }
+  if (job.firstAttemptAt !== undefined && now >= job.firstAttemptAt + LINE_RETRY_KEY_TTL_MS) {
+    return "retry_key_expired";
+  }
+  return null;
+}
+
 export function buildAiReviewEmailDedupeKey(batchId: string): string {
   return `ai-review-required/${batchId}`;
 }

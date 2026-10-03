@@ -6,7 +6,10 @@ import { createGroupReadRepository } from "../groups/convexGroupRepository";
 import { createGroupMembershipReadRepository } from "../groups/convexGroupMembershipRepository";
 import { createUserDirectoryRead } from "../groups/convexUserDirectory";
 import { createLineAccountLinkReader } from "../lineLink/convexLineAccountLinkStore";
-import { createReceiptAnalysisReader } from "../receiptAnalysisJobs/convexReceiptAnalysisStore";
+import {
+  createReceiptAnalysisReader,
+  createReceiptAnalysisStore,
+} from "../receiptAnalysisJobs/convexReceiptAnalysisStore";
 import { createSystemAdminReadStore } from "../systemAdmin/convexSystemAdminStore";
 import { createSystemAdminAuditLogStore } from "../systemAdmin/convexSystemAdminAuditLogStore";
 import { createUserReader, createUserStore } from "../users/convexUserStore";
@@ -89,7 +92,7 @@ export function createAiReviewEnqueueDeps(
   ctx: Pick<MutationCtx, "db" | "scheduler">,
 ): AiReviewNotificationEnqueueDeps {
   return {
-    batches: createReceiptAnalysisReader(ctx),
+    batches: createReceiptAnalysisStore(ctx),
     groups: createGroupReadRepository(ctx),
     memberships: createGroupMembershipReadRepository(ctx),
     users: createUserReader(ctx),
