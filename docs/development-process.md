@@ -203,7 +203,7 @@ Agent taskで残す価値があるもの:
 
 具体的な開始・再開・状態保存は [Agent Harness操作手順](agent-harness.md) を参照する。
 
-軽量化とREFINE終了時のProfile自動判定を実装する際は [Agent Harness設計](agent-harness-design.md) を正本とする。この設計は未実装であり、本節の現行運用とState Transitionを設計文書だけで変更しない。
+軽量化とREFINE終了時のProfile自動判定を実装する際は [Agent Harness設計](agent-harness-design.md) を正本とする。この設計は段階的に実装中であり、本節の現行運用とState Transitionを設計文書だけで変更しない。
 
 ### REFINE
 
