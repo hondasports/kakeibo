@@ -122,7 +122,7 @@ findingの修正では、変更箇所・影響するAC・残ったfindingを再�
 
 再利用時は元の実行対象・時刻・結果、不変性の根拠、再利用先を保存する。新しいHEADで再実行した結果として偽装しない。判定できない場合は失効させて再実行する。Profile変更では新たに必要な確認を追加し、有効性を証明できる既存証跡まで一括失効させない。
 
-実装済みの再利用経路は2つある。patch+tree二重fingerprint（rebase・mergeで内容が不変な場合）と、base不変かつ増分がmetadata-onlyの場合のprocess以外への延長である。後者はkind別の入力不変性をpath集合で証明する、§9の原則に沿った限定的な入力推論である。
+実装済みの再利用経路は2つある。patch+tree二重fingerprint（rebase・mergeで内容が不変な場合）と、base不変かつ増分がmetadata-onlyの場合のprocess以外への延長である。後者はkind別の入力不変性をpath集合で証明する、§9の原則に沿った限定的な入力推論である。unitの延長は「metadataを読むテストは全てprocess suite（延長不可）に所属する」という不変条件の上に成立し、guard testがそれを維持する。
 
 レビュー証跡はlatest HEADの実差分へ結び付ける。過去のレビューを参照しても、必要な独立レビュー・最新差分の確認・全ACの照合を省略しない。
 

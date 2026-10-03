@@ -83,8 +83,32 @@ describe("agent metrics aggregation", () => {
     const result = run({ path: file, task: "t1" }, dir);
     expect(result.entries).toBe(6);
     expect(result.source).toBe(file);
-    expect(readMetricsEntries(path.join(dir, "missing.jsonl"))).toEqual([]);
+    expect(readMetricsEntries(path.join(dir, "missing.jsonl"))).toEqual({
+      entries: [],
+      parseErrors: 0,
+    });
     expect(() => parseArguments(["--bogus"])).toThrow("unknown option");
     expect(() => parseArguments(["--task"])).toThrow("requires a value");
+  });
+  it("skips malformed lines and actionless entries instead of failing", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "loop-metrics-bad-"));
+    dirs.push(dir);
+    const file = path.join(dir, "agent-metrics.jsonl");
+    writeFileSync(
+      file,
+      [
+        JSON.stringify(entries[0]),
+        '{"taskId":"t1","action":"verify"', // torn append
+        JSON.stringify({ taskId: "t1" }), // no action field
+        JSON.stringify(entries[3]),
+        "",
+      ].join("\n"),
+    );
+    const result = run({ path: file }, dir);
+    expect(result.parseErrors).toBe(1);
+    expect(result.entries).toBe(3);
+    expect(result.actions.verify.count).toBe(1);
+    expect(result.actions.transition.events).toEqual({ findings: 1 });
+    expect(result.actions.undefined).toBeUndefined();
   });
 });

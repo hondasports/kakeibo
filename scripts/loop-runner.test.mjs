@@ -1045,6 +1045,34 @@ describe("increment reuse and loop ergonomics", () => {
         "deltaFrom",
       );
   });
+  it("keeps metadata-reading tests inside the mandatory process suite", () => {
+    // `unit` evidence is extended through metadata-only increments only because
+    // every test whose outcome can depend on metadata content runs under the
+    // `process` verification that is never extended. This guard fails loudly
+    // when a new metadata-reading test lands outside the process suite.
+    const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+    const processTests = new Set(
+      pkg.scripts["test:process"].match(/[\w./-]+\.test\.(?:mjs|ts|tsx|js)/g) ?? [],
+    );
+    const testFiles = execFileSync("git", ["ls-files", "**/*.test.*"], {
+      cwd: root,
+      encoding: "utf8",
+    })
+      .split("\n")
+      .filter(Boolean);
+    // A quoted repository-relative metadata path (.md, ISSUE_TEMPLATE, .husky):
+    // property access like `tokens.space.md` and embedded substrings do not
+    // match — only whole quoted path literals do.
+    const METADATA_PATH_REF =
+      /["'`](?:[\w./-]+\.md|[^"'`]*ISSUE_TEMPLATE[^"'`]*|\.husky[^"'`]*)["'`]/;
+    const offenders = testFiles.filter(
+      (file) =>
+        !processTests.has(file) &&
+        !file.startsWith("e2e/") &&
+        METADATA_PATH_REF.test(readFileSync(path.join(root, file), "utf8")),
+    );
+    expect(offenders).toEqual([]);
+  });
   it("records friction notes into task state, history and the state block", () => {
     const { dir, task } = repository();
     saveTask(task, dir);

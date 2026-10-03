@@ -13,13 +13,20 @@ export function metricsLogPath(root = process.cwd()) {
   return path.join(commonDir, "agent-metrics.jsonl");
 }
 
-/** Parse the JSONL metrics log; a missing or blank file yields no entries. */
+/** Parse the JSONL metrics log; a missing file yields none and malformed lines are skipped. */
 export function readMetricsEntries(file) {
-  if (!existsSync(file)) return [];
-  return readFileSync(file, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
+  if (!existsSync(file)) return { entries: [], parseErrors: 0 };
+  const entries = [];
+  let parseErrors = 0;
+  for (const line of readFileSync(file, "utf8").split("\n")) {
+    if (!line) continue;
+    try {
+      entries.push(JSON.parse(line));
+    } catch {
+      parseErrors += 1;
+    }
+  }
+  return { entries, parseErrors };
 }
 
 const bump = (bucket, key) => {
@@ -31,6 +38,7 @@ export function aggregateMetrics(entries, { taskId = null } = {}) {
   const filtered = taskId ? entries.filter((entry) => entry.taskId === taskId) : entries;
   const actions = {};
   for (const entry of filtered) {
+    if (typeof entry?.action !== "string") continue;
     const action = (actions[entry.action] ??= { count: 0 });
     action.count += 1;
     if (typeof entry.durationMs === "number")
@@ -88,9 +96,11 @@ export function parseArguments(args) {
 
 export function run(args, cwd = process.cwd()) {
   const file = args.path ?? metricsLogPath(cwd);
+  const { entries, parseErrors } = readMetricsEntries(file);
   return {
     source: file,
-    ...aggregateMetrics(readMetricsEntries(file), { taskId: args.task ?? null }),
+    parseErrors,
+    ...aggregateMetrics(entries, { taskId: args.task ?? null }),
   };
 }
 

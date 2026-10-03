@@ -94,8 +94,10 @@ function featurePatchSha256(task, root, head = task.head) {
 /**
  * Paths vitest can relate tests to for `--verify unit --scope affected`:
  * testable source extensions outside e2e/ (Playwright) and metadata-only
- * paths. Config/data files fall back to the full suite instead of producing
- * spurious "No test files found" failures.
+ * paths. Non-matching files drop out of the candidate set; an empty set
+ * reverts to the full suite. A matching file with no related tests (e.g. a
+ * root config) still makes `vitest related` exit non-zero — that loud
+ * failure is intentional; re-run with full scope.
  */
 const UNIT_RELATED_PATTERN = /\.(?:cjs|js|jsx|mjs|mts|cts|ts|tsx)$/;
 function isUnitRelatedPath(filePath) {
@@ -128,11 +130,14 @@ function incrementChangedPaths(from, to, root) {
  * Everything else (review, aftercare, assessment, skills) still invalidates
  * wholesale.
  *
- * A second, narrower reuse path covers forward-only increments whose paths are
- * all metadata-only (docs prose, issue templates, git hooks): such content
- * cannot change lint/unit/build outcomes, so evidence for those kinds is
- * extended even though the patch fingerprint changed. `process` is excluded —
- * it verifies docs/script integrity and reads exactly these inputs.
+ * A second, narrower reuse path covers increments whose paths are all
+ * metadata-only (docs prose, issue templates, git hooks). Lint and build
+ * cannot observe that content at all. Unit CAN: the full vitest suite
+ * includes workflow/docs contract tests that read .md files. That is sound
+ * only because `process` is unconditionally required, never extended, and its
+ * suite contains every metadata-reading test — a mandatory fresh process
+ * run decides whether a metadata increment is actually green. The guard test
+ * in loop-runner.test.mjs keeps that containment invariant true.
  */
 function invalidateRevision(task, root, head, baseHead) {
   const patchSha256 = featurePatchSha256(task, root, head);
@@ -416,6 +421,7 @@ export function runVerification(
           kind,
           durationMs: Date.now() - startedAt,
           result: "fail",
+          scope: appliedScope,
           signature,
         });
         saveTask(task, root);
