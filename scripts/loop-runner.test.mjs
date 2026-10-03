@@ -221,9 +221,10 @@ describe("persistent task gates", () => {
     expect(artifacts.artifacts.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(artifacts.artifacts.process.artifact.available).toBe(true);
     // The manifest references the log artifact; it never contains raw log text.
-    const logPath = artifacts.artifacts.process.artifact.path;
-    expect(logPath).toContain("agent-evidence");
-    expect(logPath.startsWith(path.join(checkout, ".git"))).toBe(false);
+    const entry = artifacts.artifacts.process.artifact;
+    expect(path.isAbsolute(entry.path)).toBe(false);
+    expect(entry.resolved).toContain("agent-evidence");
+    expect(entry.resolved.startsWith(path.join(checkout, ".git"))).toBe(false);
     const stateFile = path.join(parent, "state.md");
     expect(JSON.parse(cli("--export-file", stateFile)).written).toBe(stateFile);
     expect(parseStateBlock(readFileSync(stateFile, "utf8")).state).toBe("aftercare");
@@ -390,9 +391,16 @@ describe("persistent task gates", () => {
       contractVersion: 1,
     });
     expect(evidence.appliesTo.patchSha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(evidence.artifact.path).toContain("agent-evidence");
+    // Persisted artifact paths stay relative to the evidence root so the state
+    // block never leaks local filesystem layout into the PR body.
+    expect(path.isAbsolute(evidence.artifact.path)).toBe(false);
+    expect(evidence.artifact.path.startsWith(task.taskId)).toBe(true);
     expect(evidence.artifact.bytes).toBeGreaterThan(0);
-    const log = readFileSync(evidence.artifact.path, "utf8");
+    expect(stateBlock(result)).not.toContain(dir);
+    const entry = artifactManifest(result, dir).process.artifact;
+    expect(entry.resolved).toContain("agent-evidence");
+    expect(entry.available).toBe(true);
+    const log = readFileSync(entry.resolved, "utf8");
     expect(createHash("sha256").update(log).digest("hex")).toBe(evidence.artifact.sha256);
     expect(evidence.summary.lastLines.join("\n")).toContain("exit 0");
     // Artifact lives under git-internal storage: the worktree stays clean.
@@ -448,6 +456,41 @@ describe("persistent task gates", () => {
     expect(stale.verification.process).toBe("stale");
     expect(stale.missing).toContain("verify:process");
     expect(stale.next).toContain("node scripts/loop-runner.mjs --verify process");
+  });
+  it("rejects traversal task ids at init and at the artifact sink", () => {
+    const { dir, task } = repository();
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-taskid-"));
+    dirs.push(parent);
+    const spec = path.join(parent, "spec.json");
+    writeFileSync(spec, JSON.stringify(taskFixture().spec));
+    expect(() =>
+      run(
+        {
+          init: spec,
+          task: "../escape",
+          runtime: "codex",
+          implementer: "author",
+          base: "preview",
+        },
+        dir,
+      ),
+    ).toThrow("task id");
+    task.taskId = "../escape";
+    expect(() => runVerification(task, "process", dir, () => ({ status: 0 }))).toThrow("task id");
+  });
+  it("surfaces refine gaps for missing profile inputs and invalid specs", () => {
+    const task = taskFixture(root, { state: "refine" });
+    // blast_radius/uncertainty come from the assessment; verification_load has
+    // the selection-input fallback — baseline reports no gap.
+    expect(summarizeTask(task).missing).toEqual([]);
+    delete task.agentAssessment.risk_assessment.blast_radius;
+    expect(summarizeTask(task).missing).toContain("profile:risk_assessment.blast_radius");
+    task.agentAssessment.risk_assessment.blast_radius = "local";
+    task.spec.acceptanceCriteria = [
+      { id: "AC1", text: "one" },
+      { id: "AC1", text: "duplicate" },
+    ];
+    expect(summarizeTask(task).missing).toContain("spec:acceptanceCriteria");
   });
   it("exposes --status/--explain/--artifacts through run() without changing the task", () => {
     const { dir, task } = repository();

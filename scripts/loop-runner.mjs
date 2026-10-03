@@ -113,14 +113,15 @@ export function startTask(args, root) {
     !existsSync(taskPath(root)),
     "Task already initialized; use existing state or another worktree",
   );
-  execFileSync(process.execPath, ["scripts/check-task-worktree.mjs", "--require-clean"], {
-    cwd: root,
-    stdio: "pipe",
-  });
   requireValue(
     args.runtime && args.task && args.implementer,
     "Startup requires runtime, task and implementer",
   );
+  requireSafeTaskId(args.task);
+  execFileSync(process.execPath, ["scripts/check-task-worktree.mjs", "--require-clean"], {
+    cwd: root,
+    stdio: "pipe",
+  });
   const spec = readJson(args.init);
   // Open decisions are allowed in REFINE; leaving it requires a complete spec.
   // --model is still accepted by the argument parser but no longer used.
@@ -195,12 +196,22 @@ export function recordFailure(task, signature, root) {
     task.state = "incident";
 }
 export const EVIDENCE_CONTRACT_VERSION = 1;
-const evidenceDir = (task, root) =>
-  path.join(
-    git(["rev-parse", "--path-format=absolute", "--git-path", "agent-evidence"], root),
-    task.taskId,
-    task.head.slice(0, 12),
+const SAFE_TASK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const requireSafeTaskId = (taskId) =>
+  requireValue(
+    typeof taskId === "string" && SAFE_TASK_ID.test(taskId) && !taskId.includes(".."),
+    `Invalid task id for artifact paths: ${taskId}`,
   );
+const evidenceRoot = (root) =>
+  git(["rev-parse", "--path-format=absolute", "--git-path", "agent-evidence"], root);
+const evidenceDir = (task, root) => {
+  requireSafeTaskId(task.taskId);
+  return path.join(evidenceRoot(root), task.taskId, task.head.slice(0, 12));
+};
+// Persisted manifests store paths relative to the evidence root so state blocks
+// stay portable and never leak local filesystem layout into the PR body.
+const resolveArtifactPath = (root, stored) =>
+  path.isAbsolute(stored) ? stored : path.join(evidenceRoot(root), stored);
 const lastLines = (text, count = 20) => text.trimEnd().split("\n").slice(-count);
 export function runVerification(
   task,
@@ -279,7 +290,7 @@ export function runVerification(
     commands: CHECK_COMMANDS[kind],
     summary: { exitCode: 0, lastLines: lastLines(log, 10) },
     artifact: {
-      path: artifactPath,
+      path: path.relative(evidenceRoot(root), artifactPath),
       sha256: createHash("sha256").update(log).digest("hex"),
       bytes: statSync(artifactPath).size,
     },
@@ -312,6 +323,10 @@ function nextActions(task) {
     else if (item.startsWith("finding:"))
       actions.push(`resolve finding ${item.slice(8)} then re-review (--event findings)`);
     else if (item === "aftercare") actions.push("node scripts/loop-runner.mjs --aftercare <pr>");
+    else if (item.startsWith("profile:"))
+      actions.push(`complete profile input ${item.slice(8)} via --assessment`);
+    else if (item === "spec:acceptanceCriteria")
+      actions.push("fix --spec acceptanceCriteria (unique non-empty ids)");
     else actions.push(item);
   }
   if (actions.length === 0) {
@@ -346,9 +361,18 @@ export function summarizeTask(task) {
   };
 }
 /** Evidence manifest per verification kind — paths/hashes/summaries, never raw logs. */
-export function artifactManifest(task) {
+export function artifactManifest(task, root = process.cwd()) {
   const manifest = {};
   for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
+    const artifact = evidence.artifact
+      ? {
+          path: evidence.artifact.path,
+          resolved: resolveArtifactPath(root, evidence.artifact.path),
+          sha256: evidence.artifact.sha256,
+          bytes: evidence.artifact.bytes,
+          available: existsSync(resolveArtifactPath(root, evidence.artifact.path)),
+        }
+      : null;
     manifest[kind] = {
       success: evidence.success === true,
       run: evidence.run ?? {
@@ -358,20 +382,13 @@ export function artifactManifest(task) {
       },
       appliesTo: evidence.appliesTo ?? null,
       summary: evidence.summary ?? null,
-      artifact: evidence.artifact
-        ? {
-            path: evidence.artifact.path,
-            sha256: evidence.artifact.sha256,
-            bytes: evidence.artifact.bytes,
-            available: existsSync(evidence.artifact.path),
-          }
-        : null,
+      artifact,
       reuse: evidence.reuse ?? null,
     };
   }
   return manifest;
 }
-function explainTask(task) {
+function explainTask(task, root) {
   return {
     ...summarizeTask(task),
     requiredSkills: task.assessment?.requiredSkills ?? [],
@@ -381,7 +398,7 @@ function explainTask(task) {
       assessment: task.assessment?.risk ?? null,
       agent: task.agentAssessment?.applied_tier ?? null,
     },
-    verificationDetail: artifactManifest(task),
+    verificationDetail: artifactManifest(task, root),
     profileSource: task.configuration?.profileSource ?? null,
   };
 }
@@ -534,9 +551,9 @@ export function run(args, root = process.cwd(), services = {}) {
     return { taskId: task.taskId, state: task.state, profile: task.configuration.profileSource };
   }
   if (args.status) return task;
-  if (args.explain) return explainTask(task);
+  if (args.explain) return explainTask(task, root);
   if (args.artifacts)
-    return { taskId: task.taskId, state: task.state, artifacts: artifactManifest(task) };
+    return { taskId: task.taskId, state: task.state, artifacts: artifactManifest(task, root) };
   if (args.spec) {
     requireValue(task.state === "refine", "Spec changes require refine state");
     task.spec = readJson(args.spec);
