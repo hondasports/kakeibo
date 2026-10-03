@@ -216,19 +216,13 @@ export function selectChecks(rawChecks) {
     const latest = orderable.reduce((best, entry) => {
       if (!best) return entry;
       if (entry.at > best.at) return entry;
-      if (
-        entry.at === best.at &&
-        !isSuccessfulCheck(entry.check) &&
-        isSuccessfulCheck(best.check)
-      )
+      if (entry.at === best.at && !isSuccessfulCheck(entry.check) && isSuccessfulCheck(best.check))
         return entry;
       return best;
     }, null);
     if (startKeyed.length > 0)
       selected.push(
-        ...completed
-          .filter((entry) => !checkStartKey(entry.check))
-          .map((entry) => entry.check),
+        ...completed.filter((entry) => !checkStartKey(entry.check)).map((entry) => entry.check),
       );
     const blocking = group.filter(
       (entry) =>
