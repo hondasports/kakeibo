@@ -90,6 +90,47 @@ describe("下書きの修正導線", () => {
     expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
     expect(within(banner).getByText(/印字額と明細の金額が一致しています/)).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("金額が一致");
+    expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
+  });
+  it("金額が一致し税率別が比較不能なら税率別集計カードだけを表示する", () => {
+    render(<ReviewDialog {...props} />);
+    const region = screen.getByRole("region", { name: "確認結果" });
+    expect(within(region).getByText("税率別集計")).toBeVisible();
+    expect(within(region).queryByText("金額確認")).not.toBeInTheDocument();
+  });
+  it("金額が比較不能で税率別が一致なら金額確認カードだけを表示する", () => {
+    render(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={{
+          ...props.selectedReviewDraft!,
+          taxSummaries: [
+            {
+              taxRatePercent: 8,
+              taxMode: "included",
+              taxableAmountYen: 116,
+              taxableAmountBasis: "tax_included",
+              taxYen: 8,
+              roundingMethod: "floor",
+              warnings: [],
+            },
+          ],
+        }}
+        reviewForm={{ ...props.reviewForm, amountYen: "" }}
+        reviewItems={[
+          {
+            ...props.reviewItems[0],
+            amountBasis: "tax_included",
+            taxResolutionStatus: "resolved",
+            taxResolutionSource: "item_explicit",
+            allocatedTaxYen: 8,
+          },
+        ]}
+      />,
+    );
+    const region = screen.getByRole("region", { name: "確認結果" });
+    expect(within(region).getByText("金額確認")).toBeVisible();
+    expect(within(region).queryByText("税率別集計")).not.toBeInTheDocument();
   });
   it("金額の不一致は差額だけを示し、確認ボタンから商品一覧へ移動できる", async () => {
     const user = userEvent.setup();

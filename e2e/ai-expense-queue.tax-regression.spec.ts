@@ -98,12 +98,13 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     await expect(
       dialog.getByRole("region", { name: "全体の確認状態" }).getByText(/税率・税込／税抜/),
     ).toHaveCount(0);
-    const checkSection = dialog.getByRole("region", { name: "確認結果" });
+    // 金額・税率別ともに一致のため検算カードは出さず、成功メッセージだけが残る
     await expect(
-      checkSection.getByText("明細合計 438円 ＝ 支払額 438円", { exact: true }),
+      dialog
+        .getByRole("region", { name: "全体の確認状態" })
+        .getByText("印字額と明細の金額が一致しています"),
     ).toBeVisible();
-    await expect(checkSection.getByText(/現在 218円 ／ 印字 218円/)).toBeVisible();
-    await expect(checkSection.getByText(/現在 220円 ／ 印字 220円/)).toBeVisible();
+    await expect(dialog.getByRole("region", { name: "確認結果" })).toHaveCount(0);
     await dialog.getByRole("button", { name: "この内容で保存" }).click();
     await expect(dialog).toBeHidden();
 
