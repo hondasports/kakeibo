@@ -66,6 +66,24 @@ export function createLineNotificationJobReader(
         .take(limit);
       return docs.map(docToLineNotificationJobRecord);
     },
+    async listDueRetryingJobs(now, limit) {
+      const docs = await ctx.db
+        .query("lineNotificationJobs")
+        .withIndex("by_status_and_next_retry_at", (q) =>
+          q.eq("status", "retrying").lte("nextRetryAt", now),
+        )
+        .take(limit);
+      return docs.map(docToLineNotificationJobRecord);
+    },
+    async listExpiredProcessingJobs(now, limit) {
+      const docs = await ctx.db
+        .query("lineNotificationJobs")
+        .withIndex("by_status_and_lease_until", (q) =>
+          q.eq("status", "processing").lte("leaseUntil", now),
+        )
+        .take(limit);
+      return docs.map(docToLineNotificationJobRecord);
+    },
   };
 }
 

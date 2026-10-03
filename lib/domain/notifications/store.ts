@@ -39,6 +39,8 @@ export interface LineNotificationJobReader {
     cutoff: number,
     limit: number,
   ): Promise<LineNotificationJobRecord[]>;
+  listDueRetryingJobs(now: number, limit: number): Promise<LineNotificationJobRecord[]>;
+  listExpiredProcessingJobs(now: number, limit: number): Promise<LineNotificationJobRecord[]>;
 }
 
 export interface LineNotificationJobStore extends LineNotificationJobReader {

@@ -699,7 +699,9 @@ export default defineSchema({
   })
     .index("by_batch_id", ["batchId"])
     .index("by_user_id_and_created_at", ["userId", "createdAt"])
-    .index("by_status_and_updated_at", ["status", "updatedAt"]),
+    .index("by_status_and_updated_at", ["status", "updatedAt"])
+    .index("by_status_and_next_retry_at", ["status", "nextRetryAt"])
+    .index("by_status_and_lease_until", ["status", "leaseUntil"]),
 
   lineNotificationEvents: defineTable({
     userId: v.string(),

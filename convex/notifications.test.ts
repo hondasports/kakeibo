@@ -7,6 +7,7 @@ import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
+import { LINE_NOTIFICATION_CLEANUP_BATCH_SIZE } from "../lib/domain/notifications/rules";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -855,6 +856,36 @@ describe("internal LINE job claim and completion", () => {
     expect(authorization.claimed).toBe(false);
   });
 
+  it("send authorization extends the lease and schedules recovery for the new deadline", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const jobId = await seedClaimableJob(t);
+    const retryKey = "550e8400-e29b-41d4-a716-446655440000";
+    const claim = await t.mutation(internal.notifications.internal.claimLineNotificationJob, {
+      jobId,
+      retryKeyCandidate: retryKey,
+      leaseMs: 30_000,
+      now: 10_000,
+    });
+    expect(claim.claimed).toBe(true);
+
+    const authorization = await t.mutation(
+      internal.notifications.internal.authorizeLineNotificationSend,
+      { jobId, attemptCount: 1, retryKey, leaseMs: 30_000, now: 20_000 },
+    );
+
+    expect(authorization.claimed).toBe(true);
+    const { job, scheduledNames } = await t.run(async (ctx) => ({
+      job: await ctx.db.get(jobId),
+      scheduledNames: (await ctx.db.system.query("_scheduled_functions").collect()).map(
+        (row) => row.name,
+      ),
+    }));
+    expect(job).toMatchObject({ status: "processing", leaseUntil: 50_000 });
+    expect(
+      scheduledNames.filter((name) => name.includes("recoverLineNotificationLease")),
+    ).toHaveLength(2);
+  });
+
   it("send authorization re-checks the latest opt-out state before external delivery", async () => {
     const t = convexTest(schema, convexTestModules);
     const jobId = await seedClaimableJob(t);
@@ -909,6 +940,55 @@ describe("internal LINE job claim and completion", () => {
     ).toHaveLength(1);
     const job = await t.run(async (ctx) => await ctx.db.get(jobId));
     expect(job?.status).toBe("queued");
+  });
+
+  it("stale-job recovery finds a due retry behind a full page of future retries", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const dueJobId = await seedClaimableJob(t);
+    const now = Date.now();
+
+    await t.run(async (ctx) => {
+      const dueJob = await ctx.db.get(dueJobId);
+      const { _id, _creationTime, ...jobFields } = dueJob!;
+      await ctx.db.patch(dueJobId, {
+        status: "retrying",
+        attemptCount: 1,
+        retryKey: "550e8400-e29b-41d4-a716-446655440000",
+        nextRetryAt: now - 1,
+        updatedAt: 1,
+      });
+      for (let i = 0; i < LINE_NOTIFICATION_CLEANUP_BATCH_SIZE; i++) {
+        await ctx.db.insert("lineNotificationJobs", {
+          ...jobFields,
+          status: "retrying",
+          attemptCount: 1,
+          retryKey: `future-${i}`,
+          nextRetryAt: now + 60_000 + i,
+          updatedAt: 0,
+        });
+      }
+    });
+
+    await t.mutation(internal.notifications.internal.recoverStaleLineNotificationJobs, {});
+
+    const { scheduledNames, jobs } = await t.run(async (ctx) => ({
+      scheduledNames: (await ctx.db.system.query("_scheduled_functions").collect()).map(
+        (row) => row.name,
+      ),
+      jobs: await ctx.db.query("lineNotificationJobs").collect(),
+    }));
+    expect(
+      scheduledNames.filter((name) => name.includes("processLineNotificationJob")),
+    ).toHaveLength(1);
+    const dueJob = jobs.find((job) => job._id === dueJobId);
+    expect(dueJob).toMatchObject({
+      status: "retrying",
+      nextRetryAt: now - 1,
+    });
+    expect(dueJob?.updatedAt).toBeGreaterThanOrEqual(now);
+    expect(
+      jobs.filter((job) => job.nextRetryAt !== undefined && job.nextRetryAt > now),
+    ).toHaveLength(LINE_NOTIFICATION_CLEANUP_BATCH_SIZE);
   });
 
   it("fails the job instead of claiming once the attempt budget is exhausted", async () => {
