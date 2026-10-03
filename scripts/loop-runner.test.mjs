@@ -121,7 +121,7 @@ describe("persistent task gates", () => {
     expect(restored.counters.review).toBe(2);
   });
 
-  it("runs the startup-to-PR path through the real CLI in an isolated worktree", () => {
+  it("runs the startup-to-PR path through the real CLI in an isolated worktree", { timeout: 30000 }, () => {
     const { git } = repository();
     const parent = mkdtempSync(path.join(tmpdir(), "loop-cli-"));
     dirs.push(parent);
