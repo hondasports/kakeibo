@@ -98,21 +98,6 @@ function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
   }
 
   if (check.variant === "external") {
-    if (check.status === "matched") {
-      return (
-        <Typography variant="body2" sx={{ textAlign: "right" }}>
-          <Box component="span" sx={numericSx}>
-            明細合計 {yen(check.itemsPrintedTotalYen)}
-          </Box>{" "}
-          <Box component="span" sx={numericSx}>
-            ＋ 税額 {yen(check.printedTaxYen)}
-          </Box>{" "}
-          <Box component="span" sx={numericSx}>
-            ＝ 支払額 {yen(check.paidTotalYen)}
-          </Box>
-        </Typography>
-      );
-    }
     return (
       <Stack spacing={0.5}>
         {check.mismatchStep === "itemsVsSubtotal" ? (
@@ -138,18 +123,6 @@ function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
     );
   }
 
-  if (check.status === "matched") {
-    return (
-      <Typography variant="body2" sx={{ textAlign: "right" }}>
-        <Box component="span" sx={numericSx}>
-          明細合計 {yen(check.itemsComparableTotalYen)}
-        </Box>{" "}
-        <Box component="span" sx={numericSx}>
-          ＝ 支払額 {yen(check.paidTotalYen)}
-        </Box>
-      </Typography>
-    );
-  }
   return (
     <Stack spacing={0.5}>
       <AmountCheckLine label="明細合計" value={check.itemsComparableTotalYen} />
@@ -225,22 +198,32 @@ export function ReviewCheckCards({
   amount: ReviewAmountCheck;
   taxRate: ReviewTaxRateCheck;
 }) {
+  const showAmount = amount.status !== "matched";
+  const showTaxRate = taxRate.status !== "matched";
+  if (!showAmount && !showTaxRate) return null;
   return (
     <Box
       component="section"
       aria-label="確認結果"
       sx={{
         display: "grid",
-        gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" },
+        gridTemplateColumns:
+          showAmount && showTaxRate
+            ? { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }
+            : "minmax(0,1fr)",
         gap: 1.5,
       }}
     >
-      <CheckCard title="金額確認" status={amount.status}>
-        <AmountCheckBody check={amount} />
-      </CheckCard>
-      <CheckCard title="税率別集計" status={taxRate.status}>
-        <TaxRateCheckBody check={taxRate} />
-      </CheckCard>
+      {showAmount && (
+        <CheckCard title="金額確認" status={amount.status}>
+          <AmountCheckBody check={amount} />
+        </CheckCard>
+      )}
+      {showTaxRate && (
+        <CheckCard title="税率別集計" status={taxRate.status}>
+          <TaxRateCheckBody check={taxRate} />
+        </CheckCard>
+      )}
     </Box>
   );
 }

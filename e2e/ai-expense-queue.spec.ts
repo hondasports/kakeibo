@@ -451,10 +451,14 @@ test.describe("下書き確認の税状態保存", () => {
       await taxItemRow.locator("summary").click();
     // 開封時のクライアント側再解釈で明細は 8%・税抜に解決済み（DBには未保存のプレビュー状態）
     await expect(dialog.getByText(/税率 8%/).first()).toBeVisible({ timeout: 15_000 });
-    const checkSection = dialog.getByRole("region", { name: "確認結果" });
+    // 金額・税率別ともに一致のため検算カードは出さず、成功メッセージだけが残る
     await expect(
-      checkSection.getByText("明細合計 100円 ＋ 税額 8円 ＝ 支払額 108円"),
+      dialog
+        .getByRole("region", { name: "全体の確認状態" })
+        .getByText("印字額と明細の金額が一致しています"),
     ).toBeVisible();
+    const checkSection = dialog.getByRole("region", { name: "確認結果" });
+    await expect(checkSection).toHaveCount(0);
 
     // プレビュー解釈と異なる税率へ修正して永続化する（同値クリックではSelectのonChangeが発火しない）
     // 非課税は amountBasis も tax_included に揃えて item_explicit 解決になるため、単独の mutation で確定する
@@ -685,10 +689,13 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
     await expect(
       dialog.getByRole("region", { name: "全体の確認状態" }).getByText(/税率・税込／税抜/),
     ).toHaveCount(0);
-    const checkSection = dialog.getByRole("region", { name: "確認結果" });
-    await expect(checkSection.getByText("明細合計 438円 ＝ 支払額 438円")).toBeVisible();
-    await expect(checkSection.getByText(/現在 218円 ／ 印字 218円/)).toBeVisible();
-    await expect(checkSection.getByText(/現在 220円 ／ 印字 220円/)).toBeVisible();
+    // 金額・税率別ともに一致のため検算カードは出さず、成功メッセージだけが残る
+    await expect(
+      dialog
+        .getByRole("region", { name: "全体の確認状態" })
+        .getByText("印字額と明細の金額が一致しています"),
+    ).toBeVisible();
+    await expect(dialog.getByRole("region", { name: "確認結果" })).toHaveCount(0);
     await expect(dialog.getByText("レシート全体の確認")).toHaveCount(0);
   });
 
