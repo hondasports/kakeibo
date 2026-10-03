@@ -1,4 +1,16 @@
-import { existsSync, readFileSync, writeFileSync, renameSync, mkdtempSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  mkdtempSync,
+  mkdirSync,
+  openSync,
+  writeSync,
+  closeSync,
+  statSync,
+  rmSync,
+} from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -17,24 +29,18 @@ import {
   computeAssessment,
   highestTier,
   checkAftercare,
+  missingRequirements,
+  verificationSummary,
+  aftercareSummary,
+  verificationReusable,
+  CHECK_COMMANDS,
 } from "./loop-policy.mjs";
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
 const git = (args, root) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 const processConfig = (root) =>
   YAML.parse(readFileSync(path.join(root, ".agent/process.yaml"), "utf8"));
-export const CHECK_COMMANDS = {
-  process: [
-    ["node", "scripts/check-loop-docs.mjs"],
-    ["pnpm", "run", "test:process"],
-  ],
-  lint: [
-    ["pnpm", "run", "lint"],
-    ["pnpm", "run", "format:check"],
-  ],
-  unit: [["pnpm", "exec", "vitest", "run"]],
-  build: [["pnpm", "run", "build"]],
-};
+export { CHECK_COMMANDS };
 export function taskPath(root) {
   return git(["rev-parse", "--path-format=absolute", "--git-path", "agent-task.json"], root);
 }
@@ -71,17 +77,74 @@ function invalidate(task) {
   task.agentAssessment = null;
   task.skills = [];
 }
+/** SHA-256 of the merge-base feature patch; null means unknown → fail closed. */
+function featurePatchSha256(task, root, head = task.head) {
+  try {
+    return createHash("sha256")
+      .update(git(["diff", "--binary", "--no-renames", `${task.baseRef}...${head}`], root))
+      .digest("hex");
+  } catch {
+    return null;
+  }
+}
+/**
+ * Revision-change invalidation: verification evidence may be carried over only
+ * when both the feature patch and the verified tree are byte-identical to the
+ * new revision — the same commands over the same tree inputs reproduce the
+ * same result. Commands can still read inputs outside the tree (toolchain,
+ * gitignored files, environment); that residual is accepted because CI
+ * re-executes every required check on the real PR head. `run` keeps recording
+ * where the verification actually executed and never gets rewritten.
+ * Everything else (review, aftercare, assessment, skills) still invalidates
+ * wholesale.
+ */
+function invalidateRevision(task, root, head, baseHead) {
+  const patchSha256 = featurePatchSha256(task, root, head);
+  let headTree = null;
+  try {
+    headTree = git(["rev-parse", `${head}^{tree}`], root);
+  } catch {
+    headTree = null;
+  }
+  const kept = {};
+  const reused = [];
+  for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
+    if (
+      !verificationReusable(evidence, {
+        patchSha256,
+        headTree,
+        contractVersion: EVIDENCE_CONTRACT_VERSION,
+      })
+    )
+      continue;
+    evidence.reuse = {
+      from: { head: evidence.appliesTo.head, baseHead: evidence.appliesTo.baseHead },
+      at: new Date().toISOString(),
+    };
+    evidence.appliesTo.head = head;
+    evidence.appliesTo.baseHead = baseHead;
+    kept[kind] = evidence;
+    reused.push(kind);
+  }
+  task.verification = kept;
+  task.review = null;
+  task.aftercare = null;
+  task.assessment = null;
+  task.agentAssessment = null;
+  task.skills = [];
+  return reused;
+}
 export function refreshTask(task, root) {
   const branch = git(["branch", "--show-current"], root);
   requireValue(branch === task.branch, "Task branch changed; restore or start the correct task");
   const head = git(["rev-parse", "HEAD"], root);
   const baseHead = git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root);
   if (head !== task.head || baseHead !== task.baseHead) {
-    invalidate(task);
+    const reused = invalidateRevision(task, root, head, baseHead);
     task.head = head;
     task.baseHead = baseHead;
     if (!["refine", "incident", "human_gate"].includes(task.state)) task.state = "execute";
-    history(task, "revision_changed");
+    history(task, "revision_changed", { reusedVerification: reused });
   }
   task.assessment = computeAssessment(task, readChangedPaths({ base: task.baseRef, cwd: root }));
   task.risk = highestTier(task.risk, task.assessment.risk.final);
@@ -98,14 +161,15 @@ export function startTask(args, root) {
     !existsSync(taskPath(root)),
     "Task already initialized; use existing state or another worktree",
   );
-  execFileSync(process.execPath, ["scripts/check-task-worktree.mjs", "--require-clean"], {
-    cwd: root,
-    stdio: "pipe",
-  });
   requireValue(
     args.runtime && args.task && args.implementer,
     "Startup requires runtime, task and implementer",
   );
+  requireSafeTaskId(args.task);
+  execFileSync(process.execPath, ["scripts/check-task-worktree.mjs", "--require-clean"], {
+    cwd: root,
+    stdio: "pipe",
+  });
   const spec = readJson(args.init);
   // Open decisions are allowed in REFINE; leaving it requires a complete spec.
   // --model is still accepted by the argument parser but no longer used.
@@ -179,31 +243,67 @@ export function recordFailure(task, signature, root) {
   if (task.counters.sameFailure >= processConfig(root).limits.same_failure_max)
     task.state = "incident";
 }
+export const EVIDENCE_CONTRACT_VERSION = 1;
+const SAFE_TASK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const requireSafeTaskId = (taskId) =>
+  requireValue(
+    typeof taskId === "string" && SAFE_TASK_ID.test(taskId) && !taskId.includes(".."),
+    `Invalid task id for artifact paths: ${taskId}`,
+  );
+const evidenceRoot = (root) =>
+  git(["rev-parse", "--path-format=absolute", "--git-path", "agent-evidence"], root);
+const evidenceDir = (task, root) => {
+  requireSafeTaskId(task.taskId);
+  return path.join(evidenceRoot(root), task.taskId, task.head.slice(0, 12));
+};
+// Persisted manifests store paths relative to the evidence root so state blocks
+// stay portable and never leak local filesystem layout into the PR body.
+const resolveArtifactPath = (root, stored) =>
+  path.isAbsolute(stored) ? stored : path.join(evidenceRoot(root), stored);
+const lastLines = (text, count = 20) => text.trimEnd().split("\n").slice(-count);
 export function runVerification(
   task,
   kind,
   root,
-  run = (cmd) => spawnSync(cmd[0], cmd.slice(1), { cwd: root, stdio: "inherit" }),
+  run = (command, context) =>
+    spawnSync(command[0], command.slice(1), {
+      cwd: root,
+      stdio: ["ignore", context.fd, context.fd],
+    }),
 ) {
   requireValue(task.state === "execute", "Verification runs in execute");
   requireValue(CHECK_COMMANDS[kind], `Unknown verification kind: ${kind}`);
   requireClean(root);
   const before = { head: task.head, baseHead: task.baseHead };
   delete task.verification[kind];
-  for (const command of CHECK_COMMANDS[kind]) {
-    const result = run(command);
-    if (result.status !== 0) {
-      recordFailure(
-        task,
-        createHash("sha256")
-          .update(JSON.stringify({ kind, command, status: result.status }))
-          .digest("hex"),
-        root,
-      );
-      task.lastFailure.kind = kind;
-      saveTask(task, root);
-      throw new Error(`Verification failed: ${kind}; state=${task.state}`);
+  const startedAt = Date.now();
+  const dir = evidenceDir(task, root);
+  mkdirSync(dir, { recursive: true });
+  const artifactPath = path.join(dir, `${kind}-${startedAt}.log`);
+  const fd = openSync(artifactPath, "w");
+  try {
+    for (const command of CHECK_COMMANDS[kind]) {
+      writeSync(fd, `$ ${command.join(" ")}\n`);
+      const result = run(command, { fd, artifactPath });
+      writeSync(fd, `[exit ${result.status}]\n`);
+      if (result.status !== 0) {
+        recordFailure(
+          task,
+          createHash("sha256")
+            .update(JSON.stringify({ kind, command, status: result.status }))
+            .digest("hex"),
+          root,
+        );
+        task.lastFailure.kind = kind;
+        saveTask(task, root);
+        const tail = lastLines(readFileSync(artifactPath, "utf8")).join("\n");
+        throw new Error(
+          `Verification failed: ${kind} (exit ${result.status}); state=${task.state}; log ${artifactPath}\n${tail}`,
+        );
+      }
     }
+  } finally {
+    closeSync(fd);
   }
   refreshTask(task, root);
   requireClean(root);
@@ -211,11 +311,32 @@ export function runVerification(
     task.head === before.head && task.baseHead === before.baseHead,
     "Revision changed during verification",
   );
+  // Null fingerprints keep the evidence valid for this revision but it can
+  // never be reused for another — fail-closed.
+  const patchSha256 = featurePatchSha256(task, root);
+  const log = readFileSync(artifactPath, "utf8");
   task.verification[kind] = {
-    ...before,
+    run: {
+      head: before.head,
+      baseHead: before.baseHead,
+      checkedAt: new Date().toISOString(),
+      durationMs: Date.now() - startedAt,
+    },
+    appliesTo: {
+      head: before.head,
+      baseHead: before.baseHead,
+      headTree: git(["rev-parse", `${before.head}^{tree}`], root),
+      patchSha256,
+      contractVersion: EVIDENCE_CONTRACT_VERSION,
+    },
     success: true,
     commands: CHECK_COMMANDS[kind],
-    checkedAt: new Date().toISOString(),
+    summary: { exitCode: 0, lastLines: lastLines(log, 10) },
+    artifact: {
+      path: path.relative(evidenceRoot(root), artifactPath),
+      sha256: createHash("sha256").update(log).digest("hex"),
+      bytes: statSync(artifactPath).size,
+    },
   };
   if (task.lastFailure?.kind === kind) {
     task.counters.sameFailure = 0;
@@ -227,6 +348,102 @@ export const STATE_START = "<!-- suzumemo-agent-state:start -->";
 export const STATE_END = "<!-- suzumemo-agent-state:end -->";
 export function stateBlock(task) {
   return `${STATE_START}\n\`\`\`json\n${JSON.stringify(task, null, 2)}\n\`\`\`\n${STATE_END}`;
+}
+function nextActions(task) {
+  const missing = missingRequirements(task);
+  const actions = [];
+  for (const item of missing) {
+    if (item === "assessment") actions.push("node scripts/loop-runner.mjs --assessment <file>");
+    else if (item === "openMaterialDecisions")
+      actions.push("resolve spec openMaterialDecisions or --event decision_required");
+    else if (item.startsWith("verify:"))
+      actions.push(`node scripts/loop-runner.mjs --verify ${item.slice(7)}`);
+    else if (item.startsWith("skill:"))
+      actions.push(`read skills/${item.slice(6)}/SKILL.md then --assessment --skills`);
+    else if (item === "review") actions.push("node scripts/loop-runner.mjs --review <file>");
+    else if (item === "independent-review")
+      actions.push("obtain a fresh-context independent review");
+    else if (item.startsWith("finding:"))
+      actions.push(`resolve finding ${item.slice(8)} then re-review (--event findings)`);
+    else if (item === "aftercare") actions.push("node scripts/loop-runner.mjs --aftercare <pr>");
+    else if (item.startsWith("profile:"))
+      actions.push(`complete profile input ${item.slice(8)} via --assessment`);
+    else if (item === "spec:acceptanceCriteria")
+      actions.push("fix --spec acceptanceCriteria (unique non-empty ids)");
+    else actions.push(item);
+  }
+  if (actions.length === 0) {
+    const ready = {
+      refine: "--event ready",
+      execute: "--event ready",
+      review: "--event clean",
+      aftercare: "--event ready",
+    }[task.state];
+    if (ready) actions.push(`node scripts/loop-runner.mjs ${ready}`);
+    if (task.state === "done") actions.push("done");
+  }
+  return actions;
+}
+/** Compact task snapshot for CLI output — never contains spec/history/raw logs. */
+export function summarizeTask(task) {
+  return {
+    taskId: task.taskId,
+    state: task.state,
+    head: task.head,
+    baseHead: task.baseHead,
+    risk: task.risk,
+    profile: {
+      selected: task.configuration?.selection?.selected,
+      source: task.configuration?.selection?.source,
+    },
+    missing: missingRequirements(task),
+    verification: verificationSummary(task),
+    openFindings: (task.findings ?? []).filter((finding) => finding.status === "open").length,
+    aftercare: aftercareSummary(task),
+    next: nextActions(task),
+  };
+}
+/** Evidence manifest per verification kind — paths/hashes/summaries, never raw logs. */
+export function artifactManifest(task, root = process.cwd()) {
+  const manifest = {};
+  for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
+    const artifact = evidence.artifact
+      ? {
+          path: evidence.artifact.path,
+          resolved: resolveArtifactPath(root, evidence.artifact.path),
+          sha256: evidence.artifact.sha256,
+          bytes: evidence.artifact.bytes,
+          available: existsSync(resolveArtifactPath(root, evidence.artifact.path)),
+        }
+      : null;
+    manifest[kind] = {
+      success: evidence.success === true,
+      run: evidence.run ?? {
+        head: evidence.head ?? null,
+        baseHead: evidence.baseHead ?? null,
+        checkedAt: evidence.checkedAt ?? null,
+      },
+      appliesTo: evidence.appliesTo ?? null,
+      summary: evidence.summary ?? null,
+      artifact,
+      reuse: evidence.reuse ?? null,
+    };
+  }
+  return manifest;
+}
+function explainTask(task, root) {
+  return {
+    ...summarizeTask(task),
+    requiredSkills: task.assessment?.requiredSkills ?? [],
+    skills: task.skills ?? [],
+    riskDetail: {
+      retained: task.risk,
+      assessment: task.assessment?.risk ?? null,
+      agent: task.agentAssessment?.applied_tier ?? null,
+    },
+    verificationDetail: artifactManifest(task, root),
+    profileSource: task.configuration?.profileSource ?? null,
+  };
 }
 export function parseStateBlock(body) {
   requireValue(
@@ -279,7 +496,7 @@ function option(args, index) {
 }
 export function parseArguments(args) {
   const out = {};
-  const flags = new Set(["--export", "--assert-started"]);
+  const flags = new Set(["--export", "--assert-started", "--status", "--explain", "--artifacts"]);
   const options = new Set([
     "--init",
     "--task",
@@ -300,6 +517,7 @@ export function parseArguments(args) {
     "--spec",
     "--restore-pr",
     "--sync-pr",
+    "--export-file",
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -340,6 +558,10 @@ export function run(args, root = process.cwd(), services = {}) {
     "restore-pr",
     "sync-pr",
     "export",
+    "export-file",
+    "status",
+    "explain",
+    "artifacts",
     "assert-started",
   ].filter((key) => args[key]);
   requireValue(actions.length <= 1, "Run one task action at a time");
@@ -371,6 +593,10 @@ export function run(args, root = process.cwd(), services = {}) {
     requireValue(task.state === "execute", "Changes may only be committed in execute state");
     return { taskId: task.taskId, state: task.state, profile: task.configuration.profileSource };
   }
+  if (args.status) return task;
+  if (args.explain) return explainTask(task, root);
+  if (args.artifacts)
+    return { taskId: task.taskId, state: task.state, artifacts: artifactManifest(task, root) };
   if (args.spec) {
     requireValue(task.state === "refine", "Spec changes require refine state");
     task.spec = readJson(args.spec);
@@ -421,7 +647,7 @@ export function run(args, root = process.cwd(), services = {}) {
     task = transitionTask(task, args.event, args.exit ? readJson(args.exit) : {}, root);
   }
   saveTask(task, root);
-  if (args.export || args["sync-pr"]) {
+  if (args.export || args["export-file"] || args["sync-pr"]) {
     requireClean(root);
     requireValue(
       ["aftercare", "done"].includes(task.state),
@@ -429,6 +655,10 @@ export function run(args, root = process.cwd(), services = {}) {
     );
     const block = stateBlock(task);
     if (args.export) return block;
+    if (args["export-file"]) {
+      writeFileSync(args["export-file"], `${block}\n`, { mode: 0o600 });
+      return { taskId: task.taskId, state: task.state, written: args["export-file"] };
+    }
     const pr = JSON.parse(
       gh(["pr", "view", args["sync-pr"], "--json", "body,headRefOid,baseRefOid"], root),
     );
@@ -459,25 +689,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(
       typeof result === "string"
         ? result
-        : JSON.stringify(
-            result.version === 2
-              ? {
-                  taskId: result.taskId,
-                  state: result.state,
-                  head: result.head,
-                  baseHead: result.baseHead,
-                  risk: result.risk,
-                  configuration: result.configuration,
-                  assessment: result.assessment,
-                  verified: Object.keys(result.verification),
-                  openFindings: (result.findings ?? []).filter(
-                    (finding) => finding.status === "open",
-                  ).length,
-                }
-              : result,
-            null,
-            2,
-          ),
+        : JSON.stringify(result.version === 2 ? summarizeTask(result) : result, null, 2),
     );
   } catch (error) {
     console.error(error.message);

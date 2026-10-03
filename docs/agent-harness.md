@@ -29,6 +29,8 @@ node scripts/loop-runner.mjs --event ready
 
 base既定値は `origin/preview`。別baseは開始時に `--base` で指定する。作業状態はworktree固有のGitメタデータに保存する。通常の再開は引数なしで実行する。`--state` は保存済み状態との一致確認専用であり、状態を飛ばす指定ではない。
 
+通常出力は要約だけを返す。taskId・state・head/base・risk・profile・missing・verification・openFindings・aftercare・next を含み、spec・history・configuration・評価本文・ログ本文は含まない。不足要件の根拠が必要な場合だけ `--explain`、検証証跡のmanifestだけ `--artifacts`、状態スナップショットは `--status` で確認する。状態ブロック全体は `--export` / `--export-file <path>` / `--sync-pr` でのみ出力する。
+
 仕様の修正はREFINEで `--spec /tmp/spec.json`。未決事項があれば `--event decision_required --exit /tmp/exit.json` で停止する。exitにはreasonを記録する。Human Gateの解除には `approval: {"source":"user","reference":"対象と操作を承認したユーザー指示の参照"}` が必要。承認記録はAgentの責任であり、このJSONだけで人間の本人性を証明するものではない。
 
 ## 実装と検証
@@ -51,7 +53,11 @@ node scripts/loop-runner.mjs --verify build
 node scripts/loop-runner.mjs --event ready
 ```
 
-必要な検証のみ実行する。固定コマンドをCLIが起動し、終了結果を現在HEAD/baseへ紐づける。processはドキュメント整合とprocessテスト、lintはlintとformat、unitはVitest全体、buildは本番ビルド。dirty treeでは証跡を確定しない。HEAD/base更新で古い検証・レビューは失効する。不変性を証明した検証証跡の再利用は未実装であり、過去の結果を現在HEAD/baseの検証成功として扱わない。`git fetch origin` 後も状態を再確認する。
+必要な検証のみ実行する。固定コマンドをCLIが起動し、終了結果を現在HEAD/baseへ紐づける。processはドキュメント整合とprocessテスト、lintはlintとformat、unitはVitest全体、buildは本番ビルド。dirty treeでは証跡を確定しない。
+
+検証ログは `git rev-parse --git-path agent-evidence` 配下にartifactとして保存され、worktreeを汚さない。証跡manifestは実実行の `run`（HEAD/base・時刻・時間）と適用対象の `appliesTo`（HEAD/base・head tree・feature patch SHA-256・contract version）を分けて記録し、exit summary・artifactのpath/SHA-256/bytesを保持する。成功時のログ本文は通常出力に含めない。失敗時のエラーはexit code・artifact path・末尾行だけを返し、全文はartifactを参照する。
+
+HEAD/base更新で古い検証・レビューは失効するが、verification証跡だけは安全に部分再利用できる。feature patch（merge-base差分のSHA-256）と検証対象のhead treeがともに不変な場合のみ `appliesTo` を新revisionへ更新し、`reuse.from` に元revisionを記録する。同一のtree入力には同一の結果を再現できる——入力推論は行わない。ツールチェーン・gitignore済みファイルなどtree外の入力はfingerprintできない残差だが、必須確認はCIが実HEAD上で再実行するため再利用はローカル短絡に留まる。`run` は実実行の記録のまま書き換えない。fingerprintの計算不能・contract version不一致・必須metadata欠落はすべてfail-closedで失効する。review・aftercare・assessment・skillsは再利用しない。`git fetch origin` 後も状態を再確認する。
 
 同じ検証コマンド・終了コードが連続して3回失敗した場合はINCIDENTへ停止する。修正前後で原因が変わったと判断する場合も、INCIDENTのresolutionに切り分け証拠を記録して解除する。単なる再試行でカウンタをリセットしない。
 
@@ -80,9 +86,10 @@ Reviewerの本人性や実施内容はAgentが正しく記録する責任を持�
 
 ```bash
 node scripts/loop-runner.mjs --export > /tmp/agent-state.md
+node scripts/loop-runner.mjs --export-file /tmp/agent-state.md
 ```
 
-この状態ブロックをPR本文へ含める。Human Request、説明、更新履歴ブロックとは分離する。PR作成後・状態更新後は `--sync-pr <番号>` で既存本文を保持してブロックを更新する。この操作はGitHubへのwriteであり、ユーザーが許可したPR作業の範囲でのみ実行する。
+`--export` は標準出力、`--export-file <path>` は指定ファイルへ同じ状態ブロックを書き出す。この状態ブロックをPR本文へ含める。Human Request、説明、更新履歴ブロックとは分離する。PR作成後・状態更新後は `--sync-pr <番号>` で既存本文を保持してブロックを更新する。この操作はGitHubへのwriteであり、ユーザーが許可したPR作業の範囲でのみ実行する。
 
 `Agent harness` CIはMarkdownのみの変更でも動き、実PR HEAD/base・実差分・仕様・検証・レビューを照合する。非bot PRは状態ブロック必須。GitHubが認識するdependabot/github-actionsのBot投稿は例外とし、processテストとドキュメントチェックは実行する。既存PRもこのworkflowが走る時点で状態ブロックが必要になる。CIを必須チェックへ登録するbranch protection設定は別途管理者の操作が必要であり、このPRでは権限設定を変更しない。
 
