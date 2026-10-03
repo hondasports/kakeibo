@@ -39,6 +39,13 @@ export function SystemAdminHomePage() {
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
           <AdminLinkCard
+            description="通知種別・チャネルごとの全体配信設定を変更します。"
+            label="通知設定"
+            to="/admin/notifications"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <AdminLinkCard
             description="管理コンソールの操作履歴を期間・操作・対象で絞り込みます。"
             label="監査ログを確認"
             to="/admin/audit-logs"

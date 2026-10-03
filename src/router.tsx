@@ -33,6 +33,7 @@ import {
   SystemAdminHomePage,
   SystemAdminAuditLogPage,
   SystemAdminManagementPage,
+  SystemAdminNotificationSettingsPage,
   SystemAdminRouteGuard,
   SystemAdminUserDetailPage,
   SystemAdminUserSearchPage,
@@ -212,6 +213,7 @@ export const router = createBrowserRouter([
       { path: "audit-logs", element: <SystemAdminAuditLogPage /> },
       { path: "system-admins", element: <SystemAdminManagementPage /> },
       { path: "group-deletion", element: <SystemAdminGroupDeletionPage /> },
+      { path: "notifications", element: <SystemAdminNotificationSettingsPage /> },
     ],
   },
   {

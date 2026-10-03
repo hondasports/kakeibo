@@ -24,6 +24,7 @@ export const actionOptions: Array<{ value: SystemAdminAuditAction | ""; label: s
   { value: "system_admin_group_role_changed", label: "role変更" },
   { value: "system_admin_group_owner_transferred", label: "owner付替え" },
   { value: "system_admin_group_invitation_revoked", label: "pending招待取消" },
+  { value: "system_admin_notification_setting_changed", label: "通知設定変更" },
 ];
 
 export function formatAction(action: SystemAdminAuditAction) {

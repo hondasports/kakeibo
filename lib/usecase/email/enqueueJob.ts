@@ -9,6 +9,7 @@ export type EnqueueTransactionalEmailJobArgs = {
   payloadJson: string;
   recipientEmail: string;
   businessDedupeKey?: string;
+  recipientUserId?: string;
 };
 
 export type EnqueueJobDeps = {
@@ -50,6 +51,7 @@ export async function enqueueTransactionalEmailJob(
       normalizedRecipientEmail: normalized,
       subject: subject ?? "",
       businessDedupeKey: args.businessDedupeKey,
+      recipientUserId: args.recipientUserId,
       now,
     }),
   );
