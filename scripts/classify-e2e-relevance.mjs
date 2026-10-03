@@ -40,17 +40,23 @@ export function isProcessOnlyPath(filePath) {
   return PROCESS_ONLY_SCRIPT_PATTERN.test(normalized);
 }
 
+/** Vitest discovers test files even inside dot-dirs (glob uses dot:true). */
+const TEST_FILE_BASENAME = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+
 /**
  * Paths whose content cannot change lint/unit/build outcomes: Markdown prose,
  * issue templates, and local git hooks. Process verification still covers
  * docs/script integrity, so `process` evidence is never extended through
  * these paths — this predicate is stricter than isProcessOnlyPath on purpose.
+ * A test-pattern basename inside a metadata dir is NOT metadata-only: vitest
+ * would still pick it up and change `vitest run` output.
  */
 export function isMetadataOnlyPath(filePath) {
   const normalized = normalizeChangedPath(filePath);
   if (!normalized || normalized.includes("/../") || normalized.startsWith("../")) {
     return false;
   }
+  if (TEST_FILE_BASENAME.test(normalized)) return false;
   return (
     normalized.endsWith(".md") ||
     normalized.startsWith(".github/ISSUE_TEMPLATE/") ||

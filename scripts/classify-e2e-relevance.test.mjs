@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyChangedFiles,
+  isMetadataOnlyPath,
   isProcessOnlyPath,
   normalizeChangedPath,
   parseArguments,
@@ -103,6 +104,22 @@ describe("E2E relevance path classification", () => {
   it("keeps classifier changes and workflow changes E2E relevant", () => {
     expect(isProcessOnlyPath("scripts/classify-e2e-relevance.mjs")).toBe(false);
     expect(isProcessOnlyPath(".github/workflows/e2e.yml")).toBe(false);
+  });
+
+  it("rejects test-pattern basenames inside metadata dirs (vitest discovers dot-dirs)", () => {
+    for (const filePath of [
+      ".husky/probe.test.mjs",
+      ".husky/sub/probe.spec.ts",
+      ".github/ISSUE_TEMPLATE/x.test.tsx",
+      "docs/probe.test.cjs",
+    ])
+      expect(isMetadataOnlyPath(filePath), filePath).toBe(false);
+    for (const filePath of [
+      ".husky/pre-commit",
+      ".github/ISSUE_TEMPLATE/bug.yml",
+      "docs/x.test.md",
+    ])
+      expect(isMetadataOnlyPath(filePath), filePath).toBe(true);
   });
 });
 
