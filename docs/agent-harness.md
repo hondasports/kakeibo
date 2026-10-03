@@ -108,7 +108,7 @@ node scripts/loop-runner.mjs --event ready --handled /tmp/handled.txt
 node scripts/loop-runner.mjs --sync-pr 123
 ```
 
-CI完了を待つ場合は `--watch-aftercare` を付けてpollできる。状態変化時だけcompact event（ready・pending・failed・mergeability・finding数・head/base）を返し、変化なしのpollは出力しない。間隔は `--interval-seconds`（既定60秒）、上限は内部deadline（既定15分）。readyになった時点で通常のaftercare証跡を記録する。
+CI完了を待つ場合は `--watch-aftercare` を付けてpollできる。初回snapshotは `changed:false` のeventとして必ず返し、以後は状態変化時だけcompact event（ready・pending・failed・mergeability・finding数・head/base）を返す。間隔は `--interval-seconds`（既定60秒）、上限は内部deadline（既定15分）。readyになった時点で通常のaftercare証跡を記録する。
 
 ```bash
 node scripts/loop-runner.mjs --aftercare 123 --watch-aftercare --interval-seconds 30

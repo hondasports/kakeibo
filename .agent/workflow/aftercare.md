@@ -7,6 +7,6 @@ PR作成後のlatest HEADに対してCI・レビュー指摘・承認・競合�
 - 新規findingは `findings` でEXECUTEへ戻す。
 - owner approval等の人間承認が必要なら `decision_required` とする。
 - pending、API取得失敗、required check未観測、HEAD変更はready扱いしない。
-- CI待ちは `--aftercare <番号> --watch-aftercare` で状態変化時だけcompact eventを返すpollを使える。待たず即時確認が既定。
+- CI待ちは `--aftercare <番号> --watch-aftercare` でpollできる。初回snapshotは `changed:false` のeventとして必ず返し、以後は状態変化時だけcompact eventを返す。待たず即時確認が既定。
 
 必要条件を満たしHEAD不変を再確認できたら `ready`。
