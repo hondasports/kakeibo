@@ -6,7 +6,7 @@
 
 `Final Risk = max(Predicted Risk Floor, Machine Diff Floor, Agent Assessment, Reviewer Assessment)` とする。Machine Floorは引き下げ不可。
 
-T1はセルフレビュー可。T2で `uncertainty=some_unknowns`、またはT3は独立Reviewer必須。独立Reviewerには実装担当の結論を先に見せず、目的・AC・差分・検証・関連caller/契約を渡して独立評価させる。
+T1はセルフレビュー可。T2で `uncertainty=some_unknowns`、またはT3は独立Reviewer必須。独立Reviewerには実装担当の結論を先に見せず、目的・AC・差分・検証・関連caller/契約を渡して独立評価させる。材料は `node scripts/loop-runner.mjs --review-packet <dir>` で生成し、packet全体をfresh contextへ渡す。
 
 ## Review loop
 

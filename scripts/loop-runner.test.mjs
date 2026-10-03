@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -26,6 +27,8 @@ import {
   parseStateBlock,
   summarizeTask,
   artifactManifest,
+  buildReviewPacket,
+  watchAftercare,
 } from "./loop-runner.mjs";
 import { taskFixture, reviewFixture, verificationManifestFixture } from "./loop-test-fixtures.mjs";
 import { computeAssessment, currentEvidence, verificationSummary } from "./loop-policy.mjs";
@@ -54,6 +57,9 @@ function repository() {
     path.join(dir, "package.json"),
     JSON.stringify({ scripts: { "test:process": 'node -e "process.exit(0)"' } }),
   );
+  // pnpm run generates node_modules/ + pnpm-lock.yaml at runtime; the fixture
+  // ignores them like a real repo would so verification keeps the tree clean.
+  writeFileSync(path.join(dir, ".gitignore"), "node_modules/\npnpm-lock.yaml\n");
   git("init", "-b", "preview");
   git("config", "user.email", "test@example.invalid");
   git("config", "user.name", "Test");
@@ -680,5 +686,221 @@ describe("persistent task gates", () => {
       execution: "local",
       reason: "runtime-relevant paths changed",
     });
+  });
+  it("builds a review packet with diff, manifest, template and contracts", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "feature.txt"), "feature\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    refreshTask(task, dir);
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    task.state = "review";
+    task.risk = "T3";
+    task.assessment = { ...task.assessment, review: { independent: true } };
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-packet-"));
+    dirs.push(parent);
+    const out = path.join(parent, "packet");
+    const result = buildReviewPacket(task, out, dir);
+    expect(result.files).toBe(5);
+    const packet = JSON.parse(readFileSync(path.join(out, "packet.json"), "utf8"));
+    expect(packet).toMatchObject({
+      taskId: task.taskId,
+      head: task.head,
+      baseHead: task.baseHead,
+      goal: task.spec.goal,
+      risk: "T3",
+    });
+    expect(packet.changedPaths).toContain("feature.txt");
+    expect(packet.acceptanceCriteria[0].id).toBe("AC1");
+    expect(packet.reuseCandidates.featurePatchSha256).toMatch(/^[0-9a-f]{64}$/);
+    const template = JSON.parse(readFileSync(path.join(out, "review-template.json"), "utf8"));
+    expect(template).toMatchObject({
+      head: task.head,
+      independent: true,
+      context: "fresh",
+      findings: [],
+    });
+    expect(template.acceptanceCriteria).toEqual([{ id: "AC1", evidence: "" }]);
+    expect(readFileSync(path.join(out, "diff.patch"), "utf8")).toContain("feature.txt");
+    const manifest = JSON.parse(readFileSync(path.join(out, "verification-manifest.json"), "utf8"));
+    expect(manifest.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.parse(readFileSync(path.join(out, "task-summary.json"), "utf8")).state).toBe(
+      "review",
+    );
+    expect(existsSync(path.join(out, "contracts", "workflow-review.md"))).toBe(true);
+  });
+  it("refuses review packets outside review state or with a dirty tree", () => {
+    const { dir, task } = repository();
+    task.state = "execute";
+    expect(() => buildReviewPacket(task, path.join(dir, "out"), dir)).toThrow("review");
+    task.state = "review";
+    writeFileSync(path.join(dir, "dirty.txt"), "dirty\n");
+    expect(() => buildReviewPacket(task, path.join(dir, "out"), dir)).toThrow("Commit all");
+  });
+  it("emits watch events only on signature changes and records when ready", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const prFields = (checks) => ({
+      number: 7,
+      state: "OPEN",
+      isDraft: false,
+      headRefOid: task.head,
+      baseRefOid: task.baseHead,
+      baseRefName: "preview",
+      mergeable: "MERGEABLE",
+      mergeStateStatus: "CLEAN",
+      reviewDecision: "APPROVED",
+      statusCheckRollup: checks,
+    });
+    const ok = { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" };
+    const pending = { name: "Agent harness", status: "IN_PROGRESS", startedAt: "2026-01-01" };
+    const findings = {
+      pagesComplete: true,
+      unhandledCount: 0,
+      unresolvedThreadCount: 0,
+    };
+    const prPolls = [prFields([pending]), prFields([pending]), prFields([ok])];
+    let recorded = false;
+    const result = watchAftercare(task, 7, dir, {
+      // Same {fetchPr, fetchFindings} shape as the production fetchers.
+      fetchPr: () => prPolls.shift(),
+      fetchFindings: () => findings,
+      sleep: () => {},
+      record: (t) => {
+        recorded = true;
+        t.aftercare = { head: t.head, baseHead: t.baseHead, ready: true, pr: 7 };
+        return t;
+      },
+    });
+    expect(result.ready).toBe(true);
+    expect(recorded).toBe(true);
+    // Two events only: initial pending signature, then the ready change.
+    expect(result.events).toHaveLength(2);
+    expect(result.events[0]).toMatchObject({
+      ready: false,
+      changed: false,
+      pending: ["Agent harness"],
+    });
+    expect(result.events[1]).toMatchObject({ ready: true, changed: true });
+    expect(result.task.aftercare.ready).toBe(true);
+  });
+  it("accepts watch modifiers only with --aftercare", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    saveTask(task, dir);
+    const parsed = parseArguments([
+      "--aftercare",
+      "7",
+      "--watch-aftercare",
+      "--interval-seconds",
+      "30",
+    ]);
+    expect(parsed).toMatchObject({
+      aftercare: "7",
+      "watch-aftercare": true,
+      "interval-seconds": "30",
+    });
+    expect(() => run({ "watch-aftercare": true }, dir)).toThrow("requires --aftercare");
+    expect(() => run({ "interval-seconds": "30" }, dir)).toThrow("requires --watch-aftercare");
+    expect(() =>
+      run({ aftercare: "7", "watch-aftercare": true, "interval-seconds": "x" }, dir),
+    ).toThrow(">= 1");
+  });
+  it("stops watching at the deadline without recording", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    saveTask(task, dir);
+    const pending = {
+      number: 7,
+      headRefOid: task.head,
+      baseRefOid: task.baseHead,
+      statusCheckRollup: [
+        { name: "Agent harness", status: "IN_PROGRESS", startedAt: "2026-01-01" },
+      ],
+    };
+    let t = 0;
+    const result = watchAftercare(task, 7, dir, {
+      maxSeconds: 5,
+      intervalSeconds: 60,
+      fetchPr: () => pending,
+      fetchFindings: () => ({}),
+      now: () => (t += 1000),
+      sleep: () => {},
+      record: () => {
+        throw new Error("must not record");
+      },
+    });
+    expect(result.ready).toBe(false);
+    expect(result.task.aftercare).toBeFalsy();
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0].ready).toBe(false);
+  });
+  it("treats a transient fetch failure as a poll event, then records when ready", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const ready = {
+      number: 7,
+      state: "OPEN",
+      isDraft: false,
+      headRefOid: task.head,
+      baseRefOid: task.baseHead,
+      baseRefName: "preview",
+      mergeable: "MERGEABLE",
+      mergeStateStatus: "CLEAN",
+      reviewDecision: "APPROVED",
+      statusCheckRollup: [{ name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" }],
+    };
+    let calls = 0;
+    const result = watchAftercare(task, 7, dir, {
+      fetchPr: () => {
+        calls += 1;
+        if (calls === 1) throw new Error("gh offline");
+        return ready;
+      },
+      fetchFindings: () => ({
+        pagesComplete: true,
+        unhandledCount: 0,
+        unresolvedThreadCount: 0,
+      }),
+      sleep: () => {},
+      record: (t) => {
+        t.aftercare = { head: t.head, baseHead: t.baseHead, ready: true, pr: 7 };
+        return t;
+      },
+    });
+    expect(result.ready).toBe(true);
+    expect(result.events[0]).toMatchObject({ ready: false, error: "gh offline" });
+    expect(result.events[1]).toMatchObject({ ready: true, changed: true });
+  });
+  it("appends verify and revision metrics to the shared git dir", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    const file = path.join(
+      git("rev-parse", "--path-format=absolute", "--git-common-dir"),
+      "agent-metrics.jsonl",
+    );
+    const readMetrics = () =>
+      readFileSync(file, "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+    const verified = readMetrics().at(-1);
+    expect(verified).toMatchObject({
+      action: "verify",
+      kind: "process",
+      result: "pass",
+      taskId: task.taskId,
+      state: "execute",
+    });
+    expect(verified.artifactBytes).toBeGreaterThan(0);
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "src/app.ts", "export {};\n");
+    refreshTask(loadTask(dir), dir);
+    const revision = readMetrics().at(-1);
+    expect(revision).toMatchObject({ action: "revision_changed", reused: 1, invalidated: 0 });
   });
 });

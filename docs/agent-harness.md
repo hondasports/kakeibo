@@ -80,6 +80,13 @@ node scripts/loop-runner.mjs --event clean
 
 Reviewerの本人性や実施内容はAgentが正しく記録する責任を持つ。CLIは担当ID、fresh宣言、HEAD、必須深度、全AC、残存findingを検査する。過去findingは次roundにも同じIDで引き継ぐ。
 
+独立Reviewerへ渡す材料は `--review-packet <dir>` で生成する。packet.json（目的・AC・changedPaths・risk・verification・reuseCandidates）、diff.patch、task-summary.json、verification-manifest.json、review-template.json（validateReview準拠の雛形）、contracts/（AGENTS.md・workflow-review.md・required-skills）を書き出す。REVIEW状態かつclean treeが必須で、生成物はcommitしない。reuseCandidatesにはfeature patch fingerprintと再利用済みkindだけを記録し、review証跡は再利用しない。
+
+```bash
+node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet
+# dirはworktree外を推奨する（内側だと生成後にtreeが汚れる）
+```
+
 指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、3roundごとにreassessmentを要求する。9round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。
 
 ## PRとAFTERCARE
@@ -91,12 +98,20 @@ node scripts/loop-runner.mjs --export-file /tmp/agent-state.md
 
 `--export` は標準出力、`--export-file <path>` は指定ファイルへ同じ状態ブロックを書き出す。この状態ブロックをPR本文へ含める。Human Request、説明、更新履歴ブロックとは分離する。PR作成後・状態更新後は `--sync-pr <番号>` で既存本文を保持してブロックを更新する。この操作はGitHubへのwriteであり、ユーザーが許可したPR作業の範囲でのみ実行する。
 
+観測用のmetricsは `git rev-parse --git-common-dir` 配下の `agent-metrics.jsonl` へ1行JSONで追記する。verify（kind・durationMs・result・artifactBytes・失敗signature）、revision_changed（reused/invalidated件数）、transition、aftercare、watch_aftercare（poll回数）、review_packetを記録する。common dir配下なのでlinked worktreeを跨いで集計でき、worktreeは汚れない。追記はbest-effortであり、失敗しても本処理を止めない。
+
 `Agent harness` CIはMarkdownのみの変更でも動き、実PR HEAD/base・実差分・仕様・検証・レビューを照合する。非bot PRは状態ブロック必須。GitHubが認識するdependabot/github-actionsのBot投稿は例外とし、processテストとドキュメントチェックは実行する。既存PRもこのworkflowが走る時点で状態ブロックが必要になる。CIを必須チェックへ登録するbranch protection設定は別途管理者の操作が必要であり、このPRでは権限設定を変更しない。
 
 ```bash
 node scripts/loop-runner.mjs --aftercare 123 --handled /tmp/handled.txt
 node scripts/loop-runner.mjs --event ready --handled /tmp/handled.txt
 node scripts/loop-runner.mjs --sync-pr 123
+```
+
+CI完了を待つ場合は `--watch-aftercare` を付けてpollできる。初回snapshotは `changed:false` のeventとして必ず返し、以後は状態変化時だけcompact event（ready・pending・failed・mergeability・finding数・head/base）を返す。間隔は `--interval-seconds`（既定60秒）、上限は内部deadline（既定15分）。readyになった時点で通常のaftercare証跡を記録する。
+
+```bash
+node scripts/loop-runner.mjs --aftercare 123 --watch-aftercare --interval-seconds 30
 ```
 
 aftercareおよびDONEへの遷移直前はGitHubを再取得し、最新HEAD/base、CI全体、必須チェック、approval、mergeability、ページ取得完了、未処理指摘0件を確認する。E2E必須ならpublic/authenticated両方の成功を要求する。handledは `scripts/collect-pr-findings.mjs` の `<finding id> <updatedAt>` 形式。本文が切れている候補は全文を読んで判定する。収集コマンドのPASSだけではaftercareを完了できない。
