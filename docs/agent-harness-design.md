@@ -1,6 +1,6 @@
 # Agent Harness軽量化とProfile自動判定
 
-**状態: §5のProfile自動判定・§6のProfile適用（モデル・effort機構の撤去を含む）は実装済み。§2以降の出力・検証・証跡管理の変更は実装予定の設計仕様。**
+**状態: §5のProfile自動判定・§6のProfile適用（モデル・effort機構の撤去を含む）は実装済み。§2以降の出力・検証・証跡管理は段階的に実装中であり、実装済みの振る舞いは [Agent Harness操作手順](agent-harness.md) を正本とする。**
 
 この文書を、Harnessの軽量化の設計正本とする。現行の操作手順は [Agent Harness操作手順](agent-harness.md)、現在の実行契約は [AGENTS.md](../AGENTS.md) と `.agent/process.yaml` を参照する。設計を記載しただけで、現在のゲートやCLIの挙動を変更したものとして扱わない。
 
