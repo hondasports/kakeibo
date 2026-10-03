@@ -1164,6 +1164,24 @@ describe("increment reuse and loop ergonomics", () => {
         METADATA_PATH_REF.test(readFileSync(path.join(root, file), "utf8")),
     );
     expect(offenders).toEqual([]);
+
+    // Non-test build/unit-reachable code must not read metadata at all: a
+    // `?raw` .md import (or a metadata-dir reference) inside src/convex would
+    // change build and transitive unit outcomes while evidence is extended.
+    // Scripts are exempt — they are process-domain readers by design and their
+    // tests already live in the process suite.
+    const sourceOffenders = execFileSync("git", ["ls-files", "src/**", "convex/**"], {
+      cwd: root,
+      encoding: "utf8",
+    })
+      .split("\n")
+      .filter(
+        (file) =>
+          /\.(?:[cm]?[jt]sx?)$/.test(file) &&
+          !/\.(?:test|spec)\.[^.]+$/.test(file) &&
+          METADATA_PATH_REF.test(readFileSync(path.join(root, file), "utf8")),
+      );
+    expect(sourceOffenders).toEqual([]);
   });
   it("records friction notes into task state, history and the state block", () => {
     const { dir, task } = repository();

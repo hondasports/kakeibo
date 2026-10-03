@@ -120,6 +120,8 @@ describe("E2E relevance path classification", () => {
       "docs/x.test.md",
     ])
       expect(isMetadataOnlyPath(filePath), filePath).toBe(true);
+    // public/ ships verbatim into the build output — a .md there is observable.
+    expect(isMetadataOnlyPath("public/notes.md")).toBe(false);
   });
 });
 

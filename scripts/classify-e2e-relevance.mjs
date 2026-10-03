@@ -57,6 +57,9 @@ export function isMetadataOnlyPath(filePath) {
     return false;
   }
   if (TEST_FILE_BASENAME.test(normalized)) return false;
+  // public/ assets are copied verbatim into the build output — a .md there is
+  // observable by `vite build` without any importing file to flag.
+  if (normalized.startsWith("public/")) return false;
   return (
     normalized.endsWith(".md") ||
     normalized.startsWith(".github/ISSUE_TEMPLATE/") ||

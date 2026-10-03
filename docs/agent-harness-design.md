@@ -20,7 +20,7 @@
 | モデル・effort機構 | ~~models/でモデル推奨Profile・effort対応値を管理~~ → 機構ごと撤去（実装済み） |
 | 通常出力 | ~~毎回configurationとassessmentを含むJSONを返す~~ → 現在State・不足条件・次の操作を中心に返す（実装済み） |
 | 検証 | ~~必要な検証を固定コマンドで実行し、結果を返す~~ → 必須条件を満たす検証計画とartifact-firstの証跡を使う（実装済み） |
-| 証跡の失効 | ~~HEADまたはbaseの更新で一括失効~~ → feature patchと検証対象treeが同一の検証だけ再利用し、その他は失効。さらにmetadata-only増分ではprocess以外の証跡を延長（いずれも実装済み） |
+| 証跡の失効 | ~~HEADまたはbaseの更新で一括失効~~ → feature patchと検証対象treeが同一の検証だけ再利用し、その他は失効。さらにmetadata-only増分ではprocess以外の証跡を延長（いずれも実装済み。lintは `.md`+正規hook名のみ延長——詳細は `docs/agent-harness.md`） |
 
 ## 3. 全体の流れ
 
