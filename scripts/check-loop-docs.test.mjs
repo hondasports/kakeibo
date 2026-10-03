@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   checkBannedVocabulary,
+  checkCommandReferences,
   checkLoopDocs,
   checkPathReferences,
   checkSectionNumbering,
@@ -78,6 +79,60 @@ describe("skill reference checks", () => {
     const result = checkLoopDocs(repo);
     expect(result.errors.some((e) => e.includes("name(other)"))).toBe(true);
   });
+
+  it("fails when a SKILL.md exists but is not referenced from AGENTS.md", () => {
+    const repo = makeRepo();
+    write(repo, "AGENTS.md", "## Capability skills\n\n- see `skills/listed` only\n\n## Runtime\n");
+    write(
+      repo,
+      "skills/listed/SKILL.md",
+      "---\nname: listed\ndescription: d\nlicense: l\n---\nbody",
+    );
+    write(
+      repo,
+      "skills/orphan/SKILL.md",
+      "---\nname: orphan\ndescription: d\nlicense: l\n---\nbody",
+    );
+    const result = checkLoopDocs(repo);
+    expect(result.errors.some((e) => e.includes("skills/orphan"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("skills/listed"))).toBe(false);
+  });
+
+  it("ignores skill mentions outside the Capability skills section", () => {
+    const repo = makeRepo();
+    write(
+      repo,
+      "AGENTS.md",
+      "other text `skills/listed`\n\n## Capability skills\n\n- none\n\n## Runtime\n",
+    );
+    write(
+      repo,
+      "skills/listed/SKILL.md",
+      "---\nname: listed\ndescription: d\nlicense: l\n---\nbody",
+    );
+    const result = checkLoopDocs(repo);
+    expect(result.errors.some((e) => e.includes("skills/listed"))).toBe(true);
+  });
+
+  it("fails on a skills/ directory without SKILL.md", () => {
+    const repo = makeRepo();
+    write(repo, "AGENTS.md", "## Capability skills\n\n- `skills/listed`\n\n## Runtime\n");
+    write(
+      repo,
+      "skills/listed/SKILL.md",
+      "---\nname: listed\ndescription: d\nlicense: l\n---\nbody",
+    );
+    write(repo, "skills/stray/notes.md", "leftover");
+    write(
+      repo,
+      "skills/nested/deep/SKILL.md",
+      "---\nname: deep\ndescription: d\nlicense: l\n---\nbody",
+    );
+    const result = checkLoopDocs(repo);
+    expect(result.errors.some((e) => e.includes("skills/stray"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("skills/nested"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("skills/listed"))).toBe(false);
+  });
 });
 
 describe("path reference checks", () => {
@@ -100,6 +155,104 @@ describe("path reference checks", () => {
       "`pnpm run build` と `pnpm` と [ext](https://example.com) と `git worktree add ../x/<b>`",
     );
     expect(errors).toHaveLength(0);
+  });
+});
+
+describe("command reference checks", () => {
+  const scripts = new Set(["dev", "e2e:smoke", "test:unit"]);
+
+  it("fails on a missing pnpm run script", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "`pnpm run missing-script` を実行する",
+      scripts,
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("pnpm run missing-script");
+  });
+
+  it("fails on a missing colon-form pnpm script", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "pnpm e2e:missing で確認する",
+      scripts,
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("pnpm e2e:missing");
+  });
+
+  it("ignores pnpm builtins and resolves existing scripts", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "`pnpm run dev` / `pnpm e2e:smoke` / pnpm exec playwright / pnpm install / pnpm test",
+      scripts,
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it("skips script validation when package.json is absent", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "`pnpm run anything` を実行する",
+      null,
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it("skips flags before the script name in pnpm run calls", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "`pnpm run --if-present e2e:smoke` と `pnpm run -r dev`",
+      scripts,
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it("still validates the script name after pnpm run flags", () => {
+    const errors = checkCommandReferences(
+      "/repo",
+      "docs/a.md",
+      "`pnpm run --if-present missing-script`",
+      scripts,
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("missing-script");
+  });
+
+  it("strips full-width punctuation after a script path", () => {
+    const repo = makeRepo();
+    write(repo, "package.json", JSON.stringify({ scripts: {} }));
+    write(repo, "AGENTS.md", "x");
+    write(repo, "scripts/real.mjs", "export {}");
+    write(
+      repo,
+      "docs/guide.md",
+      "（node scripts/real.mjs）で確認する。node scripts/gone.mjs。は失敗",
+    );
+    const result = checkLoopDocs(repo);
+    expect(result.errors.some((e) => e.includes("scripts/real.mjs"))).toBe(false);
+    expect(result.errors.some((e) => e.includes("scripts/gone.mjs"))).toBe(true);
+  });
+
+  it("fails on a missing node/tsx script path", () => {
+    const repo = makeRepo();
+    write(repo, "package.json", JSON.stringify({ scripts: {} }));
+    write(repo, "AGENTS.md", "x");
+    write(repo, "scripts/real.mjs", "export {}");
+    write(
+      repo,
+      "docs/guide.md",
+      "node scripts/real.mjs は動くが、 node scripts/gone.mjs と tsx scripts/gone.ts は失敗する",
+    );
+    const result = checkLoopDocs(repo);
+    expect(result.errors.some((e) => e.includes("scripts/gone.mjs"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("scripts/gone.ts"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("scripts/real.mjs"))).toBe(false);
   });
 });
 
@@ -126,6 +279,10 @@ describe("banned vocabulary", () => {
       "task/session binding",
       ".loop/state",
       "委譲用workflowは使用しません",
+      ".agent/models/default.yaml",
+      "--model unknown",
+      "Model Registry",
+      "recommended_profile",
     ]) {
       expect(checkBannedVocabulary("docs/x.md", `これは ${word} です`)).toHaveLength(1);
     }
@@ -133,6 +290,7 @@ describe("banned vocabulary", () => {
 
   it("passes on current vocabulary", () => {
     expect(checkBannedVocabulary("docs/x.md", "要求工程と受入条件とHuman Gate")).toHaveLength(0);
+    expect(checkBannedVocabulary("docs/x.md", "coverageはbest-effortで計測する")).toHaveLength(0);
   });
 });
 

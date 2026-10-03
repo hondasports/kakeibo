@@ -72,7 +72,7 @@ describe("E2E relevance path classification", () => {
 
   it("skips only when every changed path is process-only", () => {
     expect(
-      classifyChangedFiles(["skills/code-review/SKILL.md", "docs/development-process.md"]),
+      classifyChangedFiles(["skills/workspace-preflight/SKILL.md", "docs/development-process.md"]),
     ).toMatchObject({
       runtimeRelevant: false,
       reason: "all_changed_paths_process_only",
@@ -81,7 +81,11 @@ describe("E2E relevance path classification", () => {
 
   it("fails closed for a mixed or unknown change", () => {
     expect(
-      classifyChangedFiles(["skills/code-review/SKILL.md", "src/App.tsx", "unknown/config.yaml"]),
+      classifyChangedFiles([
+        "skills/workspace-preflight/SKILL.md",
+        "src/App.tsx",
+        "unknown/config.yaml",
+      ]),
     ).toMatchObject({
       runtimeRelevant: true,
       reason: "runtime_relevant_path_detected",

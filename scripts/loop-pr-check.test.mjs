@@ -43,6 +43,25 @@ describe("GitHub delivery gates", () => {
     );
     expect(() => validateCheckpoint(task, { ...context, head: "changed" })).toThrow("HEAD/base");
   });
+  it("rejects states without a decided profile selection", () => {
+    const task = readyTask();
+    const context = { head: task.head, baseHead: task.baseHead, paths: ["README.md"] };
+    delete task.configuration.selection;
+    expect(() => validateCheckpoint(task, context)).toThrow("selection");
+    task.configuration.selection = {
+      selected: "standard",
+      source: "provisional",
+      ruleVersion: 1,
+    };
+    expect(() => validateCheckpoint(task, context)).toThrow("Profile decision");
+    task.configuration.selection = {
+      selected: "deep",
+      source: "auto",
+      ruleVersion: 1,
+      inputs: {},
+    };
+    expect(() => validateCheckpoint(task, context)).toThrow("Profile decision");
+  });
   it("requires state for non-bot PRs even when only markdown changes", () => {
     const task = readyTask();
     const event = {
@@ -84,6 +103,64 @@ describe("GitHub delivery gates", () => {
     ).toThrow("approval");
     task.assessment = computeAssessment(task, ["src/app.ts"]);
     expect(() => checkAftercare(pr, task, findings)).toThrow("Required check");
+  });
+  it("evaluates only the latest run per check name when a check was retried", () => {
+    const task = readyTask();
+    const pr = prFixture(task);
+    pr.statusCheckRollup = [
+      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "failure",
+        completedAt: "2026-10-03T02:00:00Z",
+      },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "SUCCESS",
+        completedAt: "2026-10-03T02:10:00Z",
+      },
+    ];
+    expect(checkAftercare(pr, task, findings).ready).toBe(true);
+    pr.statusCheckRollup[2] = {
+      name: "E2E (Playwright / Chromium / authenticated)",
+      status: "COMPLETED",
+      conclusion: "failure",
+      completedAt: "2026-10-03T02:20:00Z",
+    };
+    expect(() => checkAftercare(pr, task, findings)).toThrow("Unsuccessful");
+  });
+  it("never hides an unorderable check behind a dated success (fail-closed)", () => {
+    const task = readyTask();
+    const pr = prFixture(task);
+    pr.statusCheckRollup = [
+      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "SUCCESS",
+        completedAt: "2026-10-03T02:00:00Z",
+      },
+      // Undated failure: cannot be ordered, must still be evaluated.
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "failure",
+      },
+    ];
+    expect(() => checkAftercare(pr, task, findings)).toThrow("Unsuccessful");
+    // Nameless/contextless entries are also always evaluated.
+    pr.statusCheckRollup[2] = { status: "IN_PROGRESS", conclusion: "" };
+    expect(() => checkAftercare(pr, task, findings)).toThrow("Unsuccessful or pending");
+    // A newer pending retry of a dated success also stays visible.
+    pr.statusCheckRollup[2] = {
+      name: "E2E (Playwright / Chromium / authenticated)",
+      status: "IN_PROGRESS",
+      conclusion: "",
+      startedAt: "2026-10-03T02:30:00Z",
+    };
+    expect(() => checkAftercare(pr, task, findings)).toThrow("pending");
   });
   it("preserves a reviewer's higher risk and enforces independence", () => {
     const task = readyTask();

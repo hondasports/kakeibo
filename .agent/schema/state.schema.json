@@ -62,7 +62,33 @@
       "type": "object"
     },
     "configuration": {
-      "type": "object"
+      "type": "object",
+      "required": ["profileSource", "profile", "selection", "runtime"],
+      "properties": {
+        "profileSource": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile": {
+          "type": "object"
+        },
+        "selection": {
+          "type": "object",
+          "required": ["selected", "source", "ruleVersion"],
+          "properties": {
+            "selected": {
+              "enum": ["fast", "standard", "deep", "max"]
+            },
+            "source": {
+              "enum": ["provisional", "user", "auto"]
+            },
+            "ruleVersion": {}
+          }
+        },
+        "runtime": {
+          "type": "object"
+        }
+      }
     },
     "skills": {
       "type": "array",

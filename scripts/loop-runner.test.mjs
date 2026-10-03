@@ -130,8 +130,6 @@ describe("persistent task gates", () => {
         spec,
         "--task",
         "integration",
-        "--model",
-        "unknown",
         "--runtime",
         "codex",
         "--implementer",
@@ -141,7 +139,33 @@ describe("persistent task gates", () => {
       ),
     );
     expect(initial.configuration.profile.name).toBe("standard");
+    expect(initial.configuration.selection).toMatchObject({
+      selected: "standard",
+      source: "provisional",
+    });
+    // Leaving REFINE requires the determination inputs recorded via --assessment.
+    expect(() => cli("--event", "ready")).toThrow();
+    const refineAssessment = path.join(parent, "refine-assessment.json");
+    writeFileSync(
+      refineAssessment,
+      JSON.stringify({
+        ...taskFixture().agentAssessment,
+        verification_load: { level: "routine", rationale: "process checks only" },
+      }),
+    );
+    cli("--assessment", refineAssessment);
     cli("--event", "ready");
+    const decided = loadTask(checkout).configuration;
+    expect(decided.profile.name).toBe("fast");
+    expect(decided.selection).toMatchObject({
+      selected: "fast",
+      source: "auto",
+      inputs: {
+        blast_radius: "local",
+        uncertainty: "known_pattern",
+        verification_load: "routine",
+      },
+    });
     writeFileSync(path.join(checkout, "README.md"), "change");
     execFileSync("git", ["add", "."], { cwd: checkout });
     execFileSync("git", ["-c", "core.hooksPath=/dev/null", "commit", "-m", "change"], {
@@ -152,6 +176,8 @@ describe("persistent task gates", () => {
     const assessment = path.join(parent, "assessment.json");
     writeFileSync(assessment, JSON.stringify(taskFixture().agentAssessment));
     cli("--assessment", assessment);
+    // The same evaluation inputs must not trigger re-determination.
+    expect(loadTask(checkout).configuration.selection.revisions).toHaveLength(1);
     cli("--verify", "process");
     cli("--event", "ready");
     const task = loadTask(checkout);
@@ -280,6 +306,29 @@ describe("persistent task gates", () => {
     for (const flag of ["--model", "--profile", "--runtime", "--event", "--exit", "--review"])
       expect(() => parseArguments([flag])).toThrow("requires a value");
     expect(() => parseArguments(["--magic"])).toThrow("unknown option");
+  });
+  it("accepts --model for backward compatibility without recording it", () => {
+    const { git } = repository();
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-compat-"));
+    dirs.push(parent);
+    const checkout = path.join(parent, "checkout-compat");
+    git("worktree", "add", "-b", "codex/compat", checkout, "preview");
+    const spec = path.join(parent, "spec-compat.json");
+    writeFileSync(spec, JSON.stringify(taskFixture().spec));
+    const task = run(
+      {
+        init: spec,
+        task: "compat",
+        model: "legacy-model",
+        runtime: "codex",
+        implementer: "author",
+        base: "preview",
+      },
+      checkout,
+    );
+    expect(task.configuration.profile.name).toBe("standard");
+    expect(task.configuration).not.toHaveProperty("model");
+    expect(task.configuration.selection.source).toBe("provisional");
   });
   it("requires the exact execute state for verification", () => {
     const { dir, task } = repository();

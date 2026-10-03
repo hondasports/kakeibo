@@ -3,7 +3,7 @@
 このドキュメントは、AI エージェントが外部コンテンツ（Web、ファイル、API 応答、ログ等）を扱う際の
 脅威分析・防御設計・運用ガイドをまとめたものです。
 
-防御ロジック本体は `.agents/skills/prompt-injection-guard/SKILL.md` に定義し、
+防御ロジック本体は `skills/prompt-injection-guard/SKILL.md` に定義し、
 AI が外部コンテンツを参照する作業で自動的に参照します。
 
 ## 1. 脅威整理
@@ -100,12 +100,12 @@ kakeibo では以下のコンテキストが特に外部由来コンテンツに
 - GitHub MCP で取得した Issue / PR の本文・コメント
 - Web 検索結果・外部ドキュメントの引用
 
-これらを参照する際は `$prompt-injection-guard` Skill を必ず呼び出す。
+これらを参照する際は `skills/prompt-injection-guard/SKILL.md` を必ず読む。
 
 ## 6. 関連ファイル
 
 | ファイル                                         | 役割                                   |
 | ------------------------------------------------ | -------------------------------------- |
-| `.agents/skills/prompt-injection-guard/SKILL.md` | 防御ロジック本体（AI 向け実行ルール）  |
-| `docs/security-prompt-injection.md`              | 本ドキュメント（脅威分析・運用ガイド） |
-| `.agents/skills/service-ops-safety/SKILL.md`     | 外部サービス操作時の安全確認           |
+| `skills/prompt-injection-guard/SKILL.md` | 防御ロジック本体（AI 向け実行ルール）  |
+| `docs/security-prompt-injection.md`      | 本ドキュメント（脅威分析・運用ガイド） |
+| `skills/service-ops-safety/SKILL.md`     | 外部サービス操作時の安全確認           |

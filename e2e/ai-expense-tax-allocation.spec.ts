@@ -17,10 +17,10 @@ test("#748 未配分の13明細を確認して税込合計・税額を保存後�
     await row.getByRole("button", { name: "確認する" }).click();
     const dialog = page.getByRole("dialog", { name: "下書き確認" });
     const checks = dialog.getByRole("region", { name: "確認結果", exact: true });
-    // 金額は印字どおり一致している。割引対象は最寄りの商品へ自動推論される。
-    await expect(
-      checks.getByText(/明細合計 4,292円 ＋ 税額 370円 ＝ 支払額 4,662円/),
-    ).toBeVisible();
+    // 金額は印字どおり一致しているため金額確認カードは出さず、税率別集計カードだけが残る。
+    // 割引対象は最寄りの商品へ自動推論される。
+    await expect(checks.getByText("税率別集計")).toBeVisible();
+    await expect(checks.getByText("金額確認")).toHaveCount(0);
     // Choose the actual discount targets without changing their tax rates.
     for (const [name, target] of [
       ["割引4", "商品3"],
@@ -62,20 +62,24 @@ test("#748 未配分の13明細を確認して税込合計・税額を保存後�
         dialog.getByRole("combobox", { name: name + "の割引対象税率", exact: true }),
       ).toHaveText("8%対象の割引");
     }
+    // 金額・税率別ともに一致したため検算カードは出さず、成功メッセージだけが残る
+    await expect(checks).toHaveCount(0);
     await expect(
-      checks.getByText(/明細合計 4,292円 ＋ 税額 370円 ＝ 支払額 4,662円/),
+      dialog
+        .getByRole("region", { name: "全体の確認状態" })
+        .getByText("印字額と明細の金額が一致しています"),
     ).toBeVisible();
-    await expect(checks.getByText(/現在 2,912円 ／ 印字 2,912円/)).toBeVisible();
-    await expect(checks.getByText(/現在 1,380円 ／ 印字 1,380円/)).toBeVisible();
     await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
     await expect(dialog).toBeHidden();
     await page.reload();
     await row.getByRole("button", { name: "修正する" }).click();
+    // 再オープン後も一致が維持され、検算カードは出ず成功メッセージだけが残る
     await expect(
-      checks.getByText(/明細合計 4,292円 ＋ 税額 370円 ＝ 支払額 4,662円/),
+      dialog
+        .getByRole("region", { name: "全体の確認状態" })
+        .getByText("印字額と明細の金額が一致しています"),
     ).toBeVisible();
-    await expect(checks.getByText(/現在 2,912円 ／ 印字 2,912円/)).toBeVisible();
-    await expect(checks.getByText(/現在 1,380円 ／ 印字 1,380円/)).toBeVisible();
+    await expect(dialog.getByRole("region", { name: "確認結果" })).toHaveCount(0);
   } finally {
     await cleanupAiExpenseQueueByUser(userId);
   }

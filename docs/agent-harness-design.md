@@ -1,8 +1,8 @@
 # Agent Harness軽量化とProfile自動判定
 
-**状態: 実装予定の設計仕様。現行CLIには未実装。**
+**状態: §5のProfile自動判定・§6のProfile適用（モデル・effort機構の撤去を含む）は実装済み。§2以降の出力・検証・証跡管理の変更は実装予定の設計仕様。**
 
-この文書を、Harnessの軽量化とREFINE終了時のProfile自動判定を実装する際の設計正本とする。現行の操作手順は [Agent Harness操作手順](agent-harness.md)、現在の実行契約は [AGENTS.md](../AGENTS.md) と `.agent/process.yaml` を参照する。設計を記載しただけで、現在のゲートやCLIの挙動を変更したものとして扱わない。
+この文書を、Harnessの軽量化の設計正本とする。現行の操作手順は [Agent Harness操作手順](agent-harness.md)、現在の実行契約は [AGENTS.md](../AGENTS.md) と `.agent/process.yaml` を参照する。設計を記載しただけで、現在のゲートやCLIの挙動を変更したものとして扱わない。
 
 ## 1. 目的と維持する条件
 
@@ -16,8 +16,8 @@
 
 | 項目 | 現行CLI | 実装する設計 |
 |---|---|---|
-| Profile選択 | 開始時に明示指定、モデル推奨値、既定値から選択 | REFINE終了時にタスク内容から自動判定 |
-| Runtimeへの適用 | effortの対応値を返す。実行中モデルは変更しない | 対応Runtimeで適用し、推奨値と適用済みの値を分離して記録 |
+| Profile選択 | ~~開始時に明示指定、モデル推奨値、既定値から選択~~ → REFINE終了時にタスク内容から自動判定（実装済み） |
+| モデル・effort機構 | ~~models/でモデル推奨Profile・effort対応値を管理~~ → 機構ごと撤去（実装済み） |
 | 通常出力 | 毎回configurationとassessmentを含むJSONを返す | 現在State・不足条件・次の操作を中心に返す |
 | 検証 | 必要な検証を固定コマンドで実行し、結果を返す | 必須条件を満たす検証計画とcompact出力を使う |
 | 証跡の失効 | HEADまたはbaseの更新で一括失効 | 不変性を証明できる検証だけ再利用し、その他は失効 |
@@ -26,7 +26,7 @@
 
 ```mermaid
 flowchart TD
-  S["開始: モデル・Runtime・作業場所を確認"] --> R["REFINE: 仕様・影響範囲・予測Riskを整理<br/>終了時にProfileを自動判定"]
+  S["開始: Runtime・作業場所を確認"] --> R["REFINE: 仕様・影響範囲・予測Riskを整理<br/>終了時にProfileを自動判定"]
   R --> E["EXECUTE: Profileを適用<br/>実装・対象検証・修正"]
   E --> V["REVIEW: Riskに応じたレビュー"]
   V -- 指摘あり --> E
@@ -43,7 +43,7 @@ flowchart TD
 |---|---|
 | Agent | repository調査、Goal・AC・前提・検証方針の整理、Riskの4軸と根拠、実装、結果の意味の判断 |
 | CLI | 実差分の取得、Machine Floor、状態遷移、Profileの規則判定、検証実行、証跡の生成・失効、PRとの照合 |
-| Runtime adapter | モデルへの設定適用、対応能力の確認、実際に適用できた設定の記録 |
+| Runtime adapter | Runtime固有差分の解決、適用した設定の記録 |
 | Reviewer | 目的・AC・実差分・関連契約・検証を確認し、独立したRisk評価とfindingを返す |
 
 CLIの形式検査は、Agentの判断内容やReviewerの本人性を証明しない。CLIが差分の意味を全面的に理解したものとして扱わない。
@@ -52,7 +52,7 @@ CLIの形式検査は、Agentの判断内容やReviewerの本人性を証明し�
 
 ### 判定のタイミング
 
-開始時はモデル推奨値を仮Profileとし、未知モデルはstandardを使う。ユーザーが明示指定した場合はその値を使う。
+開始時は既定Profileを仮置きとし、ユーザーが明示指定した場合はその値を使う。
 
 REFINEの終了条件を満たし、Goal・AC・影響範囲・Assumptions・Verification Strategy・Predicted Riskが揃った時点で、EXECUTEへ進む前にProfileを確定する。重要な未決事項が残る場合はProfileを上げて実装を強行せず、HUMAN_GATEへ進める。
 
@@ -87,11 +87,8 @@ CLIは上から順に該当する規則を採用する。必要な評価値や�
 
 | 適用先 | 適用する内容 |
 |---|---|
-| Runtime | Model Registryでeffortを対応値へ変換し、対応している場合にEXECUTE開始時または次の実行で適用する |
 | Agent | 調査範囲、委譲方針、必要時に読む文脈の方針 |
 | 検証CLI | Machine FloorとACを満たす検証に、Profileから必要な追加確認を積み上げる |
-
-effortの推奨値・対応値・実際の適用値・適用確認の有無を区別する。未対応Runtimeや適用未確認の場合は、その事実を記録し、推奨値を適用済みと報告しない。モデルやRuntimeが未知でも、検証ゲートとAgentへの指示は有効にする。
 
 委譲は分割して進める利点がある場合に使う。aggressiveでも全タスクで別Agentを起動しない。T3、および未解決の挙動前提があるT2の独立レビューは、Profileや委譲方針にかかわらず必須とする。
 

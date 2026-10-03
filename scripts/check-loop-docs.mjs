@@ -23,12 +23,22 @@ const BANNED_VOCABULARY = [
   /\.loop\//,
   /task-loop\.mjs/,
   /委譲用workflowは使用しません/,
+  /\.agent\/models/,
+  /--model\b/,
+  /Model Registry/,
+  /recommended_profile/,
 ];
 
 const PATH_REFERENCE_PATTERN =
   /^(?:AGENTS\.md|\.env\.local|(?:docs|skills|scripts|e2e|convex|lib|src|\.agent|\.github|\.windsurf|\.husky)\/[^\s"'`()[\]{}<>|*$]+)$/;
 
 const CODE_SPAN_PATTERN = /`([^`\n]+)`/g;
+
+// Command references (inline or fenced code) — unlike code-span paths these are
+// matched in the whole document text so they are checked wherever they appear.
+const PNPM_RUN_PATTERN = /\bpnpm run(?:\s+-{1,2}[a-zA-Z][a-zA-Z0-9-]*)*\s+([a-zA-Z0-9:._-]+)/g;
+const PNPM_COLON_SCRIPT_PATTERN = /\bpnpm\s+([a-zA-Z0-9._-]+:[a-zA-Z0-9:._-]+)/g;
+const NODE_SCRIPT_PATTERN = /\b(?:node|tsx)\s+(scripts\/[a-zA-Z0-9/._-]+)/g;
 
 /** Referenced but not required to exist (gitignored, or documented as removed). */
 const REFERENCE_ALLOWLIST = [/^\.env\.local$/, /^docs\/generated\//, /^convex\/export\.ts$/];
@@ -129,6 +139,43 @@ export function checkAgentsSkillReferences(repoRoot) {
   return errors;
 }
 
+/** Content of the `## Capability skills` section only — casual `skills/x` mentions elsewhere do not count as listing. */
+export function extractCapabilitySkillsSection(content) {
+  const text = String(content);
+  const match = text.match(/^## Capability skills[^\S\n]*$/m);
+  if (!match) return "";
+  const rest = text.slice(match.index);
+  const next = rest.indexOf("\n## ");
+  return next === -1 ? rest : rest.slice(0, next + 1);
+}
+
+/** Every capability skill must be listed in AGENTS.md's Capability skills section, otherwise it is undiscoverable. */
+export function checkSkillsDiscoverability(repoRoot) {
+  const errors = [];
+  const agentsPath = path.join(repoRoot, "AGENTS.md");
+  const skillsDir = path.join(repoRoot, "skills");
+  if (!existsSync(agentsPath) || !existsSync(skillsDir)) return errors;
+  const referenced = new Set(
+    extractSkillReferences(extractCapabilitySkillsSection(readFileSync(agentsPath, "utf8"))),
+  );
+  for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const skillDir = path.join(skillsDir, entry.name);
+    if (!existsSync(path.join(skillDir, "SKILL.md"))) {
+      errors.push(
+        `skills/${entry.name}: SKILL.md が存在しません（許可されるのは直下にSKILL.mdを持つ構成のみ）`,
+      );
+      continue;
+    }
+    if (!referenced.has(entry.name)) {
+      errors.push(
+        `skills/${entry.name}: SKILL.md が存在しますが AGENTS.md のCapability skills一覧から参照されていません`,
+      );
+    }
+  }
+  return errors;
+}
+
 function resolveCandidate(repoRoot, docDir, reference) {
   const relativePath = normalizePath(path.posix.join(docDir, reference));
   return {
@@ -181,6 +228,43 @@ export function checkPathReferences(repoRoot, docPath, content) {
   return errors;
 }
 
+function loadPackageScripts(repoRoot) {
+  const pkgPath = path.join(repoRoot, "package.json");
+  if (!existsSync(pkgPath)) return null;
+  try {
+    return new Set(Object.keys(JSON.parse(readFileSync(pkgPath, "utf8")).scripts ?? {}));
+  } catch {
+    return new Set();
+  }
+}
+
+/** pnpm run / pnpm <name:...> / node scripts/... references must resolve; stale command docs are drift. */
+export function checkCommandReferences(repoRoot, docPath, content, packageScripts) {
+  const errors = [];
+  const text = String(content);
+  if (packageScripts !== null) {
+    for (const match of text.matchAll(PNPM_RUN_PATTERN)) {
+      // A leading dash means the capture is a flag token (e.g. `pnpm run -- foo`), not a script name.
+      if (match[1].startsWith("-")) continue;
+      if (!packageScripts.has(match[1])) {
+        errors.push(`${docPath}: pnpm run ${match[1]} は package.json のscriptsに存在しません`);
+      }
+    }
+    for (const match of text.matchAll(PNPM_COLON_SCRIPT_PATTERN)) {
+      if (!packageScripts.has(match[1])) {
+        errors.push(`${docPath}: pnpm ${match[1]} は package.json のscriptsに存在しません`);
+      }
+    }
+  }
+  for (const match of text.matchAll(NODE_SCRIPT_PATTERN)) {
+    const candidate = match[1].replace(/[.)\],;/]+$/, "");
+    if (!existsSync(path.join(repoRoot, candidate))) {
+      errors.push(`${docPath}: 参照スクリプト ${candidate} が存在しません`);
+    }
+  }
+  return errors;
+}
+
 export function checkSectionNumbering(docPath, content) {
   const numbers = [...String(content).matchAll(SECTION_HEADING_PATTERN)].map((m) => Number(m[1]));
   const firstGap = numbers.findIndex((number, index) => number !== index + 1);
@@ -216,7 +300,6 @@ export function checkLoopDocs(repoRoot) {
       ".agent/runtime/devin.yaml",
       ".agent/profiles/default.yaml",
       ".agent/profiles/standard.yaml",
-      ".agent/models/default.yaml",
       ".agent/workflow/refine.md",
       ".agent/workflow/execute.md",
       ".agent/workflow/review.md",
@@ -229,10 +312,13 @@ export function checkLoopDocs(repoRoot) {
   }
 
   errors.push(...checkAgentsSkillReferences(repoRoot));
+  errors.push(...checkSkillsDiscoverability(repoRoot));
 
+  const packageScripts = loadPackageScripts(repoRoot);
   for (const docPath of docFiles) {
     const content = readFileSync(path.join(repoRoot, docPath), "utf8");
     errors.push(...checkPathReferences(repoRoot, docPath, content));
+    errors.push(...checkCommandReferences(repoRoot, docPath, content, packageScripts));
     errors.push(...checkBannedVocabulary(docPath, content));
     if (SKILL_NAME_PATTERN.test(docPath)) {
       errors.push(...checkSkillFrontmatter(repoRoot, docPath));
