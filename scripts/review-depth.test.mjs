@@ -154,6 +154,9 @@ describe("stateless CLI", () => {
     expect(run(["--help"]).usage).toContain("risk_assessment");
     expect(run(["--help"]).usage).toContain(".agent/workflow/review.md");
     expect(run(["--help"]).usage).toContain("Agentが実差分");
+    // A bare "--" (forwarded verbatim by pnpm run) is skipped.
+    expect(run(["--", "--vocabulary"])).toEqual(run(["--vocabulary"]));
+    expect(run(["--"]).usage).toContain("risk_assessment");
   });
 
   it("accepts inline JSON or a file path and rejects extras", () => {

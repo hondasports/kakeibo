@@ -132,7 +132,7 @@ const USAGE = `使い方: node scripts/review-depth.mjs <入力>
 
 /** Stateless CLI: vocabulary disclosure, or one assessment → tier floor and requirements. */
 export function run(args, cwd = process.cwd()) {
-  const [arg, ...rest] = args;
+  const [arg, ...rest] = args.filter((a) => a !== "--");
   if (rest.length) throw new Error("unexpected extra arguments");
   if (!arg || arg === "--help" || arg === "-h") return { usage: USAGE };
   if (arg === "--vocabulary")

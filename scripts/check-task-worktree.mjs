@@ -163,7 +163,7 @@ export function runWorkspacePreflight({
   }
 }
 
-function parseArguments(args) {
+export function parseArguments(args) {
   const options = { requireClean: false, staged: false };
   for (const arg of args) {
     if (arg === "--") continue;
