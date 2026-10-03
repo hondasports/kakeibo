@@ -84,6 +84,7 @@ Reviewerの本人性や実施内容はAgentが正しく記録する責任を持�
 
 ```bash
 node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet
+# dirはworktree外を推奨する（内側だと生成後にtreeが汚れる）
 ```
 
 指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、3roundごとにreassessmentを要求する。9round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。

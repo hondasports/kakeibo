@@ -31,6 +31,7 @@ import {
   computeAssessment,
   highestTier,
   checkAftercare,
+  selectChecks,
   missingRequirements,
   verificationSummary,
   aftercareSummary,
@@ -250,8 +251,16 @@ export function recordFailure(task, signature, root) {
     task.lastFailure?.signature === signature ? task.counters.sameFailure + 1 : 1;
   task.lastFailure = { signature, head: task.head };
   history(task, "verification_failed", { signature });
+  const from = task.state;
   if (task.counters.sameFailure >= processConfig(root).limits.same_failure_max)
     task.state = "incident";
+  if (task.state !== from)
+    recordMetric(task, root, {
+      action: "transition",
+      event: "same_failure_limit",
+      from,
+      to: task.state,
+    });
 }
 export const EVIDENCE_CONTRACT_VERSION = 1;
 /**
@@ -327,6 +336,8 @@ export function runVerification(
         const signature = createHash("sha256")
           .update(JSON.stringify({ kind, command, status: result.status }))
           .digest("hex");
+        recordFailure(task, signature, root);
+        task.lastFailure.kind = kind;
         recordMetric(task, root, {
           action: "verify",
           kind,
@@ -334,8 +345,6 @@ export function runVerification(
           result: "fail",
           signature,
         });
-        recordFailure(task, signature, root);
-        task.lastFailure.kind = kind;
         saveTask(task, root);
         const tail = lastLines(readFileSync(artifactPath, "utf8")).join("\n");
         throw new Error(
@@ -525,17 +534,18 @@ function aftercareFetchers(pr, handled, root) {
     },
   };
 }
+const checkPending = (check) =>
+  (check.status && check.status !== "COMPLETED") ||
+  (check.state && ["PENDING", "EXPECTED"].includes(check.state));
 /** Compact per-poll snapshot for --watch-aftercare; never throws on the gate. */
 export function aftercareSnapshot(prFields, task, findings, pr) {
-  const checks = prFields.statusCheckRollup ?? [];
+  const checks = selectChecks(prFields.statusCheckRollup ?? []);
   const checkName = (check) => check.name ?? check.context ?? "";
-  const pending = checks
-    .filter((check) => check.status && check.status !== "COMPLETED")
-    .map(checkName);
+  const pending = checks.filter(checkPending).map(checkName);
   const failed = checks
     .filter(
       (check) =>
-        !(check.status && check.status !== "COMPLETED") &&
+        !checkPending(check) &&
         !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(check.conclusion ?? check.state),
     )
     .map(checkName);
@@ -570,21 +580,39 @@ export function watchAftercare(
   task,
   pr,
   root,
-  { handled, intervalSeconds = 60, maxSeconds = 900, fetch, now, sleep, record } = {},
+  {
+    handled,
+    intervalSeconds = 60,
+    maxSeconds = 900,
+    fetchPr,
+    fetchFindings,
+    now,
+    sleep,
+    record,
+  } = {},
 ) {
   requireValue(task.state === "aftercare", "GitHub aftercare runs in aftercare");
   const tick = now ?? (() => Date.now());
   const pause = sleep ?? defaultSleep;
-  const fetchers = fetch ?? aftercareFetchers(pr, handled, root);
+  // Injected fetchers use the exact same shape as production so tests exercise
+  // the real call path instead of hiding it behind a different seam.
+  const defaults = aftercareFetchers(pr, handled, root);
+  const pollPr = fetchPr ?? defaults.fetchPr;
+  const pollFindings = fetchFindings ?? defaults.fetchFindings;
   const recordAftercare = record ?? ((t) => githubAftercare(t, pr, handled, root));
   const events = [];
   const deadline = tick() + maxSeconds * 1000;
   let signature = null;
   let polls = 0;
   while (true) {
-    const { pr: prFields, findings } = fetchers();
     polls += 1;
-    const snapshot = aftercareSnapshot(prFields, task, findings, pr);
+    let snapshot;
+    try {
+      snapshot = aftercareSnapshot(pollPr(), task, pollFindings(), pr);
+    } catch (error) {
+      // A transient fetch failure is a poll event, not a watch failure.
+      snapshot = { pr, ready: false, error: String(error?.message ?? error) };
+    }
     const nextSignature = JSON.stringify(snapshot);
     if (nextSignature !== signature) events.push({ ...snapshot, changed: signature !== null });
     signature = nextSignature;
@@ -686,6 +714,8 @@ export function buildReviewPacket(task, dir, root) {
           evidence: "",
         })),
         assessment: {
+          // Optional fields (applied_tier, verification_load) stay absent —
+          // a present-but-empty value fails validation, an absent one is unset.
           risk_assessment: {
             blast_radius: "",
             data_security: "",
@@ -694,8 +724,6 @@ export function buildReviewPacket(task, dir, root) {
             floor_triggers: [],
           },
           tier_rationale: "",
-          applied_tier: "",
-          verification_load: { level: "", rationale: "" },
         },
       },
       null,
