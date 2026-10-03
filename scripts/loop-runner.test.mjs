@@ -121,114 +121,118 @@ describe("persistent task gates", () => {
     expect(restored.counters.review).toBe(2);
   });
 
-  it("runs the startup-to-PR path through the real CLI in an isolated worktree", { timeout: 30000 }, () => {
-    const { git } = repository();
-    const parent = mkdtempSync(path.join(tmpdir(), "loop-cli-"));
-    dirs.push(parent);
-    const checkout = path.join(parent, "checkout");
-    git("worktree", "add", "-b", "codex/integration", checkout, "preview");
-    const spec = path.join(parent, "spec.json");
-    writeFileSync(spec, JSON.stringify(taskFixture().spec));
-    const cli = (...args) =>
-      execFileSync(process.execPath, [path.join(root, "scripts/loop-runner.mjs"), ...args], {
-        cwd: checkout,
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
+  it(
+    "runs the startup-to-PR path through the real CLI in an isolated worktree",
+    { timeout: 30000 },
+    () => {
+      const { git } = repository();
+      const parent = mkdtempSync(path.join(tmpdir(), "loop-cli-"));
+      dirs.push(parent);
+      const checkout = path.join(parent, "checkout");
+      git("worktree", "add", "-b", "codex/integration", checkout, "preview");
+      const spec = path.join(parent, "spec.json");
+      writeFileSync(spec, JSON.stringify(taskFixture().spec));
+      const cli = (...args) =>
+        execFileSync(process.execPath, [path.join(root, "scripts/loop-runner.mjs"), ...args], {
+          cwd: checkout,
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      const initial = JSON.parse(
+        cli(
+          "--init",
+          spec,
+          "--task",
+          "integration",
+          "--runtime",
+          "codex",
+          "--implementer",
+          "author",
+          "--base",
+          "preview",
+        ),
+      );
+      // Default CLI output is a compact summary — never the full task document.
+      expect(initial).toMatchObject({
+        taskId: "integration",
+        state: "refine",
+        risk: "T1",
+        profile: { selected: "standard", source: "provisional" },
       });
-    const initial = JSON.parse(
-      cli(
-        "--init",
-        spec,
-        "--task",
-        "integration",
-        "--runtime",
-        "codex",
-        "--implementer",
-        "author",
-        "--base",
-        "preview",
-      ),
-    );
-    // Default CLI output is a compact summary — never the full task document.
-    expect(initial).toMatchObject({
-      taskId: "integration",
-      state: "refine",
-      risk: "T1",
-      profile: { selected: "standard", source: "provisional" },
-    });
-    for (const key of ["configuration", "assessment", "history", "spec"])
-      expect(initial).not.toHaveProperty(key);
-    const provisional = loadTask(checkout).configuration;
-    expect(provisional.profile.name).toBe("standard");
-    expect(provisional.selection).toMatchObject({
-      selected: "standard",
-      source: "provisional",
-    });
-    // Leaving REFINE requires the determination inputs recorded via --assessment.
-    expect(() => cli("--event", "ready")).toThrow();
-    const refineAssessment = path.join(parent, "refine-assessment.json");
-    writeFileSync(
-      refineAssessment,
-      JSON.stringify({
-        ...taskFixture().agentAssessment,
-        verification_load: { level: "routine", rationale: "process checks only" },
-      }),
-    );
-    cli("--assessment", refineAssessment);
-    cli("--event", "ready");
-    const decided = loadTask(checkout).configuration;
-    expect(decided.profile.name).toBe("fast");
-    expect(decided.selection).toMatchObject({
-      selected: "fast",
-      source: "auto",
-      inputs: {
-        blast_radius: "local",
-        uncertainty: "known_pattern",
-        verification_load: "routine",
-      },
-    });
-    writeFileSync(path.join(checkout, "README.md"), "change");
-    execFileSync("git", ["add", "."], { cwd: checkout });
-    execFileSync("git", ["-c", "core.hooksPath=/dev/null", "commit", "-m", "change"], {
-      cwd: checkout,
-      stdio: "pipe",
-    });
-    expect(() => cli("--event", "ready")).toThrow();
-    const assessment = path.join(parent, "assessment.json");
-    writeFileSync(assessment, JSON.stringify(taskFixture().agentAssessment));
-    cli("--assessment", assessment);
-    // The same evaluation inputs must not trigger re-determination.
-    expect(loadTask(checkout).configuration.selection.revisions).toHaveLength(1);
-    cli("--verify", "process");
-    cli("--event", "ready");
-    const task = loadTask(checkout);
-    const report = path.join(parent, "review.json");
-    writeFileSync(report, JSON.stringify(reviewFixture(task)));
-    cli("--review", report);
-    cli("--event", "clean");
-    expect(parseStateBlock(cli("--export")).state).toBe("aftercare");
-    expect(() => cli("--event", "ready")).toThrow();
-    expect(loadTask(checkout).state).toBe("aftercare");
-    // Focused read actions expose decision data without dumping the task.
-    const status = JSON.parse(cli("--status"));
-    expect(status).toMatchObject({ taskId: "integration", state: "aftercare" });
-    expect(status.verification.process).toBe("pass");
-    expect(status).not.toHaveProperty("configuration");
-    const explain = JSON.parse(cli("--explain"));
-    expect(explain.missing).toContain("aftercare");
-    expect(explain.verificationDetail.process.appliesTo.contractVersion).toBe(1);
-    const artifacts = JSON.parse(cli("--artifacts"));
-    expect(artifacts.artifacts.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(artifacts.artifacts.process.artifact.available).toBe(true);
-    // The manifest references the log artifact; it never contains raw log text.
-    const entry = artifacts.artifacts.process.artifact;
-    expect(path.isAbsolute(entry.path)).toBe(false);
-    expect(entry.resolved).toContain("agent-evidence");
-    expect(entry.resolved.startsWith(path.join(checkout, ".git"))).toBe(false);
-    const stateFile = path.join(parent, "state.md");
-    expect(JSON.parse(cli("--export-file", stateFile)).written).toBe(stateFile);
-    expect(parseStateBlock(readFileSync(stateFile, "utf8")).state).toBe("aftercare");
-  });
+      for (const key of ["configuration", "assessment", "history", "spec"])
+        expect(initial).not.toHaveProperty(key);
+      const provisional = loadTask(checkout).configuration;
+      expect(provisional.profile.name).toBe("standard");
+      expect(provisional.selection).toMatchObject({
+        selected: "standard",
+        source: "provisional",
+      });
+      // Leaving REFINE requires the determination inputs recorded via --assessment.
+      expect(() => cli("--event", "ready")).toThrow();
+      const refineAssessment = path.join(parent, "refine-assessment.json");
+      writeFileSync(
+        refineAssessment,
+        JSON.stringify({
+          ...taskFixture().agentAssessment,
+          verification_load: { level: "routine", rationale: "process checks only" },
+        }),
+      );
+      cli("--assessment", refineAssessment);
+      cli("--event", "ready");
+      const decided = loadTask(checkout).configuration;
+      expect(decided.profile.name).toBe("fast");
+      expect(decided.selection).toMatchObject({
+        selected: "fast",
+        source: "auto",
+        inputs: {
+          blast_radius: "local",
+          uncertainty: "known_pattern",
+          verification_load: "routine",
+        },
+      });
+      writeFileSync(path.join(checkout, "README.md"), "change");
+      execFileSync("git", ["add", "."], { cwd: checkout });
+      execFileSync("git", ["-c", "core.hooksPath=/dev/null", "commit", "-m", "change"], {
+        cwd: checkout,
+        stdio: "pipe",
+      });
+      expect(() => cli("--event", "ready")).toThrow();
+      const assessment = path.join(parent, "assessment.json");
+      writeFileSync(assessment, JSON.stringify(taskFixture().agentAssessment));
+      cli("--assessment", assessment);
+      // The same evaluation inputs must not trigger re-determination.
+      expect(loadTask(checkout).configuration.selection.revisions).toHaveLength(1);
+      cli("--verify", "process");
+      cli("--event", "ready");
+      const task = loadTask(checkout);
+      const report = path.join(parent, "review.json");
+      writeFileSync(report, JSON.stringify(reviewFixture(task)));
+      cli("--review", report);
+      cli("--event", "clean");
+      expect(parseStateBlock(cli("--export")).state).toBe("aftercare");
+      expect(() => cli("--event", "ready")).toThrow();
+      expect(loadTask(checkout).state).toBe("aftercare");
+      // Focused read actions expose decision data without dumping the task.
+      const status = JSON.parse(cli("--status"));
+      expect(status).toMatchObject({ taskId: "integration", state: "aftercare" });
+      expect(status.verification.process).toBe("pass");
+      expect(status).not.toHaveProperty("configuration");
+      const explain = JSON.parse(cli("--explain"));
+      expect(explain.missing).toContain("aftercare");
+      expect(explain.verificationDetail.process.appliesTo.contractVersion).toBe(1);
+      const artifacts = JSON.parse(cli("--artifacts"));
+      expect(artifacts.artifacts.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(artifacts.artifacts.process.artifact.available).toBe(true);
+      // The manifest references the log artifact; it never contains raw log text.
+      const entry = artifacts.artifacts.process.artifact;
+      expect(path.isAbsolute(entry.path)).toBe(false);
+      expect(entry.resolved).toContain("agent-evidence");
+      expect(entry.resolved.startsWith(path.join(checkout, ".git"))).toBe(false);
+      const stateFile = path.join(parent, "state.md");
+      expect(JSON.parse(cli("--export-file", stateFile)).written).toBe(stateFile);
+      expect(parseStateBlock(readFileSync(stateFile, "utf8")).state).toBe("aftercare");
+    },
+  );
   it("rejects caller-selected states and missing specs", () => {
     expect(() => resolveLoopStep({ state: "aftercare", event: "ready", root })).toThrow(
       "Persisted task",
