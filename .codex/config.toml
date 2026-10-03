@@ -1,3 +1,7 @@
 [agents]
 max_threads = 6
 max_depth = 1
+
+[mcp_servers.indexion]
+command = "indexion"
+args = ["mcp"]
