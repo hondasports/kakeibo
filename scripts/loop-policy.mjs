@@ -168,6 +168,60 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
     );
   }
 }
+/** Start-time key: when the run began, not when it finished. */
+const checkStartKey = (check) =>
+  check.startedAt ?? check.started_at ?? check.createdAt ?? check.created_at ?? "";
+/** Ordering key for a check entry: run start preferred, completion as fallback. */
+export function checkRecencyKey(check) {
+  return checkStartKey(check) || (check.completedAt ?? check.completed_at ?? "");
+}
+export function isPendingCheck(check) {
+  if (check.status) return check.status !== "COMPLETED";
+  return ["PENDING", "EXPECTED", "QUEUED", "IN_PROGRESS", "WAITING", "REQUESTED"].includes(
+    check.state,
+  );
+}
+// Retried checks (flake rerun, ready_for_review re-trigger) leave superseded
+// runs in the rollup; only the latest run per check name is authoritative.
+// A pending run is superseded only by a completed run whose start is strictly
+// newer — a completion time alone cannot prove the pending attempt is older,
+// because the completed run may have started before it. Entries we cannot
+// order (no name/context or no timestamp) and pending runs that are not
+// provably superseded are always kept so a failed or pending run is never
+// hidden behind an older success — fail-closed.
+export function selectChecks(rawChecks) {
+  const groups = new Map();
+  const selected = [];
+  for (const check of rawChecks) {
+    const name = check.name ?? check.context;
+    const at = checkRecencyKey(check);
+    if (!name || !at) {
+      selected.push(check);
+      continue;
+    }
+    const group = groups.get(name) ?? [];
+    group.push({ check, at });
+    groups.set(name, group);
+  }
+  for (const group of groups.values()) {
+    const completed = group.filter((entry) => !isPendingCheck(entry.check));
+    const latest = completed.reduce(
+      (best, entry) => (best && entry.at < best.at ? best : entry),
+      null,
+    );
+    const blocking = group.filter(
+      (entry) =>
+        isPendingCheck(entry.check) &&
+        !completed.some((other) => {
+          const start = checkStartKey(other.check);
+          return start && start > entry.at;
+        }),
+    );
+    if (blocking.length > 0) selected.push(...blocking.map((entry) => entry.check));
+    else if (latest) selected.push(latest.check);
+  }
+  return selected;
+}
 export function checkAftercare(pr, task, findings) {
   requireValue(
     pr.headRefOid === task.head && pr.baseRefOid === task.baseHead,
@@ -186,29 +240,7 @@ export function checkAftercare(pr, task, findings) {
   );
   const rawChecks = pr.statusCheckRollup ?? [];
   requireValue(rawChecks.length > 0, "No CI checks observed");
-  // Retried checks (flake rerun, ready_for_review re-trigger) leave superseded
-  // runs in the rollup; only the latest dated run per check name is authoritative.
-  // Entries we cannot order (no name/context or no timestamp) are always kept so a
-  // failed or pending run is never hidden behind an older success — fail-closed.
-  const latestByName = new Map();
-  const unorderable = [];
-  for (const check of rawChecks) {
-    const key = check.name ?? check.context;
-    const at =
-      check.completedAt ??
-      check.completed_at ??
-      check.createdAt ??
-      check.created_at ??
-      check.startedAt ??
-      "";
-    if (!key || !at) {
-      unorderable.push(check);
-      continue;
-    }
-    const prev = latestByName.get(key);
-    if (!prev || at >= prev.at) latestByName.set(key, { check, at });
-  }
-  const checks = [...latestByName.values()].map((entry) => entry.check).concat(unorderable);
+  const checks = selectChecks(rawChecks);
   for (const check of checks) {
     const status = check.conclusion ?? check.state;
     requireValue(
