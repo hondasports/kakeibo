@@ -2,11 +2,20 @@
 /// <reference types="vite/client" />
 
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+});
+
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});
 
 const identity = (userId: string) => ({
   tokenIdentifier: userId,
@@ -777,5 +786,55 @@ describe("internal LINE job claim and completion", () => {
 
     const job = await t.run(async (ctx) => await ctx.db.get(jobId));
     expect(job).toMatchObject({ status: "failed", errorCode: "retry_key_expired" });
+  });
+
+  it("retry completion queues one process action and stale completions queue none", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const jobId = await seedClaimableJob(t);
+    const retryKey = "550e8400-e29b-41d4-a716-446655440000";
+    const scheduledNames = async () =>
+      (await t.run(async (ctx) => await ctx.db.system.query("_scheduled_functions").collect())).map(
+        (row) => row.name,
+      );
+
+    await t.mutation(internal.notifications.internal.claimLineNotificationJob, {
+      jobId,
+      retryKeyCandidate: retryKey,
+      leaseMs: 30_000,
+      now: 10_000,
+    });
+    const afterClaim = await scheduledNames();
+    expect(afterClaim.filter((name) => name.includes("recoverLineNotificationLease"))).toHaveLength(
+      1,
+    );
+    expect(afterClaim.filter((name) => name.includes("processLineNotificationJob"))).toHaveLength(
+      0,
+    );
+
+    await t.mutation(internal.notifications.internal.completeLineNotificationJob, {
+      jobId,
+      attemptCount: 1,
+      completion: {
+        outcome: "retrying",
+        nextRetryAt: 70_000,
+        errorCode: "provider_unavailable",
+      },
+      now: 20_000,
+    });
+    const afterRetry = await scheduledNames();
+    expect(afterRetry.filter((name) => name.includes("processLineNotificationJob"))).toHaveLength(
+      1,
+    );
+
+    await t.mutation(internal.notifications.internal.completeLineNotificationJob, {
+      jobId,
+      attemptCount: 99,
+      completion: { outcome: "sent" },
+      now: 30_000,
+    });
+    const afterStale = await scheduledNames();
+    expect(afterStale.filter((name) => name.includes("processLineNotificationJob"))).toHaveLength(
+      1,
+    );
   });
 });
