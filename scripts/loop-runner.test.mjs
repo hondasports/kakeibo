@@ -591,7 +591,19 @@ describe("persistent task gates", () => {
     upstreamCommit(dir, git, "src/upstream.ts", "export {};\n");
     // Rebasing keeps the patch byte-identical but embeds new base content —
     // the head tree differs, so verification must re-run on the new content.
+    const beforeSha = task.verification.process.appliesTo.patchSha256;
     git("-c", "core.hooksPath=/dev/null", "rebase", "preview");
+    // Prove the patch fingerprint held — the drop below must come from the
+    // head-tree fingerprint, not a patch mismatch.
+    const afterSha = createHash("sha256")
+      .update(
+        execFileSync("git", ["diff", "--binary", "--no-renames", "preview...HEAD"], {
+          cwd: dir,
+          encoding: "utf8",
+        }).trim(),
+      )
+      .digest("hex");
+    expect(afterSha).toBe(beforeSha);
     const refreshed = refreshTask(loadTask(dir), dir);
     expect(refreshed.verification).toEqual({});
     expect(refreshed.history.at(-1).reusedVerification).toEqual([]);

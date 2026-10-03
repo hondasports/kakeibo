@@ -90,10 +90,13 @@ function featurePatchSha256(task, root, head = task.head) {
 /**
  * Revision-change invalidation: verification evidence may be carried over only
  * when both the feature patch and the verified tree are byte-identical to the
- * new revision — verification is a deterministic function of tree content, so
- * identical content reproduces the same result. `run` keeps recording where
- * the verification actually executed and never gets rewritten. Everything
- * else (review, aftercare, assessment, skills) still invalidates wholesale.
+ * new revision — the same commands over the same tree inputs reproduce the
+ * same result. Commands can still read inputs outside the tree (toolchain,
+ * gitignored files, environment); that residual is accepted because CI
+ * re-executes every required check on the real PR head. `run` keeps recording
+ * where the verification actually executed and never gets rewritten.
+ * Everything else (review, aftercare, assessment, skills) still invalidates
+ * wholesale.
  */
 function invalidateRevision(task, root, head, baseHead) {
   const patchSha256 = featurePatchSha256(task, root, head);

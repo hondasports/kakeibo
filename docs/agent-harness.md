@@ -57,7 +57,7 @@ node scripts/loop-runner.mjs --event ready
 
 検証ログは `git rev-parse --git-path agent-evidence` 配下にartifactとして保存され、worktreeを汚さない。証跡manifestは実実行の `run`（HEAD/base・時刻・時間）と適用対象の `appliesTo`（HEAD/base・head tree・feature patch SHA-256・contract version）を分けて記録し、exit summary・artifactのpath/SHA-256/bytesを保持する。成功時のログ本文は通常出力に含めない。失敗時のエラーはexit code・artifact path・末尾行だけを返し、全文はartifactを参照する。
 
-HEAD/base更新で古い検証・レビューは失効するが、verification証跡だけは安全に部分再利用できる。feature patch（merge-base差分のSHA-256）と検証対象のhead treeがともに不変な場合のみ `appliesTo` を新revisionへ更新し、`reuse.from` に元revisionを記録する。検証はtree内容の決定的関数なので、同一内容は同一結果を再現する——入力推論は行わない。`run` は実実行の記録のまま書き換えない。fingerprintの計算不能・contract version不一致・必須metadata欠落はすべてfail-closedで失効する。review・aftercare・assessment・skillsは再利用しない。`git fetch origin` 後も状態を再確認する。
+HEAD/base更新で古い検証・レビューは失効するが、verification証跡だけは安全に部分再利用できる。feature patch（merge-base差分のSHA-256）と検証対象のhead treeがともに不変な場合のみ `appliesTo` を新revisionへ更新し、`reuse.from` に元revisionを記録する。同一のtree入力には同一の結果を再現できる——入力推論は行わない。ツールチェーン・gitignore済みファイルなどtree外の入力はfingerprintできない残差だが、必須確認はCIが実HEAD上で再実行するため再利用はローカル短絡に留まる。`run` は実実行の記録のまま書き換えない。fingerprintの計算不能・contract version不一致・必須metadata欠落はすべてfail-closedで失効する。review・aftercare・assessment・skillsは再利用しない。`git fetch origin` 後も状態を再確認する。
 
 同じ検証コマンド・終了コードが連続して3回失敗した場合はINCIDENTへ停止する。修正前後で原因が変わったと判断する場合も、INCIDENTのresolutionに切り分け証拠を記録して解除する。単なる再試行でカウンタをリセットしない。
 
