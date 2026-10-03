@@ -17,53 +17,29 @@ export const CHECK_COMMANDS = {
   unit: [["pnpm", "exec", "vitest", "run"]],
   build: [["pnpm", "run", "build"]],
 };
-/**
- * What each verification kind reads beyond the feature patch itself.
- * `inputs: null` means the whole tree — only an empty upstream delta reuses it.
- */
+/** Where each verification kind executes and what it covers. */
 export const VERIFICATION_SCOPES = {
-  process: {
-    execution: "local",
-    scope: "harness docs integrity + process test suite",
-    inputs: [
-      /^\.agent\//,
-      /^docs\//,
-      /^skills\//,
-      /^scripts\//,
-      /^AGENTS\.md$/,
-      /^README\.md$/,
-      /^package\.json$/,
-      /^pnpm-lock\.yaml$/,
-      /^pnpm-workspace\.yaml$/,
-      /^vitest\.config\./,
-      /^tsconfig[^/]*\.json$/,
-    ],
-  },
-  lint: { execution: "local", scope: "repo lint + format", inputs: null },
-  unit: { execution: "local", scope: "vitest unit suite", inputs: null },
-  build: { execution: "local", scope: "production build", inputs: null },
-  e2e: { execution: "github", scope: "playwright e2e (delivery gate)", inputs: null },
+  process: { execution: "local", scope: "harness docs integrity + process test suite" },
+  lint: { execution: "local", scope: "repo lint + format" },
+  unit: { execution: "local", scope: "vitest unit suite" },
+  build: { execution: "local", scope: "production build" },
+  e2e: { execution: "github", scope: "playwright e2e (delivery gate)" },
 };
 /**
  * Whether recorded verification evidence may apply to a different revision.
- * Sound only when the feature patch is byte-identical and the upstream delta
- * does not touch the kind's declared inputs. Every unknown fails closed.
+ * Reuse requires both the feature patch AND the verified tree to be
+ * byte-identical — the same commands over the same content produce the same
+ * result, with no input-list inference to get wrong. Every unknown fails
+ * closed.
  */
-export function verificationReusable(
-  kind,
-  evidence,
-  { patchSha256, upstreamDeltaPaths, contractVersion },
-) {
+export function verificationReusable(evidence, { patchSha256, headTree, contractVersion }) {
   if (!evidence || evidence.success !== true) return false;
   const appliesTo = evidence.appliesTo;
   if (!appliesTo || typeof appliesTo.patchSha256 !== "string" || !appliesTo.patchSha256)
     return false;
   if (appliesTo.contractVersion !== contractVersion) return false;
   if (typeof patchSha256 !== "string" || appliesTo.patchSha256 !== patchSha256) return false;
-  if (!Array.isArray(upstreamDeltaPaths)) return false;
-  const inputs = VERIFICATION_SCOPES[kind]?.inputs;
-  if (!inputs) return upstreamDeltaPaths.length === 0;
-  return !upstreamDeltaPaths.some((changed) => inputs.some((re) => re.test(changed)));
+  return typeof headTree === "string" && appliesTo.headTree === headTree;
 }
 export function requireValue(condition, message) {
   if (!condition) throw new Error(message);
@@ -199,11 +175,7 @@ function verificationPlan(result, task) {
   const acs = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id).filter(Boolean);
   const thorough = task.configuration?.profile?.verification === "thorough";
   return Object.entries(result.verification).map(([kind, required]) => {
-    const meta = VERIFICATION_SCOPES[kind] ?? {
-      execution: "local",
-      scope: "unknown",
-      inputs: null,
-    };
+    const meta = VERIFICATION_SCOPES[kind] ?? { execution: "local", scope: "unknown" };
     const reason =
       kind === "process"
         ? "required for every change"

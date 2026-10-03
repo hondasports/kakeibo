@@ -88,31 +88,28 @@ function featurePatchSha256(task, root, head = task.head) {
   }
 }
 /**
- * Revision-change invalidation: verification evidence whose feature patch is
- * byte-identical and whose declared inputs are untouched by the upstream delta
- * is carried over with `reuse` metadata — `run` keeps recording where the
- * verification actually executed and never gets rewritten. Everything else
- * (review, aftercare, assessment, skills) still invalidates wholesale.
+ * Revision-change invalidation: verification evidence may be carried over only
+ * when both the feature patch and the verified tree are byte-identical to the
+ * new revision — verification is a deterministic function of tree content, so
+ * identical content reproduces the same result. `run` keeps recording where
+ * the verification actually executed and never gets rewritten. Everything
+ * else (review, aftercare, assessment, skills) still invalidates wholesale.
  */
 function invalidateRevision(task, root, head, baseHead) {
   const patchSha256 = featurePatchSha256(task, root, head);
-  let upstreamDeltaPaths = null;
-  if (task.baseHead !== baseHead) {
-    try {
-      upstreamDeltaPaths = git(["diff", "--name-only", `${task.baseHead}..${baseHead}`], root)
-        .split("\n")
-        .filter(Boolean);
-    } catch {
-      upstreamDeltaPaths = null;
-    }
-  } else upstreamDeltaPaths = [];
+  let headTree = null;
+  try {
+    headTree = git(["rev-parse", `${head}^{tree}`], root);
+  } catch {
+    headTree = null;
+  }
   const kept = {};
   const reused = [];
   for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
     if (
-      !verificationReusable(kind, evidence, {
+      !verificationReusable(evidence, {
         patchSha256,
-        upstreamDeltaPaths,
+        headTree,
         contractVersion: EVIDENCE_CONTRACT_VERSION,
       })
     )
@@ -311,8 +308,8 @@ export function runVerification(
     task.head === before.head && task.baseHead === before.baseHead,
     "Revision changed during verification",
   );
-  // A null hash keeps the evidence valid for this revision but it can never be
-  // reused for another — fail-closed.
+  // Null fingerprints keep the evidence valid for this revision but it can
+  // never be reused for another — fail-closed.
   const patchSha256 = featurePatchSha256(task, root);
   const log = readFileSync(artifactPath, "utf8");
   task.verification[kind] = {
@@ -325,6 +322,7 @@ export function runVerification(
     appliesTo: {
       head: before.head,
       baseHead: before.baseHead,
+      headTree: git(["rev-parse", `${before.head}^{tree}`], root),
       patchSha256,
       contractVersion: EVIDENCE_CONTRACT_VERSION,
     },
