@@ -1,6 +1,7 @@
 import { validateDocument } from "./loop-schema.mjs";
 import { assessChange } from "./assess-change.mjs";
 import { REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
+import { profileInputs, missingProfileInputs } from "./resolve-agent-profile.mjs";
 
 export const highestTier = (...tiers) =>
   REVIEW_TIERS[Math.max(...tiers.filter(Boolean).map((tier) => REVIEW_TIERS.indexOf(tier)), 0)];
@@ -89,7 +90,17 @@ export function missingRequirements(task) {
   };
   if (task.state === "refine") {
     if (!task.agentAssessment) missing.push("assessment");
+    else
+      for (const field of missingProfileInputs(
+        profileInputs(task.agentAssessment, {
+          fallbackLoad: task.configuration?.selection?.inputs?.verification_load,
+        }),
+      ))
+        missing.push(`profile:${field}`);
     if ((task.spec?.openMaterialDecisions ?? []).length > 0) missing.push("openMaterialDecisions");
+    const ids = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id);
+    if (!ids.length || !ids.every(text) || new Set(ids).size !== ids.length)
+      missing.push("spec:acceptanceCriteria");
   }
   if (task.state === "execute") localVerificationMissing();
   if (task.state === "review") {
