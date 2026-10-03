@@ -38,5 +38,6 @@ describe("assessChange", () => {
       expect(() => parseArguments([option])).toThrow(`${option} requires a value`);
       expect(() => parseArguments([option, "--next-option"])).toThrow(`${option} requires a value`);
     }
+    expect(() => parseArguments(["--", "--paths", "src/a.ts"])).not.toThrow();
   });
 });

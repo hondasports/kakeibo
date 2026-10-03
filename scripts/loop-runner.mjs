@@ -876,6 +876,7 @@ export function parseArguments(args) {
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+    if (arg === "--") continue; // pnpm forwards a bare "--" through to the script
     requireValue(flags.has(arg) || options.has(arg), `unknown option: ${arg}`);
     requireValue(!Object.hasOwn(out, arg.slice(2)), `duplicate option: ${arg}`);
     out[arg.slice(2)] = flags.has(arg) ? true : option(args, i++);

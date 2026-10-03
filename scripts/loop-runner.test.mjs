@@ -361,6 +361,8 @@ describe("persistent task gates", () => {
     for (const flag of ["--model", "--profile", "--runtime", "--event", "--exit", "--review"])
       expect(() => parseArguments([flag])).toThrow("requires a value");
     expect(() => parseArguments(["--magic"])).toThrow("unknown option");
+    // A bare "--" (forwarded verbatim by pnpm run) is skipped, not an option.
+    expect(parseArguments(["--", "--export"])).toEqual({ export: true });
   });
   it("accepts --model for backward compatibility without recording it", () => {
     const { git } = repository();

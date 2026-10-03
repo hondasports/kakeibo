@@ -139,6 +139,10 @@ describe("E2E relevance git and output helpers", () => {
     expect(() => parseArguments(["--base", SHA, "--head", SHA, "--github-output"])).toThrow(
       "--github-output requires a non-empty path",
     );
+    expect(parseArguments(["--", "--base", SHA, "--head", SHA])).toMatchObject({
+      baseSha: SHA,
+      headSha: SHA,
+    });
   });
 
   it("reads a NUL-delimited diff and writes stable GitHub outputs", () => {

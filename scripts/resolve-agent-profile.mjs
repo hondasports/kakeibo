@@ -222,6 +222,7 @@ export function parseArgs(args) {
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
+    if (arg === "--") continue;
     if (arg === "--profile") {
       profile = readOptionValue(args, index, arg);
       index += 1;
