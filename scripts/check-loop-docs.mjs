@@ -133,16 +133,34 @@ export function checkAgentsSkillReferences(repoRoot) {
   return errors;
 }
 
-/** Every capability skill must be listed in AGENTS.md, otherwise it is undiscoverable. */
+/** Content of the `## Capability skills` section only — casual `skills/x` mentions elsewhere do not count as listing. */
+export function extractCapabilitySkillsSection(content) {
+  const text = String(content);
+  const start = text.indexOf("## Capability skills");
+  if (start === -1) return "";
+  const rest = text.slice(start);
+  const next = rest.indexOf("\n## ");
+  return next === -1 ? rest : rest.slice(0, next + 1);
+}
+
+/** Every capability skill must be listed in AGENTS.md's Capability skills section, otherwise it is undiscoverable. */
 export function checkSkillsDiscoverability(repoRoot) {
   const errors = [];
   const agentsPath = path.join(repoRoot, "AGENTS.md");
   const skillsDir = path.join(repoRoot, "skills");
   if (!existsSync(agentsPath) || !existsSync(skillsDir)) return errors;
-  const referenced = new Set(extractSkillReferences(readFileSync(agentsPath, "utf8")));
+  const referenced = new Set(
+    extractSkillReferences(extractCapabilitySkillsSection(readFileSync(agentsPath, "utf8"))),
+  );
   for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    if (!existsSync(path.join(skillsDir, entry.name, "SKILL.md"))) continue;
+    const skillDir = path.join(skillsDir, entry.name);
+    if (!existsSync(path.join(skillDir, "SKILL.md"))) {
+      errors.push(
+        `skills/${entry.name}: SKILL.md が存在しません（許可されるのは直下にSKILL.mdを持つ構成のみ）`,
+      );
+      continue;
+    }
     if (!referenced.has(entry.name)) {
       errors.push(
         `skills/${entry.name}: SKILL.md が存在しますが AGENTS.md のCapability skills一覧から参照されていません`,

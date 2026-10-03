@@ -81,7 +81,7 @@ describe("skill reference checks", () => {
 
   it("fails when a SKILL.md exists but is not referenced from AGENTS.md", () => {
     const repo = makeRepo();
-    write(repo, "AGENTS.md", "see `skills/listed` only");
+    write(repo, "AGENTS.md", "## Capability skills\n\n- see `skills/listed` only\n\n## Runtime\n");
     write(
       repo,
       "skills/listed/SKILL.md",
@@ -94,6 +94,42 @@ describe("skill reference checks", () => {
     );
     const result = checkLoopDocs(repo);
     expect(result.errors.some((e) => e.includes("skills/orphan"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("skills/listed"))).toBe(false);
+  });
+
+  it("ignores skill mentions outside the Capability skills section", () => {
+    const repo = makeRepo();
+    write(
+      repo,
+      "AGENTS.md",
+      "other text `skills/listed`\n\n## Capability skills\n\n- none\n\n## Runtime\n",
+    );
+    write(
+      repo,
+      "skills/listed/SKILL.md",
+      "---\nname: listed\ndescription: d\nlicense: l\n---\nbody",
+    );
+    const result = checkLoopDocs(repo);
+    expect(result.errors.some((e) => e.includes("skills/listed"))).toBe(true);
+  });
+
+  it("fails on a skills/ directory without SKILL.md", () => {
+    const repo = makeRepo();
+    write(repo, "AGENTS.md", "## Capability skills\n\n- `skills/listed`\n\n## Runtime\n");
+    write(
+      repo,
+      "skills/listed/SKILL.md",
+      "---\nname: listed\ndescription: d\nlicense: l\n---\nbody",
+    );
+    write(repo, "skills/stray/notes.md", "leftover");
+    write(
+      repo,
+      "skills/nested/deep/SKILL.md",
+      "---\nname: deep\ndescription: d\nlicense: l\n---\nbody",
+    );
+    const result = checkLoopDocs(repo);
+    expect(result.errors.some((e) => e.includes("skills/stray"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("skills/nested"))).toBe(true);
     expect(result.errors.some((e) => e.includes("skills/listed"))).toBe(false);
   });
 });

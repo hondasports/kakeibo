@@ -131,6 +131,37 @@ describe("GitHub delivery gates", () => {
     };
     expect(() => checkAftercare(pr, task, findings)).toThrow("Unsuccessful");
   });
+  it("never hides an unorderable check behind a dated success (fail-closed)", () => {
+    const task = readyTask();
+    const pr = prFixture(task);
+    pr.statusCheckRollup = [
+      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "SUCCESS",
+        completedAt: "2026-10-03T02:00:00Z",
+      },
+      // Undated failure: cannot be ordered, must still be evaluated.
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "failure",
+      },
+    ];
+    expect(() => checkAftercare(pr, task, findings)).toThrow("Unsuccessful");
+    // Nameless/contextless entries are also always evaluated.
+    pr.statusCheckRollup[2] = { status: "IN_PROGRESS", conclusion: "" };
+    expect(() => checkAftercare(pr, task, findings)).toThrow("Unsuccessful or pending");
+    // A newer pending retry of a dated success also stays visible.
+    pr.statusCheckRollup[2] = {
+      name: "E2E (Playwright / Chromium / authenticated)",
+      status: "IN_PROGRESS",
+      conclusion: "",
+      startedAt: "2026-10-03T02:30:00Z",
+    };
+    expect(() => checkAftercare(pr, task, findings)).toThrow("pending");
+  });
   it("preserves a reviewer's higher risk and enforces independence", () => {
     const task = readyTask();
     task.review.assessment.applied_tier = "T3";
