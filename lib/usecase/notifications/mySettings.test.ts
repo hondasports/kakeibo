@@ -46,7 +46,6 @@ function makeQueryDeps({
     users: { findByUserId: vi.fn().mockResolvedValue(user) },
     links: {
       listActiveByUserId: vi.fn().mockResolvedValue(links),
-      findLatestActiveByUserId: vi.fn().mockResolvedValue(links[0] ?? null),
     },
     accountDeletionRequests: { listByUser: vi.fn().mockResolvedValue(deletionRequests) },
   } as never;
@@ -84,6 +83,14 @@ describe("getMyNotificationSettings", () => {
       emailGloballyEnabled: false,
       lineGloballyEnabled: true,
     });
+  });
+
+  it("複数のactive LINE linkがある場合は未連携として扱う", async () => {
+    const result = await getMyNotificationSettings(
+      makeQueryDeps({ links: [{ id: "link-1" }, { id: "link-2" }] }),
+      "user-1",
+    );
+    expect(result.lineLinked).toBe(false);
   });
 
   it("rejects missing and deleting users", async () => {

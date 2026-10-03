@@ -50,6 +50,21 @@ describe("NotificationSettingsPanel", () => {
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   });
 
+  it("読み込みに失敗しても見出しを維持して局所エラーを表示する", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    useQueryMock.mockImplementation(() => {
+      throw new Error("backend unavailable");
+    });
+
+    try {
+      renderWithProviders(<NotificationSettingsPanel />);
+      expect(screen.getByRole("heading", { name: "通知設定" })).toBeInTheDocument();
+      expect(screen.getByText("この設定を読み込めませんでした。")).toBeInTheDocument();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("メール/LINEスイッチと必須メールの読み取り専用リストを表示する", () => {
     renderWithProviders(<NotificationSettingsPanel />);
     expect(screen.getByRole("switch", { name: "AIレビューのメール通知" })).toBeChecked();

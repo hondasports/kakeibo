@@ -378,12 +378,7 @@ describe("checkAiReviewRequiredHandler", () => {
         _id: "batch-1",
         createdByUserId: "https://issuer.example|user-001",
       })
-      .mockResolvedValueOnce(2)
-      .mockResolvedValueOnce({
-        userId: "https://issuer.example|user-001",
-        email: "user@example.com",
-        displayName: "ユーザー",
-      });
+      .mockResolvedValueOnce(2);
 
     ctx.runMutation = vi.fn().mockResolvedValueOnce("email-job-1");
 
@@ -418,7 +413,7 @@ describe("checkAiReviewRequiredHandler", () => {
     expect(ctx.runMutation).not.toHaveBeenCalled();
   });
 
-  it("作成者の email が未設定でも通知 enqueue mutation を呼ぶ", async () => {
+  it("needs_review 待ちがあれば batchId/userId/pendingCount だけで通知 enqueue する", async () => {
     const ctx = createActionCtx(createIdentity());
 
     ctx.runQuery = vi
@@ -427,12 +422,7 @@ describe("checkAiReviewRequiredHandler", () => {
         _id: "batch-1",
         createdByUserId: "https://issuer.example|user-001",
       })
-      .mockResolvedValueOnce(2)
-      .mockResolvedValueOnce({
-        userId: "https://issuer.example|user-001",
-        email: null,
-        displayName: "ユーザー",
-      });
+      .mockResolvedValueOnce(2);
 
     ctx.runMutation = vi.fn();
 
@@ -440,6 +430,7 @@ describe("checkAiReviewRequiredHandler", () => {
       batchId: "batch-1" as Id<"receiptAnalysisBatches">,
     });
 
+    expect(ctx.runQuery).toHaveBeenCalledTimes(2);
     expect(ctx.runMutation).toHaveBeenCalledWith(expect.anything(), {
       batchId: "batch-1",
       userId: "https://issuer.example|user-001",

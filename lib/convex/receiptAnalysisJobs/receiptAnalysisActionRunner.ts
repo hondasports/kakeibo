@@ -127,10 +127,6 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
       ctx.runQuery(internal.receiptAnalysisJobs.internal.countNeedsReviewJobsByBatchId, {
         batchId: batchId as Id<"receiptAnalysisBatches">,
       }),
-    async getUserEmail(userId) {
-      const user = await ctx.runQuery(internal.users.internal.getUserById, { userId });
-      return user?.email ?? null;
-    },
     async enqueueAiReviewRequiredNotifications(args) {
       await ctx.runMutation(internal.notifications.internal.enqueueAiReviewNotifications, {
         batchId: args.batchId as Id<"receiptAnalysisBatches">,

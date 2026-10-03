@@ -26,7 +26,7 @@ export type NotificationSettingQueryDeps = {
 export type NotificationUserQueryDeps = {
   settings: NotificationSettingReader;
   users: Pick<UserStore, "findByUserId">;
-  links: Pick<LineAccountLinkReader, "listActiveByUserId" | "findLatestActiveByUserId">;
+  links: Pick<LineAccountLinkReader, "listActiveByUserId">;
   accountDeletionRequests: Pick<AccountDeletionRequestReader, "listByUser">;
 };
 
