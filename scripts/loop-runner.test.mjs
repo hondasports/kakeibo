@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  cpSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  writeSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -15,9 +24,11 @@ import {
   loadTask,
   stateBlock,
   parseStateBlock,
+  summarizeTask,
+  artifactManifest,
 } from "./loop-runner.mjs";
-import { taskFixture, reviewFixture } from "./loop-test-fixtures.mjs";
-import { computeAssessment } from "./loop-policy.mjs";
+import { taskFixture, reviewFixture, verificationManifestFixture } from "./loop-test-fixtures.mjs";
+import { computeAssessment, currentEvidence, verificationSummary } from "./loop-policy.mjs";
 const root = process.cwd();
 const dirs = [];
 afterEach(() => {
@@ -138,8 +149,18 @@ describe("persistent task gates", () => {
         "preview",
       ),
     );
-    expect(initial.configuration.profile.name).toBe("standard");
-    expect(initial.configuration.selection).toMatchObject({
+    // Default CLI output is a compact summary — never the full task document.
+    expect(initial).toMatchObject({
+      taskId: "integration",
+      state: "refine",
+      risk: "T1",
+      profile: { selected: "standard", source: "provisional" },
+    });
+    for (const key of ["configuration", "assessment", "history", "spec"])
+      expect(initial).not.toHaveProperty(key);
+    const provisional = loadTask(checkout).configuration;
+    expect(provisional.profile.name).toBe("standard");
+    expect(provisional.selection).toMatchObject({
       selected: "standard",
       source: "provisional",
     });
@@ -188,6 +209,24 @@ describe("persistent task gates", () => {
     expect(parseStateBlock(cli("--export")).state).toBe("aftercare");
     expect(() => cli("--event", "ready")).toThrow();
     expect(loadTask(checkout).state).toBe("aftercare");
+    // Focused read actions expose decision data without dumping the task.
+    const status = JSON.parse(cli("--status"));
+    expect(status).toMatchObject({ taskId: "integration", state: "aftercare" });
+    expect(status.verification.process).toBe("pass");
+    expect(status).not.toHaveProperty("configuration");
+    const explain = JSON.parse(cli("--explain"));
+    expect(explain.missing).toContain("aftercare");
+    expect(explain.verificationDetail.process.appliesTo.contractVersion).toBe(1);
+    const artifacts = JSON.parse(cli("--artifacts"));
+    expect(artifacts.artifacts.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(artifacts.artifacts.process.artifact.available).toBe(true);
+    // The manifest references the log artifact; it never contains raw log text.
+    const logPath = artifacts.artifacts.process.artifact.path;
+    expect(logPath).toContain("agent-evidence");
+    expect(logPath.startsWith(path.join(checkout, ".git"))).toBe(false);
+    const stateFile = path.join(parent, "state.md");
+    expect(JSON.parse(cli("--export-file", stateFile)).written).toBe(stateFile);
+    expect(parseStateBlock(readFileSync(stateFile, "utf8")).state).toBe("aftercare");
   });
   it("rejects caller-selected states and missing specs", () => {
     expect(() => resolveLoopStep({ state: "aftercare", event: "ready", root })).toThrow(
@@ -337,5 +376,89 @@ describe("persistent task gates", () => {
     expect(readFileSync(path.join(dir, ".agent/process.yaml"), "utf8")).toContain(
       "same_failure_max: 3",
     );
+  });
+  it("records verification evidence as an artifact manifest outside the worktree", () => {
+    const { dir, task } = repository();
+    const result = runVerification(task, "process", dir);
+    const evidence = result.verification.process;
+    expect(evidence.success).toBe(true);
+    expect(evidence.run).toMatchObject({ head: task.head, baseHead: task.baseHead });
+    expect(evidence.run.durationMs).toBeGreaterThanOrEqual(0);
+    expect(evidence.appliesTo).toMatchObject({
+      head: task.head,
+      baseHead: task.baseHead,
+      contractVersion: 1,
+    });
+    expect(evidence.appliesTo.patchSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(evidence.artifact.path).toContain("agent-evidence");
+    expect(evidence.artifact.bytes).toBeGreaterThan(0);
+    const log = readFileSync(evidence.artifact.path, "utf8");
+    expect(createHash("sha256").update(log).digest("hex")).toBe(evidence.artifact.sha256);
+    expect(evidence.summary.lastLines.join("\n")).toContain("exit 0");
+    // Artifact lives under git-internal storage: the worktree stays clean.
+    expect(execFileSync("git", ["status", "--porcelain"], { cwd: dir, encoding: "utf8" })).toBe("");
+  });
+  it("keeps legacy injected runners working and tails failures without raw logs", () => {
+    const { dir, task } = repository();
+    // Legacy runners returning only { status } keep working; context is additive.
+    expect(() => runVerification(task, "process", dir, () => ({ status: 0 }))).not.toThrow();
+    const noisy = (command, { fd }) => {
+      for (let i = 1; i <= 100; i++) writeSync(fd, `line-${String(i).padStart(3, "0")}\n`);
+      return { status: 1 };
+    };
+    let message = "";
+    try {
+      runVerification(task, "process", dir, noisy);
+    } catch (error) {
+      message = error.message;
+    }
+    expect(message).toContain("Verification failed: process (exit 1)");
+    expect(message).toContain("log ");
+    expect(message).toContain("line-100");
+    expect(message).not.toContain("line-050");
+  });
+  it("accepts legacy flat and manifest-shaped verification evidence alike", () => {
+    const task = taskFixture();
+    // taskFixture records the legacy { head, baseHead, success } shape.
+    expect(currentEvidence(task.verification.process, task)).toBe(true);
+    expect(verificationSummary(task)).toEqual({ process: "pass" });
+    expect(artifactManifest(task).process.artifact).toBeNull();
+    task.verification.process = verificationManifestFixture(task);
+    expect(currentEvidence(task.verification.process, task)).toBe(true);
+    const manifest = artifactManifest(task).process;
+    expect(manifest.appliesTo.contractVersion).toBe(1);
+    // Manifests survive restore without artifact bodies: availability is probed.
+    expect(manifest.artifact.available).toBe(false);
+  });
+  it("summarizes tasks into compact next-action output", () => {
+    const task = taskFixture();
+    const summary = summarizeTask(task);
+    expect(summary).toMatchObject({
+      taskId: task.taskId,
+      state: "execute",
+      head: task.head,
+      profile: { selected: "standard" },
+      openFindings: 0,
+    });
+    for (const key of ["configuration", "assessment", "history", "spec", "findings"])
+      expect(summary).not.toHaveProperty(key);
+    expect(summary.next).toEqual(["node scripts/loop-runner.mjs --event ready"]);
+    task.verification.process.head = "stale";
+    const stale = summarizeTask(task);
+    expect(stale.verification.process).toBe("stale");
+    expect(stale.missing).toContain("verify:process");
+    expect(stale.next).toContain("node scripts/loop-runner.mjs --verify process");
+  });
+  it("exposes --status/--explain/--artifacts through run() without changing the task", () => {
+    const { dir, task } = repository();
+    saveTask(task, dir);
+    const status = run({ status: true }, dir);
+    expect(status.version).toBe(2);
+    const explain = run({ explain: true }, dir);
+    expect(explain.missing).toBeDefined();
+    const artifacts = run({ artifacts: true }, dir);
+    expect(artifacts.artifacts.process.run.head).toBe(task.head);
+    // Read actions must not mutate the persisted state.
+    expect(loadTask(dir).head).toBe(task.head);
   });
 });

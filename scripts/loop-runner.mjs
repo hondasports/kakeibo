@@ -1,4 +1,16 @@
-import { existsSync, readFileSync, writeFileSync, renameSync, mkdtempSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  mkdtempSync,
+  mkdirSync,
+  openSync,
+  writeSync,
+  closeSync,
+  statSync,
+  rmSync,
+} from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -17,6 +29,9 @@ import {
   computeAssessment,
   highestTier,
   checkAftercare,
+  missingRequirements,
+  verificationSummary,
+  aftercareSummary,
 } from "./loop-policy.mjs";
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
@@ -179,31 +194,57 @@ export function recordFailure(task, signature, root) {
   if (task.counters.sameFailure >= processConfig(root).limits.same_failure_max)
     task.state = "incident";
 }
+export const EVIDENCE_CONTRACT_VERSION = 1;
+const evidenceDir = (task, root) =>
+  path.join(
+    git(["rev-parse", "--path-format=absolute", "--git-path", "agent-evidence"], root),
+    task.taskId,
+    task.head.slice(0, 12),
+  );
+const lastLines = (text, count = 20) => text.trimEnd().split("\n").slice(-count);
 export function runVerification(
   task,
   kind,
   root,
-  run = (cmd) => spawnSync(cmd[0], cmd.slice(1), { cwd: root, stdio: "inherit" }),
+  run = (command, context) =>
+    spawnSync(command[0], command.slice(1), {
+      cwd: root,
+      stdio: ["ignore", context.fd, context.fd],
+    }),
 ) {
   requireValue(task.state === "execute", "Verification runs in execute");
   requireValue(CHECK_COMMANDS[kind], `Unknown verification kind: ${kind}`);
   requireClean(root);
   const before = { head: task.head, baseHead: task.baseHead };
   delete task.verification[kind];
-  for (const command of CHECK_COMMANDS[kind]) {
-    const result = run(command);
-    if (result.status !== 0) {
-      recordFailure(
-        task,
-        createHash("sha256")
-          .update(JSON.stringify({ kind, command, status: result.status }))
-          .digest("hex"),
-        root,
-      );
-      task.lastFailure.kind = kind;
-      saveTask(task, root);
-      throw new Error(`Verification failed: ${kind}; state=${task.state}`);
+  const startedAt = Date.now();
+  const dir = evidenceDir(task, root);
+  mkdirSync(dir, { recursive: true });
+  const artifactPath = path.join(dir, `${kind}-${startedAt}.log`);
+  const fd = openSync(artifactPath, "w");
+  try {
+    for (const command of CHECK_COMMANDS[kind]) {
+      writeSync(fd, `$ ${command.join(" ")}\n`);
+      const result = run(command, { fd, artifactPath });
+      writeSync(fd, `[exit ${result.status}]\n`);
+      if (result.status !== 0) {
+        recordFailure(
+          task,
+          createHash("sha256")
+            .update(JSON.stringify({ kind, command, status: result.status }))
+            .digest("hex"),
+          root,
+        );
+        task.lastFailure.kind = kind;
+        saveTask(task, root);
+        const tail = lastLines(readFileSync(artifactPath, "utf8")).join("\n");
+        throw new Error(
+          `Verification failed: ${kind} (exit ${result.status}); state=${task.state}; log ${artifactPath}\n${tail}`,
+        );
+      }
     }
+  } finally {
+    closeSync(fd);
   }
   refreshTask(task, root);
   requireClean(root);
@@ -211,11 +252,37 @@ export function runVerification(
     task.head === before.head && task.baseHead === before.baseHead,
     "Revision changed during verification",
   );
+  let patchSha256 = null;
+  try {
+    patchSha256 = createHash("sha256")
+      .update(git(["diff", "--binary", "--no-renames", `${task.baseRef}...${task.head}`], root))
+      .digest("hex");
+  } catch {
+    // Missing objects or shallow history: the evidence stays valid for this
+    // revision but can never be reused for another — fail-closed.
+  }
+  const log = readFileSync(artifactPath, "utf8");
   task.verification[kind] = {
-    ...before,
+    run: {
+      head: before.head,
+      baseHead: before.baseHead,
+      checkedAt: new Date().toISOString(),
+      durationMs: Date.now() - startedAt,
+    },
+    appliesTo: {
+      head: before.head,
+      baseHead: before.baseHead,
+      patchSha256,
+      contractVersion: EVIDENCE_CONTRACT_VERSION,
+    },
     success: true,
     commands: CHECK_COMMANDS[kind],
-    checkedAt: new Date().toISOString(),
+    summary: { exitCode: 0, lastLines: lastLines(log, 10) },
+    artifact: {
+      path: artifactPath,
+      sha256: createHash("sha256").update(log).digest("hex"),
+      bytes: statSync(artifactPath).size,
+    },
   };
   if (task.lastFailure?.kind === kind) {
     task.counters.sameFailure = 0;
@@ -227,6 +294,96 @@ export const STATE_START = "<!-- suzumemo-agent-state:start -->";
 export const STATE_END = "<!-- suzumemo-agent-state:end -->";
 export function stateBlock(task) {
   return `${STATE_START}\n\`\`\`json\n${JSON.stringify(task, null, 2)}\n\`\`\`\n${STATE_END}`;
+}
+function nextActions(task) {
+  const missing = missingRequirements(task);
+  const actions = [];
+  for (const item of missing) {
+    if (item === "assessment") actions.push("node scripts/loop-runner.mjs --assessment <file>");
+    else if (item === "openMaterialDecisions")
+      actions.push("resolve spec openMaterialDecisions or --event decision_required");
+    else if (item.startsWith("verify:"))
+      actions.push(`node scripts/loop-runner.mjs --verify ${item.slice(7)}`);
+    else if (item.startsWith("skill:"))
+      actions.push(`read skills/${item.slice(6)}/SKILL.md then --assessment --skills`);
+    else if (item === "review") actions.push("node scripts/loop-runner.mjs --review <file>");
+    else if (item === "independent-review")
+      actions.push("obtain a fresh-context independent review");
+    else if (item.startsWith("finding:"))
+      actions.push(`resolve finding ${item.slice(8)} then re-review (--event findings)`);
+    else if (item === "aftercare") actions.push("node scripts/loop-runner.mjs --aftercare <pr>");
+    else actions.push(item);
+  }
+  if (actions.length === 0) {
+    const ready = {
+      refine: "--event ready",
+      execute: "--event ready",
+      review: "--event clean",
+      aftercare: "--event ready",
+    }[task.state];
+    if (ready) actions.push(`node scripts/loop-runner.mjs ${ready}`);
+    if (task.state === "done") actions.push("done");
+  }
+  return actions;
+}
+/** Compact task snapshot for CLI output — never contains spec/history/raw logs. */
+export function summarizeTask(task) {
+  return {
+    taskId: task.taskId,
+    state: task.state,
+    head: task.head,
+    baseHead: task.baseHead,
+    risk: task.risk,
+    profile: {
+      selected: task.configuration?.selection?.selected,
+      source: task.configuration?.selection?.source,
+    },
+    missing: missingRequirements(task),
+    verification: verificationSummary(task),
+    openFindings: (task.findings ?? []).filter((finding) => finding.status === "open").length,
+    aftercare: aftercareSummary(task),
+    next: nextActions(task),
+  };
+}
+/** Evidence manifest per verification kind — paths/hashes/summaries, never raw logs. */
+export function artifactManifest(task) {
+  const manifest = {};
+  for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
+    manifest[kind] = {
+      success: evidence.success === true,
+      run: evidence.run ?? {
+        head: evidence.head ?? null,
+        baseHead: evidence.baseHead ?? null,
+        checkedAt: evidence.checkedAt ?? null,
+      },
+      appliesTo: evidence.appliesTo ?? null,
+      summary: evidence.summary ?? null,
+      artifact: evidence.artifact
+        ? {
+            path: evidence.artifact.path,
+            sha256: evidence.artifact.sha256,
+            bytes: evidence.artifact.bytes,
+            available: existsSync(evidence.artifact.path),
+          }
+        : null,
+      reuse: evidence.reuse ?? null,
+    };
+  }
+  return manifest;
+}
+function explainTask(task) {
+  return {
+    ...summarizeTask(task),
+    requiredSkills: task.assessment?.requiredSkills ?? [],
+    skills: task.skills ?? [],
+    riskDetail: {
+      retained: task.risk,
+      assessment: task.assessment?.risk ?? null,
+      agent: task.agentAssessment?.applied_tier ?? null,
+    },
+    verificationDetail: artifactManifest(task),
+    profileSource: task.configuration?.profileSource ?? null,
+  };
 }
 export function parseStateBlock(body) {
   requireValue(
@@ -279,7 +436,7 @@ function option(args, index) {
 }
 export function parseArguments(args) {
   const out = {};
-  const flags = new Set(["--export", "--assert-started"]);
+  const flags = new Set(["--export", "--assert-started", "--status", "--explain", "--artifacts"]);
   const options = new Set([
     "--init",
     "--task",
@@ -300,6 +457,7 @@ export function parseArguments(args) {
     "--spec",
     "--restore-pr",
     "--sync-pr",
+    "--export-file",
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -340,6 +498,10 @@ export function run(args, root = process.cwd(), services = {}) {
     "restore-pr",
     "sync-pr",
     "export",
+    "export-file",
+    "status",
+    "explain",
+    "artifacts",
     "assert-started",
   ].filter((key) => args[key]);
   requireValue(actions.length <= 1, "Run one task action at a time");
@@ -371,6 +533,10 @@ export function run(args, root = process.cwd(), services = {}) {
     requireValue(task.state === "execute", "Changes may only be committed in execute state");
     return { taskId: task.taskId, state: task.state, profile: task.configuration.profileSource };
   }
+  if (args.status) return task;
+  if (args.explain) return explainTask(task);
+  if (args.artifacts)
+    return { taskId: task.taskId, state: task.state, artifacts: artifactManifest(task) };
   if (args.spec) {
     requireValue(task.state === "refine", "Spec changes require refine state");
     task.spec = readJson(args.spec);
@@ -421,7 +587,7 @@ export function run(args, root = process.cwd(), services = {}) {
     task = transitionTask(task, args.event, args.exit ? readJson(args.exit) : {}, root);
   }
   saveTask(task, root);
-  if (args.export || args["sync-pr"]) {
+  if (args.export || args["export-file"] || args["sync-pr"]) {
     requireClean(root);
     requireValue(
       ["aftercare", "done"].includes(task.state),
@@ -429,6 +595,10 @@ export function run(args, root = process.cwd(), services = {}) {
     );
     const block = stateBlock(task);
     if (args.export) return block;
+    if (args["export-file"]) {
+      writeFileSync(args["export-file"], `${block}\n`, { mode: 0o600 });
+      return { taskId: task.taskId, state: task.state, written: args["export-file"] };
+    }
     const pr = JSON.parse(
       gh(["pr", "view", args["sync-pr"], "--json", "body,headRefOid,baseRefOid"], root),
     );
@@ -459,25 +629,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(
       typeof result === "string"
         ? result
-        : JSON.stringify(
-            result.version === 2
-              ? {
-                  taskId: result.taskId,
-                  state: result.state,
-                  head: result.head,
-                  baseHead: result.baseHead,
-                  risk: result.risk,
-                  configuration: result.configuration,
-                  assessment: result.assessment,
-                  verified: Object.keys(result.verification),
-                  openFindings: (result.findings ?? []).filter(
-                    (finding) => finding.status === "open",
-                  ).length,
-                }
-              : result,
-            null,
-            2,
-          ),
+        : JSON.stringify(result.version === 2 ? summarizeTask(result) : result, null, 2),
     );
   } catch (error) {
     console.error(error.message);

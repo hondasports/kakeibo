@@ -28,7 +28,81 @@ export function validateTask(task, root) {
   );
 }
 export function currentEvidence(evidence, task) {
-  return evidence?.head === task.head && evidence?.baseHead === task.baseHead;
+  // New-style verification evidence carries `appliesTo`; legacy entries and
+  // review/aftercare records keep `head`/`baseHead` at the top level.
+  const appliesTo = evidence?.appliesTo ?? evidence;
+  return appliesTo?.head === task.head && appliesTo?.baseHead === task.baseHead;
+}
+/** Verification kinds required locally for this task (e2e is a GitHub delivery gate). */
+export function requiredVerificationKinds(task) {
+  return Object.entries(task.assessment?.verification ?? {})
+    .filter(([kind, required]) => required && kind !== "e2e")
+    .map(([kind]) => kind);
+}
+export function verificationSummary(task) {
+  const summary = {};
+  for (const [kind, required] of Object.entries(task.assessment?.verification ?? {})) {
+    if (!required) continue;
+    if (kind === "e2e") {
+      summary[kind] = "github";
+      continue;
+    }
+    const result = task.verification?.[kind];
+    summary[kind] = !result
+      ? "missing"
+      : !currentEvidence(result, task)
+        ? "stale"
+        : result.success === true
+          ? "pass"
+          : "failed";
+  }
+  return summary;
+}
+export function aftercareSummary(task) {
+  const evidence = task.aftercare;
+  if (!evidence) return null;
+  return {
+    ready: currentEvidence(evidence, task) && evidence.ready === true,
+    pr: evidence.pr ?? null,
+    checkedAt: evidence.checkedAt ?? null,
+  };
+}
+/** Unmet machine-floor requirements toward the next transition, as short tokens. */
+export function missingRequirements(task) {
+  const missing = [];
+  const localVerificationMissing = () => {
+    if (!task.assessment || !task.agentAssessment) missing.push("assessment");
+    for (const skill of task.assessment?.requiredSkills ?? [])
+      if (!task.skills.includes(skill)) missing.push(`skill:${skill}`);
+    for (const kind of requiredVerificationKinds(task)) {
+      const result = task.verification?.[kind];
+      if (!(currentEvidence(result, task) && result.success === true))
+        missing.push(`verify:${kind}`);
+    }
+  };
+  const reviewMissing = () => {
+    if (!currentEvidence(task.review, task)) missing.push("review");
+    for (const finding of task.findings ?? [])
+      if (finding.status === "open") missing.push(`finding:${finding.id}`);
+    if (task.assessment?.review?.independent && task.review && task.review.independent !== true)
+      missing.push("independent-review");
+  };
+  if (task.state === "refine") {
+    if (!task.agentAssessment) missing.push("assessment");
+    if ((task.spec?.openMaterialDecisions ?? []).length > 0) missing.push("openMaterialDecisions");
+  }
+  if (task.state === "execute") localVerificationMissing();
+  if (task.state === "review") {
+    localVerificationMissing();
+    reviewMissing();
+  }
+  if (task.state === "aftercare") {
+    localVerificationMissing();
+    reviewMissing();
+    if (!(currentEvidence(task.aftercare, task) && task.aftercare.ready === true))
+      missing.push("aftercare");
+  }
+  return missing;
 }
 export function computeAssessment(task, paths) {
   const reviewAssessment = currentEvidence(task.review, task) ? task.review.assessment : null;
