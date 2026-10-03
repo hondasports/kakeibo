@@ -967,6 +967,21 @@ describe("increment reuse and loop ergonomics", () => {
       expect(refreshed.verification[kind].appliesTo.head).toBe(refreshed.head);
     }
   });
+  it("does not extend lint evidence for extension-bearing files under .husky", () => {
+    const { dir, git, task } = repository();
+    for (const kind of ["lint", "unit"])
+      task.verification[kind] = verificationManifestFixture(task, kind);
+    saveTask(task, dir);
+    mkdirSync(path.join(dir, ".husky"), { recursive: true });
+    writeFileSync(path.join(dir, ".husky", "hook.json"), "{}\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky json");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.lint).toBeUndefined();
+    expect(refreshed.verification.unit.reuse).toMatchObject({
+      basis: "metadata_only_increment",
+    });
+  });
   it("drops evidence when an increment touches runtime paths or the base moved", () => {
     const { dir, git, task } = repository();
     for (const kind of ["lint", "unit", "build"])
