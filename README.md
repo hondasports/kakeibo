@@ -116,7 +116,6 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 | Agent State Machine            | `.agent/process.yaml`           |
 | 変更Risk・必須検証の統合判定   | `scripts/assess-change.mjs`     |
 | Task Profile                    | `.agent/profiles/`              |
-| Model Registry                   | `.agent/models/`                |
 | Capability Skill                | `skills/*/SKILL.md`             |
 | 開発プロセス、PR、CI            | `docs/development-process.md`   |
 | 認証ガード設計                 | `docs/auth-guard.md`            |
@@ -125,18 +124,18 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 
 ## エージェント作業
 
-SuzumemoはVendor-neutralなAgent Harnessをrepository側に持ちます。`AGENTS.md` は共通契約、`.agent/process.yaml` はState Machine、`.agent/profiles/` はタスク強度、`.agent/models/` はモデル能力とeffort差分、`.agent/runtime/` はCodex / Devin等のRuntime差分を定義します。
+SuzumemoはVendor-neutralなAgent Harnessをrepository側に持ちます。`AGENTS.md` は共通契約、`.agent/process.yaml` はState Machine、`.agent/profiles/` はタスク強度、`.agent/runtime/` はCodex / Devin等のRuntime差分を定義します。
 
 基本Stateは `REFINE → EXECUTE → REVIEW → AFTERCARE → DONE` です。Issueは詳細仕様を必須とせず、REFINEでrepositoryを調査してAcceptance Criteriaを補完します。Machine Risk Floor・必須検証・Required SkillsはAgent判断で引き下げられません。
 
-Profileは `fast / standard / deep / max` の共通4段階とし、Model名ごとのProfileは作りません。Profile未指定時は `.agent/models/` の `recommended_profile` を使い、未知モデルは `standard` へフォールバックします。Model Registryはprovider固有のeffort対応だけを吸収し、Core HarnessのRisk FloorやState Transitionは変更しません。
+Profileは `fast / standard / deep / max` の共通4段階とし、Model名ごとのProfileは作りません。REFINE終了時にタスクの評価（影響範囲・不確実性・検証負荷）から規則で自動判定し、`--profile` の明示指定を常に優先します。自動選択は実装中の評価変化に応じて上位へだけ再判定され、Core HarnessのRisk FloorやState Transitionは変更しません。
 
 開始・再開・検証・PRへの状態保存は [Agent Harness操作手順](docs/agent-harness.md) に従います。`loop:profile` は設定確認用、タスクの入口は `loop:state` です。
 
-軽量化とREFINE終了時のProfile自動判定の実装仕様は [Agent Harness設計](docs/agent-harness-design.md) を参照してください。これは未実装の設計で、現在のCLIや安全ゲートを変更するものではありません。
+軽量化の設計正本は [Agent Harness設計](docs/agent-harness-design.md) を参照してください。Profile自動判定は実装済みで、出力・検証・証跡管理のさらなる変更のみ設計段階です。
 
 ```bash
-node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --model unknown --runtime codex --implementer session-id
+node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --runtime codex --implementer session-id
 node scripts/loop-runner.mjs
 node scripts/assess-change.mjs --base origin/preview
 ```

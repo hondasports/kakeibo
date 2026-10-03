@@ -7,7 +7,7 @@
 - Agent実行契約: `AGENTS.md`
 - Agent State Machine: `.agent/process.yaml`
 - Stateごとの実行契約: `.agent/workflow/*.md`
-- Task Profile / Model Registry / Runtime差分: `.agent/profiles/`, `.agent/models/`, `.agent/runtime/`
+- Task Profile / Runtime差分: `.agent/profiles/`, `.agent/runtime/`
 - Change Assessment: `node scripts/assess-change.mjs`
 - Workspace preflight: `node scripts/check-task-worktree.mjs --require-clean`
 - ループ文書の機械検査: `node scripts/check-loop-docs.mjs`
@@ -233,11 +233,11 @@ PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest 
 
 E2Eが必須と判定された変更でブラウザ受入条件がない場合は、PR CIで実行し、AFTERCAREでpublic/authenticated両方の成功を要求する。文書・工程管理のみなど差分判定でE2E対象外となる変更には、E2E成功を必須条件として追加しない。実行対象の判定は「PR CI E2Eの差分判定」に従う。
 
-### Task Profile / Model Registry
+### Task Profile
 
-Core Harnessはモデル非依存。`.agent/profiles/` は `fast / standard / deep / max` のタスク強度を定義し、effort・autonomy・delegation・verification・context量だけを調整する。Model名ごとのProfileは作らない。
+Core Harnessはモデル非依存。`.agent/profiles/` は `fast / standard / deep / max` のタスク強度を定義し、autonomy・delegation・verification・context量だけを調整する。Model名ごとのProfileは作らない。
 
-`.agent/models/` はprovider、対応effort、Profile effortから実モデルeffortへのmapping、推奨Profileだけを持つ。Profile未指定時はModel Registryの `recommended_profile`、未知モデルは `standard` を使う。Risk Floor・Human Gate・State TransitionはTask Profile / Model Registryから変更しない。Runtime固有設定は `.agent/runtime/` に置く。
+ProfileはREFINE終了時にタスクの評価（`blast_radius`・`uncertainty`・検証負荷routine/complex）から規則で自動判定する。`--profile` の明示指定は常に優先し、自動選択は実装中の評価変化に応じて上位へだけ再判定する。Risk Floor・Human Gate・State TransitionはTask Profileから変更しない。Runtime固有設定は `.agent/runtime/` に置く。
 
 ループ文書自身（AGENTS.md・README・`.agent/workflow/`・skills/・この文書）の整合は `node scripts/check-loop-docs.mjs` が機械検査する。
 ## 6. Verification
