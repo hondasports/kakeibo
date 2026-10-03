@@ -7,6 +7,7 @@ import {
 } from "../../domain/notifications/model";
 import {
   getLineNotificationExhaustionErrorCode,
+  getLineNotificationSendAuthorizationErrorCode,
   isLineNotificationJobDue,
   LINE_NOTIFICATION_CLEANUP_BATCH_SIZE,
   LINE_NOTIFICATION_STALE_JOB_MS,
@@ -162,11 +163,11 @@ export async function authorizeLineNotificationSend(
     return { claimed: false };
   }
 
-  const exhaustionErrorCode = getLineNotificationExhaustionErrorCode(job, args.now);
-  if (exhaustionErrorCode !== null) {
+  const sendAuthorizationErrorCode = getLineNotificationSendAuthorizationErrorCode(job, args.now);
+  if (sendAuthorizationErrorCode !== null) {
     await deps.jobs.patch(args.jobId, {
       status: "failed",
-      errorCode: exhaustionErrorCode,
+      errorCode: sendAuthorizationErrorCode,
       leaseUntil: undefined,
       nextRetryAt: undefined,
       updatedAt: args.now,

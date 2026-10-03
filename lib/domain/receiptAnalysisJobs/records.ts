@@ -22,6 +22,7 @@ export type ReceiptAnalysisBatchRecord = {
   processedCount: number;
   status: ReceiptAnalysisBatchStatus;
   aiReviewNotificationScheduledAt?: number;
+  aiReviewLineNotificationConsumedAt?: number;
   createdAt: number;
   updatedAt: number;
 };

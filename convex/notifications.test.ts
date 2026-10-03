@@ -595,6 +595,54 @@ describe("internal AI review notification enqueue", () => {
     expect(replayed.events).toHaveLength(1);
   });
 
+  it("does not backfill LINE after consumed-event cleanup while the batch marker remains", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const batchId = await seedBatchFixture(t, { lineGlobal: false });
+    await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
+      batchId,
+      userId: "creator",
+      pendingCount: 2,
+    });
+
+    const event = await t.run(
+      async (ctx) => (await ctx.db.query("lineNotificationEvents").collect())[0],
+    );
+    expect(event?.outcome).toBe("skipped");
+    const batch = await t.run(async (ctx) => await ctx.db.get(batchId));
+    expect(batch?.aiReviewLineNotificationConsumedAt).toBeTypeOf("number");
+
+    await t.run(async (ctx) => {
+      const cutoff = Date.now() - 31 * 24 * 60 * 60 * 1000;
+      await ctx.db.patch(event!._id, { createdAt: cutoff, updatedAt: cutoff });
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_token_identifier", (q) => q.eq("userId", "creator"))
+        .unique();
+      await ctx.db.insert("notificationSettings", {
+        type: "ai_review_required",
+        channel: "line",
+        enabled: true,
+        updatedByUserId: user!._id,
+        updatedAt: cutoff,
+      });
+    });
+    await t.mutation(internal.notifications.cleanup.cleanupOldLineNotificationJobs, {});
+    await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
+      batchId,
+      userId: "creator",
+      pendingCount: 2,
+    });
+
+    const rows = await t.run(async (ctx) => ({
+      batch: await ctx.db.get(batchId),
+      lines: await ctx.db.query("lineNotificationJobs").collect(),
+      events: await ctx.db.query("lineNotificationEvents").collect(),
+    }));
+    expect(rows.batch?.aiReviewLineNotificationConsumedAt).toBeTypeOf("number");
+    expect(rows.lines).toHaveLength(0);
+    expect(rows.events).toHaveLength(0);
+  });
+
   it("enqueues nothing when caller userId does not match batch creator", async () => {
     const t = convexTest(schema, convexTestModules);
     const batchId = await seedBatchFixture(t);

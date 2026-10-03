@@ -611,6 +611,7 @@ export default defineSchema({
       v.literal("failed"),
     ),
     aiReviewNotificationScheduledAt: v.optional(v.number()),
+    aiReviewLineNotificationConsumedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

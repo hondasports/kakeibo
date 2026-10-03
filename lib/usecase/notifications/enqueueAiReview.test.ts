@@ -62,6 +62,7 @@ function makeDeps({
   const emailJobs = { inserted: [] as Record<string, unknown>[] };
   const lineJobs = { inserted: [] as Record<string, unknown>[] };
   const lineEvents = { inserted: [] as Record<string, unknown>[] };
+  const batchPatches = { applied: [] as { id: string; fields: Record<string, unknown> }[] };
   const emailScheduler = { scheduleProcessJob: vi.fn().mockResolvedValue(undefined) };
   const lineScheduler = {
     scheduleProcessJob: vi.fn().mockResolvedValue(undefined),
@@ -91,7 +92,12 @@ function makeDeps({
           };
 
   const deps = {
-    batches: { getBatch: vi.fn().mockResolvedValue(batch) },
+    batches: {
+      getBatch: vi.fn().mockResolvedValue(batch),
+      patchBatch: vi.fn(async (id: string, fields: Record<string, unknown>) => {
+        batchPatches.applied.push({ id, fields });
+      }),
+    },
     groups: { get: vi.fn().mockResolvedValue(group) },
     memberships: { findByGroupAndUser: vi.fn().mockResolvedValue(membership) },
     users: { findByUserId: vi.fn().mockResolvedValue(resolvedUser) },
@@ -146,12 +152,13 @@ function makeDeps({
     now: () => 5000,
   } as unknown as AiReviewNotificationEnqueueDeps;
 
-  return { deps, emailJobs, lineJobs, lineEvents, emailScheduler, lineScheduler };
+  return { deps, emailJobs, lineJobs, lineEvents, batchPatches, emailScheduler, lineScheduler };
 }
 
 describe("enqueueAiReviewNotifications", () => {
   it("enqueues email with dedupe key and LINE job in the same pass", async () => {
-    const { deps, emailJobs, lineJobs, lineEvents, emailScheduler, lineScheduler } = makeDeps();
+    const { deps, emailJobs, lineJobs, lineEvents, batchPatches, emailScheduler, lineScheduler } =
+      makeDeps();
     await enqueueAiReviewNotifications(deps, ARGS);
 
     expect(emailJobs.inserted).toHaveLength(1);
@@ -184,6 +191,12 @@ describe("enqueueAiReviewNotifications", () => {
       dedupeKey: "ai-review-required-line/batch-1",
       outcome: "queued",
     });
+    expect(batchPatches.applied).toEqual([
+      {
+        id: "batch-1",
+        fields: { aiReviewLineNotificationConsumedAt: 5000 },
+      },
+    ]);
   });
 
   it("still enqueues LINE when the user has no email address", async () => {
@@ -240,6 +253,29 @@ describe("enqueueAiReviewNotifications", () => {
     await enqueueAiReviewNotifications(deps, ARGS);
     expect(lineJobs.inserted).toHaveLength(0);
     expect(lineEvents.inserted).toHaveLength(0);
+  });
+
+  it("does not backfill LINE after consumed-event cleanup when the batch marker remains", async () => {
+    const { deps, emailJobs, lineJobs, lineEvents, batchPatches } = makeDeps({
+      batch: {
+        id: "batch-1",
+        groupId: "group-1",
+        createdByUserId: "user-1",
+        totalCount: 1,
+        processedCount: 1,
+        status: "completed",
+        aiReviewLineNotificationConsumedAt: 100,
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    });
+
+    await enqueueAiReviewNotifications(deps, ARGS);
+
+    expect(emailJobs.inserted).toHaveLength(1);
+    expect(lineJobs.inserted).toHaveLength(0);
+    expect(lineEvents.inserted).toHaveLength(0);
+    expect(batchPatches.applied).toHaveLength(0);
   });
 
   it("dedupes email via business dedupe key", async () => {

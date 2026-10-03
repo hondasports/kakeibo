@@ -320,6 +320,37 @@ describe("authorizeLineNotificationSend", () => {
     expect(patches).toHaveLength(0);
   });
 
+  it("authorizes the sixth attempt claimed from five completed attempts", async () => {
+    let job = makeJob({
+      status: "retrying",
+      nextRetryAt: 5_000,
+      attemptCount: 5,
+      retryKey: CLAIM_ARGS.retryKeyCandidate,
+      firstAttemptAt: 1_000,
+    });
+    const { deps, patches } = makeDeps({ job });
+    vi.mocked(deps.jobs.getJob).mockImplementation(async () => job);
+    vi.mocked(deps.jobs.patch).mockImplementation(async (jobId, fields) => {
+      patches.push({ jobId, fields });
+      job = { ...job, ...fields } as LineNotificationJobRecord;
+    });
+
+    const claim = await claimLineNotificationJob(deps, CLAIM_ARGS);
+    expect(claim.claimed).toBe(true);
+
+    const authorization = await authorizeLineNotificationSend(deps, {
+      jobId: job.id,
+      attemptCount: 6,
+      retryKey: CLAIM_ARGS.retryKeyCandidate,
+      leaseMs: 30_000,
+      now: 20_000,
+    });
+
+    expect(authorization.claimed).toBe(true);
+    expect(job).toMatchObject({ status: "processing", attemptCount: 6 });
+    expect(patches.at(-1)?.fields).toMatchObject({ leaseUntil: 50_000 });
+  });
+
   it("suppresses instead of authorizing when the user opted out after claim", async () => {
     const job = makeJob({
       status: "processing",
