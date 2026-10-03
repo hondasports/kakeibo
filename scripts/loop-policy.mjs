@@ -184,8 +184,18 @@ export function checkAftercare(pr, task, findings) {
     !["CHANGES_REQUESTED", "REVIEW_REQUIRED"].includes(pr.reviewDecision),
     "PR approval is outstanding",
   );
-  const checks = pr.statusCheckRollup ?? [];
-  requireValue(checks.length > 0, "No CI checks observed");
+  const rawChecks = pr.statusCheckRollup ?? [];
+  requireValue(rawChecks.length > 0, "No CI checks observed");
+  // Retried checks (flake rerun, ready_for_review re-trigger) leave superseded
+  // runs in the rollup; only the latest run per check name is authoritative.
+  const latestByName = new Map();
+  for (const check of rawChecks) {
+    const key = check.name ?? check.context;
+    const at = check.completedAt ?? check.completed_at ?? check.startedAt ?? "";
+    const prev = latestByName.get(key);
+    if (!prev || at >= prev.at) latestByName.set(key, { check, at });
+  }
+  const checks = [...latestByName.values()].map((entry) => entry.check);
   for (const check of checks) {
     const status = check.conclusion ?? check.state;
     requireValue(

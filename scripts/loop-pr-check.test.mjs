@@ -104,6 +104,33 @@ describe("GitHub delivery gates", () => {
     task.assessment = computeAssessment(task, ["src/app.ts"]);
     expect(() => checkAftercare(pr, task, findings)).toThrow("Required check");
   });
+  it("evaluates only the latest run per check name when a check was retried", () => {
+    const task = readyTask();
+    const pr = prFixture(task);
+    pr.statusCheckRollup = [
+      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "failure",
+        completedAt: "2026-10-03T02:00:00Z",
+      },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        status: "COMPLETED",
+        conclusion: "SUCCESS",
+        completedAt: "2026-10-03T02:10:00Z",
+      },
+    ];
+    expect(checkAftercare(pr, task, findings).ready).toBe(true);
+    pr.statusCheckRollup[2] = {
+      name: "E2E (Playwright / Chromium / authenticated)",
+      status: "COMPLETED",
+      conclusion: "failure",
+      completedAt: "2026-10-03T02:20:00Z",
+    };
+    expect(() => checkAftercare(pr, task, findings)).toThrow("Unsuccessful");
+  });
   it("preserves a reviewer's higher risk and enforces independence", () => {
     const task = readyTask();
     task.review.assessment.applied_tier = "T3";
