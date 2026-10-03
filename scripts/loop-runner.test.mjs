@@ -390,6 +390,7 @@ describe("persistent task gates", () => {
       baseHead: task.baseHead,
       contractVersion: 1,
     });
+    expect(evidence.appliesTo.headTree).toMatch(/^[0-9a-f]{40}$/);
     expect(evidence.appliesTo.patchSha256).toMatch(/^[0-9a-f]{64}$/);
     // Persisted artifact paths stay relative to the evidence root so the state
     // block never leaks local filesystem layout into the PR body.
@@ -529,7 +530,7 @@ describe("persistent task gates", () => {
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", `upstream ${file}`);
     git("switch", "codex/task");
   };
-  it("reuses verification evidence across base drift when inputs are untouched", () => {
+  it("reuses verification evidence across base drift when the head tree is unchanged", () => {
     const { dir, git, task } = repository();
     runVerification(task, "process", dir, () => ({ status: 0 }));
     saveTask(task, dir);
@@ -548,11 +549,45 @@ describe("persistent task gates", () => {
     expect(verificationSummary(refreshed).process).toBe("pass(reused)");
     expect(refreshed.history.at(-1).reusedVerification).toEqual(["process"]);
   });
-  it("drops verification evidence when the upstream delta touches kind inputs", () => {
+  it("keeps evidence when upstream drift leaves the head tree untouched", () => {
     const { dir, git, task } = repository();
     runVerification(task, "process", dir, () => ({ status: 0 }));
     saveTask(task, dir);
+    // Even harness-relevant upstream files cannot invalidate a verification of
+    // this tree — the head does not contain them.
     upstreamCommit(dir, git, "docs/upstream.md");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.process.reuse).toBeDefined();
+    expect(refreshed.history.at(-1).reusedVerification).toEqual(["process"]);
+  });
+  it("reuses evidence across a message-only amend when the tree is identical", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "feature.txt"), "feature\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    refreshTask(task, dir);
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    git("-c", "core.hooksPath=/dev/null", "commit", "--amend", "-m", "renamed");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    const evidence = refreshed.verification.process;
+    // Same patch, same tree, new commit SHA — evidence carries over.
+    expect(evidence.appliesTo.head).toBe(refreshed.head);
+    expect(evidence.reuse.from.head).not.toBe(refreshed.head);
+    expect(verificationSummary(refreshed).process).toBe("pass(reused)");
+  });
+  it("drops evidence after a rebase even when the feature patch is identical", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "feature.txt"), "feature\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    refreshTask(task, dir);
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "src/upstream.ts", "export {};\n");
+    // Rebasing keeps the patch byte-identical but embeds new base content —
+    // the head tree differs, so verification must re-run on the new content.
+    git("-c", "core.hooksPath=/dev/null", "rebase", "preview");
     const refreshed = refreshTask(loadTask(dir), dir);
     expect(refreshed.verification).toEqual({});
     expect(refreshed.history.at(-1).reusedVerification).toEqual([]);
