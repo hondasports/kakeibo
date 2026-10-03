@@ -6,17 +6,20 @@ import { processEmailJob } from "./processJob";
 function createDeps({
   job,
   suppression = null,
+  deliveryDecision = { enabled: true },
   sendResult = { ok: true as const, providerMessageId: "msg-1" },
   now = () => 5000,
 }: {
   job: Record<string, unknown> | null;
   suppression?: Record<string, unknown> | null;
+  deliveryDecision?: { enabled: boolean; reason?: string };
   sendResult?: { ok: true; providerMessageId: string } | { ok: false; error: EmailProviderError };
   now?: () => number;
 }) {
   const runner: EmailJobActionRunner = {
     getJob: vi.fn().mockResolvedValue(job),
     findSuppression: vi.fn().mockResolvedValue(suppression),
+    getNotificationDeliveryDecision: vi.fn().mockResolvedValue(deliveryDecision),
     markJobSent: vi.fn().mockResolvedValue(undefined),
     markJobRetrying: vi.fn().mockResolvedValue(undefined),
     markJobTerminal: vi.fn().mockResolvedValue(undefined),
@@ -73,6 +76,62 @@ describe("processEmailJob", () => {
       expect.objectContaining({ jobId: "job-1", status: "suppressed" }),
     );
     expect(deps.sender.send).not.toHaveBeenCalled();
+  });
+
+  it("suppresses the job without sending when policy disables it", async () => {
+    const deps = createDeps({
+      job: queuedJob,
+      deliveryDecision: { enabled: false, reason: "globally_disabled" },
+    });
+    await processEmailJob(deps, { jobId: "job-1" });
+
+    expect(deps.sender.send).not.toHaveBeenCalled();
+    expect(deps.runner.markJobTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: "job-1",
+        status: "suppressed",
+        errorCode: "notification_disabled",
+        errorMessage: "globally_disabled",
+      }),
+    );
+    expect(deps.runner.markJobSent).not.toHaveBeenCalled();
+    expect(deps.runner.markJobRetrying).not.toHaveBeenCalled();
+  });
+
+  it("checks the latest policy on every attempt including retries", async () => {
+    const deps = createDeps({
+      job: { ...queuedJob, status: "retrying", attemptCount: 1, nextRetryAt: 4000 },
+      deliveryDecision: { enabled: false, reason: "user_opted_out" },
+    });
+    await processEmailJob(deps, { jobId: "job-1" });
+
+    expect(deps.runner.getNotificationDeliveryDecision).toHaveBeenCalledWith({
+      type: "email_delivery_test",
+      channel: "email",
+    });
+    expect(deps.sender.send).not.toHaveBeenCalled();
+    expect(deps.runner.markJobTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "suppressed", errorCode: "notification_disabled" }),
+    );
+  });
+
+  it("passes recipientUserId to the policy check when present", async () => {
+    const deps = createDeps({
+      job: {
+        ...queuedJob,
+        templateType: "ai_review_required",
+        payloadJson: JSON.stringify({ pendingCount: 3 }),
+        recipientUserId: "user-1",
+      },
+    });
+    await processEmailJob(deps, { jobId: "job-1" });
+
+    expect(deps.runner.getNotificationDeliveryDecision).toHaveBeenCalledWith({
+      type: "ai_review_required",
+      channel: "email",
+      userId: "user-1",
+    });
+    expect(deps.sender.send).toHaveBeenCalled();
   });
 
   it("fails the job on invalid payload JSON", async () => {

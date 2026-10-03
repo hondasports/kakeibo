@@ -69,6 +69,7 @@ vi.mock("./features/system-admin", () => ({
   SystemAdminHomePage: Page,
   SystemAdminAuditLogPage: Page,
   SystemAdminManagementPage: Page,
+  SystemAdminNotificationSettingsPage: Page,
   SystemAdminRouteGuard: Page,
   SystemAdminUserDetailPage: Page,
   SystemAdminUserSearchPage: Page,

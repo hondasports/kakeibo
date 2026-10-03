@@ -2,6 +2,7 @@
  * users endpoint 用ストアのポート（domain interface）。
  * 実装は infrastructure 層（lib/convex）が提供する。
  */
+import type { UserNotificationPreferences } from "../notifications/model";
 
 /** endpoint 操作で往復するユーザーの完全形状。 */
 export type UserRecord = {
@@ -15,6 +16,7 @@ export type UserRecord = {
   weeklyStartDay?: number;
   weeklyEndDay?: number;
   receiptImageExternalApiConsentAcceptedAt?: number;
+  notificationPreferences?: UserNotificationPreferences;
   createdAt: number;
   updatedAt: number;
 };
@@ -38,6 +40,7 @@ export type UserPatch = {
   weeklyStartDay?: number;
   weeklyEndDay?: number;
   receiptImageExternalApiConsentAcceptedAt?: number;
+  notificationPreferences?: UserNotificationPreferences | undefined;
   updatedAt: number;
 };
 

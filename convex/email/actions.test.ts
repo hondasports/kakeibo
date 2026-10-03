@@ -5,21 +5,29 @@ import { processEmailJobHandler } from "./actions";
 function createActionCtx({
   job,
   suppression,
+  deliveryDecision = { enabled: true },
   mutationResult = undefined,
 }: {
   job: Record<string, unknown> | null;
   suppression?: Record<string, unknown> | null;
+  deliveryDecision?: { enabled: boolean; reason?: string };
   mutationResult?: unknown;
 }): ActionCtx {
   const runQuery = vi
     .fn()
     .mockImplementation(
-      async (ref: unknown, args: { normalizedEmail?: string } | { jobId?: string }) => {
+      async (
+        ref: unknown,
+        args: { normalizedEmail?: string } | { jobId?: string } | { type: string; userId?: string },
+      ) => {
         if ("normalizedEmail" in args) {
           return suppression ?? null;
         }
         if ("jobId" in args) {
           return job;
+        }
+        if ("type" in args) {
+          return deliveryDecision;
         }
         return null;
       },
@@ -80,6 +88,28 @@ describe("processEmailJobHandler", () => {
         jobId: "job-123",
         status: "suppressed",
       }),
+    );
+  });
+
+  it("marks suppressed without sending when the delivery decision is disabled", async () => {
+    const ctx = createActionCtx({
+      job: queuedJob,
+      deliveryDecision: { enabled: false, reason: "globally_disabled" },
+    });
+
+    await processEmailJobHandler(ctx, { jobId: "job-123" as any });
+
+    expect(ctx.runMutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        jobId: "job-123",
+        status: "suppressed",
+        errorCode: "notification_disabled",
+      }),
+    );
+    expect(ctx.runMutation).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "sent" }),
     );
   });
 

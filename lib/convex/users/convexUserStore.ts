@@ -18,6 +18,9 @@ export function docToUserRecord(doc: Doc<"users">): UserRecord {
     weeklyStartDay: doc.weeklyStartDay,
     weeklyEndDay: doc.weeklyEndDay,
     receiptImageExternalApiConsentAcceptedAt: doc.receiptImageExternalApiConsentAcceptedAt,
+    ...(doc.notificationPreferences === undefined
+      ? {}
+      : { notificationPreferences: doc.notificationPreferences }),
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };

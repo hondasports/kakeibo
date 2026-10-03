@@ -48,6 +48,11 @@ import {
   lineWebhookDeliveryValidator,
   lineWebhookEventTypeValidator,
 } from "./lineWebhook/model";
+import {
+  lineNotificationJobStatusValidator,
+  notificationChannelValidator,
+  notificationPreferencesValidator,
+} from "./notifications/model";
 
 export default defineSchema({
   users: defineTable({
@@ -65,6 +70,7 @@ export default defineSchema({
     weeklyEndDay: v.optional(v.number()),
     // レシート画像を外部APIへ送信することへのユーザー承認時刻。
     receiptImageExternalApiConsentAcceptedAt: v.optional(v.number()),
+    notificationPreferences: v.optional(notificationPreferencesValidator),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -256,6 +262,7 @@ export default defineSchema({
       v.literal("system_admin_group_role_changed"),
       v.literal("system_admin_group_owner_transferred"),
       v.literal("system_admin_group_invitation_revoked"),
+      v.literal("system_admin_notification_setting_changed"),
     ),
     actorType: v.union(v.literal("system"), v.literal("system_admin")),
     actorUserId: v.optional(v.id("users")),
@@ -264,6 +271,7 @@ export default defineSchema({
       v.literal("user"),
       v.literal("group"),
       v.literal("invitation"),
+      v.literal("notification_setting"),
     ),
     targetUserId: v.optional(v.id("users")),
     targetDisplayNameSnapshot: v.optional(v.string()),
@@ -290,6 +298,8 @@ export default defineSchema({
     afterActiveGroupId: v.optional(v.id("groups")),
     beforeOwnerCount: v.optional(v.number()),
     afterOwnerCount: v.optional(v.number()),
+    beforeNotificationEnabled: v.optional(v.boolean()),
+    afterNotificationEnabled: v.optional(v.boolean()),
     result: v.optional(v.union(v.literal("success"), v.literal("denied"))),
     createdAt: v.number(),
   })
@@ -637,6 +647,7 @@ export default defineSchema({
     normalizedRecipientEmail: v.string(),
     subject: v.string(),
     businessDedupeKey: v.optional(v.string()),
+    recipientUserId: v.optional(v.string()),
     html: v.optional(v.string()),
     text: v.optional(v.string()),
     provider: v.string(),
@@ -656,6 +667,38 @@ export default defineSchema({
     .index("by_normalized_recipient_email", ["normalizedRecipientEmail"])
     .index("by_next_retry_at", ["nextRetryAt"])
     .index("by_business_dedupe_key", ["businessDedupeKey"]),
+
+  notificationSettings: defineTable({
+    type: transactionalEmailTypeValidator,
+    channel: notificationChannelValidator,
+    enabled: v.boolean(),
+    updatedByUserId: v.id("users"),
+    updatedAt: v.number(),
+  }).index("by_type_and_channel", ["type", "channel"]),
+
+  lineNotificationJobs: defineTable({
+    userId: v.string(),
+    batchId: v.id("receiptAnalysisBatches"),
+    type: v.literal("ai_review_required"),
+    pendingCount: v.number(),
+    linkId: v.id("lineAccountLinks"),
+    linkedAtSnapshot: v.number(),
+    lineUserIdSnapshot: v.string(),
+    text: v.string(),
+    status: lineNotificationJobStatusValidator,
+    attemptCount: v.number(),
+    retryKey: v.optional(v.string()),
+    leaseUntil: v.optional(v.number()),
+    firstAttemptAt: v.optional(v.number()),
+    nextRetryAt: v.optional(v.number()),
+    providerRequestId: v.optional(v.string()),
+    errorCode: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_batch_id", ["batchId"])
+    .index("by_user_id_and_created_at", ["userId", "createdAt"])
+    .index("by_status_and_updated_at", ["status", "updatedAt"]),
 
   emailSuppressions: defineTable({
     email: v.string(),

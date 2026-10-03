@@ -35,6 +35,22 @@ export async function processEmailJob(
     return;
   }
 
+  const deliveryDecision = await deps.runner.getNotificationDeliveryDecision({
+    type: job.templateType,
+    channel: "email",
+    ...(job.recipientUserId === undefined ? {} : { userId: job.recipientUserId }),
+  });
+  if (!deliveryDecision.enabled) {
+    await deps.runner.markJobTerminal({
+      jobId,
+      status: "suppressed",
+      errorMessage: deliveryDecision.reason ?? "notification_disabled",
+      errorCode: "notification_disabled",
+      updatedAt: now(),
+    });
+    return;
+  }
+
   let payload: unknown;
   try {
     payload = JSON.parse(job.payloadJson);

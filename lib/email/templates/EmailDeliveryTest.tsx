@@ -1,5 +1,6 @@
 import { Body, Container, Head, Heading, Html, Preview, Section, Text } from "react-email";
 import type { EmailDeliveryTestPayload } from "../model";
+import { EmailFooter } from "./Footer";
 
 export function EmailDeliveryTest({ to, groupName }: EmailDeliveryTestPayload) {
   return (
@@ -18,6 +19,9 @@ export function EmailDeliveryTest({ to, groupName }: EmailDeliveryTestPayload) {
             <Text style={{ color: "#6b7280" }}>
               このメールは配信テストとして送信されています。心当たりがない場合は無視してください。
             </Text>
+          </Section>
+          <Section>
+            <EmailFooter />
           </Section>
         </Container>
       </Body>

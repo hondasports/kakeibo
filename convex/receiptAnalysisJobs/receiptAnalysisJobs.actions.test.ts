@@ -391,14 +391,11 @@ describe("checkAiReviewRequiredHandler", () => {
       batchId: "batch-1" as Id<"receiptAnalysisBatches">,
     });
 
-    expect(ctx.runMutation).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        templateType: "ai_review_required",
-        payloadJson: JSON.stringify({ pendingCount: 2 }),
-        recipientEmail: "user@example.com",
-      }),
-    );
+    expect(ctx.runMutation).toHaveBeenCalledWith(expect.anything(), {
+      batchId: "batch-1",
+      userId: "https://issuer.example|user-001",
+      pendingCount: 2,
+    });
   });
 
   it("needs_review 待ちが 0 なら何もしない", async () => {
@@ -421,7 +418,7 @@ describe("checkAiReviewRequiredHandler", () => {
     expect(ctx.runMutation).not.toHaveBeenCalled();
   });
 
-  it("作成者の email が未設定なら何もしない", async () => {
+  it("作成者の email が未設定でも通知 enqueue mutation を呼ぶ", async () => {
     const ctx = createActionCtx(createIdentity());
 
     ctx.runQuery = vi
@@ -443,6 +440,10 @@ describe("checkAiReviewRequiredHandler", () => {
       batchId: "batch-1" as Id<"receiptAnalysisBatches">,
     });
 
-    expect(ctx.runMutation).not.toHaveBeenCalled();
+    expect(ctx.runMutation).toHaveBeenCalledWith(expect.anything(), {
+      batchId: "batch-1",
+      userId: "https://issuer.example|user-001",
+      pendingCount: 2,
+    });
   });
 });

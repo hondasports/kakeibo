@@ -57,6 +57,7 @@ export function buildNewEmailJobFields(args: {
   normalizedRecipientEmail: string;
   subject: string;
   businessDedupeKey?: string;
+  recipientUserId?: string;
   now: number;
 }): NewTransactionalEmailJobFields {
   return {
@@ -66,6 +67,7 @@ export function buildNewEmailJobFields(args: {
     normalizedRecipientEmail: args.normalizedRecipientEmail,
     subject: args.subject,
     ...(args.businessDedupeKey ? { businessDedupeKey: args.businessDedupeKey } : {}),
+    ...(args.recipientUserId ? { recipientUserId: args.recipientUserId } : {}),
     provider: EMAIL_PROVIDER_NAME,
     status: "queued",
     attemptCount: 0,

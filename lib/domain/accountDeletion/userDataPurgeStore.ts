@@ -4,7 +4,11 @@
  */
 
 /** finalize で削除する userId 紐付きテーブル（ベース順序を維持）。 */
-export const ACCOUNT_DELETION_USER_PURGE_TABLES = ["lineWebhookEvents", "lineImageJobs"] as const;
+export const ACCOUNT_DELETION_USER_PURGE_TABLES = [
+  "lineWebhookEvents",
+  "lineImageJobs",
+  "lineNotificationJobs",
+] as const;
 
 export type AccountDeletionUserPurgeTable = (typeof ACCOUNT_DELETION_USER_PURGE_TABLES)[number];
 

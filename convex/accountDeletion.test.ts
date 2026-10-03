@@ -239,6 +239,7 @@ describe("account deletion group purge orchestration", () => {
         createdAt: 1,
         updatedAt: 1,
         identityDeletedAt: 1,
+        recipientEmailSnapshot: "delete-complete@example.test",
       });
       await ctx.db.insert("lineWebhookEvents", {
         webhookEventId: "account-delete-line-event",
@@ -256,12 +257,48 @@ describe("account deletion group purge orchestration", () => {
         createdAt: 1,
         updatedAt: 1,
       });
+      const batchId = await ctx.db.insert("receiptAnalysisBatches", {
+        groupId: await ctx.db.insert("groups", {
+          name: "g",
+          status: "active",
+          createdAt: 1,
+          updatedAt: 1,
+        }),
+        createdByUserId: userId,
+        totalCount: 1,
+        processedCount: 1,
+        status: "completed",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const linkId = await ctx.db.insert("lineAccountLinks", {
+        userId,
+        lineUserId: "line-u-delete",
+        status: "active",
+        linkedAt: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.insert("lineNotificationJobs", {
+        userId,
+        batchId,
+        type: "ai_review_required",
+        pendingCount: 1,
+        linkId,
+        linkedAtSnapshot: 1,
+        lineUserIdSnapshot: "line-u-delete",
+        text: "退会対象の通知",
+        status: "queued",
+        attemptCount: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      });
       return { requestId, userDbId };
     });
 
-    await t.mutation(internal.accountDeletion.finalizeAccountDeletion, { requestId });
-    await t.mutation(internal.accountDeletion.finalizeAccountDeletion, { requestId });
-    await t.mutation(internal.accountDeletion.finalizeAccountDeletion, { requestId });
+    for (let i = 0; i < 5; i += 1) {
+      await t.mutation(internal.accountDeletion.finalizeAccountDeletion, { requestId });
+    }
 
     const state = await t.run(async (ctx) => ({
       request: await ctx.db.get(requestId),
@@ -274,11 +311,19 @@ describe("account deletion group purge orchestration", () => {
         .query("lineImageJobs")
         .withIndex("by_user_id_and_created_at", (q) => q.eq("userId", userId))
         .collect(),
+      notificationJobs: await ctx.db
+        .query("lineNotificationJobs")
+        .withIndex("by_user_id_and_created_at", (q) => q.eq("userId", userId))
+        .collect(),
+      emails: await ctx.db.query("transactionalEmailJobs").collect(),
     }));
     expect(state.request?.status).toBe("completed");
     expect(state.user).toBeNull();
     expect(state.events).toHaveLength(0);
     expect(state.jobs).toHaveLength(0);
+    expect(state.notificationJobs).toHaveLength(0);
+    expect(state.emails).toHaveLength(1);
+    expect(state.emails[0].templateType).toBe("account_deletion_completed");
   });
 
   it("25件を超える共有membershipもページングで取りこぼさず離脱する", async () => {

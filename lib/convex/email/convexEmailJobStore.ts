@@ -36,6 +36,7 @@ export function toEmailJobRecord(doc: Doc<"transactionalEmailJobs">): Transactio
     normalizedRecipientEmail: doc.normalizedRecipientEmail,
     subject: doc.subject,
     ...(doc.businessDedupeKey === undefined ? {} : { businessDedupeKey: doc.businessDedupeKey }),
+    ...(doc.recipientUserId === undefined ? {} : { recipientUserId: doc.recipientUserId }),
     ...(doc.html === undefined ? {} : { html: doc.html }),
     ...(doc.text === undefined ? {} : { text: doc.text }),
     provider: doc.provider,
