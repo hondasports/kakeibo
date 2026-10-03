@@ -5,6 +5,42 @@ import { profileInputs, missingProfileInputs } from "./resolve-agent-profile.mjs
 
 export const highestTier = (...tiers) =>
   REVIEW_TIERS[Math.max(...tiers.filter(Boolean).map((tier) => REVIEW_TIERS.indexOf(tier)), 0)];
+export const CHECK_COMMANDS = {
+  process: [
+    ["node", "scripts/check-loop-docs.mjs"],
+    ["pnpm", "run", "test:process"],
+  ],
+  lint: [
+    ["pnpm", "run", "lint"],
+    ["pnpm", "run", "format:check"],
+  ],
+  unit: [["pnpm", "exec", "vitest", "run"]],
+  build: [["pnpm", "run", "build"]],
+};
+/** Where each verification kind executes and what it covers. */
+export const VERIFICATION_SCOPES = {
+  process: { execution: "local", scope: "harness docs integrity + process test suite" },
+  lint: { execution: "local", scope: "repo lint + format" },
+  unit: { execution: "local", scope: "vitest unit suite" },
+  build: { execution: "local", scope: "production build" },
+  e2e: { execution: "github", scope: "playwright e2e (delivery gate)" },
+};
+/**
+ * Whether recorded verification evidence may apply to a different revision.
+ * Reuse requires both the feature patch AND the verified tree to be
+ * byte-identical — the same commands over the same content produce the same
+ * result, with no input-list inference to get wrong. Every unknown fails
+ * closed.
+ */
+export function verificationReusable(evidence, { patchSha256, headTree, contractVersion }) {
+  if (!evidence || evidence.success !== true) return false;
+  const appliesTo = evidence.appliesTo;
+  if (!appliesTo || typeof appliesTo.patchSha256 !== "string" || !appliesTo.patchSha256)
+    return false;
+  if (appliesTo.contractVersion !== contractVersion) return false;
+  if (typeof patchSha256 !== "string" || appliesTo.patchSha256 !== patchSha256) return false;
+  return typeof headTree === "string" && appliesTo.headTree === headTree;
+}
 export function requireValue(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -53,9 +89,11 @@ export function verificationSummary(task) {
       ? "missing"
       : !currentEvidence(result, task)
         ? "stale"
-        : result.success === true
-          ? "pass"
-          : "failed";
+        : result.success !== true
+          ? "failed"
+          : result.reuse
+            ? "pass(reused)"
+            : "pass";
   }
   return summary;
 }
@@ -126,7 +164,39 @@ export function computeAssessment(task, paths) {
   if (task.configuration?.profile?.verification === "thorough") {
     Object.assign(result.verification, { lint: true, unit: true, build: true });
   }
+  result.verificationPlan = verificationPlan(result, task);
   return result;
+}
+/**
+ * Per-kind execution plan recorded on the assessment: where each check runs,
+ * what it covers, why it is required, and where its evidence lands.
+ */
+function verificationPlan(result, task) {
+  const acs = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id).filter(Boolean);
+  const thorough = task.configuration?.profile?.verification === "thorough";
+  return Object.entries(result.verification).map(([kind, required]) => {
+    const meta = VERIFICATION_SCOPES[kind] ?? { execution: "local", scope: "unknown" };
+    const reason =
+      kind === "process"
+        ? "required for every change"
+        : !required
+          ? "not required"
+          : result.runtimeRelevant
+            ? "runtime-relevant paths changed"
+            : thorough
+              ? "profile verification=thorough"
+              : "required";
+    return {
+      kind,
+      required,
+      execution: meta.execution,
+      scope: meta.scope,
+      reason,
+      evidence: `verification.${kind}`,
+      commands: CHECK_COMMANDS[kind] ?? null,
+      acs,
+    };
+  });
 }
 export function requireLocalVerification(task) {
   requireValue(task.assessment && task.agentAssessment, "Current change assessment is required");

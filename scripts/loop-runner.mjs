@@ -32,24 +32,15 @@ import {
   missingRequirements,
   verificationSummary,
   aftercareSummary,
+  verificationReusable,
+  CHECK_COMMANDS,
 } from "./loop-policy.mjs";
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
 const git = (args, root) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 const processConfig = (root) =>
   YAML.parse(readFileSync(path.join(root, ".agent/process.yaml"), "utf8"));
-export const CHECK_COMMANDS = {
-  process: [
-    ["node", "scripts/check-loop-docs.mjs"],
-    ["pnpm", "run", "test:process"],
-  ],
-  lint: [
-    ["pnpm", "run", "lint"],
-    ["pnpm", "run", "format:check"],
-  ],
-  unit: [["pnpm", "exec", "vitest", "run"]],
-  build: [["pnpm", "run", "build"]],
-};
+export { CHECK_COMMANDS };
 export function taskPath(root) {
   return git(["rev-parse", "--path-format=absolute", "--git-path", "agent-task.json"], root);
 }
@@ -86,17 +77,74 @@ function invalidate(task) {
   task.agentAssessment = null;
   task.skills = [];
 }
+/** SHA-256 of the merge-base feature patch; null means unknown → fail closed. */
+function featurePatchSha256(task, root, head = task.head) {
+  try {
+    return createHash("sha256")
+      .update(git(["diff", "--binary", "--no-renames", `${task.baseRef}...${head}`], root))
+      .digest("hex");
+  } catch {
+    return null;
+  }
+}
+/**
+ * Revision-change invalidation: verification evidence may be carried over only
+ * when both the feature patch and the verified tree are byte-identical to the
+ * new revision — the same commands over the same tree inputs reproduce the
+ * same result. Commands can still read inputs outside the tree (toolchain,
+ * gitignored files, environment); that residual is accepted because CI
+ * re-executes every required check on the real PR head. `run` keeps recording
+ * where the verification actually executed and never gets rewritten.
+ * Everything else (review, aftercare, assessment, skills) still invalidates
+ * wholesale.
+ */
+function invalidateRevision(task, root, head, baseHead) {
+  const patchSha256 = featurePatchSha256(task, root, head);
+  let headTree = null;
+  try {
+    headTree = git(["rev-parse", `${head}^{tree}`], root);
+  } catch {
+    headTree = null;
+  }
+  const kept = {};
+  const reused = [];
+  for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
+    if (
+      !verificationReusable(evidence, {
+        patchSha256,
+        headTree,
+        contractVersion: EVIDENCE_CONTRACT_VERSION,
+      })
+    )
+      continue;
+    evidence.reuse = {
+      from: { head: evidence.appliesTo.head, baseHead: evidence.appliesTo.baseHead },
+      at: new Date().toISOString(),
+    };
+    evidence.appliesTo.head = head;
+    evidence.appliesTo.baseHead = baseHead;
+    kept[kind] = evidence;
+    reused.push(kind);
+  }
+  task.verification = kept;
+  task.review = null;
+  task.aftercare = null;
+  task.assessment = null;
+  task.agentAssessment = null;
+  task.skills = [];
+  return reused;
+}
 export function refreshTask(task, root) {
   const branch = git(["branch", "--show-current"], root);
   requireValue(branch === task.branch, "Task branch changed; restore or start the correct task");
   const head = git(["rev-parse", "HEAD"], root);
   const baseHead = git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root);
   if (head !== task.head || baseHead !== task.baseHead) {
-    invalidate(task);
+    const reused = invalidateRevision(task, root, head, baseHead);
     task.head = head;
     task.baseHead = baseHead;
     if (!["refine", "incident", "human_gate"].includes(task.state)) task.state = "execute";
-    history(task, "revision_changed");
+    history(task, "revision_changed", { reusedVerification: reused });
   }
   task.assessment = computeAssessment(task, readChangedPaths({ base: task.baseRef, cwd: root }));
   task.risk = highestTier(task.risk, task.assessment.risk.final);
@@ -263,15 +311,9 @@ export function runVerification(
     task.head === before.head && task.baseHead === before.baseHead,
     "Revision changed during verification",
   );
-  let patchSha256 = null;
-  try {
-    patchSha256 = createHash("sha256")
-      .update(git(["diff", "--binary", "--no-renames", `${task.baseRef}...${task.head}`], root))
-      .digest("hex");
-  } catch {
-    // Missing objects or shallow history: the evidence stays valid for this
-    // revision but can never be reused for another — fail-closed.
-  }
+  // Null fingerprints keep the evidence valid for this revision but it can
+  // never be reused for another — fail-closed.
+  const patchSha256 = featurePatchSha256(task, root);
   const log = readFileSync(artifactPath, "utf8");
   task.verification[kind] = {
     run: {
@@ -283,6 +325,7 @@ export function runVerification(
     appliesTo: {
       head: before.head,
       baseHead: before.baseHead,
+      headTree: git(["rev-parse", `${before.head}^{tree}`], root),
       patchSha256,
       contractVersion: EVIDENCE_CONTRACT_VERSION,
     },
