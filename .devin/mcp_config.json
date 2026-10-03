@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    },
+    "vercel": {
+      "url": "https://mcp.vercel.com"
+    },
+    "convex": {
+      "command": "npx",
+      "args": ["-y", "convex@latest", "mcp", "start"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest", "--cdp-endpoint=chrome"]
+    },
+    "indexion": {
+      "command": "indexion",
+      "args": ["mcp"]
+    }
+  }
+}
