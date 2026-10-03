@@ -81,7 +81,11 @@ describe("E2E relevance path classification", () => {
 
   it("fails closed for a mixed or unknown change", () => {
     expect(
-      classifyChangedFiles(["skills/workspace-preflight/SKILL.md", "src/App.tsx", "unknown/config.yaml"]),
+      classifyChangedFiles([
+        "skills/workspace-preflight/SKILL.md",
+        "src/App.tsx",
+        "unknown/config.yaml",
+      ]),
     ).toMatchObject({
       runtimeRelevant: true,
       reason: "runtime_relevant_path_detected",

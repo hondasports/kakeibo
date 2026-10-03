@@ -82,8 +82,16 @@ describe("skill reference checks", () => {
   it("fails when a SKILL.md exists but is not referenced from AGENTS.md", () => {
     const repo = makeRepo();
     write(repo, "AGENTS.md", "see `skills/listed` only");
-    write(repo, "skills/listed/SKILL.md", "---\nname: listed\ndescription: d\nlicense: l\n---\nbody");
-    write(repo, "skills/orphan/SKILL.md", "---\nname: orphan\ndescription: d\nlicense: l\n---\nbody");
+    write(
+      repo,
+      "skills/listed/SKILL.md",
+      "---\nname: listed\ndescription: d\nlicense: l\n---\nbody",
+    );
+    write(
+      repo,
+      "skills/orphan/SKILL.md",
+      "---\nname: orphan\ndescription: d\nlicense: l\n---\nbody",
+    );
     const result = checkLoopDocs(repo);
     expect(result.errors.some((e) => e.includes("skills/orphan"))).toBe(true);
     expect(result.errors.some((e) => e.includes("skills/listed"))).toBe(false);
