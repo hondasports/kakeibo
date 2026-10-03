@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
-import { resolveAgentProfile } from "./resolve-agent-profile.mjs";
+import { decideProfile, resolveAgentProfile } from "./resolve-agent-profile.mjs";
 import { readChangedPaths } from "./suggest-skills.mjs";
 import { validateAssessment } from "./review-depth.mjs";
 import {
@@ -48,7 +48,7 @@ export function loadTask(root) {
   const target = taskPath(root);
   requireValue(
     existsSync(target),
-    "Task not initialized; run loop:state --init <spec.json> --task <id> --model <model> --runtime <runtime> --implementer <id>",
+    "Task not initialized; run loop:state --init <spec.json> --task <id> --runtime <runtime> --implementer <id>",
   );
   const task = readJson(target);
   validateTask(task, root);
@@ -103,13 +103,13 @@ export function startTask(args, root) {
     stdio: "pipe",
   });
   requireValue(
-    args.model && args.runtime && args.task && args.implementer,
-    "Startup requires model, runtime, task and implementer",
+    args.runtime && args.task && args.implementer,
+    "Startup requires runtime, task and implementer",
   );
   const spec = readJson(args.init);
   // Open decisions are allowed in REFINE; leaving it requires a complete spec.
+  // --model is still accepted by the argument parser but no longer used.
   const configuration = resolveAgentProfile({
-    model: args.model,
     profile: args.profile,
     runtime: args.runtime,
     root,
@@ -150,6 +150,9 @@ export function resolveLoopStep({ task, state, event, exit = {}, root = process.
 }
 export function transitionTask(task, event, exit, root) {
   const step = resolveLoopStep({ task, event, exit, root });
+  // REFINE completion fixes the profile from the recorded evaluation before EXECUTE.
+  if (task.state === "refine" && event === "ready")
+    decideProfile(task, { root, strict: true, trigger: "refine_ready" });
   history(task, event, { exit });
   if (event === "findings") task.counters.review += 1;
   if (event === "ci_failure") task.counters.ci += 1;
@@ -376,12 +379,18 @@ export function run(args, root = process.cwd(), services = {}) {
     invalidate(task);
   }
   if (args.assessment) {
-    requireValue(["execute", "review"].includes(task.state), "Assess in execute/review");
+    requireValue(
+      ["refine", "execute", "review"].includes(task.state),
+      "Assess in refine/execute/review",
+    );
     const assessment = readJson(args.assessment);
     requireValue(validateAssessment(assessment).length === 0, "Invalid agent risk assessment");
     task.agentAssessment = assessment;
     task.skills = args.skills?.split(",").filter(Boolean) ?? [];
     refreshTask(task, root);
+    // Re-determination runs only past the first decision: changed evaluation
+    // inputs can raise the profile; auto selection never moves downward.
+    if (task.state !== "refine") decideProfile(task, { root, trigger: "assessment" });
     history(task, "assessed");
   }
   if (args.verify) task = runVerification(task, args.verify, root);

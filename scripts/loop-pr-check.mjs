@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseStateBlock } from "./loop-runner.mjs";
+import { PROFILE_ORDER } from "./resolve-agent-profile.mjs";
 import { readChangedFiles } from "./classify-e2e-relevance.mjs";
 import {
   computeAssessment,
@@ -21,6 +22,19 @@ export function validateCheckpoint(task, { head, baseHead, paths, root = process
     "Agent state does not match PR HEAD/base",
   );
   requireValue(["aftercare", "done"].includes(task.state), "Agent task has not completed review");
+  const selection = task.configuration?.selection;
+  requireValue(
+    selection &&
+      ["user", "auto"].includes(selection.source) &&
+      PROFILE_ORDER.includes(selection.selected) &&
+      selection.selected === task.configuration?.profile?.name,
+    "Profile decision record is required (decided at REFINE completion or user-specified)",
+  );
+  if (selection.source === "auto")
+    requireValue(
+      selection.inputs && selection.ruleVersion,
+      "Auto profile decision needs recorded inputs and rule version",
+    );
   const assessment = computeAssessment(task, paths);
   requireValue(
     task.risk === highestTier(task.risk, assessment.risk.final),

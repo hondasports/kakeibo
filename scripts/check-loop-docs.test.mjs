@@ -126,6 +126,10 @@ describe("banned vocabulary", () => {
       "task/session binding",
       ".loop/state",
       "委譲用workflowは使用しません",
+      ".agent/models/default.yaml",
+      "--model unknown",
+      "Model Registry",
+      "recommended_profile",
     ]) {
       expect(checkBannedVocabulary("docs/x.md", `これは ${word} です`)).toHaveLength(1);
     }
@@ -133,6 +137,7 @@ describe("banned vocabulary", () => {
 
   it("passes on current vocabulary", () => {
     expect(checkBannedVocabulary("docs/x.md", "要求工程と受入条件とHuman Gate")).toHaveLength(0);
+    expect(checkBannedVocabulary("docs/x.md", "coverageはbest-effortで計測する")).toHaveLength(0);
   });
 });
 

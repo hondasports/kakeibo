@@ -4,7 +4,7 @@
 
 ## Startup
 
-repository編集タスクの開始時は `docs/agent-harness.md` の入口手順を実行する。編集前に専用worktreeで `node scripts/loop-runner.mjs --init <spec.json> --task <task-id> --model <実モデルIDまたはunknown> --runtime codex --implementer <session-id>` を実行し、出力されたProfileと現在Stateのworkflowを読む。Devinでは `--runtime devin` とする。再開時は引数なしで実行する。プロファイル名・状態を文章で自己申告するだけでは起動完了にならない。
+repository編集タスクの開始時は `docs/agent-harness.md` の入口手順を実行する。編集前に専用worktreeで `node scripts/loop-runner.mjs --init <spec.json> --task <task-id> --runtime codex --implementer <session-id>` を実行し、出力されたProfileと現在Stateのworkflowを読む。Devinでは `--runtime devin` とする。再開時は引数なしで実行する。プロファイル名・状態を文章で自己申告するだけでは起動完了にならない。
 
 ## Core contract
 
@@ -36,8 +36,8 @@ repository編集タスクの開始時は `docs/agent-harness.md` の入口手順
 
 ## Runtime
 
-Codex / DevinなどのRuntime固有設定は `.agent/runtime/`、タスク強度は `.agent/profiles/`、モデル固有の能力・effort差分は `.agent/models/` に置く。Model名でProfileを増やさない。Profile未指定時はModel Registryの `recommended_profile`、未知モデルは `standard` にフォールバックする。Core HarnessのRisk Floor・Human Gate・State TransitionはProfile / Model Registryで上書きしない。
+Codex / DevinなどのRuntime固有設定は `.agent/runtime/`、タスク強度は `.agent/profiles/` に置く。Model名でProfileを増やさない。ProfileはREFINE終了時にタスクの評価（影響範囲・不確実性・検証負荷）から規則で自動判定し、`--profile` の明示指定を最優先する。Core HarnessのRisk Floor・Human Gate・State TransitionはProfileで上書きしない。
 
-軽量化・REFINE終了時のProfile自動判定の実装仕様は `docs/agent-harness-design.md`（未実装）。現行操作は `docs/agent-harness.md` に従う。
+軽量化の設計正本は `docs/agent-harness-design.md`。Profile自動判定は実装済みであり、現行操作は `docs/agent-harness.md` に従う。
 
 環境・公開手順は `docs/development-process.md` を参照する。

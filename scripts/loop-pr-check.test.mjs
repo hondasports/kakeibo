@@ -43,6 +43,25 @@ describe("GitHub delivery gates", () => {
     );
     expect(() => validateCheckpoint(task, { ...context, head: "changed" })).toThrow("HEAD/base");
   });
+  it("rejects states without a decided profile selection", () => {
+    const task = readyTask();
+    const context = { head: task.head, baseHead: task.baseHead, paths: ["README.md"] };
+    delete task.configuration.selection;
+    expect(() => validateCheckpoint(task, context)).toThrow("selection");
+    task.configuration.selection = {
+      selected: "standard",
+      source: "provisional",
+      ruleVersion: 1,
+    };
+    expect(() => validateCheckpoint(task, context)).toThrow("Profile decision");
+    task.configuration.selection = {
+      selected: "deep",
+      source: "auto",
+      ruleVersion: 1,
+      inputs: {},
+    };
+    expect(() => validateCheckpoint(task, context)).toThrow("Profile decision");
+  });
   it("requires state for non-bot PRs even when only markdown changes", () => {
     const task = readyTask();
     const event = {

@@ -1,8 +1,10 @@
 # Agent Harness操作手順
 
-このCLIはタスクごとの仕様・Profile・評価・検証・レビュー・停止条件を接続する。AGENTS.mdを入口としてAgentが起動する。Codex/Devin自体を自動起動したり、実行中のモデルのreasoning effortを変更する機能はない。Profileのeffortはruntimeへ渡す推奨値であり、ホスト側の適用を確認できない場合は適用済みと報告しない。autonomy/delegation/contextはAgentが遵守する方針、verification=thoroughは追加のlocal検証として機械適用する。
+このCLIはタスクごとの仕様・Profile・評価・検証・レビュー・停止条件を接続する。AGENTS.mdを入口としてAgentが起動する。Codex/Devin自体を自動起動したり、実行中のモデルの推論設定を変更する機能はない。autonomy/delegation/contextはAgentが遵守する方針、verification=thoroughは追加のlocal検証として機械適用する。
 
-本書は現行CLIの操作手順を記載する。軽量化・REFINE終了時のProfile自動判定の実装仕様は [Agent Harness設計](agent-harness-design.md) を参照する。自動判定、Runtimeへの設定適用、出力・検証・証跡管理の変更は未実装であり、現在は本書の手順を使う。
+ProfileはREFINE終了時に、Agentが記録した評価（`blast_radius`・`uncertainty`・検証負荷）から規則で自動判定される。`--profile` の明示指定は常に優先される。実装中に評価入力が変わった場合だけ再判定し、自動選択は上位へしか移動しない。下位への変更にはユーザー指定または根拠記録が必要である。選択値・選択元・参照した評価・根拠・規則バージョンは状態に記録され、PR gateでも照合される。
+
+本書は現行CLIの操作手順を記載する。軽量化の設計正本は [Agent Harness設計](agent-harness-design.md) を参照する。出力・検証・証跡管理のさらなる変更は未実装であり、現在は本書の手順を使う。
 
 ## 開始と再開
 
@@ -10,14 +12,22 @@
 
 1. 専用worktreeでclean baselineを確認する。
 2. 作業仕様JSONをリポジトリ外（例: `/tmp/spec.json`）に作る。必須フィールドは `.agent/schema/spec.schema.json` を参照。`predictedRisk` も必須。Human Requestを改変せずGoal/AC/Non-goals/Assumptions/Verification Strategyを整理する。
-3. 次を実行し、解決されたProfileと現在のworkflowを読む。正確なモデルIDが取得できない場合は `unknown` を渡し、standardへフォールバックした事実を報告する。
+3. 次を実行し、現在のworkflowを読む。開始時のProfileは仮のdefaultであり、REFINE終了時に自動判定で確定される。Profileを明示する場合は `--profile <name>` を付ける（指定値は常に優先される）。
 
 ```bash
-node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --model unknown --runtime codex --implementer session-123
+node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --runtime codex --implementer session-123
+```
+
+Devinでは `--runtime devin` を指定する。旧来のモデル指定オプションは互換のため受理されるが、何も記録・参照しない。
+
+4. REFINEの評価を記録し、EXECUTEへ進む。`--assessment` のJSONには `risk_assessment`・`tier_rationale`・`applied_tier` に加えて、Profile判定の入力となる `verification_load: {level: routine|complex, rationale}` を含める。これらの入力が欠ける場合、`ready` はREFINEの不足条件として拒否される。
+
+```bash
+node scripts/loop-runner.mjs --assessment /tmp/assessment.json
 node scripts/loop-runner.mjs --event ready
 ```
 
-Devinでは `--runtime devin` を指定する。base既定値は `origin/preview`。別baseは開始時に `--base` で指定する。作業状態はworktree固有のGitメタデータに保存する。通常の再開は引数なしで実行する。`--state` は保存済み状態との一致確認専用であり、状態を飛ばす指定ではない。
+base既定値は `origin/preview`。別baseは開始時に `--base` で指定する。作業状態はworktree固有のGitメタデータに保存する。通常の再開は引数なしで実行する。`--state` は保存済み状態との一致確認専用であり、状態を飛ばす指定ではない。
 
 仕様の修正はREFINEで `--spec /tmp/spec.json`。未決事項があれば `--event decision_required --exit /tmp/exit.json` で停止する。exitにはreasonを記録する。Human Gateの解除には `approval: {"source":"user","reference":"対象と操作を承認したユーザー指示の参照"}` が必要。承認記録はAgentの責任であり、このJSONだけで人間の本人性を証明するものではない。
 
@@ -29,7 +39,7 @@ Devinでは `--runtime devin` を指定する。base既定値は `origin/preview
 node scripts/loop-runner.mjs --assessment /tmp/assessment.json --skills workspace-preflight,security-review
 ```
 
-assessmentは `scripts/review-depth.mjs` のrisk_assessment・tier_rationale・applied_tier形式。runnerはGitの実差分を取得し、Spec予測・Machine・Agent・Reviewer・過去の最高Riskを統合する。診断CLIの `--paths` はrunner/CIの評価を差し替えられない。
+assessmentは `scripts/review-depth.mjs` のrisk_assessment・tier_rationale・applied_tier形式に `verification_load` を加えた形。EXECUTE/REVIEWで再提出した評価が影響範囲・不確実性・検証計画の変化を示す場合だけProfileを再判定する（自動選択は上位へのみ）。通常の修正・テスト実行・CI待ち・コミットでは再判定しない。runnerはGitの実差分を取得し、Spec予測・Machine・Agent・Reviewer・過去の最高Riskを統合する。診断CLIの `--paths` はrunner/CIの評価を差し替えられない。
 
 変更をcommitしてから検証する。pre-commitは初期化済みEXECUTE状態を要求する。
 
