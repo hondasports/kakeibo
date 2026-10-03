@@ -5,21 +5,32 @@ import { processEmailJobHandler } from "./actions";
 function createActionCtx({
   job,
   suppression,
+  deliveryDecision = { enabled: true },
+  deliveryDecisionError,
   mutationResult = undefined,
 }: {
   job: Record<string, unknown> | null;
   suppression?: Record<string, unknown> | null;
+  deliveryDecision?: { enabled: boolean; reason?: string };
+  deliveryDecisionError?: Error;
   mutationResult?: unknown;
 }): ActionCtx {
   const runQuery = vi
     .fn()
     .mockImplementation(
-      async (ref: unknown, args: { normalizedEmail?: string } | { jobId?: string }) => {
+      async (
+        ref: unknown,
+        args: { normalizedEmail?: string } | { jobId?: string } | { type: string; userId?: string },
+      ) => {
         if ("normalizedEmail" in args) {
           return suppression ?? null;
         }
         if ("jobId" in args) {
           return job;
+        }
+        if ("type" in args) {
+          if (deliveryDecisionError) throw deliveryDecisionError;
+          return deliveryDecision;
         }
         return null;
       },
@@ -81,6 +92,50 @@ describe("processEmailJobHandler", () => {
         status: "suppressed",
       }),
     );
+  });
+
+  it("marks suppressed without sending when the delivery decision is disabled", async () => {
+    const ctx = createActionCtx({
+      job: queuedJob,
+      deliveryDecision: { enabled: false, reason: "globally_disabled" },
+    });
+
+    await processEmailJobHandler(ctx, { jobId: "job-123" as any });
+
+    expect(ctx.runMutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        jobId: "job-123",
+        status: "suppressed",
+        errorCode: "notification_disabled",
+      }),
+    );
+    expect(ctx.runMutation).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "sent" }),
+    );
+  });
+
+  it("reschedules the same job when the delivery decision query is temporarily unavailable", async () => {
+    const ctx = createActionCtx({
+      job: queuedJob,
+      deliveryDecisionError: new Error("temporary query failure"),
+    });
+
+    await processEmailJobHandler(ctx, { jobId: "job-123" as any });
+
+    expect(ctx.runMutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        jobId: "job-123",
+        status: "retrying",
+        attemptCount: 1,
+        errorCode: "notification_decision_unavailable",
+      }),
+    );
+    expect(ctx.scheduler.runAfter).toHaveBeenCalledWith(60 * 1000, expect.anything(), {
+      jobId: "job-123",
+    });
   });
 
   it("does nothing when job is already in a terminal state", async () => {

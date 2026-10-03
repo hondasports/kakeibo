@@ -13,6 +13,7 @@ export async function enqueueTransactionalEmailJobHandler(
     payloadJson: string;
     recipientEmail: string;
     businessDedupeKey?: string;
+    recipientUserId?: string;
   },
 ): Promise<string> {
   return await enqueueTransactionalEmailJobUsecase(createEnqueueJobDeps(ctx), args);
@@ -24,6 +25,7 @@ export const enqueueTransactionalEmailJob = internalMutation({
     payloadJson: v.string(),
     recipientEmail: v.string(),
     businessDedupeKey: v.optional(v.string()),
+    recipientUserId: v.optional(v.string()),
   },
   handler: enqueueTransactionalEmailJobHandler,
 });

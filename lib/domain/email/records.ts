@@ -14,6 +14,7 @@ export type TransactionalEmailJobRecord = {
   normalizedRecipientEmail: string;
   subject: string;
   businessDedupeKey?: string;
+  recipientUserId?: string;
   html?: string;
   text?: string;
   provider: string;

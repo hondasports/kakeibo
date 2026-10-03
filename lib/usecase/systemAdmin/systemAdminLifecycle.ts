@@ -164,6 +164,8 @@ export async function listSystemAdminAuditLogs(
       afterActiveGroupId: log.afterActiveGroupId,
       beforeOwnerCount: log.beforeOwnerCount,
       afterOwnerCount: log.afterOwnerCount,
+      beforeNotificationEnabled: log.beforeNotificationEnabled,
+      afterNotificationEnabled: log.afterNotificationEnabled,
       createdAt: log.createdAt,
     })),
   };

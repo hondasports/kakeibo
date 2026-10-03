@@ -21,6 +21,7 @@ test.describe("設定台帳（Issue #375）", () => {
       "グループ",
       "カテゴリ",
       "週の設定",
+      "通知設定",
       "LINE連携",
       "アカウント",
       "危険な操作",
@@ -46,7 +47,11 @@ test.describe("設定台帳（Issue #375）", () => {
   });
 
   test("@smoke 週設定を保存して成功通知を表示する", async ({ page }) => {
-    await page.getByRole("button", { name: "変更を保存" }).click();
+    const ledger = page.getByTestId("settings-ledger");
+    const weekSection = ledger.locator(".settings-ledger-section", {
+      has: page.getByRole("heading", { name: "週の設定", level: 2 }),
+    });
+    await weekSection.getByRole("button", { name: "変更を保存" }).click();
     await expect(page.getByText("週の設定を保存しました")).toBeVisible({ timeout: 15_000 });
   });
 

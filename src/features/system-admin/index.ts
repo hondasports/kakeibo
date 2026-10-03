@@ -11,3 +11,4 @@ export { SystemAdminMembershipChangeDialog } from "./components/SystemAdminMembe
 export { SystemAdminAuditLogPage } from "./pages/SystemAdminAuditLogPage";
 export { SystemAdminManagementPage } from "./pages/SystemAdminManagementPage";
 export { SystemAdminGroupDeletionPage } from "./pages/SystemAdminGroupDeletionPage";
+export { SystemAdminNotificationSettingsPage } from "./pages/SystemAdminNotificationSettingsPage";
