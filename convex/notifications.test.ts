@@ -813,6 +813,23 @@ describe("internal LINE job claim and completion", () => {
 
     await t.mutation(internal.notifications.internal.completeLineNotificationJob, {
       jobId,
+      attemptCount: 99,
+      completion: {
+        outcome: "retrying",
+        nextRetryAt: 80_000,
+        errorCode: "stale_attempt",
+      },
+      now: 20_000,
+    });
+    const afterStaleProcessing = await scheduledNames();
+    expect(
+      afterStaleProcessing.filter((name) => name.includes("processLineNotificationJob")),
+    ).toHaveLength(0);
+    const stillProcessing = await t.run(async (ctx) => await ctx.db.get(jobId));
+    expect(stillProcessing).toMatchObject({ status: "processing", attemptCount: 1 });
+
+    await t.mutation(internal.notifications.internal.completeLineNotificationJob, {
+      jobId,
       attemptCount: 1,
       completion: {
         outcome: "retrying",
@@ -829,12 +846,23 @@ describe("internal LINE job claim and completion", () => {
     await t.mutation(internal.notifications.internal.completeLineNotificationJob, {
       jobId,
       attemptCount: 99,
-      completion: { outcome: "sent" },
+      completion: {
+        outcome: "retrying",
+        nextRetryAt: 80_000,
+        errorCode: "stale_attempt",
+      },
       now: 30_000,
     });
     const afterStale = await scheduledNames();
     expect(afterStale.filter((name) => name.includes("processLineNotificationJob"))).toHaveLength(
       1,
     );
+    const stillRetrying = await t.run(async (ctx) => await ctx.db.get(jobId));
+    expect(stillRetrying).toMatchObject({
+      status: "retrying",
+      attemptCount: 1,
+      nextRetryAt: 70_000,
+      errorCode: "provider_unavailable",
+    });
   });
 });
