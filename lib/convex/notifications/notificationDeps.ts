@@ -10,6 +10,7 @@ import { createReceiptAnalysisReader } from "../receiptAnalysisJobs/convexReceip
 import { createSystemAdminReadStore } from "../systemAdmin/convexSystemAdminStore";
 import { createSystemAdminAuditLogStore } from "../systemAdmin/convexSystemAdminAuditLogStore";
 import { createUserReader, createUserStore } from "../users/convexUserStore";
+import { createLineNotificationEventStore } from "./convexLineNotificationEventStore";
 import { createLineNotificationJobStore } from "./convexLineNotificationJobStore";
 import { createLineNotificationActionRunner } from "./convexNotificationRunner";
 import { createLineNotificationScheduler } from "./convexNotificationScheduler";
@@ -28,6 +29,7 @@ import type {
   NotificationUserMutationDeps,
   NotificationUserQueryDeps,
   ProcessLineNotificationJobDeps,
+  StaleLineNotificationRecoveryDeps,
 } from "../../usecase/notifications/deps";
 import type { EmailDeliveryDecisionDeps } from "../../usecase/notifications/deliveryDecision";
 
@@ -97,6 +99,7 @@ export function createAiReviewEnqueueDeps(
     emailJobs: createEmailJobStore(ctx),
     emailScheduler: createEmailScheduler(ctx),
     lineJobs: createLineNotificationJobStore(ctx),
+    lineEvents: createLineNotificationEventStore(ctx),
     lineScheduler: createLineNotificationScheduler(ctx),
   };
 }
@@ -135,11 +138,21 @@ export function createProcessLineNotificationJobDeps(
   };
 }
 
+export function createStaleLineNotificationRecoveryDeps(
+  ctx: Pick<MutationCtx, "db" | "scheduler">,
+): StaleLineNotificationRecoveryDeps {
+  return {
+    jobs: createLineNotificationJobStore(ctx),
+    scheduler: createLineNotificationScheduler(ctx),
+  };
+}
+
 export function createCleanupLineNotificationDeps(
   ctx: Pick<MutationCtx, "db" | "scheduler">,
 ): CleanupLineNotificationDeps {
   return {
     jobs: createLineNotificationJobStore(ctx),
+    lineEvents: createLineNotificationEventStore(ctx),
     scheduler: createLineNotificationScheduler(ctx),
   };
 }

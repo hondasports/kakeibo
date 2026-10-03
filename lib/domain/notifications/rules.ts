@@ -10,6 +10,7 @@ export const LINE_NOTIFICATION_LEASE_MS = 30 * 1000;
 export const LINE_NOTIFICATION_PROVIDER_TIMEOUT_MS = 10 * 1000;
 export const LINE_RETRY_KEY_TTL_MS = 24 * 60 * 60 * 1000;
 export const LINE_NOTIFICATION_CLEANUP_BATCH_SIZE = 100;
+export const LINE_NOTIFICATION_STALE_JOB_MS = 60 * 1000;
 export const LINE_NOTIFICATION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -73,6 +74,10 @@ export function getLineNotificationExhaustionErrorCode(
 
 export function buildAiReviewEmailDedupeKey(batchId: string): string {
   return `ai-review-required/${batchId}`;
+}
+
+export function buildAiReviewLineDedupeKey(batchId: string): string {
+  return `ai-review-required-line/${batchId}`;
 }
 
 export function buildAiReviewLineText(pendingCount: number): string {

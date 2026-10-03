@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LineNotificationJobRecord } from "../../domain/notifications/records";
 import {
+  authorizeLineNotificationSend,
   claimLineNotificationJob,
   completeLineNotificationJob,
   recoverLineNotificationLease,
+  recoverStaleLineNotificationJobs,
 } from "./lineJobLifecycle";
 import type { LineNotificationClaimDeps } from "./deps";
 
@@ -72,6 +74,7 @@ function makeDeps({
       getJob: vi.fn().mockResolvedValue(job),
       findByBatchId: vi.fn().mockResolvedValue(null),
       listTerminalJobsUpdatedBefore: vi.fn().mockResolvedValue([]),
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([]),
       insert: vi.fn().mockResolvedValue("new-id"),
       patch: vi.fn(async (jobId: string, fields: Record<string, unknown>) => {
         patches.push({ jobId, fields });
@@ -273,6 +276,69 @@ describe("claimLineNotificationJob", () => {
   });
 });
 
+describe("authorizeLineNotificationSend", () => {
+  const AUTHORIZE_ARGS = {
+    jobId: "job-1",
+    attemptCount: 1,
+    retryKey: CLAIM_ARGS.retryKeyCandidate,
+    leaseMs: 30_000,
+    now: 10_000,
+  };
+
+  it("extends the lease after re-checking the processing/attempt/retry-key fence", async () => {
+    const job = makeJob({
+      status: "processing",
+      attemptCount: 1,
+      retryKey: CLAIM_ARGS.retryKeyCandidate,
+      leaseUntil: 20_000,
+      firstAttemptAt: 1_000,
+    });
+    const { deps, patches } = makeDeps({ job });
+    const result = await authorizeLineNotificationSend(deps, AUTHORIZE_ARGS);
+
+    expect(result.claimed).toBe(true);
+    if (result.claimed) expect(result.job.leaseUntil).toBe(40_000);
+    expect(patches[0].fields).toMatchObject({ leaseUntil: 40_000, updatedAt: 10_000 });
+  });
+
+  it.each([
+    ["stale attempt", { attemptCount: 2 }],
+    ["stale retry key", { retryKey: "aaaaaaaa-0000-4000-8000-000000000000" }],
+    ["expired lease", { leaseUntil: 9_999 }],
+    ["retrying status", { status: "retrying" as const }],
+  ])("rejects %s without another write", async (_label, overrides) => {
+    const job = makeJob({
+      status: "processing",
+      attemptCount: 1,
+      retryKey: CLAIM_ARGS.retryKeyCandidate,
+      leaseUntil: 20_000,
+      ...overrides,
+    });
+    const { deps, patches } = makeDeps({ job });
+    const result = await authorizeLineNotificationSend(deps, AUTHORIZE_ARGS);
+    expect(result.claimed).toBe(false);
+    expect(patches).toHaveLength(0);
+  });
+
+  it("suppresses instead of authorizing when the user opted out after claim", async () => {
+    const job = makeJob({
+      status: "processing",
+      attemptCount: 1,
+      retryKey: CLAIM_ARGS.retryKeyCandidate,
+      leaseUntil: 20_000,
+      firstAttemptAt: 1_000,
+    });
+    const { deps, patches } = makeDeps({ job, linePreference: false });
+    const result = await authorizeLineNotificationSend(deps, AUTHORIZE_ARGS);
+
+    expect(result.claimed).toBe(false);
+    expect(patches.at(-1)?.fields).toMatchObject({
+      status: "suppressed",
+      errorCode: "notification_disabled",
+    });
+  });
+});
+
 describe("completeLineNotificationJob", () => {
   function makeCompletionDeps(job: LineNotificationJobRecord | null) {
     const patches: { jobId: string; fields: Record<string, unknown> }[] = [];
@@ -283,6 +349,7 @@ describe("completeLineNotificationJob", () => {
           getJob: vi.fn().mockResolvedValue(job),
           findByBatchId: vi.fn().mockResolvedValue(null),
           listTerminalJobsUpdatedBefore: vi.fn().mockResolvedValue([]),
+          listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([]),
           insert: vi.fn().mockResolvedValue("x"),
           patch: vi.fn(async (jobId: string, fields: Record<string, unknown>) => {
             patches.push({ jobId, fields });
@@ -394,6 +461,7 @@ describe("recoverLineNotificationLease", () => {
           getJob: vi.fn().mockResolvedValue(job),
           findByBatchId: vi.fn().mockResolvedValue(null),
           listTerminalJobsUpdatedBefore: vi.fn().mockResolvedValue([]),
+          listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([]),
           insert: vi.fn().mockResolvedValue("x"),
           patch: vi.fn(async (jobId: string, fields: Record<string, unknown>) => {
             patches.push({ jobId, fields });
@@ -464,5 +532,63 @@ describe("recoverLineNotificationLease", () => {
       errorCode: "retry_key_expired",
     });
     expect(scheduler.scheduleProcessJob).not.toHaveBeenCalled();
+  });
+});
+
+describe("recoverStaleLineNotificationJobs", () => {
+  it("reschedules stale queued jobs, due retries and expired processing leases", async () => {
+    const queued = makeJob({ id: "queued-1", status: "queued", updatedAt: 0 });
+    const retrying = makeJob({
+      id: "retrying-1",
+      status: "retrying",
+      attemptCount: 1,
+      nextRetryAt: 50_000,
+      updatedAt: 0,
+    });
+    const futureRetry = makeJob({
+      id: "retrying-future",
+      status: "retrying",
+      attemptCount: 1,
+      nextRetryAt: 200_000,
+      updatedAt: 0,
+    });
+    const processing = makeJob({
+      id: "processing-1",
+      status: "processing",
+      attemptCount: 1,
+      leaseUntil: 60_000,
+      updatedAt: 0,
+    });
+    const patches: { jobId: string; fields: Record<string, unknown> }[] = [];
+    const scheduler = { scheduleProcessJob: vi.fn().mockResolvedValue(undefined) };
+    const deps = {
+      jobs: {
+        getJob: vi.fn().mockResolvedValue(processing),
+        findByBatchId: vi.fn().mockResolvedValue(null),
+        listTerminalJobsUpdatedBefore: vi.fn().mockResolvedValue([]),
+        listJobsByStatusUpdatedBefore: vi.fn(async (status: string) => {
+          if (status === "queued") return [queued];
+          if (status === "retrying") return [retrying, futureRetry];
+          if (status === "processing") return [processing];
+          return [];
+        }),
+        insert: vi.fn().mockResolvedValue("x"),
+        patch: vi.fn(async (jobId: string, fields: Record<string, unknown>) => {
+          patches.push({ jobId, fields });
+        }),
+        delete: vi.fn().mockResolvedValue(undefined),
+      },
+      scheduler,
+      now: () => 100_000,
+    };
+
+    await recoverStaleLineNotificationJobs(deps);
+
+    expect(scheduler.scheduleProcessJob).toHaveBeenCalledTimes(3);
+    expect(scheduler.scheduleProcessJob).toHaveBeenNthCalledWith(1, 0, "queued-1");
+    expect(scheduler.scheduleProcessJob).toHaveBeenNthCalledWith(2, 0, "retrying-1");
+    expect(scheduler.scheduleProcessJob).toHaveBeenNthCalledWith(3, 0, "processing-1");
+    expect(patches.map((patch) => patch.jobId)).toEqual(["queued-1", "retrying-1", "processing-1"]);
+    expect(patches[2].fields).toMatchObject({ status: "retrying", nextRetryAt: 100_000 });
   });
 });

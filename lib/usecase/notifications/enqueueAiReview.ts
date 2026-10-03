@@ -7,6 +7,7 @@ import {
 } from "../../domain/notifications/model";
 import {
   buildAiReviewEmailDedupeKey,
+  buildAiReviewLineDedupeKey,
   buildAiReviewLineText,
 } from "../../domain/notifications/rules";
 import { enqueueTransactionalEmailJob } from "../email/enqueueJob";
@@ -55,10 +56,12 @@ export async function enqueueAiReviewNotifications(
     );
   }
 
-  const [lineSetting, activeLinks, existingLineJob] = await Promise.all([
+  const lineDedupeKey = buildAiReviewLineDedupeKey(args.batchId);
+  const [lineSetting, activeLinks, existingLineJob, existingLineEvent] = await Promise.all([
     deps.settings.findByTypeAndChannel(AI_REVIEW_REQUIRED_NOTIFICATION_TYPE, "line"),
     deps.links.listActiveByUserId(batch.createdByUserId),
     deps.lineJobs.findByBatchId(args.batchId),
+    deps.lineEvents.findByDedupeKey(lineDedupeKey),
   ]);
 
   const lineDecision = resolveNotificationDelivery({
@@ -69,7 +72,34 @@ export async function enqueueAiReviewNotifications(
       defaultNotificationEnabled(AI_REVIEW_REQUIRED_NOTIFICATION_TYPE, "line"),
     personalEnabled: user.notificationPreferences?.aiReviewRequiredLineEnabled,
   });
-  if (!lineDecision.enabled || activeLinks.length !== 1 || existingLineJob) return;
+
+  let outcome: "queued" | "skipped" = "queued";
+  let skipReason: string | undefined;
+  if (existingLineJob) outcome = "queued";
+  else if (!lineDecision.enabled) {
+    outcome = "skipped";
+    skipReason = "notification_disabled";
+  } else if (activeLinks.length === 0) {
+    outcome = "skipped";
+    skipReason = "user_unlinked";
+  } else if (activeLinks.length !== 1) {
+    outcome = "skipped";
+    skipReason = "link_ambiguous";
+  }
+
+  if (!existingLineEvent) {
+    await deps.lineEvents.insert({
+      userId: batch.createdByUserId,
+      batchId: args.batchId,
+      type: AI_REVIEW_REQUIRED_NOTIFICATION_TYPE,
+      dedupeKey: lineDedupeKey,
+      outcome,
+      reason: skipReason,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  if (existingLineEvent || existingLineJob || outcome === "skipped") return;
 
   const link = activeLinks[0];
   const lineJobId = await deps.lineJobs.insert({

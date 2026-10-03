@@ -700,6 +700,20 @@ export default defineSchema({
     .index("by_user_id_and_created_at", ["userId", "createdAt"])
     .index("by_status_and_updated_at", ["status", "updatedAt"]),
 
+  lineNotificationEvents: defineTable({
+    userId: v.string(),
+    batchId: v.id("receiptAnalysisBatches"),
+    type: v.literal("ai_review_required"),
+    dedupeKey: v.string(),
+    outcome: v.union(v.literal("queued"), v.literal("skipped")),
+    reason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_dedupe_key", ["dedupeKey"])
+    .index("by_user_id_and_created_at", ["userId", "createdAt"])
+    .index("by_created_at", ["createdAt"]),
+
   emailSuppressions: defineTable({
     email: v.string(),
     normalizedEmail: v.string(),

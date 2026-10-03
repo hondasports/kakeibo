@@ -1,7 +1,10 @@
 import type { TransactionalEmailType } from "../../email/model";
 import type { NotificationChannel } from "./model";
 import type {
+  LineNotificationEventRecord,
   LineNotificationJobRecord,
+  LineNotificationJobStatus,
+  NewLineNotificationEventFields,
   NewLineNotificationJobFields,
   NotificationSettingRecord,
   TerminalLineNotificationJobStatus,
@@ -31,6 +34,11 @@ export interface LineNotificationJobReader {
     cutoff: number,
     limit: number,
   ): Promise<LineNotificationJobRecord[]>;
+  listJobsByStatusUpdatedBefore(
+    status: LineNotificationJobStatus,
+    cutoff: number,
+    limit: number,
+  ): Promise<LineNotificationJobRecord[]>;
 }
 
 export interface LineNotificationJobStore extends LineNotificationJobReader {
@@ -40,6 +48,13 @@ export interface LineNotificationJobStore extends LineNotificationJobReader {
     fields: Partial<Omit<LineNotificationJobRecord, "id" | "creationTime">>,
   ): Promise<void>;
   delete(jobId: string): Promise<void>;
+}
+
+export interface LineNotificationEventStore {
+  findByDedupeKey(dedupeKey: string): Promise<LineNotificationEventRecord | null>;
+  listCreatedBefore(cutoff: number, limit: number): Promise<LineNotificationEventRecord[]>;
+  insert(fields: NewLineNotificationEventFields): Promise<string>;
+  delete(eventId: string): Promise<void>;
 }
 
 export interface LineNotificationScheduler {

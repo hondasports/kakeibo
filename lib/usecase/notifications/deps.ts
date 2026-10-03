@@ -8,6 +8,7 @@ import type {
   LinePushSender,
 } from "../../domain/notifications/runner";
 import type {
+  LineNotificationEventStore,
   LineNotificationJobStore,
   LineNotificationScheduler,
   NotificationSettingReader,
@@ -60,6 +61,7 @@ export type AiReviewNotificationEnqueueDeps = {
   emailJobs: TransactionalEmailJobStore;
   emailScheduler: EmailJobScheduler;
   lineJobs: LineNotificationJobStore;
+  lineEvents: LineNotificationEventStore;
   lineScheduler: LineNotificationScheduler;
   now?: () => number;
 };
@@ -89,8 +91,15 @@ export type ProcessLineNotificationJobDeps = {
   now?: () => number;
 };
 
+export type StaleLineNotificationRecoveryDeps = {
+  jobs: LineNotificationJobStore;
+  scheduler: Pick<LineNotificationScheduler, "scheduleProcessJob">;
+  now?: () => number;
+};
+
 export type CleanupLineNotificationDeps = {
   jobs: LineNotificationJobStore;
+  lineEvents: LineNotificationEventStore;
   scheduler: Pick<LineNotificationScheduler, "scheduleCleanup">;
   now?: () => number;
 };

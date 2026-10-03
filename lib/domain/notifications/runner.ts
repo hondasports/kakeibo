@@ -18,6 +18,13 @@ export interface LineNotificationActionRunner {
     leaseMs: number;
     now: number;
   }): Promise<LineNotificationClaimResult>;
+  authorizeSend(args: {
+    jobId: string;
+    attemptCount: number;
+    retryKey: string;
+    leaseMs: number;
+    now: number;
+  }): Promise<LineNotificationClaimResult>;
   completeJob(args: {
     jobId: string;
     attemptCount: number;

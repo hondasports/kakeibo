@@ -29,15 +29,23 @@ function makeJob(overrides: Partial<LineNotificationJobRecord> = {}): LineNotifi
 
 function makeDeps({
   claimResult = { claimed: true as const, job: makeJob() },
+  authorizeResult,
   sendResult = { kind: "sent" as const, providerRequestId: "req-1" },
   now = () => 10_000,
 }: {
   claimResult?: { claimed: true; job: LineNotificationJobRecord } | { claimed: false };
+  authorizeResult?: { claimed: true; job: LineNotificationJobRecord } | { claimed: false };
   sendResult?: LinePushSendResult;
   now?: () => number;
 }) {
   const runner = {
     claimJob: vi.fn().mockResolvedValue(claimResult),
+    authorizeSend: vi
+      .fn()
+      .mockResolvedValue(
+        authorizeResult ??
+          (claimResult.claimed ? { claimed: true, job: claimResult.job } : { claimed: false }),
+      ),
     completeJob: vi.fn().mockResolvedValue(undefined),
   };
   const sender = { send: vi.fn().mockResolvedValue(sendResult) };
@@ -53,10 +61,24 @@ describe("processLineNotificationJob", () => {
     expect(runner.completeJob).not.toHaveBeenCalled();
   });
 
+  it("does not send when the claimed worker loses the send-authorization fence", async () => {
+    const { deps, sender, runner } = makeDeps({ authorizeResult: { claimed: false } });
+    await processLineNotificationJob(deps, { jobId: "job-1", retryKeyCandidate: RETRY_KEY });
+    expect(sender.send).not.toHaveBeenCalled();
+    expect(runner.completeJob).not.toHaveBeenCalled();
+  });
+
   it("sends the snapshot text/recipient with the persisted retryKey and marks sent", async () => {
     const { deps, sender, runner } = makeDeps({});
     await processLineNotificationJob(deps, { jobId: "job-1", retryKeyCandidate: RETRY_KEY });
 
+    expect(runner.authorizeSend).toHaveBeenCalledWith({
+      jobId: "job-1",
+      attemptCount: 1,
+      retryKey: RETRY_KEY,
+      leaseMs: 30_000,
+      now: 10_000,
+    });
     expect(sender.send).toHaveBeenCalledWith({
       to: "line-user-1",
       text: "line text",
@@ -161,6 +183,7 @@ describe("processLineNotificationJob", () => {
         current = deadline + 2_000;
         return { claimed: true, job };
       }),
+      authorizeSend: vi.fn().mockResolvedValue({ claimed: true, job }),
       completeJob: vi.fn().mockResolvedValue(undefined),
     };
     const sender = { send: vi.fn().mockResolvedValue({ kind: "sent" }) };
@@ -188,6 +211,7 @@ describe("processLineNotificationJob", () => {
         current = deadline;
         return { claimed: true, job };
       }),
+      authorizeSend: vi.fn().mockResolvedValue({ claimed: true, job }),
       completeJob: vi.fn().mockResolvedValue(undefined),
     };
     const sender = { send: vi.fn().mockResolvedValue({ kind: "sent" }) };
@@ -214,6 +238,7 @@ describe("processLineNotificationJob", () => {
         current = deadline - 1;
         return { claimed: true, job };
       }),
+      authorizeSend: vi.fn().mockResolvedValue({ claimed: true, job }),
       completeJob: vi.fn().mockResolvedValue(undefined),
     };
     const sender = {
@@ -242,6 +267,7 @@ describe("processLineNotificationJob", () => {
         current = deadline - 1;
         return { claimed: true, job };
       }),
+      authorizeSend: vi.fn().mockResolvedValue({ claimed: true, job }),
       completeJob: vi.fn().mockResolvedValue(undefined),
     };
     const sender = {

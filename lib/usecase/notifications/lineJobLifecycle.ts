@@ -8,10 +8,16 @@ import {
 import {
   getLineNotificationExhaustionErrorCode,
   isLineNotificationJobDue,
+  LINE_NOTIFICATION_CLEANUP_BATCH_SIZE,
+  LINE_NOTIFICATION_STALE_JOB_MS,
 } from "../../domain/notifications/rules";
 import type { LineNotificationJobRecord } from "../../domain/notifications/records";
 import type { LineNotificationClaimResult } from "../../domain/notifications/runner";
-import type { LineNotificationClaimDeps, LineNotificationCompletionDeps } from "./deps";
+import type {
+  LineNotificationClaimDeps,
+  LineNotificationCompletionDeps,
+  StaleLineNotificationRecoveryDeps,
+} from "./deps";
 
 export type ClaimLineNotificationJobArgs = {
   jobId: string;
@@ -134,6 +140,67 @@ export async function claimLineNotificationJob(
   };
 }
 
+export async function authorizeLineNotificationSend(
+  deps: LineNotificationClaimDeps,
+  args: {
+    jobId: string;
+    attemptCount: number;
+    retryKey: string;
+    leaseMs: number;
+    now: number;
+  },
+): Promise<LineNotificationClaimResult> {
+  const job = await deps.jobs.getJob(args.jobId);
+  if (
+    !job ||
+    job.status !== "processing" ||
+    job.attemptCount !== args.attemptCount ||
+    job.retryKey !== args.retryKey ||
+    job.leaseUntil === undefined ||
+    job.leaseUntil <= args.now
+  ) {
+    return { claimed: false };
+  }
+
+  const exhaustionErrorCode = getLineNotificationExhaustionErrorCode(job, args.now);
+  if (exhaustionErrorCode !== null) {
+    await deps.jobs.patch(args.jobId, {
+      status: "failed",
+      errorCode: exhaustionErrorCode,
+      leaseUntil: undefined,
+      nextRetryAt: undefined,
+      updatedAt: args.now,
+    });
+    return { claimed: false };
+  }
+
+  const leaseUntil = args.now + args.leaseMs;
+  await deps.jobs.patch(args.jobId, {
+    leaseUntil,
+    updatedAt: args.now,
+  });
+
+  const suppressionErrorCode = await evaluateSuppressionErrorCode(deps, job);
+  if (suppressionErrorCode !== null) {
+    await deps.jobs.patch(args.jobId, {
+      status: "suppressed",
+      errorCode: suppressionErrorCode,
+      leaseUntil: undefined,
+      nextRetryAt: undefined,
+      updatedAt: args.now,
+    });
+    return { claimed: false };
+  }
+  return {
+    claimed: true,
+    job: {
+      ...job,
+      leaseUntil,
+      updatedAt: args.now,
+    },
+  };
+}
+
 export async function completeLineNotificationJob(
   deps: LineNotificationCompletionDeps,
   args: {
@@ -186,7 +253,7 @@ export async function completeLineNotificationJob(
 }
 
 export async function recoverLineNotificationLease(
-  deps: Pick<LineNotificationClaimDeps, "jobs" | "scheduler">,
+  deps: StaleLineNotificationRecoveryDeps,
   args: { jobId: string; attemptCount: number },
   now: number,
 ): Promise<void> {
@@ -213,4 +280,45 @@ export async function recoverLineNotificationLease(
     updatedAt: now,
   });
   await deps.scheduler.scheduleProcessJob(0, args.jobId);
+}
+
+export async function recoverStaleLineNotificationJobs(
+  deps: StaleLineNotificationRecoveryDeps,
+): Promise<void> {
+  const now = (deps.now ?? Date.now)();
+  const staleBefore = now - LINE_NOTIFICATION_STALE_JOB_MS;
+
+  const staleQueuedJobs = await deps.jobs.listJobsByStatusUpdatedBefore(
+    "queued",
+    staleBefore,
+    LINE_NOTIFICATION_CLEANUP_BATCH_SIZE,
+  );
+  for (const job of staleQueuedJobs) {
+    await deps.jobs.patch(job.id, { updatedAt: now });
+    await deps.scheduler.scheduleProcessJob(0, job.id);
+  }
+
+  const staleRetryingJobs = await deps.jobs.listJobsByStatusUpdatedBefore(
+    "retrying",
+    staleBefore,
+    LINE_NOTIFICATION_CLEANUP_BATCH_SIZE,
+  );
+  for (const job of staleRetryingJobs) {
+    if (job.nextRetryAt === undefined || job.nextRetryAt > now) continue;
+    await deps.jobs.patch(job.id, { updatedAt: now });
+    await deps.scheduler.scheduleProcessJob(0, job.id);
+  }
+
+  const staleProcessingJobs = await deps.jobs.listJobsByStatusUpdatedBefore(
+    "processing",
+    staleBefore,
+    LINE_NOTIFICATION_CLEANUP_BATCH_SIZE,
+  );
+  for (const job of staleProcessingJobs) {
+    await recoverLineNotificationLease(
+      deps,
+      { jobId: job.id, attemptCount: job.attemptCount },
+      now,
+    );
+  }
 }

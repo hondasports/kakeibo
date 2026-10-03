@@ -24,6 +24,15 @@ export async function cleanupOldLineNotificationJobs(
     hasMore ||= batch.length === LINE_NOTIFICATION_CLEANUP_BATCH_SIZE;
   }
 
+  const eventBatch = await deps.lineEvents.listCreatedBefore(
+    cutoff,
+    LINE_NOTIFICATION_CLEANUP_BATCH_SIZE,
+  );
+  for (const event of eventBatch) {
+    await deps.lineEvents.delete(event.id);
+  }
+  hasMore ||= eventBatch.length === LINE_NOTIFICATION_CLEANUP_BATCH_SIZE;
+
   if (hasMore) {
     await deps.scheduler.scheduleCleanup(0);
   }

@@ -523,6 +523,7 @@ describe("internal AI review notification enqueue", () => {
     const rows = await t.run(async (ctx) => ({
       emails: await ctx.db.query("transactionalEmailJobs").collect(),
       lines: await ctx.db.query("lineNotificationJobs").collect(),
+      events: await ctx.db.query("lineNotificationEvents").collect(),
     }));
     expect(rows.emails).toHaveLength(1);
     expect(rows.emails[0]).toMatchObject({
@@ -538,6 +539,13 @@ describe("internal AI review notification enqueue", () => {
       lineUserIdSnapshot: "line-u-creator",
       linkedAtSnapshot: 50,
     });
+    expect(rows.events).toHaveLength(1);
+    expect(rows.events[0]).toMatchObject({
+      userId: "creator",
+      batchId,
+      outcome: "queued",
+      dedupeKey: `ai-review-required-line/${batchId}`,
+    });
   });
 
   it("does not enqueue LINE without opt-in or link, email still enqueued", async () => {
@@ -551,9 +559,40 @@ describe("internal AI review notification enqueue", () => {
     const rows = await t.run(async (ctx) => ({
       emails: await ctx.db.query("transactionalEmailJobs").collect(),
       lines: await ctx.db.query("lineNotificationJobs").collect(),
+      events: await ctx.db.query("lineNotificationEvents").collect(),
     }));
     expect(rows.emails).toHaveLength(1);
     expect(rows.lines).toHaveLength(0);
+    expect(rows.events).toHaveLength(1);
+    expect(rows.events[0]).toMatchObject({
+      outcome: "skipped",
+      reason: "notification_disabled",
+    });
+
+    await t.run(async (ctx) => {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_token_identifier", (q) => q.eq("userId", "creator"))
+        .unique();
+      await ctx.db.patch(user!._id, {
+        notificationPreferences: {
+          aiReviewRequiredEmailEnabled: true,
+          aiReviewRequiredLineEnabled: true,
+        },
+      });
+    });
+    await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
+      batchId,
+      userId: "creator",
+      pendingCount: 2,
+    });
+
+    const replayed = await t.run(async (ctx) => ({
+      lines: await ctx.db.query("lineNotificationJobs").collect(),
+      events: await ctx.db.query("lineNotificationEvents").collect(),
+    }));
+    expect(replayed.lines).toHaveLength(0);
+    expect(replayed.events).toHaveLength(1);
   });
 
   it("enqueues nothing when caller userId does not match batch creator", async () => {
@@ -735,6 +774,93 @@ describe("internal LINE job claim and completion", () => {
       retryKey,
       firstAttemptAt: 10_000,
     });
+  });
+
+  it("rejects send authorization after lease recovery turns the claimed attempt stale", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const jobId = await seedClaimableJob(t);
+    const retryKey = "550e8400-e29b-41d4-a716-446655440000";
+
+    const claim = await t.mutation(internal.notifications.internal.claimLineNotificationJob, {
+      jobId,
+      retryKeyCandidate: retryKey,
+      leaseMs: 30_000,
+      now: 10_000,
+    });
+    expect(claim.claimed).toBe(true);
+
+    await t.mutation(internal.notifications.internal.recoverLineNotificationLease, {
+      jobId,
+      attemptCount: 1,
+    });
+
+    const authorization = await t.mutation(
+      internal.notifications.internal.authorizeLineNotificationSend,
+      {
+        jobId,
+        attemptCount: 1,
+        retryKey,
+        leaseMs: 30_000,
+        now: Date.now() + 1_000,
+      },
+    );
+    expect(authorization.claimed).toBe(false);
+  });
+
+  it("send authorization re-checks the latest opt-out state before external delivery", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const jobId = await seedClaimableJob(t);
+    const retryKey = "550e8400-e29b-41d4-a716-446655440000";
+    const claim = await t.mutation(internal.notifications.internal.claimLineNotificationJob, {
+      jobId,
+      retryKeyCandidate: retryKey,
+      leaseMs: 30_000,
+      now: 10_000,
+    });
+    expect(claim.claimed).toBe(true);
+
+    await t.run(async (ctx) => {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_token_identifier", (q) => q.eq("userId", "creator"))
+        .unique();
+      await ctx.db.patch(user!._id, {
+        notificationPreferences: {
+          aiReviewRequiredEmailEnabled: true,
+          aiReviewRequiredLineEnabled: false,
+        },
+      });
+    });
+
+    const authorization = await t.mutation(
+      internal.notifications.internal.authorizeLineNotificationSend,
+      {
+        jobId,
+        attemptCount: 1,
+        retryKey,
+        leaseMs: 30_000,
+        now: 20_000,
+      },
+    );
+    expect(authorization.claimed).toBe(false);
+    const job = await t.run(async (ctx) => await ctx.db.get(jobId));
+    expect(job).toMatchObject({ status: "suppressed", errorCode: "notification_disabled" });
+  });
+
+  it("stale-job recovery reschedules a queued job that lost its process action", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const jobId = await seedClaimableJob(t);
+
+    await t.mutation(internal.notifications.internal.recoverStaleLineNotificationJobs, {});
+
+    const scheduledNames = (await t.run(async (ctx) =>
+      (await ctx.db.system.query("_scheduled_functions").collect()).map((row) => row.name),
+    )) as string[];
+    expect(
+      scheduledNames.filter((name) => name.includes("processLineNotificationJob")),
+    ).toHaveLength(1);
+    const job = await t.run(async (ctx) => await ctx.db.get(jobId));
+    expect(job?.status).toBe("queued");
   });
 
   it("fails the job instead of claiming once the attempt budget is exhausted", async () => {

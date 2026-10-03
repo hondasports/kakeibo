@@ -82,6 +82,7 @@ const USER_PURGE_INDEX: Record<AccountDeletionUserPurgeTable, string> = {
   lineWebhookEvents: "by_user_id_and_created_at",
   lineImageJobs: "by_user_id_and_created_at",
   lineNotificationJobs: "by_user_id_and_created_at",
+  lineNotificationEvents: "by_user_id_and_created_at",
 };
 
 export function createAccountDeletionUserDataPurgeStore(
