@@ -89,6 +89,7 @@ describe("agent metrics aggregation", () => {
     });
     expect(() => parseArguments(["--bogus"])).toThrow("unknown option");
     expect(() => parseArguments(["--task"])).toThrow("requires a value");
+    expect(parseArguments(["--", "--task", "t1"])).toEqual({ task: "t1" });
   });
   it("skips malformed lines and actionless entries instead of failing", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "loop-metrics-bad-"));

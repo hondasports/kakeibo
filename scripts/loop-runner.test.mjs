@@ -726,6 +726,10 @@ describe("persistent task gates", () => {
       findings: [],
     });
     expect(template.acceptanceCriteria).toEqual([{ id: "AC1", evidence: "" }]);
+    // _notes carries reviewer-facing contract hints (finding status enum,
+    // deltaFrom, machine floor) — its absence caused an invalid status enum
+    // in a real fresh-context review.
+    expect(template._notes.join(" ")).toContain("open|fixed|dismissed");
     expect(readFileSync(path.join(out, "diff.patch"), "utf8")).toContain("feature.txt");
     const manifest = JSON.parse(readFileSync(path.join(out, "verification-manifest.json"), "utf8"));
     expect(manifest.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
@@ -1044,6 +1048,21 @@ describe("increment reuse and loop ergonomics", () => {
       expect(() => validateReview(task, reviewFixture(task, { deltaFrom: bad }))).toThrow(
         "deltaFrom",
       );
+  });
+  it("reports finding status enums and assessment failures in review errors", () => {
+    const { task } = repository();
+    task.state = "review";
+    expect(() =>
+      validateReview(
+        task,
+        reviewFixture(task, {
+          findings: [{ id: "F1", status: "closed", evidence: "done" }],
+        }),
+      ),
+    ).toThrow("open|fixed|dismissed");
+    expect(() => validateReview(task, reviewFixture(task, { assessment: undefined }))).toThrow(
+      "Reviewer assessment invalid",
+    );
   });
   it("keeps metadata-reading tests inside the mandatory process suite", () => {
     // `unit` evidence is extended through metadata-only increments only because

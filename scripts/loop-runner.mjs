@@ -789,6 +789,11 @@ export function buildReviewPacket(task, dir, root) {
         reviewer: "",
         independent: task.assessment?.review?.independent === true,
         context: "fresh",
+        _notes: [
+          "finding.status is open|fixed|dismissed (unique id, non-empty evidence); every prior finding id must appear",
+          "deltaFrom (optional): SHA of a previously reviewed head — scopes review to the increment",
+          "assessment must satisfy the machine floor, not merely the reviewer's own rating",
+        ],
         evidence: [],
         findings: [],
         acceptanceCriteria: (task.spec?.acceptanceCriteria ?? []).map((ac) => ({

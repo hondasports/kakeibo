@@ -230,7 +230,7 @@ export function validateReview(task, report) {
         !ids.has(finding.id) &&
         ["open", "fixed", "dismissed"].includes(finding.status) &&
         text(finding.evidence),
-      "Invalid finding record",
+      "Invalid finding record (unique id, status open|fixed|dismissed, non-empty evidence required)",
     );
     ids.add(finding.id);
   }
@@ -247,9 +247,10 @@ export function validateReview(task, report) {
       `Missing AC evidence: ${ac.id}`,
     );
   }
+  const assessmentErrors = validateAssessment(report.assessment);
   requireValue(
-    validateAssessment(report.assessment).length === 0,
-    "Reviewer assessment is required",
+    assessmentErrors.length === 0,
+    `Reviewer assessment invalid (must satisfy the machine floor): ${assessmentErrors.join("; ")}`,
   );
   if (report.deltaFrom !== undefined) {
     requireValue(

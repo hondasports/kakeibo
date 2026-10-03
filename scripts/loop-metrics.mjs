@@ -85,6 +85,7 @@ export function parseArguments(args) {
   const options = new Set(["--path", "--task"]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+    if (arg === "--") continue;
     if (!options.has(arg)) throw new Error(`unknown option: ${arg}`);
     const value = args[i + 1];
     if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value`);
