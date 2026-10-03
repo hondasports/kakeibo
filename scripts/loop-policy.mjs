@@ -5,6 +5,66 @@ import { profileInputs, missingProfileInputs } from "./resolve-agent-profile.mjs
 
 export const highestTier = (...tiers) =>
   REVIEW_TIERS[Math.max(...tiers.filter(Boolean).map((tier) => REVIEW_TIERS.indexOf(tier)), 0)];
+export const CHECK_COMMANDS = {
+  process: [
+    ["node", "scripts/check-loop-docs.mjs"],
+    ["pnpm", "run", "test:process"],
+  ],
+  lint: [
+    ["pnpm", "run", "lint"],
+    ["pnpm", "run", "format:check"],
+  ],
+  unit: [["pnpm", "exec", "vitest", "run"]],
+  build: [["pnpm", "run", "build"]],
+};
+/**
+ * What each verification kind reads beyond the feature patch itself.
+ * `inputs: null` means the whole tree — only an empty upstream delta reuses it.
+ */
+export const VERIFICATION_SCOPES = {
+  process: {
+    execution: "local",
+    scope: "harness docs integrity + process test suite",
+    inputs: [
+      /^\.agent\//,
+      /^docs\//,
+      /^skills\//,
+      /^scripts\//,
+      /^AGENTS\.md$/,
+      /^README\.md$/,
+      /^package\.json$/,
+      /^pnpm-lock\.yaml$/,
+      /^pnpm-workspace\.yaml$/,
+      /^vitest\.config\./,
+      /^tsconfig[^/]*\.json$/,
+    ],
+  },
+  lint: { execution: "local", scope: "repo lint + format", inputs: null },
+  unit: { execution: "local", scope: "vitest unit suite", inputs: null },
+  build: { execution: "local", scope: "production build", inputs: null },
+  e2e: { execution: "github", scope: "playwright e2e (delivery gate)", inputs: null },
+};
+/**
+ * Whether recorded verification evidence may apply to a different revision.
+ * Sound only when the feature patch is byte-identical and the upstream delta
+ * does not touch the kind's declared inputs. Every unknown fails closed.
+ */
+export function verificationReusable(
+  kind,
+  evidence,
+  { patchSha256, upstreamDeltaPaths, contractVersion },
+) {
+  if (!evidence || evidence.success !== true) return false;
+  const appliesTo = evidence.appliesTo;
+  if (!appliesTo || typeof appliesTo.patchSha256 !== "string" || !appliesTo.patchSha256)
+    return false;
+  if (appliesTo.contractVersion !== contractVersion) return false;
+  if (typeof patchSha256 !== "string" || appliesTo.patchSha256 !== patchSha256) return false;
+  if (!Array.isArray(upstreamDeltaPaths)) return false;
+  const inputs = VERIFICATION_SCOPES[kind]?.inputs;
+  if (!inputs) return upstreamDeltaPaths.length === 0;
+  return !upstreamDeltaPaths.some((changed) => inputs.some((re) => re.test(changed)));
+}
 export function requireValue(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -53,9 +113,11 @@ export function verificationSummary(task) {
       ? "missing"
       : !currentEvidence(result, task)
         ? "stale"
-        : result.success === true
-          ? "pass"
-          : "failed";
+        : result.success !== true
+          ? "failed"
+          : result.reuse
+            ? "pass(reused)"
+            : "pass";
   }
   return summary;
 }
@@ -126,7 +188,43 @@ export function computeAssessment(task, paths) {
   if (task.configuration?.profile?.verification === "thorough") {
     Object.assign(result.verification, { lint: true, unit: true, build: true });
   }
+  result.verificationPlan = verificationPlan(result, task);
   return result;
+}
+/**
+ * Per-kind execution plan recorded on the assessment: where each check runs,
+ * what it covers, why it is required, and where its evidence lands.
+ */
+function verificationPlan(result, task) {
+  const acs = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id).filter(Boolean);
+  const thorough = task.configuration?.profile?.verification === "thorough";
+  return Object.entries(result.verification).map(([kind, required]) => {
+    const meta = VERIFICATION_SCOPES[kind] ?? {
+      execution: "local",
+      scope: "unknown",
+      inputs: null,
+    };
+    const reason =
+      kind === "process"
+        ? "required for every change"
+        : !required
+          ? "not required"
+          : result.runtimeRelevant
+            ? "runtime-relevant paths changed"
+            : thorough
+              ? "profile verification=thorough"
+              : "required";
+    return {
+      kind,
+      required,
+      execution: meta.execution,
+      scope: meta.scope,
+      reason,
+      evidence: `verification.${kind}`,
+      commands: CHECK_COMMANDS[kind] ?? null,
+      acs,
+    };
+  });
 }
 export function requireLocalVerification(task) {
   requireValue(task.assessment && task.agentAssessment, "Current change assessment is required");

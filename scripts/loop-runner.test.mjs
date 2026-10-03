@@ -520,4 +520,114 @@ describe("persistent task gates", () => {
     // Read actions must not mutate the persisted state.
     expect(loadTask(dir).head).toBe(task.head);
   });
+  /** Move `preview` one commit ahead on the given file, then switch back. */
+  const upstreamCommit = (dir, git, file, content = "upstream\n") => {
+    git("switch", "preview");
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), content);
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", `upstream ${file}`);
+    git("switch", "codex/task");
+  };
+  it("reuses verification evidence across base drift when inputs are untouched", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    const before = task.verification.process;
+    upstreamCommit(dir, git, "src/app.ts", "export {};\n");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    const evidence = refreshed.verification.process;
+    // The run record stays at the revision that actually executed it.
+    expect(evidence.run.head).toBe(before.run.head);
+    expect(evidence.appliesTo.head).toBe(refreshed.head);
+    expect(evidence.appliesTo.baseHead).toBe(refreshed.baseHead);
+    expect(evidence.appliesTo.baseHead).not.toBe(before.appliesTo.baseHead);
+    expect(evidence.reuse).toMatchObject({
+      from: { head: before.appliesTo.head, baseHead: before.appliesTo.baseHead },
+    });
+    expect(verificationSummary(refreshed).process).toBe("pass(reused)");
+    expect(refreshed.history.at(-1).reusedVerification).toEqual(["process"]);
+  });
+  it("drops verification evidence when the upstream delta touches kind inputs", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "docs/upstream.md");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification).toEqual({});
+    expect(refreshed.history.at(-1).reusedVerification).toEqual([]);
+  });
+  it("drops verification evidence when the feature patch changes", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    saveTask(task, dir);
+    writeFileSync(path.join(dir, "README.md"), "changed\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature change");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification).toEqual({});
+  });
+  it("drops evidence fail-closed on contract mismatch or missing reuse metadata", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    task.verification.process.appliesTo.contractVersion = 999;
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "src/app.ts", "export {};\n");
+    expect(refreshTask(loadTask(dir), dir).verification).toEqual({});
+    // Legacy flat evidence without appliesTo is never reusable either.
+    const { dir: dir2, git: git2, task: task2 } = repository();
+    task2.verification.process = {
+      head: task2.head,
+      baseHead: task2.baseHead,
+      success: true,
+    };
+    saveTask(task2, dir2);
+    upstreamCommit(dir2, git2, "src/legacy.ts", "export {};\n");
+    expect(refreshTask(loadTask(dir2), dir2).verification).toEqual({});
+  });
+  it("never reuses review or aftercare evidence on revision change", () => {
+    const { dir, git, task } = repository();
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    task.aftercare = {
+      head: task.head,
+      baseHead: task.baseHead,
+      ready: true,
+      pr: 1,
+      checkedAt: "2026-01-01",
+    };
+    saveTask(task, dir);
+    upstreamCommit(dir, git, "src/app.ts", "export {};\n");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.process).toBeDefined();
+    expect(refreshed.review).toBeNull();
+    expect(refreshed.aftercare).toBeNull();
+    expect(refreshed.state).toBe("execute");
+  });
+  it("records a verification plan with execution, scope, reason and AC references", () => {
+    const task = taskFixture();
+    const processOnly = Object.fromEntries(
+      computeAssessment(task, ["README.md"]).verificationPlan.map((i) => [i.kind, i]),
+    );
+    expect(processOnly.process).toMatchObject({
+      required: true,
+      execution: "local",
+      reason: "required for every change",
+    });
+    expect(processOnly.process.commands[0]).toEqual(["node", "scripts/check-loop-docs.mjs"]);
+    expect(processOnly.e2e).toMatchObject({ required: false, execution: "github" });
+    expect(
+      computeAssessment(task, ["README.md"]).verificationPlan.every((i) => i.acs.includes("AC1")),
+    ).toBe(true);
+    const runtime = Object.fromEntries(
+      computeAssessment(task, ["src/app.ts"]).verificationPlan.map((i) => [i.kind, i]),
+    );
+    expect(runtime.e2e.required).toBe(true);
+    expect(runtime.unit).toMatchObject({
+      required: true,
+      execution: "local",
+      reason: "runtime-relevant paths changed",
+    });
+  });
 });
