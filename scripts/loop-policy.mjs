@@ -1,9 +1,46 @@
 import { validateDocument } from "./loop-schema.mjs";
 import { assessChange } from "./assess-change.mjs";
 import { REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
+import { profileInputs, missingProfileInputs } from "./resolve-agent-profile.mjs";
 
 export const highestTier = (...tiers) =>
   REVIEW_TIERS[Math.max(...tiers.filter(Boolean).map((tier) => REVIEW_TIERS.indexOf(tier)), 0)];
+export const CHECK_COMMANDS = {
+  process: [
+    ["node", "scripts/check-loop-docs.mjs"],
+    ["pnpm", "run", "test:process"],
+  ],
+  lint: [
+    ["pnpm", "run", "lint"],
+    ["pnpm", "run", "format:check"],
+  ],
+  unit: [["pnpm", "exec", "vitest", "run"]],
+  build: [["pnpm", "run", "build"]],
+};
+/** Where each verification kind executes and what it covers. */
+export const VERIFICATION_SCOPES = {
+  process: { execution: "local", scope: "harness docs integrity + process test suite" },
+  lint: { execution: "local", scope: "repo lint + format" },
+  unit: { execution: "local", scope: "vitest unit suite" },
+  build: { execution: "local", scope: "production build" },
+  e2e: { execution: "github", scope: "playwright e2e (delivery gate)" },
+};
+/**
+ * Whether recorded verification evidence may apply to a different revision.
+ * Reuse requires both the feature patch AND the verified tree to be
+ * byte-identical — the same commands over the same content produce the same
+ * result, with no input-list inference to get wrong. Every unknown fails
+ * closed.
+ */
+export function verificationReusable(evidence, { patchSha256, headTree, contractVersion }) {
+  if (!evidence || evidence.success !== true) return false;
+  const appliesTo = evidence.appliesTo;
+  if (!appliesTo || typeof appliesTo.patchSha256 !== "string" || !appliesTo.patchSha256)
+    return false;
+  if (appliesTo.contractVersion !== contractVersion) return false;
+  if (typeof patchSha256 !== "string" || appliesTo.patchSha256 !== patchSha256) return false;
+  return typeof headTree === "string" && appliesTo.headTree === headTree;
+}
 export function requireValue(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -28,7 +65,93 @@ export function validateTask(task, root) {
   );
 }
 export function currentEvidence(evidence, task) {
-  return evidence?.head === task.head && evidence?.baseHead === task.baseHead;
+  // New-style verification evidence carries `appliesTo`; legacy entries and
+  // review/aftercare records keep `head`/`baseHead` at the top level.
+  const appliesTo = evidence?.appliesTo ?? evidence;
+  return appliesTo?.head === task.head && appliesTo?.baseHead === task.baseHead;
+}
+/** Verification kinds required locally for this task (e2e is a GitHub delivery gate). */
+export function requiredVerificationKinds(task) {
+  return Object.entries(task.assessment?.verification ?? {})
+    .filter(([kind, required]) => required && kind !== "e2e")
+    .map(([kind]) => kind);
+}
+export function verificationSummary(task) {
+  const summary = {};
+  for (const [kind, required] of Object.entries(task.assessment?.verification ?? {})) {
+    if (!required) continue;
+    if (kind === "e2e") {
+      summary[kind] = "github";
+      continue;
+    }
+    const result = task.verification?.[kind];
+    summary[kind] = !result
+      ? "missing"
+      : !currentEvidence(result, task)
+        ? "stale"
+        : result.success !== true
+          ? "failed"
+          : result.reuse
+            ? "pass(reused)"
+            : "pass";
+  }
+  return summary;
+}
+export function aftercareSummary(task) {
+  const evidence = task.aftercare;
+  if (!evidence) return null;
+  return {
+    ready: currentEvidence(evidence, task) && evidence.ready === true,
+    pr: evidence.pr ?? null,
+    checkedAt: evidence.checkedAt ?? null,
+  };
+}
+/** Unmet machine-floor requirements toward the next transition, as short tokens. */
+export function missingRequirements(task) {
+  const missing = [];
+  const localVerificationMissing = () => {
+    if (!task.assessment || !task.agentAssessment) missing.push("assessment");
+    for (const skill of task.assessment?.requiredSkills ?? [])
+      if (!task.skills.includes(skill)) missing.push(`skill:${skill}`);
+    for (const kind of requiredVerificationKinds(task)) {
+      const result = task.verification?.[kind];
+      if (!(currentEvidence(result, task) && result.success === true))
+        missing.push(`verify:${kind}`);
+    }
+  };
+  const reviewMissing = () => {
+    if (!currentEvidence(task.review, task)) missing.push("review");
+    for (const finding of task.findings ?? [])
+      if (finding.status === "open") missing.push(`finding:${finding.id}`);
+    if (task.assessment?.review?.independent && task.review && task.review.independent !== true)
+      missing.push("independent-review");
+  };
+  if (task.state === "refine") {
+    if (!task.agentAssessment) missing.push("assessment");
+    else if (task.configuration?.selection?.source !== "user")
+      for (const field of missingProfileInputs(
+        profileInputs(task.agentAssessment, {
+          fallbackLoad: task.configuration?.selection?.inputs?.verification_load,
+        }),
+      ))
+        missing.push(`profile:${field}`);
+    if ((task.spec?.openMaterialDecisions ?? []).length > 0) missing.push("openMaterialDecisions");
+    const ids = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id);
+    if (!ids.length || !ids.every(text) || new Set(ids).size !== ids.length)
+      missing.push("spec:acceptanceCriteria");
+  }
+  if (task.state === "execute") localVerificationMissing();
+  if (task.state === "review") {
+    localVerificationMissing();
+    reviewMissing();
+  }
+  if (task.state === "aftercare") {
+    localVerificationMissing();
+    reviewMissing();
+    if (!(currentEvidence(task.aftercare, task) && task.aftercare.ready === true))
+      missing.push("aftercare");
+  }
+  return missing;
 }
 export function computeAssessment(task, paths) {
   const reviewAssessment = currentEvidence(task.review, task) ? task.review.assessment : null;
@@ -41,7 +164,39 @@ export function computeAssessment(task, paths) {
   if (task.configuration?.profile?.verification === "thorough") {
     Object.assign(result.verification, { lint: true, unit: true, build: true });
   }
+  result.verificationPlan = verificationPlan(result, task);
   return result;
+}
+/**
+ * Per-kind execution plan recorded on the assessment: where each check runs,
+ * what it covers, why it is required, and where its evidence lands.
+ */
+function verificationPlan(result, task) {
+  const acs = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id).filter(Boolean);
+  const thorough = task.configuration?.profile?.verification === "thorough";
+  return Object.entries(result.verification).map(([kind, required]) => {
+    const meta = VERIFICATION_SCOPES[kind] ?? { execution: "local", scope: "unknown" };
+    const reason =
+      kind === "process"
+        ? "required for every change"
+        : !required
+          ? "not required"
+          : result.runtimeRelevant
+            ? "runtime-relevant paths changed"
+            : thorough
+              ? "profile verification=thorough"
+              : "required";
+    return {
+      kind,
+      required,
+      execution: meta.execution,
+      scope: meta.scope,
+      reason,
+      evidence: `verification.${kind}`,
+      commands: CHECK_COMMANDS[kind] ?? null,
+      acs,
+    };
+  });
 }
 export function requireLocalVerification(task) {
   requireValue(task.assessment && task.agentAssessment, "Current change assessment is required");
@@ -168,28 +323,13 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
     );
   }
 }
-export function checkAftercare(pr, task, findings) {
-  requireValue(
-    pr.headRefOid === task.head && pr.baseRefOid === task.baseHead,
-    "PR HEAD/base changed",
-  );
-  requireValue(
-    pr.state === "OPEN" &&
-      !pr.isDraft &&
-      pr.mergeable === "MERGEABLE" &&
-      pr.mergeStateStatus === "CLEAN",
-    "PR is not merge ready",
-  );
-  requireValue(
-    !["CHANGES_REQUESTED", "REVIEW_REQUIRED"].includes(pr.reviewDecision),
-    "PR approval is outstanding",
-  );
-  const rawChecks = pr.statusCheckRollup ?? [];
-  requireValue(rawChecks.length > 0, "No CI checks observed");
-  // Retried checks (flake rerun, ready_for_review re-trigger) leave superseded
-  // runs in the rollup; only the latest dated run per check name is authoritative.
-  // Entries we cannot order (no name/context or no timestamp) are always kept so a
-  // failed or pending run is never hidden behind an older success — fail-closed.
+/**
+ * Retried checks (flake rerun, ready_for_review re-trigger) leave superseded
+ * runs in the rollup; only the latest dated run per check name is authoritative.
+ * Entries we cannot order (no name/context or no timestamp) are always kept so a
+ * failed or pending run is never hidden behind an older success — fail-closed.
+ */
+export function selectChecks(rawChecks) {
   const latestByName = new Map();
   const unorderable = [];
   for (const check of rawChecks) {
@@ -208,7 +348,27 @@ export function checkAftercare(pr, task, findings) {
     const prev = latestByName.get(key);
     if (!prev || at >= prev.at) latestByName.set(key, { check, at });
   }
-  const checks = [...latestByName.values()].map((entry) => entry.check).concat(unorderable);
+  return [...latestByName.values()].map((entry) => entry.check).concat(unorderable);
+}
+export function checkAftercare(pr, task, findings) {
+  requireValue(
+    pr.headRefOid === task.head && pr.baseRefOid === task.baseHead,
+    "PR HEAD/base changed",
+  );
+  requireValue(
+    pr.state === "OPEN" &&
+      !pr.isDraft &&
+      pr.mergeable === "MERGEABLE" &&
+      pr.mergeStateStatus === "CLEAN",
+    "PR is not merge ready",
+  );
+  requireValue(
+    !["CHANGES_REQUESTED", "REVIEW_REQUIRED"].includes(pr.reviewDecision),
+    "PR approval is outstanding",
+  );
+  const rawChecks = pr.statusCheckRollup ?? [];
+  requireValue(rawChecks.length > 0, "No CI checks observed");
+  const checks = selectChecks(rawChecks);
   for (const check of checks) {
     const status = check.conclusion ?? check.state;
     requireValue(

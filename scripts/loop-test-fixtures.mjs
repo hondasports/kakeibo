@@ -64,6 +64,32 @@ export function taskFixture(root = process.cwd(), overrides = {}) {
   task.verification.process = { head: task.head, baseHead: task.baseHead, success: true };
   return task;
 }
+export function verificationManifestFixture(task, kind = "process", overrides = {}) {
+  return {
+    run: {
+      head: task.head,
+      baseHead: task.baseHead,
+      checkedAt: "2026-01-01T00:10:00.000Z",
+      durationMs: 1234,
+    },
+    appliesTo: {
+      head: task.head,
+      baseHead: task.baseHead,
+      headTree: "c".repeat(40),
+      patchSha256: "a".repeat(64),
+      contractVersion: 1,
+    },
+    success: true,
+    commands: [["node", "scripts/check-loop-docs.mjs"]],
+    summary: { exitCode: 0, lastLines: ["Tests 136 passed"] },
+    artifact: {
+      path: `/nonexistent/agent-evidence/${task.taskId}/${kind}-1.log`,
+      sha256: "b".repeat(64),
+      bytes: 1024,
+    },
+    ...overrides,
+  };
+}
 export function reviewFixture(task, overrides = {}) {
   return {
     head: task.head,
