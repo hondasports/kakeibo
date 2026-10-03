@@ -22,7 +22,8 @@ export async function processLineNotificationJob(
   if (!claim.claimed) return;
 
   const job = claim.job;
-  if (!job.retryKey || !isValidRetryKey(job.retryKey)) {
+  const retryKey = job.retryKey;
+  if (!retryKey || !isValidRetryKey(retryKey)) {
     await deps.runner.completeJob({
       jobId: args.jobId,
       attemptCount: job.attemptCount,
@@ -32,10 +33,23 @@ export async function processLineNotificationJob(
     return;
   }
 
-  if (job.firstAttemptAt !== undefined && now() >= job.firstAttemptAt + LINE_RETRY_KEY_TTL_MS) {
+  const sendAuthorization = await deps.runner.authorizeSend({
+    jobId: args.jobId,
+    attemptCount: job.attemptCount,
+    retryKey,
+    leaseMs: LINE_NOTIFICATION_LEASE_MS,
+    now: now(),
+  });
+  if (!sendAuthorization.claimed) return;
+
+  const sendJob = sendAuthorization.job;
+  if (
+    sendJob.firstAttemptAt !== undefined &&
+    now() >= sendJob.firstAttemptAt + LINE_RETRY_KEY_TTL_MS
+  ) {
     await deps.runner.completeJob({
       jobId: args.jobId,
-      attemptCount: job.attemptCount,
+      attemptCount: sendJob.attemptCount,
       completion: { outcome: "failed", errorCode: "retry_key_expired" },
       now: now(),
     });
@@ -43,9 +57,9 @@ export async function processLineNotificationJob(
   }
 
   const result = await deps.sender.send({
-    to: job.lineUserIdSnapshot,
-    text: job.text,
-    retryKey: job.retryKey,
+    to: sendJob.lineUserIdSnapshot,
+    text: sendJob.text,
+    retryKey,
   });
 
   let completion: LineNotificationCompletion;
@@ -61,8 +75,8 @@ export async function processLineNotificationJob(
     completion = { outcome: "failed", errorCode: result.errorCode };
   } else {
     const plan = planLineNotificationRetry({
-      attemptCount: job.attemptCount,
-      firstAttemptAt: job.firstAttemptAt ?? now(),
+      attemptCount: sendJob.attemptCount,
+      firstAttemptAt: sendJob.firstAttemptAt ?? now(),
       now: now(),
     });
     if (plan.kind === "retry") {
@@ -78,7 +92,7 @@ export async function processLineNotificationJob(
 
   await deps.runner.completeJob({
     jobId: args.jobId,
-    attemptCount: job.attemptCount,
+    attemptCount: sendJob.attemptCount,
     completion,
     now: now(),
   });

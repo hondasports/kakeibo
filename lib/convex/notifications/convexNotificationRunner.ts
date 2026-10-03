@@ -18,6 +18,15 @@ export function createLineNotificationActionRunner(
         now: args.now,
       })) as LineNotificationClaimResult;
     },
+    async authorizeSend(args) {
+      return (await ctx.runMutation(internal.notifications.internal.authorizeLineNotificationSend, {
+        jobId: args.jobId as Id<"lineNotificationJobs">,
+        attemptCount: args.attemptCount,
+        retryKey: args.retryKey,
+        leaseMs: args.leaseMs,
+        now: args.now,
+      })) as LineNotificationClaimResult;
+    },
     async completeJob(args) {
       await ctx.runMutation(internal.notifications.internal.completeLineNotificationJob, {
         jobId: args.jobId as Id<"lineNotificationJobs">,

@@ -25,6 +25,13 @@ crons.interval(
 );
 
 crons.interval(
+  "recover stale LINE notification jobs",
+  { minutes: 1 },
+  internal.notifications.internal.recoverStaleLineNotificationJobs,
+  {},
+);
+
+crons.interval(
   "cleanup LINE notification jobs",
   { hours: 24 },
   internal.notifications.cleanup.cleanupOldLineNotificationJobs,

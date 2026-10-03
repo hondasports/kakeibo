@@ -57,6 +57,15 @@ export function createLineNotificationJobReader(
         .take(limit);
       return docs.map(docToLineNotificationJobRecord);
     },
+    async listJobsByStatusUpdatedBefore(status, cutoff, limit) {
+      const docs = await ctx.db
+        .query("lineNotificationJobs")
+        .withIndex("by_status_and_updated_at", (q) =>
+          q.eq("status", status).lt("updatedAt", cutoff),
+        )
+        .take(limit);
+      return docs.map(docToLineNotificationJobRecord);
+    },
   };
 }
 

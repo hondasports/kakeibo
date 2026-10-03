@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LineNotificationJobRecord } from "../../domain/notifications/records";
-import type { LineNotificationJobStore } from "../../domain/notifications/store";
+import type {
+  LineNotificationEventRecord,
+  LineNotificationJobRecord,
+} from "../../domain/notifications/records";
+import type {
+  LineNotificationEventStore,
+  LineNotificationJobStore,
+} from "../../domain/notifications/store";
 import type { TransactionalEmailJobRecord } from "../../domain/email/records";
 import { enqueueAiReviewNotifications } from "./enqueueAiReview";
 import type { AiReviewNotificationEnqueueDeps } from "./deps";
@@ -23,6 +29,7 @@ function makeDeps({
     },
   ],
   existingLineJob = null,
+  existingLineEvent = null,
   existingEmailJob = null,
   batch = {
     id: "batch-1",
@@ -44,6 +51,7 @@ function makeDeps({
   linePersonal?: boolean;
   links?: unknown[];
   existingLineJob?: LineNotificationJobRecord | null;
+  existingLineEvent?: LineNotificationEventRecord | null;
   existingEmailJob?: TransactionalEmailJobRecord | null;
   batch?: unknown;
   group?: unknown;
@@ -53,6 +61,7 @@ function makeDeps({
 } = {}) {
   const emailJobs = { inserted: [] as Record<string, unknown>[] };
   const lineJobs = { inserted: [] as Record<string, unknown>[] };
+  const lineEvents = { inserted: [] as Record<string, unknown>[] };
   const emailScheduler = { scheduleProcessJob: vi.fn().mockResolvedValue(undefined) };
   const lineScheduler = {
     scheduleProcessJob: vi.fn().mockResolvedValue(undefined),
@@ -116,6 +125,7 @@ function makeDeps({
       getJob: vi.fn().mockResolvedValue(null),
       findByBatchId: vi.fn().mockResolvedValue(existingLineJob),
       listTerminalJobsUpdatedBefore: vi.fn().mockResolvedValue([]),
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([]),
       insert: vi.fn(async (fields: Record<string, unknown>) => {
         lineJobs.inserted.push(fields);
         return "line-job-1";
@@ -123,16 +133,25 @@ function makeDeps({
       patch: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
     } satisfies LineNotificationJobStore,
+    lineEvents: {
+      findByDedupeKey: vi.fn().mockResolvedValue(existingLineEvent),
+      listCreatedBefore: vi.fn().mockResolvedValue([]),
+      insert: vi.fn(async (fields: Record<string, unknown>) => {
+        lineEvents.inserted.push(fields);
+        return "line-event-1";
+      }),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } satisfies LineNotificationEventStore,
     lineScheduler,
     now: () => 5000,
   } as unknown as AiReviewNotificationEnqueueDeps;
 
-  return { deps, emailJobs, lineJobs, emailScheduler, lineScheduler };
+  return { deps, emailJobs, lineJobs, lineEvents, emailScheduler, lineScheduler };
 }
 
 describe("enqueueAiReviewNotifications", () => {
   it("enqueues email with dedupe key and LINE job in the same pass", async () => {
-    const { deps, emailJobs, lineJobs, emailScheduler, lineScheduler } = makeDeps();
+    const { deps, emailJobs, lineJobs, lineEvents, emailScheduler, lineScheduler } = makeDeps();
     await enqueueAiReviewNotifications(deps, ARGS);
 
     expect(emailJobs.inserted).toHaveLength(1);
@@ -157,6 +176,14 @@ describe("enqueueAiReviewNotifications", () => {
       attemptCount: 0,
     });
     expect(lineScheduler.scheduleProcessJob).toHaveBeenCalledWith(0, "line-job-1");
+    expect(lineEvents.inserted).toHaveLength(1);
+    expect(lineEvents.inserted[0]).toMatchObject({
+      userId: "user-1",
+      batchId: "batch-1",
+      type: "ai_review_required",
+      dedupeKey: "ai-review-required-line/batch-1",
+      outcome: "queued",
+    });
   });
 
   it("still enqueues LINE when the user has no email address", async () => {
@@ -167,18 +194,24 @@ describe("enqueueAiReviewNotifications", () => {
   });
 
   it("still enqueues email when LINE is opted out", async () => {
-    const { deps, emailJobs, lineJobs } = makeDeps({ linePersonal: false });
+    const { deps, emailJobs, lineJobs, lineEvents } = makeDeps({ linePersonal: false });
     await enqueueAiReviewNotifications(deps, ARGS);
     expect(emailJobs.inserted).toHaveLength(1);
     expect(lineJobs.inserted).toHaveLength(0);
+    expect(lineEvents.inserted[0]).toMatchObject({
+      outcome: "skipped",
+      reason: "notification_disabled",
+    });
   });
 
   it("does not enqueue LINE when globally disabled or unlinked", async () => {
     for (const overrides of [{ lineGlobal: false }, { links: [] }] as const) {
-      const { deps, emailJobs, lineJobs } = makeDeps(overrides);
+      const { deps, emailJobs, lineJobs, lineEvents } = makeDeps(overrides);
       await enqueueAiReviewNotifications(deps, ARGS);
       expect(emailJobs.inserted).toHaveLength(1);
       expect(lineJobs.inserted).toHaveLength(0);
+      expect(lineEvents.inserted).toHaveLength(1);
+      expect(lineEvents.inserted[0]).toMatchObject({ outcome: "skipped" });
     }
   });
 
@@ -188,6 +221,25 @@ describe("enqueueAiReviewNotifications", () => {
     });
     await enqueueAiReviewNotifications(deps, ARGS);
     expect(lineJobs.inserted).toHaveLength(0);
+  });
+
+  it("does not backfill LINE after the batch event was already consumed", async () => {
+    const { deps, lineJobs, lineEvents } = makeDeps({
+      existingLineEvent: {
+        id: "line-event-1",
+        userId: "user-1",
+        batchId: "batch-1",
+        type: "ai_review_required",
+        dedupeKey: "ai-review-required-line/batch-1",
+        outcome: "skipped",
+        reason: "user_unlinked",
+        createdAt: 100,
+        updatedAt: 100,
+      },
+    });
+    await enqueueAiReviewNotifications(deps, ARGS);
+    expect(lineJobs.inserted).toHaveLength(0);
+    expect(lineEvents.inserted).toHaveLength(0);
   });
 
   it("dedupes email via business dedupe key", async () => {

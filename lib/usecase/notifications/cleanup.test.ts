@@ -11,6 +11,7 @@ const NOW = 1_000_000_000_000;
 function makeDeps({
   terminalJobs = [] as { id: string }[],
   terminalJobsByStatus = {} as Partial<Record<string, { id: string }[]>>,
+  oldEvents = [] as { id: string }[],
 } = {}) {
   const listTerminalJobsUpdatedBefore = vi
     .fn()
@@ -23,12 +24,19 @@ function makeDeps({
     getJob: vi.fn(),
     findByBatchId: vi.fn(),
     listTerminalJobsUpdatedBefore,
+    listJobsByStatusUpdatedBefore: vi.fn(),
     insert: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn().mockResolvedValue(undefined),
   };
+  const lineEvents = {
+    findByDedupeKey: vi.fn(),
+    listCreatedBefore: vi.fn().mockResolvedValue(oldEvents),
+    insert: vi.fn(),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
   const scheduler = { scheduleCleanup: vi.fn().mockResolvedValue(undefined) };
-  return { deps: { jobs, scheduler, now: () => NOW }, jobs, scheduler };
+  return { deps: { jobs, lineEvents, scheduler, now: () => NOW }, jobs, lineEvents, scheduler };
 }
 
 describe("cleanupOldLineNotificationJobs", () => {
@@ -69,6 +77,26 @@ describe("cleanupOldLineNotificationJobs", () => {
     const { deps, scheduler } = makeDeps({ terminalJobs });
     await cleanupOldLineNotificationJobs(deps);
     expect(deps.jobs.delete).toHaveBeenCalledTimes(LINE_NOTIFICATION_CLEANUP_BATCH_SIZE);
+    expect(scheduler.scheduleCleanup).toHaveBeenCalledWith(0);
+  });
+
+  it("deletes consumed LINE notification events after the same retention cutoff", async () => {
+    const { deps, lineEvents } = makeDeps({ oldEvents: [{ id: "event-1" }] });
+    await cleanupOldLineNotificationJobs(deps);
+
+    expect(lineEvents.listCreatedBefore).toHaveBeenCalledWith(
+      NOW - LINE_NOTIFICATION_RETENTION_MS,
+      LINE_NOTIFICATION_CLEANUP_BATCH_SIZE,
+    );
+    expect(lineEvents.delete).toHaveBeenCalledWith("event-1");
+  });
+
+  it("reschedules itself when a full event batch was deleted", async () => {
+    const oldEvents = Array.from({ length: LINE_NOTIFICATION_CLEANUP_BATCH_SIZE }, (_, i) => ({
+      id: `event-${i}`,
+    }));
+    const { deps, scheduler } = makeDeps({ oldEvents });
+    await cleanupOldLineNotificationJobs(deps);
     expect(scheduler.scheduleCleanup).toHaveBeenCalledWith(0);
   });
 

@@ -62,3 +62,20 @@ export type LineNotificationJobRecord = {
 };
 
 export type NewLineNotificationJobFields = Omit<LineNotificationJobRecord, "id" | "creationTime">;
+
+export const LINE_NOTIFICATION_EVENT_OUTCOMES = ["queued", "skipped"] as const;
+export type LineNotificationEventOutcome = (typeof LINE_NOTIFICATION_EVENT_OUTCOMES)[number];
+
+export type LineNotificationEventRecord = {
+  id: string;
+  userId: string;
+  batchId: string;
+  type: "ai_review_required";
+  dedupeKey: string;
+  outcome: LineNotificationEventOutcome;
+  reason?: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type NewLineNotificationEventFields = Omit<LineNotificationEventRecord, "id">;

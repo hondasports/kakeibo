@@ -42,7 +42,7 @@ test.describe("通知設定（Issue #893）", () => {
     await cleanupLineLink({ page });
   });
 
-  test("AIレビューのメール通知をOFF→再読込→ONに戻せる", async ({ page }) => {
+  test("@smoke AIレビューのメール通知をOFF→再読込→ONに戻せる", async ({ page }) => {
     await gotoAuthenticated(page, "/settings");
     const section = page.locator("#notifications");
     await expect(section.getByRole("heading", { name: "通知設定" })).toBeVisible();
@@ -63,7 +63,7 @@ test.describe("通知設定（Issue #893）", () => {
     await expect(section.getByText("個別に停止できません")).toBeVisible();
   });
 
-  test("mock LINE連携後にLINE通知をopt-inして解除できる", async ({ page }) => {
+  test("@smoke mock LINE連携後にLINE通知をopt-inして解除できる", async ({ page }) => {
     await cleanupLineLink({ page });
     await gotoAuthenticated(page, "/settings");
     const section = page.locator("#notifications");
@@ -93,7 +93,7 @@ test.describe("通知設定（Issue #893）", () => {
     });
   });
 
-  test("管理者が全体設定を変更し監査ログに記録される", async ({ page }) => {
+  test("@smoke 管理者が全体設定を変更し監査ログに記録される", async ({ page }) => {
     test.skip(
       !adminFixtureEnabled,
       "E2E_SYSTEM_ADMIN_MEMBERSHIP_FIXTURE=trueのdevelopment/previewでのみfixtureを実行します",
@@ -175,7 +175,7 @@ test.describe("通知設定（Issue #893）", () => {
     }
   });
 
-  test("未認証と非管理者は /admin/notifications を利用できない", async ({ page }) => {
+  test("@smoke 未認証と非管理者は /admin/notifications を利用できない", async ({ page }) => {
     await page.goto("/admin/notifications");
     await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "通知設定" })).not.toBeVisible();

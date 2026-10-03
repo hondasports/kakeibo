@@ -293,6 +293,15 @@ describe("account deletion group purge orchestration", () => {
         createdAt: 1,
         updatedAt: 1,
       });
+      await ctx.db.insert("lineNotificationEvents", {
+        userId,
+        batchId,
+        type: "ai_review_required",
+        dedupeKey: `ai-review-required-line/${batchId}`,
+        outcome: "queued",
+        createdAt: 1,
+        updatedAt: 1,
+      });
       return { requestId, userDbId };
     });
 
@@ -315,6 +324,10 @@ describe("account deletion group purge orchestration", () => {
         .query("lineNotificationJobs")
         .withIndex("by_user_id_and_created_at", (q) => q.eq("userId", userId))
         .collect(),
+      notificationEvents: await ctx.db
+        .query("lineNotificationEvents")
+        .withIndex("by_user_id_and_created_at", (q) => q.eq("userId", userId))
+        .collect(),
       emails: await ctx.db.query("transactionalEmailJobs").collect(),
     }));
     expect(state.request?.status).toBe("completed");
@@ -322,6 +335,7 @@ describe("account deletion group purge orchestration", () => {
     expect(state.events).toHaveLength(0);
     expect(state.jobs).toHaveLength(0);
     expect(state.notificationJobs).toHaveLength(0);
+    expect(state.notificationEvents).toHaveLength(0);
     expect(state.emails).toHaveLength(1);
     expect(state.emails[0].templateType).toBe("account_deletion_completed");
   });

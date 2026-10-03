@@ -8,6 +8,7 @@ export const ACCOUNT_DELETION_USER_PURGE_TABLES = [
   "lineWebhookEvents",
   "lineImageJobs",
   "lineNotificationJobs",
+  "lineNotificationEvents",
 ] as const;
 
 export type AccountDeletionUserPurgeTable = (typeof ACCOUNT_DELETION_USER_PURGE_TABLES)[number];

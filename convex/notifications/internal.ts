@@ -6,13 +6,16 @@ import {
   createEmailDeliveryDecisionDeps,
   createLineNotificationClaimDeps,
   createLineNotificationCompletionDeps,
+  createStaleLineNotificationRecoveryDeps,
 } from "../../lib/convex/notifications/notificationDeps";
 import { getEmailDeliveryDecision as getEmailDeliveryDecisionUsecase } from "../../lib/usecase/notifications/deliveryDecision";
 import { enqueueAiReviewNotifications as enqueueAiReviewNotificationsUsecase } from "../../lib/usecase/notifications/enqueueAiReview";
 import {
+  authorizeLineNotificationSend as authorizeLineNotificationSendUsecase,
   claimLineNotificationJob as claimLineNotificationJobUsecase,
   completeLineNotificationJob as completeLineNotificationJobUsecase,
   recoverLineNotificationLease as recoverLineNotificationLeaseUsecase,
+  recoverStaleLineNotificationJobs as recoverStaleLineNotificationJobsUsecase,
 } from "../../lib/usecase/notifications/lineJobLifecycle";
 import { docToLineNotificationJobRecord } from "../../lib/convex/notifications/convexLineNotificationJobStore";
 import { createLineNotificationScheduler } from "../../lib/convex/notifications/convexNotificationScheduler";
@@ -84,6 +87,32 @@ export const claimLineNotificationJob = internalMutation({
   },
 });
 
+export const authorizeLineNotificationSend = internalMutation({
+  args: {
+    jobId: v.id("lineNotificationJobs"),
+    attemptCount: v.number(),
+    retryKey: v.string(),
+    leaseMs: v.number(),
+    now: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const result = await authorizeLineNotificationSendUsecase(
+      createLineNotificationClaimDeps(ctx),
+      {
+        jobId: args.jobId,
+        attemptCount: args.attemptCount,
+        retryKey: args.retryKey,
+        leaseMs: args.leaseMs,
+        now: args.now,
+      },
+    );
+    if (!result.claimed) return { claimed: false };
+    const doc = await ctx.db.get(args.jobId);
+    if (!doc) return { claimed: false };
+    return { claimed: true, job: docToLineNotificationJobRecord(doc) };
+  },
+});
+
 export const completeLineNotificationJob = internalMutation({
   args: {
     jobId: v.id("lineNotificationJobs"),
@@ -113,6 +142,13 @@ export const recoverLineNotificationLease = internalMutation({
   },
 });
 
+export const recoverStaleLineNotificationJobs = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    await recoverStaleLineNotificationJobsUsecase(createStaleLineNotificationRecoveryDeps(ctx));
+  },
+});
+
 export const clearE2eNotificationDataForUser = internalMutation({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
@@ -125,6 +161,14 @@ export const clearE2eNotificationDataForUser = internalMutation({
       await ctx.db.delete(job._id);
       deletedCount += 1;
     }
+    const events = await ctx.db
+      .query("lineNotificationEvents")
+      .withIndex("by_user_id_and_created_at", (q) => q.eq("userId", userId))
+      .take(100);
+    for (const event of events) {
+      await ctx.db.delete(event._id);
+      deletedCount += 1;
+    }
     const user = await ctx.db
       .query("users")
       .withIndex("by_token_identifier", (q) => q.eq("userId", userId))
@@ -135,6 +179,6 @@ export const clearE2eNotificationDataForUser = internalMutation({
         updatedAt: Date.now(),
       });
     }
-    return { deletedCount, hasMore: jobs.length >= 100 };
+    return { deletedCount, hasMore: jobs.length >= 100 || events.length >= 100 };
   },
 });
