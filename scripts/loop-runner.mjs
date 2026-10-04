@@ -898,15 +898,20 @@ export function buildReviewPacket(task, dir, root, { deltaFrom } = {}) {
   };
   const fullRange = `${task.baseRef}...${task.head}`;
   const reviewRange = deltaFrom ? `${deltaFrom}..${task.head}` : fullRange;
-  const diff = git(["diff", "--binary", "--no-renames", reviewRange], root);
+  // Keep packet patches byte-for-byte; the generic Git helper trims command values.
+  const readDiff = (args) => execFileSync("git", ["diff", ...args], { cwd: root });
+  const diff = readDiff(["--binary", "--no-renames", reviewRange]);
   const paths = (range) =>
-    git(["diff", "--name-only", "--no-renames", "-z", range], root).split("\0").filter(Boolean);
+    readDiff(["--name-only", "--no-renames", "-z", range])
+      .toString("utf8")
+      .split("\0")
+      .filter(Boolean);
   const changedPaths = paths(reviewRange);
   if (previousReview) {
-    write("full-diff.patch", `${git(["diff", "--binary", "--no-renames", fullRange], root)}\n`);
+    write("full-diff.patch", readDiff(["--binary", "--no-renames", fullRange]));
     write("previous-review.json", `${JSON.stringify(previousReview, null, 2)}\n`);
   }
-  write("diff.patch", `${diff}\n`);
+  write("diff.patch", diff);
   write("task-summary.json", `${JSON.stringify(summarizeTask(task), null, 2)}\n`);
   write("verification-manifest.json", `${JSON.stringify(artifactManifest(task, root), null, 2)}\n`);
   write(

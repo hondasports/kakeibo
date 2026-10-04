@@ -425,9 +425,17 @@ describe("persistent task gates", () => {
       buildReviewPacket(task, path.join(parent, "invalid"), dir, { deltaFrom: unrelated }),
     ).toThrow("ancestor");
   });
-  it("includes both rename paths in incremental and full review packets", () => {
+  it.each([
+    ["old-feature.txt", "new-feature.txt"],
+    [" old-feature.txt", "new-feature.txt"],
+    ["old-feature.txt", " new-feature.txt"],
+    ["\told-feature.txt", "new-feature.txt"],
+    ["\nold-feature.txt", "new-feature.txt"],
+    ["old-feature.txt ", "new-feature.txt"],
+    ["old-feature.txt", "new-feature.txt "],
+  ])("keeps both exact rename paths in review packets (%j -> %j)", (oldPath, newPath) => {
     const { dir, git, task } = repository();
-    writeFileSync(path.join(dir, "old-feature.txt"), "existing caller contract\n");
+    writeFileSync(path.join(dir, oldPath), "existing caller contract\n");
     git("add", ".");
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", "existing source");
     git("branch", "-f", "preview", "HEAD");
@@ -443,7 +451,7 @@ describe("persistent task gates", () => {
       acceptanceCriteria: [{ id: "AC1", evidence: "Reviewed original caller" }],
       findings: [],
     });
-    git("mv", "old-feature.txt", "new-feature.txt");
+    git("mv", "--", oldPath, newPath);
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", "rename source");
     refreshTask(task, dir);
     task.state = "review";
@@ -452,18 +460,54 @@ describe("persistent task gates", () => {
     const delta = path.join(parent, "delta");
     buildReviewPacket(task, delta, dir, { deltaFrom: prior });
     const packet = JSON.parse(readFileSync(path.join(delta, "packet.json"), "utf8"));
-    expect(packet.changedPaths).toEqual(["new-feature.txt", "old-feature.txt"]);
-    expect(packet.allChangedPaths).toEqual([
-      "initial-feature.txt",
-      "new-feature.txt",
-      "old-feature.txt",
-    ]);
+    expect(packet.changedPaths).toEqual([oldPath, newPath].sort());
+    expect(packet.allChangedPaths).toEqual(["initial-feature.txt", oldPath, newPath].sort());
     expect(readFileSync(path.join(delta, "diff.patch"), "utf8")).toContain("deleted file mode");
     const full = path.join(parent, "full");
     buildReviewPacket(task, full, dir);
     expect(JSON.parse(readFileSync(path.join(full, "packet.json"), "utf8")).changedPaths).toEqual(
       packet.allChangedPaths,
     );
+  });
+  it.each([
+    ["trailing spaces", Buffer.from("trailing spaces  \n")],
+    ["trailing tab", Buffer.from("trailing tab\t\n")],
+    ["blank final line", Buffer.from("trailing spaces  \n\n")],
+    ["binary", Buffer.from([0, 255, 0, 32, 32, 10])],
+    ["non-UTF8 text", Buffer.from([255, 32, 32, 10])],
+  ])("preserves exact applicable review patch bytes (%s)", (_label, contents) => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "prior.txt"), "reviewed feature\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "previously reviewed");
+    const prior = git("rev-parse", "HEAD");
+    task.history.push({
+      event: "review_recorded",
+      head: prior,
+      baseHead: task.baseHead,
+      acceptanceCriteria: [{ id: "AC1", evidence: "Reviewed prior source" }],
+      findings: [],
+    });
+    writeFileSync(path.join(dir, "payload.txt"), contents);
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "patch edge");
+    refreshTask(task, dir);
+    task.state = "review";
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-patch-"));
+    dirs.push(parent);
+    const delta = path.join(parent, "delta");
+    buildReviewPacket(task, delta, dir, { deltaFrom: prior });
+    const full = path.join(parent, "full");
+    buildReviewPacket(task, full, dir);
+    for (const [file, range] of [
+      [path.join(delta, "diff.patch"), `${prior}..${task.head}`],
+      [path.join(delta, "full-diff.patch"), `${task.baseRef}...${task.head}`],
+      [path.join(full, "diff.patch"), `${task.baseRef}...${task.head}`],
+    ]) {
+      const raw = execFileSync("git", ["diff", "--binary", "--no-renames", range], { cwd: dir });
+      expect(readFileSync(file).equals(raw)).toBe(true);
+      expect(() => git("apply", "--reverse", "--check", file)).not.toThrow();
+    }
   });
   it("rechecks GitHub at DONE and discards cached success when that recheck fails", () => {
     const { dir, task } = repository();
