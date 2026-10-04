@@ -35,6 +35,19 @@ describe("mapDraftToReviewForm: 税設定の補正元を保持する", () => {
       }),
     ).toMatchObject({ priceTaxTreatment: "excluded", taxRateComposition: "rate8" });
   });
+
+  it("保存された不明の選択は合計だけ保存の再編集でも保持する", () => {
+    expect(
+      mapDraftToReviewForm({
+        ...draft,
+        receiptTaxDecision: {
+          ...draft.receiptTaxDecision!,
+          priceTaxTreatment: "unknown",
+          taxRateComposition: "unknown",
+        },
+      }),
+    ).toMatchObject({ priceTaxTreatment: "unknown", taxRateComposition: "unknown" });
+  });
 });
 
 describe("mapConvexDraftToAiExpenseDraft", () => {
