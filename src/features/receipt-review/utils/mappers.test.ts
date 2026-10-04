@@ -94,6 +94,24 @@ describe("mapDraftToReviewForm: 税設定の補正元を保持する", () => {
   });
 });
 
+describe("mapDraftToReviewForm: 旧形式の全体税設定", () => {
+  it("保存済みtotalOnlyの不明軸を保持し、未指定の既知軸を再送しない", () => {
+    const draft = {
+      _id: "legacy-tax-choice",
+      status: "ready",
+      documentType: "receipt",
+      amountYen: 264,
+      registrationMode: "totalOnly",
+      receiptTaxDecision: { priceTaxTreatment: "unknown", taxRateComposition: "rate8" },
+      receiptUserOverride: { fields: ["items", "receiptTaxDecision", "taxSummaries"] },
+    } as AiExpenseDraft;
+    expect(mapDraftToReviewForm(draft)).toMatchObject({
+      priceTaxTreatment: "unknown",
+      taxRateComposition: undefined,
+    });
+  });
+});
+
 describe("mapConvexDraftToAiExpenseDraft", () => {
   it("新契約の4層とversionをUI callerへ欠落なく渡す", () => {
     const rawObservation = { source: "ai_ocr", observedAt: 1, lines: [] } as const;

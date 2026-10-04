@@ -87,8 +87,8 @@ export function mapDraftToReviewForm(draft: AiExpenseDraft): ReviewFormValues {
   const overrideFields = draft.receiptUserOverride?.fields ?? [];
   const hasLegacyUnknownChoice =
     overrideFields.includes("receiptTaxDecision") &&
-    !overrideFields.includes("items") &&
-    !overrideFields.includes("taxSummaries");
+    (draft.registrationMode === "totalOnly" ||
+      (!overrideFields.includes("items") && !overrideFields.includes("taxSummaries")));
   const hasSavedPriceChoice =
     overrideFields.includes(RECEIPT_TAX_CHOICE_FIELDS.priceTaxTreatment) ||
     (hasLegacyUnknownChoice && draft.receiptTaxDecision?.priceTaxTreatment === "unknown");

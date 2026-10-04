@@ -13,6 +13,7 @@ import { GROUP_ID, DRAFT_ID, CAT_ID, createInMemoryMutationCtx } from "./testHel
 import { mapDraftToReviewForm } from "../../../src/features/receipt-review/utils/mappers";
 import type { AiExpenseDraft } from "../../../src/features/receipt-review/types/types";
 import { updateSummaryTaxOverridesHandler } from "./updateSummaryTaxOverrides";
+import { RECEIPT_TAX_CHOICE_FIELDS } from "../../domain/aiExpenseDrafts/receiptDataContract";
 
 function setup(testCase: (typeof receiptTaxBasisCases)[number]) {
   const input = receiptTaxBasisInput(testCase);
@@ -245,6 +246,50 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
       testCase.paidYen,
     );
   });
+
+  it.each([
+    { priceTaxTreatment: "unknown" as const },
+    { taxRateComposition: "unknown" as const },
+    { priceTaxTreatment: "unknown" as const, taxRateComposition: "unknown" as const },
+  ])(
+    "旧形式で保存したtotalOnlyの明示的な不明を再保存でも保持する ($priceTaxTreatment/$taxRateComposition)",
+    async (choice) => {
+      const testCase = receiptTaxBasisCases[2];
+      const env = setup(testCase);
+      await correctItems(env);
+      await save(env, testCase, choice);
+      const override = env.getDraft().receiptUserOverride!;
+      const choiceFields: readonly string[] = Object.values(RECEIPT_TAX_CHOICE_FIELDS);
+      await env.ctx.db.patch(DRAFT_ID, {
+        receiptUserOverride: {
+          ...override,
+          fields: override.fields.filter((field: string) => !choiceFields.includes(field)),
+        },
+      });
+      expect(env.getDraft().receiptUserOverride!.fields).toEqual(
+        expect.arrayContaining(["items", "receiptTaxDecision", "taxSummaries"]),
+      );
+      const printedSummary = structuredClone(env.getDraft().taxSummaries);
+      const form = reopen(env);
+      expect(form.priceTaxTreatment).toBe(
+        "priceTaxTreatment" in choice ? choice.priceTaxTreatment : undefined,
+      );
+      expect(form.taxRateComposition).toBe(
+        "taxRateComposition" in choice ? choice.taxRateComposition : undefined,
+      );
+      await save(env, testCase, form);
+      await save(env, testCase, reopen(env));
+      expect(env.getDraft()).toMatchObject({
+        registrationMode: "totalOnly",
+        status: "ready",
+        receiptTaxDecision: choice,
+      });
+      expect(env.getDraft().taxSummaries).toEqual(printedSummary);
+      expect(registrationItems(env)).toEqual([
+        expect.objectContaining({ amountYen: testCase.paidYen }),
+      ]);
+    },
+  );
 
   it.each(receiptTaxBasisCases)(
     "税込対象額$paidYen 円を保持したまま保存・登録できる",
