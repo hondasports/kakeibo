@@ -92,6 +92,58 @@ describe("persistent task gates", () => {
     ...overrides,
   });
   const completeFindings = { pagesComplete: true, unhandledCount: 0, unresolvedThreadCount: 0 };
+  it.each([
+    ["aftercare", false],
+    ["aftercare", true],
+    ["done", false],
+    ["done", true],
+  ])("uses actual runtime CI requirements for %s observation (watch=%s)", (state, watch) => {
+    const { dir, git, task } = repository();
+    const cached = structuredClone(task.assessment);
+    mkdirSync(path.join(dir, "src"));
+    writeFileSync(path.join(dir, "src/app.ts"), "export const app = true;\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "runtime change");
+    task.head = git("rev-parse", "HEAD");
+    task.state = state;
+    const actual = computeAssessment(task, ["src/app.ts"]);
+    expect(actual.runtimeRelevant).toBe(true);
+    expect(actual.verification.e2e).toBe(true);
+    task.risk = actual.risk.final;
+    for (const kind of ["process", "lint", "unit", "build"])
+      task.verification[kind] = { head: task.head, baseHead: task.baseHead, success: true };
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const original = readFileSync(taskPath(dir), "utf8");
+    let checks = delivery(task).statusCheckRollup;
+    const services = {
+      fetchPr: () => delivery(task, { statusCheckRollup: checks }),
+      fetchFindings: () => completeFindings,
+      maxSeconds: 0,
+      sleep: () => {
+        throw new Error("The bounded observation should already have returned");
+      },
+    };
+    const args = { "check-pr": "7", ...(watch ? { "watch-aftercare": true } : {}) };
+    if (watch) {
+      expect(run(args, dir, services)).toMatchObject({ ready: false });
+      expect(watchAftercare(task, "7", dir, { ...services, readOnly: true })).toMatchObject({
+        ready: false,
+      });
+    } else expect(() => run(args, dir, services)).toThrow("Required check not observed successful");
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
+    checks = [
+      "Agent harness",
+      "Lint",
+      "Build",
+      "Test",
+      "E2E (Playwright / Chromium / public)",
+      "E2E (Playwright / Chromium / authenticated)",
+    ].map((name) => ({ name, status: "COMPLETED", conclusion: "SUCCESS" }));
+    expect(run(args, dir, services)).toMatchObject({ ready: true });
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
+    expect(task.assessment).toEqual(cached);
+  });
   it("returns actionable findings from a read-only watch without waiting or changing state", () => {
     const { dir, task } = repository();
     task.state = "done";
@@ -372,6 +424,46 @@ describe("persistent task gates", () => {
     expect(() =>
       buildReviewPacket(task, path.join(parent, "invalid"), dir, { deltaFrom: unrelated }),
     ).toThrow("ancestor");
+  });
+  it("includes both rename paths in incremental and full review packets", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "old-feature.txt"), "existing caller contract\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "existing source");
+    git("branch", "-f", "preview", "HEAD");
+    task.baseHead = git("rev-parse", "HEAD");
+    writeFileSync(path.join(dir, "initial-feature.txt"), "reviewed feature\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "reviewed feature");
+    const prior = git("rev-parse", "HEAD");
+    task.history.push({
+      event: "review_recorded",
+      head: prior,
+      baseHead: task.baseHead,
+      acceptanceCriteria: [{ id: "AC1", evidence: "Reviewed original caller" }],
+      findings: [],
+    });
+    git("mv", "old-feature.txt", "new-feature.txt");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "rename source");
+    refreshTask(task, dir);
+    task.state = "review";
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-rename-"));
+    dirs.push(parent);
+    const delta = path.join(parent, "delta");
+    buildReviewPacket(task, delta, dir, { deltaFrom: prior });
+    const packet = JSON.parse(readFileSync(path.join(delta, "packet.json"), "utf8"));
+    expect(packet.changedPaths).toEqual(["new-feature.txt", "old-feature.txt"]);
+    expect(packet.allChangedPaths).toEqual([
+      "initial-feature.txt",
+      "new-feature.txt",
+      "old-feature.txt",
+    ]);
+    expect(readFileSync(path.join(delta, "diff.patch"), "utf8")).toContain("deleted file mode");
+    const full = path.join(parent, "full");
+    buildReviewPacket(task, full, dir);
+    expect(JSON.parse(readFileSync(path.join(full, "packet.json"), "utf8")).changedPaths).toEqual(
+      packet.allChangedPaths,
+    );
   });
   it("rechecks GitHub at DONE and discards cached success when that recheck fails", () => {
     const { dir, task } = repository();

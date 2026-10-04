@@ -743,6 +743,7 @@ export function watchAftercare(
     readOnly ? ["aftercare", "done"].includes(task.state) : task.state === "aftercare",
     "GitHub aftercare runs in aftercare (read-only observation also accepts done)",
   );
+  if (readOnly) task = currentCheckpointTask(task, root);
   const tick = now ?? (() => Date.now());
   const pause = sleep ?? defaultSleep;
   // Injected fetchers use the exact same shape as production so tests exercise
@@ -813,13 +814,7 @@ export function githubAftercare(task, pr, handled, root) {
 }
 /** Live delivery observation: remote reads only, no task or PR writes. */
 export function inspectPullRequest(task, pr, handled, root, services = {}) {
-  requireClean(root);
-  validateCheckpoint(task, {
-    head: git(["rev-parse", "HEAD"], root),
-    baseHead: git(["rev-parse", task.baseRef], root),
-    paths: readChangedPaths({ base: task.baseRef, cwd: root }),
-    root,
-  });
+  task = currentCheckpointTask(task, root);
   const defaults = aftercareFetchers(pr, handled, root);
   const fetchPr = services.fetchPr ?? defaults.fetchPr;
   const fetchFindings = services.fetchFindings ?? defaults.fetchFindings;
@@ -839,6 +834,17 @@ export function inspectPullRequest(task, pr, handled, root, services = {}) {
     "Local revision changed during PR observation",
   );
   return { evidence, snapshot: aftercareSnapshot(after, task, findings, pr) };
+}
+/** Recompute delivery requirements without rewriting the restored checkpoint. */
+function currentCheckpointTask(task, root) {
+  requireClean(root);
+  const assessment = validateCheckpoint(task, {
+    head: git(["rev-parse", "HEAD"], root),
+    baseHead: git(["rev-parse", task.baseRef], root),
+    paths: readChangedPaths({ base: task.baseRef, cwd: root }),
+    root,
+  });
+  return { ...task, assessment };
 }
 /**
  * Bundle everything a fresh-context independent reviewer needs into one
@@ -894,7 +900,7 @@ export function buildReviewPacket(task, dir, root, { deltaFrom } = {}) {
   const reviewRange = deltaFrom ? `${deltaFrom}..${task.head}` : fullRange;
   const diff = git(["diff", "--binary", "--no-renames", reviewRange], root);
   const paths = (range) =>
-    git(["diff", "--name-only", "-z", range], root).split("\0").filter(Boolean);
+    git(["diff", "--name-only", "--no-renames", "-z", range], root).split("\0").filter(Boolean);
   const changedPaths = paths(reviewRange);
   if (previousReview) {
     write("full-diff.patch", `${git(["diff", "--binary", "--no-renames", fullRange], root)}\n`);
@@ -1123,14 +1129,7 @@ export function run(args, root = process.cwd(), services = {}) {
   }
   if (args["check-pr"]) {
     const task = loadTask(root);
-    validateCheckpoint(task, {
-      head: git(["rev-parse", "HEAD"], root),
-      baseHead: git(["rev-parse", task.baseRef], root),
-      paths: readChangedPaths({ base: task.baseRef, cwd: root }),
-      root,
-    });
     if (args["watch-aftercare"]) {
-      requireClean(root);
       const interval = args["interval-seconds"];
       requireValue(
         interval === undefined || (Number.isFinite(Number(interval)) && Number(interval) >= 1),

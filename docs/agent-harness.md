@@ -46,7 +46,6 @@ assessmentは `scripts/review-depth.mjs` のrisk_assessment・tier_rationale・a
 変更をcommitしてから検証する。pre-commitは初期化済みEXECUTE状態を要求する。
 
 ```bash
-node scripts/loop-runner.mjs --verify process
 node scripts/loop-runner.mjs --verify-required
 node scripts/loop-runner.mjs --event ready
 ```
