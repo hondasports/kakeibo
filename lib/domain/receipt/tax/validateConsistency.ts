@@ -1,5 +1,5 @@
 import type { ExtractedTaxSummary, InterpretedReceiptItem } from "./types";
-import { resolveAmountBasis } from "./resolveAmountBasis";
+import { matchTaxSummaryItems } from "./taxAmountBasis";
 
 export function validateConsistency(args: {
   amountYen: number;
@@ -15,25 +15,13 @@ export function validateConsistency(args: {
   });
   for (const summary of args.taxSummaries) {
     if (summary.status === "conflicting") continue;
-    const amountBasis = resolveAmountBasis(summary);
     const sameRate = args.items.filter(
       (item) =>
         item.taxContext.status === "resolved" && item.taxRatePercent === summary.taxRatePercent,
     );
-    const matching = sameRate.filter(
-      (item) => amountBasis === "unknown" || item.amountBasis === amountBasis,
-    );
-    if (matching.length === 0) {
-      warnings.push(
-        sameRate.length === 0
-          ? `missing_tax_items:${summary.taxRatePercent}`
-          : `taxable_amount_mismatch:${summary.taxRatePercent}`,
-      );
-      continue;
-    }
-    if (
-      matching.reduce((sum, item) => sum + item.printedAmountYen, 0) !== summary.taxableAmountYen
-    ) {
+    if (sameRate.length === 0) {
+      warnings.push(`missing_tax_items:${summary.taxRatePercent}`);
+    } else if (!matchTaxSummaryItems(summary, sameRate)) {
       warnings.push(`taxable_amount_mismatch:${summary.taxRatePercent}`);
     }
   }

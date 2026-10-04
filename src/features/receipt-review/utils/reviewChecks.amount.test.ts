@@ -62,7 +62,7 @@ describe("buildAmountCheck", () => {
       expect(check.status).toBe("matched");
     });
 
-    it("内税サマリに税抜明細が混在する場合は基準矛盾として比較不能にする", () => {
+    it("税込対象額を税抜へ換算しても明細と合わない場合は比較不能にする", () => {
       const check = buildAmountCheck({
         items: [
           resolvedItem({

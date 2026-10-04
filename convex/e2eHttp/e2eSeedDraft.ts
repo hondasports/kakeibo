@@ -127,13 +127,22 @@ export const e2eSeedTaxReviewDraftHandler = httpAction(async (ctx, req) => {
     return authError;
   }
 
-  const bodyResult = await readE2eJsonObject<{ userId?: string; email?: string; groupId?: string }>(
-    req,
-  );
+  const bodyResult = await readE2eJsonObject<{
+    userId?: string;
+    email?: string;
+    groupId?: string;
+    receiptCase?: "basis890" | "basis890_264";
+  }>(req);
   if (bodyResult instanceof Response || !isSeedBody(bodyResult)) {
     return bodyResult instanceof Response ? bodyResult : invalidJsonResponse();
   }
   const body = bodyResult;
+  if (
+    body.receiptCase !== undefined &&
+    body.receiptCase !== "basis890" &&
+    body.receiptCase !== "basis890_264"
+  )
+    return invalidJsonResponse();
 
   const scope = await resolveE2eScope(ctx, body);
   if (scope instanceof Response) return scope;
@@ -149,6 +158,7 @@ export const e2eSeedTaxReviewDraftHandler = httpAction(async (ctx, req) => {
       groupId: scope.groupId,
       createdByUserId: scope.userId,
       categoryId,
+      ...(body.receiptCase !== undefined ? { receiptCase: body.receiptCase } : {}),
     },
   );
 

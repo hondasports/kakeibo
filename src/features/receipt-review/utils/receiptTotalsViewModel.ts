@@ -4,6 +4,7 @@ import { formatYenLabel } from "./receiptTaxLabels";
 import { getTaxModeLabel } from "./receiptItemTaxViewModel";
 import { formatYenAbs } from "../../../utils/currency";
 import { isVerifiedTaxSummaryStatus } from "../../../../lib/domain/receipt/tax/taxSummaryConsistency";
+import { distinctTaxSummaryAmounts } from "../../../../lib/domain/receipt/tax/taxAmountBasis";
 
 export type ReceiptTotalsStatus = "matched" | "mismatch" | "subtotalUnavailable";
 
@@ -110,14 +111,15 @@ function resolveReceiptSubtotal(taxSummaries: AiExpenseDraft["taxSummaries"]): {
   if (bases.size !== 1 || bases.has("unknown")) {
     return {};
   }
-  if (taxSummaries.length === 1) {
-    const summary = taxSummaries[0];
+  const calculationSummaries = distinctTaxSummaryAmounts(taxSummaries);
+  if (calculationSummaries.length === 1) {
+    const summary = calculationSummaries[0];
     return {
       subtotalYen: summary.taxableAmountYen,
       rateLabel: `${summary.taxRatePercent}%${getTaxModeLabel(summary.taxMode)}`,
     };
   }
-  const subtotalYen = taxSummaries.reduce((sum, s) => sum + s.taxableAmountYen, 0);
+  const subtotalYen = calculationSummaries.reduce((sum, s) => sum + s.taxableAmountYen, 0);
   return { subtotalYen, rateLabel: "税率別" };
 }
 

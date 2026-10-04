@@ -11,7 +11,10 @@ import {
   buildDraftRegistrationItems,
   resolveRegistrationMode,
 } from "../../domain/aiExpenseDrafts/registrationItems";
-import type { AiExpenseRegistrationMode } from "../../domain/aiExpenseDrafts/receiptDataContract";
+import {
+  RECEIPT_TAX_CHOICE_FIELDS,
+  type AiExpenseRegistrationMode,
+} from "../../domain/aiExpenseDrafts/receiptDataContract";
 import {
   buildReviewConfidence,
   getReviewUpdateReadyErrorMessage,
@@ -173,6 +176,12 @@ export async function updateAiExpenseDraftForReview(
         ...REVIEW_OVERRIDE_FIELDS,
         "receiptTotalResolution",
         ...(hasTaxDecisionUpdate ? ["receiptTaxDecision", "taxSummaries"] : []),
+        ...(args.priceTaxTreatment === undefined
+          ? []
+          : [RECEIPT_TAX_CHOICE_FIELDS.priceTaxTreatment]),
+        ...(args.taxRateComposition === undefined
+          ? []
+          : [RECEIPT_TAX_CHOICE_FIELDS.taxRateComposition]),
         ...(args.items === undefined ? [] : ["items"]),
       ],
       updatedAt: now,

@@ -5,6 +5,7 @@ import type {
   TaxSummaryConsistencyReason,
   TaxSummaryConsistencyStatus,
 } from "./types";
+import { distinctTaxSummaryAmounts } from "./taxAmountBasis";
 
 type ReconcileTaxSummaryArgs = {
   amountYen?: number;
@@ -185,7 +186,7 @@ export function validateTaxSummaryConsistency({
   resolvableTaxSummaries?: ExtractedTaxSummary[];
 }): ExtractedTaxSummary[] {
   const resolvableSet = new Set(resolvableTaxSummaries ?? taxSummaries);
-  const singleResolvable = resolvableSet.size === 1;
+  const singleResolvable = distinctTaxSummaryAmounts([...resolvableSet]).length === 1;
   return taxSummaries.map((summary) => {
     if (!resolvableSet.has(summary)) {
       return {

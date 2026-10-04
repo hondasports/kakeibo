@@ -196,7 +196,9 @@ export const createE2eTaxReviewDraftForUser = internalMutation({
     createdByUserId: v.string(),
     categoryId: v.id("categories"),
     secondaryCategoryId: v.optional(v.id("categories")),
+    receiptCase: v.optional(v.union(v.literal("basis890"), v.literal("basis890_264"))),
   },
+  returns: v.id("aiExpenseDrafts"),
   handler: createE2eTaxReviewDraftForUserHandler,
 });
 

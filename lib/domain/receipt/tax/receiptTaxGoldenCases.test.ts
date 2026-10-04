@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { interpretReceiptTax } from "./interpretReceiptTax";
+import { receiptTaxBasisCases, receiptTaxBasisInput } from "./fixtures/receiptTaxBasisCases";
 import {
   RECEIPT_TAX_GOLDEN_FAILURE_CLASSES,
   RECEIPT_TAX_GOLDEN_UNAVAILABLE_MISSING_EVIDENCE,
@@ -13,6 +14,23 @@ const availableCases = receiptTaxGoldenCaseLedger.filter(
   ): testCase is ReceiptTaxGoldenCase & { input: NonNullable<ReceiptTaxGoldenCase["input"]> } =>
     testCase.sourceAvailability !== "unavailable" && testCase.input !== undefined,
 );
+
+describe("Issue #890 印字基準が異なるgolden cases", () => {
+  it.each(receiptTaxBasisCases)(
+    "税込対象額$paidYen 円と税抜明細の固定期待値を再現する",
+    (testCase) => {
+      const source = receiptTaxBasisInput(testCase);
+      const result = interpretReceiptTax(source);
+      expect(result.items.map((item) => item.allocatedTaxYen)).toEqual(testCase.allocations);
+      expect(result.items.map((item) => item.normalizedAmountYen)).toEqual(
+        testCase.amounts.map((amount, index) => amount + testCase.allocations[index]),
+      );
+      expect(result.taxSummaries[0]).toMatchObject(source.taxSummaries[0]);
+      expect(result.warnings).toEqual([]);
+      expect(interpretReceiptTax(source)).toEqual(result);
+    },
+  );
+});
 
 describe("Issue #672 receipt tax golden case ledger", () => {
   it("匿名Case IDをR001〜R038で一意に管理する", () => {

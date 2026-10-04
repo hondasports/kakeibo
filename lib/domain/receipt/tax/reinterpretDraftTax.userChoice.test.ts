@@ -372,8 +372,13 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
 
     expect(result.interpretation.decision).toMatchObject({
       priceTaxTreatment: "excluded",
-      resolutionSource: "ai",
+      resolutionSource: "reconciliation",
     });
     expect(result.interpretation.decision.evidence).toContain("user_override:treatment");
+    expect(result.itemFields[0]).toMatchObject({
+      amountBasis: "tax_included",
+      printedAmountYen: 1100,
+      normalizedAmountYen: 1100,
+    });
   });
 });

@@ -1,4 +1,5 @@
 import type { ExtractedTaxSummary, ReceiptTotalCandidate, ReceiptTotalResolution } from "./types";
+import { distinctTaxSummaryAmounts } from "./taxAmountBasis";
 
 function addCandidate(candidates: ReceiptTotalCandidate[], candidate: ReceiptTotalCandidate) {
   if (
@@ -18,10 +19,11 @@ function collectTaxCandidates(
   candidates: ReceiptTotalCandidate[],
   summaries: ExtractedTaxSummary[],
 ) {
-  if (summaries.length !== 1) {
+  const distinct = distinctTaxSummaryAmounts(summaries);
+  if (distinct.length !== 1) {
     return;
   }
-  summaries.forEach((summary, index) => {
+  distinct.forEach((summary, index) => {
     if (summary.taxIncludedAmountYen !== undefined) {
       addCandidate(candidates, {
         amountYen: summary.taxIncludedAmountYen,
