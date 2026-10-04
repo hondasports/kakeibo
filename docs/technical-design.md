@@ -796,7 +796,7 @@ domain へ分離済み。
 - **純粋関数**: `lib/domain/aiExpenseDrafts/receiptDataContract.ts` の
   `snapshotReceiptDraftValues`（draft・明細のフィールド射影。warnings 未設定は
   空配列へ正規化）と `buildReceiptUserOverride`（fields の和集合マージ・
-  `source: "user"` 組立）。
+  税判定更新時の全体設定の軸の記録置換・`source: "user"` 組立）。
 - **インフラ**: `lib/convex/aiExpenseDrafts/receiptDataContract.ts` は draft get・
   所有権チェック（`groupId` 不一致または不存在で Error・文言維持）・明細
   `by_group_id_and_draft_id` asc take(100)・patch・再取得のみを担い、
@@ -1380,6 +1380,29 @@ AI 画像解析では印字事実を抽出し、`lib/domain/receipt/tax/interpre
 - マーカーは印字文字列とレシート内の凡例を補助証拠として扱い、単独では税率を確定しない
 - 一意に解決できない税率・税込税抜区分は未解決のまま確認対象にする
 - 警告コード（`unresolved_tax_rate:items[i]`, `unresolved_amount_basis:items[i]`, `taxable_amount_mismatch`, `missing_tax_items` 等）は下書き・明細の `warnings` に保存し、UI では `src/features/receipt-review/utils/taxWarnings.ts` で日本語化する
+
+税込・税抜の基準換算は `taxAmountBasis.ts` に集約する。
+
+- 税率別に、同じ確定済み価格区分の明細合計と、印字税額でその区分に換算した対象額を完全一致で照合する。例: 税込対象額436円・印字税額32円は税抜404円となり、税抜98・138・168円の明細合計と一致する。
+- 換算には税率からの税額再計算を使わない。区分の宣言と税モードの矛盾、負の税額、税込額の算術矛盾、不明な区分は換算対象にせず、金額一致だけで商品税率・価格区分を確定しない。換算後の1円差も一致とは扱わない。
+- 同一税率・同一印字税額・同一税込対象額を表す税込/税抜サマリは計算用に重複排除し、`allocateTax` で印字税額を一度だけ配分する。印字証拠の元の `taxSummaries` 配列は保持する。税額推定では検証済み候補を選別してから重複排除する。
+- 補正プレビュー・保存時再解釈・登録ガードは `reinterpretDraftTax.ts` を共有し、画面の金額確認・税率別照合も同じ基準換算を使う。矛盾や未配分を登録可能にするための補正は行わない。
+
+Issue #890の回帰例（すべて8%、対象額は税込、商品印字額は税抜）:
+
+| 商品印字額（円） | 対象額・支払額（円） | 印字税額（円） | 配分税額（円） | 税込登録額（円） |
+| --- | --- | --- | --- | --- |
+| 98 / 138 / 168 | 436 | 32 | 8 / 11 / 13 | 106 / 149 / 181 |
+| 132 / 108 | 259 | 19 | 10 / 9 | 142 / 117 |
+| 109 / 78 / 58 | 264 | 19 | 8 / 6 / 5 | 117 / 84 / 63 |
+
+最後の例は印字税額19円を保持し、再保存で税20円・合計265円へ変化させない。入力は[共通回帰fixture](../lib/domain/receipt/tax/fixtures/receiptTaxBasisCases.ts)、画面の照合は[基準換算テスト](../src/features/receipt-review/utils/reviewChecks.basis.test.ts)、補正・再保存・登録は[E2E](../e2e/ai-expense-queue.basis-regression.spec.ts)で検証する。
+
+全体の税設定と、商品・税内訳の補正から派生した税判定は区別して保存・復元する。
+
+- `receiptUserOverride.fields` の `receiptTaxDecision.priceTaxTreatment` / `receiptTaxDecision.taxRateComposition` は、その操作でユーザーが明示した全体設定の軸だけを記録する。税判定更新時には古い軸の記録を置き換える。
+- `mapDraftToReviewForm` は記録のある軸だけを全体設定へ復元し、商品・内訳由来の派生値を再保存時の全体設定として送信しない。片方だけの全体設定でも、もう片方の派生値を商品へ一括適用しない。
+- 明示的な全体「不明」は `totalOnly` を維持する。旧形式の `receiptTaxDecision` 記録だけがある場合は、保存済み `totalOnly` または商品・内訳の補正記録がない場合に限り「不明」の軸を復元する。商品のみの「不明」は明細確認の対象であり、合計のみの登録へ自動変更しない。
 
 ## 13. CSVエクスポート設計
 
