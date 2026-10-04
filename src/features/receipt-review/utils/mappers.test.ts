@@ -6,6 +6,7 @@ import {
   mapDraftToReviewForm,
 } from "./mappers";
 import type { AiExpenseDraft } from "../types/types";
+import { RECEIPT_TAX_CHOICE_FIELDS } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 
 describe("mapDraftToReviewForm: 税設定の補正元を保持する", () => {
   const draft = {
@@ -30,10 +31,52 @@ describe("mapDraftToReviewForm: 税設定の補正元を保持する", () => {
         ...draft,
         receiptUserOverride: {
           ...draft.receiptUserOverride!,
-          fields: [...draft.receiptUserOverride!.fields, "taxSummaries"],
+          fields: [
+            ...draft.receiptUserOverride!.fields,
+            ...Object.values(RECEIPT_TAX_CHOICE_FIELDS),
+          ],
         },
       }),
     ).toMatchObject({ priceTaxTreatment: "excluded", taxRateComposition: "rate8" });
+  });
+
+  it.each([
+    [RECEIPT_TAX_CHOICE_FIELDS.priceTaxTreatment, "excluded", undefined],
+    [RECEIPT_TAX_CHOICE_FIELDS.taxRateComposition, undefined, "rate8"],
+  ])("全体設定の片軸だけが明示された場合はその軸だけ復元する (%s)", (field, price, rate) => {
+    expect(
+      mapDraftToReviewForm({
+        ...draft,
+        receiptUserOverride: {
+          ...draft.receiptUserOverride!,
+          fields: [...draft.receiptUserOverride!.fields, "taxSummaries", field!],
+        },
+      }),
+    ).toMatchObject({ priceTaxTreatment: price, taxRateComposition: rate });
+  });
+
+  it("内訳補正から得た判定を全体設定へ復元しない", () => {
+    expect(
+      mapDraftToReviewForm({
+        ...draft,
+        receiptUserOverride: {
+          ...draft.receiptUserOverride!,
+          fields: [...draft.receiptUserOverride!.fields, "taxSummaries"],
+        },
+      }),
+    ).toMatchObject({ priceTaxTreatment: undefined, taxRateComposition: undefined });
+  });
+
+  it("商品補正の不明を合計だけ保存の明示選択として復元しない", () => {
+    expect(
+      mapDraftToReviewForm({
+        ...draft,
+        receiptTaxDecision: {
+          ...draft.receiptTaxDecision!,
+          priceTaxTreatment: "unknown",
+        },
+      }),
+    ).toMatchObject({ priceTaxTreatment: undefined, taxRateComposition: undefined });
   });
 
   it("保存された不明の選択は合計だけ保存の再編集でも保持する", () => {
@@ -45,6 +88,7 @@ describe("mapDraftToReviewForm: 税設定の補正元を保持する", () => {
           priceTaxTreatment: "unknown",
           taxRateComposition: "unknown",
         },
+        receiptUserOverride: { ...draft.receiptUserOverride!, fields: ["receiptTaxDecision"] },
       }),
     ).toMatchObject({ priceTaxTreatment: "unknown", taxRateComposition: "unknown" });
   });
