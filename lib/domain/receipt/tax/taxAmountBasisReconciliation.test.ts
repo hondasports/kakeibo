@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { interpretReceiptTax } from "./interpretReceiptTax";
+import { reinterpretDraftTax } from "./reinterpretDraftTax";
 import { receiptTaxBasisCases, receiptTaxBasisInput } from "./fixtures/receiptTaxBasisCases";
 
 describe("Issue #890: 商品価格と税率別対象額の基準換算", () => {
@@ -99,5 +100,75 @@ describe("Issue #890: 商品価格と税率別対象額の基準換算", () => {
     if (field === "rate")
       expect(result.items.every((item) => item.taxContext.status === "unresolved")).toBe(true);
     expect(result.items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+  });
+
+  describe.each([false, true])("税込・税抜内訳の順序が反転%sの場合の未確定入力", (reverse) => {
+    function pairedInput() {
+      const input = receiptTaxBasisInput(receiptTaxBasisCases[0]);
+      input.taxSummaries.push({
+        ...input.taxSummaries[0],
+        taxMode: "external",
+        taxableAmountBasis: "tax_excluded",
+        taxableAmountYen: 404,
+      });
+      if (reverse) input.taxSummaries.reverse();
+      return input;
+    }
+
+    it.each(["rate", "basis", "both"])("%sを金額一致から推定確定しない", (axis) => {
+      const input = pairedInput();
+      input.items.forEach((item) => {
+        if (axis !== "basis") item.taxRatePercent = null;
+        if (axis !== "rate") item.amountBasis = "unknown";
+      });
+      const result = interpretReceiptTax(input);
+      expect(result.items.every((item) => item.taxContext.status === "unresolved")).toBe(true);
+      expect(result.items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+      expect(result.items.map((item) => item.taxRatePercent)).toEqual(
+        input.items.map((item) => item.taxRatePercent),
+      );
+      expect(result.items.map((item) => item.amountBasis)).toEqual(
+        input.items.map((item) => item.amountBasis),
+      );
+    });
+
+    it("価格区分が未確定でもユーザー指定10%を8%へ上書きしない", () => {
+      const input = pairedInput();
+      input.items[0].amountBasis = "unknown";
+      const { interpretation } = reinterpretDraftTax({
+        ...input,
+        override: { itemIndex: 0, taxRatePercent: 10 },
+      });
+      expect(interpretation.items[0]).toMatchObject({
+        taxRatePercent: 10,
+        amountBasis: "unknown",
+        taxContext: { status: "unresolved" },
+        taxAllocationStatus: "unallocated",
+      });
+      expect(interpretation.items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(
+        true,
+      );
+    });
+  });
+
+  it("単一の税抜内訳でもユーザー指定10%を金額推定で8%に変更しない", () => {
+    const input = receiptTaxBasisInput(receiptTaxBasisCases[0]);
+    input.taxSummaries[0] = {
+      ...input.taxSummaries[0],
+      taxMode: "external",
+      taxableAmountBasis: "tax_excluded",
+      taxableAmountYen: 404,
+    };
+    input.items[0].amountBasis = "unknown";
+    const { interpretation } = reinterpretDraftTax({
+      ...input,
+      override: { itemIndex: 0, taxRatePercent: 10 },
+    });
+    expect(interpretation.items[0]).toMatchObject({
+      taxRatePercent: 10,
+      amountBasis: "unknown",
+      taxContext: { status: "unresolved" },
+      taxAllocationStatus: "unallocated",
+    });
   });
 });

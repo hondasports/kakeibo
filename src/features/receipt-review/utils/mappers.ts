@@ -82,7 +82,10 @@ export function mapConvexDraftToAiExpenseDraft(draft: Doc<"aiExpenseDrafts">): A
 }
 
 export function mapDraftToReviewForm(draft: AiExpenseDraft): ReviewFormValues {
-  const hasSavedTaxDecision = draft.receiptUserOverride?.fields.includes("receiptTaxDecision");
+  // 商品補正から導かれた判定を、再保存時の新しい全体上書きとして扱わない。
+  const overrideFields = draft.receiptUserOverride?.fields ?? [];
+  const hasSavedTaxDecision =
+    overrideFields.includes("receiptTaxDecision") && overrideFields.includes("taxSummaries");
   return {
     documentType: draft.documentType,
     shopName: getDraftTitle(draft, ""),

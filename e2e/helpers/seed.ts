@@ -34,7 +34,7 @@ export async function seedAiExpenseDraftForExpenseEntriesByUser(userId: string):
 
 export async function seedTaxReviewDraftByUser(
   userId: string,
-  receiptCase?: "basis890",
+  receiptCase?: "basis890" | "basis890_264",
 ): Promise<{ draftId: string }> {
   return (await postE2eSeed("/e2e/seed-tax-review-draft", { userId, receiptCase })) as {
     draftId: string;

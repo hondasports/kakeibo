@@ -3,7 +3,39 @@ import {
   mapConvexDraftToAiExpenseDraft,
   mapDraftItemsToReviewItems,
   mapDraftToQueueItem,
+  mapDraftToReviewForm,
 } from "./mappers";
+import type { AiExpenseDraft } from "../types/types";
+
+describe("mapDraftToReviewForm: 税設定の補正元を保持する", () => {
+  const draft = {
+    _id: "draft-basis-890",
+    status: "ready",
+    documentType: "receipt",
+    amountYen: 264,
+    receiptTaxDecision: { priceTaxTreatment: "excluded", taxRateComposition: "rate8" },
+    receiptUserOverride: { fields: ["items", "receiptTotalResolution", "receiptTaxDecision"] },
+  } as AiExpenseDraft;
+
+  it("商品補正から得た判定を新しい全体税設定として再送しない", () => {
+    expect(mapDraftToReviewForm(draft)).toMatchObject({
+      priceTaxTreatment: undefined,
+      taxRateComposition: undefined,
+    });
+  });
+
+  it("ユーザーが明示した全体税設定は再表示する", () => {
+    expect(
+      mapDraftToReviewForm({
+        ...draft,
+        receiptUserOverride: {
+          ...draft.receiptUserOverride!,
+          fields: [...draft.receiptUserOverride!.fields, "taxSummaries"],
+        },
+      }),
+    ).toMatchObject({ priceTaxTreatment: "excluded", taxRateComposition: "rate8" });
+  });
+});
 
 describe("mapConvexDraftToAiExpenseDraft", () => {
   it("新契約の4層とversionをUI callerへ欠落なく渡す", () => {

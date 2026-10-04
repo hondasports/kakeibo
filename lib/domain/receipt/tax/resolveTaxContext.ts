@@ -77,10 +77,23 @@ export function resolveTaxContext(args: {
       summary.status === "verified" ||
       summary.status === "coherent",
   );
+  // 同率の税込・税抜併記は計算に使えても、未確定明細の価格区分を一意に示さない。
+  const inferenceSummaries = processableSummaries.filter(
+    (summary) =>
+      processableSummaries.filter((other) => other.taxRatePercent === summary.taxRatePercent)
+        .length === 1,
+  );
+  const canInferFrom = (summary: ExtractedTaxSummary, index: number) => {
+    const item = args.items[index];
+    return (
+      (item.taxRatePercent === null || item.taxRatePercent === summary.taxRatePercent) &&
+      (item.amountBasis === "unknown" || item.amountBasis === resolveBasis(summary))
+    );
+  };
 
   args.items.forEach((item, index) => {
     if (item.taxRatePercent === null) return;
-    const matching = processableSummaries.filter(
+    const matching = inferenceSummaries.filter(
       (summary) => summary.taxRatePercent === item.taxRatePercent,
     );
     const basis = item.amountBasis;
@@ -111,13 +124,14 @@ export function resolveTaxContext(args: {
       conflictedMarkerIndexes.add(evidence.itemIndex);
     }
   }
-  for (const summary of processableSummaries) {
+  for (const summary of inferenceSummaries) {
     const indexes = args.items
       .map((_, index) => index)
       .filter(
         (index) =>
           contexts[index].status === "unresolved" &&
-          markerRates.get(index) === summary.taxRatePercent,
+          markerRates.get(index) === summary.taxRatePercent &&
+          canInferFrom(summary, index),
       );
     if (indexes.length === 0 || itemTotal(args.items, indexes) !== summary.taxableAmountYen)
       continue;
@@ -127,13 +141,16 @@ export function resolveTaxContext(args: {
 
   const unresolved = () =>
     args.items.map((_, index) => index).filter((index) => contexts[index].status === "unresolved");
-  if (processableSummaries.length === 1 && unresolved().length > 0) {
+  if (inferenceSummaries.length === 1 && unresolved().length > 0) {
     const indexes = unresolved();
     const resolvedIndexes = args.items
       .map((_, index) => index)
       .filter((index) => contexts[index].status === "resolved");
-    const summary = processableSummaries[0];
-    if (itemTotal(args.items, [...resolvedIndexes, ...indexes]) === summary.taxableAmountYen) {
+    const summary = inferenceSummaries[0];
+    if (
+      indexes.every((index) => canInferFrom(summary, index)) &&
+      itemTotal(args.items, [...resolvedIndexes, ...indexes]) === summary.taxableAmountYen
+    ) {
       const context = resolved(summary, "single_summary");
       if (context) indexes.forEach((index) => (contexts[index] = context));
     }
@@ -143,7 +160,7 @@ export function resolveTaxContext(args: {
   while (madeProgress && unresolved().length > 0) {
     madeProgress = false;
     const unresolvedIndexes = unresolved();
-    const proposals = processableSummaries.flatMap((summary) => {
+    const proposals = inferenceSummaries.flatMap((summary) => {
       const alreadyResolved = args.items.reduce((sum, item, index) => {
         const context = contexts[index];
         return context.status === "resolved" && context.taxRatePercent === summary.taxRatePercent
@@ -152,7 +169,7 @@ export function resolveTaxContext(args: {
       }, 0);
       const indexes = findUniqueSubset(
         args.items,
-        unresolvedIndexes,
+        unresolvedIndexes.filter((index) => canInferFrom(summary, index)),
         summary.taxableAmountYen - alreadyResolved,
       );
       return indexes ? [{ summary, indexes }] : [];
@@ -174,7 +191,8 @@ export function resolveTaxContext(args: {
 
   const unresolvedIndexes = unresolved();
   if (unresolvedIndexes.length > 0) {
-    const candidates = processableSummaries.filter((summary) => {
+    const candidates = inferenceSummaries.filter((summary) => {
+      if (!unresolvedIndexes.every((index) => canInferFrom(summary, index))) return false;
       const resolvedTotal = args.items.reduce((sum, item, index) => {
         const context = contexts[index];
         return context.status === "resolved" && context.taxRatePercent === summary.taxRatePercent

@@ -160,9 +160,9 @@ export async function createE2eReadyDraftForUserHandler(
 
 export async function createE2eTaxReviewDraftForUserHandler(
   ctx: MutationCtx,
-  args: CreateE2eReadyDraftForUserArgs & { receiptCase?: "basis890" },
+  args: CreateE2eReadyDraftForUserArgs & { receiptCase?: "basis890" | "basis890_264" },
 ) {
-  if (args.receiptCase === "basis890") return createE2eCrossBasisTaxDraft(ctx, args);
+  if (args.receiptCase !== undefined) return createE2eCrossBasisTaxDraft(ctx, args);
   const now = Date.now();
   const draftId = await ctx.db.insert("aiExpenseDrafts", {
     groupId: args.groupId,
@@ -237,8 +237,13 @@ export async function createE2eTaxReviewDraftForUserHandler(
   return draftId;
 }
 
-async function createE2eCrossBasisTaxDraft(ctx: MutationCtx, args: CreateE2eReadyDraftForUserArgs) {
-  const input = receiptTaxBasisInput(receiptTaxBasisCases[0]);
+async function createE2eCrossBasisTaxDraft(
+  ctx: MutationCtx,
+  args: CreateE2eReadyDraftForUserArgs & { receiptCase?: "basis890" | "basis890_264" },
+) {
+  const testCase = receiptTaxBasisCases[args.receiptCase === "basis890_264" ? 2 : 0];
+  const input = receiptTaxBasisInput(testCase);
+  const subtotalYen = testCase.amounts.reduce((sum, amount) => sum + amount, 0);
   const now = Date.now();
   const observations = [
     ...input.items.map((item) => ({
@@ -246,11 +251,19 @@ async function createE2eCrossBasisTaxDraft(ctx: MutationCtx, args: CreateE2eRead
       amountYen: item.printedAmountYen,
       role: "item" as const,
     })),
-    { rawText: "小計404円", amountYen: 404, role: "subtotal" as const },
-    { rawText: "外税8% 32円", amountYen: 32, role: "tax" as const },
-    { rawText: "合計436円", amountYen: 436, role: "total" as const },
-    { rawText: "税率8%対象額436円", amountYen: 436, role: "tax" as const },
-    { rawText: "内消費税等8% 32円", amountYen: 32, role: "tax" as const },
+    { rawText: `小計${subtotalYen}円`, amountYen: subtotalYen, role: "subtotal" as const },
+    { rawText: `外税8% ${testCase.taxYen}円`, amountYen: testCase.taxYen, role: "tax" as const },
+    { rawText: `合計${testCase.paidYen}円`, amountYen: testCase.paidYen, role: "total" as const },
+    {
+      rawText: `税率8%対象額${testCase.paidYen}円`,
+      amountYen: testCase.paidYen,
+      role: "tax" as const,
+    },
+    {
+      rawText: `内消費税等8% ${testCase.taxYen}円`,
+      amountYen: testCase.taxYen,
+      role: "tax" as const,
+    },
   ];
   const draftId = await ctx.db.insert("aiExpenseDrafts", {
     groupId: args.groupId,
@@ -258,8 +271,8 @@ async function createE2eCrossBasisTaxDraft(ctx: MutationCtx, args: CreateE2eRead
     sourceType: "image_upload",
     status: "needs_review",
     documentType: "receipt",
-    imageFileName: "e2e-tax-basis-890.png",
-    shopName: "E2E税基準確認店",
+    imageFileName: `e2e-tax-basis-890-${testCase.paidYen}.png`,
+    shopName: `E2E税基準確認店${testCase.paidYen}`,
     date: "2026-10-04",
     amountYen: input.amountYen,
     categoryId: args.categoryId,

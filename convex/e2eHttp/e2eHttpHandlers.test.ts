@@ -352,20 +352,23 @@ describe("e2e seed handlers", () => {
     },
   );
 
-  it("固定した税基準ケースだけを既存の認可済みscopeへseedする", async () => {
-    const ctx = createActionCtx();
-    const result = await e2eSeedTaxReviewDraftHandler(
-      ctx,
-      request({ userId: E2E_USER_ID, receiptCase: "basis890" }),
-    );
-    expect(result.status).toBe(200);
-    expect(ctx.runMutation).toHaveBeenLastCalledWith(expect.anything(), {
-      groupId: GROUP_ID,
-      createdByUserId: E2E_USER_ID,
-      categoryId: "fixture-id",
-      receiptCase: "basis890",
-    });
-  });
+  it.each(["basis890", "basis890_264"])(
+    "固定税基準ケース%sを認可済みscopeへseedする",
+    async (receiptCase) => {
+      const ctx = createActionCtx();
+      const result = await e2eSeedTaxReviewDraftHandler(
+        ctx,
+        request({ userId: E2E_USER_ID, receiptCase }),
+      );
+      expect(result.status).toBe(200);
+      expect(ctx.runMutation).toHaveBeenLastCalledWith(expect.anything(), {
+        groupId: GROUP_ID,
+        createdByUserId: E2E_USER_ID,
+        categoryId: "fixture-id",
+        receiptCase,
+      });
+    },
+  );
 
   it("5種類のseed処理を成功させる", async () => {
     const ctx = createActionCtx();

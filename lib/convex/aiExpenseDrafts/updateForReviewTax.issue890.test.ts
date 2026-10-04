@@ -10,6 +10,8 @@ import {
   receiptTaxBasisInput,
 } from "../../domain/receipt/tax/fixtures/receiptTaxBasisCases";
 import { GROUP_ID, DRAFT_ID, CAT_ID, createInMemoryMutationCtx } from "./testHelpers";
+import { mapDraftToReviewForm } from "../../../src/features/receipt-review/utils/mappers";
+import type { AiExpenseDraft } from "../../../src/features/receipt-review/types/types";
 
 function setup(testCase: (typeof receiptTaxBasisCases)[number]) {
   const input = receiptTaxBasisInput(testCase);
@@ -63,7 +65,7 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
           amountBasis: "tax_excluded",
         });
       }
-      const save = () =>
+      const save = (reopenedForm?: ReturnType<typeof mapDraftToReviewForm>) =>
         updateForReviewHandler(ctx, {
           draftId: DRAFT_ID,
           documentType: "receipt",
@@ -71,6 +73,8 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
           date: "2026-10-04",
           amountYen: testCase.paidYen,
           categoryId: CAT_ID,
+          priceTaxTreatment: reopenedForm?.priceTaxTreatment,
+          taxRateComposition: reopenedForm?.taxRateComposition,
           items: getItems().map((item) => ({
             itemId: item._id as Id<"aiExpenseDraftItems">,
             itemName: String(item.itemName),
@@ -79,7 +83,8 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
           })),
         });
       await save();
-      await save();
+      const reopenedForm = mapDraftToReviewForm(getDraft() as unknown as AiExpenseDraft);
+      await save(reopenedForm);
       expect(getDraft().status).toBe("ready");
       expect(getItems().map((item) => item.printedAmountYen)).toEqual(testCase.amounts);
       expect(getItems().map((item) => item.allocatedTaxYen)).toEqual(testCase.allocations);
@@ -105,4 +110,44 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
       ).toThrow("税込登録額が未確定");
     },
   );
+
+  it("同値内訳が併記されてもユーザー指定10%と未確定の価格区分を保存して登録を拒否する", async () => {
+    const { ctx, getDraft, getItems } = setup(receiptTaxBasisCases[0]);
+    const summaries = receiptTaxBasisInput(receiptTaxBasisCases[0]).taxSummaries;
+    await ctx.db.patch(DRAFT_ID, {
+      taxSummaries: [
+        ...summaries,
+        {
+          ...summaries[0],
+          taxMode: "external",
+          taxableAmountBasis: "tax_excluded",
+          taxableAmountYen: 404,
+        },
+      ],
+    });
+    for (const [index, item] of getItems().entries()) {
+      await ctx.db.patch(item._id as Id<"aiExpenseDraftItems">, {
+        amountBasis: index === 0 ? "unknown" : "tax_excluded",
+      });
+    }
+    const firstId = getItems()[0]._id as Id<"aiExpenseDraftItems">;
+    await updateDraftItemTaxOverridesMutationHandler(ctx, {
+      draftId: DRAFT_ID,
+      itemId: firstId,
+      taxRatePercent: 10,
+    });
+    expect(getItems()[0]).toMatchObject({
+      taxRatePercent: 10,
+      amountBasis: "unknown",
+      taxResolutionStatus: "unresolved",
+      taxAllocationStatus: "unallocated",
+    });
+    expect(getDraft().status).toBe("needs_review");
+    expect(() =>
+      buildDraftRegistrationItems(
+        getDraft() as unknown as Doc<"aiExpenseDrafts">,
+        getItems() as unknown as Doc<"aiExpenseDraftItems">[],
+      ),
+    ).toThrow("税込登録額が未確定");
+  });
 });
