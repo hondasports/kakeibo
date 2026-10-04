@@ -65,6 +65,49 @@ describe("interpretReceiptTaxDecision decision table (evidence exclusions)", () 
     expect(decision.reasons).toContain("unverified_tax_summary_for_estimate");
   });
 
+  it.each(["未検証先", "検証済み先"])(
+    "推定不能な同値の未検証summaryが検証済みの税額推定を消さない（%s）",
+    (order) => {
+      const unverified = summary({
+        status: "ambiguous",
+        taxableAmountBasis: "unknown",
+        roundingMethod: "floor",
+      });
+      const verified = summary({ roundingMethod: "floor" });
+      const decision = interpretReceiptTaxDecision(
+        baseInput({
+          items: [{ ...item("tax_included", 10), printedAmountYen: 1100 }],
+          rawObservationLines: [line("税込 10%", null, 8)],
+          taxSummaries: order === "未検証先" ? [unverified, verified] : [verified, unverified],
+        }),
+      );
+
+      expect(decision.taxAmount).toEqual({
+        estimatedTaxYen: 100,
+        roundingMethod: "floor",
+        source: "estimated",
+      });
+      expect(decision.reasons).not.toContain("unverified_tax_summary_for_estimate");
+    },
+  );
+
+  it.each(["未検証先", "検証済み先"])(
+    "推定可能な未検証summaryは同値の検証済みsummaryがあっても推定を確定しない（%s）",
+    (order) => {
+      const unverified = summary({ status: "ambiguous", roundingMethod: "floor" });
+      const verified = summary({ roundingMethod: "floor" });
+      const decision = interpretReceiptTaxDecision(
+        baseInput({
+          rawObservationLines: [line("税込 10%", null, 8)],
+          taxSummaries: order === "未検証先" ? [unverified, verified] : [verified, unverified],
+        }),
+      );
+
+      expect(decision.taxAmount).toEqual({ roundingMethod: "floor", source: "unknown" });
+      expect(decision.reasons).toContain("unverified_tax_summary_for_estimate");
+    },
+  );
+
   it("矛盾summaryがあれば明示ラベルがあってもcontradictoryにする", () => {
     const decision = interpretReceiptTaxDecision(
       baseInput({

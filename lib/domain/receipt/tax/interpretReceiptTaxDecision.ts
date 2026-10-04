@@ -131,8 +131,11 @@ function taxAmountDecision(input: ReceiptTaxInput): {
       canonicalTaxSummaryStatus(summary.status) !== "verified" &&
       estimateTax(summary) !== undefined,
   );
-  const estimates = distinctTaxSummaryAmounts(input.taxSummaries)
-    .filter((summary) => canonicalTaxSummaryStatus(summary.status) === "verified")
+  const estimates = distinctTaxSummaryAmounts(
+    input.taxSummaries.filter(
+      (summary) => canonicalTaxSummaryStatus(summary.status) === "verified",
+    ),
+  )
     .map(estimateTax)
     .filter((value): value is number => value !== undefined);
   return {
