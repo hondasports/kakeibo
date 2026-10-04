@@ -1,4 +1,5 @@
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
+import { distinctTaxSummaryAmounts } from "../../../../lib/domain/receipt/tax/taxAmountBasis";
 import type { ReviewBlockerCode, ReviewCheckStatus } from "./reviewCheckUtils";
 import {
   findBasisConflicts,
@@ -102,11 +103,12 @@ export function buildAmountCheck(args: {
   }, 0);
 
   if (external) {
-    const printedSubtotalYen = summaries.reduce(
+    const calculationSummaries = distinctTaxSummaryAmounts(summaries);
+    const printedSubtotalYen = calculationSummaries.reduce(
       (sum, summary) => sum + summary.taxableAmountYen,
       0,
     );
-    const printedTaxYen = summaries.reduce((sum, summary) => sum + summary.taxYen, 0);
+    const printedTaxYen = calculationSummaries.reduce((sum, summary) => sum + summary.taxYen, 0);
     const expectedPaidYen = printedSubtotalYen + printedTaxYen;
     const base = {
       variant,

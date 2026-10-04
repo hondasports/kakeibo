@@ -10,10 +10,18 @@ import {
   receiptTaxBasisInput,
 } from "../../domain/receipt/tax/fixtures/receiptTaxBasisCases";
 import { GROUP_ID, DRAFT_ID, CAT_ID, createInMemoryMutationCtx } from "./testHelpers";
-import { mapDraftToReviewForm } from "../../../src/features/receipt-review/utils/mappers";
-import type { AiExpenseDraft } from "../../../src/features/receipt-review/types/types";
+import {
+  mapDraftToReviewForm,
+  mapDraftItemsToReviewItems,
+} from "../../../src/features/receipt-review/utils/mappers";
+import type {
+  AiExpenseDraft,
+  AiExpenseDraftWithItems,
+} from "../../../src/features/receipt-review/types/types";
 import { updateSummaryTaxOverridesHandler } from "./updateSummaryTaxOverrides";
 import { RECEIPT_TAX_CHOICE_FIELDS } from "../../domain/aiExpenseDrafts/receiptDataContract";
+import { buildReviewChecks } from "../../../src/features/receipt-review/utils/reviewChecks";
+import { toReceiptTotalsViewModel } from "../../../src/features/receipt-review/utils/receiptTotalsViewModel";
 
 function setup(testCase: (typeof receiptTaxBasisCases)[number]) {
   const input = receiptTaxBasisInput(testCase);
@@ -102,6 +110,51 @@ function registrationItems(env: ReturnType<typeof setup>) {
 }
 
 describe("Issue #890: 補正・保存・再表示・登録境界", () => {
+  it.each([false, true])(
+    "同値の外税内訳2行を再保存しても画面確認と436円登録が一致する（逆順=%s）",
+    async (reverse) => {
+      const testCase = receiptTaxBasisCases[0];
+      const env = setup(testCase);
+      const withIncluded = {
+        ...env.getDraft().taxSummaries![0],
+        taxMode: "external" as const,
+        taxableAmountBasis: "tax_excluded" as const,
+        taxableAmountYen: 404,
+      };
+      const withoutIncluded = { ...withIncluded };
+      delete withoutIncluded.taxIncludedAmountYen;
+      const printedSummaries = reverse
+        ? [withIncluded, withoutIncluded]
+        : [withoutIncluded, withIncluded];
+      await env.ctx.db.patch(DRAFT_ID, { taxSummaries: printedSummaries });
+      await correctItems(env);
+
+      for (let cycle = 0; cycle < 2; cycle += 1) {
+        await save(env, testCase, reopen(env));
+        const draft = env.getDraft() as unknown as AiExpenseDraft;
+        const items = mapDraftItemsToReviewItems(
+          env.getItems() as unknown as AiExpenseDraftWithItems["items"],
+        );
+
+        expect(draft.status).toBe("ready");
+        expect(draft.taxSummaries).toHaveLength(2);
+        expect(draft.taxSummaries).toMatchObject(printedSummaries);
+        expect(items.map((item) => item.allocatedTaxYen)).toEqual([8, 11, 13]);
+        expect(registrationItems(env).reduce((sum, item) => sum + item.amountYen, 0)).toBe(436);
+        expect(
+          buildReviewChecks({ items, paidTotalYen: 436, taxSummaries: draft.taxSummaries }),
+        ).toMatchObject({ amount: { status: "matched" }, taxRate: { status: "matched" } });
+        expect(
+          toReceiptTotalsViewModel({
+            reviewItems: items,
+            paidTotalYen: 436,
+            taxSummaries: draft.taxSummaries,
+          }),
+        ).toMatchObject({ status: "matched", receiptSubtotalYen: 404 });
+      }
+    },
+  );
+
   it.each(
     receiptTaxBasisCases.flatMap((testCase) =>
       [{ priceTaxTreatment: "excluded" as const }, { taxRateComposition: "rate8" as const }].map(
