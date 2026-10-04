@@ -41,6 +41,7 @@ export function buildAmountCheck(args: {
   const paidTotalYen = args.paidTotalYen;
   const external =
     summaries.length > 0 &&
+    !args.items.some((item) => item.amountBasis === "tax_included") &&
     summaries.every(
       (summary) =>
         summaryAmountBasis(summary) === "tax_excluded" &&

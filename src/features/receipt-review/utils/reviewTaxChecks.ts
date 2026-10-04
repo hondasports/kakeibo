@@ -3,6 +3,7 @@ import type { AmountBasis, TaxMode, TaxRatePercent } from "../../../../lib/recei
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
+import { matchTaxSummaryItems } from "../../../../lib/domain/receipt/tax/taxAmountBasis";
 import type {
   ReviewBlockerCode,
   ReviewCheckStatus,
@@ -157,7 +158,14 @@ export function buildTaxRateCheck(args: {
         (item.amountBasis === "tax_included" || item.amountBasis === "tax_excluded") &&
         item.amountBasis !== basis,
     );
-    if (conflictingItems.length > 0)
+    const basisMatch = matchTaxSummaryItems(
+      summary,
+      bucket.map((item) => ({
+        amountBasis: item.amountBasis ?? "unknown",
+        printedAmountYen: itemPrintedYen(item) ?? Number.NaN,
+      })),
+    );
+    if (conflictingItems.length > 0 && !basisMatch)
       return {
         ...base,
         status: "uncomparable" as const,
@@ -176,7 +184,10 @@ export function buildTaxRateCheck(args: {
           .filter((item) => itemPrintedYen(item) === undefined)
           .map((item) => item.id),
       };
-    const currentYen = bucket.reduce((sum, item) => sum + (itemPrintedYen(item) ?? 0), 0);
+    const currentYen =
+      conflictingItems.length > 0 && basisMatch
+        ? summary.taxableAmountYen
+        : bucket.reduce((sum, item) => sum + (itemPrintedYen(item) ?? 0), 0);
     const differenceYen = currentYen - summary.taxableAmountYen;
     if (differenceYen === 0)
       return { ...base, currentYen, differenceYen, status: "matched", matchKind: "exact" };

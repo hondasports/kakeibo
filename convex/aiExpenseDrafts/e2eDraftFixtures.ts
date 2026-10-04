@@ -1,4 +1,8 @@
 import { unallocatedTaxReceipt } from "../../lib/domain/receipt/tax/fixtures/unallocatedTaxReceipt";
+import {
+  receiptTaxBasisCases,
+  receiptTaxBasisInput,
+} from "../../lib/domain/receipt/tax/fixtures/receiptTaxBasisCases";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 
@@ -156,8 +160,9 @@ export async function createE2eReadyDraftForUserHandler(
 
 export async function createE2eTaxReviewDraftForUserHandler(
   ctx: MutationCtx,
-  args: CreateE2eReadyDraftForUserArgs,
+  args: CreateE2eReadyDraftForUserArgs & { receiptCase?: "basis890" },
 ) {
+  if (args.receiptCase === "basis890") return createE2eCrossBasisTaxDraft(ctx, args);
   const now = Date.now();
   const draftId = await ctx.db.insert("aiExpenseDrafts", {
     groupId: args.groupId,
@@ -229,6 +234,76 @@ export async function createE2eTaxReviewDraftForUserHandler(
     updatedAt: now,
   });
 
+  return draftId;
+}
+
+async function createE2eCrossBasisTaxDraft(ctx: MutationCtx, args: CreateE2eReadyDraftForUserArgs) {
+  const input = receiptTaxBasisInput(receiptTaxBasisCases[0]);
+  const now = Date.now();
+  const observations = [
+    ...input.items.map((item) => ({
+      rawText: `${item.itemName} ${item.printedAmountYen}円`,
+      amountYen: item.printedAmountYen,
+      role: "item" as const,
+    })),
+    { rawText: "小計404円", amountYen: 404, role: "subtotal" as const },
+    { rawText: "外税8% 32円", amountYen: 32, role: "tax" as const },
+    { rawText: "合計436円", amountYen: 436, role: "total" as const },
+    { rawText: "税率8%対象額436円", amountYen: 436, role: "tax" as const },
+    { rawText: "内消費税等8% 32円", amountYen: 32, role: "tax" as const },
+  ];
+  const draftId = await ctx.db.insert("aiExpenseDrafts", {
+    groupId: args.groupId,
+    createdByUserId: args.createdByUserId,
+    sourceType: "image_upload",
+    status: "needs_review",
+    documentType: "receipt",
+    imageFileName: "e2e-tax-basis-890.png",
+    shopName: "E2E税基準確認店",
+    date: "2026-10-04",
+    amountYen: input.amountYen,
+    categoryId: args.categoryId,
+    confidence: { documentType: 1, shopName: 1, date: 1, amountYen: 1, categoryId: 1 },
+    taxSummaries: input.taxSummaries,
+    rawObservation: {
+      source: "ai_ocr",
+      observedAt: now,
+      lines: observations.map((line, sourceLineIndex) => ({
+        rawText: line.rawText,
+        amountText: `${line.amountYen}円`,
+        amountYen: line.amountYen,
+        lineRoleCandidates: [line.role],
+        roleConfidence: 0.99,
+        explicitlyPrinted: true,
+        sourceLineIndex,
+      })),
+    },
+    warnings: [],
+    reviewReasons: ["user_confirmation_required", "amount_mismatch"],
+    createdAt: now,
+    updatedAt: now,
+  });
+  for (const item of input.items) {
+    await ctx.db.insert("aiExpenseDraftItems", {
+      groupId: args.groupId,
+      draftId,
+      itemName: item.itemName,
+      amountYen: item.printedAmountYen,
+      printedAmountYen: item.printedAmountYen,
+      amountBasis: "tax_included",
+      taxRatePercent: 8,
+      allocatedTaxYen: 0,
+      taxAllocationStatus: "unallocated",
+      normalizedAmountYen: item.printedAmountYen,
+      taxResolutionStatus: "resolved",
+      taxResolutionSource: "item_explicit",
+      categoryId: args.categoryId,
+      confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+      warnings: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
   return draftId;
 }
 

@@ -1,4 +1,5 @@
 import type { ExtractedTaxSummary, ReceiptTaxInput, ReconciliationResult } from "./types";
+import { equivalentTaxSummaryAmounts } from "./taxAmountBasis";
 
 function summaryKey(summary: ExtractedTaxSummary) {
   return [
@@ -23,12 +24,20 @@ export function reconcileTaxSummaries(input: ReceiptTaxInput): ReconciliationRes
     seen.add(key);
     return true;
   });
-  const countsByRate = new Map<number, number>();
+  const summariesByRate = new Map<number, ExtractedTaxSummary[]>();
   for (const summary of taxSummaries) {
-    countsByRate.set(summary.taxRatePercent, (countsByRate.get(summary.taxRatePercent) ?? 0) + 1);
+    const group = summariesByRate.get(summary.taxRatePercent) ?? [];
+    group.push(summary);
+    summariesByRate.set(summary.taxRatePercent, group);
   }
   const conflictingRates = new Set(
-    [...countsByRate].filter(([, count]) => count > 1).map(([rate]) => rate),
+    [...summariesByRate]
+      .filter(
+        ([, group]) =>
+          group.length > 1 &&
+          group.some((summary) => !equivalentTaxSummaryAmounts(group[0], summary)),
+      )
+      .map(([rate]) => rate),
   );
   return {
     taxSummaries,

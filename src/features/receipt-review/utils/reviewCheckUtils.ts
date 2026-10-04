@@ -1,6 +1,8 @@
 import type { AmountBasis, TaxMode, TaxRatePercent } from "../../../../lib/receiptTax/types";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
+import { resolveAmountBasis } from "../../../../lib/domain/receipt/tax/resolveAmountBasis";
+import { matchTaxSummaryItems } from "../../../../lib/domain/receipt/tax/taxAmountBasis";
 /** 金額確認・税率別集計それぞれの判定状態。 */
 export type ReviewCheckStatus = "matched" | "mismatch" | "uncomparable";
 
@@ -112,10 +114,7 @@ export function itemComparableYen(item: ReviewItemValues): number | undefined {
 
 /** サマリの対象額基準。basis が unknown でも税モードから意味を復元する。 */
 export function summaryAmountBasis(summary: TaxSummary): AmountBasis {
-  if (summary.taxableAmountBasis !== "unknown") return summary.taxableAmountBasis;
-  if (summary.taxMode === "external") return "tax_excluded";
-  if (summary.taxMode === "included") return "tax_included";
-  return "unknown";
+  return resolveAmountBasis(summary);
 }
 
 export function effectiveTaxRateOf(
@@ -133,17 +132,35 @@ export function findBasisConflicts(
   items: ReviewItemValues[],
   summaries: TaxSummary[],
 ): ReviewItemValues[] {
-  const basisByRate = new Map(
-    summaries.map((summary) => [summary.taxRatePercent, summaryAmountBasis(summary)]),
-  );
+  const checks = summaries.map((summary) => {
+    const bucket = items.filter(
+      (item) => effectiveTaxRateOf(item, items) === summary.taxRatePercent,
+    );
+    return {
+      rate: summary.taxRatePercent,
+      basis: summaryAmountBasis(summary),
+      reconciled:
+        matchTaxSummaryItems(
+          summary,
+          bucket.map((item) => ({
+            amountBasis: item.amountBasis ?? "unknown",
+            printedAmountYen: itemPrintedYen(item) ?? Number.NaN,
+          })),
+        ) !== undefined,
+    };
+  });
   return items.filter((item) => {
     const rate = effectiveTaxRateOf(item, items);
     if (rate === null) return false;
-    const expectedBasis = basisByRate.get(rate);
-    if (!expectedBasis || expectedBasis === "unknown") return false;
     return (
       (item.amountBasis === "tax_included" || item.amountBasis === "tax_excluded") &&
-      item.amountBasis !== expectedBasis
+      checks.some(
+        (check) =>
+          check.rate === rate &&
+          check.basis !== "unknown" &&
+          item.amountBasis !== check.basis &&
+          !check.reconciled,
+      )
     );
   });
 }

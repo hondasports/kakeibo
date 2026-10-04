@@ -176,7 +176,7 @@ describe("interpretReceiptTaxDecision decision table (evidence exclusions)", () 
     expect(decision.reasons).toContain("non_tax_adjustment_lines_excluded");
   });
 
-  it("itemとsummaryのbasis不一致をperItem商品混在にしない", () => {
+  it("換算できるitemとsummaryの基準差を商品混在や金額矛盾にしない", () => {
     const decision = interpretReceiptTaxDecision(
       baseInput({
         items: [item("tax_excluded", 10)],
@@ -184,8 +184,10 @@ describe("interpretReceiptTaxDecision decision table (evidence exclusions)", () 
     );
 
     expect(decision.priceTaxTreatment).not.toBe("perItem");
-    expect(decision.resolutionStatus).toBe("contradictory");
-    expect(decision.reasons).toContain("receipt_reconciliation_mismatch");
+    expect(decision.priceTaxTreatment).toBe("excluded");
+    expect(decision.resolutionStatus).toBe("ambiguous");
+    expect(decision.reasons).not.toContain("receipt_reconciliation_mismatch");
+    expect(decision.reasons).toContain("estimated_tax_with_unknown_rounding");
   });
 
   it("税率だけのuser overrideは価格軸をuserへ昇格しない", () => {

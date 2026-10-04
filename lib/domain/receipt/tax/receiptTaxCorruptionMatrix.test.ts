@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { interpretReceiptTax } from "./interpretReceiptTax";
 import { normalizeTaxSummary } from "./taxSummaryConsistency";
 import type { ExtractedReceiptItem, ExtractedTaxSummary, ReceiptTaxInput } from "./types";
+import { receiptTaxBasisCases, receiptTaxBasisInput } from "./fixtures/receiptTaxBasisCases";
 
 function item(overrides: Partial<ExtractedReceiptItem> = {}): ExtractedReceiptItem {
   return {
@@ -45,6 +46,24 @@ function input(overrides: Partial<ReceiptTaxInput> = {}): ReceiptTaxInput {
 }
 
 describe("receiptTax corruption matrix", () => {
+  it.each(["taxYen", "taxableAmountYen", "taxIncludedAmountYen"] as const)(
+    "税込・税抜内訳の%s が矛盾すれば同値扱いしない",
+    (field) => {
+      const source = receiptTaxBasisInput(receiptTaxBasisCases[0]);
+      const excluded = {
+        ...source.taxSummaries[0],
+        taxMode: "external" as const,
+        taxableAmountBasis: "tax_excluded" as const,
+        taxableAmountYen: 404,
+      };
+      excluded[field] = (excluded[field] ?? 436) + 1;
+      source.taxSummaries.push(excluded);
+      const result = interpretReceiptTax(source);
+      expect(result.warnings).toContain("conflicting_tax_summary:8");
+      expect(result.items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+    },
+  );
+
   it("AI誤読：included × tax_excluded + A + T != I を検出", () => {
     const result = interpretReceiptTax(
       input({
