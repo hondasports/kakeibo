@@ -18,4 +18,8 @@ findingはid・状態・根拠を持つ。修正後は変更hunk・影響項目�
 
 再レビューは `deltaFrom` に直前のレビュー済みheadを指定し、差分範囲をその増分とopen findingの処置へ限定できる。全ACの `{id, evidence}` 記録は変わらず必須で、増分で影響を受けなかったACは根拠として直前のレビューを参照する。
 
+増分資料は `--review-packet <dir> --delta-from <reviewed-head>` で生成する。`diff.patch` は増分、`previous-review.json` は同じbaseの過去AC・finding記録、`full-diff.patch` は範囲拡張時の参照先となる。全AC・全変更path・過去finding・必須契約は引き続き提供する。過去記録のbase/AC証跡が不明、起点が未記録または現在HEADのancestorでない場合は拒否するため、通常の全差分packetを使う。
+
+Reviewerは増分・影響caller・open findingから確認し、影響のないACの証跡は過去レビューを参照する。共有契約や前提が変わった場合は全差分へ広げる。報告全文はファイルに保存し、実装担当への返却は結論・指摘件数・対象HEAD・報告参照先を中心にする。
+
 open findingが0件なら `clean`。findingが残れば `findings`。3ラウンドごとに方針を再評価し、上限到達は未完了として扱う。

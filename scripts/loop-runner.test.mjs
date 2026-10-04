@@ -21,8 +21,10 @@ import {
   transitionTask,
   refreshTask,
   runVerification,
+  runRequiredVerification,
   saveTask,
   loadTask,
+  taskPath,
   stateBlock,
   parseStateBlock,
   summarizeTask,
@@ -76,6 +78,301 @@ function repository() {
   return { dir, git, task };
 }
 describe("persistent task gates", () => {
+  const delivery = (task, overrides = {}) => ({
+    number: 7,
+    state: "OPEN",
+    isDraft: false,
+    headRefOid: task.head,
+    baseRefOid: task.baseHead,
+    baseRefName: "preview",
+    mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
+    reviewDecision: "APPROVED",
+    statusCheckRollup: [{ name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" }],
+    ...overrides,
+  });
+  const completeFindings = { pagesComplete: true, unhandledCount: 0, unresolvedThreadCount: 0 };
+  it("returns actionable findings from a read-only watch without waiting or changing state", () => {
+    const { dir, task } = repository();
+    task.state = "done";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const before = readFileSync(taskPath(dir), "utf8");
+    const result = run({ "check-pr": "7", "watch-aftercare": true }, dir, {
+      fetchPr: () => delivery(task),
+      fetchFindings: () => ({ ...completeFindings, unhandledCount: 1 }),
+      sleep: () => {
+        throw new Error("Should return for agent judgment");
+      },
+    });
+    expect(result).toMatchObject({ ready: false, reason: "action_required" });
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(before);
+  });
+  it("refuses local source changes during remote observation and stale batch inputs", () => {
+    const { dir, git, task } = repository();
+    task.state = "done";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    let reads = 0;
+    expect(() =>
+      run({ "check-pr": "7" }, dir, {
+        fetchPr: () => {
+          if (++reads === 2) {
+            writeFileSync(path.join(dir, "changed.txt"), "new head");
+            git("add", ".");
+            git("-c", "core.hooksPath=/dev/null", "commit", "-m", "concurrent change");
+          }
+          return delivery(task);
+        },
+        fetchFindings: () => completeFindings,
+      }),
+    ).toThrow("Local revision changed");
+    task.state = "execute";
+    expect(() => runRequiredVerification(task, dir, () => ({ status: 0 }))).toThrow(
+      "Revision changed",
+    );
+  });
+
+  it.each(["aftercare", "done"])("observes delivery in %s without rewriting the task", (state) => {
+    const { dir, task } = repository();
+    task.state = state;
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const original = readFileSync(taskPath(dir), "utf8");
+    const pr = delivery(task, {
+      statusCheckRollup: [
+        {
+          name: "Agent harness",
+          status: "COMPLETED",
+          conclusion: "FAILURE",
+          startedAt: "2026-01-01",
+        },
+        {
+          name: "Agent harness",
+          status: "COMPLETED",
+          conclusion: "SUCCESS",
+          startedAt: "2026-01-02",
+        },
+      ],
+    });
+    let reads = 0;
+    const result = run(parseArguments(["--check-pr", "7"]), dir, {
+      fetchPr: () => {
+        reads++;
+        return pr;
+      },
+      fetchFindings: () => completeFindings,
+    });
+    expect(result).toMatchObject({ state, ready: true, head: task.head, unhandledFindings: 0 });
+    expect(reads).toBe(2);
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
+  });
+
+  it.each([
+    { pagesComplete: false, unhandledCount: 0, unresolvedThreadCount: 0 },
+    { ...completeFindings, unhandledCount: 1 },
+    { ...completeFindings, unresolvedThreadCount: 1 },
+  ])("refuses incomplete or open findings without changing DONE", (findings) => {
+    const { dir, task } = repository();
+    task.state = "done";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const original = readFileSync(taskPath(dir), "utf8");
+    expect(() =>
+      run({ "check-pr": "7" }, dir, {
+        fetchPr: () => delivery(task),
+        fetchFindings: () => findings,
+      }),
+    ).toThrow("Unhandled or incompletely collected");
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
+  });
+
+  it("refuses changed HEAD/base, pending checks and revoked approval during observation", () => {
+    const { dir, task } = repository();
+    task.state = "done";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    for (const overrides of [
+      { headRefOid: "e".repeat(40) },
+      { baseRefOid: "e".repeat(40) },
+      { reviewDecision: "CHANGES_REQUESTED" },
+      { statusCheckRollup: [{ name: "Agent harness", status: "IN_PROGRESS" }] },
+    ])
+      expect(() =>
+        run({ "check-pr": "7" }, dir, {
+          fetchPr: () => delivery(task, overrides),
+          fetchFindings: () => completeFindings,
+        }),
+      ).toThrow();
+    let reads = 0;
+    expect(() =>
+      run({ "check-pr": "7" }, dir, {
+        fetchPr: () => delivery(task, ++reads === 1 ? {} : { baseRefOid: "e".repeat(40) }),
+        fetchFindings: () => completeFindings,
+      }),
+    ).toThrow("PR HEAD/base changed");
+  });
+
+  it("watches DONE without recording readiness into the task or repeating unchanged events", () => {
+    const { dir, task } = repository();
+    task.state = "done";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const original = readFileSync(taskPath(dir), "utf8");
+    let reads = 0;
+    let clock = 0;
+    const result = run({ "check-pr": "7", "watch-aftercare": true }, dir, {
+      fetchPr: () =>
+        delivery(
+          task,
+          ++reads < 3
+            ? {
+                statusCheckRollup: [{ name: "Agent harness", status: "IN_PROGRESS" }],
+              }
+            : {},
+        ),
+      fetchFindings: () => completeFindings,
+      now: () => clock,
+      sleep: () => {
+        clock += 1000;
+      },
+    });
+    expect(result.ready).toBe(true);
+    expect(result.watch).toHaveLength(2);
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
+  });
+
+  it("skips identical PR bodies and preserves prose and literal replacement characters", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    task.spec.assumptions.push("Literal $& and $` are data");
+    refreshTask(task, dir);
+    saveTask(task, dir);
+    const original = `Human Request\n\n${stateBlock(task)}\n\nUpdate history`;
+    const writes = [];
+    const gh = (args) => {
+      if (args[1] === "view")
+        return JSON.stringify({ body: original, headRefOid: task.head, baseRefOid: task.baseHead });
+      writes.push(readFileSync(args.at(-1), "utf8"));
+      return "";
+    };
+    expect(run({ "sync-pr": "7" }, dir, { gh }).synced).toBe(false);
+    expect(writes).toEqual([]);
+    task.spec.assumptions.push("New assumption");
+    saveTask(task, dir);
+    expect(run({ "sync-pr": "7" }, dir, { gh }).synced).toBe(true);
+    expect(writes[0]).toMatch(/^Human Request/);
+    expect(writes[0]).toMatch(/Update history$/);
+    expect(parseStateBlock(writes[0]).spec.assumptions).toContain("Literal $& and $` are data");
+  });
+
+  it("runs missing required verification serially and retains completed evidence on failure", () => {
+    const { dir, task } = repository();
+    task.assessment.verification = {
+      process: true,
+      lint: true,
+      unit: true,
+      build: true,
+      e2e: true,
+    };
+    task.configuration.profile.verification = "thorough";
+    const kinds = [];
+    expect(() =>
+      runRequiredVerification(task, dir, (command) => {
+        const kind =
+          command.includes("lint") || command.includes("format:check")
+            ? "lint"
+            : command.includes("vitest")
+              ? "unit"
+              : "other";
+        kinds.push(kind);
+        if (kind === "unit") {
+          expect(loadTask(dir).verification.lint.success).toBe(true);
+          return { status: 1 };
+        }
+        return { status: 0 };
+      }),
+    ).toThrow("Verification failed: unit");
+    expect(kinds).toEqual(["lint", "lint", "unit"]);
+    expect(loadTask(dir).verification.lint.success).toBe(true);
+    expect(loadTask(dir).verification.build).toBeUndefined();
+    expect(loadTask(dir).lastFailure.kind).toBe("unit");
+    runRequiredVerification(loadTask(dir), dir, () => ({ status: 0 }));
+    expect(Object.keys(loadTask(dir).verification)).toEqual(["process", "lint", "unit", "build"]);
+    expect(loadTask(dir).verification.unit.run.scope).toBe("full");
+  });
+
+  it("creates an incremental packet with prior AC evidence and available full context", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "old-feature.txt"), "original\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    const prior = git("rev-parse", "HEAD");
+    task.history.push({
+      event: "review_recorded",
+      state: "review",
+      head: prior,
+      baseHead: task.baseHead,
+      reviewer: "previous",
+      acceptanceCriteria: [{ id: "AC1", evidence: "Previous verified behavior" }],
+      findings: [{ id: "F1", status: "open", evidence: "Correction needed" }],
+    });
+    task.findings = task.history.at(-1).findings;
+    writeFileSync(path.join(dir, "fix.txt"), "correction\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "fix");
+    refreshTask(task, dir);
+    task.state = "review";
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-delta-"));
+    dirs.push(parent);
+    const out = path.join(parent, "packet");
+    buildReviewPacket(task, out, dir, { deltaFrom: prior });
+    const packet = JSON.parse(readFileSync(path.join(out, "packet.json"), "utf8"));
+    expect(packet.changedPaths).toEqual(["fix.txt"]);
+    expect(packet.allChangedPaths).toEqual(["fix.txt", "old-feature.txt"]);
+    expect(packet.priorFindings[0].id).toBe("F1");
+    expect(readFileSync(path.join(out, "diff.patch"), "utf8")).not.toContain("old-feature.txt");
+    expect(readFileSync(path.join(out, "full-diff.patch"), "utf8")).toContain("old-feature.txt");
+    expect(
+      JSON.parse(readFileSync(path.join(out, "previous-review.json"), "utf8")).acceptanceCriteria[0]
+        .evidence,
+    ).toContain("Previous");
+    expect(JSON.parse(readFileSync(path.join(out, "review-template.json"), "utf8")).deltaFrom).toBe(
+      prior,
+    );
+    for (const invalid of [task.head, "f".repeat(40), "bad-sha"])
+      expect(() =>
+        buildReviewPacket(task, path.join(parent, "invalid"), dir, { deltaFrom: invalid }),
+      ).toThrow("deltaFrom");
+    const previous = task.history.find((entry) => entry.event === "review_recorded");
+    previous.baseHead = "f".repeat(40);
+    expect(() =>
+      buildReviewPacket(task, path.join(parent, "invalid"), dir, { deltaFrom: prior }),
+    ).toThrow("base changed");
+    previous.baseHead = task.baseHead;
+    const acs = previous.acceptanceCriteria;
+    delete previous.acceptanceCriteria;
+    expect(() =>
+      buildReviewPacket(task, path.join(parent, "invalid"), dir, { deltaFrom: prior }),
+    ).toThrow("AC evidence");
+    for (const invalid of [
+      [],
+      [{ id: "AC1", evidence: " " }],
+      [{ id: "unknown", evidence: "ok" }],
+    ]) {
+      previous.acceptanceCriteria = invalid;
+      expect(() =>
+        buildReviewPacket(task, path.join(parent, "invalid"), dir, { deltaFrom: prior }),
+      ).toThrow("AC evidence");
+    }
+    previous.acceptanceCriteria = acs;
+    const unrelated = git("commit-tree", `${prior}^{tree}`, "-m", "unrelated root");
+    previous.head = unrelated;
+    expect(() =>
+      buildReviewPacket(task, path.join(parent, "invalid"), dir, { deltaFrom: unrelated }),
+    ).toThrow("ancestor");
+  });
   it("rechecks GitHub at DONE and discards cached success when that recheck fails", () => {
     const { dir, task } = repository();
     task.state = "aftercare";
@@ -100,6 +397,49 @@ describe("persistent task gates", () => {
     expect(called).toBe(true);
     expect(loadTask(dir).aftercare).toBeNull();
     expect(loadTask(dir).state).toBe("aftercare");
+  });
+  it("executes read-only observation and no-op sync through the real CLI", () => {
+    const { dir, task } = repository();
+    task.state = "done";
+    task.review = reviewFixture(task);
+    refreshTask(task, dir);
+    saveTask(task, dir);
+    const before = readFileSync(taskPath(dir), "utf8");
+    const gitDir = path.dirname(taskPath(dir));
+    const bin = path.join(gitDir, "test-bin");
+    mkdirSync(bin);
+    const fixture = path.join(gitDir, "delivery.json");
+    const pr = { ...delivery(task), body: stateBlock(task), findings: completeFindings };
+    writeFileSync(fixture, JSON.stringify(pr));
+    writeFileSync(
+      path.join(bin, "gh"),
+      `#!${process.execPath}\nimport { readFileSync } from 'node:fs';\nif (process.argv[3] !== 'view') process.exit(99);\nconsole.log(readFileSync(process.env.LOOP_TEST_PR_JSON, 'utf8'));\n`,
+      { mode: 0o755 },
+    );
+    // Only the remote response is stubbed; the production CLI/gates run unchanged.
+    writeFileSync(path.join(gitDir, "info", "exclude"), "scripts/collect-pr-findings.mjs\n");
+    writeFileSync(
+      path.join(dir, "scripts", "collect-pr-findings.mjs"),
+      "import { readFileSync } from 'node:fs'; console.log(JSON.stringify(JSON.parse(readFileSync(process.env.LOOP_TEST_PR_JSON, 'utf8')).findings));\n",
+    );
+    const cli = (...args) =>
+      execFileSync(process.execPath, [path.join(root, "scripts/loop-runner.mjs"), ...args], {
+        cwd: dir,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+          LOOP_TEST_PR_JSON: fixture,
+        },
+      });
+    expect(JSON.parse(cli("--check-pr", "7")).ready).toBe(true);
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(before);
+    expect(JSON.parse(cli("--sync-pr", "7")).synced).toBe(false);
+    pr.findings = { ...completeFindings, unhandledCount: 1 };
+    writeFileSync(fixture, JSON.stringify(pr));
+    expect(() => cli("--check-pr", "7")).toThrow(/Unhandled or incompletely collected/);
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(before);
   });
   it("restores an old PR snapshot by invalidating evidence while keeping risk/findings/counters", () => {
     const { dir, git, task } = repository();
@@ -213,7 +553,7 @@ describe("persistent task gates", () => {
       cli("--assessment", assessment);
       // The same evaluation inputs must not trigger re-determination.
       expect(loadTask(checkout).configuration.selection.revisions).toHaveLength(1);
-      cli("--verify", "process");
+      cli("--verify-required");
       cli("--event", "ready");
       const task = loadTask(checkout);
       const report = path.join(parent, "review.json");
@@ -473,7 +813,10 @@ describe("persistent task gates", () => {
     const stale = summarizeTask(task);
     expect(stale.verification.process).toBe("stale");
     expect(stale.missing).toContain("verify:process");
-    expect(stale.next).toContain("node scripts/loop-runner.mjs --verify process");
+    expect(stale.next).toEqual(["node scripts/loop-runner.mjs --verify-required"]);
+    task.assessment.verification = { process: true, lint: true, unit: true, build: true };
+    task.verification = {};
+    expect(summarizeTask(task).next).toEqual(["node scripts/loop-runner.mjs --verify-required"]);
   });
   it("rejects traversal task ids at init and at the artifact sink", () => {
     const { dir, task } = repository();
