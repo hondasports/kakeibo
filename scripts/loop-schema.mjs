@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 // The repository schemas intentionally use this small, explicit JSON Schema subset.
@@ -53,9 +53,17 @@ export function validateSchema(schema, value, location = "$") {
     }
   }
 }
+/**
+ * Schema documents are re-parsed on every validateTask save/load; memoize per
+ * file + mtime so repeated validation in one process skips the read and parse
+ * while an on-disk edit still busts the entry.
+ */
+const schemaCache = new Map();
 export function validateDocument(name, value, root = process.cwd()) {
-  const schema = JSON.parse(
-    readFileSync(path.join(root, ".agent/schema", `${name}.schema.json`), "utf8"),
-  );
-  validateSchema(schema, value);
+  const file = path.join(root, ".agent/schema", `${name}.schema.json`);
+  const stamp = statSync(file).mtimeMs;
+  const hit = schemaCache.get(file);
+  if (!hit || hit.stamp !== stamp)
+    schemaCache.set(file, { stamp, schema: JSON.parse(readFileSync(file, "utf8")) });
+  validateSchema(schemaCache.get(file).schema, value);
 }
