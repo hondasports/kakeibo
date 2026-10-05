@@ -1571,6 +1571,34 @@ describe("increment reuse and loop ergonomics", () => {
     expect(readChangedPathsRevisioned(dir, baseHead, h2)).toEqual(["src/a.ts", "src/b.ts"]);
     expect(readChangedPathsRevisioned(dir, baseHead, h1)).toEqual(["src/a.ts"]);
   });
+  it("invalidates verification when the base ref advances to include head", () => {
+    const { dir, git, task } = repository();
+    mkdirSync(path.join(dir, "src"), { recursive: true });
+    writeFileSync(path.join(dir, "src/a.ts"), "export {};\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feat");
+    task.head = git("rev-parse", "HEAD");
+    runVerification(task, "process", dir, () => ({ status: 0 }));
+    expect(task.verification.process.appliesTo.patchSha256).toBeTruthy();
+    saveTask(task, dir);
+    // preview fast-forwards to head: the live feature patch becomes empty,
+    // so the recorded fingerprint no longer matches and evidence invalidates.
+    git("switch", "preview");
+    git("merge", "--ff-only", "codex/task");
+    git("switch", "codex/task");
+    const refreshed = refreshTask(loadTask(dir), dir);
+    expect(refreshed.verification.process).toBeUndefined();
+  });
+  it("returns a null patch fingerprint for a base with no merge-base", () => {
+    const { dir, git, task } = repository();
+    const head = git("rev-parse", "HEAD");
+    // An unrelated root commit shares no history with head.
+    git("switch", "--orphan", "orphan-root");
+    git("-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-m", "unrelated root");
+    const orphan = git("rev-parse", "HEAD");
+    git("switch", "codex/task");
+    expect(featurePatchSha256(task, dir, head, {}, orphan)).toBeNull();
+  });
   it("extends non-process evidence through metadata-only increments", () => {
     const { dir, git, task } = repository();
     runVerification(task, "process", dir, () => ({ status: 0 }));

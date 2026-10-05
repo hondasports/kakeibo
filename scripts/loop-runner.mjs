@@ -153,11 +153,20 @@ function invalidate(task) {
  * value; misses and nulls both memoize (null stays fail-closed).
  */
 const patchSha256Cache = new Map();
-export function featurePatchSha256(task, root, head = task.head, services = {}) {
+export function featurePatchSha256(
+  task,
+  root,
+  head = task.head,
+  services = {},
+  base = task.baseHead ?? task.baseRef,
+) {
   const run = services.git ?? git;
-  // Key and diff on the recorded resolved base (baseHead), not the baseRef
-  // name, so a moved ref can never alias a stale entry.
-  const base = task.baseHead ?? task.baseRef;
+  // Key and diff on a resolved base (baseHead), not the baseRef name, so a
+  // moved ref can never alias a stale entry. Callers that just resolved a
+  // fresh base pass it explicitly: during invalidateRevision task.baseHead
+  // still holds the *previous* recorded base, and a non-forward base move
+  // must recompute against the live position (missing merge-base → null →
+  // fail-closed invalidation).
   const key = `${path.resolve(root)}${base}${head}`;
   if (patchSha256Cache.has(key)) return patchSha256Cache.get(key);
   let value = null;
@@ -271,7 +280,7 @@ const lintInvisiblePath = (p) =>
   p.endsWith(".md") || HUSKY_HOOK_NAMES.has(p.slice(".husky/".length));
 
 function invalidateRevision(task, root, head, baseHead) {
-  const patchSha256 = featurePatchSha256(task, root, head);
+  const patchSha256 = featurePatchSha256(task, root, head, {}, baseHead);
   let headTree = null;
   try {
     headTree = git(["rev-parse", `${head}^{tree}`], root);
