@@ -37,6 +37,10 @@ import {
   watchAftercare,
   featurePatchSha256,
   readChangedPathsRevisioned,
+  aftercareFetchers,
+  collectFindingsArgs,
+  repositorySlugFromRemoteUrl,
+  resolveRepositorySlug,
   compactTaskForExport,
   hydrateExportedTask,
   acceptanceCriteriaHash,
@@ -1754,6 +1758,129 @@ describe("persistent task gates", () => {
       state: null,
       head: null,
     });
+  });
+  it("reuses the ready poll's fetches, adding only one aftercare PR read", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    let prReads = 0;
+    let findingReads = 0;
+    const result = watchAftercare(task, 7, dir, {
+      fetchPr: () => {
+        prReads += 1;
+        return delivery(task);
+      },
+      fetchFindings: () => {
+        findingReads += 1;
+        return completeFindings;
+      },
+      sleep: () => {
+        throw new Error("ready on the first poll must not wait");
+      },
+    });
+    expect(result.ready).toBe(true);
+    // 1 poll fetch + 1 TOCTOU after-fetch; findings come from the same poll.
+    expect(prReads).toBe(2);
+    expect(findingReads).toBe(1);
+    expect(result.task.aftercare.ready).toBe(true);
+  });
+  it("keeps the TOCTOU check on the reused before/final fetch pair", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const polls = [
+      delivery(task),
+      delivery(task, { headRefOid: "f".repeat(40) }), // head moves after the poll
+    ];
+    expect(() =>
+      watchAftercare(task, 7, dir, {
+        fetchPr: () => polls.shift(),
+        fetchFindings: () => completeFindings,
+        sleep: () => {},
+      }),
+    ).toThrow("PR HEAD/base changed");
+  });
+  it("skips prefetched before/findings calls in inspectPullRequest", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const before = delivery(task);
+    let prReads = 0;
+    let findingReads = 0;
+    const { evidence } = inspectPullRequest(task, "7", undefined, dir, {
+      before,
+      findings: completeFindings,
+      fetchPr: () => {
+        prReads += 1;
+        return delivery(task);
+      },
+      fetchFindings: () => {
+        findingReads += 1;
+        return completeFindings;
+      },
+    });
+    expect(evidence.ready).toBe(true);
+    expect(prReads).toBe(1); // only the after fetch
+    expect(findingReads).toBe(0);
+  });
+  it("resolves the repository slug from the remote URL before gh, memoized per watch", () => {
+    const { dir } = repository();
+    expect(repositorySlugFromRemoteUrl("git@github.com:hondasports/kakeibo.git")).toBe(
+      "hondasports/kakeibo",
+    );
+    expect(repositorySlugFromRemoteUrl("https://github.com/hondasports/kakeibo.git")).toBe(
+      "hondasports/kakeibo",
+    );
+    expect(repositorySlugFromRemoteUrl("https://github.com/hondasports/kakeibo/")).toBe(
+      "hondasports/kakeibo",
+    );
+    expect(repositorySlugFromRemoteUrl("not a url")).toBeNull();
+    expect(repositorySlugFromRemoteUrl(null)).toBeNull();
+    // Remote parses locally: no gh fallback is consulted.
+    expect(
+      resolveRepositorySlug(dir, {
+        remoteUrl: "git@github.com:hondasports/kakeibo.git",
+        repoView: () => {
+          throw new Error("gh repo view must not run when the remote parses");
+        },
+      }),
+    ).toBe("hondasports/kakeibo");
+    // Unparseable remote falls back to a single gh repo view.
+    const parsed = { owner: { login: "hondasports" }, name: "kakeibo" };
+    expect(resolveRepositorySlug(dir, { remoteUrl: null, repoView: () => parsed })).toBe(
+      "hondasports/kakeibo",
+    );
+    // Total failure resolves to null so collect-pr-findings keeps its own fallback.
+    expect(
+      resolveRepositorySlug(dir, {
+        remoteUrl: null,
+        repoView: () => {
+          throw new Error("offline");
+        },
+      }),
+    ).toBeNull();
+    // fetchFindings resolves once across polls and always forwards --repo.
+    let resolutions = 0;
+    const argv = [];
+    const { fetchFindings } = aftercareFetchers(7, "/tmp/handled", dir, {
+      resolveRepo: () => {
+        resolutions += 1;
+        return "hondasports/kakeibo";
+      },
+      exec: (_bin, args) => {
+        argv.push(args);
+        return "{}";
+      },
+    });
+    fetchFindings();
+    fetchFindings();
+    expect(resolutions).toBe(1);
+    expect(argv[0]).toEqual(collectFindingsArgs(7, "/tmp/handled", "hondasports/kakeibo"));
+    expect(argv[0]).toContain("--repo");
+    expect(argv[1]).toEqual(argv[0]);
   });
 });
 

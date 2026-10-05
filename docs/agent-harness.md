@@ -171,7 +171,7 @@ node scripts/loop-runner.mjs --check-pr 123 --handled /tmp/handled.txt --watch-a
 
 check-prの監視は同じ状態変化イベントを使うが、taskのaftercare証跡やhistoryを更新しない。監視回数は観測用metricsへ残る。未処理指摘・未解決thread・新しい失敗・承認待ち・revision変更では `ready: false, reason: action_required` で即座にAgentへ戻す。同名の新しいcheckがpendingの間は、旧失敗だけで待機を中断しない。待機上限では `ready: false` を返し、完了扱いしない。DONE本文の同期後はこの経路で再確認し、観測のたびに本文同期や状態遷移を繰り返さない。handled記録はローカルの観測補助であり、別SessionではPR状態を復元した後に最新コメントを取得・再確認して作成する。復元用Spec・Risk・finding・検証・レビュー記録は従来どおり本文の状態ブロックへ保存する。
 
-CI完了を待つ場合は `--watch-aftercare` を付けてpollできる。初回snapshotは `changed:false` のeventとして必ず返し、以後は状態変化時だけ差分eventを返す（`changed:true`・ready・変化したスカラー値・`added`/`removed` のpending/failed一覧・消えたキー名の `removedKeys`。変化なしの項目は出さない）。結果の `watch.last` に最終snapshot全体を1つ含めるので差分から状態を復元する必要はない。変化のないpollは何も出力しない。間隔は `--interval-seconds`（既定60秒）、上限は内部deadline（既定15分）。readyになった時点で通常のaftercare証跡を記録する。
+CI完了を待つ場合は `--watch-aftercare` を付けてpollできる。初回snapshotは `changed:false` のeventとして必ず返し、以後は状態変化時だけ差分eventを返す（`changed:true`・ready・変化したスカラー値・`added`/`removed` のpending/failed一覧・消えたキー名の `removedKeys`。変化なしの項目は出さない）。結果の `watch.last` に最終snapshot全体を1つ含めるので差分から状態を復元する必要はない。変化のないpollは何も出力しない。間隔は `--interval-seconds`（既定60秒）、上限は内部deadline（既定15分）。readyになった時点で通常のaftercare証跡を記録する。ready検知pollで取ったPR・findingsはaftercare証跡側のbeforeとして再利用し、追加の取得は照合用の `after` 1回だけにする（PR計2回・findings計1回）。before/afterのheadRefOid・baseRefName一致チェックは従来どおり行う。findings収集のowner/repoはremote URLから1回だけ解決して `--repo` で渡し、解決できない場合だけ `gh repo view` 1回にフォールバックする。
 
 ```bash
 node scripts/loop-runner.mjs --aftercare 123 --watch-aftercare --interval-seconds 30

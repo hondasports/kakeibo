@@ -966,17 +966,64 @@ const gh = (args, root) =>
   execFileSync("gh", args, { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
 const AFTERCARE_PR_FIELDS =
   "number,state,isDraft,headRefOid,baseRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup";
-function aftercareFetchers(pr, handled, root) {
+/** owner/name slug parsed from a git remote URL (ssh or https); null when it does not match. */
+export function repositorySlugFromRemoteUrl(url) {
+  const match = /[:/]([^/:]+)\/([^/]+?)(?:\.git)?\/?\s*$/.exec(url ?? "");
+  return match ? `${match[1]}/${match[2]}` : null;
+}
+/**
+ * Resolve the GitHub repository slug once per fetcher set: the origin remote
+ * URL is parsed locally, and `gh repo view` is the single fallback. A null
+ * result keeps collect-pr-findings' own per-call resolution as before.
+ */
+export function resolveRepositorySlug(root, services = {}) {
+  const remoteUrl =
+    services.remoteUrl ??
+    (() => {
+      try {
+        if (!git(["remote"], root).split("\n").includes("origin")) return null;
+        return git(["remote", "get-url", "origin"], root).trim();
+      } catch {
+        return null;
+      }
+    })();
+  const slug = repositorySlugFromRemoteUrl(remoteUrl);
+  if (slug) return slug;
+  try {
+    const parsed =
+      services.repoView?.() ?? JSON.parse(gh(["repo", "view", "--json", "owner,name"], root));
+    return parsed?.owner?.login && parsed?.name ? `${parsed.owner.login}/${parsed.name}` : null;
+  } catch {
+    return null;
+  }
+}
+/** argv for the collect-pr-findings child process, including the deduplicated --repo. */
+export function collectFindingsArgs(pr, handled, repoSlug) {
+  const args = ["scripts/collect-pr-findings.mjs", "--pr", String(pr)];
+  if (repoSlug) args.push("--repo", repoSlug);
+  if (handled) args.push("--handled", handled);
+  return args;
+}
+export function aftercareFetchers(pr, handled, root, services = {}) {
+  // Lazy so injected fetchers never trigger a resolution, and memoized so a
+  // single watch resolves the repository at most once (usually zero gh calls:
+  // the origin remote URL parses locally, otherwise one `gh repo view`).
+  let repoSlug;
+  const slug = () => {
+    if (repoSlug === undefined)
+      repoSlug = services.resolveRepo
+        ? services.resolveRepo()
+        : resolveRepositorySlug(root, services);
+    return repoSlug;
+  };
   return {
     fetchPr: () => JSON.parse(gh(["pr", "view", String(pr), "--json", AFTERCARE_PR_FIELDS], root)),
     fetchFindings: () => {
-      const args = ["scripts/collect-pr-findings.mjs", "--pr", String(pr)];
-      if (handled) args.push("--handled", handled);
-      const raw = execFileSync(process.execPath, args, {
-        cwd: root,
-        encoding: "utf8",
-        maxBuffer: 10 * 1024 * 1024,
-      });
+      const raw = (services.exec ?? execFileSync)(
+        process.execPath,
+        collectFindingsArgs(pr, handled, slug()),
+        { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 },
+      );
       return JSON.parse(raw.slice(raw.indexOf("{")));
     },
   };
@@ -1098,6 +1145,7 @@ export function watchAftercare(
   const defaults = aftercareFetchers(pr, handled, root);
   const pollPr = fetchPr ?? defaults.fetchPr;
   const pollFindings = fetchFindings ?? defaults.fetchFindings;
+  let lastPoll = null;
   const recordAftercare =
     record ??
     (readOnly
@@ -1105,6 +1153,8 @@ export function watchAftercare(
           inspectPullRequest(t, pr, handled, root, {
             fetchPr: pollPr,
             fetchFindings: pollFindings,
+            before: lastPoll?.prFields,
+            findings: lastPoll?.findings,
           });
           return t;
         }
@@ -1112,6 +1162,8 @@ export function watchAftercare(
           githubAftercare(t, pr, handled, root, {
             fetchPr: pollPr,
             fetchFindings: pollFindings,
+            before: lastPoll?.prFields,
+            findings: lastPoll?.findings,
           }));
   const events = [];
   const deadline = tick() + maxSeconds * 1000;
@@ -1122,7 +1174,10 @@ export function watchAftercare(
     polls += 1;
     let snapshot;
     try {
-      snapshot = aftercareSnapshot(pollPr(), task, pollFindings(), pr);
+      const prFields = pollPr();
+      const findings = pollFindings();
+      lastPoll = { prFields, findings };
+      snapshot = aftercareSnapshot(prFields, task, findings, pr);
     } catch (error) {
       // A transient fetch failure is a poll event, not a watch failure.
       snapshot = { pr, ready: false, error: String(error?.message ?? error) };
@@ -1170,11 +1225,13 @@ export function githubAftercare(task, pr, handled, root, services = {}) {
 /** Live delivery observation: remote reads only, no task or PR writes. */
 export function inspectPullRequest(task, pr, handled, root, services = {}) {
   task = currentCheckpointTask(task, root);
-  const defaults = aftercareFetchers(pr, handled, root);
+  const defaults = aftercareFetchers(pr, handled, root, services);
   const fetchPr = services.fetchPr ?? defaults.fetchPr;
   const fetchFindings = services.fetchFindings ?? defaults.fetchFindings;
-  const before = fetchPr();
-  const findings = fetchFindings();
+  // A watch that already polled may pass its `before`/`findings` so the only
+  // extra fetch on the ready path is the single `after` fetchPr (TOCTOU check).
+  const before = services.before ?? fetchPr();
+  const findings = services.findings ?? fetchFindings();
   const evidence = checkAftercare(before, task, findings);
   const after = fetchPr();
   checkAftercare(after, task, findings);
