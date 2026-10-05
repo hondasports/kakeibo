@@ -192,8 +192,10 @@ describe("agent metrics aggregation", () => {
         exit: 0,
       },
       { taskId: "t1", action: "cli_output", outputBytes: 20, exit: 1 },
+      // Malformed/hand-edited line without a size must not drag the average down.
+      { taskId: "t1", action: "cli_output", command: "status", exit: 0 },
     ]);
-    expect(result.actions.cli_output.count).toBe(5);
+    expect(result.actions.cli_output.count).toBe(6);
     expect(result.actions.cli_output.byCommand.status).toEqual({
       count: 2,
       outputBytes: { total: 1200, avg: 600, max: 800 },
