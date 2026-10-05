@@ -1394,29 +1394,39 @@ export function restoreTask(pr, root) {
   saveTask(task, root);
   return task;
 }
+const CLI_ACTION_KEYS = [
+  "init",
+  "spec",
+  "assessment",
+  "verify",
+  "verify-required",
+  "review",
+  "aftercare",
+  "check-pr",
+  "event",
+  "restore-pr",
+  "sync-pr",
+  "export",
+  "export-file",
+  "review-packet",
+  "status",
+  "explain",
+  "artifacts",
+  "assert-started",
+  "friction-note",
+  "record-usage",
+];
+/**
+ * Name reported in `cli_output` metrics. Watch runs are tagged separately so
+ * their larger output can be compared against non-watch commands.
+ */
+export function cliCommandName(args) {
+  const action = CLI_ACTION_KEYS.find((key) => args[key]);
+  if (!action) return "none";
+  return args["watch-aftercare"] ? `${action}+watch-aftercare` : action;
+}
 export function run(args, root = process.cwd(), services = {}) {
-  const actions = [
-    "init",
-    "spec",
-    "assessment",
-    "verify",
-    "verify-required",
-    "review",
-    "aftercare",
-    "check-pr",
-    "event",
-    "restore-pr",
-    "sync-pr",
-    "export",
-    "export-file",
-    "review-packet",
-    "status",
-    "explain",
-    "artifacts",
-    "assert-started",
-    "friction-note",
-    "record-usage",
-  ].filter((key) => args[key]);
+  const actions = CLI_ACTION_KEYS.filter((key) => args[key]);
   requireValue(actions.length <= 1, "Run one task action at a time");
   requireValue(
     !args["watch-aftercare"] || args.aftercare || args["check-pr"],
@@ -1668,16 +1678,49 @@ export function run(args, root = process.cwd(), services = {}) {
   }
   return task;
 }
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+/**
+ * Record the byte size of what a CLI run emitted so the effect of
+ * output-shrinking work is measurable per command. The task may be absent
+ * (pre-init or early failures) — recordMetric accepts null and stays
+ * best-effort, never affecting output or exit codes.
+ */
+const recordCliOutput = (root, command, output, exit) => {
+  let task = null;
   try {
-    const result = run(parseArguments(process.argv.slice(2)));
-    console.log(
+    task = loadTask(root);
+  } catch {
+    task = null;
+  }
+  recordMetric(task, root, {
+    action: "cli_output",
+    command,
+    outputBytes: Buffer.byteLength(output),
+    exit,
+  });
+};
+export function cliMain(
+  argv,
+  { root = process.cwd(), log = console.log, errorLog = console.error } = {},
+) {
+  let command = "unknown";
+  try {
+    const args = parseArguments(argv);
+    command = cliCommandName(args);
+    const result = run(args, root);
+    const output =
       typeof result === "string"
         ? result
-        : JSON.stringify(result.version === 2 ? summarizeTask(result) : result, null, 2),
-    );
+        : JSON.stringify(result.version === 2 ? summarizeTask(result) : result, null, 2);
+    log(output);
+    recordCliOutput(root, command, output, 0);
+    return 0;
   } catch (error) {
-    console.error(error.message);
-    process.exitCode = 1;
+    const output = error?.message ?? String(error);
+    errorLog(output);
+    recordCliOutput(root, command, output, 1);
+    return 1;
   }
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  process.exitCode = cliMain(process.argv.slice(2));
 }

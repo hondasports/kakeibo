@@ -137,7 +137,7 @@ node scripts/loop-runner.mjs --export-file /tmp/agent-state.md
 
 `--sync-pr` は同期後の本文が既存本文と完全一致する場合、GitHub editを行わず `synced: false` を返す。更新時は `synced: true`。Human Requestや更新履歴は保持する。頻繁なCI観測やbot確認日時だけを本文へ追記せず、復元用の状態が変わる節目で同期する。
 
-観測用のmetricsは `git rev-parse --git-common-dir` 配下の `agent-metrics.jsonl` へ1行JSONで追記する。verify（kind・durationMs・result・scope・artifactBytes・失敗signature）、revision_changed（reused/invalidated件数・assessmentCarried）、transition、aftercare、watch_aftercare（poll回数）、review_packet（scope）、friction_note（本文先頭500文字）、usage（後述）を記録する。common dir配下なのでlinked worktreeを跨いで集計でき、worktreeは汚れない。追記はbest-effortであり、失敗しても本処理を止めない。環境変数 `AGENT_METRICS_FILE` で出力先を上書きでき、Vitest実行中（`VITEST` 設定時）に上書きがなければ記録しない。テストが実リポジトリの集計を汚さないためである。
+観測用のmetricsは `git rev-parse --git-common-dir` 配下の `agent-metrics.jsonl` へ1行JSONで追記する。verify（kind・durationMs・result・scope・artifactBytes・失敗signature）、revision_changed（reused/invalidated件数・assessmentCarried）、transition、aftercare、watch_aftercare（poll回数）、review_packet（scope）、friction_note（本文先頭500文字）、usage（後述）を記録する。加えて、CLIがAgentへ返したstdout/stderrのバイト数を `cli_output`（command・outputBytes・exit）として記録する。出力本文は記録せず、`--watch-aftercare` 付きの実行はcommandへ `+watch-aftercare` を付記して区別する。taskが読めない実行（init前や早期失敗）はtask=nullで記録する。common dir配下なのでlinked worktreeを跨いで集計でき、worktreeは汚れない。追記はbest-effortであり、失敗しても本処理を止めない。環境変数 `AGENT_METRICS_FILE` で出力先を上書きでき、Vitest実行中（`VITEST` 設定時）に上書きがなければ記録しない。テストが実リポジトリの集計を汚さないためである。
 
 トークン量はセッションtranscriptから記録する。Claude Codeは `~/.claude/projects/<project>/<session>.jsonl`、Codexは `~/.codex/sessions/**/rollout-*.jsonl` を渡す。Claude Codeはresponse idで重複を除き、Codexは最後の累積値を使う。input（uncached）・cache read・cache write・output・reasoning（outputの内数）・呼び出し数を記録する。taskもPR本文も変更しない観測専用の操作である。独立Reviewerのtranscriptは `--usage-role reviewer` で記録する。
 
@@ -152,7 +152,7 @@ node scripts/loop-metrics.mjs --task issue-123   # タスク別集計
 node scripts/loop-metrics.mjs --path /tmp/other.jsonl
 ```
 
-`loop:metrics` はJSONLを集計し、action別件数・durationMs・verifyのkind別pass/fail・scope別件数・revision_changedのreused/invalidated/assessmentCarried・review_packetのscope別件数・transitionイベント別件数を返す。usageはtranscriptごとの最新記録だけを数え、role別と合計を `usage` に返す。作業中に感じた摩擦は `--friction-note <text>` で `task.frictionNote` へ記録でき、history・metrics・export状態ブロックに残る。ハーネス改善タスクの定性入力として使う。
+`loop:metrics` はJSONLを集計し、action別件数・durationMs・verifyのkind別pass/fail・scope別件数・revision_changedのreused/invalidated/assessmentCarried・review_packetのscope別件数・transitionイベント別件数を返す。cli_outputはcommand別のoutputBytes（合計・平均・最大）を `byCommand` に返す。usageはtranscriptごとの最新記録だけを数え、role別と合計を `usage` に返す。作業中に感じた摩擦は `--friction-note <text>` で `task.frictionNote` へ記録でき、history・metrics・export状態ブロックに残る。ハーネス改善タスクの定性入力として使う。
 
 `Agent harness` CIはMarkdownのみの変更でも動き、実PR HEAD/base・実差分・仕様・検証・レビューを照合する。非bot PRは状態ブロック必須（draft PRではjobごとスキップし、ready化で実行する）。GitHubが認識するdependabot/github-actionsのBot投稿は例外とし、processテストとドキュメントチェックは実行する。既存PRもこのworkflowが走る時点で状態ブロックが必要になる。CIを必須チェックへ登録するbranch protection設定は別途管理者の操作が必要であり、このPRでは権限設定を変更しない。
 

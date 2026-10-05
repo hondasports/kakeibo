@@ -112,6 +112,20 @@ export function aggregateMetrics(entries, { taskId = null } = {}) {
       action.polls = (action.polls ?? 0) + (entry.polls ?? 0);
       if (entry.ready === true) action.ready = (action.ready ?? 0) + 1;
     }
+    if (entry.action === "cli_output") {
+      action.byCommand ??= Object.create(null);
+      const name = typeof entry.command === "string" ? entry.command : "unknown";
+      const command = (action.byCommand[name] ??= {
+        count: 0,
+        outputBytes: { total: 0, avg: 0, max: 0 },
+      });
+      command.count += 1;
+      if (typeof entry.outputBytes === "number") {
+        command.outputBytes.total += entry.outputBytes;
+        command.outputBytes.max = Math.max(command.outputBytes.max, entry.outputBytes);
+      }
+      command.outputBytes.avg = Math.round(command.outputBytes.total / command.count);
+    }
   }
   const usage = aggregateUsage(filtered);
   return {
