@@ -3,8 +3,9 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Shared metrics sink written by recordMetric in loop-runner.mjs. */
-export function metricsLogPath(root = process.cwd()) {
+/** Shared metrics sink written by recordMetric in loop-runner.mjs (AGENT_METRICS_FILE overrides). */
+export function metricsLogPath(root = process.cwd(), env = process.env) {
+  if (env.AGENT_METRICS_FILE) return env.AGENT_METRICS_FILE;
   const commonDir = execFileSync(
     "git",
     ["rev-parse", "--path-format=absolute", "--git-common-dir"],
@@ -38,6 +39,32 @@ const bump = (bucket, key) => {
   bucket[key] = (bucket[key] ?? 0) + 1;
 };
 
+const USAGE_FIELDS = ["calls", "inputUncached", "cacheRead", "cacheWrite", "output", "reasoning"];
+/**
+ * Token usage per role. A transcript grows while its session runs and may be
+ * recorded repeatedly, so only the latest record per (task, source) counts.
+ */
+export function aggregateUsage(entries) {
+  const latest = new Map();
+  for (const entry of entries) {
+    if (entry?.action !== "usage" || typeof entry.source !== "string") continue;
+    latest.set(`${entry.taskId}\0${entry.source}`, entry);
+  }
+  if (latest.size === 0) return null;
+  const sum = () => Object.fromEntries(USAGE_FIELDS.map((field) => [field, 0]));
+  const total = sum();
+  const byRole = Object.create(null);
+  for (const entry of latest.values()) {
+    const role = (byRole[typeof entry.role === "string" ? entry.role : "other"] ??= sum());
+    for (const field of USAGE_FIELDS) {
+      const value = Number.isFinite(entry[field]) ? entry[field] : 0;
+      role[field] += value;
+      total[field] += value;
+    }
+  }
+  return { transcripts: latest.size, total, byRole };
+}
+
 /** Aggregate JSONL entries into per-action counts, durations and totals. */
 export function aggregateMetrics(entries, { taskId = null } = {}) {
   const filtered = taskId ? entries.filter((entry) => entry.taskId === taskId) : entries;
@@ -69,6 +96,12 @@ export function aggregateMetrics(entries, { taskId = null } = {}) {
     if (entry.action === "revision_changed") {
       action.reused = (action.reused ?? 0) + (entry.reused ?? 0);
       action.invalidated = (action.invalidated ?? 0) + (entry.invalidated ?? 0);
+      if (entry.assessmentCarried === true)
+        action.assessmentCarried = (action.assessmentCarried ?? 0) + 1;
+    }
+    if (entry.action === "review_packet" && entry.scope) {
+      action.byScope ??= Object.create(null);
+      bump(action.byScope, entry.scope);
     }
     if (entry.action === "transition") {
       action.events ??= Object.create(null);
@@ -79,10 +112,12 @@ export function aggregateMetrics(entries, { taskId = null } = {}) {
       if (entry.ready === true) action.ready = (action.ready ?? 0) + 1;
     }
   }
+  const usage = aggregateUsage(filtered);
   return {
     entries: filtered.length,
     tasks: [...new Set(filtered.map((entry) => entry.taskId).filter(Boolean))],
     actions,
+    ...(usage ? { usage } : {}),
   };
 }
 

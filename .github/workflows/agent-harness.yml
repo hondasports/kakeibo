@@ -11,6 +11,11 @@ permissions:
 jobs:
   harness:
     name: Agent harness
+    # Draft PRs (opened early so external review runs alongside the internal
+    # review) carry no state block yet. Skipping the whole job makes the check
+    # SKIPPED, which never satisfies aftercare's required SUCCESS; marking the
+    # PR ready (ready_for_review) re-runs the full gate on the same head.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

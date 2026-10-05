@@ -22,8 +22,13 @@
 | 検証 | ~~必要な検証を固定コマンドで実行し、結果を返す~~ | 必須条件を満たす検証計画とartifact-firstの証跡を使う（実装済み） |
 | 証跡の失効 | ~~HEADまたはbaseの更新で一括失効~~ | feature patchと検証対象treeが同一の検証だけ再利用し、その他は失効。さらにmetadata-only増分ではprocess以外の証跡を延長（いずれも実装済み。lintは `.md`+正規hook名のみ延長——詳細は `docs/agent-harness.md`） |
 | 検証の往復 |  | 必須kindの個別実行に加え、`--verify-required` による直列一括実行・成功済み証跡の保持を実装済み |
-| 再レビュー資料 |  | `--delta-from` で増分・前回AC証跡・全体参照を提供（実装済み）。全AC記録とfresh独立レビューを維持 |
+| 再レビュー資料 |  | `--delta-from` で増分・前回AC証跡・全体参照を提供し、条件を満たす記録があれば自動で増分を選ぶ（`--full-review` で全差分）。templateは過去findingを事前記入し、severityを記録できる（実装済み）。全AC記録とfresh独立レビューを維持 |
 | PR同期と観測 |  | 同一本文はwrite省略。`--check-pr` は状態を更新せずAFTERCARE/DONEを確認（実装済み）。観測を本文同期から分離 |
+| 修正ループの回数 |  | 初回REVIEW進入時のdraft PRで外部レビューを前倒しし、内部・外部指摘を同じラウンドへ集約する。draftでは `Agent harness`・E2Eをスキップし、ready化で実行する（実装済み） |
+| unitの重複と待ち時間 |  | local unitはprocess suiteを除外。EXECUTE→REVIEWはaffected unitで可、REVIEW clean以降はfull unit必須で、Reviewerと並行実行できる（実装済み） |
+| 評価の再提出 | ~~revision変更で一律失効~~ | Machine分類が不変なら引き継ぎ、変化時のみ再提出（実装済み） |
+| PR状態ブロック | ~~task全体（history・assessment・ログ末尾を含む）~~ | 復元とPR gateに必要な範囲へ圧縮（直近history＋参照されるreview記録、assessmentは再計算）（実装済み） |
+| 計測 |  | テストは実ログへ書かない（`AGENT_METRICS_FILE`）。transcriptからtoken usageをrole別に記録・集計し、friction本文も残す（実装済み） |
 
 ## 3. 全体の流れ
 

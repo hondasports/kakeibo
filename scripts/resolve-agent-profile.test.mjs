@@ -49,6 +49,14 @@ describe("resolveAgentProfile", () => {
     expect(result.selection).toMatchObject({ selected: "deep", source: "user" });
   });
 
+  it("loads the Claude Code runtime adapter", () => {
+    const result = resolveAgentProfile({ runtime: "claude-code" });
+    expect(result.runtime).toMatchObject({
+      name: "claude-code",
+      instruction_entry: "AGENTS.md",
+      supports_fresh_reviewer_context: true,
+    });
+  });
   it("rejects unknown task profiles and runtimes", () => {
     expect(() => resolveAgentProfile({ profile: "turbo" })).toThrow("unknown profile: turbo");
     expect(() => resolveAgentProfile({ runtime: "nowhere" })).toThrow("unknown runtime: nowhere");

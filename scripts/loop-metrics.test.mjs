@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { aggregateMetrics, parseArguments, readMetricsEntries, run } from "./loop-metrics.mjs";
+import {
+  aggregateMetrics,
+  metricsLogPath,
+  parseArguments,
+  readMetricsEntries,
+  run,
+} from "./loop-metrics.mjs";
 
 const dirs = [];
 afterEach(() => {
@@ -131,5 +137,44 @@ describe("agent metrics aggregation", () => {
     expect(result.actions.verify.byKind["__proto__"].count).toBe(1);
     expect(result.actions.transition.events["__proto__"]).toBe(1);
     expect(Object.prototype.count).toBeUndefined();
+  });
+  it("aggregates token usage per role from the latest record of each transcript", () => {
+    const usage = (source, role, output, calls = 1) => ({
+      taskId: "t",
+      action: "usage",
+      source,
+      role,
+      calls,
+      inputUncached: 1,
+      cacheRead: 10,
+      cacheWrite: 2,
+      output,
+      reasoning: 0,
+    });
+    const result = aggregateMetrics([
+      usage("impl.jsonl", "implementer", 5),
+      usage("impl.jsonl", "implementer", 9, 3),
+      usage("review.jsonl", "reviewer", 4),
+      {
+        taskId: "t",
+        action: "revision_changed",
+        reused: 1,
+        invalidated: 2,
+        assessmentCarried: true,
+      },
+      { taskId: "t", action: "review_packet", files: 5, scope: "increment" },
+    ]);
+    expect(result.usage.transcripts).toBe(2);
+    expect(result.usage.byRole.implementer).toMatchObject({ calls: 3, output: 9 });
+    expect(result.usage.byRole.reviewer).toMatchObject({ calls: 1, output: 4 });
+    expect(result.usage.total).toMatchObject({ calls: 4, output: 13, cacheRead: 20 });
+    expect(result.actions.revision_changed.assessmentCarried).toBe(1);
+    expect(result.actions.review_packet.byScope.increment).toBe(1);
+    expect(aggregateMetrics([{ action: "verify" }]).usage).toBeUndefined();
+  });
+  it("honors AGENT_METRICS_FILE for the default log path", () => {
+    expect(metricsLogPath(process.cwd(), { AGENT_METRICS_FILE: "/x/metrics.jsonl" })).toBe(
+      "/x/metrics.jsonl",
+    );
   });
 });

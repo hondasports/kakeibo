@@ -76,8 +76,12 @@ jobs:
     needs: classify
     # PR コードへ Secrets を渡すため、同一リポジトリの通常 PR に限定する。
     # Dependabot PR は GitHub の仕様で fork 相当として扱われ、Actions Secrets を利用できない。
+    # Draft PRs skip E2E (the shared-dev authenticated queue never cancels, so
+    # every review-fix push would queue a full run); ready_for_review runs it
+    # once on the reviewed head, and aftercare requires both E2E successes.
     if: |
       needs.classify.outputs.runtime_relevant == 'true' &&
+      github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest

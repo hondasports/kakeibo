@@ -4,7 +4,7 @@
 
 ## Startup
 
-repository編集タスクの開始時は `docs/agent-harness.md` の入口手順を実行する。編集前に専用worktreeで `node scripts/loop-runner.mjs --init <spec.json> --task <task-id> --runtime codex --implementer <session-id>` を実行し、出力されたProfileと現在Stateのworkflowを読む。Devinでは `--runtime devin` とする。再開時は引数なしで実行する。プロファイル名・状態を文章で自己申告するだけでは起動完了にならない。
+repository編集タスクの開始時は `docs/agent-harness.md` の「クイックリファレンス」節を読み、入口手順を実行する。編集前に専用worktreeで `node scripts/loop-runner.mjs --init <spec.json> --task <task-id> --runtime <runtime> --implementer <session-id>` を実行する。`<runtime>` はCodexで `codex`、Devinで `devin`、Claude Codeで `claude-code` とする。以後はrunner出力の `workflow`（現在Stateのworkflow）と `next` に従い、操作の詳細が必要な時だけ同文書の該当節を読む。再開時は引数なしで実行する。プロファイル名・状態を文章で自己申告するだけでは起動完了にならない。
 
 ## Core contract
 
@@ -37,7 +37,7 @@ repository編集タスクの開始時は `docs/agent-harness.md` の入口手順
 
 ## Runtime
 
-Codex / DevinなどのRuntime固有設定は `.agent/runtime/`、タスク強度は `.agent/profiles/` に置く。Model名でProfileを増やさない。ProfileはREFINE終了時にタスクの評価（影響範囲・不確実性・検証負荷）から規則で自動判定し、`--profile` の明示指定を最優先する。Core HarnessのRisk Floor・Human Gate・State TransitionはProfileで上書きしない。
+Codex / Devin / Claude CodeなどのRuntime固有設定は `.agent/runtime/`、タスク強度は `.agent/profiles/` に置く。Model名でProfileを増やさない。ProfileはREFINE終了時にタスクの評価（影響範囲・不確実性・検証負荷）から規則で自動判定し、`--profile` の明示指定を最優先する。Core HarnessのRisk Floor・Human Gate・State TransitionはProfileで上書きしない。
 
 軽量化の設計正本は `docs/agent-harness-design.md`。Profile自動判定は実装済みであり、現行操作は `docs/agent-harness.md` に従う。
 

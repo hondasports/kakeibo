@@ -2,6 +2,8 @@
 
 PR作成後のlatest HEADに対してCI・レビュー指摘・承認・競合・mergeabilityを確認し、merge_readyまで進める。
 
+- REVIEWでdraft PRを作っている場合は、`--sync-pr <番号>` で状態ブロックを入れてから `gh pr ready <番号>` でready化する。`ready_for_review` で `Agent harness` とE2Eが実行される。draftのままではready扱いにならない。draft PRがなければここでPRを作る。
+
 - `node scripts/collect-pr-findings.mjs --pr <番号>` で外部findingを収集し、仕様と照合して修正または根拠付きで棄却する。
 - CI失敗は原因を調査して `ci_failure` でEXECUTEへ戻す。
 - 新規findingは `findings` でEXECUTEへ戻す。
