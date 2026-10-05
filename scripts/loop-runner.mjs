@@ -1116,11 +1116,16 @@ function deltaReviewBasis(task, deltaFrom, root) {
 }
 /** Latest reviewed head that qualifies as an incremental-review base, if any. */
 export function autoDeltaFrom(task, root) {
-  const reviewed = [...(task.history ?? [])]
-    .reverse()
-    .find((entry) => entry.event === "review_recorded" && entry.head !== task.head);
-  if (!reviewed) return null;
-  return deltaReviewBasis(task, reviewed.head, root).previousReview ? reviewed.head : null;
+  // Newest qualifying record wins; an ineligible newer one (e.g. a self-review
+  // while independence is required) does not hide an older eligible base.
+  const seen = new Set();
+  for (const entry of [...(task.history ?? [])].reverse()) {
+    if (entry.event !== "review_recorded" || entry.head === task.head || seen.has(entry.head))
+      continue;
+    seen.add(entry.head);
+    if (deltaReviewBasis(task, entry.head, root).previousReview) return entry.head;
+  }
+  return null;
 }
 export function buildReviewPacket(
   task,
@@ -1469,6 +1474,12 @@ export function run(args, root = process.cwd(), services = {}) {
       action: "usage",
       role,
       source: path.basename(args["record-usage"]),
+      // Distinguishes same-named transcripts in different directories without
+      // writing local filesystem layout into the metrics log.
+      sourceId: createHash("sha256")
+        .update(path.resolve(args["record-usage"]))
+        .digest("hex")
+        .slice(0, 16),
       ...usage,
     };
     recordMetric(task, root, entry);

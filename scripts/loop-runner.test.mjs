@@ -2142,6 +2142,10 @@ describe("increment reuse and loop ergonomics", () => {
     task.spec.assumptions = ["A new assumption"];
     expect(autoDeltaFrom(task, dir)).toBeNull();
     task.spec.assumptions = [];
+    // A newer ineligible record does not hide an older eligible base.
+    task.history.push({ ...entry, head: task.baseHead, independent: false });
+    expect(autoDeltaFrom(task, dir)).toBe(prior);
+    task.history.pop();
     // Legacy records without these fields fail closed.
     task.spec.acceptanceCriteria[0].text = "Task works";
     delete entry.acHash;

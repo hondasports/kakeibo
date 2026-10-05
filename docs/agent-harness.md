@@ -113,7 +113,7 @@ node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet
 # dirはworktree外を推奨する（内側だと生成後にtreeが汚れる）
 ```
 
-各 `review_recorded` には、そのレビューが独立・fresh contextだったか、満たしたrisk tier、spec（goal・ACのid/本文・non-goals・assumptions）のfingerprintが記録される。再レビューの `--review-packet <dir>` は、現在HEAD以外で最新のレビュー記録が増分条件（同一base・全ACの証跡あり・現在HEADのancestor・同じspecのfingerprint・現在のrisk以上のtier・現在独立レビューが必要なら独立レビューだったこと）を満たす場合、自動でその記録済みheadからの増分資料を生成する（`reviewScope.selection: "auto"`）。満たさない場合は全差分packetへ戻る。起点を指定する場合は `--delta-from <reviewed-head>`（条件を満たさなければ拒否）、全差分を強制する場合は `--full-review` を使う。両者は併用できない。増分では `diff.patch` と `changedPaths` が起点からの増分となり、`full-diff.patch`・`allChangedPaths` で全体を参照できる。`previous-review.json` は過去のAC証跡とfinding、`priorFindings` は引き継ぐ指摘を含む。雛形の `deltaFrom` も設定される。共有契約や前提が変わった場合、Reviewerは全差分へ範囲を広げる。全ACの記録とRisk Floor・fresh独立レビューは維持する。
+各 `review_recorded` には、そのレビューが独立・fresh contextだったか、満たしたrisk tier、spec（goal・ACのid/本文・non-goals・assumptions）のfingerprintが記録される。再レビューの `--review-packet <dir>` は、現在HEAD以外のレビュー記録を新しい順に調べ、増分条件（同一base・全ACの証跡あり・現在HEADのancestor・同じspecのfingerprint・現在のrisk以上のtier・現在独立レビューが必要なら独立レビューだったこと）を満たす最新の記録があれば、自動でその記録済みheadからの増分資料を生成する（新しい記録が不適格でも、より古い適格な記録を使う）（`reviewScope.selection: "auto"`）。満たさない場合は全差分packetへ戻る。起点を指定する場合は `--delta-from <reviewed-head>`（条件を満たさなければ拒否）、全差分を強制する場合は `--full-review` を使う。両者は併用できない。増分では `diff.patch` と `changedPaths` が起点からの増分となり、`full-diff.patch`・`allChangedPaths` で全体を参照できる。`previous-review.json` は過去のAC証跡とfinding、`priorFindings` は引き継ぐ指摘を含む。雛形の `deltaFrom` も設定される。共有契約や前提が変わった場合、Reviewerは全差分へ範囲を広げる。全ACの記録とRisk Floor・fresh独立レビューは維持する。
 
 ```bash
 node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet-r2   # 自動で増分

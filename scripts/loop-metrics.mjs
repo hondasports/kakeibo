@@ -42,13 +42,14 @@ const bump = (bucket, key) => {
 const USAGE_FIELDS = ["calls", "inputUncached", "cacheRead", "cacheWrite", "output", "reasoning"];
 /**
  * Token usage per role. A transcript grows while its session runs and may be
- * recorded repeatedly, so only the latest record per (task, source) counts.
+ * recorded repeatedly, so only the latest record per (task, transcript) counts;
+ * a transcript is its path-derived sourceId (basename `source` for old records).
  */
 export function aggregateUsage(entries) {
   const latest = new Map();
   for (const entry of entries) {
     if (entry?.action !== "usage" || typeof entry.source !== "string") continue;
-    latest.set(`${entry.taskId}\0${entry.source}`, entry);
+    latest.set(`${entry.taskId}\0${entry.sourceId ?? entry.source}`, entry);
   }
   if (latest.size === 0) return null;
   const sum = () => Object.fromEntries(USAGE_FIELDS.map((field) => [field, 0]));
