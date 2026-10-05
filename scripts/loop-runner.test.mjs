@@ -17,6 +17,8 @@ import YAML from "yaml";
 import {
   parseArguments,
   run,
+  cliMain,
+  cliCommandName,
   restoreTask,
   resolveLoopStep,
   transitionTask,
@@ -934,6 +936,20 @@ describe("persistent task gates", () => {
     // A bare "--" (forwarded verbatim by pnpm run) is skipped, not an option.
     expect(parseArguments(["--", "--export"])).toEqual({ export: true });
   });
+  it("names cli_output commands after the executed action, watch runs tagged", () => {
+    expect(cliCommandName(parseArguments(["--status"]))).toBe("status");
+    expect(cliCommandName(parseArguments(["--export"]))).toBe("export");
+    expect(cliCommandName(parseArguments(["--verify-required"]))).toBe("verify-required");
+    expect(cliCommandName(parseArguments(["--review-packet", "/tmp/p"]))).toBe("review-packet");
+    expect(cliCommandName(parseArguments(["--check-pr", "7"]))).toBe("check-pr");
+    expect(cliCommandName(parseArguments(["--check-pr", "7", "--watch-aftercare"]))).toBe(
+      "check-pr+watch-aftercare",
+    );
+    expect(cliCommandName(parseArguments(["--aftercare", "7", "--watch-aftercare"]))).toBe(
+      "aftercare+watch-aftercare",
+    );
+    expect(cliCommandName(parseArguments([]))).toBe("none");
+  });
   it("accepts --model for backward compatibility without recording it", () => {
     const { git } = repository();
     const parent = mkdtempSync(path.join(tmpdir(), "loop-compat-"));
@@ -1508,6 +1524,80 @@ describe("persistent task gates", () => {
     }
     const revision = readMetrics().at(-1);
     expect(revision).toMatchObject({ action: "revision_changed", reused: 1, invalidated: 0 });
+  });
+  it("records cli_output size for stdout and stderr without changing them", () => {
+    const { dir, task } = repository();
+    saveTask(task, dir);
+    const file = path.join(dir, "cli-metrics.jsonl");
+    const stdout = [];
+    const stderr = [];
+    const io = {
+      root: dir,
+      log: (text) => stdout.push(text),
+      errorLog: (text) => stderr.push(text),
+    };
+    process.env.AGENT_METRICS_FILE = file;
+    try {
+      expect(cliMain(["--status"], io)).toBe(0);
+      // --export is only valid from aftercare — this run must fail on stderr.
+      expect(cliMain(["--export"], io)).toBe(1);
+      // Unknown options fail before the command can be resolved.
+      expect(cliMain(["--magic"], io)).toBe(1);
+    } finally {
+      delete process.env.AGENT_METRICS_FILE;
+    }
+    expect(stdout).toHaveLength(1);
+    expect(stderr).toHaveLength(2);
+    const lines = readFileSync(file, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toMatchObject({
+      action: "cli_output",
+      command: "status",
+      exit: 0,
+      taskId: task.taskId,
+      state: "execute",
+    });
+    expect(lines[0].outputBytes).toBe(Buffer.byteLength(stdout[0]));
+    expect(lines[1]).toMatchObject({ action: "cli_output", command: "export", exit: 1 });
+    expect(lines[1].outputBytes).toBe(Buffer.byteLength(stderr[0]));
+    expect(lines[2]).toMatchObject({ action: "cli_output", command: "unknown", exit: 1 });
+    // No task content is stored — only the size of the emitted output.
+    for (const line of lines) {
+      expect(line.outputBytes).toBeGreaterThan(0);
+      expect(line).not.toHaveProperty("output");
+      expect(line).not.toHaveProperty("body");
+    }
+  });
+  it("records cli_output with a null task when none is initialized", () => {
+    const { dir } = repository();
+    const file = path.join(dir, "cli-metrics-null.jsonl");
+    process.env.AGENT_METRICS_FILE = file;
+    try {
+      expect(
+        cliMain(["--status"], {
+          root: dir,
+          log: () => {},
+          errorLog: () => {},
+        }),
+      ).toBe(1);
+    } finally {
+      delete process.env.AGENT_METRICS_FILE;
+    }
+    const [line] = readFileSync(file, "utf8")
+      .trim()
+      .split("\n")
+      .map((entry) => JSON.parse(entry));
+    expect(line).toMatchObject({
+      action: "cli_output",
+      command: "status",
+      exit: 1,
+      taskId: null,
+      state: null,
+      head: null,
+    });
   });
 });
 

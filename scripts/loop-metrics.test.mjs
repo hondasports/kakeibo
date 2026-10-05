@@ -179,6 +179,39 @@ describe("agent metrics aggregation", () => {
     expect(twins.usage.byRole.reviewer.output).toBe(7);
     expect(aggregateMetrics([{ action: "verify" }]).usage).toBeUndefined();
   });
+  it("aggregates cli_output sizes per command", () => {
+    const result = aggregateMetrics([
+      { taskId: "t1", action: "cli_output", command: "status", outputBytes: 400, exit: 0 },
+      { taskId: "t1", action: "cli_output", command: "status", outputBytes: 800, exit: 0 },
+      { taskId: "t1", action: "cli_output", command: "export", outputBytes: 9500, exit: 0 },
+      {
+        taskId: "t1",
+        action: "cli_output",
+        command: "check-pr+watch-aftercare",
+        outputBytes: 30000,
+        exit: 0,
+      },
+      { taskId: "t1", action: "cli_output", outputBytes: 20, exit: 1 },
+    ]);
+    expect(result.actions.cli_output.count).toBe(5);
+    expect(result.actions.cli_output.byCommand.status).toEqual({
+      count: 2,
+      outputBytes: { total: 1200, avg: 600, max: 800 },
+    });
+    expect(result.actions.cli_output.byCommand.export).toEqual({
+      count: 1,
+      outputBytes: { total: 9500, avg: 9500, max: 9500 },
+    });
+    expect(result.actions.cli_output.byCommand["check-pr+watch-aftercare"].outputBytes).toEqual({
+      total: 30000,
+      avg: 30000,
+      max: 30000,
+    });
+    expect(result.actions.cli_output.byCommand.unknown).toEqual({
+      count: 1,
+      outputBytes: { total: 20, avg: 20, max: 20 },
+    });
+  });
   it("honors AGENT_METRICS_FILE for the default log path", () => {
     expect(metricsLogPath(process.cwd(), { AGENT_METRICS_FILE: "/x/metrics.jsonl" })).toBe(
       "/x/metrics.jsonl",
