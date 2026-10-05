@@ -106,7 +106,7 @@ node scripts/loop-runner.mjs --event clean
 
 Reviewerの本人性や実施内容はAgentが正しく記録する責任を持つ。CLIは担当ID、fresh宣言、HEAD、必須深度、全AC、残存findingを検査する。過去findingは次roundにも同じIDで引き継ぐ。
 
-独立Reviewerへ渡す材料は `--review-packet <dir>` で生成する。packet.json（目的・AC・changedPaths・risk・verification・reuseCandidates）、diff.patch、task-summary.json、verification-manifest.json、review-template.json（validateReview準拠の雛形。過去findingのid・status・severityを事前記入し、evidenceはReviewerが再確認して書く）、contracts/（AGENTS.md・workflow-review.md・required-skills）を書き出す。REVIEW状態かつclean treeが必須で、生成物はcommitしない。reuseCandidatesにはfeature patch fingerprintと再利用済みkindだけを記録し、review証跡は再利用しない。
+独立Reviewerへ渡す材料は `--review-packet <dir>` で生成する。packet.json（目的・AC・changedPaths・risk・reuseCandidates。verificationの要約はtask-summary.jsonを参照）、diff.patch、task-summary.json、verification-manifest.json（Reviewer向けの要約。kindごとに成否・scope・reuseのbasis・末尾ログ・artifact相対パスのみ。run/appliesToフィンガープリントやartifactのsha256・絶対パスは含まない。完全なmanifestは実装担当のworktreeで `--artifacts` を実行して取得する）、review-template.json（validateReview準拠の雛形。過去findingのid・status・severityを事前記入し、evidenceはReviewerが再確認して書く）、contracts/（AGENTS.md・workflow-review.md・required-skills）を書き出す。REVIEW状態かつclean treeが必須で、生成物はcommitしない。reuseCandidatesにはfeature patch fingerprintと再利用済みkindだけを記録し、review証跡は再利用しない。
 
 ```bash
 node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet

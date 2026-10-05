@@ -1322,11 +1322,26 @@ describe("persistent task gates", () => {
     // in a real fresh-context review.
     expect(template._notes.join(" ")).toContain("open|fixed|dismissed");
     expect(readFileSync(path.join(out, "diff.patch"), "utf8")).toContain("feature.txt");
+    // Reviewer-facing manifest: the conclusion (success, scope, reuse basis,
+    // log tail, artifact path) without fingerprints the reviewer never checks.
     const manifest = JSON.parse(readFileSync(path.join(out, "verification-manifest.json"), "utf8"));
-    expect(manifest.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(JSON.parse(readFileSync(path.join(out, "task-summary.json"), "utf8")).state).toBe(
-      "review",
-    );
+    expect(manifest.process).toMatchObject({
+      success: true,
+      scope: "full",
+      reuse: null,
+      artifact: expect.stringContaining("process"),
+    });
+    expect(manifest.process.summary.exitCode).toBe(0);
+    expect(manifest.process.summary.lastLines.length).toBeGreaterThan(0);
+    expect(manifest.process.run).toBeUndefined();
+    expect(manifest.process.appliesTo).toBeUndefined();
+    expect(manifest.process.commands).toBeUndefined();
+    // The summary lives once, in task-summary.json — packet.json points at it.
+    expect(packet.verification).toBe("task-summary.json");
+    expect(JSON.parse(readFileSync(path.join(out, "task-summary.json"), "utf8"))).toMatchObject({
+      state: "review",
+      verification: { process: expect.stringContaining("pass") },
+    });
     expect(existsSync(path.join(out, "contracts", "workflow-review.md"))).toBe(true);
   });
   it("refuses review packets outside review state or with a dirty tree", () => {

@@ -852,6 +852,27 @@ export function artifactManifest(task, root = process.cwd()) {
   }
   return manifest;
 }
+/**
+ * Reviewer-facing verification evidence for review packets — same conclusion
+ * (success, scope, reuse basis, log tail, artifact path) without the
+ * fingerprints a reviewer never checks (run/appliesTo hashes, resolved
+ * absolute paths, artifact sha256/bytes). The full manifest stays available
+ * via `--artifacts` in the implementer's worktree.
+ */
+export function reviewerVerificationManifest(task) {
+  const manifest = {};
+  for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
+    manifest[kind] = {
+      success: evidence.success === true,
+      scope: evidence.run?.scope ?? null,
+      ...(evidence.run?.affectedFiles ? { affectedFiles: evidence.run.affectedFiles } : {}),
+      reuse: evidence.reuse?.basis ?? null,
+      summary: evidence.summary ?? null,
+      artifact: evidence.artifact?.path ?? null,
+    };
+  }
+  return manifest;
+}
 function explainTask(task, root) {
   return {
     ...summarizeTask(task),
@@ -1201,7 +1222,10 @@ export function buildReviewPacket(
     );
   }
   write("task-summary.json", `${JSON.stringify(summarizeTask(task), null, 2)}\n`);
-  write("verification-manifest.json", `${JSON.stringify(artifactManifest(task, root), null, 2)}\n`);
+  write(
+    "verification-manifest.json",
+    `${JSON.stringify(reviewerVerificationManifest(task), null, 2)}\n`,
+  );
   write(
     "packet.json",
     `${JSON.stringify(
@@ -1230,7 +1254,12 @@ export function buildReviewPacket(
           : { kind: "full" },
         risk: task.risk,
         requiredSkills: task.assessment?.requiredSkills ?? [],
-        verification: verificationSummary(task),
+        // Verification summary lives once, in task-summary.json — a reviewer
+        // needs no second copy inside packet.json.
+        verification: "task-summary.json",
+        notes: [
+          "Full evidence manifest (run/appliesTo fingerprints, artifact sha256/bytes): run `node scripts/loop-runner.mjs --artifacts` in the implementer's worktree.",
+        ],
         verificationPlan: task.assessment?.verificationPlan ?? null,
         reuseCandidates: {
           featurePatchSha256: featurePatchSha256(task, root),
