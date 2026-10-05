@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { validateDocument } from "./loop-schema.mjs";
 import { assessChange } from "./assess-change.mjs";
 import { REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
@@ -17,6 +19,32 @@ export const CHECK_COMMANDS = {
   unit: [["pnpm", "exec", "vitest", "run"]],
   build: [["pnpm", "run", "build"]],
 };
+/**
+ * Test files owned by the process suite (`test:process`). The process kind is
+ * required for every change and runs them, so the local unit kind excludes
+ * them instead of executing the same files twice. CI still runs everything.
+ * A missing or unparsable script yields no exclusions (runs more, never less).
+ */
+export function processSuiteFiles(root = process.cwd()) {
+  try {
+    const file = path.join(root, "package.json");
+    if (!existsSync(file)) return [];
+    const script = JSON.parse(readFileSync(file, "utf8")).scripts?.["test:process"];
+    const match = typeof script === "string" ? script.match(/^vitest run ((?:\S+ ?)+)$/) : null;
+    if (!match) return [];
+    return match[1].split(" ").filter((token) => token && !token.startsWith("-"));
+  } catch {
+    return [];
+  }
+}
+/** Full local unit command: the vitest suite minus files the process kind already runs. */
+export function unitFullCommand(root = process.cwd()) {
+  return [
+    [...CHECK_COMMANDS.unit[0], ...processSuiteFiles(root).flatMap((file) => ["--exclude", file])],
+  ];
+}
+/** Unit evidence from `--scope affected` cannot satisfy a gate that needs the full suite. */
+export const isFullScopeEvidence = (evidence) => (evidence?.run?.scope ?? "full") !== "affected";
 /** Where each verification kind executes and what it covers. */
 export const VERIFICATION_SCOPES = {
   process: { execution: "local", scope: "harness docs integrity + process test suite" },
@@ -93,7 +121,9 @@ export function verificationSummary(task) {
           ? "failed"
           : result.reuse
             ? "pass(reused)"
-            : "pass";
+            : isFullScopeEvidence(result)
+              ? "pass"
+              : "pass(affected)";
   }
   return summary;
 }
@@ -109,7 +139,8 @@ export function aftercareSummary(task) {
 /** Unmet machine-floor requirements toward the next transition, as short tokens. */
 export function missingRequirements(task) {
   const missing = [];
-  const localVerificationMissing = () => {
+  // EXECUTE→REVIEW accepts affected-scope unit evidence; every later gate needs the full suite.
+  const localVerificationMissing = ({ fullUnit = true } = {}) => {
     if (!task.assessment || !task.agentAssessment) missing.push("assessment");
     for (const skill of task.assessment?.requiredSkills ?? [])
       if (!task.skills.includes(skill)) missing.push(`skill:${skill}`);
@@ -117,6 +148,8 @@ export function missingRequirements(task) {
       const result = task.verification?.[kind];
       if (!(currentEvidence(result, task) && result.success === true))
         missing.push(`verify:${kind}`);
+      else if (kind === "unit" && fullUnit && !isFullScopeEvidence(result))
+        missing.push("verify:unit(full)");
     }
   };
   const reviewMissing = () => {
@@ -140,7 +173,7 @@ export function missingRequirements(task) {
     if (!ids.length || !ids.every(text) || new Set(ids).size !== ids.length)
       missing.push("spec:acceptanceCriteria");
   }
-  if (task.state === "execute") localVerificationMissing();
+  if (task.state === "execute") localVerificationMissing({ fullUnit: false });
   if (task.state === "review") {
     localVerificationMissing();
     reviewMissing();
@@ -198,7 +231,7 @@ function verificationPlan(result, task) {
     };
   });
 }
-export function requireLocalVerification(task) {
+export function requireLocalVerification(task, { fullUnit = true } = {}) {
   requireValue(task.assessment && task.agentAssessment, "Current change assessment is required");
   requireValue(validateAssessment(task.agentAssessment).length === 0, "Invalid agent assessment");
   for (const skill of task.assessment.requiredSkills)
@@ -211,8 +244,15 @@ export function requireLocalVerification(task) {
       currentEvidence(result, task) && result.success === true,
       `Missing current successful verification: ${kind}`,
     );
+    if (kind === "unit" && fullUnit)
+      requireValue(
+        isFullScopeEvidence(result),
+        "Full unit verification is required at this gate (affected scope only satisfies EXECUTE→REVIEW)",
+      );
   }
 }
+/** Optional finding severity; every finding still has to be fixed or dismissed before clean. */
+export const FINDING_SEVERITIES = ["blocker", "major", "minor", "nit"];
 export function validateReview(task, report) {
   requireValue(currentEvidence(report, task), "Review must match current HEAD and base");
   requireValue(
@@ -231,6 +271,10 @@ export function validateReview(task, report) {
         ["open", "fixed", "dismissed"].includes(finding.status) &&
         text(finding.evidence),
       "Invalid finding record (unique id, status open|fixed|dismissed, non-empty evidence required)",
+    );
+    requireValue(
+      finding.severity === undefined || FINDING_SEVERITIES.includes(finding.severity),
+      `Invalid finding severity: ${finding.severity} (${FINDING_SEVERITIES.join("|")})`,
     );
     ids.add(finding.id);
   }
@@ -283,7 +327,8 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
   );
   requireValue(!exit.blockers?.length, "Resolve blockers before transitioning");
   if (task.state === "refine" && event === "ready") validateSpec(task.spec, root);
-  if (task.state === "execute" && event === "ready") requireLocalVerification(task);
+  if (task.state === "execute" && event === "ready")
+    requireLocalVerification(task, { fullUnit: false });
   if (task.state === "review" && event === "clean") {
     requireLocalVerification(task);
     validateReview(task, task.review);

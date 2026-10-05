@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -32,12 +32,28 @@ import {
   buildReviewPacket,
   inspectPullRequest,
   watchAftercare,
+  compactTaskForExport,
+  hydrateExportedTask,
+  STATE_START,
+  STATE_END,
+  metricsPath,
+  autoDeltaFrom,
+  STATE_BLOCK_RECENT_HISTORY,
 } from "./loop-runner.mjs";
-import { taskFixture, reviewFixture, verificationManifestFixture } from "./loop-test-fixtures.mjs";
+import {
+  agentAssessment,
+  taskFixture,
+  reviewFixture,
+  verificationManifestFixture,
+} from "./loop-test-fixtures.mjs";
 import {
   computeAssessment,
   currentEvidence,
+  missingRequirements,
+  processSuiteFiles,
+  unitFullCommand,
   validateReview,
+  validateTask,
   verificationSummary,
 } from "./loop-policy.mjs";
 const root = process.cwd();
@@ -45,16 +61,37 @@ const dirs = [];
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
-function repository() {
-  const dir = mkdtempSync(path.join(tmpdir(), "loop-test-"));
-  dirs.push(dir);
-  cpSync(path.join(root, ".agent"), path.join(dir, ".agent"), { recursive: true });
-  const git = (...args) =>
+let template = null;
+afterAll(() => {
+  if (template) rmSync(template, { recursive: true, force: true });
+});
+const gitIn =
+  (dir) =>
+  (...args) =>
     execFileSync("git", args, {
       cwd: dir,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
+/**
+ * Every test starts from the same committed fixture repository. Building it
+ * once and copying the directory (a plain repo stores no absolute paths)
+ * replaces seven git spawns per test with one filesystem copy.
+ */
+function repository() {
+  template ??= buildTemplateRepository();
+  const dir = mkdtempSync(path.join(tmpdir(), "loop-test-"));
+  dirs.push(dir);
+  cpSync(template, dir, { recursive: true });
+  const git = gitIn(dir);
+  const baseHead = git("rev-parse", "HEAD");
+  const task = taskFixture(dir, { head: baseHead, baseHead, baseRef: "preview" });
+  return { dir, git, task };
+}
+function buildTemplateRepository() {
+  const dir = mkdtempSync(path.join(tmpdir(), "loop-template-"));
+  cpSync(path.join(root, ".agent"), path.join(dir, ".agent"), { recursive: true });
+  const git = gitIn(dir);
   mkdirSync(path.join(dir, "scripts"));
   cpSync(
     path.join(root, "scripts/check-task-worktree.mjs"),
@@ -73,10 +110,8 @@ function repository() {
   git("config", "user.name", "Test");
   git("add", ".");
   git("-c", "core.hooksPath=/dev/null", "commit", "-m", "base");
-  const baseHead = git("rev-parse", "HEAD");
   git("switch", "-c", "codex/task");
-  const task = taskFixture(dir, { head: baseHead, baseHead, baseRef: "preview" });
-  return { dir, git, task };
+  return dir;
 }
 describe("persistent task gates", () => {
   const delivery = (task, overrides = {}) => ({
@@ -508,7 +543,7 @@ describe("persistent task gates", () => {
     expect(packet.allChangedPaths).toEqual(["initial-feature.txt", oldPath, newPath].sort());
     expect(readFileSync(path.join(delta, "diff.patch"), "utf8")).toContain("deleted file mode");
     const full = path.join(parent, "full");
-    buildReviewPacket(task, full, dir);
+    buildReviewPacket(task, full, dir, { full: true });
     expect(JSON.parse(readFileSync(path.join(full, "packet.json"), "utf8")).changedPaths).toEqual(
       packet.allChangedPaths,
     );
@@ -542,7 +577,7 @@ describe("persistent task gates", () => {
     const delta = path.join(parent, "delta");
     buildReviewPacket(task, delta, dir, { deltaFrom: prior });
     const full = path.join(parent, "full");
-    buildReviewPacket(task, full, dir);
+    buildReviewPacket(task, full, dir, { full: true });
     for (const [file, range] of [
       [path.join(delta, "diff.patch"), `${prior}..${task.head}`],
       [path.join(delta, "full-diff.patch"), `${task.baseRef}...${task.head}`],
@@ -873,7 +908,9 @@ describe("persistent task gates", () => {
   });
   it("round-trips durable PR snapshots and rejects missing/duplicate snapshots", () => {
     const task = taskFixture();
-    expect(parseStateBlock(stateBlock(task))).toEqual(task);
+    expect(parseStateBlock(stateBlock(task))).toEqual(
+      hydrateExportedTask(compactTaskForExport(task)),
+    );
     expect(() => parseStateBlock("no checkpoint")).toThrow();
     expect(() => parseStateBlock(stateBlock(task) + stateBlock(task))).toThrow();
   });
@@ -1410,13 +1447,30 @@ describe("persistent task gates", () => {
     expect(result.events[0]).toMatchObject({ ready: false, error: "gh offline" });
     expect(result.events[1]).toMatchObject({ ready: true, changed: true });
   });
-  it("appends verify and revision metrics to the shared git dir", () => {
+  it("resolves the metrics sink: explicit file, never the real log under vitest, else the common dir", () => {
     const { dir, git, task } = repository();
+    const common = git("rev-parse", "--path-format=absolute", "--git-common-dir");
+    expect(metricsPath(dir, {})).toBe(path.join(common, "agent-metrics.jsonl"));
+    expect(metricsPath(dir, { VITEST: "true" })).toBeNull();
+    expect(metricsPath(dir, { VITEST: "true", AGENT_METRICS_FILE: "/x/m.jsonl" })).toBe(
+      "/x/m.jsonl",
+    );
+    // This suite itself runs under vitest without an override: nothing is appended.
     runVerification(task, "process", dir, () => ({ status: 0 }));
+    expect(existsSync(path.join(common, "agent-metrics.jsonl"))).toBe(false);
+  });
+  it("appends verify and revision metrics to the configured sink", () => {
+    const { dir, git, task } = repository();
     const file = path.join(
       git("rev-parse", "--path-format=absolute", "--git-common-dir"),
       "agent-metrics.jsonl",
     );
+    process.env.AGENT_METRICS_FILE = file;
+    try {
+      runVerification(task, "process", dir, () => ({ status: 0 }));
+    } finally {
+      delete process.env.AGENT_METRICS_FILE;
+    }
     const readMetrics = () =>
       readFileSync(file, "utf8")
         .trim()
@@ -1433,7 +1487,12 @@ describe("persistent task gates", () => {
     expect(verified.artifactBytes).toBeGreaterThan(0);
     saveTask(task, dir);
     upstreamCommit(dir, git, "src/app.ts", "export {};\n");
-    refreshTask(loadTask(dir), dir);
+    process.env.AGENT_METRICS_FILE = file;
+    try {
+      refreshTask(loadTask(dir), dir);
+    } finally {
+      delete process.env.AGENT_METRICS_FILE;
+    }
     const revision = readMetrics().at(-1);
     expect(revision).toMatchObject({ action: "revision_changed", reused: 1, invalidated: 0 });
   });
@@ -1715,5 +1774,312 @@ describe("increment reuse and loop ergonomics", () => {
     expect(saved.history.at(-1)).toMatchObject({ event: "friction_note" });
     expect(stateBlock(saved)).toContain("per-kind verify");
     expect(() => run({ "friction-note": "   " }, dir)).toThrow("requires non-empty");
+  });
+  it("records the friction note text (bounded) in the metric line", () => {
+    const { dir, task } = repository();
+    saveTask(task, dir);
+    const file = path.join(dir, "..", `${path.basename(dir)}-metrics.jsonl`);
+    dirs.push(file);
+    process.env.AGENT_METRICS_FILE = file;
+    try {
+      run({ "friction-note": `review packets felt heavy ${"x".repeat(600)}` }, dir);
+    } finally {
+      delete process.env.AGENT_METRICS_FILE;
+    }
+    const metric = JSON.parse(readFileSync(file, "utf8").trim().split("\n").at(-1));
+    expect(metric).toMatchObject({ action: "friction_note" });
+    expect(metric.note.startsWith("review packets felt heavy")).toBe(true);
+    expect(metric.note).toHaveLength(500);
+  });
+  it("carries the agent assessment only while the machine classification is unchanged", () => {
+    const { dir, git, task } = repository();
+    task.skills = ["note-only"];
+    writeFileSync(path.join(dir, "notes.md"), "first\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs");
+    refreshTask(task, dir);
+    expect(task.agentAssessment).toBeTruthy();
+    expect(task.skills).toEqual(["note-only"]);
+    expect(task.history.at(-1)).toMatchObject({
+      event: "revision_changed",
+      assessmentCarried: true,
+    });
+    mkdirSync(path.join(dir, "scripts"), { recursive: true });
+    writeFileSync(path.join(dir, "scripts", "loop-extra.mjs"), "export {};\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "harness change");
+    refreshTask(task, dir);
+    expect(task.agentAssessment).toBeNull();
+    expect(task.skills).toEqual([]);
+    expect(task.history.at(-1)).toMatchObject({ assessmentCarried: false });
+    expect(missingRequirements(task)).toContain("assessment");
+  });
+  it("never carries an assessment into a task that is back in refine", () => {
+    const { dir, git, task } = repository();
+    task.state = "refine";
+    writeFileSync(path.join(dir, "notes.md"), "first\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs");
+    refreshTask(task, dir);
+    expect(task.agentAssessment).toBeNull();
+  });
+  it("accepts affected unit evidence for EXECUTE→REVIEW and completes the full suite in review", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "src-feature.ts"), "export {};\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    refreshTask(task, dir);
+    // The change became runtime-relevant, so the agent re-submits its assessment.
+    expect(task.agentAssessment).toBeNull();
+    task.agentAssessment = structuredClone(agentAssessment);
+    refreshTask(task, dir);
+    task.skills = [...task.assessment.requiredSkills];
+    expect(task.assessment.verification.unit).toBe(true);
+    const commands = [];
+    const runner = (command) => {
+      commands.push(command);
+      return { status: 0 };
+    };
+    runRequiredVerification(task, dir, runner);
+    const unitCommand = commands.find((command) => command.includes("vitest"));
+    expect(unitCommand.slice(0, 4)).toEqual(["pnpm", "exec", "vitest", "related"]);
+    expect(unitCommand).toContain("--passWithNoTests");
+    expect(task.verification.unit.run.scope).toBe("affected");
+    expect(verificationSummary(task).unit).toBe("pass(affected)");
+    expect(missingRequirements(task)).toEqual([]);
+    transitionTask(task, "ready", {}, dir);
+    expect(task.state).toBe("review");
+    expect(missingRequirements(task)).toContain("verify:unit(full)");
+    task.review = reviewFixture(task);
+    expect(() => transitionTask(structuredClone(task), "clean", {}, dir)).toThrow(
+      "Full unit verification",
+    );
+    commands.length = 0;
+    runRequiredVerification(task, dir, runner);
+    expect(commands).toEqual([["pnpm", "exec", "vitest", "run"]]);
+    expect(task.state).toBe("review");
+    expect(task.verification.unit.run.scope).toBe("full");
+    expect(missingRequirements(task)).not.toContain("verify:unit(full)");
+    transitionTask(task, "clean", {}, dir);
+    expect(task.state).toBe("aftercare");
+  });
+  it("excludes the process suite files from the full unit command", () => {
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-unit-"));
+    dirs.push(parent);
+    writeFileSync(
+      path.join(parent, "package.json"),
+      JSON.stringify({
+        scripts: { "test:process": "vitest run scripts/a.test.mjs tests/b.test.ts" },
+      }),
+    );
+    expect(processSuiteFiles(parent)).toEqual(["scripts/a.test.mjs", "tests/b.test.ts"]);
+    expect(unitFullCommand(parent)).toEqual([
+      [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--exclude",
+        "scripts/a.test.mjs",
+        "--exclude",
+        "tests/b.test.ts",
+      ],
+    ]);
+    writeFileSync(
+      path.join(parent, "package.json"),
+      JSON.stringify({ scripts: { "test:process": "node scripts/custom.mjs" } }),
+    );
+    // An unrecognized script never shrinks the unit suite.
+    expect(unitFullCommand(parent)).toEqual([["pnpm", "exec", "vitest", "run"]]);
+    // The repository's own process suite is excluded from local unit runs.
+    expect(processSuiteFiles(root)).toContain("scripts/loop-runner.test.mjs");
+  });
+  it("defaults re-review packets to the increment since the latest qualifying review", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "old-feature.txt"), "original\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    const prior = git("rev-parse", "HEAD");
+    task.history.push({
+      event: "review_recorded",
+      head: prior,
+      baseHead: task.baseHead,
+      acceptanceCriteria: [{ id: "AC1", evidence: "Reviewed feature" }],
+      findings: [{ id: "F1", status: "open", severity: "major", evidence: "Fix needed" }],
+    });
+    task.findings = [
+      { id: "F1", status: "fixed", severity: "major", evidence: "Fixed" },
+      { id: "F2", status: "dismissed", evidence: "Out of scope" },
+    ];
+    writeFileSync(path.join(dir, "fix.txt"), "correction\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "fix");
+    refreshTask(task, dir);
+    task.state = "review";
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-auto-"));
+    dirs.push(parent);
+    expect(autoDeltaFrom(task, dir)).toBe(prior);
+    const auto = buildReviewPacket(task, path.join(parent, "auto"), dir);
+    expect(auto.reviewScope).toEqual({ kind: "increment", deltaFrom: prior, selection: "auto" });
+    const packet = JSON.parse(readFileSync(path.join(parent, "auto", "packet.json"), "utf8"));
+    expect(packet.changedPaths).toEqual(["fix.txt"]);
+    expect(packet.reviewScope.selection).toBe("auto");
+    const template = JSON.parse(
+      readFileSync(path.join(parent, "auto", "review-template.json"), "utf8"),
+    );
+    expect(template.deltaFrom).toBe(prior);
+    expect(template.findings).toEqual([
+      { id: "F1", status: "fixed", severity: "major", evidence: "" },
+      { id: "F2", status: "dismissed", evidence: "" },
+    ]);
+    expect(
+      buildReviewPacket(task, path.join(parent, "full"), dir, { full: true }).reviewScope,
+    ).toEqual({ kind: "full" });
+    expect(() =>
+      buildReviewPacket(task, path.join(parent, "x"), dir, { full: true, deltaFrom: prior }),
+    ).toThrow("conflicts");
+    // Ineligible history falls back to a full packet instead of failing.
+    task.history.at(-2).baseHead = "f".repeat(40);
+    const reviewed = task.history.find((entry) => entry.event === "review_recorded");
+    reviewed.baseHead = "f".repeat(40);
+    expect(autoDeltaFrom(task, dir)).toBeNull();
+    expect(buildReviewPacket(task, path.join(parent, "fallback"), dir).reviewScope).toEqual({
+      kind: "full",
+    });
+    saveTask({ ...task, state: "execute" }, dir);
+    expect(() => run({ "full-review": true }, dir)).toThrow("--full-review requires");
+  });
+  it("validates the optional finding severity", () => {
+    const task = taskFixture(root, { state: "review" });
+    const finding = { id: "F1", status: "fixed", evidence: "ok" };
+    expect(() =>
+      validateReview(task, reviewFixture(task, { findings: [{ ...finding, severity: "major" }] })),
+    ).not.toThrow();
+    expect(() =>
+      validateReview(
+        task,
+        reviewFixture(task, { findings: [{ ...finding, severity: "critical" }] }),
+      ),
+    ).toThrow("Invalid finding severity");
+  });
+  it("compacts the published state block while keeping restore and gate references", () => {
+    const task = taskFixture(root, { state: "aftercare" });
+    const reviewHead = (n) => n.toString(16).padStart(40, "0");
+    task.history = Array.from({ length: 30 }, (_, index) => ({
+      state: "execute",
+      event: "assessed",
+      head: reviewHead(index + 1),
+      at: "2026-01-01T00:00:00.000Z",
+    }));
+    const priorFindings = [{ id: "F1", status: "open", evidence: "Needs a fix" }];
+    task.history[3] = {
+      ...task.history[3],
+      event: "review_recorded",
+      acceptanceCriteria: [{ id: "AC1", evidence: "Earlier review" }],
+      findings: priorFindings,
+    };
+    task.review = reviewFixture(task, {
+      deltaFrom: reviewHead(4),
+      findings: [{ id: "F1", status: "fixed", evidence: "Fixed in the increment" }],
+    });
+    task.findings = structuredClone(task.review.findings);
+    task.history[20] = {
+      ...task.history[20],
+      event: "review_recorded",
+      head: task.head,
+      acceptanceCriteria: structuredClone(task.review.acceptanceCriteria),
+      findings: structuredClone(task.review.findings),
+    };
+    task.verification.unit = verificationManifestFixture(task, "unit");
+    const compact = compactTaskForExport(task);
+    expect(compact.assessment).toBeNull();
+    expect(compact.verification.unit.summary).toEqual({ exitCode: 0 });
+    expect(compact.verification.unit.artifact).toEqual(task.verification.unit.artifact);
+    expect(compact.history).toHaveLength(STATE_BLOCK_RECENT_HISTORY + 1);
+    // The delta base keeps AC evidence only; the latest review becomes a reference.
+    expect(compact.history[0]).toEqual({
+      ...task.history[3],
+      findings: undefined,
+    });
+    expect(compact.history[0]).not.toHaveProperty("findings");
+    const latest = compact.history.find((entry) => entry.sameAsReview);
+    expect(latest).toMatchObject({ event: "review_recorded", head: task.head });
+    expect(latest).not.toHaveProperty("findings");
+    expect(compact).not.toHaveProperty("findings");
+    expect(compact.historyOmitted).toBe(30 - STATE_BLOCK_RECENT_HISTORY - 1);
+    // Parsing re-hydrates the references exactly.
+    const restored = parseStateBlock(stateBlock(task));
+    expect(restored.findings).toEqual(task.findings);
+    expect(restored.review).toEqual(task.review);
+    expect(restored.history.find((entry) => entry.head === task.head)).toEqual(task.history[20]);
+    expect(restored.history[0].acceptanceCriteria).toEqual(task.history[3].acceptanceCriteria);
+    expect(() => validateTask(restored, root)).not.toThrow();
+    expect(() => validateReview(restored, restored.review)).not.toThrow();
+    // Re-publishing a restored snapshot keeps the omitted count cumulative.
+    expect(compactTaskForExport(restored).historyOmitted).toBe(compact.historyOmitted);
+    expect(task.history).toHaveLength(30);
+    expect(stateBlock(task).length).toBeLessThan(JSON.stringify(task, null, 2).length / 2);
+    // Findings that differ from the review are kept; a broken reference fails closed.
+    expect(compactTaskForExport({ ...task, findings: priorFindings }).findings).toEqual(
+      priorFindings,
+    );
+    const block = (value) =>
+      `${STATE_START}\n\`\`\`json\n${JSON.stringify(value)}\n\`\`\`\n${STATE_END}`;
+    const broken = compactTaskForExport(task);
+    broken.history.find((entry) => entry.sameAsReview).head = "e".repeat(40);
+    expect(() => parseStateBlock(block(broken))).toThrow("review reference");
+    // Legacy (uncompacted) blocks pass through unchanged.
+    expect(parseStateBlock(block(task))).toEqual(task);
+  });
+  it("reports the current state's workflow in the compact summary", () => {
+    const task = taskFixture(root);
+    expect(summarizeTask(task).workflow).toBe(".agent/workflow/execute.md");
+    expect(summarizeTask({ ...task, state: "done" }).workflow).toBeNull();
+  });
+  it("records transcript token usage without touching the task", () => {
+    const { dir, task } = repository();
+    saveTask(task, dir);
+    const original = readFileSync(taskPath(dir), "utf8");
+    const transcript = path.join(dir, "..", `${path.basename(dir)}-session.jsonl`);
+    const metrics = path.join(dir, "..", `${path.basename(dir)}-usage.jsonl`);
+    dirs.push(transcript, metrics);
+    const line = (id, usage) =>
+      JSON.stringify({ message: { id, role: "assistant", model: "m", usage } });
+    writeFileSync(
+      transcript,
+      [
+        line("r1", { input_tokens: 3, cache_read_input_tokens: 10, output_tokens: 5 }),
+        line("r1", { input_tokens: 3, cache_read_input_tokens: 10, output_tokens: 5 }),
+        line("r2", { input_tokens: 1, cache_creation_input_tokens: 7, output_tokens: 2 }),
+      ].join("\n"),
+    );
+    process.env.AGENT_METRICS_FILE = metrics;
+    let result;
+    try {
+      result = run({ "record-usage": transcript, "usage-role": "reviewer" }, dir);
+    } finally {
+      delete process.env.AGENT_METRICS_FILE;
+    }
+    expect(result).toMatchObject({
+      action: "usage",
+      role: "reviewer",
+      calls: 2,
+      inputUncached: 4,
+      cacheRead: 10,
+      cacheWrite: 7,
+      output: 7,
+    });
+    expect(JSON.parse(readFileSync(metrics, "utf8").trim())).toMatchObject({
+      action: "usage",
+      taskId: task.taskId,
+      source: path.basename(transcript),
+    });
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
+    expect(() => run({ "record-usage": transcript, "usage-role": "boss" }, dir)).toThrow(
+      "--usage-role",
+    );
+    writeFileSync(transcript, "{}\n");
+    expect(() => run({ "record-usage": transcript }, dir)).toThrow("No token usage");
+    expect(() => run({ "usage-role": "reviewer" }, dir)).toThrow("requires --record-usage");
   });
 });

@@ -23,6 +23,7 @@ import { decideProfile, resolveAgentProfile } from "./resolve-agent-profile.mjs"
 import { readChangedPaths } from "./suggest-skills.mjs";
 import { isMetadataOnlyPath, normalizeChangedPath } from "./classify-e2e-relevance.mjs";
 import { validateAssessment } from "./review-depth.mjs";
+import { readTranscriptUsage, USAGE_ROLES } from "./agent-usage.mjs";
 import {
   validateTask,
   validateSpec,
@@ -40,6 +41,8 @@ import {
   validateCheckpoint,
   requiredVerificationKinds,
   currentEvidence,
+  isFullScopeEvidence,
+  unitFullCommand,
   CHECK_COMMANDS,
 } from "./loop-policy.mjs";
 
@@ -48,8 +51,19 @@ const git = (args, root) => execFileSync("git", args, { cwd: root, encoding: "ut
 const processConfig = (root) =>
   YAML.parse(readFileSync(path.join(root, ".agent/process.yaml"), "utf8"));
 export { CHECK_COMMANDS };
+/**
+ * Git path lookups are stable for a given worktree root, and every
+ * save/load/metric/evidence call needs one; memoizing them per process removes
+ * most `git rev-parse` spawns without caching anything revision-dependent.
+ */
+const gitPathCache = new Map();
+const gitPath = (root, args) => {
+  const key = `${path.resolve(root)}\0${args.join("\0")}`;
+  if (!gitPathCache.has(key)) gitPathCache.set(key, git(args, root));
+  return gitPathCache.get(key);
+};
 export function taskPath(root) {
-  return git(["rev-parse", "--path-format=absolute", "--git-path", "agent-task.json"], root);
+  return gitPath(root, ["rev-parse", "--path-format=absolute", "--git-path", "agent-task.json"]);
 }
 export function saveTask(task, root) {
   validateTask(task, root);
@@ -234,25 +248,60 @@ function invalidateRevision(task, root, head, baseHead) {
   task.skills = [];
   return reused;
 }
+/**
+ * Machine-derived part of an assessment. When a new revision leaves all of it
+ * unchanged, the agent's recorded judgment still describes the change class
+ * and can carry over; any difference requires a fresh --assessment.
+ */
+function machineShape(assessment) {
+  if (!assessment?.risk) return null;
+  return JSON.stringify({
+    machine: assessment.risk.machine,
+    triggers: [...(assessment.risk.machineFloorTriggers ?? [])].sort(),
+    skills: [...(assessment.requiredSkills ?? [])].sort(),
+    runtimeRelevant: assessment.runtimeRelevant,
+    verification: Object.entries(assessment.verification ?? {}).sort(),
+  });
+}
 export function refreshTask(task, root) {
   const branch = git(["branch", "--show-current"], root);
   requireValue(branch === task.branch, "Task branch changed; restore or start the correct task");
   const head = git(["rev-parse", "HEAD"], root);
   const baseHead = git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root);
+  let changedPaths;
+  const paths = () => (changedPaths ??= readChangedPaths({ base: task.baseRef, cwd: root }));
   if (head !== task.head || baseHead !== task.baseHead) {
+    const prior = {
+      assessment: task.assessment,
+      agentAssessment: task.agentAssessment,
+      skills: task.skills ?? [],
+    };
     const previousVerification = Object.keys(task.verification ?? {}).length;
     const reused = invalidateRevision(task, root, head, baseHead);
     task.head = head;
     task.baseHead = baseHead;
     if (!["refine", "incident", "human_gate"].includes(task.state)) task.state = "execute";
-    history(task, "revision_changed", { reusedVerification: reused });
+    let assessmentCarried = false;
+    if (task.state !== "refine" && prior.agentAssessment && machineShape(prior.assessment)) {
+      const candidate = computeAssessment(
+        { ...task, agentAssessment: prior.agentAssessment },
+        paths(),
+      );
+      if (machineShape(candidate) === machineShape(prior.assessment)) {
+        task.agentAssessment = prior.agentAssessment;
+        task.skills = prior.skills;
+        assessmentCarried = true;
+      }
+    }
+    history(task, "revision_changed", { reusedVerification: reused, assessmentCarried });
     recordMetric(task, root, {
       action: "revision_changed",
       reused: reused.length,
       invalidated: previousVerification - reused.length,
+      assessmentCarried,
     });
   }
-  task.assessment = computeAssessment(task, readChangedPaths({ base: task.baseRef, cwd: root }));
+  task.assessment = computeAssessment(task, paths());
   task.risk = highestTier(task.risk, task.assessment.risk.final);
   return task;
 }
@@ -367,15 +416,22 @@ export const EVIDENCE_CONTRACT_VERSION = 1;
  * dir), never the worktree-private `--git-path` location. Failures never
  * block the caller — observability must not become a gate.
  */
-const metricsPath = (root) =>
-  path.join(
-    git(["rev-parse", "--path-format=absolute", "--git-common-dir"], root),
+export function metricsPath(root, env = process.env) {
+  // An explicit sink always wins; a test run without one must never append to
+  // the developer's real repository log.
+  if (env.AGENT_METRICS_FILE) return env.AGENT_METRICS_FILE;
+  if (env.VITEST) return null;
+  return path.join(
+    gitPath(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]),
     "agent-metrics.jsonl",
   );
+}
 export function recordMetric(task, root, entry) {
   try {
+    const file = metricsPath(root);
+    if (!file) return;
     appendFileSync(
-      metricsPath(root),
+      file,
       `${JSON.stringify({
         at: new Date().toISOString(),
         taskId: task?.taskId ?? null,
@@ -396,7 +452,7 @@ const requireSafeTaskId = (taskId) =>
     `Invalid task id for artifact paths: ${taskId}`,
   );
 const evidenceRoot = (root) =>
-  git(["rev-parse", "--path-format=absolute", "--git-path", "agent-evidence"], root);
+  gitPath(root, ["rev-parse", "--path-format=absolute", "--git-path", "agent-evidence"]);
 const evidenceDir = (task, root) => {
   requireSafeTaskId(task.taskId);
   return path.join(evidenceRoot(root), task.taskId, task.head.slice(0, 12));
@@ -417,7 +473,10 @@ export function runVerification(
     }),
   { scope = "full" } = {},
 ) {
-  requireValue(task.state === "execute", "Verification runs in execute");
+  requireValue(
+    ["execute", "review"].includes(task.state),
+    "Verification runs in execute (review may complete the full unit suite)",
+  );
   requireValue(CHECK_COMMANDS[kind], `Unknown verification kind: ${kind}`);
   requireValue(["full", "affected"].includes(scope), `Unknown verification scope: ${scope}`);
   requireValue(
@@ -429,20 +488,26 @@ export function runVerification(
   delete task.verification[kind];
   // --scope affected narrows `unit` to vitest related over the task's changed
   // paths. Only files vitest can relate tests to are passed (testable source
-  // extensions, present on disk, outside e2e/ and metadata-only paths). A file
-  // with no related tests makes vitest exit non-zero; that is a normal failure,
-  // not an implicit full-suite fallback. An empty candidate set reverts to the
-  // full command list and is recorded as scope "full".
-  let commands = CHECK_COMMANDS[kind];
+  // extensions, present on disk, outside e2e/ and metadata-only paths). Files
+  // without related tests pass (--passWithNoTests): affected evidence only
+  // satisfies EXECUTE→REVIEW, and every later gate requires the full suite.
+  // An empty candidate set reverts to the full suite, recorded as scope "full".
+  // The full unit suite excludes the process suite files, which the
+  // always-required process kind executes.
+  let commands = kind === "unit" ? unitFullCommand(root) : CHECK_COMMANDS[kind];
+  let appliedScope = "full";
   let affectedFiles = null;
   if (kind === "unit" && scope === "affected") {
     affectedFiles = readChangedPaths({ base: task.baseRef, cwd: root })
       .map(normalizeChangedPath)
       .filter((file) => isUnitRelatedPath(file) && existsSync(path.join(root, file)));
-    if (affectedFiles.length > 0)
-      commands = [["pnpm", "exec", "vitest", "related", ...affectedFiles, "--run"]];
+    if (affectedFiles.length > 0) {
+      commands = [
+        ["pnpm", "exec", "vitest", "related", ...affectedFiles, "--run", "--passWithNoTests"],
+      ];
+      appliedScope = "affected";
+    }
   }
-  const appliedScope = commands === CHECK_COMMANDS[kind] ? "full" : scope;
   const startedAt = Date.now();
   const dir = evidenceDir(task, root);
   mkdirSync(dir, { recursive: true });
@@ -526,9 +591,18 @@ export function runVerification(
   });
   return task;
 }
-/** Run missing required checks serially; each completed kind is durably saved. */
+/**
+ * Run missing required checks serially; each completed kind is durably saved.
+ * In EXECUTE the unit kind runs affected-scope (EXECUTE→REVIEW accepts it); in
+ * REVIEW it completes the full suite, which REVIEW clean and every later gate
+ * require — so the full run can overlap the independent review.
+ */
 export function runRequiredVerification(task, root, run) {
-  requireValue(task.state === "execute", "Verification runs in execute");
+  requireValue(
+    ["execute", "review"].includes(task.state),
+    "Verification runs in execute or review",
+  );
+  const fullUnit = task.state === "review";
   requireValue(task.assessment && task.agentAssessment, "Current change assessment is required");
   requireClean(root);
   const before = { head: task.head, baseHead: task.baseHead };
@@ -538,9 +612,16 @@ export function runRequiredVerification(task, root, run) {
   requireValue(unchanged(), "Revision changed during required verification");
   for (const kind of requiredVerificationKinds(task)) {
     const evidence = task.verification[kind];
-    if (evidence?.success === true && currentEvidence(evidence, task)) continue;
+    if (
+      evidence?.success === true &&
+      currentEvidence(evidence, task) &&
+      (kind !== "unit" || !fullUnit || isFullScopeEvidence(evidence))
+    )
+      continue;
     requireValue(unchanged(), "Revision changed during required verification");
-    task = runVerification(task, kind, root, run);
+    task = runVerification(task, kind, root, run, {
+      scope: kind === "unit" && !fullUnit ? "affected" : "full",
+    });
     saveTask(task, root);
   }
   requireClean(root);
@@ -549,8 +630,89 @@ export function runRequiredVerification(task, root, run) {
 }
 export const STATE_START = "<!-- suzumemo-agent-state:start -->";
 export const STATE_END = "<!-- suzumemo-agent-state:end -->";
+/** Recent history entries kept in the published state block. */
+export const STATE_BLOCK_RECENT_HISTORY = 12;
+/**
+ * The PR state block is what restore and the PR gate need, not the full local
+ * record: the assessment is recomputed from the real diff on both paths,
+ * verification log tails live in local artifacts, and history keeps the
+ * recent entries plus every review_recorded entry a delta review or the gate
+ * can reference (the latest one and review.deltaFrom). Omitted entries are
+ * counted; the complete history stays in the worktree's Git metadata.
+ *
+ * Exact duplicates of `task.review` are replaced by references that
+ * parseStateBlock re-hydrates: `findings` (always the last report's findings)
+ * and the latest review_recorded entry's findings/AC evidence. Older kept
+ * review entries keep their AC evidence (a delta packet's previous review)
+ * but not their findings, which every later review carries forward by id.
+ */
+const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+export function compactTaskForExport(task) {
+  const history = task.history ?? [];
+  const keep = new Set(history.map((_, index) => index).slice(-STATE_BLOCK_RECENT_HISTORY));
+  const reviewIndexes = history
+    .map((entry, index) => (entry.event === "review_recorded" ? index : -1))
+    .filter((index) => index >= 0);
+  const latestReview = reviewIndexes.at(-1);
+  if (latestReview !== undefined) keep.add(latestReview);
+  const deltaFrom = task.review?.deltaFrom;
+  if (deltaFrom)
+    for (const index of reviewIndexes) if (history[index].head === deltaFrom) keep.add(index);
+  const review = task.review;
+  const kept = [];
+  history.forEach((entry, index) => {
+    if (!keep.has(index)) return;
+    if (entry.event !== "review_recorded") return kept.push(entry);
+    const { findings, acceptanceCriteria, ...rest } = entry;
+    if (
+      index === latestReview &&
+      review &&
+      entry.head === review.head &&
+      sameJson(findings, review.findings) &&
+      sameJson(acceptanceCriteria, review.acceptanceCriteria)
+    )
+      return kept.push({ ...rest, sameAsReview: true });
+    kept.push(index === latestReview ? entry : { ...rest, acceptanceCriteria });
+  });
+  const verification = {};
+  for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
+    const { summary, ...rest } = evidence ?? {};
+    verification[kind] =
+      summary && typeof summary === "object"
+        ? { ...rest, summary: { exitCode: summary.exitCode } }
+        : { ...rest };
+  }
+  const omitted = history.length - kept.length;
+  const { findings, ...rest } = task;
+  return {
+    ...rest,
+    ...(findings === undefined || (review && sameJson(findings, review.findings))
+      ? {}
+      : { findings }),
+    assessment: null,
+    verification,
+    history: kept,
+    ...(omitted + (task.historyOmitted ?? 0) > 0
+      ? { historyOmitted: omitted + (task.historyOmitted ?? 0) }
+      : {}),
+  };
+}
+/** Inverse of the reference compaction above; plain (legacy) blocks pass through unchanged. */
+export function hydrateExportedTask(task) {
+  const review = task.review;
+  if (review && task.findings === undefined && Array.isArray(review.findings))
+    task.findings = structuredClone(review.findings);
+  for (const entry of task.history ?? []) {
+    if (entry?.event !== "review_recorded" || entry.sameAsReview !== true) continue;
+    delete entry.sameAsReview;
+    requireValue(review && review.head === entry.head, "State block review reference is broken");
+    entry.findings = structuredClone(review.findings);
+    entry.acceptanceCriteria = structuredClone(review.acceptanceCriteria);
+  }
+  return task;
+}
 export function stateBlock(task) {
-  return `${STATE_START}\n\`\`\`json\n${JSON.stringify(task, null, 2)}\n\`\`\`\n${STATE_END}`;
+  return `${STATE_START}\n\`\`\`json\n${JSON.stringify(compactTaskForExport(task), null, 1)}\n\`\`\`\n${STATE_END}`;
 }
 function nextActions(task) {
   const missing = missingRequirements(task);
@@ -560,7 +722,10 @@ function nextActions(task) {
     else if (item === "openMaterialDecisions")
       actions.push("resolve spec openMaterialDecisions or --event decision_required");
     else if (item.startsWith("verify:")) {
-      const verify = "node scripts/loop-runner.mjs --verify-required";
+      const verify =
+        task.state === "review"
+          ? "node scripts/loop-runner.mjs --verify-required (full unit; may run alongside the reviewer)"
+          : "node scripts/loop-runner.mjs --verify-required";
       if (!actions.includes(verify)) actions.push(verify);
     } else if (item.startsWith("skill:"))
       actions.push(`read skills/${item.slice(6)}/SKILL.md then --assessment --skills`);
@@ -589,10 +754,18 @@ function nextActions(task) {
   return actions;
 }
 /** Compact task snapshot for CLI output — never contains spec/history/raw logs. */
+const STATE_WORKFLOWS = {
+  refine: ".agent/workflow/refine.md",
+  execute: ".agent/workflow/execute.md",
+  review: ".agent/workflow/review.md",
+  aftercare: ".agent/workflow/aftercare.md",
+  incident: ".agent/workflow/incident.md",
+};
 export function summarizeTask(task) {
   return {
     taskId: task.taskId,
     state: task.state,
+    workflow: STATE_WORKFLOWS[task.state] ?? null,
     head: task.head,
     baseHead: task.baseHead,
     risk: task.risk,
@@ -660,7 +833,7 @@ export function parseStateBlock(body) {
     .trim()
     .match(/^```json\s*([\s\S]*?)\s*```$/);
   requireValue(match, "Invalid Agent state JSON block");
-  return JSON.parse(match[1]);
+  return hydrateExportedTask(JSON.parse(match[1]));
 }
 const gh = (args, root) =>
   execFileSync("gh", args, { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
@@ -851,43 +1024,64 @@ function currentCheckpointTask(task, root) {
  * directory: task facts, the exact diff, verification evidence manifest, a
  * review template matching validateReview(), and the governing contracts.
  */
-export function buildReviewPacket(task, dir, root, { deltaFrom } = {}) {
+/**
+ * Why `deltaFrom` cannot scope an incremental review, or the matching
+ * review_recorded entry when it can (same base, every AC evidenced, ancestor).
+ */
+function deltaReviewBasis(task, deltaFrom, root) {
+  if (
+    !(typeof deltaFrom === "string" && /^[0-9a-f]{40}$/i.test(deltaFrom) && deltaFrom !== task.head)
+  )
+    return { error: "deltaFrom must be a previous 40-character commit SHA" };
+  const previousReview = [...task.history]
+    .reverse()
+    .find((entry) => entry.event === "review_recorded" && entry.head === deltaFrom);
+  if (!previousReview) return { error: "deltaFrom must reference a previously reviewed head" };
+  if (previousReview.baseHead !== task.baseHead)
+    return { error: "deltaFrom review base changed or is unknown" };
+  if (
+    !(
+      Array.isArray(previousReview.acceptanceCriteria) &&
+      task.spec.acceptanceCriteria.every((ac) =>
+        previousReview.acceptanceCriteria.some(
+          (entry) =>
+            entry?.id === ac.id &&
+            typeof entry.evidence === "string" &&
+            entry.evidence.trim().length > 0,
+        ),
+      )
+    )
+  )
+    return { error: "deltaFrom review AC evidence is unavailable" };
+  try {
+    git(["merge-base", "--is-ancestor", deltaFrom, task.head], root);
+  } catch {
+    // Unknown/non-ancestor commits require a full review.
+    return { error: "deltaFrom must be an ancestor of the current head" };
+  }
+  return { previousReview };
+}
+/** Latest reviewed head that qualifies as an incremental-review base, if any. */
+export function autoDeltaFrom(task, root) {
+  const reviewed = [...(task.history ?? [])]
+    .reverse()
+    .find((entry) => entry.event === "review_recorded" && entry.head !== task.head);
+  if (!reviewed) return null;
+  return deltaReviewBasis(task, reviewed.head, root).previousReview ? reviewed.head : null;
+}
+export function buildReviewPacket(task, dir, root, { deltaFrom, full = false } = {}) {
   requireValue(task.state === "review", "Review packets are generated in review state");
   requireClean(root);
+  requireValue(!(full && deltaFrom !== undefined), "--full-review conflicts with --delta-from");
+  // Re-reviews default to the increment since the latest qualifying review;
+  // ineligible history (or --full-review) falls back to the full diff.
+  const auto = deltaFrom === undefined && !full ? autoDeltaFrom(task, root) : null;
+  if (auto) deltaFrom = auto;
   let previousReview = null;
   if (deltaFrom !== undefined) {
-    requireValue(
-      typeof deltaFrom === "string" && /^[0-9a-f]{40}$/i.test(deltaFrom) && deltaFrom !== task.head,
-      "deltaFrom must be a previous 40-character commit SHA",
-    );
-    previousReview = [...task.history]
-      .reverse()
-      .find((entry) => entry.event === "review_recorded" && entry.head === deltaFrom);
-    requireValue(previousReview, "deltaFrom must reference a previously reviewed head");
-    requireValue(
-      previousReview.baseHead === task.baseHead,
-      "deltaFrom review base changed or is unknown",
-    );
-    requireValue(
-      Array.isArray(previousReview.acceptanceCriteria) &&
-        task.spec.acceptanceCriteria.every((ac) =>
-          previousReview.acceptanceCriteria.some(
-            (entry) =>
-              entry?.id === ac.id &&
-              typeof entry.evidence === "string" &&
-              entry.evidence.trim().length > 0,
-          ),
-        ),
-      "deltaFrom review AC evidence is unavailable",
-    );
-    let ancestor = false;
-    try {
-      git(["merge-base", "--is-ancestor", deltaFrom, task.head], root);
-      ancestor = true;
-    } catch {
-      /* Unknown/non-ancestor commits require a full review. */
-    }
-    requireValue(ancestor, "deltaFrom must be an ancestor of the current head");
+    const basis = deltaReviewBasis(task, deltaFrom, root);
+    requireValue(!basis.error, basis.error);
+    previousReview = basis.previousReview;
   }
   mkdirSync(dir, { recursive: true });
   const written = [];
@@ -936,6 +1130,7 @@ export function buildReviewPacket(task, dir, root, { deltaFrom } = {}) {
               deltaFrom,
               fullDiff: "full-diff.patch",
               previousReview: "previous-review.json",
+              selection: auto ? "auto" : "explicit",
             }
           : { kind: "full" },
         risk: task.risk,
@@ -965,11 +1160,18 @@ export function buildReviewPacket(task, dir, root, { deltaFrom } = {}) {
         context: "fresh",
         _notes: [
           "finding.status is open|fixed|dismissed (unique id, non-empty evidence); every prior finding id must appear",
+          "finding.severity (optional): blocker|major|minor|nit — report every finding in this round, all severities at once",
+          "prior findings are prefilled with their last status; re-check each and write evidence (a closed finding untouched by the increment may cite the previous review)",
           "deltaFrom (optional): SHA of a previously reviewed head — scopes review to the increment",
           "assessment must satisfy the machine floor, not merely the reviewer's own rating",
         ],
         evidence: [],
-        findings: [],
+        findings: (task.findings ?? []).map((finding) => ({
+          id: finding.id,
+          status: finding.status,
+          ...(finding.severity ? { severity: finding.severity } : {}),
+          evidence: "",
+        })),
         acceptanceCriteria: (task.spec?.acceptanceCriteria ?? []).map((ac) => ({
           id: ac.id,
           evidence: "",
@@ -1002,8 +1204,20 @@ export function buildReviewPacket(task, dir, root, { deltaFrom } = {}) {
     const source = path.join(root, "skills", skill, "SKILL.md");
     if (existsSync(source)) cpSync(source, path.join(contracts, "required-skills", `${skill}.md`));
   }
-  recordMetric(task, root, { action: "review_packet", files: written.length });
-  return { taskId: task.taskId, state: task.state, dir, files: written.length };
+  recordMetric(task, root, {
+    action: "review_packet",
+    files: written.length,
+    scope: deltaFrom ? "increment" : "full",
+  });
+  return {
+    taskId: task.taskId,
+    state: task.state,
+    dir,
+    files: written.length,
+    reviewScope: deltaFrom
+      ? { kind: "increment", deltaFrom, selection: auto ? "auto" : "explicit" }
+      : { kind: "full" },
+  };
 }
 function option(args, index) {
   requireValue(
@@ -1022,6 +1236,7 @@ export function parseArguments(args) {
     "--artifacts",
     "--watch-aftercare",
     "--verify-required",
+    "--full-review",
   ]);
   const options = new Set([
     "--init",
@@ -1050,6 +1265,8 @@ export function parseArguments(args) {
     "--interval-seconds",
     "--scope",
     "--friction-note",
+    "--record-usage",
+    "--usage-role",
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -1100,6 +1317,7 @@ export function run(args, root = process.cwd(), services = {}) {
     "artifacts",
     "assert-started",
     "friction-note",
+    "record-usage",
   ].filter((key) => args[key]);
   requireValue(actions.length <= 1, "Run one task action at a time");
   requireValue(
@@ -1114,6 +1332,14 @@ export function run(args, root = process.cwd(), services = {}) {
   requireValue(
     args["delta-from"] === undefined || args["review-packet"],
     "--delta-from requires --review-packet",
+  );
+  requireValue(
+    args["full-review"] === undefined || args["review-packet"],
+    "--full-review requires --review-packet",
+  );
+  requireValue(
+    args["usage-role"] === undefined || args["record-usage"],
+    "--usage-role requires --record-usage",
   );
   if (args.init) return startTask(args, root);
   if (args["restore-pr"]) {
@@ -1131,6 +1357,25 @@ export function run(args, root = process.cwd(), services = {}) {
       ),
     );
     return restoreTask(pr, root);
+  }
+  if (args["record-usage"]) {
+    // Observation only: never refreshes, invalidates or saves the task.
+    const task = loadTask(root);
+    const role = args["usage-role"] ?? "implementer";
+    requireValue(
+      USAGE_ROLES.includes(role),
+      `--usage-role must be one of ${USAGE_ROLES.join("|")}`,
+    );
+    const usage = readTranscriptUsage(args["record-usage"]);
+    requireValue(usage, "No token usage records found in transcript");
+    const entry = {
+      action: "usage",
+      role,
+      source: path.basename(args["record-usage"]),
+      ...usage,
+    };
+    recordMetric(task, root, entry);
+    return { taskId: task.taskId, state: task.state, ...entry };
   }
   if (args["check-pr"]) {
     const task = loadTask(root);
@@ -1179,7 +1424,10 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args.artifacts)
     return { taskId: task.taskId, state: task.state, artifacts: artifactManifest(task, root) };
   if (args["review-packet"])
-    return buildReviewPacket(task, args["review-packet"], root, { deltaFrom: args["delta-from"] });
+    return buildReviewPacket(task, args["review-packet"], root, {
+      deltaFrom: args["delta-from"],
+      full: args["full-review"] === true,
+    });
   if (args["friction-note"] !== undefined) {
     requireValue(
       typeof args["friction-note"] === "string" && args["friction-note"].trim().length > 0,
@@ -1187,7 +1435,7 @@ export function run(args, root = process.cwd(), services = {}) {
     );
     task.frictionNote = args["friction-note"].trim();
     history(task, "friction_note", { note: task.frictionNote });
-    recordMetric(task, root, { action: "friction_note" });
+    recordMetric(task, root, { action: "friction_note", note: task.frictionNote.slice(0, 500) });
     saveTask(task, root);
     return task;
   }

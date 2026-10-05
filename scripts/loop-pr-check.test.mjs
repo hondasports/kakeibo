@@ -81,6 +81,40 @@ describe("GitHub delivery gates", () => {
     event.pull_request.body = "";
     expect(checkPullRequest(event).skipped).toBe("automation account");
   });
+  it("accepts the compact published block, including a delta review reference", () => {
+    const task = readyTask();
+    const reviewedHead = "c".repeat(40);
+    task.history = Array.from({ length: 40 }, (_, index) => ({
+      state: "execute",
+      event: "assessed",
+      head: index.toString(16).padStart(40, "0"),
+    }));
+    task.history[2] = { state: "review", event: "review_recorded", head: reviewedHead };
+    task.review = reviewFixture(task, { deltaFrom: reviewedHead });
+    const event = {
+      pull_request: {
+        user: { login: "person", type: "User" },
+        head: { sha: task.head, ref: task.branch },
+        base: { sha: task.baseHead },
+        body: `Human Request\n\n${stateBlock(task)}`,
+      },
+    };
+    expect(event.pull_request.body.length).toBeLessThan(JSON.stringify(task, null, 2).length);
+    expect(checkPullRequest(event, { readPaths: () => ["README.md"] }).risk.final).toBe("T1");
+  });
+  it("requires full-scope unit evidence at the PR checkpoint", () => {
+    const task = readyTask();
+    const paths = ["src/app.ts"];
+    const assessment = computeAssessment(task, paths);
+    expect(assessment.verification.unit).toBe(true);
+    task.skills = [...assessment.requiredSkills];
+    for (const kind of ["process", "lint", "unit", "build"])
+      task.verification[kind] = { head: task.head, baseHead: task.baseHead, success: true };
+    const context = { head: task.head, baseHead: task.baseHead, paths };
+    expect(() => validateCheckpoint(task, context)).not.toThrow();
+    task.verification.unit.run = { scope: "affected" };
+    expect(() => validateCheckpoint(task, context)).toThrow("Full unit verification");
+  });
   it("rejects pending checks, stale HEAD, missing required checks, and unhandled findings", () => {
     const task = readyTask();
     const pr = prFixture(task);

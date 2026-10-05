@@ -147,6 +147,10 @@
     },
     "frictionNote": {
       "type": "string"
+    },
+    "historyOmitted": {
+      "type": "integer",
+      "minimum": 0
     }
   },
   "additionalProperties": false
