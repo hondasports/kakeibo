@@ -436,6 +436,19 @@ describe("stripInvisibleMarkup", () => {
     expect(body).toBe("[todo]: fix the thing");
   });
 
+  it("keeps lines whose destination is not a valid definition", () => {
+    // Unbalanced parens, a bare `<` opener, or a paren title containing a
+    // bare `(` all make the line plain text on GitHub.
+    for (const line of ["[a]: /u(rl", "[a]: <x", "[a]: /u (a(b)", "[a]: /u extra"]) {
+      expect(stripInvisibleMarkup(line).body).toBe(line);
+    }
+  });
+
+  it("still strips definitions with balanced-paren destinations", () => {
+    const input = "[a]: /wiki/foo_(bar)\n[b]: /u (a\\(b)\nkept";
+    expect(stripInvisibleMarkup(input).body).toBe("kept");
+  });
+
   it("collapses runs of 3+ blank lines down to 2", () => {
     const { body } = stripInvisibleMarkup("a\n\n\n\n\n\nb");
     expect(body).toBe("a\n\n\nb");

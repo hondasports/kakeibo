@@ -83,8 +83,12 @@ const HTML_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
 // title, end of line. A line with trailing unquoted text (e.g.
 // `[todo]: fix the thing`) is NOT a definition — it renders as text and
 // must be kept.
+// Bare destinations follow CommonMark loosely: no whitespace/angle
+// brackets, parens only in balanced non-nested groups (so `/u(rl` or `<x`
+// is not a destination and the line stays). Parenthesized titles likewise
+// forbid unescaped `(` inside.
 const LINK_REFERENCE_LINE_PATTERN =
-  /^ {0,3}\[[^\]\n]+\]:\s*(<[^>\n]*>|\S+)(\s+("([^"\\\n]|\\.)*"|'([^'\\\n]|\\.)*'|\(([^)\\\n]|\\.)*\)))?\s*$/;
+  /^ {0,3}\[[^\]\n]+\]:\s*(<[^>\n]*>|(?:[^\s()<>\\]|\\.|\([^()\n\\]*\))+)(\s+("([^"\\\n]|\\.)*"|'([^'\\\n]|\\.)*'|\(([^()\\\n]|\\.)*\)))?\s*$/;
 const FENCE_MARKER_PATTERN = /^(`{3,}|~{3,})/;
 const FENCE_CLOSER_PATTERN = /^(`{3,}|~{3,})\s*$/;
 
