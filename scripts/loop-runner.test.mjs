@@ -1560,9 +1560,9 @@ describe("persistent task gates", () => {
       taskId: task.taskId,
       state: "execute",
     });
-    expect(lines[0].outputBytes).toBe(Buffer.byteLength(stdout[0]));
+    expect(lines[0].outputBytes).toBe(Buffer.byteLength(`${stdout[0]}\n`));
     expect(lines[1]).toMatchObject({ action: "cli_output", command: "export", exit: 1 });
-    expect(lines[1].outputBytes).toBe(Buffer.byteLength(stderr[0]));
+    expect(lines[1].outputBytes).toBe(Buffer.byteLength(`${stderr[0]}\n`));
     expect(lines[2]).toMatchObject({ action: "cli_output", command: "unknown", exit: 1 });
     // No task content is stored — only the size of the emitted output.
     for (const line of lines) {

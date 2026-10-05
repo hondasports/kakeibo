@@ -1712,12 +1712,15 @@ export function cliMain(
         ? result
         : JSON.stringify(result.version === 2 ? summarizeTask(result) : result, null, 2);
     log(output);
-    recordCliOutput(root, command, output, 0);
+    // Measure what was emitted: the print call appends a trailing newline.
+    recordCliOutput(root, command, `${output}\n`, 0);
     return 0;
   } catch (error) {
-    const output = error?.message ?? String(error);
+    // Force a string: a thrown non-Error with a truthy non-string .message would
+    // otherwise make Buffer.byteLength throw inside this catch.
+    const output = String(error?.message ?? error);
     errorLog(output);
-    recordCliOutput(root, command, output, 1);
+    recordCliOutput(root, command, `${output}\n`, 1);
     return 1;
   }
 }

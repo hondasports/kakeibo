@@ -119,12 +119,14 @@ export function aggregateMetrics(entries, { taskId = null } = {}) {
         count: 0,
         outputBytes: { total: 0, avg: 0, max: 0 },
       });
-      command.count += 1;
+      // Count only entries that actually carried a size: a malformed or
+      // hand-edited line must not drag the average down.
       if (typeof entry.outputBytes === "number") {
+        command.count += 1;
         command.outputBytes.total += entry.outputBytes;
         command.outputBytes.max = Math.max(command.outputBytes.max, entry.outputBytes);
+        command.outputBytes.avg = Math.round(command.outputBytes.total / command.count);
       }
-      command.outputBytes.avg = Math.round(command.outputBytes.total / command.count);
     }
   }
   const usage = aggregateUsage(filtered);
