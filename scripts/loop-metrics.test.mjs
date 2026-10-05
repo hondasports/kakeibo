@@ -170,6 +170,13 @@ describe("agent metrics aggregation", () => {
     expect(result.usage.total).toMatchObject({ calls: 4, output: 13, cacheRead: 20 });
     expect(result.actions.revision_changed.assessmentCarried).toBe(1);
     expect(result.actions.review_packet.byScope.increment).toBe(1);
+    // Same basename in different directories stays two transcripts.
+    const twins = aggregateMetrics([
+      { ...usage("session.jsonl", "reviewer", 3), sourceId: "aaaa" },
+      { ...usage("session.jsonl", "reviewer", 4), sourceId: "bbbb" },
+    ]);
+    expect(twins.usage.transcripts).toBe(2);
+    expect(twins.usage.byRole.reviewer.output).toBe(7);
     expect(aggregateMetrics([{ action: "verify" }]).usage).toBeUndefined();
   });
   it("honors AGENT_METRICS_FILE for the default log path", () => {
