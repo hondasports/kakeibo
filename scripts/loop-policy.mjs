@@ -1,7 +1,7 @@
 import { validateDocument } from "./loop-schema.mjs";
 import { assessChange } from "./assess-change.mjs";
 import { REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
-import { profileInputs, missingProfileInputs } from "./resolve-agent-profile.mjs";
+import { PROFILE_ORDER, profileInputs, missingProfileInputs } from "./resolve-agent-profile.mjs";
 
 export const highestTier = (...tiers) =>
   REVIEW_TIERS[Math.max(...tiers.filter(Boolean).map((tier) => REVIEW_TIERS.indexOf(tier)), 0)];
@@ -462,4 +462,45 @@ export function checkAftercare(pr, task, findings) {
     pr: pr.number,
     checkedAt: new Date().toISOString(),
   };
+}
+
+/** Shared reviewed-source gate for PR CI and read-only delivery checks. */
+export function validateCheckpoint(task, { head, baseHead, paths, root = process.cwd() }) {
+  validateTask(task, root);
+  validateSpec(task.spec, root);
+  requireValue(
+    task.head === head && task.baseHead === baseHead,
+    "Agent state does not match PR HEAD/base",
+  );
+  requireValue(["aftercare", "done"].includes(task.state), "Agent task has not completed review");
+  const selection = task.configuration?.selection;
+  requireValue(
+    selection &&
+      ["user", "auto"].includes(selection.source) &&
+      PROFILE_ORDER.includes(selection.selected) &&
+      selection.selected === task.configuration?.profile?.name,
+    "Profile decision record is required (decided at REFINE completion or user-specified)",
+  );
+  if (selection.source === "auto")
+    requireValue(
+      selection.inputs && selection.ruleVersion,
+      "Auto profile decision needs recorded inputs and rule version",
+    );
+  const assessment = computeAssessment(task, paths);
+  requireValue(
+    task.risk === highestTier(task.risk, assessment.risk.final),
+    "Retained risk is below the current floor",
+  );
+  const current = { ...task, assessment };
+  requireLocalVerification(current);
+  validateReview(current, current.review);
+  requireValue(
+    current.review.findings.every((finding) => finding.status !== "open"),
+    "Open review findings remain",
+  );
+  requireValue(
+    !assessment.review.independent || current.review.independent === true,
+    "Independent reviewer evidence is required",
+  );
+  return assessment;
 }

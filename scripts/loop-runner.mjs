@@ -37,6 +37,9 @@ import {
   verificationSummary,
   aftercareSummary,
   verificationReusable,
+  validateCheckpoint,
+  requiredVerificationKinds,
+  currentEvidence,
   CHECK_COMMANDS,
 } from "./loop-policy.mjs";
 
@@ -523,6 +526,27 @@ export function runVerification(
   });
   return task;
 }
+/** Run missing required checks serially; each completed kind is durably saved. */
+export function runRequiredVerification(task, root, run) {
+  requireValue(task.state === "execute", "Verification runs in execute");
+  requireValue(task.assessment && task.agentAssessment, "Current change assessment is required");
+  requireClean(root);
+  const before = { head: task.head, baseHead: task.baseHead };
+  const unchanged = () =>
+    git(["rev-parse", "HEAD"], root) === before.head &&
+    git(["rev-parse", `${task.baseRef}^{commit}`], root) === before.baseHead;
+  requireValue(unchanged(), "Revision changed during required verification");
+  for (const kind of requiredVerificationKinds(task)) {
+    const evidence = task.verification[kind];
+    if (evidence?.success === true && currentEvidence(evidence, task)) continue;
+    requireValue(unchanged(), "Revision changed during required verification");
+    task = runVerification(task, kind, root, run);
+    saveTask(task, root);
+  }
+  requireClean(root);
+  requireValue(unchanged(), "Revision changed during required verification");
+  return task;
+}
 export const STATE_START = "<!-- suzumemo-agent-state:start -->";
 export const STATE_END = "<!-- suzumemo-agent-state:end -->";
 export function stateBlock(task) {
@@ -535,9 +559,10 @@ function nextActions(task) {
     if (item === "assessment") actions.push("node scripts/loop-runner.mjs --assessment <file>");
     else if (item === "openMaterialDecisions")
       actions.push("resolve spec openMaterialDecisions or --event decision_required");
-    else if (item.startsWith("verify:"))
-      actions.push(`node scripts/loop-runner.mjs --verify ${item.slice(7)}`);
-    else if (item.startsWith("skill:"))
+    else if (item.startsWith("verify:")) {
+      const verify = "node scripts/loop-runner.mjs --verify-required";
+      if (!actions.includes(verify)) actions.push(verify);
+    } else if (item.startsWith("skill:"))
       actions.push(`read skills/${item.slice(6)}/SKILL.md then --assessment --skills`);
     else if (item === "review") actions.push("node scripts/loop-runner.mjs --review <file>");
     else if (item === "independent-review")
@@ -711,9 +736,14 @@ export function watchAftercare(
     now,
     sleep,
     record,
+    readOnly = false,
   } = {},
 ) {
-  requireValue(task.state === "aftercare", "GitHub aftercare runs in aftercare");
+  requireValue(
+    readOnly ? ["aftercare", "done"].includes(task.state) : task.state === "aftercare",
+    "GitHub aftercare runs in aftercare (read-only observation also accepts done)",
+  );
+  if (readOnly) task = currentCheckpointTask(task, root);
   const tick = now ?? (() => Date.now());
   const pause = sleep ?? defaultSleep;
   // Injected fetchers use the exact same shape as production so tests exercise
@@ -721,7 +751,17 @@ export function watchAftercare(
   const defaults = aftercareFetchers(pr, handled, root);
   const pollPr = fetchPr ?? defaults.fetchPr;
   const pollFindings = fetchFindings ?? defaults.fetchFindings;
-  const recordAftercare = record ?? ((t) => githubAftercare(t, pr, handled, root));
+  const recordAftercare =
+    record ??
+    (readOnly
+      ? (t) => {
+          inspectPullRequest(t, pr, handled, root, {
+            fetchPr: pollPr,
+            fetchFindings: pollFindings,
+          });
+          return t;
+        }
+      : (t) => githubAftercare(t, pr, handled, root));
   const events = [];
   const deadline = tick() + maxSeconds * 1000;
   let signature = null;
@@ -743,6 +783,18 @@ export function watchAftercare(
       recordMetric(task, root, { action: "watch_aftercare", polls, ready: true });
       return { task, events, ready: true };
     }
+    if (
+      readOnly &&
+      (snapshot.unhandledFindings > 0 ||
+        snapshot.unresolvedThreads > 0 ||
+        snapshot.failed?.some((name) => !snapshot.pending.includes(name)) ||
+        ["CHANGES_REQUESTED", "REVIEW_REQUIRED"].includes(snapshot.reviewDecision) ||
+        (snapshot.head && snapshot.head !== task.head) ||
+        (snapshot.baseHead && snapshot.baseHead !== task.baseHead))
+    ) {
+      recordMetric(task, root, { action: "watch_aftercare", polls, ready: false, readOnly: true });
+      return { task, events, ready: false, reason: "action_required" };
+    }
     if (tick() >= deadline) {
       recordMetric(task, root, { action: "watch_aftercare", polls, ready: false });
       return { task, events, ready: false };
@@ -754,7 +806,18 @@ export function githubAftercare(task, pr, handled, root) {
   requireValue(task.state === "aftercare", "GitHub aftercare runs in aftercare");
   task.aftercare = null;
   saveTask(task, root);
-  const { fetchPr, fetchFindings } = aftercareFetchers(pr, handled, root);
+  const { evidence } = inspectPullRequest(task, pr, handled, root);
+  task.aftercare = evidence;
+  history(task, "github_verified", { pr: evidence.pr });
+  recordMetric(task, root, { action: "aftercare", pr: evidence.pr, ready: evidence.ready });
+  return task;
+}
+/** Live delivery observation: remote reads only, no task or PR writes. */
+export function inspectPullRequest(task, pr, handled, root, services = {}) {
+  task = currentCheckpointTask(task, root);
+  const defaults = aftercareFetchers(pr, handled, root);
+  const fetchPr = services.fetchPr ?? defaults.fetchPr;
+  const fetchFindings = services.fetchFindings ?? defaults.fetchFindings;
   const before = fetchPr();
   const findings = fetchFindings();
   const evidence = checkAftercare(before, task, findings);
@@ -764,19 +827,68 @@ export function githubAftercare(task, pr, handled, root) {
     before.baseRefName === after.baseRefName && before.headRefOid === after.headRefOid,
     "PR changed during aftercare",
   );
-  task.aftercare = evidence;
-  history(task, "github_verified", { pr: pr.number ?? pr });
-  recordMetric(task, root, { action: "aftercare", pr: evidence.pr, ready: evidence.ready });
-  return task;
+  requireClean(root);
+  requireValue(
+    git(["rev-parse", "HEAD"], root) === task.head &&
+      git(["rev-parse", `${task.baseRef}^{commit}`], root) === task.baseHead,
+    "Local revision changed during PR observation",
+  );
+  return { evidence, snapshot: aftercareSnapshot(after, task, findings, pr) };
+}
+/** Recompute delivery requirements without rewriting the restored checkpoint. */
+function currentCheckpointTask(task, root) {
+  requireClean(root);
+  const assessment = validateCheckpoint(task, {
+    head: git(["rev-parse", "HEAD"], root),
+    baseHead: git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root),
+    paths: readChangedPaths({ base: task.baseRef, cwd: root }),
+    root,
+  });
+  return { ...task, assessment };
 }
 /**
  * Bundle everything a fresh-context independent reviewer needs into one
  * directory: task facts, the exact diff, verification evidence manifest, a
  * review template matching validateReview(), and the governing contracts.
  */
-export function buildReviewPacket(task, dir, root) {
+export function buildReviewPacket(task, dir, root, { deltaFrom } = {}) {
   requireValue(task.state === "review", "Review packets are generated in review state");
   requireClean(root);
+  let previousReview = null;
+  if (deltaFrom !== undefined) {
+    requireValue(
+      typeof deltaFrom === "string" && /^[0-9a-f]{40}$/i.test(deltaFrom) && deltaFrom !== task.head,
+      "deltaFrom must be a previous 40-character commit SHA",
+    );
+    previousReview = [...task.history]
+      .reverse()
+      .find((entry) => entry.event === "review_recorded" && entry.head === deltaFrom);
+    requireValue(previousReview, "deltaFrom must reference a previously reviewed head");
+    requireValue(
+      previousReview.baseHead === task.baseHead,
+      "deltaFrom review base changed or is unknown",
+    );
+    requireValue(
+      Array.isArray(previousReview.acceptanceCriteria) &&
+        task.spec.acceptanceCriteria.every((ac) =>
+          previousReview.acceptanceCriteria.some(
+            (entry) =>
+              entry?.id === ac.id &&
+              typeof entry.evidence === "string" &&
+              entry.evidence.trim().length > 0,
+          ),
+        ),
+      "deltaFrom review AC evidence is unavailable",
+    );
+    let ancestor = false;
+    try {
+      git(["merge-base", "--is-ancestor", deltaFrom, task.head], root);
+      ancestor = true;
+    } catch {
+      /* Unknown/non-ancestor commits require a full review. */
+    }
+    requireValue(ancestor, "deltaFrom must be an ancestor of the current head");
+  }
   mkdirSync(dir, { recursive: true });
   const written = [];
   const write = (name, content) => {
@@ -784,11 +896,22 @@ export function buildReviewPacket(task, dir, root) {
     writeFileSync(file, content, { mode: 0o600 });
     written.push(file);
   };
-  const diff = git(["diff", "--binary", "--no-renames", `${task.baseRef}...${task.head}`], root);
-  const changedPaths = git(["diff", "--name-only", `${task.baseRef}...${task.head}`], root)
-    .split("\n")
-    .filter(Boolean);
-  write("diff.patch", `${diff}\n`);
+  const fullRange = `${task.baseRef}...${task.head}`;
+  const reviewRange = deltaFrom ? `${deltaFrom}..${task.head}` : fullRange;
+  // Keep packet patches byte-for-byte; the generic Git helper trims command values.
+  const readDiff = (args) => execFileSync("git", ["diff", ...args], { cwd: root });
+  const diff = readDiff(["--binary", "--no-renames", reviewRange]);
+  const paths = (range) =>
+    readDiff(["--name-only", "--no-renames", "-z", range])
+      .toString("utf8")
+      .split("\0")
+      .filter(Boolean);
+  const changedPaths = paths(reviewRange);
+  if (previousReview) {
+    write("full-diff.patch", readDiff(["--binary", "--no-renames", fullRange]));
+    write("previous-review.json", `${JSON.stringify(previousReview, null, 2)}\n`);
+  }
+  write("diff.patch", diff);
   write("task-summary.json", `${JSON.stringify(summarizeTask(task), null, 2)}\n`);
   write("verification-manifest.json", `${JSON.stringify(artifactManifest(task, root), null, 2)}\n`);
   write(
@@ -805,6 +928,16 @@ export function buildReviewPacket(task, dir, root) {
         nonGoals: task.spec?.nonGoals ?? [],
         assumptions: task.spec?.assumptions ?? [],
         changedPaths,
+        allChangedPaths: paths(fullRange),
+        priorFindings: task.findings ?? [],
+        reviewScope: deltaFrom
+          ? {
+              kind: "increment",
+              deltaFrom,
+              fullDiff: "full-diff.patch",
+              previousReview: "previous-review.json",
+            }
+          : { kind: "full" },
         risk: task.risk,
         requiredSkills: task.assessment?.requiredSkills ?? [],
         verification: verificationSummary(task),
@@ -826,6 +959,7 @@ export function buildReviewPacket(task, dir, root) {
       {
         head: task.head,
         baseHead: task.baseHead,
+        ...(deltaFrom ? { deltaFrom } : {}),
         reviewer: "",
         independent: task.assessment?.review?.independent === true,
         context: "fresh",
@@ -887,6 +1021,7 @@ export function parseArguments(args) {
     "--explain",
     "--artifacts",
     "--watch-aftercare",
+    "--verify-required",
   ]);
   const options = new Set([
     "--init",
@@ -904,12 +1039,14 @@ export function parseArguments(args) {
     "--verify",
     "--review",
     "--aftercare",
+    "--check-pr",
     "--handled",
     "--spec",
     "--restore-pr",
     "--sync-pr",
     "--export-file",
     "--review-packet",
+    "--delta-from",
     "--interval-seconds",
     "--scope",
     "--friction-note",
@@ -948,8 +1085,10 @@ export function run(args, root = process.cwd(), services = {}) {
     "spec",
     "assessment",
     "verify",
+    "verify-required",
     "review",
     "aftercare",
+    "check-pr",
     "event",
     "restore-pr",
     "sync-pr",
@@ -964,14 +1103,18 @@ export function run(args, root = process.cwd(), services = {}) {
   ].filter((key) => args[key]);
   requireValue(actions.length <= 1, "Run one task action at a time");
   requireValue(
-    !args["watch-aftercare"] || args.aftercare,
-    "--watch-aftercare requires --aftercare",
+    !args["watch-aftercare"] || args.aftercare || args["check-pr"],
+    "--watch-aftercare requires --aftercare or --check-pr",
   );
   requireValue(
     args["interval-seconds"] === undefined || args["watch-aftercare"],
     "--interval-seconds requires --watch-aftercare",
   );
   requireValue(args.scope === undefined || args.verify, "--scope requires --verify");
+  requireValue(
+    args["delta-from"] === undefined || args["review-packet"],
+    "--delta-from requires --review-packet",
+  );
   if (args.init) return startTask(args, root);
   if (args["restore-pr"]) {
     requireValue(!existsSync(taskPath(root)), "A local task already exists");
@@ -989,6 +1132,37 @@ export function run(args, root = process.cwd(), services = {}) {
     );
     return restoreTask(pr, root);
   }
+  if (args["check-pr"]) {
+    const task = loadTask(root);
+    if (args["watch-aftercare"]) {
+      const interval = args["interval-seconds"];
+      requireValue(
+        interval === undefined || (Number.isFinite(Number(interval)) && Number(interval) >= 1),
+        "--interval-seconds must be a number >= 1",
+      );
+      const result = watchAftercare(task, args["check-pr"], root, {
+        ...services,
+        handled: args.handled,
+        readOnly: true,
+        intervalSeconds: interval === undefined ? undefined : Number(interval),
+      });
+      return {
+        taskId: task.taskId,
+        state: task.state,
+        ready: result.ready,
+        watch: result.events,
+        ...(result.reason ? { reason: result.reason } : {}),
+      };
+    }
+    const { evidence, snapshot } = inspectPullRequest(
+      task,
+      args["check-pr"],
+      args.handled,
+      root,
+      services,
+    );
+    return { taskId: task.taskId, state: task.state, ...snapshot, checkedAt: evidence.checkedAt };
+  }
   let task = refreshTask(loadTask(root), root);
   saveTask(task, root); // Persist invalidation even if the requested action fails.
   requireValue(
@@ -1004,7 +1178,8 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args.explain) return explainTask(task, root);
   if (args.artifacts)
     return { taskId: task.taskId, state: task.state, artifacts: artifactManifest(task, root) };
-  if (args["review-packet"]) return buildReviewPacket(task, args["review-packet"], root);
+  if (args["review-packet"])
+    return buildReviewPacket(task, args["review-packet"], root, { deltaFrom: args["delta-from"] });
   if (args["friction-note"] !== undefined) {
     requireValue(
       typeof args["friction-note"] === "string" && args["friction-note"].trim().length > 0,
@@ -1040,6 +1215,7 @@ export function run(args, root = process.cwd(), services = {}) {
   }
   if (args.verify)
     task = runVerification(task, args.verify, root, undefined, { scope: args.scope });
+  if (args["verify-required"]) task = runRequiredVerification(task, root, services.runVerification);
   if (args.review) {
     requireClean(root);
     requireValue(task.state === "review", "Record review in review state");
@@ -1047,7 +1223,12 @@ export function run(args, root = process.cwd(), services = {}) {
     validateReview(task, report);
     task.review = report;
     task.findings = report.findings;
-    history(task, "review_recorded", { reviewer: report.reviewer, findings: report.findings });
+    history(task, "review_recorded", {
+      reviewer: report.reviewer,
+      findings: report.findings,
+      baseHead: task.baseHead,
+      acceptanceCriteria: report.acceptanceCriteria,
+    });
     refreshTask(task, root);
   }
   if (args.aftercare) {
@@ -1097,7 +1278,10 @@ export function run(args, root = process.cwd(), services = {}) {
       return { taskId: task.taskId, state: task.state, written: args["export-file"] };
     }
     const pr = JSON.parse(
-      gh(["pr", "view", args["sync-pr"], "--json", "body,headRefOid,baseRefOid"], root),
+      (services.gh ?? gh)(
+        ["pr", "view", args["sync-pr"], "--json", "body,headRefOid,baseRefOid"],
+        root,
+      ),
     );
     requireValue(
       pr.headRefOid === task.head && pr.baseRefOid === task.baseHead,
@@ -1106,17 +1290,19 @@ export function run(args, root = process.cwd(), services = {}) {
     const body = pr.body.includes(STATE_START)
       ? pr.body.replace(
           /<!-- suzumemo-agent-state:start -->[\s\S]*?<!-- suzumemo-agent-state:end -->/,
-          block,
+          () => block,
         )
       : `${pr.body}\n\n${block}`;
+    if (body === pr.body) return { ...summarizeTask(task), pr: args["sync-pr"], synced: false };
     const temp = mkdtempSync(path.join(tmpdir(), "agent-state-"));
     try {
       const file = path.join(temp, "body.md");
       writeFileSync(file, body, { mode: 0o600 });
-      gh(["pr", "edit", args["sync-pr"], "--body-file", file], root);
+      (services.gh ?? gh)(["pr", "edit", args["sync-pr"], "--body-file", file], root);
     } finally {
       rmSync(temp, { recursive: true, force: true });
     }
+    return { ...summarizeTask(task), pr: args["sync-pr"], synced: true };
   }
   return task;
 }

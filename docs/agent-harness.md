@@ -46,14 +46,13 @@ assessmentは `scripts/review-depth.mjs` のrisk_assessment・tier_rationale・a
 変更をcommitしてから検証する。pre-commitは初期化済みEXECUTE状態を要求する。
 
 ```bash
-node scripts/loop-runner.mjs --verify process
-node scripts/loop-runner.mjs --verify lint
-node scripts/loop-runner.mjs --verify unit
-node scripts/loop-runner.mjs --verify build
+node scripts/loop-runner.mjs --verify-required
 node scripts/loop-runner.mjs --event ready
 ```
 
 必要な検証のみ実行する。固定コマンドをCLIが起動し、終了結果を現在HEAD/baseへ紐づける。processはドキュメント整合とprocessテスト、lintはlintとformat、unitはVitest全体、buildは本番ビルド。dirty treeでは証跡を確定しない。
+
+`--verify-required` は現在の評価で必須のlocal検証を直列実行し、成功したkindごとに証跡を保存する。現在HEAD/baseで成功済みのkindは省略し、最初の失敗で停止する。E2Eは従来どおりGitHubのdelivery gateとなる。修正・再開時にHEAD/baseが変われば通常の失効判定を適用する。単独kindの `--verify <kind>` も利用できる。状態ファイルを更新するrunnerを同じworktreeで並行起動しない。
 
 unitだけ `--scope affected` で差分連動にできる。変更ファイルのうちvitestが関連テストを解決できるもの（テスト可能な拡張子・`e2e/`・metadata-only以外・存在するファイル）へ `vitest related` を実行し、証跡にはscopeと対象ファイルを記録する。関連テストが存在しない変更ではvitestが `No test files found` で失敗するため、その場合はfull scopeで再実行する。候補が0件の場合はfull commandへ戻り、証跡は `scope: "full"` と記録される。既定はfullであり、CIは常にfull suiteを実行する。
 
@@ -96,6 +95,8 @@ node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet
 # dirはworktree外を推奨する（内側だと生成後にtreeが汚れる）
 ```
 
+再レビューは `--review-packet <dir> --delta-from <reviewed-head>` で増分資料を生成できる。`diff.patch` と `changedPaths` はその起点からの増分となり、`full-diff.patch`・`allChangedPaths` で全体を参照できる。`previous-review.json` は過去のAC証跡とfinding、`priorFindings` は引き継ぐ指摘を含む。雛形の `deltaFrom` も設定される。起点は記録済み・同一base・現在HEADのancestorが必要で、base/AC記録のない旧形式は通常の全差分packetへ戻す。全ACの記録とRisk Floor・fresh独立レビューは維持する。
+
 指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、3roundごとにreassessmentを要求する。9round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。遷移時に証跡を無条件失効させることはない——証跡の失効は実際のHEAD/base変更時だけ判定する。却下で終わる指摘やmetadata-onlyの修正で全検証をやり直させないためである。同じラウンドのopen findingはまとめて修正・再検証する（`.agent/workflow/review.md` 参照）。
 
 ## PRとAFTERCARE
@@ -106,6 +107,8 @@ node scripts/loop-runner.mjs --export-file /tmp/agent-state.md
 ```
 
 `--export` は標準出力、`--export-file <path>` は指定ファイルへ同じ状態ブロックを書き出す。この状態ブロックをPR本文へ含める。Human Request、説明、更新履歴ブロックとは分離する。PR作成後・状態更新後は `--sync-pr <番号>` で既存本文を保持してブロックを更新する。この操作はGitHubへのwriteであり、ユーザーが許可したPR作業の範囲でのみ実行する。
+
+`--sync-pr` は同期後の本文が既存本文と完全一致する場合、GitHub editを行わず `synced: false` を返す。更新時は `synced: true`。Human Requestや更新履歴は保持する。頻繁なCI観測やbot確認日時だけを本文へ追記せず、復元用の状態が変わる節目で同期する。
 
 観測用のmetricsは `git rev-parse --git-common-dir` 配下の `agent-metrics.jsonl` へ1行JSONで追記する。verify（kind・durationMs・result・scope・artifactBytes・失敗signature）、revision_changed（reused/invalidated件数）、transition、aftercare、watch_aftercare（poll回数）、review_packet、friction_noteを記録する。common dir配下なのでlinked worktreeを跨いで集計でき、worktreeは汚れない。追記はbest-effortであり、失敗しても本処理を止めない。
 
@@ -124,6 +127,15 @@ node scripts/loop-runner.mjs --aftercare 123 --handled /tmp/handled.txt
 node scripts/loop-runner.mjs --event ready --handled /tmp/handled.txt
 node scripts/loop-runner.mjs --sync-pr 123
 ```
+
+状態や本文を更新せず現在のPRを確認する場合は `--check-pr` を使う。AFTERCARE/DONEで利用でき、PR CIと共通のlocal検証・レビューcheckpointを照合した後、GitHubを再取得してHEAD/base・最新CI・approval・mergeability・findingを確認する。成功時は `ready: true` と要約を返し、条件を満たさなければ失敗する。古いDONE記録だけを成功根拠にしない。
+
+```bash
+node scripts/loop-runner.mjs --check-pr 123 --handled /tmp/handled.txt
+node scripts/loop-runner.mjs --check-pr 123 --handled /tmp/handled.txt --watch-aftercare
+```
+
+check-prの監視は同じ状態変化イベントを使うが、taskのaftercare証跡やhistoryを更新しない。監視回数は観測用metricsへ残る。未処理指摘・未解決thread・新しい失敗・承認待ち・revision変更では `ready: false, reason: action_required` で即座にAgentへ戻す。同名の新しいcheckがpendingの間は、旧失敗だけで待機を中断しない。待機上限では `ready: false` を返し、完了扱いしない。DONE本文の同期後はこの経路で再確認し、観測のたびに本文同期や状態遷移を繰り返さない。handled記録はローカルの観測補助であり、別SessionではPR状態を復元した後に最新コメントを取得・再確認して作成する。復元用Spec・Risk・finding・検証・レビュー記録は従来どおり本文の状態ブロックへ保存する。
 
 CI完了を待つ場合は `--watch-aftercare` を付けてpollできる。初回snapshotは `changed:false` のeventとして必ず返し、以後は状態変化時だけcompact event（ready・pending・failed・mergeability・finding数・head/base）を返す。間隔は `--interval-seconds`（既定60秒）、上限は内部deadline（既定15分）。readyになった時点で通常のaftercare証跡を記録する。
 
