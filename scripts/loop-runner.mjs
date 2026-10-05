@@ -957,8 +957,41 @@ export function aftercareSnapshot(prFields, task, findings, pr) {
 }
 const defaultSleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 /**
+ * Event emitted on a signature change: the first poll emits the full
+ * snapshot; later polls emit only what changed — changed scalars plus
+ * added/removed members of array fields — so long pending/failed check
+ * lists are not repeated on every change.
+ */
+export function snapshotEvent(prev, next) {
+  if (!prev) return { ...next, changed: false };
+  const event = { changed: true, ready: next.ready };
+  const added = {};
+  const removed = {};
+  for (const key of new Set([...Object.keys(prev), ...Object.keys(next)])) {
+    if (key === "ready") continue; // always emitted above
+    const before = prev[key];
+    const after = next[key];
+    if (JSON.stringify(before) === JSON.stringify(after)) continue;
+    if (Array.isArray(before) && Array.isArray(after)) {
+      const plus = after.filter((item) => !before.includes(item));
+      const minus = before.filter((item) => !after.includes(item));
+      if (plus.length) (added[key] ??= []).push(...plus);
+      if (minus.length) (removed[key] ??= []).push(...minus);
+      // Same members in a different order is still a signature change.
+      if (!plus.length && !minus.length) event[key] = after;
+    } else {
+      event[key] = after;
+    }
+  }
+  if (Object.keys(added).length) event.added = added;
+  if (Object.keys(removed).length) event.removed = removed;
+  return event;
+}
+/**
  * Poll the PR until the aftercare gate would pass or `maxSeconds` elapse.
  * Only signature changes are emitted as events; unchanged polls stay silent.
+ * The returned `last` is the final full snapshot so the caller need not
+ * reconstruct state from the diff events.
  * On success the normal aftercare evidence path runs before returning.
  */
 export function watchAftercare(
@@ -1003,6 +1036,7 @@ export function watchAftercare(
   const events = [];
   const deadline = tick() + maxSeconds * 1000;
   let signature = null;
+  let prevSnapshot = null;
   let polls = 0;
   while (true) {
     polls += 1;
@@ -1014,12 +1048,15 @@ export function watchAftercare(
       snapshot = { pr, ready: false, error: String(error?.message ?? error) };
     }
     const nextSignature = JSON.stringify(snapshot);
-    if (nextSignature !== signature) events.push({ ...snapshot, changed: signature !== null });
+    if (nextSignature !== signature) {
+      events.push(snapshotEvent(prevSnapshot, snapshot));
+      prevSnapshot = snapshot;
+    }
     signature = nextSignature;
     if (snapshot.ready) {
       task = recordAftercare(task);
       recordMetric(task, root, { action: "watch_aftercare", polls, ready: true });
-      return { task, events, ready: true };
+      return { task, events, last: snapshot, ready: true };
     }
     if (
       readOnly &&
@@ -1031,11 +1068,11 @@ export function watchAftercare(
         (snapshot.baseHead && snapshot.baseHead !== task.baseHead))
     ) {
       recordMetric(task, root, { action: "watch_aftercare", polls, ready: false, readOnly: true });
-      return { task, events, ready: false, reason: "action_required" };
+      return { task, events, last: snapshot, ready: false, reason: "action_required" };
     }
     if (tick() >= deadline) {
       recordMetric(task, root, { action: "watch_aftercare", polls, ready: false });
-      return { task, events, ready: false };
+      return { task, events, last: snapshot, ready: false };
     }
     pause(intervalSeconds * 1000);
   }
@@ -1542,7 +1579,7 @@ export function run(args, root = process.cwd(), services = {}) {
         taskId: task.taskId,
         state: task.state,
         ready: result.ready,
-        watch: result.events,
+        watch: { events: result.events, last: result.last },
         ...(result.reason ? { reason: result.reason } : {}),
       };
     }
@@ -1647,8 +1684,13 @@ export function run(args, root = process.cwd(), services = {}) {
       });
       task = result.task;
       saveTask(task, root);
-      if (!result.ready) return { taskId: task.taskId, state: task.state, watch: result.events };
-      return { ...summarizeTask(task), watch: result.events };
+      if (!result.ready)
+        return {
+          taskId: task.taskId,
+          state: task.state,
+          watch: { events: result.events, last: result.last },
+        };
+      return { ...summarizeTask(task), watch: { events: result.events, last: result.last } };
     } else {
       task = githubAftercare(task, args.aftercare, args.handled, root);
     }
