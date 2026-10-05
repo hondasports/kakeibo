@@ -379,7 +379,8 @@ describe("persistent task gates", () => {
       },
     });
     expect(result.ready).toBe(true);
-    expect(result.watch).toHaveLength(2);
+    expect(result.watch.events).toHaveLength(2);
+    expect(result.watch.last.ready).toBe(true);
     expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
   });
 
@@ -1368,7 +1369,98 @@ describe("persistent task gates", () => {
       pending: ["Agent harness"],
     });
     expect(result.events[1]).toMatchObject({ ready: true, changed: true });
+    expect(result.events[1].removed).toMatchObject({ pending: ["Agent harness"] });
+    expect(result.events[1].pending).toBeUndefined();
+    expect(result.last).toMatchObject({ ready: true, pending: [], failed: [] });
     expect(result.task.aftercare.ready).toBe(true);
+  });
+  it("emits diff-only watch events with added/removed lists and changed scalars", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const prFields = (fields) => ({
+      number: 7,
+      state: "OPEN",
+      isDraft: false,
+      headRefOid: task.head,
+      baseRefOid: task.baseHead,
+      baseRefName: "preview",
+      mergeable: "MERGEABLE",
+      mergeStateStatus: "CLEAN",
+      reviewDecision: "APPROVED",
+      ...fields,
+    });
+    const check = (name, extra) => ({ name, ...extra });
+    const polls = [
+      prFields({
+        statusCheckRollup: [
+          check("Lint", { status: "IN_PROGRESS" }),
+          check("Test", { status: "IN_PROGRESS" }),
+        ],
+      }),
+      prFields({
+        mergeable: "CONFLICTING",
+        mergeStateStatus: "DIRTY",
+        statusCheckRollup: [
+          check("Test", { status: "IN_PROGRESS" }),
+          check("Lint", { status: "COMPLETED", conclusion: "FAILURE" }),
+        ],
+      }),
+      prFields({
+        statusCheckRollup: [
+          check("Test", { status: "COMPLETED", conclusion: "SUCCESS" }),
+          check("Agent harness", { status: "COMPLETED", conclusion: "SUCCESS" }),
+        ],
+      }),
+    ];
+    let t = 0;
+    const result = watchAftercare(task, 7, dir, {
+      fetchPr: () => polls.shift(),
+      fetchFindings: () => ({ pagesComplete: true, unhandledCount: 0, unresolvedThreadCount: 0 }),
+      maxSeconds: 30,
+      now: () => (t += 1000),
+      sleep: () => {},
+      record: (t) => {
+        t.aftercare = { ready: true, pr: 7 };
+        return t;
+      },
+    });
+    expect(result.ready).toBe(true);
+    expect(result.events).toHaveLength(3);
+    // First event: full snapshot.
+    expect(result.events[0]).toMatchObject({
+      changed: false,
+      ready: false,
+      pending: ["Lint", "Test"],
+      mergeable: "MERGEABLE",
+    });
+    // Second event: only the diff — Lint moved pending→failed, mergeable changed.
+    const second = result.events[1];
+    expect(second).toMatchObject({
+      changed: true,
+      ready: false,
+      mergeable: "CONFLICTING",
+      mergeStateStatus: "DIRTY",
+    });
+    expect(second.added).toEqual({ failed: ["Lint"] });
+    expect(second.removed).toEqual({ pending: ["Lint"] });
+    // Unchanged values (pending still contains Test, head/base, reviewDecision) stay out.
+    expect(second.pending).toBeUndefined();
+    expect(second.reviewDecision).toBeUndefined();
+    expect(second.head).toBeUndefined();
+    // Third event: everything cleared, ready.
+    const third = result.events[2];
+    expect(third).toMatchObject({ changed: true, ready: true, mergeable: "MERGEABLE" });
+    expect(third.removed).toEqual({ pending: ["Test"], failed: ["Lint"] });
+    // The final result always carries one complete snapshot.
+    expect(result.last).toMatchObject({
+      ready: true,
+      pending: [],
+      failed: [],
+      mergeable: "MERGEABLE",
+      head: task.head,
+    });
   });
   it("accepts watch modifiers only with --aftercare", () => {
     const { dir, task } = repository();
