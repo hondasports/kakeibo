@@ -967,9 +967,16 @@ export function snapshotEvent(prev, next) {
   const event = { changed: true, ready: next.ready };
   const added = {};
   const removed = {};
+  const removedKeys = [];
   for (const key of new Set([...Object.keys(prev), ...Object.keys(next)])) {
     if (key === "ready") continue; // always emitted above
     const before = prev[key];
+    if (!Object.hasOwn(next, key)) {
+      // JSON.stringify drops undefined, so a removed scalar key would be
+      // invisible on the wire; report it by name (e.g. error clearing).
+      removedKeys.push(key);
+      continue;
+    }
     const after = next[key];
     if (JSON.stringify(before) === JSON.stringify(after)) continue;
     if (Array.isArray(before) && Array.isArray(after)) {
@@ -985,6 +992,7 @@ export function snapshotEvent(prev, next) {
   }
   if (Object.keys(added).length) event.added = added;
   if (Object.keys(removed).length) event.removed = removed;
+  if (removedKeys.length) event.removedKeys = removedKeys;
   return event;
 }
 /**
@@ -1032,7 +1040,11 @@ export function watchAftercare(
           });
           return t;
         }
-      : (t) => githubAftercare(t, pr, handled, root));
+      : (t) =>
+          githubAftercare(t, pr, handled, root, {
+            fetchPr: pollPr,
+            fetchFindings: pollFindings,
+          }));
   const events = [];
   const deadline = tick() + maxSeconds * 1000;
   let signature = null;
@@ -1077,11 +1089,11 @@ export function watchAftercare(
     pause(intervalSeconds * 1000);
   }
 }
-export function githubAftercare(task, pr, handled, root) {
+export function githubAftercare(task, pr, handled, root, services = {}) {
   requireValue(task.state === "aftercare", "GitHub aftercare runs in aftercare");
   task.aftercare = null;
   saveTask(task, root);
-  const { evidence } = inspectPullRequest(task, pr, handled, root);
+  const { evidence } = inspectPullRequest(task, pr, handled, root, services);
   task.aftercare = evidence;
   history(task, "github_verified", { pr: evidence.pr });
   recordMetric(task, root, { action: "aftercare", pr: evidence.pr, ready: evidence.ready });
@@ -1679,6 +1691,7 @@ export function run(args, root = process.cwd(), services = {}) {
           "--interval-seconds must be a number >= 1",
         );
       const result = watchAftercare(task, args.aftercare, root, {
+        ...services,
         handled: args.handled,
         intervalSeconds: interval === undefined ? undefined : Number(interval),
       });

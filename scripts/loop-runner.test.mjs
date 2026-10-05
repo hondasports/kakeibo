@@ -386,6 +386,47 @@ describe("persistent task gates", () => {
     expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
   });
 
+  it("returns watch events and last on the --aftercare path, ready or not", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    let reads = 0;
+    const ready = run({ aftercare: "7", "watch-aftercare": true }, dir, {
+      fetchPr: () =>
+        delivery(
+          task,
+          ++reads === 1
+            ? { statusCheckRollup: [{ name: "Agent harness", status: "IN_PROGRESS" }] }
+            : {},
+        ),
+      fetchFindings: () => completeFindings,
+      sleep: () => {},
+    });
+    expect(ready.watch.events).toHaveLength(2);
+    expect(ready.watch.last).toMatchObject({ ready: true, pending: [], failed: [] });
+    expect(ready.aftercare.ready).toBe(true);
+
+    let clock = 0;
+    const notReady = run({ aftercare: "7", "watch-aftercare": true }, dir, {
+      fetchPr: () =>
+        delivery(task, {
+          statusCheckRollup: [{ name: "Agent harness", status: "IN_PROGRESS" }],
+        }),
+      fetchFindings: () => completeFindings,
+      now: () => clock,
+      sleep: () => {
+        clock += 1000;
+      },
+    });
+    expect(notReady.watch.events).toHaveLength(1);
+    expect(notReady.watch.last).toMatchObject({
+      ready: false,
+      pending: ["Agent harness"],
+    });
+    expect(notReady.ready).toBeUndefined();
+  });
+
   it("skips identical PR bodies and preserves prose and literal replacement characters", () => {
     const { dir, task } = repository();
     task.state = "aftercare";
@@ -1581,7 +1622,13 @@ describe("persistent task gates", () => {
     });
     expect(result.ready).toBe(true);
     expect(result.events[0]).toMatchObject({ ready: false, error: "gh offline" });
-    expect(result.events[1]).toMatchObject({ ready: true, changed: true });
+    // The cleared `error` key cannot serialize as undefined, so the diff event
+    // names it in removedKeys alongside the other changed fields.
+    expect(result.events[1]).toMatchObject({
+      ready: true,
+      changed: true,
+      removedKeys: ["error"],
+    });
   });
   it("resolves the metrics sink: explicit file, never the real log under vitest, else the common dir", () => {
     const { dir, git, task } = repository();
