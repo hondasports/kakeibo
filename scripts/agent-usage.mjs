@@ -41,12 +41,15 @@ function parseLines(text) {
 
 function claudeCodeUsage(lines) {
   const responses = new Map();
+  const usageLine = (line) => line.message?.role === "assistant" && line.message.usage;
+  // A main transcript that embeds sidechain (subagent) messages counts only its
+  // own responses; subagents are recorded from their own transcript (e.g.
+  // --usage-role reviewer). A subagent transcript is all sidechain and counts in full.
+  const hasMain = lines.some((line) => usageLine(line) && line.isSidechain !== true);
   for (const line of lines) {
     const message = line.message;
-    // Sidechain (subagent) messages are recorded from their own transcript
-    // (e.g. --usage-role reviewer); counting them here would double-count.
-    if (line.isSidechain === true) continue;
-    if (message?.role !== "assistant" || !message.usage) continue;
+    if (hasMain && line.isSidechain === true) continue;
+    if (!usageLine(line)) continue;
     const id = message.id ?? line.requestId ?? line.uuid;
     if (!id) continue;
     responses.set(id, { usage: message.usage, model: message.model });
