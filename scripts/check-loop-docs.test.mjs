@@ -156,6 +156,25 @@ describe("path reference checks", () => {
     );
     expect(errors).toHaveLength(0);
   });
+
+  it("accepts section anchors on existing files in links and code spans", () => {
+    const errors = checkPathReferences(
+      REPO_ROOT,
+      "docs/a.md",
+      "[詳細](development-process.md#6-verification) と `docs/development-process.md#pr-ci-e2eの差分判定` と `#same-page`",
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it("still fails on a dead path hidden behind an anchor", () => {
+    const errors = checkPathReferences(
+      REPO_ROOT,
+      "docs/a.md",
+      "[x](./missing.md#sec) `docs/missing.md#sec`",
+    );
+    expect(errors).toHaveLength(2);
+    expect(errors.every((e) => e.includes("missing.md"))).toBe(true);
+  });
 });
 
 describe("command reference checks", () => {

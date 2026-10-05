@@ -21,4 +21,4 @@ license: Apache-2.0
 - required environment不足、env sync失敗、Convex CLI未反映を「未実行理由」にして先へ進まない。復旧できなければblockerとして報告する
 - 秘密値・deployment実値をログ・PR・Issueへ出さない
 
-詳細は `docs/development-process.md` §6（Convex reflection）。
+例外ケースや背景だけ `docs/development-process.md#convex-reflection` を参照する。通常の操作は本ファイルで完結する。

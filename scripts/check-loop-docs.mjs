@@ -205,8 +205,11 @@ export function checkPathReferences(repoRoot, docPath, content) {
   for (const match of String(content).matchAll(MARKDOWN_LINK_PATTERN)) {
     const target = match[1];
     if (/^(?:https?:|mailto:|#)/.test(target)) continue;
+    // A `#fragment` suffix names a section anchor, not part of the file name —
+    // only the file portion must exist.
+    const filePart = target.split("#")[0];
     // Markdown links are resolved relative to the document (GitHub semantics).
-    const { relativePath, exists } = resolveCandidate(repoRoot, docDir, target);
+    const { relativePath, exists } = resolveCandidate(repoRoot, docDir, filePart);
     if (!exists) {
       errors.push(`${docPath}: リンク先 ${target} (${relativePath}) が存在しません`);
     }
@@ -215,7 +218,8 @@ export function checkPathReferences(repoRoot, docPath, content) {
   for (const match of String(content).matchAll(CODE_SPAN_PATTERN)) {
     const span = match[1].trim();
     if (/\s/.test(span)) continue;
-    const stripped = span.replace(/,+$/, "");
+    // `path#section` pins a heading anchor; check the file portion only.
+    const stripped = span.replace(/,+$/, "").split("#")[0];
     if (!isRepoRootPath(stripped)) continue;
     const candidate = stripped.replace(/\/$/, "");
     if (isAllowlisted(candidate)) continue;

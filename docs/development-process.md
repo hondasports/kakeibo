@@ -201,7 +201,7 @@ Agent taskで残す価値があるもの:
 
 `AGENTS.md` はRuntime共通契約、`.agent/process.yaml` はState Transitionの正本とする。基本Stateは `REFINE / EXECUTE / REVIEW / AFTERCARE`、例外Stateは `INCIDENT / HUMAN_GATE`。Workflow本体をCodex・Devin・Claude Codeの個別設定へ複製しない。
 
-具体的な開始・再開・状態保存は [Agent Harness操作手順](agent-harness.md) を参照する。
+具体的な開始・再開・状態保存は [Agent Harness詳細仕様](agent-harness-reference.md) を参照する（起動手順は [Agent Harness操作手順](agent-harness.md)）。
 
 軽量化とREFINE終了時のProfile自動判定を実装する際は [Agent Harness設計](agent-harness-design.md) を正本とする。この設計は段階的に実装中であり、本節の現行運用とState Transitionを設計文書だけで変更しない。
 
@@ -227,11 +227,11 @@ Machine Riskはschema/migration、認証・認可、削除/retention、Agent orc
 
 T1はセルフレビュー可。T2で未解決の挙動前提がある場合とT3は独立Reviewerを必須とする。Reviewerはfresh contextで目的・Acceptance Criteria・差分・検証結果・関連caller/契約を読み、実装担当の結論を先に見ずに独立評価する。
 
-修正ループの回数を減らすため、PR作業を許可されたタスクは初回REVIEW進入時にdraft PRを作り、外部レビュー（CodeRabbit）を内部レビューと並行させて同じラウンドで指摘を処理する。Reviewerは各ラウンドで指摘を重要度付きで一度に出す。full unitはREVIEW中にReviewerと並行して完了させ、REVIEW cleanの条件とする（[Agent Harness操作手順](agent-harness.md) 参照）。
+修正ループの回数を減らすため、PR作業を許可されたタスクは初回REVIEW進入時にdraft PRを作り、外部レビュー（CodeRabbit）を内部レビューと並行させて同じラウンドで指摘を処理する。Reviewerは各ラウンドで指摘を重要度付きで一度に出す。full unitはREVIEW中にReviewerと並行して完了させ、REVIEW cleanの条件とする（[Agent Harness詳細仕様](agent-harness-reference.md#レビュー) 参照）。
 
 ### AFTERCARE / Persistent State
 
-PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest HEADで確認する。タスク状態はIssue / PRを正本とし、Human Requestは保持する。Agent Spec・Machine-readable state・検証証跡を分離して残し、別SessionでもGitHubと実HEADを照合して再開できるようにする。状態はGitメタデータ内に作業キャッシュを保存し、PR本文の状態ブロックへ同期する。HEADまたはbase更新時は検証・レビューを失効させるが、CLIが不変性を証明した検証証跡は再利用し、Machine分類が不変ならAgent評価を引き継ぐ。PR本文の状態ブロックは復元とPR gateに必要な範囲へ圧縮し、完全なhistoryはGitメタデータに残す（[Agent Harness操作手順](agent-harness.md) 参照）。
+PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest HEADで確認する。タスク状態はIssue / PRを正本とし、Human Requestは保持する。Agent Spec・Machine-readable state・検証証跡を分離して残し、別SessionでもGitHubと実HEADを照合して再開できるようにする。状態はGitメタデータ内に作業キャッシュを保存し、PR本文の状態ブロックへ同期する。HEADまたはbase更新時は検証・レビューを失効させるが、CLIが不変性を証明した検証証跡は再利用し、Machine分類が不変ならAgent評価を引き継ぐ。PR本文の状態ブロックは復元とPR gateに必要な範囲へ圧縮し、完全なhistoryはGitメタデータに残す（[Agent Harness詳細仕様](agent-harness-reference.md#prとaftercare) 参照）。
 
 E2Eが必須と判定された変更でブラウザ受入条件がない場合は、PR CIで実行し、AFTERCAREでpublic/authenticated両方の成功を要求する。文書・工程管理のみなど差分判定でE2E対象外となる変更には、E2E成功を必須条件として追加しない。実行対象の判定は「PR CI E2Eの差分判定」に従う。
 
