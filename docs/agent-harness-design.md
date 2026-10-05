@@ -1,8 +1,8 @@
 # Agent Harness軽量化とProfile自動判定
 
-**状態: §5のProfile自動判定・§6のProfile適用（モデル・effort機構の撤去を含む）は実装済み。§2以降の出力・検証・証跡管理は段階的に実装中であり、実装済みの振る舞いは [Agent Harness操作手順](agent-harness.md) を正本とする。**
+**状態: §5のProfile自動判定・§6のProfile適用（モデル・effort機構の撤去を含む）は実装済み。§2以降の出力・検証・証跡管理は段階的に実装中であり、実装済みの振る舞いは [Agent Harness詳細仕様](agent-harness-reference.md) を正本とする。**
 
-この文書を、Harnessの軽量化の設計正本とする。現行の操作手順は [Agent Harness操作手順](agent-harness.md)、現在の実行契約は [AGENTS.md](../AGENTS.md) と `.agent/process.yaml` を参照する。設計を記載しただけで、現在のゲートやCLIの挙動を変更したものとして扱わない。
+この文書を、Harnessの軽量化の設計正本とする。現行の操作手順は [Agent Harness操作手順](agent-harness.md)（詳細は [Agent Harness詳細仕様](agent-harness-reference.md)）、現在の実行契約は [AGENTS.md](../AGENTS.md) と `.agent/process.yaml` を参照する。設計を記載しただけで、現在のゲートやCLIの挙動を変更したものとして扱わない。
 
 ## 1. 目的と維持する条件
 
@@ -20,7 +20,7 @@
 | モデル・effort機構 | ~~models/でモデル推奨Profile・effort対応値を管理~~ | 機構ごと撤去（実装済み） |
 | 通常出力 | ~~毎回configurationとassessmentを含むJSONを返す~~ | 現在State・不足条件・次の操作を中心に返す（実装済み） |
 | 検証 | ~~必要な検証を固定コマンドで実行し、結果を返す~~ | 必須条件を満たす検証計画とartifact-firstの証跡を使う（実装済み） |
-| 証跡の失効 | ~~HEADまたはbaseの更新で一括失効~~ | feature patchと検証対象treeが同一の検証だけ再利用し、その他は失効。さらにmetadata-only増分ではprocess以外の証跡を延長（いずれも実装済み。lintは `.md`+正規hook名のみ延長——詳細は `docs/agent-harness.md`） |
+| 証跡の失効 | ~~HEADまたはbaseの更新で一括失効~~ | feature patchと検証対象treeが同一の検証だけ再利用し、その他は失効。さらにmetadata-only増分ではprocess以外の証跡を延長（いずれも実装済み。lintは `.md`+正規hook名のみ延長——詳細は `docs/agent-harness-reference.md`） |
 | 検証の往復 |  | 必須kindの個別実行に加え、`--verify-required` による直列一括実行・成功済み証跡の保持を実装済み |
 | 再レビュー資料 |  | `--delta-from` で増分・前回AC証跡・全体参照を提供し、条件を満たす記録があれば自動で増分を選ぶ（`--full-review` で全差分）。templateは過去findingを事前記入し、severityを記録できる（実装済み）。全AC記録とfresh独立レビューを維持 |
 | PR同期と観測 |  | 同一本文はwrite省略。`--check-pr` は状態を更新せずAFTERCARE/DONEを確認（実装済み）。観測を本文同期から分離 |

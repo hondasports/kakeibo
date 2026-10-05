@@ -10,7 +10,7 @@ PR作成後のlatest HEADに対してCI・レビュー指摘・承認・競合�
 - owner approval等の人間承認が必要なら `decision_required` とする。
 - pending、API取得失敗、required check未観測、HEAD変更はready扱いしない。
 - CI待ちは `--aftercare <番号> --watch-aftercare` でpollできる。初回snapshotは `changed:false` のeventとして必ず返し、以後は状態変化時だけ差分event（変化した項目＋`added`/`removed`のpending/failed＋消えたキー名の `removedKeys`）を返す。結果の `watch.last` に最終snapshot全体を含む。変化なしのpollは出力なし。待たず即時確認が既定。
-- 状態や本文を更新しない観測には `--check-pr <番号>` を使う。AFTERCARE/DONEで同じHEAD/base・検証・レビュー・最新CI・finding判定を適用し、taskの成功記録を書き換えない。待機は `--check-pr <番号> --watch-aftercare` に集約し、別のCI確認ループを重ねない。
+- 状態や本文を更新しない観測には `--check-pr <番号>` を使う。AFTERCARE/DONEで同じHEAD/base・検証・レビュー・最新CI・finding判定を適用し、taskの成功記録を書き換えない。待機は `--check-pr <番号> --watch-aftercare` に集約し、別のCI確認ループを重ねない。PRの状態確認は `--check-pr` に統一し、`gh pr view` で本文（body）を取得しない——状態ブロックごとcontextへ読み込まれるため。`gh` が必要な場合だけ `--json` で body 以外のフィールドを指定する。
 - read-only監視で未処理指摘・未解決thread・新しい失敗・承認待ち・revision変更を検出したら `ready: false, reason: action_required` でAgentへ戻す。判断が必要な状態のまま待機を繰り返さない。
 - `--sync-pr` はPR作成後・修正HEADのレビュー完了・状態遷移など復元用checkpointが変わる節目で行う。同一本文ならwriteを省略する。bot確認日時や待機snapshotの更新だけを人間向け本文へ書き戻さない。handled記録は別ファイルで管理し、別Sessionでは最新コメントを再取得・再確認して作り直す。
 - DONE本文の同期でcheckやbotコメントが更新された場合は、`--check-pr` で現在の結果を確認する。観測結果をまた本文へ書く連鎖を作らない。新規の実指摘は通常どおりfindingsとして対応する。
