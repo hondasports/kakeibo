@@ -86,6 +86,14 @@ describe("transcript token usage", () => {
       ),
     );
     expect(usage).toMatchObject({ calls: 1, inputUncached: 1, output: 2 });
+    // A subagent's own transcript is all sidechain and still counts.
+    const subagent = transcriptUsage(
+      jsonl({
+        isSidechain: true,
+        message: { id: "sub", role: "assistant", usage: { input_tokens: 50, output_tokens: 60 } },
+      }),
+    );
+    expect(subagent).toMatchObject({ calls: 1, inputUncached: 50, output: 60 });
   });
   it("returns null when no usage record is recognized", () => {
     expect(transcriptUsage("")).toBeNull();
