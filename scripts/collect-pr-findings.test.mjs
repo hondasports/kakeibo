@@ -4,6 +4,7 @@ import {
   fetchConnectionPages,
   parseArguments,
   parseHandledContent,
+  stripInvisibleMarkup,
   toFindings,
 } from "./collect-pr-findings.mjs";
 
@@ -398,5 +399,144 @@ describe("toFindings", () => {
   it("skips a bare '--' forwarded by pnpm run", () => {
     const parsed = parseArguments(["--", "--pr", "123"]);
     expect(parsed.pr).toBe("123");
+  });
+});
+
+describe("stripInvisibleMarkup", () => {
+  it("removes single-line and multi-line HTML comments", () => {
+    const { body } = stripInvisibleMarkup(
+      "本文A<!-- hidden -->\n<!-- multi\nline\ncomment -->\n本文B",
+    );
+    expect(body).toBe("本文A\n\n本文B");
+  });
+
+  it("removes whole-line link reference definitions including vercel's [vc]: lines", () => {
+    const { body } = stripInvisibleMarkup(
+      "deployed\n[vc]: #aGVsbG8gd29ybGQ=\n[1]: https://example.com/x\nnext",
+    );
+    expect(body).toBe("deployed\nnext");
+  });
+
+  it("does not remove inline links or lines that merely start with a bracket", () => {
+    const input = "[link](https://example.com) は残す\n[partial]: trailing は消す";
+    const { body } = stripInvisibleMarkup(input);
+    expect(body).toBe("[link](https://example.com) は残す");
+  });
+
+  it("collapses runs of 3+ blank lines down to 2", () => {
+    const { body } = stripInvisibleMarkup("a\n\n\n\n\n\nb");
+    expect(body).toBe("a\n\n\nb");
+  });
+
+  it("keeps fenced code blocks verbatim including <!-- --> inside them", () => {
+    const fence = "```\n<!-- visible in code -->\n[x]: #y\n```";
+    const { body } = stripInvisibleMarkup(`head\n${fence}\ntail <!-- gone -->`);
+    expect(body).toBe(`head\n${fence}\ntail `);
+  });
+
+  it("keeps inline code verbatim including <!-- --> inside it", () => {
+    const { body } = stripInvisibleMarkup("見て `<!-- shown -->` ね <!-- gone -->");
+    expect(body).toBe("見て `<!-- shown -->` ね ");
+  });
+
+  it("keeps <details> blocks untouched", () => {
+    const details = "<details>\n<summary>指摘</summary>\nbody\n</details>";
+    const { body } = stripInvisibleMarkup(`a\n${details}\nb`);
+    expect(body).toBe(`a\n${details}\nb`);
+  });
+
+  it("reports how many characters were removed", () => {
+    const input = "x<!-- removed -->";
+    const { strippedChars } = stripInvisibleMarkup(input);
+    expect(strippedChars).toBe(input.length - "x".length);
+    expect(stripInvisibleMarkup("plain").strippedChars).toBe(0);
+  });
+
+  it("judges bodyTruncated on the normalized body, not the original", () => {
+    const padding = "<!-- " + "x".repeat(900) + " -->";
+    const visible = "y".repeat(900);
+    const result = toFindings({
+      comments: [
+        {
+          id: "IC_1",
+          body: `${visible}\n${padding}`,
+          url: "u",
+          createdAt: "2026-01-05T00:00:00Z",
+          author: { login: "h" },
+        },
+      ],
+    });
+    const finding = result.findings[0];
+    // original is >1000 chars, normalized is <1000 → no truncation
+    expect(finding.bodyTruncated).toBe(false);
+    expect(finding.body).toHaveLength(visible.length + 1);
+    expect(finding.body).toContain(visible);
+    expect(finding.strippedChars).toBeGreaterThan(0);
+  });
+
+  it("keeps a review whose body normalizes to empty, marked bodyInvisibleOnly", () => {
+    const result = toFindings({
+      reviews: [
+        {
+          id: "PRR_inv",
+          state: "COMMENTED",
+          body: "<!-- only hidden content -->",
+          url: "u",
+          submittedAt: "2026-01-05T00:00:00Z",
+          author: { login: "bot" },
+        },
+      ],
+    });
+
+    expect(result.reviewFindingCount).toBe(1);
+    const finding = result.findings[0];
+    expect(finding.body).toBe("");
+    expect(finding.bodyInvisibleOnly).toBe(true);
+    expect(finding.strippedChars).toBeGreaterThan(0);
+  });
+
+  it("still drops reviews whose ORIGINAL body is empty", () => {
+    const result = toFindings({
+      reviews: [
+        { id: "PRR_e1", state: "COMMENTED", body: "", url: "u", author: { login: "h" } },
+        { id: "PRR_e2", state: "COMMENTED", body: "  \n ", url: "u", author: { login: "h" } },
+      ],
+    });
+    expect(result.reviewFindingCount).toBe(0);
+  });
+
+  it("does not change ids, updatedAt, counts, or handled matching", () => {
+    const input = {
+      reviews: [
+        {
+          id: "PRR_1",
+          state: "COMMENTED",
+          body: "本文 <!-- hidden -->",
+          url: "u1",
+          submittedAt: "2026-01-03T00:00:00Z",
+          updatedAt: "2026-01-03T01:00:00Z",
+          author: { login: "h" },
+        },
+      ],
+      comments: [
+        {
+          id: "IC_1",
+          body: "comment\n[vc]: #abc",
+          url: "u2",
+          createdAt: "2026-01-04T00:00:00Z",
+          updatedAt: "2026-01-04T02:00:00Z",
+          author: { login: "vercel" },
+        },
+      ],
+    };
+    const everything = toFindings(input);
+    expect(everything.unhandledCount).toBe(2);
+    expect(everything.findings.map((f) => f.id)).toEqual(["PRR_1", "IC_1"]);
+    expect(everything.findings.find((f) => f.id === "IC_1").updatedAt).toBe("2026-01-04T02:00:00Z");
+
+    const handled = parseHandledContent("PRR_1 2026-01-03T01:00:00Z\nIC_1 2026-01-04T02:00:00Z\n");
+    const converged = toFindings({ ...input, handled });
+    expect(converged.unhandledCount).toBe(0);
+    expect(converged.findings).toHaveLength(2);
   });
 });
