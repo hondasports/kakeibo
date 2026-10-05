@@ -66,11 +66,25 @@ const gitPath = (root, args) => {
 export function taskPath(root) {
   return gitPath(root, ["rev-parse", "--path-format=absolute", "--git-path", "agent-task.json"]);
 }
+/**
+ * Last task-file content this process loaded or wrote, per path. A save is
+ * refused when the file changed underneath (another runner in the same
+ * worktree saved in between), turning a silent lost update into an error.
+ */
+const taskSnapshots = new Map();
 export function saveTask(task, root) {
   validateTask(task, root);
   const target = taskPath(root);
-  writeFileSync(`${target}.tmp`, `${JSON.stringify(task, null, 2)}\n`, { mode: 0o600 });
+  requireValue(
+    !taskSnapshots.has(target) ||
+      !existsSync(target) ||
+      readFileSync(target, "utf8") === taskSnapshots.get(target),
+    "Task state was changed by another runner since this one loaded it; re-run the command (do not run state-updating runners in parallel)",
+  );
+  const content = `${JSON.stringify(task, null, 2)}\n`;
+  writeFileSync(`${target}.tmp`, content, { mode: 0o600 });
   renameSync(`${target}.tmp`, target);
+  taskSnapshots.set(target, content);
 }
 export function loadTask(root) {
   const target = taskPath(root);
@@ -78,10 +92,17 @@ export function loadTask(root) {
     existsSync(target),
     "Task not initialized; run loop:state --init <spec.json> --task <id> --runtime <runtime> --implementer <id>",
   );
-  const task = readJson(target);
+  const content = readFileSync(target, "utf8");
+  const task = JSON.parse(content);
   validateTask(task, root);
+  taskSnapshots.set(target, content);
   return task;
 }
+/** Fingerprint of the acceptance criteria (ids and text) a review was recorded against. */
+export const acceptanceCriteriaHash = (spec) =>
+  createHash("sha256")
+    .update(JSON.stringify((spec?.acceptanceCriteria ?? []).map((ac) => [ac.id, ac.text])))
+    .digest("hex");
 function history(task, event, details = {}) {
   task.history.push({
     state: task.state,
@@ -287,6 +308,7 @@ export function refreshTask(task, root) {
       const candidate = computeAssessment(
         { ...task, agentAssessment: prior.agentAssessment },
         paths(),
+        root,
       );
       if (machineShape(candidate) === machineShape(prior.assessment)) {
         task.agentAssessment = prior.agentAssessment;
@@ -302,7 +324,7 @@ export function refreshTask(task, root) {
       assessmentCarried,
     });
   }
-  task.assessment = computeAssessment(task, paths());
+  task.assessment = computeAssessment(task, paths(), root);
   task.risk = highestTier(task.risk, task.assessment.risk.final);
   return task;
 }
@@ -764,7 +786,8 @@ function nextActions(task) {
   return actions;
 }
 /** Compact task snapshot for CLI output — never contains spec/history/raw logs. */
-const STATE_WORKFLOWS = {
+/** Mirrors `.agent/process.yaml` states[*].workflow; a test keeps them in sync. */
+export const STATE_WORKFLOWS = {
   refine: ".agent/workflow/refine.md",
   execute: ".agent/workflow/execute.md",
   review: ".agent/workflow/review.md",
@@ -1049,6 +1072,15 @@ function deltaReviewBasis(task, deltaFrom, root) {
   if (!previousReview) return { error: "deltaFrom must reference a previously reviewed head" };
   if (previousReview.baseHead !== task.baseHead)
     return { error: "deltaFrom review base changed or is unknown" };
+  // A narrower review may only build on one that met the same bar: the same
+  // acceptance criteria, at least the current tier, and independence when the
+  // current change requires it. Entries without these records fail closed.
+  if (previousReview.acHash !== acceptanceCriteriaHash(task.spec))
+    return { error: "deltaFrom review covered different acceptance criteria" };
+  if (!previousReview.risk || highestTier(previousReview.risk, task.risk) !== previousReview.risk)
+    return { error: "deltaFrom review was recorded below the current risk tier" };
+  if (task.assessment?.review?.independent && previousReview.independent !== true)
+    return { error: "deltaFrom review was not an independent fresh-context review" };
   if (
     !(
       Array.isArray(previousReview.acceptanceCriteria) &&
@@ -1079,7 +1111,12 @@ export function autoDeltaFrom(task, root) {
   if (!reviewed) return null;
   return deltaReviewBasis(task, reviewed.head, root).previousReview ? reviewed.head : null;
 }
-export function buildReviewPacket(task, dir, root, { deltaFrom, full = false } = {}) {
+export function buildReviewPacket(
+  task,
+  dir,
+  root,
+  { deltaFrom, full = false, externalFindings } = {},
+) {
   requireValue(task.state === "review", "Review packets are generated in review state");
   requireClean(root);
   requireValue(!(full && deltaFrom !== undefined), "--full-review conflicts with --delta-from");
@@ -1116,6 +1153,22 @@ export function buildReviewPacket(task, dir, root, { deltaFrom, full = false } =
     write("previous-review.json", `${JSON.stringify(previousReview, null, 2)}\n`);
   }
   write("diff.patch", diff);
+  // External review findings (collect-pr-findings output) go to the
+  // independent reviewer as input, so the reviewer adjudicates them in the
+  // same round instead of the implementer editing the reviewer's report.
+  if (externalFindings !== undefined) {
+    let external;
+    try {
+      external = JSON.parse(readFileSync(externalFindings, "utf8"));
+    } catch {
+      external = undefined;
+    }
+    requireValue(
+      external && typeof external === "object",
+      "--external-findings must be a JSON file (collect-pr-findings output)",
+    );
+    write("external-findings.json", `${JSON.stringify(external, null, 2)}\n`);
+  }
   write("task-summary.json", `${JSON.stringify(summarizeTask(task), null, 2)}\n`);
   write("verification-manifest.json", `${JSON.stringify(artifactManifest(task, root), null, 2)}\n`);
   write(
@@ -1134,6 +1187,7 @@ export function buildReviewPacket(task, dir, root, { deltaFrom, full = false } =
         changedPaths,
         allChangedPaths: paths(fullRange),
         priorFindings: task.findings ?? [],
+        externalFindings: externalFindings !== undefined ? "external-findings.json" : null,
         reviewScope: deltaFrom
           ? {
               kind: "increment",
@@ -1277,6 +1331,7 @@ export function parseArguments(args) {
     "--friction-note",
     "--record-usage",
     "--usage-role",
+    "--external-findings",
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -1350,6 +1405,10 @@ export function run(args, root = process.cwd(), services = {}) {
   requireValue(
     args["usage-role"] === undefined || args["record-usage"],
     "--usage-role requires --record-usage",
+  );
+  requireValue(
+    args["external-findings"] === undefined || args["review-packet"],
+    "--external-findings requires --review-packet",
   );
   if (args.init) return startTask(args, root);
   if (args["restore-pr"]) {
@@ -1437,6 +1496,7 @@ export function run(args, root = process.cwd(), services = {}) {
     return buildReviewPacket(task, args["review-packet"], root, {
       deltaFrom: args["delta-from"],
       full: args["full-review"] === true,
+      externalFindings: args["external-findings"],
     });
   if (args["friction-note"] !== undefined) {
     requireValue(
@@ -1486,6 +1546,11 @@ export function run(args, root = process.cwd(), services = {}) {
       findings: report.findings,
       baseHead: task.baseHead,
       acceptanceCriteria: report.acceptanceCriteria,
+      // What a later incremental review may rely on: independence, the tier
+      // this review satisfied, and the exact acceptance criteria it covered.
+      independent: report.independent === true && report.context === "fresh",
+      risk: highestTier(task.risk, task.assessment?.risk?.final),
+      acHash: acceptanceCriteriaHash(task.spec),
     });
     refreshTask(task, root);
   }

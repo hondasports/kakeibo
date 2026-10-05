@@ -14,7 +14,7 @@ ProfileはREFINE終了時に、Agentが記録した評価（`blast_radius`・`un
 2. spec JSONをリポジトリ外に作り、`node scripts/loop-runner.mjs --init <spec.json> --task <id> --runtime codex|devin|claude-code --implementer <session>`。
 3. REFINE: `--assessment <file>`（4軸・tier_rationale・applied_tier・verification_load）→ `--event ready` でProfileが確定する。
 4. EXECUTE: 実装・commit → `--verify-required`（unitは差分関連のaffected）→ `--event ready`。初回のREVIEW進入時はdraft PRを作り外部レビューを並行で受ける。
-5. REVIEW: `--review-packet <dir>`（再レビューは自動で増分）を独立Reviewerへ渡し、並行して `--verify-required` でfull unitを完了する。外部指摘も同じラウンドで集約し `--review <file>` → `--event clean | findings`。
+5. REVIEW: draft PRがあれば外部指摘を収集して `--review-packet <dir> --external-findings <file>`（再レビューは条件を満たせば自動で増分）を作り、独立Reviewerへ渡す。Reviewerの作業中に `--verify-required` でfull unitを完了させ、それが終わってから `--review <file>` → `--event clean | findings`（状態を更新するrunnerは同時に1つ）。
 6. AFTERCARE: `--sync-pr <番号>` → PRをready化 → `--aftercare <番号> --watch-aftercare` → `--event ready`（DONE=merge_ready）。
 7. 計測: `--friction-note <text>`、`--record-usage <transcript.jsonl> [--usage-role reviewer]`、`node scripts/loop-metrics.mjs --task <id>`。
 
@@ -68,7 +68,7 @@ node scripts/loop-runner.mjs --event ready
 
 `--verify-required` は現在の評価で必須のlocal検証を直列実行し、成功したkindごとに証跡を保存する。現在HEAD/baseで成功済みのkindは省略し、最初の失敗で停止する。E2Eは従来どおりGitHubのdelivery gateとなる。修正・再開時にHEAD/baseが変われば通常の失効判定を適用する。単独kindの `--verify <kind>` も利用できる。状態ファイルを更新するrunnerを同じworktreeで並行起動しない。
 
-unitの範囲はゲートごとに異なる。EXECUTEの `--verify-required` はunitを差分関連（affected）で実行し、EXECUTE→REVIEWはそれで満たせる。REVIEW clean・AFTERCARE ready・PR checkpoint（`Agent harness` CI）はcurrent HEADのfull unit証跡を必須とし、affectedの証跡では通らない（不足は `verify:unit(full)` と表示される）。REVIEW状態の `--verify-required` は残りのfull unitだけを実行するので、独立Reviewerへpacketを渡した後、レビューと並行して実行できる。full unitが失敗したら `--event findings` でEXECUTEへ戻す。
+unitの範囲はゲートごとに異なる。EXECUTEの `--verify-required` はunitを差分関連（affected）で実行し、EXECUTE→REVIEWはそれで満たせる。REVIEW clean・AFTERCARE ready・PR checkpoint（`Agent harness` CI）はcurrent HEADのfull unit証跡を必須とし、affectedの証跡では通らない（不足は `verify:unit(full)` と表示される）。REVIEW状態の `--verify-required` は残りのfull unitだけを実行するので、独立Reviewerへpacketを渡した後、レビューと並行して実行できる。並行するのはrunnerとReviewerであり、`--review` の記録は `--verify-required` の終了後に行う。状態ファイルは読み込み時点から別runnerに書き換えられていると保存を拒否する（lost updateを防ぐ）ので、その場合はコマンドを再実行する。full unitが失敗したら `--event findings` でEXECUTEへ戻す。
 
 affectedは変更ファイルのうちvitestが関連テストを解決できるもの（テスト可能な拡張子・`e2e/`・metadata-only以外・存在するファイル）へ `vitest related --passWithNoTests` を実行し（process suiteのファイルはfullと同様に除外する）、証跡にscopeと対象ファイルを記録する。候補が0件の場合はfull commandへ戻り、証跡は `scope: "full"` と記録される。単独でも指定できる。
 
@@ -97,7 +97,7 @@ Reviewerへ目的・AC・実差分・検証結果・関連契約を渡す。T3�
 - `findings`: `{id, status: open | fixed | dismissed, severity?, evidence}` 配列（0件は空配列）。`severity` は任意で `blocker | major | minor | nit`。重要度にかかわらず、cleanには全findingの修正または根拠付き却下が必要
 - `deltaFrom`（任意）: 増分レビューの起点とする、過去のレビュー記録済みhead。現在HEADや未記録のSHAは拒否される
 
-ラウンド数を減らすため、各ラウンドのReviewerは対象範囲（初回は全差分・全AC）を網羅し、見つけた指摘を重要度付きで一度に出す。後のラウンドへ小出しにしない。draft PRがある場合は、記録前に `node scripts/collect-pr-findings.mjs --pr <番号>` で外部レビュー（CodeRabbit等）の未処理指摘を取得し、同じラウンドのfindingsへ含める（idは外部指摘を辿れる形にする）。記録後に届いた外部指摘はAFTERCAREで従来どおり扱う。
+ラウンド数を減らすため、各ラウンドのReviewerは対象範囲（初回は全差分・全AC）を網羅し、見つけた指摘を重要度付きで一度に出す。後のラウンドへ小出しにしない。draft PRがある場合は、packet生成前に `node scripts/collect-pr-findings.mjs --pr <番号>` で外部レビュー（CodeRabbit等）の未処理指摘をファイルへ保存し、`--review-packet <dir> --external-findings <file>` で `external-findings.json` としてpacketへ含める。外部指摘の採否は独立Reviewerが判断し、同じラウンドのfindingsへ外部指摘を辿れるidで記録する。実装担当はReviewerの報告を編集しない。packet生成後に届いた外部指摘は次のラウンドかAFTERCAREで従来どおり扱う。
 
 ```bash
 node scripts/loop-runner.mjs --review /tmp/review.json
@@ -113,7 +113,7 @@ node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet
 # dirはworktree外を推奨する（内側だと生成後にtreeが汚れる）
 ```
 
-再レビューの `--review-packet <dir>` は、現在HEAD以外で最新のレビュー記録が増分条件（同一base・全ACの証跡あり・現在HEADのancestor）を満たす場合、自動でその記録済みheadからの増分資料を生成する（`reviewScope.selection: "auto"`）。満たさない場合は全差分packetへ戻る。起点を指定する場合は `--delta-from <reviewed-head>`（条件を満たさなければ拒否）、全差分を強制する場合は `--full-review` を使う。両者は併用できない。増分では `diff.patch` と `changedPaths` が起点からの増分となり、`full-diff.patch`・`allChangedPaths` で全体を参照できる。`previous-review.json` は過去のAC証跡とfinding、`priorFindings` は引き継ぐ指摘を含む。雛形の `deltaFrom` も設定される。共有契約や前提が変わった場合、Reviewerは全差分へ範囲を広げる。全ACの記録とRisk Floor・fresh独立レビューは維持する。
+各 `review_recorded` には、そのレビューが独立・fresh contextだったか、満たしたrisk tier、ACのid・本文のfingerprintが記録される。再レビューの `--review-packet <dir>` は、現在HEAD以外で最新のレビュー記録が増分条件（同一base・全ACの証跡あり・現在HEADのancestor・同じACのfingerprint・現在のrisk以上のtier・現在独立レビューが必要なら独立レビューだったこと）を満たす場合、自動でその記録済みheadからの増分資料を生成する（`reviewScope.selection: "auto"`）。満たさない場合は全差分packetへ戻る。起点を指定する場合は `--delta-from <reviewed-head>`（条件を満たさなければ拒否）、全差分を強制する場合は `--full-review` を使う。両者は併用できない。増分では `diff.patch` と `changedPaths` が起点からの増分となり、`full-diff.patch`・`allChangedPaths` で全体を参照できる。`previous-review.json` は過去のAC証跡とfinding、`priorFindings` は引き継ぐ指摘を含む。雛形の `deltaFrom` も設定される。共有契約や前提が変わった場合、Reviewerは全差分へ範囲を広げる。全ACの記録とRisk Floor・fresh独立レビューは維持する。
 
 ```bash
 node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet-r2   # 自動で増分

@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import YAML from "yaml";
 import {
   parseArguments,
   run,
@@ -34,6 +35,8 @@ import {
   watchAftercare,
   compactTaskForExport,
   hydrateExportedTask,
+  acceptanceCriteriaHash,
+  STATE_WORKFLOWS,
   STATE_START,
   STATE_END,
   metricsPath,
@@ -79,6 +82,12 @@ const gitIn =
  * once and copying the directory (a plain repo stores no absolute paths)
  * replaces seven git spawns per test with one filesystem copy.
  */
+/** Records an earlier review must carry to serve as an incremental-review base. */
+const eligibleReview = (task) => ({
+  independent: true,
+  risk: "T3",
+  acHash: acceptanceCriteriaHash(task.spec),
+});
 function repository() {
   template ??= buildTemplateRepository();
   const dir = mkdtempSync(path.join(tmpdir(), "loop-test-"));
@@ -443,6 +452,7 @@ describe("persistent task gates", () => {
     const prior = git("rev-parse", "HEAD");
     task.history.push({
       event: "review_recorded",
+      ...eligibleReview(task),
       state: "review",
       head: prior,
       baseHead: task.baseHead,
@@ -526,6 +536,7 @@ describe("persistent task gates", () => {
     const prior = git("rev-parse", "HEAD");
     task.history.push({
       event: "review_recorded",
+      ...eligibleReview(task),
       head: prior,
       baseHead: task.baseHead,
       acceptanceCriteria: [{ id: "AC1", evidence: "Reviewed original caller" }],
@@ -563,6 +574,7 @@ describe("persistent task gates", () => {
     const prior = git("rev-parse", "HEAD");
     task.history.push({
       event: "review_recorded",
+      ...eligibleReview(task),
       head: prior,
       baseHead: task.baseHead,
       acceptanceCriteria: [{ id: "AC1", evidence: "Reviewed prior source" }],
@@ -1904,6 +1916,7 @@ describe("increment reuse and loop ergonomics", () => {
     const prior = git("rev-parse", "HEAD");
     task.history.push({
       event: "review_recorded",
+      ...eligibleReview(task),
       head: prior,
       baseHead: task.baseHead,
       acceptanceCriteria: [{ id: "AC1", evidence: "Reviewed feature" }],
@@ -2083,5 +2096,146 @@ describe("increment reuse and loop ergonomics", () => {
     writeFileSync(transcript, "{}\n");
     expect(() => run({ "record-usage": transcript }, dir)).toThrow("No token usage");
     expect(() => run({ "usage-role": "reviewer" }, dir)).toThrow("requires --record-usage");
+  });
+  it("never narrows a review onto a base that did not meet the current bar", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "feature.txt"), "feature\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feature");
+    const prior = git("rev-parse", "HEAD");
+    const entry = {
+      event: "review_recorded",
+      head: prior,
+      baseHead: task.baseHead,
+      acceptanceCriteria: [{ id: "AC1", evidence: "Reviewed" }],
+      findings: [],
+      ...eligibleReview(task),
+      risk: "T1",
+    };
+    task.history.push(entry);
+    writeFileSync(path.join(dir, "fix.txt"), "fix\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "fix");
+    refreshTask(task, dir);
+    task.state = "review";
+    task.risk = "T3";
+    task.assessment.review.independent = true;
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-bar-"));
+    dirs.push(parent);
+    const packet = (name, options) =>
+      buildReviewPacket(task, path.join(parent, name), dir, options);
+    // Lower tier than the current risk.
+    expect(autoDeltaFrom(task, dir)).toBeNull();
+    expect(packet("tier").reviewScope).toEqual({ kind: "full" });
+    expect(() => packet("tier-x", { deltaFrom: prior })).toThrow("below the current risk tier");
+    // Same tier but a self-review while independence is required.
+    entry.risk = "T3";
+    entry.independent = false;
+    expect(autoDeltaFrom(task, dir)).toBeNull();
+    expect(() => packet("indep-x", { deltaFrom: prior })).toThrow("not an independent");
+    // Independent, but the acceptance criteria text changed since.
+    entry.independent = true;
+    task.spec.acceptanceCriteria[0].text = "Task works differently";
+    expect(autoDeltaFrom(task, dir)).toBeNull();
+    expect(() => packet("ac-x", { deltaFrom: prior })).toThrow("different acceptance criteria");
+    // Legacy records without these fields fail closed.
+    task.spec.acceptanceCriteria[0].text = "Task works";
+    delete entry.acHash;
+    expect(autoDeltaFrom(task, dir)).toBeNull();
+    entry.acHash = acceptanceCriteriaHash(task.spec);
+    expect(autoDeltaFrom(task, dir)).toBe(prior);
+  });
+  it("records independence, tier and AC fingerprint with each review", () => {
+    const { dir, task } = repository();
+    task.state = "review";
+    saveTask(task, dir);
+    const file = path.join(dir, "..", `${path.basename(dir)}-review.json`);
+    dirs.push(file);
+    writeFileSync(file, JSON.stringify(reviewFixture(task)));
+    run({ review: file }, dir);
+    expect(loadTask(dir).history.at(-1)).toMatchObject({
+      event: "review_recorded",
+      independent: true,
+      risk: "T1",
+      acHash: acceptanceCriteriaHash(task.spec),
+    });
+  });
+  it("refuses to save over task state another runner changed since it was loaded", () => {
+    const { dir, task } = repository();
+    saveTask(task, dir);
+    const mine = loadTask(dir);
+    const other = JSON.parse(readFileSync(taskPath(dir), "utf8"));
+    other.attempt = 7;
+    writeFileSync(taskPath(dir), `${JSON.stringify(other, null, 2)}\n`);
+    expect(() => saveTask(mine, dir)).toThrow("changed by another runner");
+    expect(loadTask(dir).attempt).toBe(7);
+    saveTask(loadTask(dir), dir);
+  });
+  it("parses test:process linearly and disables exclusions for options or globs", () => {
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-parse-"));
+    dirs.push(parent);
+    const write = (script) =>
+      writeFileSync(
+        path.join(parent, "package.json"),
+        JSON.stringify({ scripts: { "test:process": script } }),
+      );
+    const files = Array.from({ length: 30 }, (_, index) => `scripts/f${index}.test.mjs`);
+    write(`vitest run  ${files.join(" \t ")} `);
+    const started = Date.now();
+    expect(processSuiteFiles(parent)).toEqual(files);
+    expect(Date.now() - started).toBeLessThan(500);
+    for (const script of [
+      "vitest run --config other.ts scripts/a.test.mjs",
+      "vitest run scripts/**/*.test.mjs",
+      "vitest run 'scripts/a.test.mjs'",
+      "vitest run",
+      "vitest scripts/a.test.mjs",
+    ]) {
+      write(script);
+      expect(processSuiteFiles(parent)).toEqual([]);
+    }
+  });
+  it("hands collected external findings to the independent reviewer in the packet", () => {
+    const { dir, task } = repository();
+    task.state = "review";
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-ext-"));
+    dirs.push(parent);
+    const external = path.join(parent, "external.json");
+    writeFileSync(external, JSON.stringify({ unhandledCount: 1, findings: [{ id: "CR-1" }] }));
+    buildReviewPacket(task, path.join(parent, "packet"), dir, { externalFindings: external });
+    expect(
+      JSON.parse(readFileSync(path.join(parent, "packet", "external-findings.json"), "utf8")),
+    ).toMatchObject({ unhandledCount: 1 });
+    expect(
+      JSON.parse(readFileSync(path.join(parent, "packet", "packet.json"), "utf8")).externalFindings,
+    ).toBe("external-findings.json");
+    writeFileSync(external, "not json");
+    expect(() =>
+      buildReviewPacket(task, path.join(parent, "bad"), dir, { externalFindings: external }),
+    ).toThrow("--external-findings");
+    saveTask({ ...task, state: "execute" }, dir);
+    expect(() => run({ "external-findings": external }, dir)).toThrow("requires --review-packet");
+  });
+  it("keeps the summary workflow map in sync with process.yaml", () => {
+    const config = YAML.parse(readFileSync(path.join(root, ".agent/process.yaml"), "utf8"));
+    const fromProcess = Object.fromEntries(
+      Object.entries(config.states)
+        .filter(([, state]) => state.workflow)
+        .map(([name, state]) => [name, state.workflow]),
+    );
+    expect(STATE_WORKFLOWS).toEqual(fromProcess);
+  });
+  it("labels reused affected unit evidence so the full-suite gap stays visible", () => {
+    const task = taskFixture(root);
+    task.assessment.verification.unit = true;
+    task.verification.unit = {
+      ...verificationManifestFixture(task, "unit"),
+      run: { head: task.head, baseHead: task.baseHead, scope: "affected" },
+      reuse: { basis: "identical_patch_and_tree" },
+    };
+    expect(verificationSummary(task).unit).toBe("pass(reused,affected)");
+    expect(task.assessment.verificationPlan.find((plan) => plan.kind === "unit").scope).toContain(
+      "excluding test:process",
+    );
   });
 });
