@@ -20,7 +20,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { decideProfile, resolveAgentProfile } from "./resolve-agent-profile.mjs";
-import { readChangedPaths } from "./suggest-skills.mjs";
+import { readBranchChangedPaths, readWorktreeChangedPaths } from "./suggest-skills.mjs";
 import { isMetadataOnlyPath, normalizeChangedPath } from "./classify-e2e-relevance.mjs";
 import { validateAssessment } from "./review-depth.mjs";
 import { readTranscriptUsage, USAGE_ROLES } from "./agent-usage.mjs";
@@ -49,8 +49,22 @@ import {
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
 const git = (args, root) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+/**
+ * File-content memoization keyed by path + mtime: a single run parses these
+ * documents many times, and an edit between calls (e.g. tests rewriting the
+ * config) busts the entry instead of going stale.
+ */
+const fileMemo = (cache, file, parse) => {
+  const stamp = statSync(file).mtimeMs;
+  const hit = cache.get(file);
+  if (hit && hit.stamp === stamp) return hit.value;
+  const value = parse(readFileSync(file, "utf8"));
+  cache.set(file, { stamp, value });
+  return value;
+};
+const processConfigCache = new Map();
 const processConfig = (root) =>
-  YAML.parse(readFileSync(path.join(root, ".agent/process.yaml"), "utf8"));
+  fileMemo(processConfigCache, path.join(root, ".agent/process.yaml"), YAML.parse);
 export { CHECK_COMMANDS };
 /**
  * Git path lookups are stable for a given worktree root, and every
@@ -131,15 +145,43 @@ function invalidate(task) {
   task.agentAssessment = null;
   task.skills = [];
 }
-/** SHA-256 of the merge-base feature patch; null means unknown → fail closed. */
-function featurePatchSha256(task, root, head = task.head) {
+/**
+ * Revision-keyed memo for the merge-base patch hash: a single run asks for the
+ * same (baseRef, head) digest once per verification kind and again during
+ * invalidation/review-packet building, each spawning a full `git diff
+ * --binary`. Keyed on head+base so a moved revision never reuses a stale
+ * value; misses and nulls both memoize (null stays fail-closed).
+ */
+const patchSha256Cache = new Map();
+export function featurePatchSha256(task, root, head = task.head, services = {}) {
+  const run = services.git ?? git;
+  const key = `${path.resolve(root)}${task.baseRef}${head}`;
+  if (patchSha256Cache.has(key)) return patchSha256Cache.get(key);
+  let value = null;
   try {
-    return createHash("sha256")
-      .update(git(["diff", "--binary", "--no-renames", `${task.baseRef}...${head}`], root))
+    value = createHash("sha256")
+      .update(run(["diff", "--binary", "--no-renames", `${task.baseRef}...${head}`], root))
       .digest("hex");
   } catch {
-    return null;
+    value = null;
   }
+  patchSha256Cache.set(key, value);
+  return value;
+}
+/**
+ * changedPaths (committed ∪ worktree) with the committed diff memoized per
+ * (root, base, head): the committed set is fixed for a revision while the
+ * worktree set is re-read every call so uncommitted edits never go stale.
+ */
+const committedPathsCache = new Map();
+export function readChangedPathsRevisioned(root, base, head) {
+  // `head` is the caller's just-read HEAD and must match the real worktree
+  // HEAD — the committed diff itself is computed against HEAD literally.
+  const key = `${path.resolve(root)}${base}${head}`;
+  if (!committedPathsCache.has(key))
+    committedPathsCache.set(key, readBranchChangedPaths({ base, cwd: root }));
+  const worktree = readWorktreeChangedPaths({ cwd: root });
+  return [...new Set([...committedPathsCache.get(key), ...worktree])].sort();
 }
 /**
  * Paths vitest can relate tests to for `--verify unit --scope affected`:
@@ -302,7 +344,7 @@ export function refreshTask(task, root) {
   const head = git(["rev-parse", "HEAD"], root);
   const baseHead = git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root);
   let changedPaths;
-  const paths = () => (changedPaths ??= readChangedPaths({ base: task.baseRef, cwd: root }));
+  const paths = () => (changedPaths ??= readChangedPathsRevisioned(root, task.baseRef, head));
   if (head !== task.head || baseHead !== task.baseHead) {
     const prior = {
       assessment: task.assessment,
@@ -532,7 +574,7 @@ export function runVerification(
   let appliedScope = "full";
   let affectedFiles = null;
   if (kind === "unit" && scope === "affected") {
-    affectedFiles = readChangedPaths({ base: task.baseRef, cwd: root })
+    affectedFiles = readChangedPathsRevisioned(root, task.baseRef, git(["rev-parse", "HEAD"], root))
       .map(normalizeChangedPath)
       .filter((file) => isUnitRelatedPath(file) && existsSync(path.join(root, file)));
     if (affectedFiles.length > 0) {
@@ -829,13 +871,16 @@ export function artifactManifest(task, root = process.cwd()) {
   const manifest = {};
   for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
     const artifact = evidence.artifact
-      ? {
-          path: evidence.artifact.path,
-          resolved: resolveArtifactPath(root, evidence.artifact.path),
-          sha256: evidence.artifact.sha256,
-          bytes: evidence.artifact.bytes,
-          available: existsSync(resolveArtifactPath(root, evidence.artifact.path)),
-        }
+      ? (() => {
+          const resolved = resolveArtifactPath(root, evidence.artifact.path);
+          return {
+            path: evidence.artifact.path,
+            resolved,
+            sha256: evidence.artifact.sha256,
+            bytes: evidence.artifact.bytes,
+            available: existsSync(resolved),
+          };
+        })()
       : null;
     manifest[kind] = {
       success: evidence.success === true,
@@ -901,6 +946,12 @@ function aftercareFetchers(pr, handled, root) {
 const checkPending = (check) =>
   (check.status && check.status !== "COMPLETED") ||
   (check.state && ["PENDING", "EXPECTED"].includes(check.state));
+/** Shared --interval-seconds validation for both watch call sites. */
+const requireIntervalSeconds = (value) =>
+  requireValue(
+    value === undefined || (Number.isFinite(Number(value)) && Number(value) >= 1),
+    "--interval-seconds must be a number >= 1",
+  );
 /** Compact per-poll snapshot for --watch-aftercare; never throws on the gate. */
 export function aftercareSnapshot(prFields, task, findings, pr) {
   const checks = selectChecks(prFields.statusCheckRollup ?? []);
@@ -1055,10 +1106,11 @@ export function inspectPullRequest(task, pr, handled, root, services = {}) {
 /** Recompute delivery requirements without rewriting the restored checkpoint. */
 function currentCheckpointTask(task, root) {
   requireClean(root);
+  const head = git(["rev-parse", "HEAD"], root);
   const assessment = validateCheckpoint(task, {
-    head: git(["rev-parse", "HEAD"], root),
+    head,
     baseHead: git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root),
-    paths: readChangedPaths({ base: task.baseRef, cwd: root }),
+    paths: readChangedPathsRevisioned(root, task.baseRef, head),
     root,
   });
   return { ...task, assessment };
@@ -1489,10 +1541,7 @@ export function run(args, root = process.cwd(), services = {}) {
     const task = loadTask(root);
     if (args["watch-aftercare"]) {
       const interval = args["interval-seconds"];
-      requireValue(
-        interval === undefined || (Number.isFinite(Number(interval)) && Number(interval) >= 1),
-        "--interval-seconds must be a number >= 1",
-      );
+      requireIntervalSeconds(interval);
       const result = watchAftercare(task, args["check-pr"], root, {
         ...services,
         handled: args.handled,
@@ -1597,11 +1646,7 @@ export function run(args, root = process.cwd(), services = {}) {
     requireClean(root);
     if (args["watch-aftercare"]) {
       const interval = args["interval-seconds"];
-      if (interval !== undefined)
-        requireValue(
-          Number.isFinite(Number(interval)) && Number(interval) >= 1,
-          "--interval-seconds must be a number >= 1",
-        );
+      requireIntervalSeconds(interval);
       const result = watchAftercare(task, args.aftercare, root, {
         handled: args.handled,
         intervalSeconds: interval === undefined ? undefined : Number(interval),
