@@ -2084,11 +2084,28 @@ describe("increment reuse and loop ergonomics", () => {
       cacheWrite: 7,
       output: 7,
     });
-    expect(JSON.parse(readFileSync(metrics, "utf8").trim())).toMatchObject({
+    const recorded = JSON.parse(readFileSync(metrics, "utf8").trim());
+    expect(recorded).toMatchObject({
       action: "usage",
       taskId: task.taskId,
       source: path.basename(transcript),
     });
+    // sourceId is a stable 16-hex path digest: same path → same id, and no
+    // local path is written to the metrics log.
+    expect(recorded.sourceId).toMatch(/^[0-9a-f]{16}$/);
+    expect(JSON.stringify(recorded)).not.toContain(path.dirname(transcript));
+    process.env.AGENT_METRICS_FILE = metrics;
+    try {
+      expect(run({ "record-usage": transcript }, dir).sourceId).toBe(recorded.sourceId);
+      const twin = path.join(dir, "..", `${path.basename(dir)}-twin`);
+      dirs.push(twin);
+      mkdirSync(twin, { recursive: true });
+      const sameName = path.join(twin, path.basename(transcript));
+      writeFileSync(sameName, readFileSync(transcript));
+      expect(run({ "record-usage": sameName }, dir).sourceId).not.toBe(recorded.sourceId);
+    } finally {
+      delete process.env.AGENT_METRICS_FILE;
+    }
     expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
     expect(() => run({ "record-usage": transcript, "usage-role": "boss" }, dir)).toThrow(
       "--usage-role",
