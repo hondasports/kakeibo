@@ -70,7 +70,7 @@ node scripts/loop-runner.mjs --event ready
 
 unitの範囲はゲートごとに異なる。EXECUTEの `--verify-required` はunitを差分関連（affected）で実行し、EXECUTE→REVIEWはそれで満たせる。REVIEW clean・AFTERCARE ready・PR checkpoint（`Agent harness` CI）はcurrent HEADのfull unit証跡を必須とし、affectedの証跡では通らない（不足は `verify:unit(full)` と表示される）。REVIEW状態の `--verify-required` は残りのfull unitだけを実行するので、独立Reviewerへpacketを渡した後、レビューと並行して実行できる。full unitが失敗したら `--event findings` でEXECUTEへ戻す。
 
-affectedは変更ファイルのうちvitestが関連テストを解決できるもの（テスト可能な拡張子・`e2e/`・metadata-only以外・存在するファイル）へ `vitest related --passWithNoTests` を実行し、証跡にscopeと対象ファイルを記録する。候補が0件の場合はfull commandへ戻り、証跡は `scope: "full"` と記録される。単独でも指定できる。
+affectedは変更ファイルのうちvitestが関連テストを解決できるもの（テスト可能な拡張子・`e2e/`・metadata-only以外・存在するファイル）へ `vitest related --passWithNoTests` を実行し（process suiteのファイルはfullと同様に除外する）、証跡にscopeと対象ファイルを記録する。候補が0件の場合はfull commandへ戻り、証跡は `scope: "full"` と記録される。単独でも指定できる。
 
 ```bash
 node scripts/loop-runner.mjs --verify unit --scope affected

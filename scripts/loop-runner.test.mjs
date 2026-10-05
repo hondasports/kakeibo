@@ -50,6 +50,7 @@ import {
   computeAssessment,
   currentEvidence,
   missingRequirements,
+  processSuiteExcludes,
   processSuiteFiles,
   unitFullCommand,
   validateReview,
@@ -1891,6 +1892,7 @@ describe("increment reuse and loop ergonomics", () => {
     );
     // An unrecognized script never shrinks the unit suite.
     expect(unitFullCommand(parent)).toEqual([["pnpm", "exec", "vitest", "run"]]);
+    expect(processSuiteExcludes(parent)).toEqual([]);
     // The repository's own process suite is excluded from local unit runs.
     expect(processSuiteFiles(root)).toContain("scripts/loop-runner.test.mjs");
   });

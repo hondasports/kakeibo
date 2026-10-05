@@ -42,6 +42,7 @@ import {
   requiredVerificationKinds,
   currentEvidence,
   isFullScopeEvidence,
+  processSuiteExcludes,
   unitFullCommand,
   CHECK_COMMANDS,
 } from "./loop-policy.mjs";
@@ -503,7 +504,16 @@ export function runVerification(
       .filter((file) => isUnitRelatedPath(file) && existsSync(path.join(root, file)));
     if (affectedFiles.length > 0) {
       commands = [
-        ["pnpm", "exec", "vitest", "related", ...affectedFiles, "--run", "--passWithNoTests"],
+        [
+          "pnpm",
+          "exec",
+          "vitest",
+          "related",
+          ...affectedFiles,
+          "--run",
+          "--passWithNoTests",
+          ...processSuiteExcludes(root),
+        ],
       ];
       appliedScope = "affected";
     }

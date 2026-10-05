@@ -37,11 +37,12 @@ export function processSuiteFiles(root = process.cwd()) {
     return [];
   }
 }
+/** `--exclude` arguments that keep the unit kind off the process suite's files. */
+export const processSuiteExcludes = (root = process.cwd()) =>
+  processSuiteFiles(root).flatMap((file) => ["--exclude", file]);
 /** Full local unit command: the vitest suite minus files the process kind already runs. */
 export function unitFullCommand(root = process.cwd()) {
-  return [
-    [...CHECK_COMMANDS.unit[0], ...processSuiteFiles(root).flatMap((file) => ["--exclude", file])],
-  ];
+  return [[...CHECK_COMMANDS.unit[0], ...processSuiteExcludes(root)]];
 }
 /** Unit evidence from `--scope affected` cannot satisfy a gate that needs the full suite. */
 export const isFullScopeEvidence = (evidence) => (evidence?.run?.scope ?? "full") !== "affected";
