@@ -43,6 +43,9 @@ function claudeCodeUsage(lines) {
   const responses = new Map();
   for (const line of lines) {
     const message = line.message;
+    // Sidechain (subagent) messages are recorded from their own transcript
+    // (e.g. --usage-role reviewer); counting them here would double-count.
+    if (line.isSidechain === true) continue;
     if (message?.role !== "assistant" || !message.usage) continue;
     const id = message.id ?? line.requestId ?? line.uuid;
     if (!id) continue;

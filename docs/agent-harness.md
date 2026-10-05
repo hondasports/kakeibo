@@ -97,7 +97,7 @@ Reviewerへ目的・AC・実差分・検証結果・関連契約を渡す。T3�
 - `findings`: `{id, status: open | fixed | dismissed, severity?, evidence}` 配列（0件は空配列）。`severity` は任意で `blocker | major | minor | nit`。重要度にかかわらず、cleanには全findingの修正または根拠付き却下が必要
 - `deltaFrom`（任意）: 増分レビューの起点とする、過去のレビュー記録済みhead。現在HEADや未記録のSHAは拒否される
 
-ラウンド数を減らすため、各ラウンドのReviewerは対象範囲（初回は全差分・全AC）を網羅し、見つけた指摘を重要度付きで一度に出す。後のラウンドへ小出しにしない。draft PRがある場合は、packet生成前に `node scripts/collect-pr-findings.mjs --pr <番号>` で外部レビュー（CodeRabbit等）の未処理指摘をファイルへ保存し、`--review-packet <dir> --external-findings <file>` で `external-findings.json` としてpacketへ含める。外部指摘の採否は独立Reviewerが判断し、同じラウンドのfindingsへ外部指摘を辿れるidで記録する。実装担当はReviewerの報告を編集しない。packet生成後に届いた外部指摘は次のラウンドかAFTERCAREで従来どおり扱う。
+ラウンド数を減らすため、各ラウンドのReviewerは対象範囲（初回は全差分・全AC）を網羅し、見つけた指摘を重要度付きで一度に出す。後のラウンドへ小出しにしない。draft PRがある場合は、packet生成前に `node scripts/collect-pr-findings.mjs --pr <番号>` で外部レビュー（CodeRabbit等）の未処理指摘をファイルへ保存し、`--review-packet <dir> --external-findings <file>` で `external-findings.json` としてpacketへ含める（status行付きの出力をそのまま渡せる）。PRコメントは誰でも書けるため、ファイルは `untrusted: true` で包まれ、packetのcontractsに `skills/prompt-injection-guard` が同梱される。外部指摘の採否は独立Reviewerが判断し、同じラウンドのfindingsへ外部指摘を辿れるidで記録する。実装担当はReviewerの報告を編集しない。packet生成後に届いた外部指摘は次のラウンドかAFTERCAREで従来どおり扱う。
 
 ```bash
 node scripts/loop-runner.mjs --review /tmp/review.json
@@ -113,7 +113,7 @@ node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet
 # dirはworktree外を推奨する（内側だと生成後にtreeが汚れる）
 ```
 
-各 `review_recorded` には、そのレビューが独立・fresh contextだったか、満たしたrisk tier、ACのid・本文のfingerprintが記録される。再レビューの `--review-packet <dir>` は、現在HEAD以外で最新のレビュー記録が増分条件（同一base・全ACの証跡あり・現在HEADのancestor・同じACのfingerprint・現在のrisk以上のtier・現在独立レビューが必要なら独立レビューだったこと）を満たす場合、自動でその記録済みheadからの増分資料を生成する（`reviewScope.selection: "auto"`）。満たさない場合は全差分packetへ戻る。起点を指定する場合は `--delta-from <reviewed-head>`（条件を満たさなければ拒否）、全差分を強制する場合は `--full-review` を使う。両者は併用できない。増分では `diff.patch` と `changedPaths` が起点からの増分となり、`full-diff.patch`・`allChangedPaths` で全体を参照できる。`previous-review.json` は過去のAC証跡とfinding、`priorFindings` は引き継ぐ指摘を含む。雛形の `deltaFrom` も設定される。共有契約や前提が変わった場合、Reviewerは全差分へ範囲を広げる。全ACの記録とRisk Floor・fresh独立レビューは維持する。
+各 `review_recorded` には、そのレビューが独立・fresh contextだったか、満たしたrisk tier、spec（goal・ACのid/本文・non-goals・assumptions）のfingerprintが記録される。再レビューの `--review-packet <dir>` は、現在HEAD以外で最新のレビュー記録が増分条件（同一base・全ACの証跡あり・現在HEADのancestor・同じspecのfingerprint・現在のrisk以上のtier・現在独立レビューが必要なら独立レビューだったこと）を満たす場合、自動でその記録済みheadからの増分資料を生成する（`reviewScope.selection: "auto"`）。満たさない場合は全差分packetへ戻る。起点を指定する場合は `--delta-from <reviewed-head>`（条件を満たさなければ拒否）、全差分を強制する場合は `--full-review` を使う。両者は併用できない。増分では `diff.patch` と `changedPaths` が起点からの増分となり、`full-diff.patch`・`allChangedPaths` で全体を参照できる。`previous-review.json` は過去のAC証跡とfinding、`priorFindings` は引き継ぐ指摘を含む。雛形の `deltaFrom` も設定される。共有契約や前提が変わった場合、Reviewerは全差分へ範囲を広げる。全ACの記録とRisk Floor・fresh独立レビューは維持する。
 
 ```bash
 node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet-r2   # 自動で増分
@@ -124,7 +124,7 @@ node scripts/loop-runner.mjs --review-packet /tmp/issue-900-full --full-review
 
 ## PRとAFTERCARE
 
-ユーザーがPR作業を許可したタスクでは、初回のEXECUTE→REVIEW進入時にbranchをpushし、Human Requestと更新履歴ブロックを持つdraft PRを作る（`gh pr create --draft`）。状態ブロックはまだ含めない（`--export` はAFTERCARE以降のみ）。CodeRabbitはdraftもレビューするため、外部レビューが内部の独立レビューと並行して進む。draft PRでは `Agent harness` とE2Eのjobをスキップする（checkはSKIPPEDとなり、AFTERCAREが要求するSUCCESSを満たさない）。lint/test/buildのCIはdraftでも実行される。REVIEW clean後に `--sync-pr` で状態ブロックを入れてから `gh pr ready <番号>` でready化すると、`ready_for_review` で `Agent harness` とE2Eが同じHEADに対して実行される。draftはGitHubでmergeできず、AFTERCAREもnon-draftを要求するため、draft中のスキップが最終ゲートを弱めることはない。PR作業の許可がないタスクでは従来どおりAFTERCAREでPRを作る。
+ユーザーがPR作業を許可したタスクでは、初回のEXECUTE→REVIEW進入時にbranchをpushし、Human Requestと更新履歴ブロックを持つdraft PRを作る（`gh pr create --draft`）。状態ブロックはまだ含めない（`--export` はAFTERCARE以降のみ）。CodeRabbitはdraftもレビューするため、外部レビューが内部の独立レビューと並行して進む。draft PRでは `Agent harness` とE2Eのjobをスキップする（checkはSKIPPEDとなり、AFTERCAREが要求するSUCCESSを満たさない）。lint/test/buildのCIはdraftでも実行される。REVIEW clean後に `--sync-pr` で状態ブロックを入れてから `gh pr ready <番号>` でready化すると、`ready_for_review` で `Agent harness` とE2Eが同じHEADに対して実行される。draftはGitHubでmergeできず、AFTERCAREもnon-draftを要求するため、draft中のスキップが最終ゲートを弱めることはない。PR作業の許可がないタスクでは従来どおりAFTERCAREでPRを作る。REVIEW中のdraft PRには状態ブロックがないため、その間にSessionを失った場合は `--restore-pr` で復元できない。作業worktreeのGitメタデータから再開し、worktreeも失った場合はREFINEからやり直す。
 
 ```bash
 node scripts/loop-runner.mjs --export > /tmp/agent-state.md

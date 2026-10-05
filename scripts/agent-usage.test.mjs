@@ -73,6 +73,20 @@ describe("transcript token usage", () => {
       models: [],
     });
   });
+  it("skips sidechain (subagent) messages recorded in their own transcripts", () => {
+    const usage = transcriptUsage(
+      jsonl(
+        {
+          message: { id: "main", role: "assistant", usage: { input_tokens: 1, output_tokens: 2 } },
+        },
+        {
+          isSidechain: true,
+          message: { id: "sub", role: "assistant", usage: { input_tokens: 50, output_tokens: 60 } },
+        },
+      ),
+    );
+    expect(usage).toMatchObject({ calls: 1, inputUncached: 1, output: 2 });
+  });
   it("returns null when no usage record is recognized", () => {
     expect(transcriptUsage("")).toBeNull();
     expect(transcriptUsage(jsonl({ type: "user" }, { message: { role: "assistant" } }))).toBeNull();

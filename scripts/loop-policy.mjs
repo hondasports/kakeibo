@@ -52,7 +52,10 @@ export function unitFullCommand(root = process.cwd()) {
   return [[...CHECK_COMMANDS.unit[0], ...processSuiteExcludes(root)]];
 }
 /** Unit evidence from `--scope affected` cannot satisfy a gate that needs the full suite. */
-export const isFullScopeEvidence = (evidence) => (evidence?.run?.scope ?? "full") !== "affected";
+// Evidence recorded by the runner always carries run.scope; only legacy entries
+// without a `run` record (pre-scope format) are read as full.
+export const isFullScopeEvidence = (evidence) =>
+  evidence?.run ? evidence.run.scope === "full" : true;
 /** Where each verification kind executes and what it covers. */
 export const VERIFICATION_SCOPES = {
   process: { execution: "local", scope: "harness docs integrity + process test suite" },

@@ -114,6 +114,11 @@ describe("GitHub delivery gates", () => {
     expect(() => validateCheckpoint(task, context)).not.toThrow();
     task.verification.unit.run = { scope: "affected" };
     expect(() => validateCheckpoint(task, context)).toThrow("Full unit verification");
+    // A run record without an explicit full scope never counts as full.
+    task.verification.unit.run = {};
+    expect(() => validateCheckpoint(task, context)).toThrow("Full unit verification");
+    task.verification.unit.run = { scope: "full" };
+    expect(() => validateCheckpoint(task, context)).not.toThrow();
   });
   it("rejects pending checks, stale HEAD, missing required checks, and unhandled findings", () => {
     const task = readyTask();

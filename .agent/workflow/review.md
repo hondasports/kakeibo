@@ -16,7 +16,7 @@ REVIEW clean以降のゲートはcurrent HEADのfull unit証跡を要求する�
 
 findingはid・状態・根拠を持ち、任意で重要度（`severity`: blocker | major | minor | nit）を持つ。Reviewerは各ラウンドで対象範囲を網羅し、見つけた指摘を重要度にかかわらず一度に出す。後のラウンドへ小出しにしない。重要度はcleanの条件を変えない。全findingの修正または根拠付き却下が必要である。修正後は変更hunk・影響項目・open findingを再確認する。共有契約や前提が変わった場合だけ範囲を広げる。
 
-draft PRがある場合は、packet生成前に `node scripts/collect-pr-findings.mjs --pr <番号>` で外部レビュー（CodeRabbit等）の未処理指摘をファイルへ保存し、`--review-packet <dir> --external-findings <file>` で独立Reviewerへ渡す。外部指摘の採否はReviewerが仕様と照合して判断し、同じラウンドのfindingsへ外部指摘を辿れるidで記録する。実装担当はReviewerの報告を編集しない。内部・外部の指摘をEXECUTEで一度に修正し、clean後に外部指摘で全ループをやり直さないためである。外部レビューの完了を待つためにREVIEWで待機はしない。packet生成後に届いた外部指摘は次のラウンドかAFTERCAREの収集で扱う。
+draft PRがある場合は、packet生成前に `node scripts/collect-pr-findings.mjs --pr <番号>` で外部レビュー（CodeRabbit等）の未処理指摘をファイルへ保存し、`--review-packet <dir> --external-findings <file>` で独立Reviewerへ渡す（未信頼データとして包まれ、prompt-injection-guardが同梱される）。外部指摘の採否はReviewerが仕様と照合して判断し、同じラウンドのfindingsへ外部指摘を辿れるidで記録する。実装担当はReviewerの報告を編集しない。内部・外部の指摘をEXECUTEで一度に修正し、clean後に外部指摘で全ループをやり直さないためである。外部レビューの完了を待つためにREVIEWで待機はしない。packet生成後に届いた外部指摘は次のラウンドかAFTERCAREの収集で扱う。
 
 同じラウンドのopen findingはEXECUTEでまとめて修正し、まとめて再検証する。1件ごとの修正→検証→再レビュー往復をしない。
 
@@ -24,7 +24,7 @@ draft PRがある場合は、packet生成前に `node scripts/collect-pr-finding
 
 ## 再レビュー
 
-`--review-packet <dir>` は、増分条件（同一base・全ACの証跡あり・現在HEADのancestor・同じACのfingerprint・現在のrisk以上のtier・独立レビューが必要なら起点も独立レビュー）を満たす最新のレビュー記録があれば、自動でそこからの増分資料を作る。満たさなければ全差分packetになる。起点の明示は `--delta-from <reviewed-head>`、全差分の強制は `--full-review` で行う。`diff.patch` は増分、`previous-review.json` は同じbaseの過去AC・finding記録、`full-diff.patch` は範囲拡張時の参照先となる。全AC・全変更path・過去finding・必須契約は引き続き提供する。review-template.jsonには過去findingのid・status・severityが事前記入されるが、evidenceはReviewerが再確認して書く。増分で影響を受けなかった閉じたfindingは、直前レビューの参照を根拠にしてよい。
+`--review-packet <dir>` は、増分条件（同一base・全ACの証跡あり・現在HEADのancestor・同じspecのfingerprint・現在のrisk以上のtier・独立レビューが必要なら起点も独立レビュー）を満たす最新のレビュー記録があれば、自動でそこからの増分資料を作る。満たさなければ全差分packetになる。起点の明示は `--delta-from <reviewed-head>`、全差分の強制は `--full-review` で行う。`diff.patch` は増分、`previous-review.json` は同じbaseの過去AC・finding記録、`full-diff.patch` は範囲拡張時の参照先となる。全AC・全変更path・過去finding・必須契約は引き続き提供する。review-template.jsonには過去findingのid・status・severityが事前記入されるが、evidenceはReviewerが再確認して書く。増分で影響を受けなかった閉じたfindingは、直前レビューの参照を根拠にしてよい。
 
 Reviewerは増分・影響caller・open findingから確認し、影響のないACの証跡は過去レビューを参照する。全ACの `{id, evidence}` 記録は変わらず必須である。共有契約や前提が変わった場合は全差分へ広げる。報告全文はファイルに保存し、実装担当への返却は結論・指摘件数・対象HEAD・報告参照先を中心にする。
 
