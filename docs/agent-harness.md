@@ -177,6 +177,6 @@ CI完了を待つ場合は `--watch-aftercare` を付けてpollできる。初�
 node scripts/loop-runner.mjs --aftercare 123 --watch-aftercare --interval-seconds 30
 ```
 
-aftercareおよびDONEへの遷移直前はGitHubを再取得し、最新HEAD/base、CI全体、必須チェック、approval、mergeability、ページ取得完了、未処理指摘0件を確認する。E2E必須ならpublic/authenticated両方の成功を要求する。handledは `scripts/collect-pr-findings.mjs` の `<finding id> <updatedAt>` 形式。収集時、本文はGitHub上で表示されないマークアップ（HTMLコメント・行全体のリンク参照定義）を除去してから上限まで切り詰める。除去量は `strippedChars`、正規化後に本文が空になる候補は `bodyInvisibleOnly` で分かる。本文が切れている候補は全文を読んで判定する。収集コマンドのPASSだけではaftercareを完了できない。
+aftercareおよびDONEへの遷移直前はGitHubを再取得し、最新HEAD/base、CI全体、必須チェック、approval、mergeability、ページ取得完了、未処理指摘0件を確認する。E2E必須ならpublic/authenticated両方の成功を要求する。handledは `scripts/collect-pr-findings.mjs` の `<finding id> <updatedAt>` 形式。収集時、本文はGitHub上で表示されないマークアップ（HTMLコメント・行全体のリンク参照定義）を除去し、除去でできた3行以上の連続空行は2行へ詰めてから上限まで切り詰める。フェンス・インラインコード内のマークアップは表示されるため保持する。除去量は `strippedChars`、正規化後に本文が空になる候補は `bodyInvisibleOnly` で分かる。本文が切れている候補は全文を読んで判定する。収集コマンドのPASSだけではaftercareを完了できない。
 
 別worktreeから再開する場合は対象branch/HEADをcheckoutし、`--restore-pr <番号>` で復元する。復元先に既存タスクがある場合や別branchの状態は拒否する。PR本文のsnapshotが古い場合は過去のRisk・finding・counterを保持し、検証を失効してEXECUTEへ戻す。復元前にcurrent PR HEAD/baseをfetchしてcheckoutする。PR本文への同期でチェックが再実行された場合はその完了を確認する。DONEはmerge_readyを表し、merge自体はユーザーの許可に従う。
