@@ -2137,7 +2137,11 @@ describe("increment reuse and loop ergonomics", () => {
     entry.independent = true;
     task.spec.acceptanceCriteria[0].text = "Task works differently";
     expect(autoDeltaFrom(task, dir)).toBeNull();
-    expect(() => packet("ac-x", { deltaFrom: prior })).toThrow("different acceptance criteria");
+    expect(() => packet("ac-x", { deltaFrom: prior })).toThrow("different spec");
+    task.spec.acceptanceCriteria[0].text = "Task works";
+    task.spec.assumptions = ["A new assumption"];
+    expect(autoDeltaFrom(task, dir)).toBeNull();
+    task.spec.assumptions = [];
     // Legacy records without these fields fail closed.
     task.spec.acceptanceCriteria[0].text = "Task works";
     delete entry.acHash;
@@ -2196,16 +2200,29 @@ describe("increment reuse and loop ergonomics", () => {
     }
   });
   it("hands collected external findings to the independent reviewer in the packet", () => {
-    const { dir, task } = repository();
+    const { dir, git, task } = repository();
+    mkdirSync(path.join(dir, "skills", "prompt-injection-guard"), { recursive: true });
+    writeFileSync(path.join(dir, "skills", "prompt-injection-guard", "SKILL.md"), "guard\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "guard skill");
+    refreshTask(task, dir);
     task.state = "review";
     const parent = mkdtempSync(path.join(tmpdir(), "loop-ext-"));
     dirs.push(parent);
     const external = path.join(parent, "external.json");
-    writeFileSync(external, JSON.stringify({ unhandledCount: 1, findings: [{ id: "CR-1" }] }));
+    writeFileSync(
+      external,
+      `PR_FINDINGS status: PASS\n${JSON.stringify({ unhandledCount: 1, findings: [{ id: "CR-1" }] })}`,
+    );
     buildReviewPacket(task, path.join(parent, "packet"), dir, { externalFindings: external });
     expect(
       JSON.parse(readFileSync(path.join(parent, "packet", "external-findings.json"), "utf8")),
-    ).toMatchObject({ unhandledCount: 1 });
+    ).toMatchObject({ untrusted: true, collected: { unhandledCount: 1 } });
+    expect(
+      existsSync(
+        path.join(parent, "packet", "contracts", "required-skills", "prompt-injection-guard.md"),
+      ),
+    ).toBe(true);
     expect(
       JSON.parse(readFileSync(path.join(parent, "packet", "packet.json"), "utf8")).externalFindings,
     ).toBe("external-findings.json");
