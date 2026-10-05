@@ -1552,23 +1552,24 @@ describe("increment reuse and loop ergonomics", () => {
     const real2 = featurePatchSha256(task, dir, git("rev-parse", "HEAD"));
     expect(real2).not.toBe(real1);
   });
-  it("memoizes committed paths per (base, head) while re-reading worktree paths", () => {
-    const { dir, git, task } = repository();
+  it("memoizes committed paths per (baseHead, head) while re-reading worktree paths", () => {
+    const { dir, git } = repository();
+    const baseHead = git("rev-parse", "preview");
     mkdirSync(path.join(dir, "src"), { recursive: true });
     writeFileSync(path.join(dir, "src/a.ts"), "export {};\n");
     git("add", ".");
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", "a");
     const h1 = git("rev-parse", "HEAD");
-    expect(readChangedPathsRevisioned(dir, task.baseRef, h1)).toEqual(["src/a.ts"]);
+    expect(readChangedPathsRevisioned(dir, baseHead, h1)).toEqual(["src/a.ts"]);
     // Worktree edits are never served from the committed-diff memo.
     writeFileSync(path.join(dir, "src/b.ts"), "export {};\n");
-    expect(readChangedPathsRevisioned(dir, task.baseRef, h1)).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(readChangedPathsRevisioned(dir, baseHead, h1)).toEqual(["src/a.ts", "src/b.ts"]);
     git("add", ".");
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", "b");
     const h2 = git("rev-parse", "HEAD");
     // The new head resolves the committed diff afresh (no stale h1 result).
-    expect(readChangedPathsRevisioned(dir, task.baseRef, h2)).toEqual(["src/a.ts", "src/b.ts"]);
-    expect(readChangedPathsRevisioned(dir, task.baseRef, h1)).toEqual(["src/a.ts"]);
+    expect(readChangedPathsRevisioned(dir, baseHead, h2)).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(readChangedPathsRevisioned(dir, baseHead, h1)).toEqual(["src/a.ts"]);
   });
   it("extends non-process evidence through metadata-only increments", () => {
     const { dir, git, task } = repository();

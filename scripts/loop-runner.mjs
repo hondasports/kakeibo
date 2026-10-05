@@ -155,12 +155,15 @@ function invalidate(task) {
 const patchSha256Cache = new Map();
 export function featurePatchSha256(task, root, head = task.head, services = {}) {
   const run = services.git ?? git;
-  const key = `${path.resolve(root)}${task.baseRef}${head}`;
+  // Key and diff on the recorded resolved base (baseHead), not the baseRef
+  // name, so a moved ref can never alias a stale entry.
+  const base = task.baseHead ?? task.baseRef;
+  const key = `${path.resolve(root)}${base}${head}`;
   if (patchSha256Cache.has(key)) return patchSha256Cache.get(key);
   let value = null;
   try {
     value = createHash("sha256")
-      .update(run(["diff", "--binary", "--no-renames", `${task.baseRef}...${head}`], root))
+      .update(run(["diff", "--binary", "--no-renames", `${base}...${head}`], root))
       .digest("hex");
   } catch {
     value = null;
@@ -174,12 +177,13 @@ export function featurePatchSha256(task, root, head = task.head, services = {}) 
  * worktree set is re-read every call so uncommitted edits never go stale.
  */
 const committedPathsCache = new Map();
-export function readChangedPathsRevisioned(root, base, head) {
-  // `head` is the caller's just-read HEAD and must match the real worktree
-  // HEAD — the committed diff itself is computed against HEAD literally.
-  const key = `${path.resolve(root)}${base}${head}`;
+export function readChangedPathsRevisioned(root, baseHead, head) {
+  // `baseHead`/`head` are the caller's just-read resolved SHAs; keying and
+  // diffing on resolved positions means a moved ref can never alias a stale
+  // entry.
+  const key = `${path.resolve(root)}${baseHead}${head}`;
   if (!committedPathsCache.has(key))
-    committedPathsCache.set(key, readBranchChangedPaths({ base, cwd: root }));
+    committedPathsCache.set(key, readBranchChangedPaths({ base: baseHead, cwd: root }));
   const worktree = readWorktreeChangedPaths({ cwd: root });
   return [...new Set([...committedPathsCache.get(key), ...worktree])].sort();
 }
@@ -344,7 +348,7 @@ export function refreshTask(task, root) {
   const head = git(["rev-parse", "HEAD"], root);
   const baseHead = git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root);
   let changedPaths;
-  const paths = () => (changedPaths ??= readChangedPathsRevisioned(root, task.baseRef, head));
+  const paths = () => (changedPaths ??= readChangedPathsRevisioned(root, baseHead, head));
   if (head !== task.head || baseHead !== task.baseHead) {
     const prior = {
       assessment: task.assessment,
@@ -574,7 +578,11 @@ export function runVerification(
   let appliedScope = "full";
   let affectedFiles = null;
   if (kind === "unit" && scope === "affected") {
-    affectedFiles = readChangedPathsRevisioned(root, task.baseRef, git(["rev-parse", "HEAD"], root))
+    affectedFiles = readChangedPathsRevisioned(
+      root,
+      task.baseHead,
+      git(["rev-parse", "HEAD"], root),
+    )
       .map(normalizeChangedPath)
       .filter((file) => isUnitRelatedPath(file) && existsSync(path.join(root, file)));
     if (affectedFiles.length > 0) {
@@ -1107,10 +1115,11 @@ export function inspectPullRequest(task, pr, handled, root, services = {}) {
 function currentCheckpointTask(task, root) {
   requireClean(root);
   const head = git(["rev-parse", "HEAD"], root);
+  const baseHead = git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root);
   const assessment = validateCheckpoint(task, {
     head,
-    baseHead: git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root),
-    paths: readChangedPathsRevisioned(root, task.baseRef, head),
+    baseHead,
+    paths: readChangedPathsRevisioned(root, baseHead, head),
     root,
   });
   return { ...task, assessment };
