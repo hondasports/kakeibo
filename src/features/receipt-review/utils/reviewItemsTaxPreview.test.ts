@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewItemValues } from "../types/types";
-import { applyReviewItemsTaxPreview } from "./reviewItemsTaxPreview";
+import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
+import { mixedTaxReviewFixture } from "./reviewTaxPreviewTestHelpers";
+import { getReviewGuidance } from "./reviewGuidance";
+import { buildReviewChecks } from "./reviewChecks";
+import { buildDraftRegistrationItems } from "../../../../lib/domain/aiExpenseDrafts/registrationItems";
 
 function externalTaxItem(overrides: Partial<ReviewItemValues> = {}): ReviewItemValues {
   return {
@@ -79,5 +83,123 @@ describe("applyReviewItemsTaxPreview", () => {
         taxSummaries: taxSummaries.map((s) => ({ ...s, taxableAmountYen: 299 })),
       })[0],
     ).toMatchObject({ taxAllocationStatus: "unallocated" });
+  });
+});
+
+describe("共有再解釈後の明細と税内訳", () => {
+  it.each(["mode", "basis"])("%sだけ宣言された混在税の補完は1782円と確認0件を維持する", (side) => {
+    const { draft, items, form } = mixedTaxReviewFixture();
+    const summaries = draft.taxSummaries!.map((summary, index) =>
+      index === 0 && side === "basis"
+        ? { ...summary, taxMode: "unknown" as const, taxableAmountBasis: "tax_excluded" as const }
+        : summary,
+    );
+    const preview = buildReviewTaxPreview(items, { paidTotalYen: 1782, taxSummaries: summaries });
+    expect(preview.taxSummaries[0]).toMatchObject({
+      taxMode: "external",
+      taxableAmountBasis: "tax_excluded",
+      status: "verified",
+      reasons: [],
+    });
+    expect(preview.items.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+    expect(preview.items.reduce((sum, item) => sum + item.normalizedAmountYen!, 0)).toBe(1782);
+    expect(
+      buildReviewChecks({
+        items: preview.items,
+        paidTotalYen: 1782,
+        taxSummaries: preview.taxSummaries.map((summary) => ({ ...summary, confidence: {} })),
+      }),
+    ).toMatchObject({ amount: { status: "matched" }, taxRate: { status: "matched" } });
+    expect(
+      getReviewGuidance(form, preview.items, { ...draft, taxSummaries: preview.taxSummaries }),
+    ).toEqual([]);
+    expect(preview.summarySourceIndexes).toEqual([0, 1]);
+    // OCR由来のサマリは書き換えない。
+    expect(draft.taxSummaries![0].taxableAmountBasis).toBe("unknown");
+    const registered = buildDraftRegistrationItems(
+      {
+        amountYen: 1782,
+        documentType: "receipt",
+        shopName: form.shopName,
+        categoryId: "food",
+        taxSummaries: preview.taxSummaries.map((summary) => ({ ...summary, confidence: {} })),
+      },
+      preview.items.map((item) => ({
+        ...item,
+        amountYen: Number(item.amountYen),
+        groupId: "group",
+        draftId: draft._id,
+        confidence: {},
+        createdAt: 1,
+        updatedAt: 1,
+      })),
+    );
+    expect(registered.reduce((sum, item) => sum + item.amountYen, 0)).toBe(1782);
+  });
+
+  it.each(["unknown", "contradictory", "amount-mismatch"])(
+    "%sは警告・未配分・登録ガードを保持する",
+    (problem) => {
+      const { draft, items, form } = mixedTaxReviewFixture();
+      const summaries = draft.taxSummaries!.map((summary, index) =>
+        index === 0
+          ? {
+              ...summary,
+              ...(problem === "unknown" ? { taxMode: "unknown" as const } : {}),
+              ...(problem === "contradictory"
+                ? { taxableAmountBasis: "tax_included" as const }
+                : {}),
+              ...(problem === "amount-mismatch" ? { taxableAmountYen: 670 } : {}),
+            }
+          : summary,
+      );
+      const preview = buildReviewTaxPreview(items, { paidTotalYen: 1782, taxSummaries: summaries });
+      const guidance = getReviewGuidance(form, preview.items, {
+        ...draft,
+        taxSummaries: preview.taxSummaries,
+      });
+      expect(guidance).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "summary-0", target: "tax-summary-0", required: false }),
+        ]),
+      );
+      expect(preview.items.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+      expect(() =>
+        buildDraftRegistrationItems(
+          {
+            amountYen: 1782,
+            documentType: "receipt",
+            shopName: form.shopName,
+            categoryId: "food",
+            taxSummaries: preview.taxSummaries.map((summary) => ({ ...summary, confidence: {} })),
+          },
+          preview.items.map((item) => ({
+            ...item,
+            amountYen: Number(item.amountYen),
+            groupId: "group",
+            draftId: draft._id,
+            confidence: {},
+            createdAt: 1,
+            updatedAt: 1,
+          })),
+        ),
+      ).toThrow("税額または税込登録額が未確定");
+    },
+  );
+
+  it("重複除去後も元の税サマリ番号を維持する", () => {
+    const { draft, items } = mixedTaxReviewFixture();
+    const summaries = [
+      draft.taxSummaries![0],
+      draft.taxSummaries![0],
+      {
+        ...draft.taxSummaries![1],
+        taxableAmountBasis: "tax_excluded" as const,
+      },
+    ];
+    const preview = buildReviewTaxPreview(items, { paidTotalYen: 1782, taxSummaries: summaries });
+    expect(preview.taxSummaries).toHaveLength(2);
+    expect(preview.summarySourceIndexes).toEqual([0, 2]);
+    expect(preview.taxSummaries[1].status).toBe("contradictory");
   });
 });

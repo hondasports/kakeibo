@@ -3,6 +3,8 @@ import type { ReviewFormValues, ReviewItemValues } from "../types/types";
 import { effectiveReviewMode, getReviewGuidance } from "./reviewGuidance";
 import { buildAmountCheck } from "./reviewAmountChecks";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
+import { mixedTaxReviewFixture } from "./reviewTaxPreviewTestHelpers";
+import { buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 
 const form: ReviewFormValues = {
   documentType: "receipt",
@@ -87,4 +89,53 @@ describe("下書きの修正状態と保存内容", () => {
       }).status,
     ).toBe("uncomparable");
   });
+});
+
+it("税内訳を補完しても、読み取り確認・割引対象・カテゴリ修正を消さない", () => {
+  const fixture = mixedTaxReviewFixture();
+  const preview = buildReviewTaxPreview(fixture.items, {
+    paidTotalYen: 1782,
+    taxSummaries: fixture.draft.taxSummaries,
+  });
+  const guidance = getReviewGuidance(
+    fixture.form,
+    [
+      ...preview.items.map((item, index) => (index === 1 ? { ...item, categoryId: "" } : item)),
+      { ...discount, amountYen: "0" },
+    ],
+    { ...fixture.draft, taxSummaries: preview.taxSummaries, reviewReasons: ["low_confidence"] },
+  );
+  expect(guidance.map((issue) => issue.id)).toEqual(
+    expect.arrayContaining(["reading", "discount-discount", "category-item-1"]),
+  );
+  expect(guidance.some((issue) => issue.id.startsWith("summary-"))).toBe(false);
+});
+
+it("合計だけ一致して税率別対象額がずれる場合は両税率の修正を残す", () => {
+  const fixture = mixedTaxReviewFixture();
+  const items = [8, 10].map((rate, index) => ({
+    ...fixture.items[index],
+    amountYen: "100",
+    printedAmountYen: 100,
+    normalizedAmountYen: 100,
+    amountBasis: "tax_included" as const,
+    taxRatePercent: rate as 8 | 10,
+    taxAllocationStatus: "allocated" as const,
+  }));
+  const taxSummaries = fixture.draft.taxSummaries!.map((summary, index) => ({
+    ...summary,
+    taxMode: "included" as const,
+    taxableAmountBasis: "tax_included" as const,
+    taxableAmountYen: index === 0 ? 120 : 80,
+    status: "verified" as const,
+    reasons: [],
+  }));
+  const guidance = getReviewGuidance({ ...fixture.form, amountYen: "200" }, items, {
+    ...fixture.draft,
+    taxSummaries,
+  });
+  expect(guidance.filter((issue) => issue.taxSummaryIndex !== undefined)).toEqual([
+    expect.objectContaining({ target: "tax-summary-0", message: expect.stringContaining("120円") }),
+    expect.objectContaining({ target: "tax-summary-1", message: expect.stringContaining("80円") }),
+  ]);
 });

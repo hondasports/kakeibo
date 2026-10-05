@@ -30,11 +30,13 @@ export function ReceiptTaxSummaryEditor({
   summaryIndex,
   isSaving,
   onChange,
+  reviewMessage,
 }: {
   summary: EditableTaxSummary;
   summaryIndex: number;
   isSaving: boolean;
   onChange: (index: number, change: TaxSummaryChange) => void;
+  reviewMessage?: string;
 }) {
   const [form, setForm] = useState<TaxSummaryChange>({
     taxRatePercent: summary.taxRatePercent,
@@ -97,7 +99,7 @@ export function ReceiptTaxSummaryEditor({
   const amountBasisLabel = getAmountBasisLabel(form.taxableAmountBasis);
 
   const status = summary.status ?? "ambiguous";
-  const statusLabel = getTaxSummaryStatusLabel(status);
+  const statusLabel = reviewMessage ? "確認が必要" : getTaxSummaryStatusLabel(status);
 
   return (
     <Stack spacing={1}>
@@ -110,10 +112,17 @@ export function ReceiptTaxSummaryEditor({
         </Typography>
       </Stack>
 
-      {summary.reasons && summary.reasons.length > 0 && (
+      {reviewMessage ? (
         <Typography color="warning.main" variant="body2">
-          {summary.reasons.map(getTaxSummaryConflictLabel).join(" / ")}
+          {reviewMessage}
         </Typography>
+      ) : (
+        summary.reasons &&
+        summary.reasons.length > 0 && (
+          <Typography color="warning.main" variant="body2">
+            {summary.reasons.map(getTaxSummaryConflictLabel).join(" / ")}
+          </Typography>
+        )
       )}
 
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>

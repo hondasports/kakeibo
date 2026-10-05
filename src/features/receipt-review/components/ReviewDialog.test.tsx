@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import { ReviewDialog } from "./ReviewDialog";
+import { mixedTaxReviewFixture } from "../utils/reviewTaxPreviewTestHelpers";
 
 const props: ComponentProps<typeof ReviewDialog> = {
   open: true,
@@ -177,7 +178,7 @@ describe("下書きの修正導線", () => {
               taxRatePercent: 8,
               taxMode: "included",
               taxableAmountYen: 92,
-              taxableAmountBasis: "unknown",
+              taxableAmountBasis: "tax_excluded",
               taxYen: 6,
               roundingMethod: "floor",
               warnings: [],
@@ -277,6 +278,93 @@ describe("下書きの修正導線", () => {
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "下書きを保存" }));
     expect(props.onSubmit).toHaveBeenCalledWith(false, "detailed");
+  });
+});
+
+describe("Issue #892 現在の税内訳に揃えた表示", () => {
+  it("1782円の混在税は確認0件で、参考欄に税内訳フォームや余白を残さない", async () => {
+    const user = userEvent.setup();
+    const fixture = mixedTaxReviewFixture();
+    render(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={fixture.draft}
+        reviewForm={fixture.form}
+        reviewItems={fixture.items}
+      />,
+    );
+    expect(
+      within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 0件"),
+    ).toBeVisible();
+    await user.click(screen.getByText("読み取り原文・詳しい税情報（参考）"));
+    expect(screen.getByRole("list", { name: "OCR原文" })).toHaveTextContent("合計 1,782円");
+    expect(screen.queryByLabelText("税率別集計", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "税内訳を確認" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "税内訳を修正" })).not.toBeInTheDocument();
+  });
+
+  it("未解決の10%だけ表示し、元番号のフォームへフォーカスして保存できる", async () => {
+    const user = userEvent.setup();
+    const fixture = mixedTaxReviewFixture();
+    const onSummaryChange = vi.fn();
+    const unresolvedDraft = {
+      ...fixture.draft,
+      taxSummaries: [
+        fixture.draft.taxSummaries![0],
+        fixture.draft.taxSummaries![0],
+        { ...fixture.draft.taxSummaries![1], taxableAmountBasis: "tax_excluded" as const },
+      ],
+    };
+    const { rerender } = render(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={unresolvedDraft}
+        reviewForm={fixture.form}
+        reviewItems={fixture.items}
+        onTaxSummaryChange={onSummaryChange}
+      />,
+    );
+    const banner = screen.getByRole("region", { name: "全体の確認状態" });
+    expect(within(banner).getByText(/10%の税内訳：内税として/)).toBeVisible();
+    expect(
+      within(banner).queryByText(/印字額と明細の金額が一致しています/),
+    ).not.toBeInTheDocument();
+    await user.click(within(banner).getByRole("button", { name: "税内訳を修正" }));
+    const editor = screen.getByRole("region", { name: "10%の税内訳を修正" });
+    expect(editor).toContainElement(document.activeElement as HTMLElement);
+    expect(screen.queryByRole("region", { name: "8%の税内訳を修正" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "保存" })).toHaveLength(1);
+    const target = within(editor).getByRole("spinbutton", { name: "対象額" });
+    await user.clear(target);
+    await user.type(target, "1061");
+    // 税更新中などの親再描画でフォームの入力を失わない。
+    rerender(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={unresolvedDraft}
+        reviewForm={fixture.form}
+        reviewItems={fixture.items}
+        onTaxSummaryChange={onSummaryChange}
+        reviewError=""
+      />,
+    );
+    expect(target).toHaveValue(1061);
+    await user.click(within(editor).getByRole("button", { name: "保存" }));
+    expect(onSummaryChange).toHaveBeenCalledWith(2, { taxableAmountYen: 1061 });
+    rerender(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={fixture.draft}
+        reviewForm={fixture.form}
+        reviewItems={fixture.items}
+        onTaxSummaryChange={onSummaryChange}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "税内訳を修正" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("税率別集計", { exact: true })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 0件"),
+    ).toBeVisible();
   });
 });
 

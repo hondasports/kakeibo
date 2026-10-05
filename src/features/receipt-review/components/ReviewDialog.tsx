@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import {
   Alert,
@@ -28,6 +28,7 @@ import { buildReviewChecks } from "../utils/reviewChecks";
 import { buildTaxContextFromReviewItem } from "../utils/receiptItemTaxViewModel";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
+import { buildReviewTaxPreview } from "../utils/reviewItemsTaxPreview";
 
 export type ReviewDialogProps = {
   open: boolean;
@@ -69,15 +70,31 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const {
     open,
     categories,
-    selectedReviewDraft: draft,
+    selectedReviewDraft: sourceDraft,
     reviewForm: form,
-    reviewItems: items,
+    reviewItems: sourceItems,
     onFieldChange,
     onSubmit,
     reviewError,
     isReviewDraftLoading,
     isReviewDraftNotFound,
   } = props;
+  const paidTotalYen =
+    form.amountYen.trim() !== "" && Number.isFinite(Number(form.amountYen))
+      ? Number(form.amountYen)
+      : undefined;
+  const preview = useMemo(
+    () =>
+      buildReviewTaxPreview(sourceItems, {
+        paidTotalYen,
+        taxSummaries: sourceDraft?.taxSummaries,
+        markerDefinitions: sourceDraft?.markerDefinitions,
+      }),
+    [sourceItems, paidTotalYen, sourceDraft?.taxSummaries, sourceDraft?.markerDefinitions],
+  );
+  // 税サマリのない応答では、個別修正で確定した登録額を再描画だけで上書きしない。
+  const items = sourceDraft?.taxSummaries?.length ? preview.items : sourceItems;
+  const draft = sourceDraft ? { ...sourceDraft, taxSummaries: preview.taxSummaries } : null;
   const small = useMediaQuery(useTheme().breakpoints.down("sm"));
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [taxDetails, setTaxDetails] = useState<Record<string, boolean>>({});
@@ -93,7 +110,14 @@ export function ReviewDialog(props: ReviewDialogProps) {
     setTaxDetails({});
     setLocalError("");
   }
-  const guidance = getReviewGuidance(form, items, draft);
+  const guidance = getReviewGuidance(form, items, draft, preview.summarySourceIndexes);
+  const editableSummaries = guidance.flatMap((issue) => {
+    if (issue.taxSummaryIndex === undefined) return [];
+    const sourceIndex = preview.summarySourceIndexes[issue.taxSummaryIndex];
+    return sourceIndex !== undefined && sourceIndex >= 0
+      ? [{ summaryIndex: issue.taxSummaryIndex, sourceIndex, message: issue.message }]
+      : [];
+  });
   const required = guidance.filter((issue) => issue.required);
   const recommendations = guidance.filter((issue) => !issue.required && issue.scope !== "receipt");
   const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");
@@ -101,16 +125,13 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const itemTargets = new Set(items.map((item) => item.id));
   const bannerGuidance = specificGuidance.filter(
     (issue) =>
-      issue.required &&
-      issue.target !== "items" &&
-      issue.target !== "tax-summary" &&
-      !itemTargets.has(issue.target),
+      issue.taxSummaryIndex !== undefined ||
+      (issue.required &&
+        issue.target !== "items" &&
+        issue.target !== "tax-summary" &&
+        !itemTargets.has(issue.target)),
   );
   const totalOnly = effectiveReviewMode(form) === "totalOnly";
-  const paidTotalYen =
-    form.amountYen.trim() !== "" && Number.isFinite(Number(form.amountYen))
-      ? Number(form.amountYen)
-      : undefined;
   const checks = buildReviewChecks({
     items,
     paidTotalYen,
@@ -143,12 +164,21 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const unavailable = isReviewDraftLoading || isReviewDraftNotFound || categories.length === 0;
   const products = items.filter((item) => !isDiscountLine(item.itemName, item.lineType));
   const categoryNames = new Map(categories.map((category) => [category._id, category.name]));
-  const canEditTax = Boolean(draft?.taxSummaries?.length);
+  const canEditTax = editableSummaries.length > 0;
   const goTo = (target: string) => {
+    if (target === "tax-summary") {
+      target = editableSummaries.length
+        ? `tax-summary-${editableSummaries[0].sourceIndex}`
+        : "items";
+    }
+    if (target === "tax-summary" || target.startsWith("tax-summary-")) {
+      if (!editableSummaries.some(({ sourceIndex }) => target === `tax-summary-${sourceIndex}`))
+        target = "items";
+    }
     setExpanded((current) => ({
       ...current,
       [target]: true,
-      ...(target === "tax-summary" ? { reference: true } : {}),
+      ...(target.startsWith("tax-summary-") ? { reference: true } : {}),
     }));
     pendingJump.current = target;
   };
@@ -358,6 +388,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                 <ReviewDialogReferenceSection
                   draft={draft}
                   canEditTax={canEditTax}
+                  editableSummaries={editableSummaries}
                   open={expanded.reference ?? false}
                   busy={busy}
                   taxSummaryUpdatingIndex={props.taxSummaryUpdatingIndex}

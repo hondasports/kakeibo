@@ -40,19 +40,30 @@ function reviewItemToDraftFields(item: ReviewItemValues): DraftItemTaxFields {
   };
 }
 
-export function applyReviewItemsTaxPreview(
+type ReviewTaxPreviewArgs = {
+  paidTotalYen?: number;
+  taxSummaries?: AiExpenseDraft["taxSummaries"];
+  markerDefinitions?: AiExpenseDraft["markerDefinitions"];
+  priceTaxTreatment?: PriceTaxTreatment;
+  taxRateComposition?: TaxRateComposition;
+};
+
+export function buildReviewTaxPreview(
   items: ReviewItemValues[],
-  args: {
-    paidTotalYen?: number;
-    taxSummaries?: AiExpenseDraft["taxSummaries"];
-    markerDefinitions?: AiExpenseDraft["markerDefinitions"];
-    priceTaxTreatment?: PriceTaxTreatment;
-    taxRateComposition?: TaxRateComposition;
-  },
-): ReviewItemValues[] {
+  args: ReviewTaxPreviewArgs,
+): {
+  items: ReviewItemValues[];
+  taxSummaries: NonNullable<AiExpenseDraft["taxSummaries"]>;
+  summarySourceIndexes: number[];
+} {
+  const unchanged = {
+    items,
+    taxSummaries: args.taxSummaries ?? [],
+    summarySourceIndexes: (args.taxSummaries ?? []).map((_, index) => index),
+  };
   const paidTotalYen = args.paidTotalYen;
   if (paidTotalYen === undefined || !Number.isFinite(paidTotalYen) || paidTotalYen < 1) {
-    return items;
+    return unchanged;
   }
   if (
     (!args.taxSummaries || args.taxSummaries.length === 0) &&
@@ -60,13 +71,14 @@ export function applyReviewItemsTaxPreview(
     args.priceTaxTreatment === undefined &&
     args.taxRateComposition === undefined
   ) {
-    return items;
+    return unchanged;
   }
 
-  const { itemFields } = reinterpretDraftTax({
+  const sourceSummaries = toExtractedTaxSummaries(args.taxSummaries ?? []);
+  const { itemFields, interpretation } = reinterpretDraftTax({
     amountYen: paidTotalYen,
     items: items.map(reviewItemToDraftFields),
-    taxSummaries: args.taxSummaries ? toExtractedTaxSummaries(args.taxSummaries) : [],
+    taxSummaries: sourceSummaries,
     markerDefinitions: args.markerDefinitions,
     decisionOverride: {
       priceTaxTreatment: args.priceTaxTreatment,
@@ -74,7 +86,7 @@ export function applyReviewItemsTaxPreview(
     },
   });
 
-  return items.map((item, index) => {
+  const previewItems = items.map((item, index) => {
     const fields = itemFields[index];
     if (!fields) {
       return item;
@@ -93,4 +105,21 @@ export function applyReviewItemsTaxPreview(
       warnings: fields.warnings,
     };
   });
+
+  return {
+    items: previewItems,
+    taxSummaries: interpretation.taxSummaries,
+    // 再解釈は同一サマリの重複を除く。保持されるconfidenceの参照で保存先を追跡する。
+    // ユーザーの全体選択から合成されたサマリには元の編集フォームがない。
+    summarySourceIndexes: interpretation.taxSummaries.map((summary) =>
+      sourceSummaries.findIndex((source) => source.confidence === summary.confidence),
+    ),
+  };
+}
+
+export function applyReviewItemsTaxPreview(
+  items: ReviewItemValues[],
+  args: ReviewTaxPreviewArgs,
+): ReviewItemValues[] {
+  return buildReviewTaxPreview(items, args).items;
 }

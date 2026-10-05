@@ -11,6 +11,10 @@ import {
   getReviewCategoryAggregateErrorMessage,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
+import { isVerifiedTaxSummaryStatus } from "../../../../lib/domain/receipt/tax/taxSummaryConsistency";
+import { buildTaxRateCheck } from "./reviewTaxChecks";
+import { getTaxSummaryConflictLabel } from "./receiptTaxLabels";
+import { formatYen } from "../../../utils/currency";
 
 export type ReviewGuidanceItem = {
   id: string;
@@ -18,6 +22,7 @@ export type ReviewGuidanceItem = {
   target: string;
   required: boolean;
   scope?: "receipt";
+  taxSummaryIndex?: number;
 };
 
 export function effectiveReviewMode(form: ReviewFormValues) {
@@ -31,6 +36,7 @@ export function getReviewGuidance(
   form: ReviewFormValues,
   items: ReviewItemValues[],
   draft?: AiExpenseDraft | null,
+  summarySourceIndexes?: number[],
 ): ReviewGuidanceItem[] {
   const issues: ReviewGuidanceItem[] = [];
   const add = (id: string, message: string, target: string, required: boolean) =>
@@ -44,17 +50,42 @@ export function getReviewGuidance(
   if (!form.categoryId)
     add("category", "レシート全体のカテゴリを選択してください。", "categoryId", true);
   if (effectiveReviewMode(form) === "detailed") {
+    const taxCheck = buildTaxRateCheck({
+      items,
+      taxSummaries: draft?.taxSummaries,
+      rawObservation: draft?.rawObservation,
+    });
     draft?.taxSummaries?.forEach((summary, index) => {
-      if (
-        ["ambiguous", "contradictory", "reconcilable", "conflicting"].includes(summary.status ?? "")
-      ) {
-        add(
-          `summary-${index}`,
-          `${summary.taxRatePercent}%の税内訳：対象額・税額・税込／税抜をレシートと照合してください。`,
-          "tax-summary",
-          false,
+      const row = taxCheck.rows[index];
+      const unallocated = items.some(
+        (item) =>
+          item.taxRatePercent === summary.taxRatePercent &&
+          item.taxAllocationStatus === "unallocated",
+      );
+      const reasons = (summary.reasons ?? []).map(getTaxSummaryConflictLabel);
+      const unresolvedDeclaration =
+        summary.taxMode === "unknown" || summary.taxableAmountBasis === "unknown";
+      if (unresolvedDeclaration) reasons.push("税モードまたは対象額の税込／税抜が未確定です");
+      if (row?.status === "mismatch")
+        reasons.push(
+          `明細の対象額 ${formatYen(row.currentYen ?? 0)} ／ 税内訳 ${formatYen(summary.taxableAmountYen)}`,
         );
-      }
+      if (row?.blockerCode === "basis-conflict" && row.reason) reasons.push(row.reason);
+      if (unallocated) reasons.push("税額を商品に配分できていません");
+      const unresolvedStatus =
+        summary.status !== undefined && !isVerifiedTaxSummaryStatus(summary.status);
+      if (!unresolvedStatus && reasons.length === 0) return;
+      const sourceIndex = summarySourceIndexes?.[index] ?? index;
+      issues.push({
+        id: `summary-${index}`,
+        message: `${summary.taxRatePercent}%の税内訳：${
+          [...new Set(reasons)].join(" / ") ||
+          "対象額・税額・税込／税抜をレシートと照合してください"
+        }。`,
+        target: sourceIndex >= 0 ? `tax-summary-${sourceIndex}` : "items",
+        required: false,
+        taxSummaryIndex: index,
+      });
     });
     for (const item of items) {
       const name = item.itemName || "名称未設定";
@@ -79,6 +110,11 @@ export function getReviewGuidance(
       }
       if (
         !issues.some((issue) => issue.id === "allocation") &&
+        !issues.some(
+          (issue) =>
+            issue.taxSummaryIndex !== undefined &&
+            draft?.taxSummaries?.[issue.taxSummaryIndex]?.taxRatePercent === item.taxRatePercent,
+        ) &&
         item.taxAllocationStatus === "unallocated" &&
         buildTaxContextFromReviewItem(item).status === "resolved"
       ) {

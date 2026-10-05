@@ -71,4 +71,30 @@ describe("ReceiptTaxSummarySection", () => {
 
     expect(container.firstChild).toBeNull();
   });
+
+  it("修正対象が0件なら税率別集計の要素や余白を描画しない", () => {
+    const { container } = render(
+      <ReceiptTaxSummarySection draft={draft({ status: "coherent" })} editableSummaries={[]} />,
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("宣言だけ整合したサマリでも未配分の修正理由と確認ラベルを表示する", () => {
+    render(
+      <ReceiptTaxSummarySection
+        draft={draft({ status: "coherent" })}
+        editableSummaries={[
+          {
+            summaryIndex: 0,
+            sourceIndex: 2,
+            message: "10%の税内訳：税額を商品に配分できていません。",
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("確認が必要")).toBeVisible();
+    expect(screen.queryByText("確認済み")).not.toBeInTheDocument();
+    expect(screen.getByText("10%の税内訳：税額を商品に配分できていません。")).toBeVisible();
+    expect(screen.getByRole("button", { name: "保存" })).toBeVisible();
+  });
 });

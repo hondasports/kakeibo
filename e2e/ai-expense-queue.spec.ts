@@ -758,9 +758,11 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
     const summarySection = dialog.getByLabel("税率別集計", { exact: true });
     await expect(summarySection).toBeVisible();
     await expect(
-      dialog.getByText("内税として読み取りましたが、対象額は税抜として読み取られています"),
+      summarySection.getByText("内税として読み取りましたが、対象額は税抜として読み取られています"),
     ).toBeVisible();
-    await expect(dialog.getByText("税込額と支払合計が一致しません")).toBeVisible();
+    await expect(
+      summarySection.getByText("税率別対象額・税額・支払合計の金額が一致しません"),
+    ).toBeVisible();
 
     const taxableAmountInput = dialog.getByRole("spinbutton", { name: "対象額" });
     await expect(taxableAmountInput).toBeVisible();
@@ -782,9 +784,8 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
       dialog.getByText("内税として読み取りましたが、対象額は税抜として読み取られています"),
     ).toHaveCount(0);
     await expect(dialog.getByText("税込額と支払合計が一致しません")).toHaveCount(0);
-    await expect(dialog.getByText("対象額 1,060円（税込）")).toBeVisible();
-    await expect(dialog.getByText("税額 96円")).toBeVisible();
-    await expect(dialog.getByText("税込合計 1,060円")).toBeVisible();
+    await expect(dialog.getByLabel("税率別集計", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "税内訳を修正" })).toHaveCount(0);
 
     await dialog.getByRole("button", { name: "この内容で保存" }).click();
     await expect(dialog).toBeHidden();
@@ -799,6 +800,6 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
     await readyItem.getByRole("button", { name: "修正する" }).click();
     await expect(dialog).toBeVisible();
     await dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true }).click();
-    await expect(dialog.getByText("対象額 1,060円（税込）")).toBeVisible({ timeout: 10_000 });
+    await expect(dialog.getByLabel("税率別集計", { exact: true })).toHaveCount(0);
   });
 });
