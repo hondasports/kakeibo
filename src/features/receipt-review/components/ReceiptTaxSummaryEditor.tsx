@@ -48,7 +48,15 @@ export function ReceiptTaxSummaryEditor({
   });
 
   const [prevSummary, setPrevSummary] = useState(summary);
-  if (prevSummary !== summary) {
+  // 明細や確認理由だけの更新では未保存入力を保持する。
+  if (
+    prevSummary.taxRatePercent !== summary.taxRatePercent ||
+    prevSummary.taxMode !== summary.taxMode ||
+    prevSummary.taxableAmountYen !== summary.taxableAmountYen ||
+    prevSummary.taxableAmountBasis !== summary.taxableAmountBasis ||
+    prevSummary.taxYen !== summary.taxYen ||
+    prevSummary.taxIncludedAmountYen !== summary.taxIncludedAmountYen
+  ) {
     setPrevSummary(summary);
     setForm({
       taxRatePercent: summary.taxRatePercent,

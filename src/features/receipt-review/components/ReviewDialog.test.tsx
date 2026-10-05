@@ -343,7 +343,9 @@ describe("Issue #892 現在の税内訳に揃えた表示", () => {
         {...props}
         selectedReviewDraft={unresolvedDraft}
         reviewForm={fixture.form}
-        reviewItems={fixture.items}
+        reviewItems={fixture.items.map((item, index) =>
+          index === 0 ? { ...item, itemName: "食品の名称を修正" } : item,
+        )}
         onTaxSummaryChange={onSummaryChange}
         reviewError=""
       />,
@@ -362,6 +364,113 @@ describe("Issue #892 現在の税内訳に揃えた表示", () => {
     );
     expect(screen.queryByRole("button", { name: "税内訳を修正" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("税率別集計", { exact: true })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 0件"),
+    ).toBeVisible();
+  });
+
+  it("両方unknownの税宣言はフォームに残し、モードを保存すると確認が消える", async () => {
+    const user = userEvent.setup();
+    const onSummaryChange = vi.fn();
+    const source = {
+      taxRatePercent: 8 as const,
+      taxMode: "unknown" as const,
+      taxableAmountYen: 100,
+      taxableAmountBasis: "unknown" as const,
+      taxYen: 8,
+      roundingMethod: "floor" as const,
+      warnings: [],
+      status: "ambiguous" as const,
+    };
+    const draft = { ...props.selectedReviewDraft!, taxSummaries: [source] };
+    const form = {
+      ...props.reviewForm,
+      amountYen: "108",
+      priceTaxTreatment: undefined,
+      taxRateComposition: undefined,
+    };
+    const items = [
+      {
+        ...props.reviewItems[0],
+        amountYen: "100",
+        printedAmountYen: 100,
+        amountBasis: "tax_excluded" as const,
+      },
+    ];
+    const { rerender } = render(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={draft}
+        reviewForm={form}
+        reviewItems={items}
+        onTaxSummaryChange={onSummaryChange}
+      />,
+    );
+    const banner = screen.getByRole("region", { name: "全体の確認状態" });
+    expect(within(banner).getByText(/8%の税内訳：.*未確定/)).toBeVisible();
+    await user.click(within(banner).getByRole("button", { name: "税内訳を修正" }));
+    const editor = screen.getByRole("region", { name: "8%の税内訳を修正" });
+    expect(within(editor).getByRole("combobox", { name: "税モード" })).toHaveTextContent("不明");
+    await user.click(within(editor).getByRole("combobox", { name: "税モード" }));
+    await user.click(screen.getByRole("option", { name: "外税" }));
+    await user.click(within(editor).getByRole("button", { name: "保存" }));
+    expect(onSummaryChange).toHaveBeenCalledWith(0, { taxMode: "external" });
+    rerender(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={{ ...draft, taxSummaries: [{ ...source, taxMode: "external" }] }}
+        reviewForm={form}
+        reviewItems={items}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "税内訳を修正" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 0件"),
+    ).toBeVisible();
+  });
+
+  it("保存済み全体8%外税の金額を変更しても画面の登録額は216円になる", async () => {
+    const user = userEvent.setup();
+    render(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={{
+          ...props.selectedReviewDraft!,
+          taxSummaries: [
+            {
+              taxRatePercent: 8,
+              taxMode: "external",
+              taxableAmountYen: 100,
+              taxableAmountBasis: "tax_excluded",
+              taxYen: 8,
+              roundingMethod: "round",
+              warnings: [],
+            },
+          ],
+        }}
+        reviewForm={{
+          ...props.reviewForm,
+          amountYen: "216",
+          priceTaxTreatment: "excluded",
+          taxRateComposition: "rate8",
+        }}
+        reviewItems={[
+          {
+            ...props.reviewItems[0],
+            amountYen: "200",
+            printedAmountYen: 200,
+            amountBasis: "tax_excluded",
+            normalizedAmountYen: 216,
+            allocatedTaxYen: 16,
+            taxAllocationStatus: "allocated",
+          },
+        ]}
+      />,
+    );
+    const item = screen.getByText("ホットケーキ").closest("details")!;
+    await user.click(item.querySelector("summary")!);
+    expect(within(item as HTMLElement).getByText("登録額: 216円（税込）")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "税内訳を修正" })).not.toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 0件"),
     ).toBeVisible();

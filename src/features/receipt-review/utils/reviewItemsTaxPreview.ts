@@ -6,6 +6,10 @@ import type {
   TaxRateComposition,
 } from "../../../../lib/receiptTax/types";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
+import {
+  isVerifiedTaxSummaryStatus,
+  reconcileTaxSummary,
+} from "../../../../lib/domain/receipt/tax/taxSummaryConsistency";
 
 function toExtractedTaxSummaries(
   taxSummaries: NonNullable<AiExpenseDraft["taxSummaries"]>,
@@ -106,15 +110,36 @@ export function buildReviewTaxPreview(
     };
   });
 
-  return {
-    items: previewItems,
-    taxSummaries: interpretation.taxSummaries,
-    // 再解釈は同一サマリの重複を除く。保持されるconfidenceの参照で保存先を追跡する。
-    // ユーザーの全体選択から合成されたサマリには元の編集フォームがない。
-    summarySourceIndexes: interpretation.taxSummaries.map((summary) =>
-      sourceSummaries.findIndex((source) => source.confidence === summary.confidence),
-    ),
-  };
+  // 再解釈は同一サマリの重複を除く。保持されるconfidenceの参照で保存先を追跡する。
+  // ユーザーの全体選択から合成されたサマリには元の編集フォームがない。
+  const summarySourceIndexes = interpretation.taxSummaries.map((summary) =>
+    sourceSummaries.findIndex((source) => source.confidence === summary.confidence),
+  );
+  const taxSummaries = interpretation.taxSummaries.map((summary, index) => {
+    const source = sourceSummaries[summarySourceIndexes[index]];
+    if (
+      !source ||
+      source.taxMode !== "unknown" ||
+      source.taxableAmountBasis !== "unknown" ||
+      args.priceTaxTreatment === "included" ||
+      args.priceTaxTreatment === "excluded"
+    ) {
+      return summary;
+    }
+    // 算術だけで両方不明の宣言を確認済みにしない。計算した登録額は維持する。
+    const declaration = reconcileTaxSummary({ summary: source });
+    return {
+      ...summary,
+      taxMode: source.taxMode,
+      taxableAmountBasis: source.taxableAmountBasis,
+      status:
+        summary.status && !isVerifiedTaxSummaryStatus(summary.status)
+          ? summary.status
+          : declaration.status,
+      reasons: [...new Set([...(summary.reasons ?? []), ...declaration.reasons])],
+    };
+  });
+  return { items: previewItems, taxSummaries, summarySourceIndexes };
 }
 
 export function applyReviewItemsTaxPreview(

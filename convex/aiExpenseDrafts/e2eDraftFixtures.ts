@@ -10,6 +10,7 @@ export type E2eTaxReviewReceiptCase =
   | "basis890"
   | "basis890_264"
   | "summary892"
+  | "summary892_unknown"
   | "summary892_conflict10"
   | "summary892_conflictBoth";
 
@@ -171,6 +172,7 @@ export async function createE2eTaxReviewDraftForUserHandler(
 ) {
   if (
     args.receiptCase === "summary892" ||
+    args.receiptCase === "summary892_unknown" ||
     args.receiptCase === "summary892_conflict10" ||
     args.receiptCase === "summary892_conflictBoth"
   )
@@ -256,6 +258,8 @@ async function createE2eSummaryReviewDraft(
   args: CreateE2eReadyDraftForUserArgs & { receiptCase?: E2eTaxReviewReceiptCase },
 ) {
   const now = Date.now();
+  const tenPercentConflict =
+    args.receiptCase === "summary892_conflict10" || args.receiptCase === "summary892_conflictBoth";
   const draftId = await ctx.db.insert("aiExpenseDrafts", {
     groupId: args.groupId,
     createdByUserId: args.createdByUserId,
@@ -270,10 +274,11 @@ async function createE2eSummaryReviewDraft(
     taxSummaries: [
       {
         taxRatePercent: 8,
-        taxMode: "external",
+        taxMode: args.receiptCase === "summary892_unknown" ? "unknown" : "external",
         taxableAmountYen: args.receiptCase === "summary892_conflictBoth" ? 668 : 669,
         taxableAmountBasis: "unknown",
         taxYen: 53,
+        ...(args.receiptCase === "summary892_unknown" ? { taxIncludedAmountYen: 722 } : {}),
         roundingMethod: "floor",
         confidence: {},
         warnings: [],
@@ -284,12 +289,12 @@ async function createE2eSummaryReviewDraft(
         taxRatePercent: 10,
         taxMode: "included",
         taxableAmountYen: 1060,
-        taxableAmountBasis: args.receiptCase === "summary892" ? "tax_included" : "tax_excluded",
+        taxableAmountBasis: tenPercentConflict ? "tax_excluded" : "tax_included",
         taxYen: 96,
         roundingMethod: "floor",
         confidence: {},
         warnings: [],
-        status: args.receiptCase === "summary892" ? "verified" : "contradictory",
+        status: tenPercentConflict ? "contradictory" : "verified",
       },
     ],
     rawObservation: {

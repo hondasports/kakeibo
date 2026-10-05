@@ -89,8 +89,17 @@ export function ReviewDialog(props: ReviewDialogProps) {
         paidTotalYen,
         taxSummaries: sourceDraft?.taxSummaries,
         markerDefinitions: sourceDraft?.markerDefinitions,
+        priceTaxTreatment: form.priceTaxTreatment,
+        taxRateComposition: form.taxRateComposition,
       }),
-    [sourceItems, paidTotalYen, sourceDraft?.taxSummaries, sourceDraft?.markerDefinitions],
+    [
+      sourceItems,
+      paidTotalYen,
+      sourceDraft?.taxSummaries,
+      sourceDraft?.markerDefinitions,
+      form.priceTaxTreatment,
+      form.taxRateComposition,
+    ],
   );
   // 税サマリのない応答では、個別修正で確定した登録額を再描画だけで上書きしない。
   const items = sourceDraft?.taxSummaries?.length ? preview.items : sourceItems;

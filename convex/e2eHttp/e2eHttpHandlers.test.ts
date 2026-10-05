@@ -356,6 +356,7 @@ describe("e2e seed handlers", () => {
     "basis890",
     "basis890_264",
     "summary892",
+    "summary892_unknown",
     "summary892_conflict10",
     "summary892_conflictBoth",
   ])("固定税基準ケース%sを認可済みscopeへseedする", async (receiptCase) => {

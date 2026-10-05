@@ -19,6 +19,7 @@ for (const width of [1280, 320]) {
 
     for (const receiptCase of [
       "summary892",
+      "summary892_unknown",
       "summary892_conflict10",
       "summary892_conflictBoth",
     ] as const) {
@@ -42,13 +43,17 @@ for (const width of [1280, 320]) {
           await expect(banner.getByRole("button", { name: "税内訳を修正" })).toHaveCount(
             expectedForms,
           );
-          const rate = receiptCase === "summary892_conflictBoth" ? 8 : 10;
+          const rate =
+            receiptCase === "summary892_conflictBoth" || receiptCase === "summary892_unknown"
+              ? 8
+              : 10;
           await banner
             .locator("li")
             .filter({ hasText: `${rate}%の税内訳：` })
             .getByRole("button", { name: "税内訳を修正" })
             .click();
           const editor = dialog.getByRole("region", { name: `${rate}%の税内訳を修正` });
+          await expect(editor.getByText("確認が必要", { exact: true })).toBeVisible();
           await expect(editor.getByRole("combobox", { name: "税率", exact: true })).toBeFocused();
           await expect(editor).toBeInViewport();
           const bounds = await editor.boundingBox();
@@ -59,21 +64,38 @@ for (const width of [1280, 320]) {
           );
           if (receiptCase === "summary892_conflict10")
             await expect(dialog.getByRole("region", { name: "8%の税内訳を修正" })).toHaveCount(0);
+          if (receiptCase === "summary892_unknown")
+            await expect(dialog.getByRole("region", { name: "10%の税内訳を修正" })).toHaveCount(0);
           await dialog.screenshot({ path: testInfo.outputPath("tax-summary-before.png") });
-          if (receiptCase === "summary892_conflictBoth") {
-            await editor.getByRole("spinbutton", { name: "対象額" }).fill("669");
+          if (receiptCase === "summary892_unknown") {
+            await expect(editor.getByRole("combobox", { name: "税モード" })).toContainText("不明");
+            await editor.getByRole("combobox", { name: "税モード" }).click();
+            await page.getByRole("option", { name: "外税", exact: true }).click();
             await editor.getByRole("button", { name: "保存", exact: true }).click();
-            await expect(editor).toHaveCount(0);
-            await expect(banner.getByRole("button", { name: "税内訳を修正" })).toHaveCount(1);
-            await banner.getByRole("button", { name: "税内訳を修正" }).click();
+          } else {
+            if (receiptCase === "summary892_conflictBoth") {
+              const targetAmount = editor.getByRole("spinbutton", { name: "対象額" });
+              await targetAmount.fill("669");
+              const product = dialog
+                .getByRole("region", { name: "商品一覧" })
+                .locator("details")
+                .filter({ hasText: "食品0" });
+              await product.locator("summary").click();
+              await product.getByRole("textbox", { name: "明細名" }).fill("食品0の名称修正");
+              await expect(targetAmount).toHaveValue("669");
+              await editor.getByRole("button", { name: "保存", exact: true }).click();
+              await expect(editor).toHaveCount(0);
+              await expect(banner.getByRole("button", { name: "税内訳を修正" })).toHaveCount(1);
+              await banner.getByRole("button", { name: "税内訳を修正" }).click();
+            }
+            const tenPercentEditor = dialog.getByRole("region", { name: "10%の税内訳を修正" });
+            await expect(
+              tenPercentEditor.getByRole("combobox", { name: "税率", exact: true }),
+            ).toBeFocused();
+            await tenPercentEditor.getByRole("combobox", { name: "対象額種別" }).click();
+            await page.getByRole("option", { name: "税込印字", exact: true }).click();
+            await tenPercentEditor.getByRole("button", { name: "保存", exact: true }).click();
           }
-          const tenPercentEditor = dialog.getByRole("region", { name: "10%の税内訳を修正" });
-          await expect(
-            tenPercentEditor.getByRole("combobox", { name: "税率", exact: true }),
-          ).toBeFocused();
-          await tenPercentEditor.getByRole("combobox", { name: "対象額種別" }).click();
-          await page.getByRole("option", { name: "税込印字", exact: true }).click();
-          await tenPercentEditor.getByRole("button", { name: "保存", exact: true }).click();
           await expectResolved(dialog);
         } else {
           await dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true }).click();

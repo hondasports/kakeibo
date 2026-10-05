@@ -87,6 +87,83 @@ describe("applyReviewItemsTaxPreview", () => {
 });
 
 describe("共有再解釈後の明細と税内訳", () => {
+  it.each(["external", "included"] as const)(
+    "%sとして算術一致しても両方unknownの宣言は確認対象に残す",
+    (mode) => {
+      const taxYen = mode === "external" ? 8 : 7;
+      const total = mode === "external" ? 108 : 100;
+      const source = {
+        taxRatePercent: 8 as const,
+        taxMode: "unknown" as const,
+        taxableAmountYen: 100,
+        taxableAmountBasis: "unknown" as const,
+        taxYen,
+        roundingMethod: "floor" as const,
+        warnings: [],
+        status: "ambiguous" as const,
+      };
+      const item = externalTaxItem({
+        amountYen: "100",
+        printedAmountYen: 100,
+        amountBasis: mode === "external" ? "tax_excluded" : "tax_included",
+      });
+      const preview = buildReviewTaxPreview([item], {
+        paidTotalYen: total,
+        taxSummaries: [source],
+      });
+      expect(preview.items[0].normalizedAmountYen).toBe(total);
+      expect(preview.taxSummaries[0]).toMatchObject({
+        taxMode: "unknown",
+        taxableAmountBasis: "unknown",
+        status: "ambiguous",
+      });
+      const { draft, form } = mixedTaxReviewFixture();
+      expect(
+        getReviewGuidance(
+          { ...form, amountYen: String(total) },
+          preview.items,
+          { ...draft, taxSummaries: preview.taxSummaries },
+          preview.summarySourceIndexes,
+        ),
+      ).toContainEqual(
+        expect.objectContaining({
+          target: "tax-summary-0",
+          message: expect.stringContaining("税モードまたは対象額の税込／税抜が未確定"),
+        }),
+      );
+      expect(source.taxMode).toBe("unknown");
+    },
+  );
+
+  it("明示した全体税設定では両方unknownの元サマリだけを理由に確認を残さない", () => {
+    const preview = buildReviewTaxPreview(
+      [externalTaxItem({ amountYen: "100", printedAmountYen: 100 })],
+      {
+        paidTotalYen: 108,
+        priceTaxTreatment: "excluded",
+        taxRateComposition: "rate8",
+        taxSummaries: [
+          {
+            taxRatePercent: 8,
+            taxMode: "unknown",
+            taxableAmountYen: 100,
+            taxableAmountBasis: "unknown",
+            taxYen: 8,
+            roundingMethod: "floor",
+            warnings: [],
+          },
+        ],
+      },
+    );
+    expect(preview.taxSummaries[0]).toMatchObject({
+      taxMode: "external",
+      taxableAmountBasis: "tax_excluded",
+      status: "verified",
+    });
+    expect(preview.summarySourceIndexes).toEqual([-1]);
+    expect(preview.items[0].normalizedAmountYen).toBe(108);
+  });
+
   it.each(["mode", "basis"])("%sだけ宣言された混在税の補完は1782円と確認0件を維持する", (side) => {
     const { draft, items, form } = mixedTaxReviewFixture();
     const summaries = draft.taxSummaries!.map((summary, index) =>
