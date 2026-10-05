@@ -1,6 +1,6 @@
 # REFINE
 
-雑なIssueを実装可能な仕様へ育てる。Human Requestは変更せず、Agent SpecをIssueへ追記・更新する。Issueのない依頼はtask specへ記録し、PR作成時に状態ブロックとともに公開する。
+雑なIssueを実装可能な仕様へ育てる。Human Requestは変更せず、Agent SpecをIssueへ追記・更新する。Issueのない依頼はtask specへ記録し、AFTERCAREでPR本文へ同期する状態ブロックとともに公開する（draft PRを先に作った場合もready化の前に同期する）。
 
 ## やること
 

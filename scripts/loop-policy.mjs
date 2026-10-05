@@ -30,9 +30,16 @@ export function processSuiteFiles(root = process.cwd()) {
     const file = path.join(root, "package.json");
     if (!existsSync(file)) return [];
     const script = JSON.parse(readFileSync(file, "utf8")).scripts?.["test:process"];
-    const match = typeof script === "string" ? script.match(/^vitest run ((?:\S+ ?)+)$/) : null;
-    if (!match) return [];
-    return match[1].split(" ").filter((token) => token && !token.startsWith("-"));
+    if (typeof script !== "string") return [];
+    // Linear tokenization (no backtracking regex). Only a plain list of literal
+    // file paths is trusted: any option (its value could change what runs) or
+    // shell/glob metacharacter (sh and vitest expand differently) disables the
+    // exclusion entirely, so unit runs everything rather than too little.
+    const [command, subcommand, ...files] = script.trim().split(/\s+/);
+    if (command !== "vitest" || subcommand !== "run" || files.length === 0) return [];
+    if (files.some((token) => token.startsWith("-") || /[*?[\]{}()'"`$\\;&|<>!~]/.test(token)))
+      return [];
+    return files;
   } catch {
     return [];
   }
@@ -50,7 +57,11 @@ export const isFullScopeEvidence = (evidence) => (evidence?.run?.scope ?? "full"
 export const VERIFICATION_SCOPES = {
   process: { execution: "local", scope: "harness docs integrity + process test suite" },
   lint: { execution: "local", scope: "repo lint + format" },
-  unit: { execution: "local", scope: "vitest unit suite" },
+  unit: {
+    execution: "local",
+    scope:
+      "vitest suite excluding test:process files; affected (vitest related) satisfies EXECUTE→REVIEW only, full is required from REVIEW clean",
+  },
   build: { execution: "local", scope: "production build" },
   e2e: { execution: "github", scope: "playwright e2e (delivery gate)" },
 };
@@ -120,11 +131,13 @@ export function verificationSummary(task) {
         ? "stale"
         : result.success !== true
           ? "failed"
-          : result.reuse
-            ? "pass(reused)"
-            : isFullScopeEvidence(result)
-              ? "pass"
-              : "pass(affected)";
+          : [
+              "pass",
+              ...(result.reuse ? ["reused"] : []),
+              ...(isFullScopeEvidence(result) ? [] : ["affected"]),
+            ]
+              .join(",")
+              .replace(/^pass,(.+)$/, "pass($1)");
   }
   return summary;
 }
@@ -187,7 +200,7 @@ export function missingRequirements(task) {
   }
   return missing;
 }
-export function computeAssessment(task, paths) {
+export function computeAssessment(task, paths, root = process.cwd()) {
   const reviewAssessment = currentEvidence(task.review, task) ? task.review.assessment : null;
   const result = assessChange({
     paths,
@@ -198,14 +211,14 @@ export function computeAssessment(task, paths) {
   if (task.configuration?.profile?.verification === "thorough") {
     Object.assign(result.verification, { lint: true, unit: true, build: true });
   }
-  result.verificationPlan = verificationPlan(result, task);
+  result.verificationPlan = verificationPlan(result, task, root);
   return result;
 }
 /**
  * Per-kind execution plan recorded on the assessment: where each check runs,
  * what it covers, why it is required, and where its evidence lands.
  */
-function verificationPlan(result, task) {
+function verificationPlan(result, task, root) {
   const acs = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id).filter(Boolean);
   const thorough = task.configuration?.profile?.verification === "thorough";
   return Object.entries(result.verification).map(([kind, required]) => {
@@ -227,7 +240,7 @@ function verificationPlan(result, task) {
       scope: meta.scope,
       reason,
       evidence: `verification.${kind}`,
-      commands: CHECK_COMMANDS[kind] ?? null,
+      commands: kind === "unit" ? unitFullCommand(root) : (CHECK_COMMANDS[kind] ?? null),
       acs,
     };
   });
@@ -532,7 +545,7 @@ export function validateCheckpoint(task, { head, baseHead, paths, root = process
       selection.inputs && selection.ruleVersion,
       "Auto profile decision needs recorded inputs and rule version",
     );
-  const assessment = computeAssessment(task, paths);
+  const assessment = computeAssessment(task, paths, root);
   requireValue(
     task.risk === highestTier(task.risk, assessment.risk.final),
     "Retained risk is below the current floor",
