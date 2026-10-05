@@ -30,6 +30,7 @@ import {
   summarizeTask,
   artifactManifest,
   buildReviewPacket,
+  inspectPullRequest,
   watchAftercare,
 } from "./loop-runner.mjs";
 import { taskFixture, reviewFixture, verificationManifestFixture } from "./loop-test-fixtures.mjs";
@@ -92,6 +93,49 @@ describe("persistent task gates", () => {
     ...overrides,
   });
   const completeFindings = { pagesComplete: true, unhandledCount: 0, unresolvedThreadCount: 0 };
+  it.each([
+    ["aftercare", false],
+    ["aftercare", true],
+    ["done", false],
+    ["done", true],
+  ])("observes annotated-tag bases in %s and rejects moved tags (watch=%s)", (state, watch) => {
+    const { dir, git, task } = repository();
+    git("tag", "-a", "baseline", "-m", "original base", task.baseHead);
+    expect(git("rev-parse", "baseline")).not.toBe(task.baseHead);
+    task.baseRef = "baseline";
+    task.state = state;
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const original = readFileSync(taskPath(dir), "utf8");
+    const services = {
+      fetchPr: () => delivery(task),
+      fetchFindings: () => completeFindings,
+      sleep: () => {
+        throw new Error("A valid checkpoint should return without waiting");
+      },
+    };
+    const args = { "check-pr": "7", ...(watch ? { "watch-aftercare": true } : {}) };
+    const observeDirect = () =>
+      watch
+        ? watchAftercare(task, "7", dir, { ...services, readOnly: true })
+        : inspectPullRequest(task, "7", undefined, dir, services).evidence;
+    expect(run(args, dir, services)).toMatchObject({ ready: true });
+    expect(observeDirect()).toMatchObject({ ready: true });
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
+    const movedBase = git(
+      "commit-tree",
+      git("rev-parse", "HEAD^{tree}"),
+      "-p",
+      task.baseHead,
+      "-m",
+      "changed base",
+    );
+    git("tag", "-f", "-a", "baseline", "-m", "moved base", movedBase);
+    expect(git("rev-parse", "HEAD")).toBe(task.head);
+    expect(() => run(args, dir, services)).toThrow("Agent state does not match PR HEAD/base");
+    expect(observeDirect).toThrow("Agent state does not match PR HEAD/base");
+    expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
+  });
   it.each([
     ["aftercare", false],
     ["aftercare", true],

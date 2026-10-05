@@ -14,16 +14,16 @@
 
 ## 2. 現行実装との差分
 
-| 項目 | 現行CLI | 実装する設計 |
+| 項目 | 従来のCLI | 設計・実装状況 |
 |---|---|---|
-| Profile選択 | ~~開始時に明示指定、モデル推奨値、既定値から選択~~ → REFINE終了時にタスク内容から自動判定（実装済み） |
-| モデル・effort機構 | ~~models/でモデル推奨Profile・effort対応値を管理~~ → 機構ごと撤去（実装済み） |
-| 通常出力 | ~~毎回configurationとassessmentを含むJSONを返す~~ → 現在State・不足条件・次の操作を中心に返す（実装済み） |
-| 検証 | ~~必要な検証を固定コマンドで実行し、結果を返す~~ → 必須条件を満たす検証計画とartifact-firstの証跡を使う（実装済み） |
-| 証跡の失効 | ~~HEADまたはbaseの更新で一括失効~~ → feature patchと検証対象treeが同一の検証だけ再利用し、その他は失効。さらにmetadata-only増分ではprocess以外の証跡を延長（いずれも実装済み。lintは `.md`+正規hook名のみ延長——詳細は `docs/agent-harness.md`） |
-| 検証の往復 | 必須kindの個別実行に加え、`--verify-required` による直列一括実行・成功済み証跡の保持を実装済み |
-| 再レビュー資料 | `--delta-from` で増分・前回AC証跡・全体参照を提供（実装済み）。全AC記録とfresh独立レビューを維持 |
-| PR同期と観測 | 同一本文はwrite省略。`--check-pr` は状態を更新せずAFTERCARE/DONEを確認（実装済み）。観測を本文同期から分離 |
+| Profile選択 | ~~開始時に明示指定、モデル推奨値、既定値から選択~~ | REFINE終了時にタスク内容から自動判定（実装済み） |
+| モデル・effort機構 | ~~models/でモデル推奨Profile・effort対応値を管理~~ | 機構ごと撤去（実装済み） |
+| 通常出力 | ~~毎回configurationとassessmentを含むJSONを返す~~ | 現在State・不足条件・次の操作を中心に返す（実装済み） |
+| 検証 | ~~必要な検証を固定コマンドで実行し、結果を返す~~ | 必須条件を満たす検証計画とartifact-firstの証跡を使う（実装済み） |
+| 証跡の失効 | ~~HEADまたはbaseの更新で一括失効~~ | feature patchと検証対象treeが同一の検証だけ再利用し、その他は失効。さらにmetadata-only増分ではprocess以外の証跡を延長（いずれも実装済み。lintは `.md`+正規hook名のみ延長——詳細は `docs/agent-harness.md`） |
+| 検証の往復 |  | 必須kindの個別実行に加え、`--verify-required` による直列一括実行・成功済み証跡の保持を実装済み |
+| 再レビュー資料 |  | `--delta-from` で増分・前回AC証跡・全体参照を提供（実装済み）。全AC記録とfresh独立レビューを維持 |
+| PR同期と観測 |  | 同一本文はwrite省略。`--check-pr` は状態を更新せずAFTERCARE/DONEを確認（実装済み）。観測を本文同期から分離 |
 
 ## 3. 全体の流れ
 

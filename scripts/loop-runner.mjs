@@ -840,7 +840,7 @@ function currentCheckpointTask(task, root) {
   requireClean(root);
   const assessment = validateCheckpoint(task, {
     head: git(["rev-parse", "HEAD"], root),
-    baseHead: git(["rev-parse", task.baseRef], root),
+    baseHead: git(["rev-parse", "--verify", `${task.baseRef}^{commit}`], root),
     paths: readChangedPaths({ base: task.baseRef, cwd: root }),
     root,
   });
