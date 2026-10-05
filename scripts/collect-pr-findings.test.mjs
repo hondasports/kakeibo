@@ -418,9 +418,22 @@ describe("stripInvisibleMarkup", () => {
   });
 
   it("does not remove inline links or lines that merely start with a bracket", () => {
-    const input = "[link](https://example.com) は残す\n[partial]: trailing は消す";
+    const input = "[link](https://example.com) は残す\n[partial]: trailing は残す";
     const { body } = stripInvisibleMarkup(input);
-    expect(body).toBe("[link](https://example.com) は残す");
+    expect(body).toBe(input);
+  });
+
+  it("strips definitions with titles or angle destinations and ≤3-space indent", () => {
+    const input = '[a]: /u "title"\n[b]: <b c>\n   [c]: /x\nkept';
+    const { body } = stripInvisibleMarkup(input);
+    expect(body).toBe("kept");
+  });
+
+  it("keeps [label]: lines whose trailing text is not a quoted title", () => {
+    // `[todo]: fix the thing` is not a CommonMark link definition — the
+    // trailing words cannot be a title — so GitHub renders it as text.
+    const { body } = stripInvisibleMarkup("[todo]: fix the thing");
+    expect(body).toBe("[todo]: fix the thing");
   });
 
   it("collapses runs of 3+ blank lines down to 2", () => {
@@ -437,6 +450,23 @@ describe("stripInvisibleMarkup", () => {
   it("keeps inline code verbatim including <!-- --> inside it", () => {
     const { body } = stripInvisibleMarkup("見て `<!-- shown -->` ね <!-- gone -->");
     expect(body).toBe("見て `<!-- shown -->` ね ");
+  });
+
+  it("keeps a fence left open at EOF verbatim — GitHub renders it as code", () => {
+    const input = "text\n```\n<!-- still code -->\n[x]: #y\nmore";
+    const { body } = stripInvisibleMarkup(input);
+    expect(body).toBe(input);
+  });
+
+  it("restores inline code containing $-substitution sequences verbatim", () => {
+    const input = "a `$&` b\na `$'` z\na `$$` c";
+    const { body } = stripInvisibleMarkup(input);
+    expect(body).toBe(input);
+  });
+
+  it("does not re-pair backtick runs nested inside a consumed code span", () => {
+    const { body } = stripInvisibleMarkup("`` `x` ``");
+    expect(body).toBe("`` `x` ``");
   });
 
   it("keeps <details> blocks untouched", () => {
@@ -493,6 +523,16 @@ describe("stripInvisibleMarkup", () => {
     expect(finding.body).toBe("");
     expect(finding.bodyInvisibleOnly).toBe(true);
     expect(finding.strippedChars).toBeGreaterThan(0);
+  });
+
+  it("does not flag an absent comment body as bodyInvisibleOnly", () => {
+    const result = toFindings({
+      comments: [{ id: "IC_e", body: null, url: "u", author: { login: "h" } }],
+    });
+    const finding = result.findings[0];
+    expect(finding.body).toBe("");
+    expect(finding.bodyInvisibleOnly).toBeUndefined();
+    expect(finding.strippedChars).toBeUndefined();
   });
 
   it("still drops reviews whose ORIGINAL body is empty", () => {

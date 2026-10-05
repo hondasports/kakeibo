@@ -78,7 +78,13 @@ const COLLECTION_SCOPE =
   "inline review threads (unresolved) + non-empty submitted review bodies (all states) + PR issue comments";
 
 const HTML_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
-const LINK_REFERENCE_LINE_PATTERN = /^\[[^\]]+\]:\s*\S+.*$/;
+// CommonMark link reference definition: optional ≤3-space indent, label,
+// colon, destination (bare token or <...>), optional quoted/parenthesized
+// title, end of line. A line with trailing unquoted text (e.g.
+// `[todo]: fix the thing`) is NOT a definition — it renders as text and
+// must be kept.
+const LINK_REFERENCE_LINE_PATTERN =
+  /^ {0,3}\[[^\]\n]+\]:\s*(<[^>\n]*>|\S+)(\s+("([^"\\\n]|\\.)*"|'([^'\\\n]|\\.)*'|\(([^)\\\n]|\\.)*\)))?\s*$/;
 const FENCE_MARKER_PATTERN = /^(`{3,}|~{3,})/;
 const FENCE_CLOSER_PATTERN = /^(`{3,}|~{3,})\s*$/;
 
@@ -101,8 +107,9 @@ function maskInlineCode(text) {
       if (used[j]) continue;
       if (runs[j].end - runs[j].start !== length) continue;
       spans.push([runs[i].start, runs[j].end]);
-      used[i] = true;
-      used[j] = true;
+      // Backtick runs between the pair sit inside the code span and are
+      // literal text; they must not pair again outside it.
+      for (let k = i; k <= j; k += 1) used[k] = true;
       break;
     }
   }
@@ -167,7 +174,9 @@ export function stripInvisibleMarkup(body) {
     }
     buffer.push(line);
   }
-  pushBuffer("normal");
+  // A fence left open at EOF is a code block through end of document —
+  // its content renders as literal code, so it stays verbatim.
+  pushBuffer(fence ? "verbatim" : "normal");
 
   const stripped = parts.map((part) => {
     if (part.kind === "verbatim") return part.text;
@@ -191,7 +200,10 @@ export function stripInvisibleMarkup(body) {
     }
     text = out.join("\n");
     for (let i = 0; i < saved.length; i += 1) {
-      text = text.replace(`\u0000${i}\u0000`, saved[i]);
+      // Function replacement: saved spans may contain $&, $$, $', $`
+      // which String.replace would otherwise interpret as substitution
+      // patterns.
+      text = text.replace(`\u0000${i}\u0000`, () => saved[i]);
     }
     return text;
   });
@@ -203,7 +215,9 @@ export function stripInvisibleMarkup(body) {
 function toCommentSummary(comment) {
   const original = String(comment?.body ?? "");
   const normalized = stripInvisibleMarkup(original);
-  const invisibleOnly = normalized.body.trim() === "";
+  // An empty original carries no markup — invisibleOnly means the body
+  // was *entirely* invisible markup, not that it was absent.
+  const invisibleOnly = original.trim() !== "" && normalized.body.trim() === "";
   const body = invisibleOnly ? "" : normalized.body;
   return {
     author: comment?.author?.login ?? null,
