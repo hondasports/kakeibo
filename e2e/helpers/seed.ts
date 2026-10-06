@@ -1,3 +1,5 @@
+import type { E2eTaxReviewReceiptCase } from "../../convex/aiExpenseDrafts/e2eDraftFixtures";
+
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim().replace(/^["']+|["']+$/g, "");
   if (!value) {
@@ -34,7 +36,7 @@ export async function seedAiExpenseDraftForExpenseEntriesByUser(userId: string):
 
 export async function seedTaxReviewDraftByUser(
   userId: string,
-  receiptCase?: "basis890" | "basis890_264",
+  receiptCase?: E2eTaxReviewReceiptCase,
 ): Promise<{ draftId: string }> {
   return (await postE2eSeed("/e2e/seed-tax-review-draft", { userId, receiptCase })) as {
     draftId: string;

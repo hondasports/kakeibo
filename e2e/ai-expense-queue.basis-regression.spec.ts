@@ -39,6 +39,7 @@ for (const receipt of [
       await page.reload();
       await row.getByRole("button", { name: "修正する", exact: true }).click();
       await expect(matched).toBeVisible();
+      let registeredTotalYen = 0;
       for (const [index, amount] of receipt.amounts.entries()) {
         const name = `商品${index + 1}`;
         const detail = dialog.locator("details").filter({ hasText: name }).first();
@@ -47,7 +48,15 @@ for (const receipt of [
           detail.getByRole("combobox", { name: name + "の表示価格", exact: true }),
         ).toHaveText("税抜");
         await expect(detail.getByLabel("レシートの金額", { exact: true })).toHaveValue(amount);
+        const registeredAmount = await detail.getByText(/^登録額:/).textContent();
+        const match = /登録額:\s*([\d,]+)円/.exec(registeredAmount ?? "");
+        expect(match).not.toBeNull();
+        registeredTotalYen += Number(match![1].replaceAll(",", ""));
       }
+      expect(registeredTotalYen).toBe(receipt.paidYen);
+      expect(
+        registeredTotalYen - receipt.amounts.reduce((sum, amount) => sum + Number(amount), 0),
+      ).toBe(receipt.taxYen);
       const reference = dialog
         .locator("details")
         .filter({ hasText: "読み取り原文・詳しい税情報（参考）" })
@@ -55,16 +64,23 @@ for (const receipt of [
       if ((await reference.getAttribute("open")) === null)
         await reference.locator("summary").click();
       const taxSummary = reference.locator('[aria-label="税率別集計"]');
-      await expect(taxSummary).toContainText(`対象額 ${receipt.paidYen}円（税込）`);
-      await expect(taxSummary).toContainText(`税額 ${receipt.taxYen}円`);
+      await expect(taxSummary).toHaveCount(0);
+      await expect(reference.getByRole("list", { name: "OCR原文" })).toContainText(
+        `税率8%対象額${receipt.paidYen}円`,
+      );
+      await expect(reference.getByRole("list", { name: "OCR原文" })).toContainText(
+        `内消費税等8% ${receipt.taxYen}円`,
+      );
       await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
       await expect(dialog).toBeHidden();
       await row.getByRole("button", { name: "修正する", exact: true }).click();
       await expect(matched).toBeVisible();
       if ((await reference.getAttribute("open")) === null)
         await reference.locator("summary").click();
-      await expect(taxSummary).toContainText(`対象額 ${receipt.paidYen}円（税込）`);
-      await expect(taxSummary).toContainText(`税額 ${receipt.taxYen}円`);
+      await expect(taxSummary).toHaveCount(0);
+      await expect(reference.getByRole("list", { name: "OCR原文" })).toContainText(
+        `内消費税等8% ${receipt.taxYen}円`,
+      );
       await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
       await expect(dialog).toBeHidden();
       await row.getByRole("button", { name: "登録する", exact: true }).click();

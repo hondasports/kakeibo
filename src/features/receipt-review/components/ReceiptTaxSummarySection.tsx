@@ -3,17 +3,29 @@ import type { AiExpenseDraft } from "../types/types";
 import { ReceiptTaxSummaryEditor, type TaxSummaryChange } from "./ReceiptTaxSummaryEditor";
 import { ReceiptTaxSummaryReadOnly } from "./ReceiptTaxSummaryReadOnly";
 
+export type EditableTaxSummaryTarget = {
+  summaryIndex: number;
+  sourceIndex: number;
+  message?: string;
+};
+
 export function ReceiptTaxSummarySection({
   draft,
   updatingIndex,
   onSummaryChange,
+  editableSummaries,
+  registerSummary,
 }: {
   draft: AiExpenseDraft | null;
   updatingIndex?: number | null;
   onSummaryChange?: (index: number, change: TaxSummaryChange) => void;
+  editableSummaries?: EditableTaxSummaryTarget[];
+  registerSummary?: (target: string) => (node: HTMLElement | null) => void;
 }) {
   const summaries = draft?.taxSummaries ?? [];
-  if (summaries.length === 0) {
+  const visibleSummaries: EditableTaxSummaryTarget[] =
+    editableSummaries ?? summaries.map((_, index) => ({ summaryIndex: index, sourceIndex: index }));
+  if (summaries.length === 0 || visibleSummaries.length === 0) {
     return null;
   }
 
@@ -22,8 +34,11 @@ export function ReceiptTaxSummarySection({
       <Typography sx={{ fontWeight: 600 }} variant="subtitle2">
         税率別集計
       </Typography>
-      {summaries.map((summary, index) => {
+      {visibleSummaries.map(({ summaryIndex: index, sourceIndex, message }) => {
+        const summary = summaries[index];
+        if (!summary) return null;
         const isEditable =
+          editableSummaries !== undefined ||
           summary.status === "ambiguous" ||
           summary.status === "contradictory" ||
           summary.status === "reconcilable" ||
@@ -32,7 +47,11 @@ export function ReceiptTaxSummarySection({
 
         return (
           <Stack
+            component="section"
             key={key}
+            ref={registerSummary?.(`tax-summary-${sourceIndex}`)}
+            tabIndex={-1}
+            aria-label={`${summary.taxRatePercent}%の税内訳を${isEditable ? "修正" : "確認"}`}
             spacing={0.25}
             sx={{
               border: "1px solid",
@@ -43,9 +62,10 @@ export function ReceiptTaxSummarySection({
           >
             {isEditable ? (
               <ReceiptTaxSummaryEditor
-                isSaving={updatingIndex === index}
+                isSaving={updatingIndex === sourceIndex}
                 summary={summary}
-                summaryIndex={index}
+                summaryIndex={sourceIndex}
+                reviewMessage={message}
                 onChange={onSummaryChange ?? (() => {})}
               />
             ) : (

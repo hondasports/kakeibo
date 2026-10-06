@@ -24,6 +24,43 @@ function summary(
 }
 
 describe("ReceiptTaxSummaryEditor", () => {
+  it("同じ税値のサマリ再生成では入力を保持し、保存済み税値の更新では反映する", async () => {
+    const user = userEvent.setup();
+    const original = summary({ status: "conflicting" });
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <ReceiptTaxSummaryEditor
+        isSaving={false}
+        summary={original}
+        summaryIndex={0}
+        onChange={onChange}
+      />,
+    );
+    const input = screen.getByRole("spinbutton", { name: "対象額" });
+    await user.clear(input);
+    await user.type(input, "1060");
+    rerender(
+      <ReceiptTaxSummaryEditor
+        isSaving={false}
+        summary={{ ...original, reasons: ["unresolved_tax_summary"] }}
+        summaryIndex={0}
+        onChange={onChange}
+      />,
+    );
+    expect(input).toHaveValue(1060);
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(onChange).toHaveBeenCalledWith(0, { taxableAmountYen: 1060 });
+    rerender(
+      <ReceiptTaxSummaryEditor
+        isSaving={false}
+        summary={{ ...original, taxableAmountYen: 1000 }}
+        summaryIndex={0}
+        onChange={onChange}
+      />,
+    );
+    expect(input).toHaveValue(1000);
+  });
+
   it("conflicting 状態の summary を編集して保存すると変更内容が通知される", async () => {
     const onChange = vi.fn();
     render(
