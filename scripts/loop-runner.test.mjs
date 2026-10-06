@@ -1414,7 +1414,7 @@ describe("persistent task gates", () => {
     dirs.push(parent);
     const out = path.join(parent, "packet");
     buildReviewPacket(task, out, dir);
-    expect(readFileSync(path.join(out, "diff.patch"))).toEqual(expectedDiff);
+    expect(readFileSync(path.join(out, "diff.patch")).equals(expectedDiff)).toBe(true);
     const packet = JSON.parse(readFileSync(path.join(out, "packet.json"), "utf8"));
     expect(packet.reuseCandidates.featurePatchSha256).toBe(expectedHash);
   });
