@@ -48,7 +48,10 @@ import {
 } from "./loop-policy.mjs";
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
-const git = (args, root) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+// Full promotion patches can exceed Node's default 1 MiB subprocess buffer.
+const GIT_MAX_BUFFER = 32 * 1024 * 1024;
+const git = (args, root) =>
+  execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: GIT_MAX_BUFFER }).trim();
 /**
  * File-content memoization keyed by path + mtime: a single run parses these
  * documents many times, and an edit between calls (e.g. tests rewriting the
@@ -1353,7 +1356,8 @@ export function buildReviewPacket(
   const fullRange = `${task.baseRef}...${task.head}`;
   const reviewRange = deltaFrom ? `${deltaFrom}..${task.head}` : fullRange;
   // Keep packet patches byte-for-byte; the generic Git helper trims command values.
-  const readDiff = (args) => execFileSync("git", ["diff", ...args], { cwd: root });
+  const readDiff = (args) =>
+    execFileSync("git", ["diff", ...args], { cwd: root, maxBuffer: GIT_MAX_BUFFER });
   const diff = readDiff(["--binary", "--no-renames", reviewRange]);
   const paths = (range) =>
     readDiff(["--name-only", "--no-renames", "-z", range])

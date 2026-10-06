@@ -342,7 +342,8 @@ async function drainPurgeSteps(
   }
 
   // 2. 死んだ groupId を指す group-scoped ドキュメントを全対象テーブルで掃除
-  let hasMore = false;
+  // scan の最終ページでも削除失敗分は残る。即時再実行の判定とは分ける。
+  let hasMore = groupScanFailed || stats.groupDeleteFailed > 0;
   if (!groupScanDone) {
     hasMore = true;
     if (!groupScanFailed) {
