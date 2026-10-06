@@ -77,8 +77,152 @@ const ISSUE_COMMENTS_PAGE_QUERY = `query($owner: String!, $name: String!, $numbe
 const COLLECTION_SCOPE =
   "inline review threads (unresolved) + non-empty submitted review bodies (all states) + PR issue comments";
 
+const HTML_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
+// CommonMark link reference definition: optional ≤3-space indent, label,
+// colon, destination (bare token or <...>), optional quoted/parenthesized
+// title, end of line. A line with trailing unquoted text (e.g.
+// `[todo]: fix the thing`) is NOT a definition — it renders as text and
+// must be kept.
+// Bare destinations follow CommonMark loosely: no whitespace/angle
+// brackets, parens only in balanced non-nested groups (so `/u(rl` or `<x`
+// is not a destination and the line stays). Parenthesized titles likewise
+// forbid unescaped `(` inside.
+const LINK_REFERENCE_LINE_PATTERN =
+  /^ {0,3}\[[^\]\n]+\]:\s*(<[^>\n]*>|(?:[^\s()<>\\]|\\.|\([^()\n\\]*\))+)(\s+("([^"\\\n]|\\.)*"|'([^'\\\n]|\\.)*'|\(([^()\\\n]|\\.)*\)))?\s*$/;
+const FENCE_MARKER_PATTERN = /^(`{3,}|~{3,})/;
+const FENCE_CLOSER_PATTERN = /^(`{3,}|~{3,})\s*$/;
+
+/**
+ * Mask inline code spans (`` `...` ``) so stripping never touches text that
+ * renders on GitHub. An opener backtick run pairs with the next run of the
+ * exact same length; unclosed runs stay normal text, matching CommonMark.
+ */
+function maskInlineCode(text) {
+  const runs = [];
+  for (const match of text.matchAll(/`+/g)) {
+    runs.push({ start: match.index, end: match.index + match[0].length });
+  }
+  const used = new Array(runs.length).fill(false);
+  const spans = [];
+  for (let i = 0; i < runs.length; i += 1) {
+    if (used[i]) continue;
+    const length = runs[i].end - runs[i].start;
+    for (let j = i + 1; j < runs.length; j += 1) {
+      if (used[j]) continue;
+      if (runs[j].end - runs[j].start !== length) continue;
+      spans.push([runs[i].start, runs[j].end]);
+      // Backtick runs between the pair sit inside the code span and are
+      // literal text; they must not pair again outside it.
+      for (let k = i; k <= j; k += 1) used[k] = true;
+      break;
+    }
+  }
+  const saved = [];
+  let masked = "";
+  let last = 0;
+  for (const [start, end] of spans.sort((a, b) => a[0] - b[0])) {
+    // NUL cannot appear in a GitHub body, so the sentinel never collides
+    // with real content the way a space-padded marker could.
+    masked += text.slice(last, start);
+    masked += `\u0000${saved.length}\u0000`;
+    saved.push(text.slice(start, end));
+    last = end;
+  }
+  masked += text.slice(last);
+  return { masked, saved };
+}
+
+/**
+ * Remove markup that GitHub renders invisible: HTML comments (single- and
+ * multi-line) and whole-line link reference definitions (`[label]: target`),
+ * then collapse runs of 3+ blank lines (created by removal) down to 2.
+ * Fenced code blocks and inline code are kept verbatim — markup inside them
+ * is visible. Visible text is never removed.
+ */
+export function stripInvisibleMarkup(body) {
+  const input = String(body ?? "");
+  if (!input) return { body: input, strippedChars: 0 };
+
+  // Split into verbatim (fenced code) and normal regions. Fences toggle on
+  // lines whose trimmed content starts with 3+ of the same marker char.
+  const lines = input.split("\n");
+  const parts = [];
+  let fence = null;
+  let buffer = [];
+  const pushBuffer = (kind) => {
+    if (buffer.length === 0) return;
+    parts.push({ kind, text: buffer.join("\n") });
+    buffer = [];
+  };
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (fence) {
+      buffer.push(line);
+      // A closer is marker chars only (plus trailing whitespace) — a line like
+      // ```info inside a fence is content, not a close.
+      const closer = trimmed.match(FENCE_CLOSER_PATTERN);
+      if (closer && closer[1][0] === fence.char && closer[1].length >= fence.len) {
+        pushBuffer("verbatim");
+        fence = null;
+      }
+      continue;
+    }
+    // A backtick fence's info string may not itself contain backticks, but
+    // treating any 3+-marker line as an opener is safe: it still stays verbatim.
+    const opener = trimmed.match(FENCE_MARKER_PATTERN);
+    if (opener) {
+      pushBuffer("normal");
+      buffer.push(line);
+      fence = { char: opener[1][0], len: opener[1].length };
+      continue;
+    }
+    buffer.push(line);
+  }
+  // A fence left open at EOF is a code block through end of document —
+  // its content renders as literal code, so it stays verbatim.
+  pushBuffer(fence ? "verbatim" : "normal");
+
+  const stripped = parts.map((part) => {
+    if (part.kind === "verbatim") return part.text;
+    const { masked, saved } = maskInlineCode(part.text);
+    let text = masked.replace(HTML_COMMENT_PATTERN, "");
+    text = text
+      .split("\n")
+      .filter((line) => !LINK_REFERENCE_LINE_PATTERN.test(line))
+      .join("\n");
+    // Collapse 3+ consecutive blank (whitespace-only) lines to 2.
+    const out = [];
+    let blanks = 0;
+    for (const line of text.split("\n")) {
+      if (line.trim() === "") {
+        blanks += 1;
+        if (blanks > 2) continue;
+      } else {
+        blanks = 0;
+      }
+      out.push(line);
+    }
+    text = out.join("\n");
+    for (let i = 0; i < saved.length; i += 1) {
+      // Function replacement: saved spans may contain $&, $$, $', $`
+      // which String.replace would otherwise interpret as substitution
+      // patterns.
+      text = text.replace(`\u0000${i}\u0000`, () => saved[i]);
+    }
+    return text;
+  });
+
+  const result = stripped.join("\n");
+  return { body: result, strippedChars: input.length - result.length };
+}
+
 function toCommentSummary(comment) {
-  const body = String(comment?.body ?? "");
+  const original = String(comment?.body ?? "");
+  const normalized = stripInvisibleMarkup(original);
+  // An empty original carries no markup — invisibleOnly means the body
+  // was *entirely* invisible markup, not that it was absent.
+  const invisibleOnly = original.trim() !== "" && normalized.body.trim() === "";
+  const body = invisibleOnly ? "" : normalized.body;
   return {
     author: comment?.author?.login ?? null,
     url: comment?.url ?? null,
@@ -86,6 +230,8 @@ function toCommentSummary(comment) {
     updatedAt: comment?.updatedAt ?? null,
     bodyTruncated: body.length > FINDING_BODY_LIMIT,
     body: body.slice(0, FINDING_BODY_LIMIT),
+    ...(normalized.strippedChars ? { strippedChars: normalized.strippedChars } : {}),
+    ...(invisibleOnly ? { bodyInvisibleOnly: true } : {}),
   };
 }
 
@@ -185,14 +331,20 @@ export function toFindings({ reviewThreads = [], reviews = [], comments = [], ha
       updatedAt: firstComment.updatedAt,
       bodyTruncated: firstComment.bodyTruncated,
       body: firstComment.body,
+      ...(firstComment.strippedChars ? { strippedChars: firstComment.strippedChars } : {}),
+      ...(firstComment.bodyInvisibleOnly ? { bodyInvisibleOnly: true } : {}),
       replies: commentNodes.slice(1).map(toCommentSummary),
     });
   }
 
+  // Eligibility (non-empty submitted review bodies) is decided on the ORIGINAL
+  // body so stripping never changes which reviews are collected.
   const reviewFindings = reviews
     .filter((review) => String(review.body ?? "").trim() !== "")
     .map((review) => {
-      const body = String(review.body ?? "");
+      const normalized = stripInvisibleMarkup(String(review.body ?? ""));
+      const invisibleOnly = normalized.body.trim() === "";
+      const body = invisibleOnly ? "" : normalized.body;
       return {
         kind: "review",
         id: review.id,
@@ -203,6 +355,8 @@ export function toFindings({ reviewThreads = [], reviews = [], comments = [], ha
         updatedAt: review.updatedAt ?? review.submittedAt ?? null,
         bodyTruncated: body.length > FINDING_BODY_LIMIT,
         body: body.slice(0, FINDING_BODY_LIMIT),
+        ...(normalized.strippedChars ? { strippedChars: normalized.strippedChars } : {}),
+        ...(invisibleOnly ? { bodyInvisibleOnly: true } : {}),
       };
     });
 
@@ -217,6 +371,8 @@ export function toFindings({ reviewThreads = [], reviews = [], comments = [], ha
       updatedAt: summary.updatedAt,
       bodyTruncated: summary.bodyTruncated,
       body: summary.body,
+      ...(summary.strippedChars ? { strippedChars: summary.strippedChars } : {}),
+      ...(summary.bodyInvisibleOnly ? { bodyInvisibleOnly: true } : {}),
     };
   });
 
@@ -313,6 +469,7 @@ export function fetchPullRequestFindings({ owner, name, number, cwd, execGraphql
 export function parseArguments(args) {
   const parsed = { cwd: process.cwd() };
   for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === "--") continue;
     if (args[index] === "--pr") {
       parsed.pr = args[index + 1];
       index += 1;

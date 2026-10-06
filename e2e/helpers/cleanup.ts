@@ -202,6 +202,13 @@ export async function cleanupLineLink(options?: CleanupOptions): Promise<void> {
   });
 }
 
+export async function cleanupNotificationData(options?: CleanupOptions): Promise<void> {
+  await callCleanupEndpoint({
+    ...(await resolveCleanupIdentity(options)),
+    clearNotificationData: true,
+  });
+}
+
 /**
  * テストユーザーのグループ所属を削除する。
  */
@@ -317,6 +324,7 @@ async function callCleanupEndpoint(body: {
   clearGroupMemberships?: boolean;
   clearGroupInvitations?: boolean;
   clearLineLink?: boolean;
+  clearNotificationData?: boolean;
   setGroupMemberRole?: "owner" | "member";
 }): Promise<void> {
   const siteUrl = process.env.VITE_CONVEX_SITE_URL;

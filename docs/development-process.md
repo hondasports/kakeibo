@@ -5,12 +5,14 @@
 エージェント作業の詳細をここへ二重定義しない。この文書は非normativeな運用説明で、内容が衝突した場合は次を正本とする。
 
 - Agent実行契約: `AGENTS.md`
-- レビュー深度の機械算出: `node scripts/review-depth.mjs --help`
+- Agent State Machine: `.agent/process.yaml`
+- Stateごとの実行契約: `.agent/workflow/*.md`
+- Task Profile / Runtime差分: `.agent/profiles/`, `.agent/runtime/`
+- Change Assessment: `node scripts/assess-change.mjs`
 - Workspace preflight: `node scripts/check-task-worktree.mjs --require-clean`
 - ループ文書の機械検査: `node scripts/check-loop-docs.mjs`
-- 差分からのスキル推奨・E2E要否: `node scripts/suggest-skills.mjs`
 - PR上の未対応指摘の収集・照合: `node scripts/collect-pr-findings.mjs --pr <番号> [--handled <ファイル>]`
-- 各工程の手順: `skills/*/SKILL.md`
+- 専門能力: `skills/*/SKILL.md`
 - 技術設計: `docs/technical-design.md`
 - 認証: `docs/auth-guard.md`
 - UI/UX: `docs/ui-ux-design.md`
@@ -102,7 +104,7 @@ PASS条件:
 
 FAILしたまま編集しない。
 
-`docs/`、`README.md`、`CHANGELOG.md`だけのpure docsは理由を記録して例外にできる。ただし次はpure docs扱いしない。
+`docs/`、`README.md`だけのpure docsは理由を記録して例外にできる。ただし次はpure docs扱いしない。
 
 - `AGENTS.md`
 - `skills/`
@@ -195,19 +197,56 @@ Agent taskで残す価値があるもの:
 
 ---
 
-## 5. Agent の工程
+## 5. Agent Harness
 
-[AGENTS.md](../AGENTS.md)を入口に、工程に応じたskills/だけを読む。標準ループはターン型: ユーザーのプロンプトで開始し、完了地点（ユーザー指定、既定 merge_ready 相当）まで実装・検証・セルフレビュー・引き渡しを反復する。タスクの状態・判断履歴は専用の状態JSONを持たず Issue / PR に外部化する。ゴール型・時間型・自動トリガーのループは未採用。
+`AGENTS.md` はRuntime共通契約、`.agent/process.yaml` はState Transitionの正本とする。基本Stateは `REFINE / EXECUTE / REVIEW / AFTERCARE`、例外Stateは `INCIDENT / HUMAN_GATE`。Workflow本体をCodex・Devin・Claude Codeの個別設定へ複製しない。
 
-セルフレビューの最低深度（T1/T2/T3）と確認項目は `scripts/review-depth.mjs` が実差分のリスク評価から機械算出する。レビューと修正の反復は「open findingが0件で収束・進展がある間は制約と実行予算内で継続・3ラウンドごとに方針再評価・上限到達は未完了として報告・再レビューは変更hunkと影響項目に限定し共有契約や前提の変化時だけ範囲を広げる」のプロトコルに従う（`skills/code-review/SKILL.md`）。findingは再現条件での再検証・再レビューまでopenのままとし、閉じる根拠に修正commit・差分と確認結果を残す。受入条件を満たせない指摘の先送りは収束に数えない。
+具体的な開始・再開・状態保存は [Agent Harness詳細仕様](agent-harness-reference.md) を参照する（起動手順は [Agent Harness操作手順](agent-harness.md)）。
 
-Checkerは、必須条件（セルフレビュー必須項目、repository policy・ユーザー指定のCIと承認）と補助観点（利用可能なボット指摘）に分ける。T3相当でも必須セルフレビュー項目は実施し、独立観点が必要な部分は未確認リスクと証跡を具体化してボット・人間レビューへ引き渡す。失敗側の停止条件は、同一原因の失敗3回・検証手段なし・要求矛盾で停止して報告する。ユーザーの訂正・繰り返しの失敗・制御の穴は、一時的な環境要因か再利用可能な制御の穴かを分け、後者のみ同じPRで skills/・AGENTS.md・docs/ へ書き戻す。区切り・待機時は Issue / PR に再開情報（目的と完了地点・branch/HEAD・未コミット作業・未解決finding・証跡・次の1手・外部待ち解除条件）を残し、再開時は要約と実状態を照合してから続行する。
+軽量化とREFINE終了時のProfile自動判定を実装する際は [Agent Harness設計](agent-harness-design.md) を正本とする。この設計は段階的に実装中であり、本節の現行運用とState Transitionを設計文書だけで変更しない。
 
-ループ文書自身（AGENTS.md・skills/・この文書）の整合は `node scripts/check-loop-docs.mjs` が機械検査する。スキル参照・frontmatter・内部リンク・節番号・廃止語彙を静的に確認し、文書のズレを検知する。
+### REFINE
 
+Issueは詳細仕様を必須としない。Agentはrepository、既存仕様、テストを調査してHuman Requestを実装可能なAgent Specへ育てる。調査で解ける疑問は自力で解決し、既存patternに沿う可逆・低影響な判断はAssumptionとして記録する。Product / UX / Security / Data semanticsをmaterially変える未確定事項だけHUMAN_GATEへ送る。
+
+Spec GateはGoal、1件以上のAcceptance Criteria、Non-goals、Assumptions、Verification Strategy、material open decisionが0件であることを要求する。
+
+### EXECUTE
+
+実装・targeted test・debug・修正・再検証は同じAgent Run内で回す。HarnessはHOWを細分化せず、Machine FloorとExit Contractだけを強制する。
+
+### Machine Floor
+
+`scripts/assess-change.mjs` はPredicted Risk、差分からのMachine Risk、Agent Assessmentを統合する。Final Riskは最も高いTierを採用し、Agentは最低条件を引き下げられない。同じ考え方をRequired SkillsとVerification Floorにも適用する。
+
+評価CLIは引数省略時にPR baseまたは明示されたbaseからcommit済み・未commit・未追跡の差分を取得する。`--paths` は診断用途のみで、タスクとCIのゲートはGit実差分を再取得する。
+
+Machine Riskはschema/migration、認証・認可、削除/retention、Agent orchestration、外部write/webhook等を決定論的にT3 floorへ引き上げる。より高いRiskが必要とAgentまたはReviewerが判断した場合は上積みする。
+
+### REVIEW
+
+T1はセルフレビュー可。T2で未解決の挙動前提がある場合とT3は独立Reviewerを必須とする。Reviewerはfresh contextで目的・Acceptance Criteria・差分・検証結果・関連caller/契約を読み、実装担当の結論を先に見ずに独立評価する。
+
+修正ループの回数を減らすため、PR作業を許可されたタスクは初回REVIEW進入時にdraft PRを作り、外部レビュー（CodeRabbit）を内部レビューと並行させて同じラウンドで指摘を処理する。Reviewerは各ラウンドで指摘を重要度付きで一度に出す。full unitはREVIEW中にReviewerと並行して完了させ、REVIEW cleanの条件とする（[Agent Harness詳細仕様](agent-harness-reference.md#レビュー) 参照）。
+
+### AFTERCARE / Persistent State
+
+PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest HEADで確認する。タスク状態はIssue / PRを正本とし、Human Requestは保持する。Agent Spec・Machine-readable state・検証証跡を分離して残し、別SessionでもGitHubと実HEADを照合して再開できるようにする。状態はGitメタデータ内に作業キャッシュを保存し、PR本文の状態ブロックへ同期する。HEADまたはbase更新時は検証・レビューを失効させるが、CLIが不変性を証明した検証証跡は再利用し、Machine分類が不変ならAgent評価を引き継ぐ。PR本文の状態ブロックは復元とPR gateに必要な範囲へ圧縮し、完全なhistoryはGitメタデータに残す（[Agent Harness詳細仕様](agent-harness-reference.md#prとaftercare) 参照）。
+
+E2Eが必須と判定された変更でブラウザ受入条件がない場合は、PR CIで実行し、AFTERCAREでpublic/authenticated両方の成功を要求する。文書・工程管理のみなど差分判定でE2E対象外となる変更には、E2E成功を必須条件として追加しない。実行対象の判定は「PR CI E2Eの差分判定」に従う。
+
+### Task Profile
+
+Core Harnessはモデル非依存。`.agent/profiles/` は `fast / standard / deep / max` のタスク強度を定義し、autonomy・delegation・verification・context量だけを調整する。Model名ごとのProfileは作らない。
+
+ProfileはREFINE終了時にタスクの評価（`blast_radius`・`uncertainty`・検証負荷routine/complex）から規則で自動判定する。`--profile` の明示指定は常に優先し、自動選択は実装中の評価変化に応じて上位へだけ再判定する。Risk Floor・Human Gate・State TransitionはTask Profileから変更しない。Runtime固有設定は `.agent/runtime/` に置く。
+
+ループ文書自身（AGENTS.md・README・`.agent/workflow/`・skills/・この文書）の整合は `node scripts/check-loop-docs.mjs` が機械検査する。
 ## 6. Verification
 
-「全コマンドを毎回実行する」ことではなく、受入条件と関連する不変条件、必須確認を証明する。受入条件は要求工程でbullet化したものを全件照合し、`受入条件 → 確認方法 → 期待結果/実結果 → 対象commit → 証跡` の対応とともに検証した内容・未検証・残課題をPR・作業報告へ記録する。変更後は影響する条件を未検証に戻し、無関係な証跡は理由付きで再利用する。
+「全コマンドを毎回実行する」ことではなく、受入条件と関連する不変条件、必須確認を証明する。受入条件は要求工程でbullet化したものを全件照合し、`受入条件 → 確認方法 → 期待結果/実結果 → 対象commit → 証跡` の対応とともに検証した内容・未検証・残課題をPR・作業報告へ記録する。変更後は影響する条件を未検証に戻す。
+
+現行CLIではHEAD/base更新時に検証・レビューを失効させる。過去の結果は調査の参考として参照でき、feature patchと検証対象treeの両方が不変だとCLIが証明できた検証証跡だけは再利用される（[Agent Harness設計](agent-harness-design.md) 第9節・実装済み）。base不変の増分commitがmetadata-only（`.md`・`.github/ISSUE_TEMPLATE/`・`.husky/`）だけを変更する場合は、process以外の証跡も延長される（実装済み。ただしlintは増分が `.md` と `.husky/` 正規hook名のみの場合に限る——ISSUE_TEMPLATE配下のYAML/JSON等はoxfmtが観測する）。それ以外の旧HEAD/baseの証跡を現在の必須確認の成功として扱わない。
 
 ローカル既定:
 
@@ -301,7 +340,7 @@ required environment不足、env sync失敗、Convex CLI未反映を「未実行
 
 ## 7. Review / Delivery
 
-ユーザー指定の完了地点に従う。PR指摘は `node scripts/collect-pr-findings.mjs` で機械収集して全件確認し（inlineスレッド・全stateの非空レビュー本文・PR会話コメント）、修正 or 棄却の根拠を残す。レビュー本文と会話コメントはresolve状態を持たないため、対応済みのfinding idと確認した候補のupdatedAtをIssue/PRの記録に残し、`--handled` で `unhandledCount: 0` を「指摘なし」と判定する（未解決threadはresolveまで常に未対応）。`bodyTruncated`・`commentsTruncated` の項目は記載URLの全文を読むまで確認済みとしない。指摘対応はまとめて1 pushで行い、pushごとのCI起動を抑える。観測した最新HEADに対して実行中は再観測、失敗は修正・再検証・push、新規指摘は修正ループ、必要承認だけ不足は人間待ち、必要条件充足はHEAD不変を再確認して完了とする判断表に従う（`skills/pr-aftercare/SKILL.md`）。GitHubの承認・branch保護条件を満たす。
+ユーザー指定の完了地点に従う。PR指摘は `node scripts/collect-pr-findings.mjs` で機械収集して全件確認し（inlineスレッド・全stateの非空レビュー本文・PR会話コメント）、修正 or 棄却の根拠を残す。レビュー本文と会話コメントはresolve状態を持たないため、対応済みのfinding idと確認した候補のupdatedAtをIssue/PRの記録に残し、`--handled` で `unhandledCount: 0` を「指摘なし」と判定する（未解決threadはresolveまで常に未対応）。`bodyTruncated`・`commentsTruncated` の項目は記載URLの全文を読むまで確認済みとしない。指摘対応はまとめて1 pushで行い、pushごとのCI起動を抑える。観測した最新HEADに対して実行中は再観測、失敗は修正・再検証・push、新規指摘は修正ループ、必要承認だけ不足は人間待ち、必要条件充足はHEAD不変を再確認して完了とする判断表に従う（`.agent/workflow/aftercare.md`）。GitHubの承認・branch保護条件を満たす。
 
 ## 8. CI / マージ条件
 
@@ -335,6 +374,7 @@ Markdown-onlyでworkflowがpaths-ignoreにより起動しない場合は、`git 
 ### local / CIの重複を避ける
 
 - local: changed / affected / functional AC
+- local unit: process suiteのファイルは除外する（必須のprocessが実行するため）。EXECUTE→REVIEWはaffected、REVIEW clean以降はfull
 - CI: repo-wide regression / required checks
 - 同じfull checkを両方で行う時は理由を持つ
 - failure修正後は失敗checkと依存checkだけ再実行
@@ -362,7 +402,7 @@ AGENTS.mdのルールが独自に「常に1 approval」を追加しない。
 - test adequacy
 - existing pattern consistency
 
-レビュー直前に実差分を4軸と強制条件で評価し、`scripts/review-depth.mjs` が算出する最低深度（T1/T2/T3）以上でレビューする。必要な確認内容はスクリプトが返す。評価の妥当性とレビューの実施はAgentの責任。詳細は `skills/code-review/SKILL.md` を参照。
+レビュー直前に実差分を4軸と強制条件で評価し、`scripts/review-depth.mjs` が算出する最低深度（T1/T2/T3）以上でレビューする。T1はセルフレビュー、T2のうち不確実性が残るものとT3は独立レビューも必須とする。軸の選択根拠とレビュー担当の条件は `.agent/workflow/review.md` を参照する。評価の妥当性とレビューの実施はAgentの責任。
 
 ---
 

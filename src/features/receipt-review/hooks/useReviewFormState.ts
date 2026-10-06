@@ -57,6 +57,8 @@ export function useReviewFormState({
         paidTotalYen: Number(mappedForm.amountYen),
         taxSummaries: selectedReviewDraft.taxSummaries,
         markerDefinitions: selectedReviewDraft.markerDefinitions,
+        priceTaxTreatment: mappedForm.priceTaxTreatment,
+        taxRateComposition: mappedForm.taxRateComposition,
       }),
     );
     setIsCategorySplit(categoryState.isCategorySplit);

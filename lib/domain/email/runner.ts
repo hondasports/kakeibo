@@ -19,6 +19,11 @@ import type {
 export interface EmailJobActionRunner {
   getJob(jobId: string): Promise<TransactionalEmailJobRecord | null>;
   findSuppression(normalizedEmail: string): Promise<EmailSuppressionRecord | null>;
+  getNotificationDeliveryDecision(args: {
+    type: TransactionalEmailJobRecord["templateType"];
+    channel: "email";
+    userId?: string;
+  }): Promise<{ enabled: boolean; reason?: string }>;
   markJobSent(fields: MarkJobSentFields): Promise<void>;
   markJobRetrying(fields: MarkJobRetryingFields): Promise<void>;
   markJobTerminal(fields: MarkJobTerminalFields): Promise<void>;

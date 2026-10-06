@@ -28,33 +28,8 @@ playwright/.clerk/
 
 # Service local state
 .vercel/
-.agents/*
-!.agents/roles/
-!.agents/roles/**
-!.agents/skills/
-.agents/skills/*
-!.agents/skills/browser-verification/
-!.agents/skills/browser-verification/**
-!.agents/skills/babysit-pr/
-!.agents/skills/babysit-pr/**
-!.agents/skills/code-review/
-!.agents/skills/code-review/**
-!.agents/skills/issue-gate-0/
-!.agents/skills/issue-gate-0/**
-!.agents/skills/tdd-implement/
-!.agents/skills/tdd-implement/**
-!.agents/skills/e2e-author/
-!.agents/skills/e2e-author/**
-!.agents/skills/verify-pre-push/
-!.agents/skills/verify-pre-push/**
-!.agents/skills/prompt-injection-guard/
-!.agents/skills/prompt-injection-guard/**
-!.agents/skills/service-ops-safety/
-!.agents/skills/service-ops-safety/**
-!.agents/skills/stuck-advisor/
-!.agents/skills/stuck-advisor/**
-!.agents/skills/virtual-company/
-!.agents/skills/virtual-company/**
+# 外部インストールSkill等の環境依存生成物（手作りSkillは skills/ でGit管理）
+.agents/
 
 # Local script outputs
 .tmp/
@@ -62,3 +37,7 @@ playwright/.clerk/
 # Logs and OS files
 *.log
 .DS_Store
+
+# indexion のローカル状態（digest index・reconcile DB等）。kgfs/ はプロジェクト固有スペックで共有対象
+.indexion/*
+!.indexion/kgfs/

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyChangedFiles,
+  isMetadataOnlyPath,
   isProcessOnlyPath,
   normalizeChangedPath,
   parseArguments,
@@ -72,7 +73,7 @@ describe("E2E relevance path classification", () => {
 
   it("skips only when every changed path is process-only", () => {
     expect(
-      classifyChangedFiles(["skills/code-review/SKILL.md", "docs/development-process.md"]),
+      classifyChangedFiles(["skills/workspace-preflight/SKILL.md", "docs/development-process.md"]),
     ).toMatchObject({
       runtimeRelevant: false,
       reason: "all_changed_paths_process_only",
@@ -81,7 +82,11 @@ describe("E2E relevance path classification", () => {
 
   it("fails closed for a mixed or unknown change", () => {
     expect(
-      classifyChangedFiles(["skills/code-review/SKILL.md", "src/App.tsx", "unknown/config.yaml"]),
+      classifyChangedFiles([
+        "skills/workspace-preflight/SKILL.md",
+        "src/App.tsx",
+        "unknown/config.yaml",
+      ]),
     ).toMatchObject({
       runtimeRelevant: true,
       reason: "runtime_relevant_path_detected",
@@ -99,6 +104,24 @@ describe("E2E relevance path classification", () => {
   it("keeps classifier changes and workflow changes E2E relevant", () => {
     expect(isProcessOnlyPath("scripts/classify-e2e-relevance.mjs")).toBe(false);
     expect(isProcessOnlyPath(".github/workflows/e2e.yml")).toBe(false);
+  });
+
+  it("rejects test-pattern basenames inside metadata dirs (vitest discovers dot-dirs)", () => {
+    for (const filePath of [
+      ".husky/probe.test.mjs",
+      ".husky/sub/probe.spec.ts",
+      ".github/ISSUE_TEMPLATE/x.test.tsx",
+      "docs/probe.test.cjs",
+    ])
+      expect(isMetadataOnlyPath(filePath), filePath).toBe(false);
+    for (const filePath of [
+      ".husky/pre-commit",
+      ".github/ISSUE_TEMPLATE/bug.yml",
+      "docs/x.test.md",
+    ])
+      expect(isMetadataOnlyPath(filePath), filePath).toBe(true);
+    // public/ ships verbatim into the build output — a .md there is observable.
+    expect(isMetadataOnlyPath("public/notes.md")).toBe(false);
   });
 });
 
@@ -135,6 +158,10 @@ describe("E2E relevance git and output helpers", () => {
     expect(() => parseArguments(["--base", SHA, "--head", SHA, "--github-output"])).toThrow(
       "--github-output requires a non-empty path",
     );
+    expect(parseArguments(["--", "--base", SHA, "--head", SHA])).toMatchObject({
+      baseSha: SHA,
+      headSha: SHA,
+    });
   });
 
   it("reads a NUL-delimited diff and writes stable GitHub outputs", () => {

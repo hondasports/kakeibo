@@ -1,90 +1,34 @@
-name: バグ報告
-description: 既存機能の不具合や想定外の挙動を報告する
+name: 困っていること
+description: 不具合や想定外の挙動を分かる範囲で報告する
 title: ""
 body:
   - type: markdown
     attributes:
       value: |
-        再現できる情報と、期待する挙動との差分を優先して記載してください。
+        何が起きているかを優先して書いてください。期待動作・影響範囲・完了条件はAgentのREFINE工程でrepositoryと証拠を調査して補完します。
 
   - type: textarea
-    id: actual
+    id: problem
     attributes:
       label: 発生していること
-      description: 実際に起きている問題を記載してください。
-    validations:
-      required: true
-
-  - type: textarea
-    id: expected
-    attributes:
-      label: 期待する動作
-      description: 本来どう動くべきかを記載してください。
+      description: 分かる範囲で問題を記載してください。
     validations:
       required: true
 
   - type: textarea
     id: reproduction
     attributes:
-      label: 再現手順
-      description: 可能な範囲で、最短の再現手順を記載してください。
-      placeholder: |
-        1. xxxを開く
-        2. xxxを入力する
-        3. xxxを実行する
-        4. 問題が発生する
-    validations:
-      required: true
+      label: 再現方法
+      description: 分かれば最短の再現手順を記載してください。
 
   - type: input
     id: environment
     attributes:
       label: 発生環境
       description: DEV / PREVIEW / PROD、ブラウザ、端末など分かる範囲で記載してください。
-      placeholder: "例）PREVIEW / Chrome / Android"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: frequency
-    attributes:
-      label: 発生頻度
-      options:
-        - 常に発生する
-        - 高頻度で発生する
-        - ときどき発生する
-        - 1回だけ確認した
-        - 不明
-    validations:
-      required: true
-
-  - type: textarea
-    id: impact
-    attributes:
-      label: 影響範囲
-      description: 利用不能、データ不整合、表示崩れなど、ユーザーや運用への影響を記載してください。
-    validations:
-      required: true
 
   - type: textarea
     id: evidence
     attributes:
-      label: ログ・スクリーンショット
-      description: エラー、ログ、Request ID、スクリーンショットなどがあれば添付してください。秘密情報は含めないでください。
-
-  - type: textarea
-    id: acceptance-criteria
-    attributes:
-      label: 完了条件
-      description: 修正完了と判断できる条件を記載してください。
-      placeholder: |
-        - [ ] 再現手順で問題が発生しない
-        - [ ] 関連する回帰テストが追加されている
-    validations:
-      required: true
-
-  - type: textarea
-    id: additional-context
-    attributes:
-      label: 補足
-      description: 関連Issue、直前の変更、回避策などがあれば記載してください。
+      label: ログ・スクリーンショット・補足
+      description: 証拠や関連Issueがあれば添付してください。秘密情報は含めないでください。

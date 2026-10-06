@@ -169,53 +169,18 @@ pnpm run dev
 *.p12
 *.pfx
 .vercel/
-.agents/*
-!.agents/roles/
-!.agents/roles/**
-!.agents/skills/
-.agents/skills/*
-!.agents/skills/browser-verification/
-!.agents/skills/browser-verification/**
-!.agents/skills/babysit-pr/
-!.agents/skills/babysit-pr/**
-!.agents/skills/code-review/
-!.agents/skills/code-review/**
-!.agents/skills/issue-gate-0/
-!.agents/skills/issue-gate-0/**
-!.agents/skills/tdd-implement/
-!.agents/skills/tdd-implement/**
-!.agents/skills/e2e-author/
-!.agents/skills/e2e-author/**
-!.agents/skills/verify-pre-push/
-!.agents/skills/verify-pre-push/**
-!.agents/skills/prompt-injection-guard/
-!.agents/skills/prompt-injection-guard/**
-!.agents/skills/service-ops-safety/
-!.agents/skills/service-ops-safety/**
-!.agents/skills/stuck-advisor/
-!.agents/skills/stuck-advisor/**
-!.agents/skills/virtual-company/
-!.agents/skills/virtual-company/**
+.agents/
 .pnpm-store/
 ```
 
-`.agents/` 配下の生成物はGit管理外にする。ただし、このリポジトリで手作りしたSkillと役割定義だけは `.agents/roles/` および以下のSkillディレクトリをGit管理する。
+`.agents/` 配下は外部インストールSkill等の環境依存生成物のため、丸ごとGit管理外にする。
 
-**Git管理するSkill（手作り）:**
-- `browser-verification` — Chrome DevTools MCP確認手順
-- `babysit-pr` — PR merge-ready 化
-- `code-review` — PR前セルフレビュー（Plan 契約フェーズ4）
-- `e2e-author` — E2E 追加・更新・省略判断と spec 作成
-- `e2e-smoke-run` — Smoke E2E 実行手順
-- `issue-gate-0` — 実装前仕様ゲート（Plan 契約フェーズ0）
-- `prompt-injection-guard` — プロンプトインジェクション対策
-- `service-ops-safety` — 外部サービス操作安全確認
-- `stuck-advisor` — ハマったときのアドバイザー
-- `tdd-implement` — TDD 実装（Plan 契約フェーズ1）
-- `verify-pre-push` — push 前検証（Plan 契約フェーズ3）
-- `virtual-company` — 仮想ソフト開発会社ワークフロー
+このリポジトリで手作りしたSkillと工程定義は、`.agents/` ではなく次のGit管理ディレクトリに置く。
 
-**Git管理しないSkill（外部インストール）:**
+- Capability Skill: `skills/<name>/SKILL.md`（一覧は `AGENTS.md` のCapability skillsが正本）
+- 工程（REFINE / EXECUTE / REVIEW / AFTERCARE / INCIDENT）: `.agent/workflow/`（Skillではなく工程定義）
+
+**Git管理しないSkill（外部インストール、`.agents/` 配下）:**
 - `clerk` / `clerk-*` 系 — Clerk公式 Skills（`npx skills add clerk/agent-skills`）
 - `convex` / `convex-*` 系 — Convex公式 Skills（`npx convex ai-files install`）
 - `vercel-*` / `deploy-to-vercel` / `web-design-guidelines` — Vercel公式 Skills（`npx skills add vercel-labs/agent-skills --skill <name>`）

@@ -43,6 +43,9 @@ export interface ReceiptAnalysisActionRunner {
   finalizeBatchStatus(batchId: string): Promise<void>;
   getBatch(batchId: string): Promise<{ createdByUserId?: string } | null>;
   countNeedsReviewJobs(batchId: string): Promise<number>;
-  getUserEmail(userId: string): Promise<string | null>;
-  enqueueAiReviewRequiredEmail(email: string, pendingCount: number): Promise<void>;
+  enqueueAiReviewRequiredNotifications(args: {
+    batchId: string;
+    userId: string;
+    pendingCount: number;
+  }): Promise<void>;
 }

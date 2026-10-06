@@ -2,7 +2,13 @@ import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DOC_SCAN_GLOBS = [/^AGENTS\.md$/, /^docs\/.*\.md$/, /^skills\/[^/]+\/SKILL\.md$/];
+const DOC_SCAN_GLOBS = [
+  /^AGENTS\.md$/,
+  /^README\.md$/,
+  /^docs\/.*\.md$/,
+  /^skills\/[^/]+\/SKILL\.md$/,
+  /^\.agent\/workflow\/.*\.md$/,
+];
 
 const REQUIRED_FRONTMATTER_KEYS = ["name", "description", "license"];
 
@@ -16,12 +22,23 @@ const BANNED_VOCABULARY = [
   /docs\/superpowers/,
   /\.loop\//,
   /task-loop\.mjs/,
+  /委譲用workflowは使用しません/,
+  /\.agent\/models/,
+  /--model\b/,
+  /Model Registry/,
+  /recommended_profile/,
 ];
 
 const PATH_REFERENCE_PATTERN =
-  /^(?:AGENTS\.md|\.env\.local|(?:docs|skills|scripts|e2e|convex|lib|src|\.github|\.windsurf|\.husky)\/[^\s"'`()[\]{}<>|*$]+)$/;
+  /^(?:AGENTS\.md|\.env\.local|(?:docs|skills|scripts|e2e|convex|lib|src|\.agent|\.github|\.windsurf|\.husky)\/[^\s"'`()[\]{}<>|*$]+)$/;
 
 const CODE_SPAN_PATTERN = /`([^`\n]+)`/g;
+
+// Command references (inline or fenced code) — unlike code-span paths these are
+// matched in the whole document text so they are checked wherever they appear.
+const PNPM_RUN_PATTERN = /\bpnpm run(?:\s+-{1,2}[a-zA-Z][a-zA-Z0-9-]*)*\s+([a-zA-Z0-9:._-]+)/g;
+const PNPM_COLON_SCRIPT_PATTERN = /\bpnpm\s+([a-zA-Z0-9._-]+:[a-zA-Z0-9:._-]+)/g;
+const NODE_SCRIPT_PATTERN = /\b(?:node|tsx)\s+(scripts\/[a-zA-Z0-9/._-]+)/g;
 
 /** Referenced but not required to exist (gitignored, or documented as removed). */
 const REFERENCE_ALLOWLIST = [/^\.env\.local$/, /^docs\/generated\//, /^convex\/export\.ts$/];
@@ -29,14 +46,16 @@ const MARKDOWN_LINK_PATTERN = /\[[^\]]*\]\(([^)\s]+)\)/g;
 const SKILL_NAME_PATTERN = /^skills\/([a-z0-9-]+)\/SKILL\.md$/;
 const SECTION_HEADING_PATTERN = /^## (\d+)\. /gm;
 
+/** Normalize repository paths before validation. */
 function normalizePath(value) {
   return String(value)
     .replaceAll("\\", "/")
     .replace(/^\.\/+/, "");
 }
 
-const DOC_SCAN_ROOTS = ["AGENTS.md", "docs", "skills"];
+const DOC_SCAN_ROOTS = ["AGENTS.md", "README.md", "docs", "skills", ".agent/workflow"];
 
+/** List documentation and workflow files covered by loop consistency checks. */
 export function listDocFiles(repoRoot) {
   const files = [];
   const walk = (relativeDir) => {
@@ -120,6 +139,43 @@ export function checkAgentsSkillReferences(repoRoot) {
   return errors;
 }
 
+/** Content of the `## Capability skills` section only — casual `skills/x` mentions elsewhere do not count as listing. */
+export function extractCapabilitySkillsSection(content) {
+  const text = String(content);
+  const match = text.match(/^## Capability skills[^\S\n]*$/m);
+  if (!match) return "";
+  const rest = text.slice(match.index);
+  const next = rest.indexOf("\n## ");
+  return next === -1 ? rest : rest.slice(0, next + 1);
+}
+
+/** Every capability skill must be listed in AGENTS.md's Capability skills section, otherwise it is undiscoverable. */
+export function checkSkillsDiscoverability(repoRoot) {
+  const errors = [];
+  const agentsPath = path.join(repoRoot, "AGENTS.md");
+  const skillsDir = path.join(repoRoot, "skills");
+  if (!existsSync(agentsPath) || !existsSync(skillsDir)) return errors;
+  const referenced = new Set(
+    extractSkillReferences(extractCapabilitySkillsSection(readFileSync(agentsPath, "utf8"))),
+  );
+  for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const skillDir = path.join(skillsDir, entry.name);
+    if (!existsSync(path.join(skillDir, "SKILL.md"))) {
+      errors.push(
+        `skills/${entry.name}: SKILL.md が存在しません（許可されるのは直下にSKILL.mdを持つ構成のみ）`,
+      );
+      continue;
+    }
+    if (!referenced.has(entry.name)) {
+      errors.push(
+        `skills/${entry.name}: SKILL.md が存在しますが AGENTS.md のCapability skills一覧から参照されていません`,
+      );
+    }
+  }
+  return errors;
+}
+
 function resolveCandidate(repoRoot, docDir, reference) {
   const relativePath = normalizePath(path.posix.join(docDir, reference));
   return {
@@ -149,8 +205,11 @@ export function checkPathReferences(repoRoot, docPath, content) {
   for (const match of String(content).matchAll(MARKDOWN_LINK_PATTERN)) {
     const target = match[1];
     if (/^(?:https?:|mailto:|#)/.test(target)) continue;
+    // A `#fragment` suffix names a section anchor, not part of the file name —
+    // only the file portion must exist.
+    const filePart = target.split("#")[0];
     // Markdown links are resolved relative to the document (GitHub semantics).
-    const { relativePath, exists } = resolveCandidate(repoRoot, docDir, target);
+    const { relativePath, exists } = resolveCandidate(repoRoot, docDir, filePart);
     if (!exists) {
       errors.push(`${docPath}: リンク先 ${target} (${relativePath}) が存在しません`);
     }
@@ -159,7 +218,8 @@ export function checkPathReferences(repoRoot, docPath, content) {
   for (const match of String(content).matchAll(CODE_SPAN_PATTERN)) {
     const span = match[1].trim();
     if (/\s/.test(span)) continue;
-    const stripped = span.replace(/,+$/, "");
+    // `path#section` pins a heading anchor; check the file portion only.
+    const stripped = span.replace(/,+$/, "").split("#")[0];
     if (!isRepoRootPath(stripped)) continue;
     const candidate = stripped.replace(/\/$/, "");
     if (isAllowlisted(candidate)) continue;
@@ -167,6 +227,43 @@ export function checkPathReferences(repoRoot, docPath, content) {
     const { relativePath, exists } = resolveCandidate(repoRoot, "", candidate);
     if (!exists) {
       errors.push(`${docPath}: 参照 ${candidate} (${relativePath}) が存在しません`);
+    }
+  }
+  return errors;
+}
+
+function loadPackageScripts(repoRoot) {
+  const pkgPath = path.join(repoRoot, "package.json");
+  if (!existsSync(pkgPath)) return null;
+  try {
+    return new Set(Object.keys(JSON.parse(readFileSync(pkgPath, "utf8")).scripts ?? {}));
+  } catch {
+    return new Set();
+  }
+}
+
+/** pnpm run / pnpm <name:...> / node scripts/... references must resolve; stale command docs are drift. */
+export function checkCommandReferences(repoRoot, docPath, content, packageScripts) {
+  const errors = [];
+  const text = String(content);
+  if (packageScripts !== null) {
+    for (const match of text.matchAll(PNPM_RUN_PATTERN)) {
+      // A leading dash means the capture is a flag token (e.g. `pnpm run -- foo`), not a script name.
+      if (match[1].startsWith("-")) continue;
+      if (!packageScripts.has(match[1])) {
+        errors.push(`${docPath}: pnpm run ${match[1]} は package.json のscriptsに存在しません`);
+      }
+    }
+    for (const match of text.matchAll(PNPM_COLON_SCRIPT_PATTERN)) {
+      if (!packageScripts.has(match[1])) {
+        errors.push(`${docPath}: pnpm ${match[1]} は package.json のscriptsに存在しません`);
+      }
+    }
+  }
+  for (const match of text.matchAll(NODE_SCRIPT_PATTERN)) {
+    const candidate = match[1].replace(/[.)\],;/]+$/, "");
+    if (!existsSync(path.join(repoRoot, candidate))) {
+      errors.push(`${docPath}: 参照スクリプト ${candidate} が存在しません`);
     }
   }
   return errors;
@@ -192,15 +289,40 @@ export function checkBannedVocabulary(docPath, content) {
   return errors;
 }
 
+/** Run all repository-level Agent Harness documentation consistency checks. */
 export function checkLoopDocs(repoRoot) {
   const errors = [];
   const docFiles = listDocFiles(repoRoot);
+  if (existsSync(path.join(repoRoot, ".agent"))) {
+    for (const required of [
+      ".agent/process.yaml",
+      ".agent/schema/spec.schema.json",
+      ".agent/schema/state.schema.json",
+      ".agent/schema/exit.schema.json",
+      ".agent/schema/assessment.schema.json",
+      ".agent/runtime/codex.yaml",
+      ".agent/runtime/devin.yaml",
+      ".agent/profiles/default.yaml",
+      ".agent/profiles/standard.yaml",
+      ".agent/workflow/refine.md",
+      ".agent/workflow/execute.md",
+      ".agent/workflow/review.md",
+      ".agent/workflow/aftercare.md",
+      ".agent/workflow/incident.md",
+    ]) {
+      if (!existsSync(path.join(repoRoot, required)))
+        errors.push(`Agent Harness必須ファイル ${required} が存在しません`);
+    }
+  }
 
   errors.push(...checkAgentsSkillReferences(repoRoot));
+  errors.push(...checkSkillsDiscoverability(repoRoot));
 
+  const packageScripts = loadPackageScripts(repoRoot);
   for (const docPath of docFiles) {
     const content = readFileSync(path.join(repoRoot, docPath), "utf8");
     errors.push(...checkPathReferences(repoRoot, docPath, content));
+    errors.push(...checkCommandReferences(repoRoot, docPath, content, packageScripts));
     errors.push(...checkBannedVocabulary(docPath, content));
     if (SKILL_NAME_PATTERN.test(docPath)) {
       errors.push(...checkSkillFrontmatter(repoRoot, docPath));

@@ -1,0 +1,53 @@
+version: 1
+initial: refine
+
+states:
+  refine:
+    workflow: .agent/workflow/refine.md
+    on:
+      ready: execute
+      decision_required: human_gate
+
+  execute:
+    workflow: .agent/workflow/execute.md
+    on:
+      ready: review
+      repeated_failure: incident
+      decision_required: human_gate
+
+  review:
+    workflow: .agent/workflow/review.md
+    on:
+      clean: aftercare
+      findings: execute
+      repeated_failure: incident
+      decision_required: human_gate
+
+  aftercare:
+    workflow: .agent/workflow/aftercare.md
+    on:
+      ready: done
+      ci_failure: execute
+      findings: execute
+      repeated_failure: incident
+      decision_required: human_gate
+
+  incident:
+    workflow: .agent/workflow/incident.md
+    on:
+      resolved: execute
+      decision_required: human_gate
+
+  human_gate:
+    terminal: false
+    on:
+      resolved: refine
+
+  done:
+    terminal: true
+
+limits:
+  same_failure_max: 3
+  review_reassess_every: 3
+  review_max_rounds: 9
+  ci_fix_max_rounds: 3

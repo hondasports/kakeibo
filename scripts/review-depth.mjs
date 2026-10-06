@@ -19,6 +19,8 @@ export const REVIEW_FLOOR_TRIGGERS = [
   "destructive_or_irreversible_operation",
 ];
 export const REVIEW_TIERS = ["T1", "T2", "T3"];
+/** Verification-load vocabulary used for REFINE-linked profile determination. */
+export const VERIFICATION_LOADS = ["routine", "complex"];
 /** Cumulative review obligations, disclosed only for the selected tier. */
 export const REVIEW_REQUIREMENTS = {
   T1: ["差分のスポットチェック", "変更に対応する検証の成功"],
@@ -70,6 +72,16 @@ export function validateAssessment(input) {
     errors.push("risk_assessment.floor_triggers entries must match documented vocabulary");
   if (input?.applied_tier !== undefined && !REVIEW_TIERS.includes(input.applied_tier))
     errors.push("applied_tier must be one of T1/T2/T3");
+  if (input?.verification_load !== undefined) {
+    const load = input.verification_load;
+    if (
+      !load ||
+      typeof load !== "object" ||
+      !VERIFICATION_LOADS.includes(load.level) ||
+      !nonempty(load.rationale)
+    )
+      errors.push("verification_load requires {level: routine|complex, rationale}");
+  }
   if (
     !errors.length &&
     input.applied_tier !== undefined &&
@@ -105,17 +117,22 @@ const USAGE = `使い方: node scripts/review-depth.mjs <入力>
         "floor_triggers": ["(下記の語彙のみ)"]
       },
       "tier_rationale": "評価の根拠",
-      "applied_tier": "T1 | T2 | T3 (省略時は最低深度。引き上げのみ可)"
+      "applied_tier": "T1 | T2 | T3 (省略時は最低深度。引き上げのみ可)",
+      "verification_load": {
+        "level": "routine | complex",
+        "rationale": "Verification Strategy を根拠付きで評価した結果（Profile自動判定の入力）"
+      }
     }
   --vocabulary: 評価語彙（軸・強制条件・ティア）を返す
+  独立レビュー手順: .agent/workflow/review.md
 
 出力: { minimum_tier, applied_tier, requirements }
-  実差分（未コミット・未追跡を含む）を評価し、applied_tierの確認項目でセルフレビューする。
+  Agentが実差分（未コミット・未追跡を含む）を評価し、applied_tierの確認項目でセルフレビューする。
   判定内容やレビュー実施の真偽はこのスクリプトでは保証しない。`;
 
 /** Stateless CLI: vocabulary disclosure, or one assessment → tier floor and requirements. */
 export function run(args, cwd = process.cwd()) {
-  const [arg, ...rest] = args;
+  const [arg, ...rest] = args.filter((a) => a !== "--");
   if (rest.length) throw new Error("unexpected extra arguments");
   if (!arg || arg === "--help" || arg === "-h") return { usage: USAGE };
   if (arg === "--vocabulary")

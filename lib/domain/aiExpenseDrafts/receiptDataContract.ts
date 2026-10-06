@@ -79,6 +79,12 @@ export type ReceiptUserOverrideSnapshot<TCategoryId = string> = {
   values: ReceiptDraftValueSnapshot<TCategoryId>;
 };
 
+/** 全体設定で明示した軸を、商品・内訳補正から導かれた判定と区別する。 */
+export const RECEIPT_TAX_CHOICE_FIELDS = {
+  priceTaxTreatment: "receiptTaxDecision.priceTaxTreatment",
+  taxRateComposition: "receiptTaxDecision.taxRateComposition",
+} as const;
+
 export type AiExpenseRegistrationMode = "detailed" | "totalOnly";
 
 export type DerivedRegistrationSnapshot<TCategoryId = string> = {
@@ -201,17 +207,21 @@ export function snapshotReceiptDraftValues<TCategoryId>(
   };
 }
 
-/** receiptUserOverride を組み立てる。fields は既存と新規の和集合を取る。 */
+/** 補正対象は累積し、税判定を更新するときは全体設定の軸の記録を置き換える。 */
 export function buildReceiptUserOverride<TCategoryId>(args: {
   existingFields?: readonly string[];
   fields: readonly string[];
   updatedAt: number;
   values: ReceiptDraftValueSnapshot<TCategoryId>;
 }): ReceiptUserOverrideSnapshot<TCategoryId> {
+  const taxChoiceFields: readonly string[] = Object.values(RECEIPT_TAX_CHOICE_FIELDS);
+  const existingFields = args.fields.includes("receiptTaxDecision")
+    ? args.existingFields?.filter((field) => !taxChoiceFields.includes(field))
+    : args.existingFields;
   return {
     source: "user",
     updatedAt: args.updatedAt,
-    fields: [...new Set([...(args.existingFields ?? []), ...args.fields])],
+    fields: [...new Set([...(existingFields ?? []), ...args.fields])],
     values: args.values,
   };
 }

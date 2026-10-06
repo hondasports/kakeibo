@@ -113,19 +113,32 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 | 用途                           | 参照先                          |
 | ------------------------------ | ------------------------------- |
 | エージェントの常時適用ルール   | `AGENTS.md`                     |
-| レビュー深度の機械算出         | `scripts/review-depth.mjs`      |
-| 工程別Agent Skill              | `skills/*/SKILL.md`             |
-| 開発プロセス、PR、CI、レビュー | `docs/development-process.md`   |
+| Agent State Machine            | `.agent/process.yaml`           |
+| 変更Risk・必須検証の統合判定   | `scripts/assess-change.mjs`     |
+| Task Profile                    | `.agent/profiles/`              |
+| Capability Skill                | `skills/*/SKILL.md`             |
+| 開発プロセス、PR、CI            | `docs/development-process.md`   |
 | 認証ガード設計                 | `docs/auth-guard.md`            |
 | 環境変数一覧                   | `docs/environment-variables.md` |
 | QAチェックリスト               | `docs/qa-checklist.md`          |
 
 ## エージェント作業
 
-[AGENTS.md](AGENTS.md)を入口に、実装・検証・セルフレビュー・引き渡しを進めます。セルフレビューの最低深度は `scripts/review-depth.mjs` が実差分のリスク評価から機械算出します。
+SuzumemoはVendor-neutralなAgent Harnessをrepository側に持ちます。`AGENTS.md` は共通契約、`.agent/process.yaml` はState Machine、`.agent/profiles/` はタスク強度、`.agent/runtime/` はCodex / Devin等のRuntime差分を定義します。
 
-通常は単独エージェントで作業し、完了地点はユーザーの指定に従います。委譲用workflowは使用しません。
+基本Stateは `REFINE → EXECUTE → REVIEW → AFTERCARE → DONE` です。Issueは詳細仕様を必須とせず、REFINEでrepositoryを調査してAcceptance Criteriaを補完します。Machine Risk Floor・必須検証・Required SkillsはAgent判断で引き下げられません。
 
+Profileは `fast / standard / deep / max` の共通4段階とし、Model名ごとのProfileは作りません。REFINE終了時にタスクの評価（影響範囲・不確実性・検証負荷）から規則で自動判定し、`--profile` の明示指定を常に優先します。自動選択は実装中の評価変化に応じて上位へだけ再判定され、Core HarnessのRisk FloorやState Transitionは変更しません。
+
+開始・再開・検証・PRへの状態保存は [Agent Harness操作手順](docs/agent-harness.md) に従います。`loop:profile` は設定確認用、タスクの入口は `loop:state` です。
+
+軽量化の設計正本は [Agent Harness設計](docs/agent-harness-design.md) を参照してください。Profile自動判定は実装済みで、出力・検証・証跡管理のさらなる変更のみ設計段階です。
+
+```bash
+node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --runtime codex --implementer session-id
+node scripts/loop-runner.mjs
+node scripts/assess-change.mjs --base origin/preview
+```
 ## ローカル状態とsecret
 
 主要なローカルsecretとサービス状態はGit管理外です。

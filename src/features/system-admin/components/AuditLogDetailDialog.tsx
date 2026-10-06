@@ -63,6 +63,13 @@ export function AuditLogDetailDialog({
                 owner数: {selected.beforeOwnerCount ?? "-"} → {selected.afterOwnerCount ?? "-"}
               </Typography>
             ) : null}
+            {selected.beforeNotificationEnabled !== undefined ||
+            selected.afterNotificationEnabled !== undefined ? (
+              <Typography>
+                通知設定: {selected.beforeNotificationEnabled ? "ON" : "OFF"} →{" "}
+                {selected.afterNotificationEnabled ? "ON" : "OFF"}
+              </Typography>
+            ) : null}
             <Typography color="text.secondary" variant="caption">
               理由・検索語・token・secret・家計データは表示しません。
             </Typography>

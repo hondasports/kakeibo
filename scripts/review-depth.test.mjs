@@ -71,6 +71,22 @@ describe("assessment validation", () => {
     expect(validateAssessment({ ...baseInput, applied_tier: "T9" })).toContain(
       "applied_tier must be one of T1/T2/T3",
     );
+    expect(
+      validateAssessment({
+        ...baseInput,
+        verification_load: { level: "routine", rationale: "process checks only" },
+      }),
+    ).toEqual([]);
+    for (const verification_load of [
+      "routine",
+      { level: "heavy", rationale: "x" },
+      { level: "routine", rationale: "" },
+      { level: "routine" },
+    ]) {
+      expect(validateAssessment({ ...structuredClone(baseInput), verification_load })).toHaveLength(
+        1,
+      );
+    }
   });
 
   it("rejects an applied tier below the computed floor and allows deeper", () => {
@@ -136,6 +152,11 @@ describe("stateless CLI", () => {
     });
     expect(run([]).usage).toContain("risk_assessment");
     expect(run(["--help"]).usage).toContain("risk_assessment");
+    expect(run(["--help"]).usage).toContain(".agent/workflow/review.md");
+    expect(run(["--help"]).usage).toContain("Agentが実差分");
+    // A bare "--" (forwarded verbatim by pnpm run) is skipped.
+    expect(run(["--", "--vocabulary"])).toEqual(run(["--vocabulary"]));
+    expect(run(["--"]).usage).toContain("risk_assessment");
   });
 
   it("accepts inline JSON or a file path and rejects extras", () => {

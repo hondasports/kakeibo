@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateWorkspaceState,
   isDocumentationOnlyPath,
+  parseArguments,
   parseWorktreeList,
   stagedFilesRequireIsolation,
 } from "./check-task-worktree.mjs";
@@ -105,7 +106,7 @@ describe("documentation-only exceptions", () => {
     expect(isDocumentationOnlyPath("docs/development-process.md")).toBe(true);
     expect(isDocumentationOnlyPath("README.md")).toBe(true);
     expect(isDocumentationOnlyPath("AGENTS.md")).toBe(false);
-    expect(isDocumentationOnlyPath("skills/code-review/SKILL.md")).toBe(false);
+    expect(isDocumentationOnlyPath("skills/workspace-preflight/SKILL.md")).toBe(false);
     expect(isDocumentationOnlyPath("scripts/check-task-worktree.mjs")).toBe(false);
     expect(isDocumentationOnlyPath("src/example.ts")).toBe(false);
   });
@@ -114,5 +115,10 @@ describe("documentation-only exceptions", () => {
     expect(stagedFilesRequireIsolation(["docs/guide.md", "README.md"])).toBe(false);
     expect(stagedFilesRequireIsolation(["docs/guide.md", "AGENTS.md"])).toBe(true);
     expect(stagedFilesRequireIsolation([])).toBe(false);
+  });
+
+  it("skips a bare '--' forwarded by pnpm run", () => {
+    expect(parseArguments(["--", "--staged"])).toEqual({ requireClean: false, staged: true });
+    expect(parseArguments(["--"])).toEqual({ requireClean: false, staged: false });
   });
 });

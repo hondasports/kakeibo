@@ -35,6 +35,57 @@ export async function processEmailJob(
     return;
   }
 
+  let deliveryDecision: { enabled: boolean; reason?: string };
+  try {
+    deliveryDecision = await deps.runner.getNotificationDeliveryDecision({
+      type: job.templateType,
+      channel: "email",
+      ...(job.recipientUserId === undefined ? {} : { userId: job.recipientUserId }),
+    });
+  } catch {
+    const failedAt = now();
+    const plan = planSendFailure(
+      {
+        retryable: true,
+        message: "Notification delivery decision unavailable",
+        code: "unknown",
+      },
+      job.attemptCount + 1,
+      failedAt,
+    );
+    if (plan.kind === "failed") {
+      await deps.runner.markJobTerminal({
+        jobId,
+        status: "failed",
+        errorMessage: "Notification delivery decision unavailable",
+        errorCode: "notification_decision_unavailable",
+        updatedAt: failedAt,
+      });
+      return;
+    }
+    await deps.runner.markJobRetrying({
+      jobId,
+      status: "retrying",
+      attemptCount: job.attemptCount + 1,
+      nextRetryAt: plan.nextRetryAt,
+      errorMessage: "Notification delivery decision unavailable",
+      errorCode: "notification_decision_unavailable",
+      updatedAt: failedAt,
+    });
+    await deps.scheduler.scheduleProcessJob(plan.delayMs, jobId);
+    return;
+  }
+  if (!deliveryDecision.enabled) {
+    await deps.runner.markJobTerminal({
+      jobId,
+      status: "suppressed",
+      errorMessage: deliveryDecision.reason ?? "notification_disabled",
+      errorCode: "notification_disabled",
+      updatedAt: now(),
+    });
+    return;
+  }
+
   let payload: unknown;
   try {
     payload = JSON.parse(job.payloadJson);

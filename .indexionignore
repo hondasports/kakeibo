@@ -1,0 +1,11 @@
+# indexion の解析対象から除外する生成物・依存物
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.tmp/
+*.log
+.DS_Store
+pnpm-lock.yaml
+bun.lock

@@ -1,0 +1,6 @@
+name: max
+autonomy: high
+delegation: aggressive
+verification: thorough
+context:
+  strategy: on_demand

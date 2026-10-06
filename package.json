@@ -15,7 +15,7 @@
     "pretest": "node scripts/check-test-environment.mjs",
     "test": "vitest --maxWorkers=4",
     "test:agent": "node scripts/run-compact-tests.mjs vitest",
-    "test:process": "vitest run scripts/review-depth.test.mjs scripts/check-task-worktree.test.mjs scripts/classify-e2e-relevance.test.mjs scripts/check-loop-docs.test.mjs scripts/collect-pr-findings.test.mjs scripts/suggest-skills.test.mjs",
+    "test:process": "vitest run scripts/review-depth.test.mjs scripts/check-task-worktree.test.mjs scripts/classify-e2e-relevance.test.mjs scripts/check-loop-docs.test.mjs scripts/collect-pr-findings.test.mjs scripts/suggest-skills.test.mjs scripts/machine-risk.test.mjs scripts/assess-change.test.mjs scripts/resolve-agent-profile.test.mjs scripts/loop-runner.test.mjs scripts/loop-pr-check.test.mjs scripts/loop-metrics.test.mjs scripts/agent-usage.test.mjs tests/workflow/localConvexWorkflow.test.ts",
     "test:preflight": "node scripts/check-test-environment.mjs --coverage",
     "test:coverage": "node scripts/run-coverage.mjs",
     "prepare": "husky",
@@ -36,10 +36,14 @@
     "review:depth": "node scripts/review-depth.mjs",
     "loop:check-docs": "node scripts/check-loop-docs.mjs",
     "loop:pr-findings": "node scripts/collect-pr-findings.mjs",
-    "loop:suggest-skills": "node scripts/suggest-skills.mjs"
+    "loop:suggest-skills": "node scripts/suggest-skills.mjs",
+    "loop:assess": "node scripts/assess-change.mjs",
+    "loop:profile": "node scripts/resolve-agent-profile.mjs",
+    "loop:state": "node scripts/loop-runner.mjs",
+    "loop:metrics": "node scripts/loop-metrics.mjs"
   },
   "dependencies": {
-    "@clerk/backend": "^3.16.6",
+    "@clerk/backend": "^3.20.1",
     "@clerk/react": "^6.15.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -54,8 +58,8 @@
     "react-dom": "^19.2.8",
     "react-email": "6.9.2",
     "react-router-dom": "^7.18.3",
-    "resend": "6.22.1",
-    "valibot": "^1.4.2"
+    "resend": "6.30.0",
+    "valibot": "^1.5.0"
   },
   "devDependencies": {
     "@clerk/testing": "^2.2.30",
@@ -63,7 +67,7 @@
     "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.4",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^26.4.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.3",
@@ -76,15 +80,15 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "lint-staged": "^17.5.1",
-    "oxfmt": "^0.62.0",
+    "oxfmt": "^0.70.0",
     "oxlint": "^1.82.0",
     "tailwindcss": "^4.3.3",
-    "tsx": "4.23.13",
+    "tsx": "4.23.15",
     "typescript": "~7.0.2",
     "vercel": "^59.5.0",
-    "vite": "^8.2.2",
+    "vite": "^8.3.0",
     "vitest": "^5.0.1",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.1"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

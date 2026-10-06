@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Suzumemo Change Assessment",
+  "type": "object",
+  "required": ["risk", "requiredSkills", "verification", "review"],
+  "properties": {
+    "risk": {
+      "type": "object"
+    },
+    "requiredSkills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verification": {
+      "type": "object"
+    },
+    "review": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

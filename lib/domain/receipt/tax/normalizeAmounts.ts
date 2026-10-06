@@ -4,7 +4,7 @@ import type {
   InterpretedReceiptItem,
   TaxContextResolution,
 } from "./types";
-import { resolveAmountBasis } from "./resolveAmountBasis";
+import { matchTaxSummaryItems } from "./taxAmountBasis";
 
 export function allocateTax(taxYen: number, taxableAmountYen: number, amounts: number[]) {
   if (amounts.length === 0 || taxableAmountYen === 0) return amounts.map(() => 0);
@@ -40,7 +40,9 @@ export function normalizeAmounts(args: {
       normalizedAmountYen: item.printedAmountYen,
     } satisfies InterpretedReceiptItem;
   });
+  const allocatedRates = new Set<number>();
   for (const summary of args.taxSummaries) {
+    if (allocatedRates.has(summary.taxRatePercent)) continue;
     if (
       summary.status !== undefined &&
       summary.status !== "verified" &&
@@ -48,32 +50,28 @@ export function normalizeAmounts(args: {
     ) {
       continue;
     }
-    const amountBasis = resolveAmountBasis(summary);
-    if (amountBasis === "unknown") continue;
     const indexes = result
       .map((item, index) => ({ item, index }))
-      .filter(
-        ({ item }) =>
-          item.taxContext.status === "resolved" &&
-          item.taxRatePercent === summary.taxRatePercent &&
-          item.amountBasis === amountBasis,
-      )
+      .filter(({ item }) => item.taxRatePercent === summary.taxRatePercent)
       .map(({ index }) => index);
-    const printedTotal = indexes.reduce((sum, index) => sum + result[index].printedAmountYen, 0);
-    if (indexes.length === 0) continue;
-
-    if (printedTotal === summary.taxableAmountYen) {
+    if (indexes.some((index) => result[index].taxContext.status !== "resolved")) continue;
+    const match = matchTaxSummaryItems(
+      summary,
+      indexes.map((index) => result[index]),
+    );
+    if (match) {
+      allocatedRates.add(summary.taxRatePercent);
       const allocations = allocateTax(
         summary.taxYen,
-        summary.taxableAmountYen,
+        match.printedTotalYen,
         indexes.map((index) => result[index].printedAmountYen),
       );
       indexes.forEach((itemIndex, allocationIndex) => {
         result[itemIndex].allocatedTaxYen = allocations[allocationIndex];
         result[itemIndex].taxAllocationStatus = "allocated";
-        if (result[itemIndex].amountBasis === "tax_excluded") {
-          result[itemIndex].normalizedAmountYen += allocations[allocationIndex];
-        }
+        result[itemIndex].normalizedAmountYen =
+          result[itemIndex].printedAmountYen +
+          (match.amountBasis === "tax_excluded" ? allocations[allocationIndex] : 0);
       });
     }
   }

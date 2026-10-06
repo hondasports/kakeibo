@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import type { TransactionalEmailType } from "./model";
 import {
   buildTransactionalEmail,
   validatePayloadForTemplate,
@@ -157,5 +158,32 @@ describe("templateFactory", () => {
     expect(getTemplateSubject("group_membership_removed")).toBe(
       "「{groupName}」から外れました | Suzumemo",
     );
+  });
+
+  it("includes the notification settings link in HTML and text for all templates", async () => {
+    const cases: Array<[TransactionalEmailType, unknown]> = [
+      ["email_delivery_test", { to: "user@example.com" }],
+      ["group_membership_removed", { groupName: "山田家" }],
+      ["group_role_changed", { groupName: "山田家", previousRole: "member", newRole: "owner" }],
+      ["group_ownership_received", { groupName: "山田家" }],
+      ["group_ownership_transferred", { groupName: "山田家", newOwnerDisplayName: "花子" }],
+      ["group_deletion_started", { groupName: "山田家" }],
+      ["group_deletion_failed", { groupName: "山田家", jobId: "job-1" }],
+      ["group_deleted", { groupName: "山田家" }],
+      ["ai_review_required", { pendingCount: 2 }],
+      ["account_deletion_completed", { leftGroupCount: 1, deletedGroupCount: 0 }],
+    ];
+    for (const [type, payload] of cases) {
+      const built = await buildTransactionalEmail(type, payload);
+      expect(built.html, `${type} html`).toContain("/settings#notifications");
+      expect(built.html, `${type} html`).toContain("通知設定を変更");
+      expect(built.text, `${type} text`).toContain("/settings#notifications");
+    }
+  });
+
+  it("does not present the footer as an unsubscribe link", async () => {
+    const built = await buildTransactionalEmail("group_deleted", { groupName: "山田家" });
+    expect(built.text).toContain("個別に停止できません");
+    expect(built.text).not.toContain("配信停止");
   });
 });

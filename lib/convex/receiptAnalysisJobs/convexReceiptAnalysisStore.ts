@@ -32,6 +32,9 @@ export function toBatchRecord(doc: Doc<"receiptAnalysisBatches">): ReceiptAnalys
     ...(doc.aiReviewNotificationScheduledAt === undefined
       ? {}
       : { aiReviewNotificationScheduledAt: doc.aiReviewNotificationScheduledAt }),
+    ...(doc.aiReviewLineNotificationConsumedAt === undefined
+      ? {}
+      : { aiReviewLineNotificationConsumedAt: doc.aiReviewLineNotificationConsumedAt }),
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };

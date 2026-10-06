@@ -65,6 +65,49 @@ describe("interpretReceiptTaxDecision decision table (evidence exclusions)", () 
     expect(decision.reasons).toContain("unverified_tax_summary_for_estimate");
   });
 
+  it.each(["未検証先", "検証済み先"])(
+    "推定不能な同値の未検証summaryが検証済みの税額推定を消さない（%s）",
+    (order) => {
+      const unverified = summary({
+        status: "ambiguous",
+        taxableAmountBasis: "unknown",
+        roundingMethod: "floor",
+      });
+      const verified = summary({ roundingMethod: "floor" });
+      const decision = interpretReceiptTaxDecision(
+        baseInput({
+          items: [{ ...item("tax_included", 10), printedAmountYen: 1100 }],
+          rawObservationLines: [line("税込 10%", null, 8)],
+          taxSummaries: order === "未検証先" ? [unverified, verified] : [verified, unverified],
+        }),
+      );
+
+      expect(decision.taxAmount).toEqual({
+        estimatedTaxYen: 100,
+        roundingMethod: "floor",
+        source: "estimated",
+      });
+      expect(decision.reasons).not.toContain("unverified_tax_summary_for_estimate");
+    },
+  );
+
+  it.each(["未検証先", "検証済み先"])(
+    "推定可能な未検証summaryは同値の検証済みsummaryがあっても推定を確定しない（%s）",
+    (order) => {
+      const unverified = summary({ status: "ambiguous", roundingMethod: "floor" });
+      const verified = summary({ roundingMethod: "floor" });
+      const decision = interpretReceiptTaxDecision(
+        baseInput({
+          rawObservationLines: [line("税込 10%", null, 8)],
+          taxSummaries: order === "未検証先" ? [unverified, verified] : [verified, unverified],
+        }),
+      );
+
+      expect(decision.taxAmount).toEqual({ roundingMethod: "floor", source: "unknown" });
+      expect(decision.reasons).toContain("unverified_tax_summary_for_estimate");
+    },
+  );
+
   it("矛盾summaryがあれば明示ラベルがあってもcontradictoryにする", () => {
     const decision = interpretReceiptTaxDecision(
       baseInput({
@@ -176,7 +219,7 @@ describe("interpretReceiptTaxDecision decision table (evidence exclusions)", () 
     expect(decision.reasons).toContain("non_tax_adjustment_lines_excluded");
   });
 
-  it("itemとsummaryのbasis不一致をperItem商品混在にしない", () => {
+  it("換算できるitemとsummaryの基準差を商品混在や金額矛盾にしない", () => {
     const decision = interpretReceiptTaxDecision(
       baseInput({
         items: [item("tax_excluded", 10)],
@@ -184,8 +227,10 @@ describe("interpretReceiptTaxDecision decision table (evidence exclusions)", () 
     );
 
     expect(decision.priceTaxTreatment).not.toBe("perItem");
-    expect(decision.resolutionStatus).toBe("contradictory");
-    expect(decision.reasons).toContain("receipt_reconciliation_mismatch");
+    expect(decision.priceTaxTreatment).toBe("excluded");
+    expect(decision.resolutionStatus).toBe("ambiguous");
+    expect(decision.reasons).not.toContain("receipt_reconciliation_mismatch");
+    expect(decision.reasons).toContain("estimated_tax_with_unknown_rounding");
   });
 
   it("税率だけのuser overrideは価格軸をuserへ昇格しない", () => {

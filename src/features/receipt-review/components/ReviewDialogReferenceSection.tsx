@@ -2,10 +2,12 @@ import { Box, Button, Stack, Typography } from "@mui/material";
 import type { AiExpenseDraft } from "../types/types";
 import type { TaxSummaryChange } from "./ReceiptTaxSummaryEditor";
 import { ReceiptTaxSummary } from "./ReceiptTaxSummary";
+import type { EditableTaxSummaryTarget } from "./ReceiptTaxSummarySection";
 
 export type ReviewDialogReferenceSectionProps = {
   draft: AiExpenseDraft | null;
   canEditTax: boolean;
+  editableSummaries: EditableTaxSummaryTarget[];
   open: boolean;
   busy: boolean;
   taxSummaryUpdatingIndex?: number | null;
@@ -18,6 +20,7 @@ export type ReviewDialogReferenceSectionProps = {
 export function ReviewDialogReferenceSection({
   draft,
   canEditTax,
+  editableSummaries,
   open,
   busy,
   taxSummaryUpdatingIndex,
@@ -67,6 +70,8 @@ export function ReviewDialogReferenceSection({
               draft={draft}
               onSummaryChange={busy ? undefined : onTaxSummaryChange}
               updatingIndex={taxSummaryUpdatingIndex}
+              editableSummaries={editableSummaries}
+              registerSummary={register}
             />
           </Box>
         )}

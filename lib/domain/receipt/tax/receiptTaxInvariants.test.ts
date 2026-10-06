@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { interpretReceiptTax } from "./interpretReceiptTax";
 import type { ExtractedReceiptItem, ExtractedTaxSummary, ReceiptTaxInput } from "./types";
+import { receiptTaxBasisCases, receiptTaxBasisInput } from "./fixtures/receiptTaxBasisCases";
 
 function item(overrides: Partial<ExtractedReceiptItem> = {}): ExtractedReceiptItem {
   return {
@@ -44,6 +45,22 @@ function input(overrides: Partial<ReceiptTaxInput> = {}): ReceiptTaxInput {
 }
 
 describe("receiptTax invariants", () => {
+  it.each(receiptTaxBasisCases)(
+    "基準が異なっても税額$taxYen 円と支払額$paidYen 円を保存する",
+    (testCase) => {
+      const result = interpretReceiptTax(receiptTaxBasisInput(testCase));
+      expect(result.items.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(
+        testCase.taxYen,
+      );
+      expect(result.items.reduce((sum, item) => sum + item.normalizedAmountYen, 0)).toBe(
+        testCase.paidYen,
+      );
+      for (const item of result.items) {
+        expect(item.normalizedAmountYen).toBe(item.printedAmountYen + item.allocatedTaxYen);
+      }
+    },
+  );
+
   it("外税: normalizedAmountYen === printedAmountYen + allocatedTaxYen", () => {
     const result = interpretReceiptTax(
       input({

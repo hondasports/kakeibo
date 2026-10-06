@@ -235,7 +235,7 @@ describe("buildTaxRateCheck", () => {
       expect(check.rows[0].reason).toContain("税込／税抜");
     });
 
-    it("対象額が税抜なのに税込明細を含む行は比較不能", () => {
+    it("税抜対象額を税込へ換算しても明細と合わない行は比較不能", () => {
       const check = buildTaxRateCheck({
         items: [resolvedItem({ amountBasis: "tax_included" })],
         taxSummaries: [summary()],

@@ -9,6 +9,11 @@ import type {
 } from "./types";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
 import { canonicalTaxSummaryStatus } from "./taxSummaryConsistency";
+import {
+  distinctTaxSummaryAmounts,
+  matchTaxSummaryItems,
+  taxSummaryAmountInBasis,
+} from "./taxAmountBasis";
 
 export type AxisEvidence<TValue> = {
   value: TValue;
@@ -188,33 +193,46 @@ export function aiAxisEvidence(input: ReceiptTaxInput) {
 }
 
 export function reconciliationAxisEvidence(input: ReceiptTaxInput) {
+  const summaries = distinctTaxSummaryAmounts(input.taxSummaries);
   const summariesAreVerified =
     input.taxSummaries.length > 0 &&
     input.taxSummaries.every((summary) => canonicalTaxSummaryStatus(summary.status) === "verified");
-  const summaryTotal = input.taxSummaries.reduce((sum, summary) => {
-    if (summary.taxableAmountBasis === "tax_included") return sum + summary.taxableAmountYen;
-    if (summary.taxableAmountBasis === "tax_excluded") {
-      return sum + summary.taxableAmountYen + summary.taxYen;
-    }
-    return Number.NaN;
-  }, 0);
+  const summaryTotal = summaries.reduce(
+    (sum, summary) => sum + (taxSummaryAmountInBasis(summary, "tax_included") ?? Number.NaN),
+    0,
+  );
   const itemTreatment = treatmentFromBases(knownBases(input.items));
   const summaryTreatment = treatmentFromBases(
     new Set(input.taxSummaries.map((summary) => summary.taxableAmountBasis)),
   );
   const itemPrintedTotal = input.items.reduce((sum, item) => sum + item.printedAmountYen, 0);
-  const itemTotal =
-    itemTreatment === "included"
+  const summaryRates = new Set(summaries.map((summary) => summary.taxRatePercent));
+  const basesReconciled =
+    input.items.length > 0 &&
+    input.items.every(
+      (item) => item.taxRatePercent !== null && summaryRates.has(item.taxRatePercent),
+    ) &&
+    summaries.every(
+      (summary) =>
+        matchTaxSummaryItems(
+          summary,
+          input.items.filter((item) => item.taxRatePercent === summary.taxRatePercent),
+        ) !== undefined,
+    );
+  const itemTotal = basesReconciled
+    ? summaryTotal
+    : itemTreatment === "included"
       ? itemPrintedTotal
       : itemTreatment === "excluded"
-        ? itemPrintedTotal + input.taxSummaries.reduce((sum, summary) => sum + summary.taxYen, 0)
+        ? itemPrintedTotal + summaries.reduce((sum, summary) => sum + summary.taxYen, 0)
         : Number.NaN;
   const isFullyReconciled =
     summariesAreVerified &&
     Number.isFinite(summaryTotal) &&
     summaryTotal === input.amountYen &&
     input.items.length > 0 &&
-    itemTreatment === summaryTreatment &&
+    itemTreatment !== "perItem" &&
+    (itemTreatment === summaryTreatment || basesReconciled) &&
     itemTotal === input.amountYen;
   if (!isFullyReconciled) {
     return {
@@ -228,10 +246,11 @@ export function reconciliationAxisEvidence(input: ReceiptTaxInput) {
           (input.items.length > 0 &&
             itemTreatment !== "unknown" &&
             summaryTreatment !== "unknown" &&
-            itemTreatment !== summaryTreatment)),
+            itemTreatment !== summaryTreatment &&
+            !basesReconciled)),
     };
   }
-  const treatment = summaryTreatment;
+  const treatment = itemTreatment;
   const composition = compositionFromRates(
     input.taxSummaries.map((summary) => summary.taxRatePercent),
   );

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const PROCESS_ONLY_SCRIPT_PATTERN =
-  /^scripts\/(?:review-depth|check-task-worktree|check-loop-docs|collect-pr-findings|suggest-skills)(?:\.test)?\.mjs$/;
+  /^scripts\/(?:review-depth|check-task-worktree|check-loop-docs|collect-pr-findings|suggest-skills|machine-risk|assess-change|resolve-agent-profile|loop-(?:runner|policy|schema|pr-check|test-fixtures|metrics))(?:\.test)?\.mjs$/;
 
 /** Normalize a Git path to a stable repository-relative form. */
 export function normalizeChangedPath(filePath) {
@@ -29,6 +29,8 @@ export function isProcessOnlyPath(filePath) {
   if (
     normalized === "AGENTS.md" ||
     normalized === "plugin.json" ||
+    normalized.startsWith(".agent/") ||
+    normalized.startsWith(".github/ISSUE_TEMPLATE/") ||
     normalized.startsWith("skills/") ||
     normalized.startsWith(".husky/")
   ) {
@@ -36,6 +38,33 @@ export function isProcessOnlyPath(filePath) {
   }
 
   return PROCESS_ONLY_SCRIPT_PATTERN.test(normalized);
+}
+
+/** Vitest discovers test files even inside dot-dirs (glob uses dot:true). */
+const TEST_FILE_BASENAME = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+
+/**
+ * Paths whose content cannot change lint/unit/build outcomes: Markdown prose,
+ * issue templates, and local git hooks. Process verification still covers
+ * docs/script integrity, so `process` evidence is never extended through
+ * these paths — this predicate is stricter than isProcessOnlyPath on purpose.
+ * A test-pattern basename inside a metadata dir is NOT metadata-only: vitest
+ * would still pick it up and change `vitest run` output.
+ */
+export function isMetadataOnlyPath(filePath) {
+  const normalized = normalizeChangedPath(filePath);
+  if (!normalized || normalized.includes("/../") || normalized.startsWith("../")) {
+    return false;
+  }
+  if (TEST_FILE_BASENAME.test(normalized)) return false;
+  // public/ assets are copied verbatim into the build output — a .md there is
+  // observable by `vite build` without any importing file to flag.
+  if (normalized.startsWith("public/")) return false;
+  return (
+    normalized.endsWith(".md") ||
+    normalized.startsWith(".github/ISSUE_TEMPLATE/") ||
+    normalized.startsWith(".husky/")
+  );
 }
 
 /** Classify a changed-path set and return the machine-readable E2E decision. */
@@ -133,6 +162,7 @@ export function parseArguments(args) {
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
+    if (arg === "--") continue;
     if (arg === "--base") {
       options.baseSha = args[index + 1] ?? "";
       index += 1;

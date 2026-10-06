@@ -1,10 +1,19 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { readChangedPaths, resolvePrBase, suggestSkillsForPaths } from "./suggest-skills.mjs";
+import {
+  parseArguments,
+  readChangedPaths,
+  resolvePrBase,
+  SKILL_SUGGESTION_RULES,
+  suggestSkillsForPaths,
+} from "./suggest-skills.mjs";
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function suggestedSkills(result) {
   return result.suggestions.map((s) => s.skill);
@@ -60,7 +69,7 @@ describe("suggestSkillsForPaths", () => {
   it("suggests nothing for process-only changes and reports runtime_relevant false", () => {
     const result = suggestSkillsForPaths([
       "docs/development-process.md",
-      "skills/code-review/SKILL.md",
+      "skills/workspace-preflight/SKILL.md",
     ]);
     expect(result.suggestions).toEqual([]);
     expect(result.runtimeRelevant).toBe(false);
@@ -70,6 +79,23 @@ describe("suggestSkillsForPaths", () => {
     const result = suggestSkillsForPaths(["src/App.tsx"]);
     expect(result.suggestions).toEqual([]);
     expect(result.runtimeRelevant).toBe(true);
+  });
+
+  it("references only skills and literal paths that exist in the repository", () => {
+    for (const rule of SKILL_SUGGESTION_RULES) {
+      for (const skill of rule.skills) {
+        expect(
+          existsSync(path.join(REPO_ROOT, "skills", skill, "SKILL.md")),
+          `suggested skill ${skill} has no SKILL.md`,
+        ).toBe(true);
+      }
+      for (const exactPath of rule.exactPaths ?? []) {
+        expect(
+          existsSync(path.join(REPO_ROOT, exactPath)),
+          `exact path ${exactPath} in rule for ${rule.skills.join(",")} does not exist`,
+        ).toBe(true);
+      }
+    }
   });
 });
 
@@ -159,5 +185,10 @@ describe("readChangedPaths", () => {
     git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
     const execGh = () => JSON.stringify({ baseRefName: "main" });
     expect(resolvePrBase({ cwd: dir, execGh })).toBe("origin/main");
+  });
+
+  it("skips a bare '--' forwarded by pnpm run", () => {
+    const parsed = parseArguments(["--", "--base", "main"]);
+    expect(parsed.base).toBe("main");
   });
 });
