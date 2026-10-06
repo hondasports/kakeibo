@@ -202,6 +202,7 @@ export const createE2eTaxReviewDraftForUser = internalMutation({
         v.literal("basis890_264"),
         v.literal("summary892"),
         v.literal("summary892_unknown"),
+        v.literal("summary892_tax52"),
         v.literal("summary892_conflict10"),
         v.literal("summary892_conflictBoth"),
       ),

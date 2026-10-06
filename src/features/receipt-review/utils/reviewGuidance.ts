@@ -13,6 +13,7 @@ import {
 import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
 import { isVerifiedTaxSummaryStatus } from "../../../../lib/domain/receipt/tax/taxSummaryConsistency";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
+import { buildAmountCheck } from "./reviewAmountChecks";
 import { getTaxSummaryConflictLabel } from "./receiptTaxLabels";
 import { formatYen } from "../../../utils/currency";
 
@@ -36,7 +37,10 @@ export function getReviewGuidance(
   form: ReviewFormValues,
   items: ReviewItemValues[],
   draft?: AiExpenseDraft | null,
-  summarySourceIndexes?: number[],
+  taxSummaryContext?: {
+    summarySourceIndexes?: number[];
+    sourceTaxSummaries?: AiExpenseDraft["taxSummaries"];
+  },
 ): ReviewGuidanceItem[] {
   const issues: ReviewGuidanceItem[] = [];
   const add = (id: string, message: string, target: string, required: boolean) =>
@@ -50,12 +54,28 @@ export function getReviewGuidance(
   if (!form.categoryId)
     add("category", "レシート全体のカテゴリを選択してください。", "categoryId", true);
   if (effectiveReviewMode(form) === "detailed") {
+    const amountCheck = buildAmountCheck({
+      items,
+      paidTotalYen:
+        form.amountYen.trim() !== "" && Number.isFinite(Number(form.amountYen))
+          ? Number(form.amountYen)
+          : undefined,
+      taxSummaries: draft?.taxSummaries,
+    });
+    const paidTotalMismatchReason =
+      amountCheck.itemsComparableTotalYen !== undefined &&
+      amountCheck.paidTotalYen !== undefined &&
+      amountCheck.itemsComparableTotalYen !== amountCheck.paidTotalYen
+        ? `明細の税込合計 ${formatYen(amountCheck.itemsComparableTotalYen)} ／ 支払合計 ${formatYen(amountCheck.paidTotalYen)}`
+        : undefined;
     const taxCheck = buildTaxRateCheck({
       items,
       taxSummaries: draft?.taxSummaries,
       rawObservation: draft?.rawObservation,
     });
     draft?.taxSummaries?.forEach((summary, index) => {
+      const sourceIndex = taxSummaryContext?.summarySourceIndexes?.[index] ?? index;
+      const sourceSummary = taxSummaryContext?.sourceTaxSummaries?.[sourceIndex];
       const row = taxCheck.rows[index];
       const unallocated = items.some(
         (item) =>
@@ -72,10 +92,17 @@ export function getReviewGuidance(
         );
       if (row?.blockerCode === "basis-conflict" && row.reason) reasons.push(row.reason);
       if (unallocated) reasons.push("税額を商品に配分できていません");
+      // 元の未確定情報を補完しても、支払額が一致するまでは税額を修正できるようにする。
+      const sourceNeedsReview =
+        sourceSummary &&
+        (sourceSummary.taxMode === "unknown" ||
+          sourceSummary.taxableAmountBasis === "unknown" ||
+          (sourceSummary.status !== undefined &&
+            !isVerifiedTaxSummaryStatus(sourceSummary.status)));
+      if (paidTotalMismatchReason && sourceNeedsReview) reasons.push(paidTotalMismatchReason);
       const unresolvedStatus =
         summary.status !== undefined && !isVerifiedTaxSummaryStatus(summary.status);
       if (!unresolvedStatus && reasons.length === 0) return;
-      const sourceIndex = summarySourceIndexes?.[index] ?? index;
       issues.push({
         id: `summary-${index}`,
         message: `${summary.taxRatePercent}%の税内訳：${

@@ -123,7 +123,7 @@ describe("共有再解釈後の明細と税内訳", () => {
           { ...form, amountYen: String(total) },
           preview.items,
           { ...draft, taxSummaries: preview.taxSummaries },
-          preview.summarySourceIndexes,
+          { summarySourceIndexes: preview.summarySourceIndexes },
         ),
       ).toContainEqual(
         expect.objectContaining({

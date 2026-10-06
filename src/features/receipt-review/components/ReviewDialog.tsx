@@ -119,7 +119,10 @@ export function ReviewDialog(props: ReviewDialogProps) {
     setTaxDetails({});
     setLocalError("");
   }
-  const guidance = getReviewGuidance(form, items, draft, preview.summarySourceIndexes);
+  const guidance = getReviewGuidance(form, items, draft, {
+    summarySourceIndexes: preview.summarySourceIndexes,
+    sourceTaxSummaries: sourceDraft?.taxSummaries,
+  });
   const editableSummaries = guidance.flatMap((issue) => {
     if (issue.taxSummaryIndex === undefined) return [];
     const sourceIndex = preview.summarySourceIndexes[issue.taxSummaryIndex];

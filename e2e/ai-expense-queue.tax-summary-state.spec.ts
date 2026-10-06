@@ -20,6 +20,7 @@ for (const width of [1280, 320]) {
     for (const receiptCase of [
       "summary892",
       "summary892_unknown",
+      "summary892_tax52",
       "summary892_conflict10",
       "summary892_conflictBoth",
     ] as const) {
@@ -43,10 +44,11 @@ for (const width of [1280, 320]) {
           await expect(banner.getByRole("button", { name: "税内訳を修正" })).toHaveCount(
             expectedForms,
           );
-          const rate =
-            receiptCase === "summary892_conflictBoth" || receiptCase === "summary892_unknown"
-              ? 8
-              : 10;
+          const rate = receiptCase === "summary892_conflict10" ? 10 : 8;
+          if (receiptCase === "summary892_tax52")
+            await expect(banner).toContainText(
+              "8%の税内訳：明細の税込合計 1,781円 ／ 支払合計 1,782円",
+            );
           await banner
             .locator("li")
             .filter({ hasText: `${rate}%の税内訳：` })
@@ -64,10 +66,15 @@ for (const width of [1280, 320]) {
           );
           if (receiptCase === "summary892_conflict10")
             await expect(dialog.getByRole("region", { name: "8%の税内訳を修正" })).toHaveCount(0);
-          if (receiptCase === "summary892_unknown")
+          if (receiptCase === "summary892_unknown" || receiptCase === "summary892_tax52")
             await expect(dialog.getByRole("region", { name: "10%の税内訳を修正" })).toHaveCount(0);
           await dialog.screenshot({ path: testInfo.outputPath("tax-summary-before.png") });
-          if (receiptCase === "summary892_unknown") {
+          if (receiptCase === "summary892_tax52") {
+            const tax = editor.getByRole("spinbutton", { name: "税額", exact: true });
+            await expect(tax).toHaveValue("52");
+            await tax.fill("53");
+            await editor.getByRole("button", { name: "保存", exact: true }).click();
+          } else if (receiptCase === "summary892_unknown") {
             await expect(editor.getByRole("combobox", { name: "税モード" })).toContainText("不明");
             await editor.getByRole("combobox", { name: "税モード" }).click();
             await page.getByRole("option", { name: "外税", exact: true }).click();

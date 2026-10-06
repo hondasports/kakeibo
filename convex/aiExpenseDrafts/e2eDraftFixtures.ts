@@ -11,6 +11,7 @@ export type E2eTaxReviewReceiptCase =
   | "basis890_264"
   | "summary892"
   | "summary892_unknown"
+  | "summary892_tax52"
   | "summary892_conflict10"
   | "summary892_conflictBoth";
 
@@ -173,6 +174,7 @@ export async function createE2eTaxReviewDraftForUserHandler(
   if (
     args.receiptCase === "summary892" ||
     args.receiptCase === "summary892_unknown" ||
+    args.receiptCase === "summary892_tax52" ||
     args.receiptCase === "summary892_conflict10" ||
     args.receiptCase === "summary892_conflictBoth"
   )
@@ -277,7 +279,7 @@ async function createE2eSummaryReviewDraft(
         taxMode: args.receiptCase === "summary892_unknown" ? "unknown" : "external",
         taxableAmountYen: args.receiptCase === "summary892_conflictBoth" ? 668 : 669,
         taxableAmountBasis: "unknown",
-        taxYen: 53,
+        taxYen: args.receiptCase === "summary892_tax52" ? 52 : 53,
         ...(args.receiptCase === "summary892_unknown" ? { taxIncludedAmountYen: 722 } : {}),
         roundingMethod: "floor",
         confidence: {},
