@@ -1392,6 +1392,32 @@ describe("persistent task gates", () => {
     });
     expect(existsSync(path.join(out, "contracts", "workflow-review.md"))).toBe(true);
   });
+  it("preserves a complete review patch and feature hash larger than 1 MiB", () => {
+    const { dir, git, task } = repository();
+    writeFileSync(path.join(dir, "large-feature.txt"), "large diff line\n".repeat(80_000));
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "large feature");
+    refreshTask(task, dir);
+    task.state = "review";
+    const expectedDiff = execFileSync(
+      "git",
+      ["diff", "--binary", "--no-renames", `${task.baseHead}...${task.head}`],
+      { cwd: dir, maxBuffer: 32 * 1024 * 1024 },
+    );
+    expect(expectedDiff.length).toBeGreaterThan(1024 * 1024);
+    const expectedHash = createHash("sha256")
+      .update(expectedDiff.toString("utf8").trim())
+      .digest("hex");
+    expect(featurePatchSha256(task, dir)).toBe(expectedHash);
+
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-large-packet-"));
+    dirs.push(parent);
+    const out = path.join(parent, "packet");
+    buildReviewPacket(task, out, dir);
+    expect(readFileSync(path.join(out, "diff.patch"))).toEqual(expectedDiff);
+    const packet = JSON.parse(readFileSync(path.join(out, "packet.json"), "utf8"));
+    expect(packet.reuseCandidates.featurePatchSha256).toBe(expectedHash);
+  });
   it("refuses review packets outside review state or with a dirty tree", () => {
     const { dir, task } = repository();
     task.state = "execute";
