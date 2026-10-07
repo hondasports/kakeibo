@@ -117,7 +117,12 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
         diffFailed = true;
       }
     }
-    console.log(JSON.stringify(assessChange({ ...args, paths, hunks, diffFailed }), null, 2));
+    const result = assessChange({ ...args, paths, hunks, diffFailed });
+    if (args.paths && !args.base && paths.some(isContentTarget)) {
+      result.warning =
+        "--paths without --base skips the hunk read, so content rules were not evaluated; pass --base to include them";
+    }
+    console.log(JSON.stringify(result, null, 2));
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

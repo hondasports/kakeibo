@@ -128,14 +128,35 @@ const MAX_DIFF_BYTES = 10 * 1024 * 1024;
 const git = (args, cwd) =>
   execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: MAX_DIFF_BYTES });
 
-/** Accumulate added/deleted lines from a `git diff --unified=0` output. */
+/**
+ * Accumulate added/deleted lines from a `git diff --unified=0` output.
+ * Hunk state comes from `diff --git`/`@@` headers, not from `---`/`+++` lines:
+ * a deleted file has `+++ /dev/null` but its `-` lines still belong to the
+ * `--- a/` path, and a removed line whose text starts with `-- ` looks like
+ * `--- ...` inside the hunk, so header detection applies only before `@@`.
+ */
 function collectHunks(hunks, diffText) {
   let current = null;
+  let oldPath = null;
+  let inHunk = false;
   for (const line of diffText.split("\n")) {
-    if (line.startsWith("+++ b/")) current = normalizeChangedPath(line.slice(6));
-    else if (line.startsWith("+++ ") || line.startsWith("--- ")) current = null;
-    else if (current && (line.startsWith("+") || line.startsWith("-")))
+    if (line.startsWith("diff --git ")) {
+      current = null;
+      oldPath = null;
+      inHunk = false;
+    } else if (!inHunk && line.startsWith("--- a/")) {
+      oldPath = normalizeChangedPath(line.slice(6));
+    } else if (!inHunk && line.startsWith("--- ")) {
+      oldPath = null;
+    } else if (!inHunk && line.startsWith("+++ b/")) {
+      current = normalizeChangedPath(line.slice(6));
+    } else if (!inHunk && line.startsWith("+++ ")) {
+      current = oldPath;
+    } else if (line.startsWith("@@ ")) {
+      inHunk = true;
+    } else if (inHunk && current && (line.startsWith("+") || line.startsWith("-"))) {
       (hunks[current] ??= []).push(line.slice(1));
+    }
   }
   return hunks;
 }

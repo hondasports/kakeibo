@@ -1,6 +1,10 @@
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { machineRiskForChange, machineRiskForPaths } from "./machine-risk.mjs";
+import { machineRiskForChange, machineRiskForPaths, readChangedHunks } from "./machine-risk.mjs";
 
 describe("machineRiskForPaths", () => {
   it("forces T3 for schema changes", () => {
@@ -192,5 +196,46 @@ describe("machineRiskForChange (content rules)", () => {
     expect(machineRiskForPaths(["convex/schema.ts"])).toEqual(
       machineRiskForChange({ paths: ["convex/schema.ts"] }),
     );
+  });
+});
+
+describe("readChangedHunks (diff parser)", () => {
+  function repoWith(lines) {
+    const dir = mkdtempSync(path.join(tmpdir(), "machine-risk-"));
+    const git = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+    git("init", "-b", "main");
+    git("config", "user.email", "test@example.com");
+    git("config", "user.name", "test");
+    mkdirSync(path.join(dir, "convex"), { recursive: true });
+    const file = path.join(dir, "convex", "helpers.ts");
+    writeFileSync(file, lines.join("\n"));
+    git("add", "-A");
+    git("commit", "-m", "init");
+    return { dir, git, file };
+  }
+
+  it("deleted files still contribute their removed lines (f-1)", () => {
+    const { dir, git } = repoWith([
+      "export async function sweep(ctx) {",
+      "  await ctx.db.delete(row);",
+      "}",
+    ]);
+    git("rm", "convex/helpers.ts");
+    const hunks = readChangedHunks({ base: "HEAD", cwd: dir });
+    expect(hunks["convex/helpers.ts"].join("\n")).toContain("ctx.db.delete");
+    expect(machineRiskForChange({ paths: ["convex/helpers.ts"], hunks }).minimumTier).toBe("T3");
+  });
+
+  it("removed lines starting with '-- ' are hunk content, not file headers (f-2)", () => {
+    const { dir, file } = repoWith([
+      "const notes = [",
+      "-- keep this comment",
+      "  await ctx.db.delete(row);",
+      "];",
+    ]);
+    writeFileSync(file, ["const notes = [", "  'safe line',", "];"].join("\n"));
+    const hunks = readChangedHunks({ base: "HEAD", cwd: dir });
+    expect(hunks["convex/helpers.ts"].join("\n")).toContain("ctx.db.delete");
+    expect(machineRiskForChange({ paths: ["convex/helpers.ts"], hunks }).minimumTier).toBe("T3");
   });
 });

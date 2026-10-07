@@ -115,7 +115,8 @@ export function suggestSkillsForPaths(changedPaths = []) {
  * Path rules plus the Machine Floor content rules (Issue #944): a hunk that
  * touches auth/deletion/schema/external-write symbols also suggests
  * security-review, even when the file path is innocuous. `diffFailed`
- * (unreadable diff) adds the same suggestion — fail-closed like the floor.
+ * (unreadable diff) does NOT add the suggestion — the sentinel raises the
+ * Machine Floor to T3 but, being no symbol match, never suggests a skill.
  */
 export function suggestSkillsForChange({ changedPaths = [], hunks = {}, diffFailed = false } = {}) {
   const result = suggestSkillsForPaths(changedPaths);
@@ -242,8 +243,9 @@ export function parseArguments(args) {
 
 export function runSuggestSkills({ base, paths, cwd } = {}) {
   const changedPaths = paths ?? readChangedPaths({ base, cwd });
-  // Content check is best-effort for suggestions; an unreadable diff still
-  // flags security-review via the fail-closed path (Issue #944).
+  // Content check is best-effort for suggestions; an unreadable diff
+  // produces no extra suggestion (the T3 fail-close is the floor's job).
+
   let hunks = {};
   let diffFailed = false;
   try {
