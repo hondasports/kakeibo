@@ -34,15 +34,17 @@ describe("ci.yml", () => {
     }
   });
 
-  test("Lint / Build / Test が CI scope の判定で skip する", () => {
+  test("scope 以外の全ジョブが CI scope の判定で skip する", () => {
     const jobs = workflow.jobs;
     expect(jobs.scope.name).toBe("CI scope");
 
     const guard =
       "${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code_changed == 'true') }}";
-    for (const name of ["lint", "build", "test"]) {
-      expect(jobs[name].needs).toBe("scope");
-      expect(jobs[name].if).toBe(guard);
+    // scope以外の全jobにガードを要求する（将来jobを追加したとき付け忘れを検出する）
+    for (const [name, job] of Object.entries(jobs)) {
+      if (name === "scope") continue;
+      expect(job.needs, `job ${name} lacks needs: scope`).toBe("scope");
+      expect(job.if, `job ${name} lacks the scope guard`).toBe(guard);
     }
     // ジョブ名は required checks が参照するので変更しない
     expect(jobs.lint.name).toBe("Lint");
