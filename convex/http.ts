@@ -4,6 +4,7 @@ import { resendWebhookHandler } from "./email/webhooks/resendWebhook";
 import { lineWebhookHandler } from "./lineWebhook/webhook";
 import { e2eCleanupHandler } from "./e2eHttp/e2eCleanup";
 import { e2eCleanupAuthCheckHandler } from "./e2eHttp/e2eAuth";
+import { e2eHeadProbeHandler } from "./e2eHttp/e2eHeadProbe";
 import { e2ePurgeOrphansHandler } from "./e2ePurge";
 import {
   cleanupSystemAdminMembershipHandler,
@@ -31,6 +32,12 @@ http.route({
   path: "/e2e/cleanup-auth-check",
   method: "POST",
   handler: e2eCleanupAuthCheckHandler,
+});
+// 一時検証用（#956 AC2）。このブランチだけに存在するHEAD関数反映の証明。
+http.route({
+  path: "/e2e/head-probe",
+  method: "GET",
+  handler: e2eHeadProbeHandler,
 });
 http.route({
   path: "/e2e/cleanup",
