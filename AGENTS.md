@@ -4,7 +4,7 @@
 
 ## Startup
 
-repository編集タスクの開始時は `docs/agent-harness.md`（起動用クイックリファレンス）だけを読み、入口手順を実行する。編集前に専用worktreeで `node scripts/loop-runner.mjs --init <spec.json> --task <task-id> --runtime <runtime> --implementer <session-id>` を実行する。`<runtime>` はCodexで `codex`、Devinで `devin`、Claude Codeで `claude-code` とする。以後はrunner出力の `workflow`（現在Stateのworkflow）と `next` に従い、操作の詳細が必要な時だけ `docs/agent-harness-reference.md` の該当節を読む。再開時は引数なしで実行する。プロファイル名・状態を文章で自己申告するだけでは起動完了にならない。
+repository編集タスクの開始時は `docs/agent-harness.md`（起動用クイックリファレンス）だけを読み、入口手順を実行する。編集前に専用worktreeで `node scripts/loop-runner.mjs --init <spec.json> --task <task-id> --runtime <runtime> --implementer <session-id>` を実行する。`<runtime>` はCodexで `codex`、Devinで `devin`、Claude Codeで `claude-code` とする。以後はrunner出力の `workflow`（現在Stateのworkflow）と `next` に従い、操作の詳細が必要な時だけ `docs/agent-harness-reference.md` の該当節を読む。再開時は引数なしで実行する。プロファイル名・状態を文章で自己申告するだけでは起動完了にならない（Claude Codeでは `.claude/settings.json` のhooksが機械強制する）。
 
 ## Core contract
 
