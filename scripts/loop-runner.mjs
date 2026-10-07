@@ -1608,6 +1608,7 @@ export function parseArguments(args) {
     "--watch-aftercare",
     "--verify-required",
     "--full-review",
+    "--hook-state",
   ]);
   const options = new Set([
     "--init",
@@ -1802,6 +1803,15 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args["publish-metrics"]) {
     const task = loadTask(root);
     return publishTaskMetrics(task, args["publish-metrics"], root, services);
+  }
+  if (args["hook-state"]) {
+    // Read-only probe for runtime hooks (#945): never refreshes or saves the
+    // task, and reports an uninitialized task as state:null instead of
+    // failing so the caller can decide whether editing is allowed.
+    const target = taskPath(root);
+    if (!existsSync(target)) return { state: null, next: [] };
+    const probe = JSON.parse(readFileSync(target, "utf8"));
+    return { state: probe.state ?? null, next: nextActions(probe) };
   }
   let task = refreshTask(loadTask(root), root);
   saveTask(task, root); // Persist invalidation even if the requested action fails.
