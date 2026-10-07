@@ -177,7 +177,10 @@ test.describe("通知設定（Issue #893）", () => {
 
   test("@smoke 未認証と非管理者は /admin/notifications を利用できない", async ({ page }) => {
     await page.goto("/admin/notifications");
-    await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeVisible();
+    // デプロイ環境ではClerk初期化に10秒を超えることがあるため余裕を持たせる
+    await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(page.getByRole("heading", { name: "通知設定" })).not.toBeVisible();
 
     await gotoAuthenticated(page, "/admin/notifications");
