@@ -35,17 +35,13 @@
 
 import { execFileSync } from "node:child_process";
 import {
-  cpSync,
   existsSync,
   mkdirSync,
-  readdirSync,
   readFileSync,
   rmSync,
-  statSync,
   writeFileSync,
   appendFileSync,
 } from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -332,7 +328,7 @@ function runVitest(dir, files) {
   }
 }
 
-function runDocsOracle(entry, dir, record) {
+function runDocsOracle(entry, dir) {
   const failedTests = [];
   for (const check of entry.oracle.requiredContent ?? []) {
     const target = path.join(dir, check.file);
@@ -355,7 +351,7 @@ export function grade(id, { dir, out, record, expectFail = false } = {}) {
   if (!existsSync(path.join(absDir, ".git"))) fail(`not a worktree: ${absDir}`);
   let result;
   if (entry.oracle.type === "docs") {
-    result = runDocsOracle(entry, absDir, record);
+    result = runDocsOracle(entry, absDir);
   } else {
     oracleTestFiles(entry, absDir, record);
     result = runVitest(absDir, entry.oracle.tests);
