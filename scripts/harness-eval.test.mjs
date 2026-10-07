@@ -217,10 +217,34 @@ describe("git guard (AC8)", () => {
     const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
     expect(() => mod.git(tmp(), ["push", "origin", "x"])).toThrow(/never/);
     expect(() => mod.git(tmp(), ["pr", "create"])).toThrow(/never/);
+    // f-4: option-first bypass (`git -c k=v push`) is rejected too.
+    expect(() => mod.git(tmp(), ["-c", "k=v", "push", "origin", "x"])).toThrow(/never/);
     // CLI source must not shell out to gh (PR creation) at all.
     const src = readFileSync(SCRIPT, "utf8");
     expect(src).not.toMatch(/execFileSync\("gh"/);
     expect(src).not.toMatch(/["'`]gh["'`]/);
+  });
+});
+
+describe("globToRegExp", () => {
+  test("**/ matches zero or more leading segments", async () => {
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    const re = mod.globToRegExp("a/**/b.test.mjs");
+    expect(re.test("a/b.test.mjs")).toBe(true); // direct child (zero dirs)
+    expect(re.test("a/x/b.test.mjs")).toBe(true);
+    expect(re.test("a/x/y/b.test.mjs")).toBe(true);
+    expect(re.test("b/b.test.mjs")).toBe(false);
+    expect(mod.globToRegExp("scripts/loop-*.mjs").test("scripts/loop-runner.mjs")).toBe(true);
+    expect(mod.globToRegExp("scripts/loop-*.mjs").test("scripts/x/loop.mjs")).toBe(false);
+  });
+});
+
+describe("parseCli", () => {
+  test("--expect-fail is a bare boolean flag (f-2)", async () => {
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    const { options } = mod.parseCli(["grade", "g1", "--dir", "/x", "--expect-fail"]);
+    expect(options["expect-fail"]).toBe(true);
+    expect(() => mod.parseCli(["grade", "g1", "--dir"])).toThrow(/requires a value/);
   });
 });
 

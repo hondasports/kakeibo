@@ -8,6 +8,14 @@
  *     commit the overlay locally (never pushed), and print the single
  *     `loop-runner.mjs --init` command the agent should run.
  *
+ *     The worktree is a linked worktree of a `git clone --depth 1` of this repo,
+ *     NOT of the canonical clone — so the eval repo's object db holds only the
+ *     base commit and the overlay. `git show <other-commit>` fails inside it,
+ *     which is the point: the oracle (referenceCommit objects, golden-set.json)
+ *     does not exist in the eval repo. It is still not airtight isolation — an
+ *     agent that re-adds the origin remote can fetch them — but there is no
+ *     casual path (documented limitation, see eval/harness/README.md).
+ *
  *   grade <id> --dir <path> [--out <file>]
  *     Apply the oracle of golden[id] to the worktree HEAD: overwrite the worktree
  *     with the oracle tests taken from referenceCommit and run vitest, or run the
@@ -70,27 +78,54 @@ function golden(id) {
   return entry;
 }
 
-/** Every git invocation funnels here so tests can audit that push/PR never runs. */
-export function git(cwd, args, { record } = {}) {
-  const sub = args[0];
-  if (sub === "push" || sub === "pr") fail(`eval must never run: git ${sub}`);
+/**
+ * Reject remote-touching git verbs. Scans every arg (not just args[0]) so
+ * `git -c k=v push` cannot slip past; every git call site funnels through
+ * this check.
+ */
+function assertLocalGit(args) {
+  for (const arg of args) {
+    if (arg === "push" || arg === "pr") fail(`eval must never run: git ${arg}`);
+  }
+}
+
+export function git(cwd, args, { record, quiet } = {}) {
+  assertLocalGit(args);
   record?.push(["git", ...args]);
-  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+  // quiet: existence probes (cat-file -t) expect misses; keep stderr off the console
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", quiet ? "ignore" : "inherit"],
+  }).trim();
 }
 
 function run(cmd, args, cwd) {
   return execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
 }
 
-/** Glob match (gitignore-ish): `*` within one segment, `**` across segments. */
+/**
+ * Glob match (gitignore-ish): single-* and ? match within one path segment;
+ * double-star-slash matches zero or more leading segments, and a trailing
+ * double-star matches anything below.
+ */
 export function globToRegExp(pattern) {
-  const segment = (text) =>
-    [...text]
-      .map((ch) =>
-        ch === "*" ? "[^/]*" : ch === "?" ? "[^/]" : ch.replace(/[.+^${}()|[\]\\]/g, "\\$&"),
-      )
-      .join("");
-  return new RegExp(`^${pattern.split("**").map(segment).join(".*")}$`);
+  let out = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "*" && pattern[i + 1] === "*") {
+      if (pattern[i + 2] === "/") {
+        out += "(?:[^/]+/)*"; // `a/**/b` also matches the direct child `a/b`
+        i += 2;
+      } else {
+        out += ".*";
+        i += 1;
+      }
+    } else if (ch === "*") out += "[^/]*";
+    else if (ch === "?") out += "[^/]";
+    else out += ch.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  }
+  return new RegExp(`^${out}$`);
 }
 
 /** Expand one harness-paths entry into concrete file paths existing at <ref>. */
@@ -107,7 +142,7 @@ export function expandHarnessPattern(repoRoot, ref, pattern, record) {
   }
   let type = "";
   try {
-    type = git(repoRoot, ["cat-file", "-t", `${ref}:${clean}`], { record });
+    type = git(repoRoot, ["cat-file", "-t", `${ref}:${clean}`], { record, quiet: true });
   } catch {
     return [];
   }
@@ -129,7 +164,10 @@ export function harnessFiles(repoRoot, ref, record) {
 }
 
 function extractFile(repoRoot, ref, file, record) {
-  return execFileSync("git", ["show", `${ref}:${file}`], {
+  const args = ["show", `${ref}:${file}`];
+  assertLocalGit(args); // same funnel as git(); binary-safe so kept as execFileSync
+  record?.push(["git", ...args]);
+  return execFileSync("git", args, {
     cwd: repoRoot,
     maxBuffer: 64 * 1024 * 1024,
   });
@@ -173,6 +211,7 @@ export function buildAgentSpec(entry) {
     })),
     nonGoals: [
       "oracleのテスト・採点内容は与えられない。仕様どおり実装し、通常の検証で確認する",
+      "git履歴・object db・リモート取得でoracleや参照実装を探さない",
       "evalのためリモートpush・PR作成は行わない（REVIEW cleanで終了）",
     ],
     assumptions: [],
@@ -186,37 +225,74 @@ export function buildAgentSpec(entry) {
 
 export function prepare(id, { dir, harness = "HEAD", specOut, record } = {}) {
   const entry = golden(id);
+  const repoRoot = repoRootFor(record);
   const absDir = path.resolve(dir);
   if (existsSync(absDir)) fail(`prepare dir already exists: ${absDir}`);
-  const branch = `eval/${id}/${Date.now()}`;
-  git(repoRootFor(record), ["worktree", "add", absDir, "-b", branch, entry.baseCommit], { record });
-  const { files, mergedScripts } = overlayHarness(repoRootFor(record), absDir, harness, { record });
-  run("pnpm", ["install", "--frozen-lockfile"], absDir);
-  git(absDir, ["add", "-A"], { record });
-  git(
-    absDir,
-    [
-      "-c",
-      "user.email=eval@local",
-      "-c",
-      "user.name=eval",
-      "commit",
-      "-m",
-      `eval: overlay harness ${harness}`,
-    ],
-    { record },
-  );
-  const overlayHead = git(absDir, ["rev-parse", "HEAD"], { record });
+  const ts = Date.now();
+  const branch = `eval/${id}/${ts}`;
+  const tmpBase = `eval-base/${id}/${ts}`;
+  const srcDir = `${absDir}.eval-src`;
+
+  // Isolation: clone --depth 1 so the eval repo's object db contains only the
+  // base commit, then add <dir> as a linked worktree of that clone (required —
+  // check-task-worktree rejects plain checkouts and the canonical dir).
+  git(repoRoot, ["branch", tmpBase, entry.baseCommit], { record });
+  let overlayHead;
+  let overlayResult;
+  try {
+    execFileSync(
+      "git",
+      ["clone", "--depth", "1", "--no-tags", "--branch", tmpBase, `file://${repoRoot}`, srcDir],
+      { encoding: "utf8" },
+    );
+    git(srcDir, ["worktree", "add", absDir, "-b", branch], { record });
+    try {
+      git(absDir, ["remote", "remove", "origin"], { record });
+      overlayResult = overlayHarness(repoRoot, absDir, harness, { record });
+      run("pnpm", ["install", "--frozen-lockfile"], absDir);
+      git(absDir, ["add", "-A"], { record });
+      git(
+        absDir,
+        [
+          "-c",
+          "user.email=eval@local",
+          "-c",
+          "user.name=eval",
+          "commit",
+          "-m",
+          `eval: overlay harness ${harness}`,
+        ],
+        { record },
+      );
+      overlayHead = git(absDir, ["rev-parse", "HEAD"], { record });
+    } catch (error) {
+      // Roll back so a failed prepare leaves nothing behind (f-5).
+      try {
+        git(srcDir, ["worktree", "remove", "--force", absDir], { record });
+      } catch {
+        rmSync(absDir, { recursive: true, force: true });
+      }
+      rmSync(srcDir, { recursive: true, force: true });
+      throw error;
+    }
+  } finally {
+    try {
+      git(repoRoot, ["branch", "-D", tmpBase], { record });
+    } catch {
+      /* best effort */
+    }
+  }
   const specPath = specOut ?? `/tmp/eval-${id}-spec.json`;
   writeFileSync(specPath, `${JSON.stringify(buildAgentSpec(entry), null, 2)}\n`);
   return {
     id,
     dir: absDir,
+    srcDir,
     branch,
     baseCommit: entry.baseCommit,
     harnessRef: harness,
-    overlaidFiles: files.length,
-    mergedScripts,
+    overlaidFiles: overlayResult.files.length,
+    mergedScripts: overlayResult.mergedScripts,
     overlayCommit: overlayHead,
     spec: specPath,
     init: `node scripts/loop-runner.mjs --init ${specPath} --task ${id} --runtime <runtime> --implementer <session-id> --base ${overlayHead}`,
@@ -373,30 +449,54 @@ export function report({ baseline, candidate }) {
 export function cleanup(id, { dir, record } = {}) {
   const absDir = path.resolve(dir);
   const repoRoot = repoRootFor(record);
+  const srcDir = `${absDir}.eval-src`;
   if (existsSync(absDir)) {
-    git(repoRoot, ["worktree", "remove", "--force", absDir], { record });
+    if (existsSync(srcDir)) {
+      // <dir> is a worktree of the eval-src clone, not of this repo.
+      try {
+        git(srcDir, ["worktree", "remove", "--force", absDir], { record });
+      } catch {
+        rmSync(absDir, { recursive: true, force: true });
+      }
+    } else {
+      // Backward compatible: worktree of the canonical repo (pre-clone prepare).
+      git(repoRoot, ["worktree", "remove", "--force", absDir], { record });
+    }
   }
+  rmSync(srcDir, { recursive: true, force: true });
+  // Branch sweep is best-effort: `+`/` ` prefixes mark worktree-checked-out
+  // branches; a branch still checked out elsewhere is skipped, not fatal.
   for (const branch of git(repoRoot, ["branch", "--list", `eval/${id}/*`], { record })
     .split("\n")
-    .map((name) => name.trim().replace(/^\*\s*/, ""))
+    .map((name) => name.trim().replace(/^[*+]\s*/, ""))
     .filter(Boolean)) {
-    git(repoRoot, ["branch", "-D", branch], { record });
+    try {
+      git(repoRoot, ["branch", "-D", branch], { record });
+    } catch {
+      /* checked out elsewhere — leave it */
+    }
   }
-  return { removed: absDir };
+  return { removed: absDir, removedSrc: srcDir };
 }
 
 /* ------------------------------------------------------------------- cli */
 
-function parseCli(argv) {
+export function parseCli(argv) {
   const [command, ...rest] = argv;
   const positional = [];
   const options = {};
+  const booleanOptions = new Set(["expect-fail"]);
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i];
     if (arg.startsWith("--")) {
+      const key = arg.slice(2);
+      if (booleanOptions.has(key)) {
+        options[key] = true;
+        continue;
+      }
       const value = rest[i + 1];
       if (value === undefined || value.startsWith("--")) fail(`${arg} requires a value`);
-      options[arg.slice(2)] = value;
+      options[key] = value;
       i += 1;
     } else positional.push(arg);
   }
