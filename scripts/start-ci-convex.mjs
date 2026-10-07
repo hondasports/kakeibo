@@ -219,6 +219,7 @@ export async function waitForCleanupAuth({
   intervalMs = 1000,
   fetchImpl = fetch,
   now = Date.now,
+  acceptAnyResponse = false,
 } = {}) {
   const deadline = now() + timeoutMs;
   let lastError = "未実行";
@@ -229,7 +230,10 @@ export async function waitForCleanupAuth({
         headers: { "Content-Type": "application/json", "X-E2E-Cleanup-Secret": secret },
         body: "{}",
       });
-      if (res.status === 200) return;
+      if (res.status === 200) return res.status;
+      // probe では「HTTP action が応答した」こと自体が疎通の証明になる。
+      // 401/503 はデプロイ済み関数が実行された応答なのでそこで終了する。
+      if (acceptAnyResponse) return res.status;
       lastError = `HTTP ${res.status}`;
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
@@ -268,7 +272,7 @@ async function setConvexEnv(env, name, value, secrets, { attempts = 5 } = {}) {
   throw new Error(`convex env set ${name} に失敗しました。${lastDetail ? ` (${lastDetail})` : ""}`);
 }
 
-async function applyConvexEnv({ env, secrets, clerkIssuerDomain }) {
+async function applyConvexEnv({ env, secrets, clerkIssuerDomain, e2eClerkUserId, clerkSecretKey }) {
   const secret = generateCleanupSecret();
   const allSecrets = [...secrets, secret];
   // auth.config.ts が参照する env が無いとpush自体が失敗するため最優先で設定する
@@ -277,12 +281,12 @@ async function applyConvexEnv({ env, secrets, clerkIssuerDomain }) {
   }
   await setConvexEnv(env, "APP_ENV", "development", allSecrets);
   await setConvexEnv(env, "RECEIPT_IMAGE_EXTRACTOR_MODE", "mock", allSecrets);
-  if (process.env.E2E_CLERK_USER_ID) {
-    await setConvexEnv(env, "E2E_CLERK_USER_ID", process.env.E2E_CLERK_USER_ID, allSecrets);
+  if (e2eClerkUserId) {
+    await setConvexEnv(env, "E2E_CLERK_USER_ID", e2eClerkUserId, allSecrets);
   }
   // 招待系actionが Clerk API を呼ぶ経路のため、利用可能なら同期する（throwaway backendのみ）
-  if (process.env.CLERK_SECRET_KEY) {
-    await setConvexEnv(env, "CLERK_SECRET_KEY", process.env.CLERK_SECRET_KEY, allSecrets);
+  if (clerkSecretKey) {
+    await setConvexEnv(env, "CLERK_SECRET_KEY", clerkSecretKey, allSecrets);
   }
   await setConvexEnv(env, "E2E_CLEANUP_SECRET", secret, allSecrets);
   ensureLineIntegrationMode({
@@ -330,13 +334,27 @@ export function buildChildEnv(base, { url, siteUrl, cleanupSecret }) {
   return env;
 }
 
-function resolveClerkIssuer() {
-  const key = process.env.CLERK_PUBLISHABLE_KEY ?? process.env.VITE_CLERK_PUBLISHABLE_KEY;
+function resolveClerkIssuer(fallbackEnv) {
+  const key =
+    process.env.CLERK_PUBLISHABLE_KEY ??
+    process.env.VITE_CLERK_PUBLISHABLE_KEY ??
+    fallbackEnv?.get("VITE_CLERK_PUBLISHABLE_KEY");
   if (!key) {
     log("CLERK_PUBLISHABLE_KEY 未設定のため CLERK_JWT_ISSUER_DOMAIN は設定しません");
     return null;
   }
   return deriveClerkJwtIssuerDomain(key);
+}
+
+/**
+ * 退避した `.env.local` をfallback値として読む。ローカルで `pnpm run e2e:isolated`
+ * を実行する際、開発者の .env.local に入っている E2E_CLERK_USER_ID 等を
+ * 環境変数 export なしで引き継ぐため。CIのcheckoutには .env.local が無いので
+ * そこでは何もしない。
+ */
+export function readBackedUpEnv({ backupPath = envBackupPath } = {}) {
+  if (!existsSync(backupPath)) return null;
+  return parseEnvFile(readFileSync(backupPath, "utf8"));
 }
 
 function appendGithubEnv(envValues) {
@@ -445,19 +463,28 @@ async function main() {
     const startedAt = Date.now();
     const { url, siteUrl } = await waitForLocalEnvFile({ timeoutMs: ENV_FILE_TIMEOUT_MS });
 
+    // 退避済み .env.local を env 未設定時のfallbackにする（ローカル `e2e:isolated` 用）
+    const fallbackEnv = readBackedUpEnv();
+    const e2eClerkUserId = process.env.E2E_CLERK_USER_ID ?? fallbackEnv?.get("E2E_CLERK_USER_ID");
+    const clerkSecretKey = process.env.CLERK_SECRET_KEY ?? fallbackEnv?.get("CLERK_SECRET_KEY");
+    if (!args.probe && !e2eClerkUserId) {
+      throw new Error(
+        "E2E_CLERK_USER_ID が未設定です。CIでは resolve-e2e-clerk-user-id.mjs を先行実行し、" +
+          "ローカルでは .env.local に E2E_CLERK_USER_ID を入れてください。",
+      );
+    }
+
     // push前に deployment の環境変数を設定する。auth.config.ts が参照する
     // CLERK_JWT_ISSUER_DOMAIN が無い初回pushは失敗するが、`convex dev` は
     // env vars 型の失敗後に deployment env の変更を購読して自動再pushする。
-    const clerkIssuer = resolveClerkIssuer();
-    const secretValues = [
-      process.env.CLERK_SECRET_KEY,
-      process.env.E2E_CLERK_USER_PASSWORD,
-      process.env.E2E_CLERK_USER_ID,
-    ];
+    const clerkIssuer = resolveClerkIssuer(fallbackEnv);
+    const secretValues = [clerkSecretKey, process.env.E2E_CLERK_USER_PASSWORD, e2eClerkUserId];
     const cleanupSecret = await applyConvexEnv({
       env,
       secrets: secretValues,
       clerkIssuerDomain: clerkIssuer,
+      e2eClerkUserId,
+      clerkSecretKey,
     });
     maskForCI(cleanupSecret);
 
@@ -469,8 +496,19 @@ async function main() {
     }
     log(`backend 準備完了（${Math.round((Date.now() - startedAt) / 1000)}秒）`);
 
-    await waitForCleanupAuth({ siteUrl, secret: cleanupSecret, timeoutMs });
-    log("e2e/cleanup-auth-check 疎通 OK");
+    const authStatus = await waitForCleanupAuth({
+      siteUrl,
+      secret: cleanupSecret,
+      timeoutMs,
+      acceptAnyResponse: args.probe,
+    });
+    if (authStatus === 200) {
+      log("e2e/cleanup-auth-check 疎通 OK");
+    } else {
+      log(
+        `e2e/cleanup-auth-check は HTTP ${authStatus}（action疎通を確認。deployment env が不足している可能性）`,
+      );
+    }
 
     appendGithubEnv({
       VITE_CONVEX_URL: url,

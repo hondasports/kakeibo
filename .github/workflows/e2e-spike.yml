@@ -34,6 +34,13 @@ jobs:
           path: ~/.cache/convex
           key: convex-backend-${{ hashFiles('**/pnpm-lock.yaml') }}
 
+      - name: Resolve E2E Clerk user identifier
+        env:
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
+        run: node scripts/resolve-e2e-clerk-user-id.mjs
+
       - name: S1/S2/S3/S5/S7 - start anonymous backend and probe
         id: probe
         env:
@@ -43,13 +50,6 @@ jobs:
           START=$(date +%s)
           node scripts/start-ci-convex.mjs --probe --timeout 180
           echo "probe_seconds=$(( $(date +%s) - START ))" >> "$GITHUB_OUTPUT"
-
-      - name: Resolve E2E Clerk user identifier
-        env:
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
-        run: node scripts/resolve-e2e-clerk-user-id.mjs
 
       - name: Cache Playwright browsers
         id: playwright-cache

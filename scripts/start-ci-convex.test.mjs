@@ -9,6 +9,7 @@ import {
   buildChildEnv,
   generateCleanupSecret,
   parseArgs,
+  readBackedUpEnv,
   redact,
   restoreEnvLocal,
   waitForCleanupAuth,
@@ -223,6 +224,20 @@ describe("waitForFunctionsReady", () => {
   });
 });
 
+describe("readBackedUpEnv", () => {
+  it("returns parsed env from a backup file, null when absent", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "ci-convex-"));
+    try {
+      const backupPath = path.join(dir, ".env.local.e2e-isolated.bak");
+      expect(readBackedUpEnv({ backupPath })).toBeNull();
+      writeFileSync(backupPath, "E2E_CLERK_USER_ID=issuer|user_1\n");
+      expect(readBackedUpEnv({ backupPath })?.get("E2E_CLERK_USER_ID")).toBe("issuer|user_1");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("waitForCleanupAuth", () => {
   it("resolves once the endpoint returns 200", async () => {
     let calls = 0;
@@ -235,8 +250,24 @@ describe("waitForCleanupAuth", () => {
         intervalMs: 1,
         timeoutMs: 2000,
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(200);
     expect(calls).toBe(3);
+  });
+
+  it("acceptAnyResponse returns the first HTTP status (probe mode)", async () => {
+    let calls = 0;
+    const fetchImpl = async () => ({ status: ++calls === 1 ? 503 : 200 });
+    await expect(
+      waitForCleanupAuth({
+        siteUrl: "http://127.0.0.1:3211",
+        secret: "s",
+        fetchImpl,
+        intervalMs: 1,
+        timeoutMs: 2000,
+        acceptAnyResponse: true,
+      }),
+    ).resolves.toBe(503);
+    expect(calls).toBe(1);
   });
 
   it("times out with the last observed status on persistent failure", async () => {
