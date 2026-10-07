@@ -14,10 +14,14 @@
  * 仕組み:
  *   1. cloud向け環境変数を取り除いた子環境で `CONVEX_AGENT_MODE=anonymous` の
  *      `convex dev` を起動する（ログイン不要の使い捨てlocal deployment）。
- *   2. CLIが `.env.local` へ local URL を書き出すのを待ち、関数の反映完了
- *      （"Convex functions ready"）を待つ。既存の `.env.local` は起動前に
- *      `.env.local.e2e-isolated.bak` へ退避し、終了時に復元する。
+ *   2. CLIが `.env.local` へ local URL を書き出すのを待つ。既存の `.env.local`
+ *      は起動前に `.env.local.e2e-isolated.bak` へ退避し、終了時に復元する。
  *   3. `convex env set` で E2E 用の環境変数を deployment へ設定する。
+ *      `convex/auth.config.ts` が参照する CLERK_JWT_ISSUER_DOMAIN 等が無いと
+ *      初回pushは失敗するが、watchモードの `convex dev` は env vars 型の失敗後に
+ *      deployment の環境変数変更を購読して自動で再pushするため、先に env set
+ *      してから反映完了（"Convex functions ready"）を待つ。取りこぼし対策として
+ *      待機中は `convex/auth.config.ts` のmtimeを定期的に更新して再pushを促す。
  *   4. `POST /e2e/cleanup-auth-check` が 200 を返すまで待機して準備完了とする。
  *   5. --run の場合はコマンドを子プロセスで実行し、終了コードをそのまま返す。
  *      終了時（正常・異常・シグナル）は必ずbackendのプロセスグループを終了する。
@@ -35,6 +39,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  utimesSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,6 +57,9 @@ const ENV_FILE_TIMEOUT_MS = 60_000;
 const BACKEND_ENV_DENYLIST = [
   "CONVEX_DEPLOYMENT",
   "CONVEX_DEPLOY_KEY",
+  "CONVEX_DEPLOYMENT_TOKEN",
+  "CONVEX_SELF_HOSTED_URL",
+  "CONVEX_SELF_HOSTED_ADMIN_KEY",
   "VITE_CONVEX_URL",
   "VITE_CONVEX_SITE_URL",
 ];
@@ -247,34 +255,79 @@ function runConvexCli(args, env) {
   };
 }
 
-function setConvexEnv(env, name, value, secrets) {
-  const result = runConvexCli(["env", "set", name, value], env);
-  if (result.status !== 0) {
-    const detail = redact(`${result.stdout}\n${result.stderr}`, secrets).trim();
-    throw new Error(`convex env set ${name} に失敗しました。${detail ? ` (${detail})` : ""}`);
+async function setConvexEnv(env, name, value, secrets, { attempts = 5 } = {}) {
+  let lastDetail = "";
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const result = runConvexCli(["env", "set", name, value], env);
+    if (result.status === 0) return;
+    lastDetail = redact(`${result.stdout}\n${result.stderr}`, secrets).trim();
+    // `.convex/local/default` のcredential書き込みと `convex env` の解決が
+    // 微妙にずれる起動直後だけ再試行する（spawnSyncなので Atomics.wait で待つ）
+    if (attempt < attempts) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
   }
+  throw new Error(`convex env set ${name} に失敗しました。${lastDetail ? ` (${lastDetail})` : ""}`);
 }
 
-function applyConvexEnv({ env, secrets, clerkIssuerDomain }) {
-  setConvexEnv(env, "APP_ENV", "development", secrets);
-  setConvexEnv(env, "RECEIPT_IMAGE_EXTRACTOR_MODE", "mock", secrets);
+async function applyConvexEnv({ env, secrets, clerkIssuerDomain }) {
+  const secret = generateCleanupSecret();
+  const allSecrets = [...secrets, secret];
+  // auth.config.ts が参照する env が無いとpush自体が失敗するため最優先で設定する
   if (clerkIssuerDomain) {
-    setConvexEnv(env, "CLERK_JWT_ISSUER_DOMAIN", clerkIssuerDomain, secrets);
+    await setConvexEnv(env, "CLERK_JWT_ISSUER_DOMAIN", clerkIssuerDomain, allSecrets);
   }
+  await setConvexEnv(env, "APP_ENV", "development", allSecrets);
+  await setConvexEnv(env, "RECEIPT_IMAGE_EXTRACTOR_MODE", "mock", allSecrets);
   if (process.env.E2E_CLERK_USER_ID) {
-    setConvexEnv(env, "E2E_CLERK_USER_ID", process.env.E2E_CLERK_USER_ID, secrets);
+    await setConvexEnv(env, "E2E_CLERK_USER_ID", process.env.E2E_CLERK_USER_ID, allSecrets);
   }
   // 招待系actionが Clerk API を呼ぶ経路のため、利用可能なら同期する（throwaway backendのみ）
   if (process.env.CLERK_SECRET_KEY) {
-    setConvexEnv(env, "CLERK_SECRET_KEY", process.env.CLERK_SECRET_KEY, secrets);
+    await setConvexEnv(env, "CLERK_SECRET_KEY", process.env.CLERK_SECRET_KEY, allSecrets);
   }
-  const secret = generateCleanupSecret();
-  setConvexEnv(env, "E2E_CLEANUP_SECRET", secret, secrets);
+  await setConvexEnv(env, "E2E_CLEANUP_SECRET", secret, allSecrets);
   ensureLineIntegrationMode({
     runConvexEnv: (args) => runConvexCli(args, env),
     log,
   });
   return secret;
+}
+
+/**
+ * `convex dev` が env vars 型のpush失敗後に張る deployment env watch の購読開始と
+ * こちらの `convex env set` が前後した場合の取りこぼし対策。
+ * fileSystemWatch が拾うよう、観測対象の `convex/auth.config.ts` のmtimeを更新する。
+ */
+function startPushNudge({
+  intervalMs = 5000,
+  filePath = resolve(repoRoot, "convex/auth.config.ts"),
+} = {}) {
+  const timer = setInterval(() => {
+    try {
+      const now = new Date();
+      utimesSync(filePath, now, now);
+    } catch {
+      /* 監視対象が無ければ何もしない */
+    }
+  }, intervalMs);
+  timer.unref();
+  return () => clearInterval(timer);
+}
+
+export function buildChildEnv(base, { url, siteUrl, cleanupSecret }) {
+  const env = {
+    ...base,
+    // CIモードにして playwright の webServer が vite のみ（dev:frontend）を
+    // 起動するようにし、sync-e2e-env の .env.local 同期を止める。
+    CI: "true",
+    VITE_CONVEX_URL: url,
+    VITE_CONVEX_SITE_URL: siteUrl,
+    E2E_CLEANUP_SECRET: cleanupSecret,
+  };
+  // CIでは CLERK_PUBLISHABLE_KEY だけが来るので Vite 側が読む名前へ写す
+  if (!env.VITE_CLERK_PUBLISHABLE_KEY && env.CLERK_PUBLISHABLE_KEY) {
+    env.VITE_CLERK_PUBLISHABLE_KEY = env.CLERK_PUBLISHABLE_KEY;
+  }
+  return env;
 }
 
 function resolveClerkIssuer() {
@@ -391,21 +444,30 @@ async function main() {
   try {
     const startedAt = Date.now();
     const { url, siteUrl } = await waitForLocalEnvFile({ timeoutMs: ENV_FILE_TIMEOUT_MS });
-    await waitForFunctionsReady({ getLog, timeoutMs });
-    log(`backend 準備完了（${Math.round((Date.now() - startedAt) / 1000)}秒）`);
 
+    // push前に deployment の環境変数を設定する。auth.config.ts が参照する
+    // CLERK_JWT_ISSUER_DOMAIN が無い初回pushは失敗するが、`convex dev` は
+    // env vars 型の失敗後に deployment env の変更を購読して自動再pushする。
     const clerkIssuer = resolveClerkIssuer();
     const secretValues = [
       process.env.CLERK_SECRET_KEY,
       process.env.E2E_CLERK_USER_PASSWORD,
       process.env.E2E_CLERK_USER_ID,
     ];
-    const cleanupSecret = applyConvexEnv({
+    const cleanupSecret = await applyConvexEnv({
       env,
       secrets: secretValues,
       clerkIssuerDomain: clerkIssuer,
     });
     maskForCI(cleanupSecret);
+
+    const stopNudge = startPushNudge();
+    try {
+      await waitForFunctionsReady({ getLog, timeoutMs });
+    } finally {
+      stopNudge();
+    }
+    log(`backend 準備完了（${Math.round((Date.now() - startedAt) / 1000)}秒）`);
 
     await waitForCleanupAuth({ siteUrl, secret: cleanupSecret, timeoutMs });
     log("e2e/cleanup-auth-check 疎通 OK");
@@ -423,15 +485,7 @@ async function main() {
     }
 
     if (args.run) {
-      const childEnv = {
-        ...process.env,
-        // CIモードにして playwright の webServer が vite のみ（dev:frontend）を
-        // 起動するようにし、sync-e2e-env の .env.local 同期を止める。
-        CI: "true",
-        VITE_CONVEX_URL: url,
-        VITE_CONVEX_SITE_URL: siteUrl,
-        E2E_CLEANUP_SECRET: cleanupSecret,
-      };
+      const childEnv = buildChildEnv(process.env, { url, siteUrl, cleanupSecret });
       const code = await runChildCommand(args.run, args.extraArgs, childEnv);
       await cleanup();
       process.exitCode = code;

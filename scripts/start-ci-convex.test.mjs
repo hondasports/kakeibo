@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   backendEnv,
   backupEnvLocal,
+  buildChildEnv,
   generateCleanupSecret,
   parseArgs,
   redact,
@@ -58,16 +59,52 @@ describe("backendEnv", () => {
     const env = backendEnv({
       CONVEX_DEPLOYMENT: "prod:cloud-123",
       CONVEX_DEPLOY_KEY: "key",
+      CONVEX_DEPLOYMENT_TOKEN: "token",
+      CONVEX_SELF_HOSTED_URL: "https://self.example",
+      CONVEX_SELF_HOSTED_ADMIN_KEY: "admin",
       VITE_CONVEX_URL: "https://x.convex.cloud",
       VITE_CONVEX_SITE_URL: "https://x.convex.site",
       KEEP_ME: "1",
     });
     expect(env.CONVEX_DEPLOYMENT).toBeUndefined();
     expect(env.CONVEX_DEPLOY_KEY).toBeUndefined();
+    expect(env.CONVEX_DEPLOYMENT_TOKEN).toBeUndefined();
+    expect(env.CONVEX_SELF_HOSTED_URL).toBeUndefined();
+    expect(env.CONVEX_SELF_HOSTED_ADMIN_KEY).toBeUndefined();
     expect(env.VITE_CONVEX_URL).toBeUndefined();
     expect(env.VITE_CONVEX_SITE_URL).toBeUndefined();
     expect(env.CONVEX_AGENT_MODE).toBe("anonymous");
     expect(env.KEEP_ME).toBe("1");
+  });
+});
+
+describe("buildChildEnv", () => {
+  it("injects the isolated backend URLs and forces CI mode", () => {
+    const env = buildChildEnv(
+      { CLERK_PUBLISHABLE_KEY: "pk_test_x", KEEP_ME: "1" },
+      { url: "http://127.0.0.1:3210", siteUrl: "http://127.0.0.1:3211", cleanupSecret: "s" },
+    );
+    expect(env.CI).toBe("true");
+    expect(env.VITE_CONVEX_URL).toBe("http://127.0.0.1:3210");
+    expect(env.VITE_CONVEX_SITE_URL).toBe("http://127.0.0.1:3211");
+    expect(env.E2E_CLEANUP_SECRET).toBe("s");
+    expect(env.KEEP_ME).toBe("1");
+  });
+
+  it("maps CLERK_PUBLISHABLE_KEY to VITE_CLERK_PUBLISHABLE_KEY when missing", () => {
+    const env = buildChildEnv(
+      { CLERK_PUBLISHABLE_KEY: "pk_test_x" },
+      { url: "u", siteUrl: "s", cleanupSecret: "c" },
+    );
+    expect(env.VITE_CLERK_PUBLISHABLE_KEY).toBe("pk_test_x");
+  });
+
+  it("keeps an explicit VITE_CLERK_PUBLISHABLE_KEY", () => {
+    const env = buildChildEnv(
+      { CLERK_PUBLISHABLE_KEY: "pk_test_a", VITE_CLERK_PUBLISHABLE_KEY: "pk_test_b" },
+      { url: "u", siteUrl: "s", cleanupSecret: "c" },
+    );
+    expect(env.VITE_CLERK_PUBLISHABLE_KEY).toBe("pk_test_b");
   });
 });
 
