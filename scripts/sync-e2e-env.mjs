@@ -3,7 +3,7 @@
  * ローカル E2E 前の .env.local 同期 + Convex E2E 専用設定反映。
  *
  * 正本: docs/development-process.md「`.env.local` 同期」
- * CI では e2e.yml が同等の同期を行うため、CI=true のときは no-op。
+ * CI では start-ci-convex.mjs がジョブ内で backend と env を用意するため、CI=true のときは no-op。
  */
 
 import { copyFileSync, existsSync, readFileSync } from "node:fs";
@@ -20,7 +20,7 @@ function redactSensitiveText(text, sensitiveValues) {
   );
 }
 
-function parseEnvFile(content) {
+export function parseEnvFile(content) {
   const values = new Map();
   for (const line of content.split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -32,7 +32,7 @@ function parseEnvFile(content) {
   return values;
 }
 
-function deriveClerkJwtIssuerDomain(publishableKey) {
+export function deriveClerkJwtIssuerDomain(publishableKey) {
   const normalizedKey = publishableKey.trim().replace(/^(['"])(.*)\1$/, "$2");
   const match = normalizedKey.match(/^pk_(?:test|live)_(.+)$/);
   if (!match) {
@@ -203,7 +203,7 @@ async function verifyCleanupAuth(env) {
     throw new Error(
       "E2E cleanup 認証失敗 (401)。.env.local の E2E_CLEANUP_SECRET と Convex deployment が不一致です。" +
         " pnpm run e2e:env-sync を再実行するか、正本 preview worktree の .env.local を更新してください。" +
-        " エージェントが独自の secret で convex env set しないこと（GitHub DEV_E2E_CLEANUP_SECRET が正本）。",
+        " エージェントが独自の secret で convex env set しないこと（.env.local が正本）。",
     );
   }
   throw new Error(`E2E cleanup 検証失敗: ${res.status} ${text}`);
@@ -267,7 +267,7 @@ function syncConvexEnvironment(secret, userId, clerkJwtIssuerDomain) {
 
 async function main() {
   if (process.env.CI === "true" || process.env.CI === "1") {
-    console.log("[e2e:env-sync] CI 環境のためスキップ（e2e.yml が同期担当）");
+    console.log("[e2e:env-sync] CI 環境のためスキップ（start-ci-convex.mjs が同期担当）");
     return;
   }
 

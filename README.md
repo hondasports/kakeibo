@@ -89,6 +89,7 @@ pnpm run build
 pnpm run e2e:smoke -- --project=chromium
 pnpm run e2e -- --project=chromium
 pnpm run e2e:public -- --project=chromium
+pnpm run e2e:isolated -- e2e/<spec>.spec.ts
 pnpm run test:email-integration
 ```
 
