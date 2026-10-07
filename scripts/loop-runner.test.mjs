@@ -878,6 +878,8 @@ describe("persistent task gates", () => {
   });
   it("requires current tests, skill acknowledgement, and fresh independent review for T3", () => {
     const task = taskFixture();
+    // "HEAD" keeps the content-rule diff read resolvable in shallow checkouts.
+    task.baseRef = "HEAD";
     task.assessment = computeAssessment(task, ["convex/schema.ts"]);
     expect(() => resolveLoopStep({ task, event: "ready", root })).toThrow("skill");
     task.skills = task.assessment.requiredSkills;

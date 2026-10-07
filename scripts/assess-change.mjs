@@ -2,9 +2,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { classifyChangedFiles } from "./classify-e2e-relevance.mjs";
-import { machineRiskForPaths } from "./machine-risk.mjs";
+import { isContentTarget, machineRiskForChange, readChangedHunks } from "./machine-risk.mjs";
 import { assessReviewDepth, REVIEW_TIERS } from "./review-depth.mjs";
-import { readChangedPaths, suggestSkillsForPaths } from "./suggest-skills.mjs";
+import { readChangedPaths, resolvePrBase, suggestSkillsForChange } from "./suggest-skills.mjs";
 
 /** Return the ordering index for a review tier. */
 const tierIndex = (tier) => REVIEW_TIERS.indexOf(tier);
@@ -15,13 +15,15 @@ const highestTier = (...tiers) =>
 /** Assess changed paths and combine machine, predicted, and agent review floors. */
 export function assessChange({
   paths = [],
+  hunks = {},
+  diffFailed = false,
   predictedRisk = "T1",
   agentAssessment = null,
   reviewerAssessment = null,
 } = {}) {
   const classification = classifyChangedFiles(paths);
-  const machine = machineRiskForPaths(paths);
-  const skillResult = suggestSkillsForPaths(paths);
+  const machine = machineRiskForChange({ paths, hunks, diffFailed });
+  const skillResult = suggestSkillsForChange({ changedPaths: paths, hunks, diffFailed });
   const agent = agentAssessment ? assessReviewDepth(agentAssessment) : null;
   const reviewer = reviewerAssessment ? assessReviewDepth(reviewerAssessment) : null;
   const finalTier = highestTier(
@@ -46,6 +48,7 @@ export function assessChange({
       predicted: predictedRisk,
       machine: machine.minimumTier,
       machineFloorTriggers: machine.floorTriggers,
+      machineFloorTriggerDetails: machine.floorTriggerDetails,
       agent: agent?.applied_tier ?? null,
       reviewer: reviewer?.applied_tier ?? null,
       final: finalTier,
@@ -101,7 +104,25 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
   try {
     const args = parseArguments(process.argv.slice(2));
     const paths = args.paths ?? readChangedPaths({ base: args.base });
-    console.log(JSON.stringify(assessChange({ ...args, paths }), null, 2));
+    // Content rules need the diff; a read failure fails closed to T3 (AC5).
+    // With explicit --paths and no base there is no diff to read, and paths
+    // outside the content targets cannot hide dangerous symbols anyway.
+    let hunks = {};
+    let diffFailed = false;
+    if ((args.base || !args.paths) && paths.some(isContentTarget)) {
+      try {
+        const base = args.base ?? resolvePrBase();
+        hunks = readChangedHunks({ base, paths });
+      } catch {
+        diffFailed = true;
+      }
+    }
+    const result = assessChange({ ...args, paths, hunks, diffFailed });
+    if (args.paths && !args.base && paths.some(isContentTarget)) {
+      result.warning =
+        "--paths without --base skips the hunk read, so content rules were not evaluated; pass --base to include them";
+    }
+    console.log(JSON.stringify(result, null, 2));
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { validateDocument } from "./loop-schema.mjs";
 import { assessChange } from "./assess-change.mjs";
+import { isContentTarget, readChangedHunks } from "./machine-risk.mjs";
 import { REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
 import { PROFILE_ORDER, profileInputs, missingProfileInputs } from "./resolve-agent-profile.mjs";
 
@@ -205,8 +206,22 @@ export function missingRequirements(task) {
 }
 export function computeAssessment(task, paths, root = process.cwd()) {
   const reviewAssessment = currentEvidence(task.review, task) ? task.review.assessment : null;
+  // Content rules only inspect convex/src TypeScript; other paths cannot hide
+  // dangerous symbols, so their hunks are not needed. When a diff IS needed
+  // but unreadable, the floor fails closed (T3).
+  let hunks = {};
+  let diffFailed = false;
+  if (paths.some(isContentTarget)) {
+    try {
+      hunks = readChangedHunks({ base: task.baseRef ?? "origin/preview", cwd: root, paths });
+    } catch {
+      diffFailed = true;
+    }
+  }
   const result = assessChange({
     paths,
+    hunks,
+    diffFailed,
     predictedRisk: highestTier(task.spec.predictedRisk, task.risk),
     agentAssessment: task.agentAssessment,
     reviewerAssessment: reviewAssessment,

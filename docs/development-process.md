@@ -221,7 +221,7 @@ Spec GateはGoal、1件以上のAcceptance Criteria、Non-goals、Assumptions、
 
 評価CLIは引数省略時にPR baseまたは明示されたbaseからcommit済み・未commit・未追跡の差分を取得する。`--paths` は診断用途のみで、タスクとCIのゲートはGit実差分を再取得する。
 
-Machine Riskはschema/migration、認証・認可、削除/retention、Agent orchestration、外部write/webhook等を決定論的にT3 floorへ引き上げる。より高いRiskが必要とAgentまたはReviewerが判断した場合は上積みする。
+Machine Riskはschema/migration、認証・認可、削除/retention、Agent orchestration、外部write/webhook等を決定論的にT3 floorへ引き上げる。判定はパスルールに加えて差分の中身（変更hunk行の危険シンボル: `getUserIdentity`・`ctx.db.delete`・`defineTable`・`fetch(` 等）でも行い、ファイル名に依らず `convex/**`・`src/**` のコード変更を捕捉する（content ruleは `.test.`/`.spec.` ファイルでは発火しない）。hunkの読み取りはcontent rule対象のpathが含まれる変更だけで行い、その読み取りに失敗した場合はfail-closedでT3になる（`diff_read_failed`）。どちらで検知したかは `floorTriggerDetails` の `source`（`path`|`content`）で区別する。より高いRiskが必要とAgentまたはReviewerが判断した場合は上積みする。
 
 ### REVIEW
 

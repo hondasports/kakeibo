@@ -32,6 +32,9 @@ describe("GitHub delivery gates", () => {
   });
   it("recomputes floors from actual changed paths instead of trusting a PR snapshot", () => {
     const task = readyTask();
+    // Content-target paths make the assessment read the diff; "HEAD" keeps it
+    // resolvable in shallow checkouts where origin/preview is absent.
+    task.baseRef = "HEAD";
     const context = { head: task.head, baseHead: task.baseHead, paths: ["README.md"] };
     expect(validateCheckpoint(task, context).risk.final).toBe("T1");
     expect(() => validateCheckpoint(task, { ...context, paths: ["convex/schema.ts"] })).toThrow(
@@ -104,6 +107,7 @@ describe("GitHub delivery gates", () => {
   });
   it("requires full-scope unit evidence at the PR checkpoint", () => {
     const task = readyTask();
+    task.baseRef = "HEAD";
     const paths = ["src/app.ts"];
     const assessment = computeAssessment(task, paths);
     expect(assessment.verification.unit).toBe(true);
@@ -140,6 +144,7 @@ describe("GitHub delivery gates", () => {
     expect(() =>
       checkAftercare({ ...pr, reviewDecision: "REVIEW_REQUIRED" }, task, findings),
     ).toThrow("approval");
+    task.baseRef = "HEAD";
     task.assessment = computeAssessment(task, ["src/app.ts"]);
     expect(() => checkAftercare(pr, task, findings)).toThrow("Required check");
   });
@@ -393,6 +398,7 @@ describe("GitHub delivery gates", () => {
   });
   it("preserves a reviewer's higher risk and enforces independence", () => {
     const task = readyTask();
+    task.baseRef = "HEAD";
     task.review.assessment.applied_tier = "T3";
     expect(computeAssessment(task, ["README.md"]).risk.final).toBe("T3");
     task.risk = "T3";

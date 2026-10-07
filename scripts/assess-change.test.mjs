@@ -33,6 +33,35 @@ describe("assessChange", () => {
     expect(result.review.independent).toBe(true);
   });
 
+  it("routes hunks into the machine floor and marks their source", () => {
+    const result = assessChange({
+      paths: ["convex/categories/mutations.ts"],
+      hunks: {
+        "convex/categories/mutations.ts": ["const u = await ctx.auth.getUserIdentity();"],
+      },
+      predictedRisk: "T1",
+    });
+    expect(result.risk.machine).toBe("T3");
+    expect(result.risk.final).toBe("T3");
+    expect(result.risk.machineFloorTriggers).toContain("authentication_or_authorization");
+    expect(result.risk.machineFloorTriggerDetails).toContainEqual({
+      trigger: "authentication_or_authorization",
+      source: "content",
+      path: "convex/categories/mutations.ts",
+    });
+    expect(result.requiredSkills).toContain("security-review");
+  });
+
+  it("fails closed to T3 when the diff could not be read", () => {
+    const result = assessChange({
+      paths: ["src/features/foo/Foo.tsx"],
+      diffFailed: true,
+      predictedRisk: "T1",
+    });
+    expect(result.risk.machine).toBe("T3");
+    expect(result.risk.machineFloorTriggers).toContain("diff_read_failed");
+  });
+
   it("rejects missing CLI option values", () => {
     for (const option of ["--paths", "--predicted-risk", "--agent-assessment"]) {
       expect(() => parseArguments([option])).toThrow(`${option} requires a value`);
