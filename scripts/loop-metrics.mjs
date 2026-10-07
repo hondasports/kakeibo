@@ -186,19 +186,6 @@ export function run(args, cwd = process.cwd()) {
   };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    const result = run(parseArguments(process.argv.slice(2)));
-    // summary-json keeps stdout as a single JSONL record so it can be piped
-    // straight into collect-harness-metrics consumers.
-    if (result?.summary) console.log(JSON.stringify(result.summary));
-    else console.log(JSON.stringify(result, null, 2));
-  } catch (error) {
-    console.error(error.message);
-    process.exitCode = 1;
-  }
-}
-
 /** Stable schema id for per-task metric summaries shared via PR comments / JSONL. */
 export const SUMMARY_SCHEMA = "agent-metrics-summary/v1";
 /** HTML marker prefix identifying the one PR comment that carries a task's summary. */
@@ -375,5 +362,19 @@ export function extractMetricsSummary(body) {
     return parsed?.schema === SUMMARY_SCHEMA ? parsed : null;
   } catch {
     return null;
+  }
+}
+
+// CLI entry stays last: consts above must be initialized before run() executes.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    const result = run(parseArguments(process.argv.slice(2)));
+    // summary-json keeps stdout as a single JSONL record so it can be piped
+    // straight into collect-harness-metrics consumers.
+    if (result?.summary) console.log(JSON.stringify(result.summary));
+    else console.log(JSON.stringify(result, null, 2));
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
   }
 }
