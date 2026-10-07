@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
-import { METRICS_MARKER_PREFIX, extractMetricsSummary } from "./loop-metrics.mjs";
+import { METRICS_MARKER_PREFIX, SUMMARY_SCHEMA, extractMetricsSummary } from "./loop-metrics.mjs";
 import { repositorySlugFromRemoteUrl } from "./loop-runner.mjs";
 
 /**
@@ -183,7 +183,15 @@ export function recordsFromJsonl(text) {
     if (!line.trim()) continue;
     try {
       const parsed = JSON.parse(line);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) records.push(parsed);
+      // Same schema gate as extractMetricsSummary — non-summary JSONL must
+      // not leak into the aggregate (review f-5).
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        parsed.schema === SUMMARY_SCHEMA
+      )
+        records.push(parsed);
       else skipped += 1;
     } catch {
       skipped += 1;
@@ -213,7 +221,11 @@ export function run(args, cwd = process.cwd(), services = {}) {
   if (args.state !== undefined && !["merged", "all"].includes(args.state))
     throw new Error("--state must be merged|all");
   const prs = args.pr
-    ? args.pr.split(",").map((value) => Number(value))
+    ? args.pr.split(",").map((value) => {
+        const pr = Number(value);
+        if (!Number.isInteger(pr) || pr <= 0) throw new Error(`invalid --pr: ${value}`);
+        return pr;
+      })
     : listPullRequests(
         slug,
         { since: args.since ?? null, state: args.state ?? "merged" },

@@ -220,7 +220,7 @@ export function summarizeTask(entries, taskId, context = {}) {
   const transitionCount = (event) => transitions.filter((entry) => entry.event === event).length;
   const verifyDurationMs = { lint: 0, unit: 0, build: 0, process: 0 };
   for (const entry of filtered) {
-    if (entry?.action === "verify" && entry.kind in verifyDurationMs)
+    if (entry?.action === "verify" && Object.hasOwn(verifyDurationMs, entry.kind))
       verifyDurationMs[entry.kind] += number(entry.durationMs);
   }
   const summary = {
@@ -265,12 +265,17 @@ export function harnessVersion(root = process.cwd()) {
   } catch {
     version = null;
   }
-  const blobSha = execFileSync("git", ["hash-object", "scripts/loop-runner.mjs"], {
-    cwd: root,
-    encoding: "utf8",
-  })
-    .trim()
-    .slice(0, 12);
+  let blobSha = "unknown";
+  try {
+    blobSha = execFileSync("git", ["hash-object", "scripts/loop-runner.mjs"], {
+      cwd: root,
+      encoding: "utf8",
+    })
+      .trim()
+      .slice(0, 12);
+  } catch {
+    // Non-git or reduced checkouts still emit a summary (review f-3).
+  }
   return `${version ?? "unknown"}+${blobSha}`;
 }
 

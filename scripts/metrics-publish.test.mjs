@@ -337,9 +337,13 @@ describe("collect-harness-metrics", () => {
     expect(table).toContain("| 1+abcdef012345 | T3 | 2 |");
   });
 
-  it("recordsFromJsonl tolerates malformed lines", () => {
-    const { records, skipped } = recordsFromJsonl(`{"a":1}\nnot json\n\n[{"x":1}]\n`);
-    expect(records).toEqual([{ a: 1 }]);
-    expect(skipped).toBe(2);
+  it("recordsFromJsonl tolerates malformed lines and non-summary objects", () => {
+    const summary = summarizeTask(fixtureEntries, "t1", { harnessVersion: "1+x" });
+    const { records, skipped } = recordsFromJsonl(
+      `${JSON.stringify(summary)}\nnot json\n\n{"a":1}\n[{"x":1}]\n`,
+    );
+    expect(records).toEqual([summary]);
+    // broken JSON + non-summary object + array are all skipped (review f-5).
+    expect(skipped).toBe(3);
   });
 });

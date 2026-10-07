@@ -1257,9 +1257,14 @@ export function publishTaskMetrics(task, pr, root = process.cwd(), services = {}
       run(["api", `repos/${slug}/issues/${pr}/comments?per_page=100&page=${page}`], root),
     );
     if (!Array.isArray(batch) || batch.length === 0) break;
-    existing =
-      batch.find((comment) => typeof comment?.body === "string" && comment.body.includes(marker)) ??
-      existing;
+    // Whole-line marker match: a quoted or embedded marker (e.g. someone
+    // quoting the comment) must not be picked as the publish target.
+    const marked = batch.filter(
+      (comment) =>
+        typeof comment?.body === "string" &&
+        comment.body.split("\n").some((line) => line.trim() === marker),
+    );
+    existing = marked.find((comment) => comment?.user?.type === "Bot") ?? marked[0] ?? existing;
     if (existing || batch.length < 100) break;
   }
   const result = existing
