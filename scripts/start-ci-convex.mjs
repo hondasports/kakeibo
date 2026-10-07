@@ -251,11 +251,14 @@ function runConvexCli(args, env) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     env,
+    // CLIがhangしてもGHAのstep timeoutで原因が隠れないよう早期に切る
+    timeout: 60_000,
+    killSignal: "SIGKILL",
   });
   return {
     status: result.status ?? 1,
     stdout: result.stdout?.toString() ?? "",
-    stderr: result.stderr?.toString() ?? "",
+    stderr: `${result.error ? `${result.error.message}\n` : ""}${result.stderr?.toString() ?? ""}`,
   };
 }
 
@@ -317,16 +320,34 @@ function startPushNudge({
   return () => clearInterval(timer);
 }
 
-export function buildChildEnv(base, { url, siteUrl, cleanupSecret }) {
-  const env = {
-    ...base,
+// 子プロセスへ引き継いではいけない .env.local の値。
+// deployment selectorと今回生成し直す値だけを落とし、
+// VITE_CLERK_PUBLISHABLE_KEY や E2E_CLERK_USER_* 等は .env.local から補う。
+const CHILD_ENV_DENYLIST = new Set([
+  ...BACKEND_ENV_DENYLIST,
+  "CONVEX_AGENT_MODE",
+  "VITE_CONVEX_URL",
+  "VITE_CONVEX_SITE_URL",
+  "E2E_CLEANUP_SECRET",
+]);
+
+export function buildChildEnv(base, { url, siteUrl, cleanupSecret, fallbackEnv } = {}) {
+  const env = { ...base };
+  // ローカル実行用: 正本が .env.local のみの環境でも backend生成物以外の
+  // Clerk/E2E系変数を子へ届ける（実際の環境変数を .env.local で上書きはしない）
+  if (fallbackEnv instanceof Map) {
+    for (const [name, value] of fallbackEnv) {
+      if (env[name] === undefined && !CHILD_ENV_DENYLIST.has(name)) env[name] = value;
+    }
+  }
+  Object.assign(env, {
     // CIモードにして playwright の webServer が vite のみ（dev:frontend）を
     // 起動するようにし、sync-e2e-env の .env.local 同期を止める。
     CI: "true",
     VITE_CONVEX_URL: url,
     VITE_CONVEX_SITE_URL: siteUrl,
     E2E_CLEANUP_SECRET: cleanupSecret,
-  };
+  });
   // `node scripts/start-ci-convex.mjs` を直接呼ぶCI環境でも
   // `playwright` 等の .bin コマンドが解決できるようにする
   const binDir = resolve(repoRoot, "node_modules", ".bin");
@@ -532,7 +553,12 @@ async function main() {
     }
 
     if (args.run) {
-      const childEnv = buildChildEnv(process.env, { url, siteUrl, cleanupSecret });
+      const childEnv = buildChildEnv(process.env, {
+        url,
+        siteUrl,
+        cleanupSecret,
+        fallbackEnv,
+      });
       const code = await runChildCommand(args.run, args.extraArgs, childEnv);
       await cleanup();
       process.exitCode = code;

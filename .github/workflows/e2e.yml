@@ -95,10 +95,12 @@ jobs:
       matrix:
         include:
           - name: public
-            e2e_command: pnpm run e2e:public -- --project=chromium --workers=3
+            # `--` 以降の引数は playwright に位置引数フィルタとして飲まれるため
+            # フラグは script 名の直後に付ける
+            e2e_command: pnpm run e2e:public --project=chromium --workers=3
             timeout: 10
           - name: authenticated
-            e2e_command: pnpm run e2e:smoke -- --project=chromium --grep-invert @public --workers=1
+            e2e_command: pnpm run e2e:smoke --project=chromium --grep-invert @public --workers=1
             timeout: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

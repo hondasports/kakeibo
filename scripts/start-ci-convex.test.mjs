@@ -122,6 +122,39 @@ describe("buildChildEnv", () => {
     );
     expect(env.VITE_CLERK_PUBLISHABLE_KEY).toBe("pk_test_b");
   });
+
+  it("merges fallback .env.local values without overriding real env or backend values", () => {
+    const fallbackEnv = new Map([
+      ["VITE_CLERK_PUBLISHABLE_KEY", "pk_test_from_env_local"],
+      ["E2E_CLERK_USER_ID", "issuer|user_1"],
+      ["E2E_CLERK_USER_EMAIL", "e2e@example.com"],
+      ["VITE_CONVEX_URL", "https://stale-cloud.convex.cloud"],
+      ["CONVEX_DEPLOYMENT", "prod:stale"],
+      ["CONVEX_DEPLOY_KEY", "stale-deploy-key"],
+      ["E2E_CLEANUP_SECRET", "stale-secret"],
+      ["KEEP_FROM_ENV", "env_wins"],
+    ]);
+    const env = buildChildEnv(
+      { KEEP_FROM_ENV: "real_env" },
+      {
+        url: "http://127.0.0.1:3210",
+        siteUrl: "http://127.0.0.1:3211",
+        cleanupSecret: "fresh-secret",
+        fallbackEnv,
+      },
+    );
+    // 欠けている変数は .env.local から補う
+    expect(env.VITE_CLERK_PUBLISHABLE_KEY).toBe("pk_test_from_env_local");
+    expect(env.E2E_CLERK_USER_ID).toBe("issuer|user_1");
+    expect(env.E2E_CLERK_USER_EMAIL).toBe("e2e@example.com");
+    // 実環境変数が優先
+    expect(env.KEEP_FROM_ENV).toBe("real_env");
+    // backend 生成物は今回生成した値だけを引き継ぐ
+    expect(env.VITE_CONVEX_URL).toBe("http://127.0.0.1:3210");
+    expect(env.E2E_CLEANUP_SECRET).toBe("fresh-secret");
+    expect(env.CONVEX_DEPLOYMENT).toBeUndefined();
+    expect(env.CONVEX_DEPLOY_KEY).toBeUndefined();
+  });
 });
 
 describe("generateCleanupSecret", () => {

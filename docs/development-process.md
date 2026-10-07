@@ -301,6 +301,8 @@ WindowsでConvex CLIが設定成功後の終了処理だけassertする既知パ
 
 CIと同じ「匿名使い捨てbackend」構成でE2Eを実行したい場合は `pnpm run e2e:isolated -- e2e/<spec>.spec.ts` を使う。`CONVEX_AGENT_MODE=anonymous` のlocal deploymentが起動し、現在のworktreeの `convex/**` がpushされてからspecが走る。終了時にbackendと `.env.local` は元の状態へ戻る。CIでこけたspecのローカル再現にも使える。
 
+注意: CIではジョブごとにVM自体が使い捨てだが、ローカルではanonymous deploymentの状態が `.convex/local/default/` に持続するため、以前の実行のDBデータやcredentialが残る場合がある。seed/cleanup系のspecは前回実行の残骸に影響されうることを前提に動く（CIより緩い）。真にクリーンな状態で試したい場合は `.convex/local/default/` を削除してから実行する。
+
 E2E終了後はターミナル1のwatcherを `Ctrl+C` で停止する。
 
 ### E2E seed
