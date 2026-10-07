@@ -14,7 +14,7 @@ name: E2E
 #
 # E2Eは PRの Convex関数を反映した PR/ジョブ専用の匿名使い捨て backend
 # （CONVEX_AGENT_MODE=anonymous の local deployment）に対して実行する。
-# 共有Dev deployment・DEV_* secrets には接続しない（Issue #956）。
+# 共有Dev deployment・共有Dev用のsecretsには接続しない（Issue #956）。
 # backend の起動・env同期・終了は scripts/start-ci-convex.mjs が担う。
 #
 # 詳細: docs/development-process.md「E2E 確認方針」
