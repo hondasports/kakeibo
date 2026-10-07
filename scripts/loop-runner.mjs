@@ -1807,7 +1807,11 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args["hook-state"]) {
     // Read-only probe for runtime hooks (#945): never refreshes or saves the
     // task, and reports an uninitialized task as state:null instead of
-    // failing so the caller can decide whether editing is allowed.
+    // failing so the caller can decide whether editing is allowed. Because
+    // it skips refreshTask, it reports the persisted state even when a HEAD
+    // move would have invalidated it; that is the required trade-off of the
+    // read-only contract (a refresh would mutate the task), and the next
+    // normal loop-runner invocation still refreshes as usual.
     const target = taskPath(root);
     if (!existsSync(target)) return { state: null, next: [] };
     const probe = JSON.parse(readFileSync(target, "utf8"));
