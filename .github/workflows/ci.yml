@@ -42,6 +42,7 @@ jobs:
             HEAD="${{ github.sha }}"
           fi
           node scripts/ci-change-scope.mjs --base "$BASE" --head "$HEAD" --github-output "$GITHUB_OUTPUT"
+          exit 1 # TEMP: 検証用（scope強制失敗）
 
       - name: Classify change scope (workflow_dispatch)
         id: scope_dispatch
