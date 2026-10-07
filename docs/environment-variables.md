@@ -285,11 +285,11 @@ PROD 反映では、`main` への push で `production-release.yml` が自動起
 - `CLERK_SECRET_KEY` — Clerk Dev instance の秘密鍵
 - `E2E_CLERK_USER_EMAIL` — E2E テストユーザーのメールアドレス
 - `E2E_CLERK_USER_PASSWORD` — レガシー。現行 E2E は Testing Token 方式のため未使用
-- `VITE_CONVEX_URL` — PR CI内Viteが接続するDev deploymentのConvex WebSocket URL
-- `DEV_VITE_CONVEX_SITE_URL` — PR Preview が接続する Dev deployment の Convex HTTP URL
-- `DEV_E2E_CLEANUP_SECRET` — Dev deployment の E2E クリーンアップ API 認証シークレット
-- `DEV_CONVEX_DEPLOY_KEY` — Dev deployment の deploy key（PR E2E 前に `E2E_CLEANUP_SECRET` を Convex へ同期）
-- `E2E_CLEANUP_SECRET` — 固定 staging deployment の E2E クリーンアップ API 認証シークレット
+- `VITE_CONVEX_URL` — 廃止（削除可）。PR E2E は共有Devではなくジョブ専用の匿名使い捨てlocal deploymentで実行するため不要になった（#956）
+- `DEV_VITE_CONVEX_SITE_URL` — 廃止（削除可）。同上
+- `DEV_E2E_CLEANUP_SECRET` — 廃止（削除可）。使い捨てbackendではジョブ内でランダム生成する
+- `DEV_CONVEX_DEPLOY_KEY` — 廃止（削除可）。CIは共有Dev deploymentへ接続しない
+- `E2E_CLEANUP_SECRET` — 固定 staging deployment の E2E クリーンアップ API 認証シークレット（`preview-deploy.yml` / `production-release.yml` 用。引き続き必要）
 - `E2E_CLERK_USER_ID` — CIでは設定不要。各workflowが`E2E_CLERK_USER_EMAIL`からジョブ内で生成する
 - `PRODUCT_UPDATE_OPENAI_API_KEY` — 廃止予定。Product Update 生成はPR本文の原稿を使う方式に切り替わり、workflowからの参照は除去済み
 
