@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { bypassClerkBotDetection } from "./helpers/auth";
 
 /**
  * 公開・異常系ページ E2E（Milestone 23 / #249-#255, #266, #268）
@@ -83,9 +84,13 @@ test.describe("公開・異常系ページ", () => {
   });
 
   test("未ログインのログイン画面から法務ページへリンクできる (#249/#250)", async ({ page }) => {
+    await bypassClerkBotDetection(page);
     await page.goto("/");
 
-    await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeVisible();
+    // デプロイ環境ではClerk初期化に10秒を超えることがあるため余裕を持たせる
+    await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(page.getByRole("link", { name: "プライバシーポリシー" })).toHaveAttribute(
       "href",
       "/privacy",
