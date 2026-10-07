@@ -2,18 +2,18 @@
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
+      "args": ["-y", "chrome-devtools-mcp@1.10.1"]
     },
     "vercel": {
       "url": "https://mcp.vercel.com"
     },
     "convex": {
       "command": "npx",
-      "args": ["-y", "convex@latest", "mcp", "start"]
+      "args": ["-y", "convex@1.44.0", "mcp", "start"]
     },
     "playwright": {
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--cdp-endpoint=chrome"]
+      "args": ["-y", "@playwright/mcp@0.0.83", "--cdp-endpoint=chrome"]
     },
     "indexion": {
       "command": "indexion",
