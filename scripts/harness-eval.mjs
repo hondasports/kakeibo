@@ -236,12 +236,19 @@ export function prepare(id, { dir, harness = "HEAD", specOut, record } = {}) {
   let overlayHead;
   let overlayResult;
   try {
-    execFileSync(
-      "git",
-      ["clone", "--depth", "1", "--no-tags", "--branch", tmpBase, `file://${repoRoot}`, srcDir],
-      { encoding: "utf8" },
-    );
-    git(srcDir, ["worktree", "add", absDir, "-b", branch], { record });
+    try {
+      execFileSync(
+        "git",
+        ["clone", "--depth", "1", "--no-tags", "--branch", tmpBase, `file://${repoRoot}`, srcDir],
+        { encoding: "utf8" },
+      );
+      git(srcDir, ["worktree", "add", absDir, "-b", branch], { record });
+    } catch (error) {
+      // clone/worktree-add自体の失敗でも残骸を残さない
+      rmSync(absDir, { recursive: true, force: true });
+      rmSync(srcDir, { recursive: true, force: true });
+      throw error;
+    }
     try {
       git(absDir, ["remote", "remove", "origin"], { record });
       overlayResult = overlayHarness(repoRoot, absDir, harness, { record });
