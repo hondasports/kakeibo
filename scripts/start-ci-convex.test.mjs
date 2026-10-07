@@ -92,6 +92,21 @@ describe("buildChildEnv", () => {
     expect(env.KEEP_ME).toBe("1");
   });
 
+  it("prepends node_modules/.bin to PATH", () => {
+    const env = buildChildEnv({ PATH: "/usr/bin" }, { url: "u", siteUrl: "s", cleanupSecret: "c" });
+    expect(env.PATH.startsWith(path.join(process.cwd(), "node_modules", ".bin"))).toBe(true);
+    expect(env.PATH).toContain("/usr/bin");
+  });
+
+  it("does not duplicate .bin in PATH", () => {
+    const binDir = path.join(process.cwd(), "node_modules", ".bin");
+    const env = buildChildEnv(
+      { PATH: `${binDir}:/usr/bin` },
+      { url: "u", siteUrl: "s", cleanupSecret: "c" },
+    );
+    expect(env.PATH.split(":").filter((p) => p === binDir)).toHaveLength(1);
+  });
+
   it("maps CLERK_PUBLISHABLE_KEY to VITE_CLERK_PUBLISHABLE_KEY when missing", () => {
     const env = buildChildEnv(
       { CLERK_PUBLISHABLE_KEY: "pk_test_x" },

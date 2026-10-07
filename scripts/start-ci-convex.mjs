@@ -327,6 +327,15 @@ export function buildChildEnv(base, { url, siteUrl, cleanupSecret }) {
     VITE_CONVEX_SITE_URL: siteUrl,
     E2E_CLEANUP_SECRET: cleanupSecret,
   };
+  // `node scripts/start-ci-convex.mjs` を直接呼ぶCI環境でも
+  // `playwright` 等の .bin コマンドが解決できるようにする
+  const binDir = resolve(repoRoot, "node_modules", ".bin");
+  const delimiter = process.platform === "win32" ? ";" : ":";
+  if (env.PATH && !env.PATH.split(delimiter).includes(binDir)) {
+    env.PATH = `${binDir}${delimiter}${env.PATH}`;
+  } else if (!env.PATH) {
+    env.PATH = binDir;
+  }
   // CIでは CLERK_PUBLISHABLE_KEY だけが来るので Vite 側が読む名前へ写す
   if (!env.VITE_CLERK_PUBLISHABLE_KEY && env.CLERK_PUBLISHABLE_KEY) {
     env.VITE_CLERK_PUBLISHABLE_KEY = env.CLERK_PUBLISHABLE_KEY;
