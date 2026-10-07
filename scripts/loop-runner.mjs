@@ -46,6 +46,13 @@ import {
   unitFullCommand,
   CHECK_COMMANDS,
 } from "./loop-policy.mjs";
+import {
+  metricsCommentMarker,
+  readMetricsEntries,
+  renderMetricsComment,
+  summarizeTask as summarizeTaskMetrics,
+  taskSummaryContext,
+} from "./loop-metrics.mjs";
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
 // Full promotion patches can exceed Node's default 1 MiB subprocess buffer.
@@ -1225,6 +1232,64 @@ export function githubAftercare(task, pr, handled, root, services = {}) {
   recordMetric(task, root, { action: "aftercare", pr: evidence.pr, ready: evidence.ready });
   return task;
 }
+/**
+ * Publish the task's metrics summary to the PR's single marked comment
+ * (`<!-- agent-metrics:v1 task=... -->`): update in place when present,
+ * create otherwise. State file is never touched — same non-mutating class
+ * as --check-pr (the cli_output metric append is observability, not state).
+ */
+export function publishTaskMetrics(task, pr, root = process.cwd(), services = {}) {
+  requireValue(
+    ["aftercare", "done"].includes(task.state),
+    "Metrics publish runs in aftercare or done",
+  );
+  const file = metricsPath(root);
+  const entries = file && existsSync(file) ? readMetricsEntries(file).entries : [];
+  const summary = summarizeTaskMetrics(entries, task.taskId, taskSummaryContext(task, root));
+  const body = renderMetricsComment(summary);
+  const slug = resolveRepositorySlug(root, services);
+  requireValue(slug, "Repository slug not resolved");
+  const run = services.gh ?? gh;
+  const marker = metricsCommentMarker(task.taskId);
+  let existing = null;
+  for (let page = 1; ; page += 1) {
+    const batch = JSON.parse(
+      run(["api", `repos/${slug}/issues/${pr}/comments?per_page=100&page=${page}`], root),
+    );
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    // Whole-line marker match: a quoted or embedded marker (e.g. someone
+    // quoting the comment) must not be picked as the publish target.
+    const marked = batch.filter(
+      (comment) =>
+        typeof comment?.body === "string" &&
+        comment.body.split("\n").some((line) => line.trim() === marker),
+    );
+    existing = marked.find((comment) => comment?.user?.type === "Bot") ?? marked[0] ?? existing;
+    if (existing || batch.length < 100) break;
+  }
+  const result = existing
+    ? JSON.parse(
+        run(
+          [
+            "api",
+            `repos/${slug}/issues/comments/${existing.id}`,
+            "-X",
+            "PATCH",
+            "-f",
+            `body=${body}`,
+          ],
+          root,
+        ),
+      )
+    : JSON.parse(run(["api", `repos/${slug}/issues/${pr}/comments`, "-f", `body=${body}`], root));
+  return {
+    taskId: task.taskId,
+    state: task.state,
+    published: existing ? "updated" : "created",
+    commentUrl: result?.html_url ?? null,
+    pr: Number(pr),
+  };
+}
 /** Live delivery observation: remote reads only, no task or PR writes. */
 export function inspectPullRequest(task, pr, handled, root, services = {}) {
   task = currentCheckpointTask(task, root);
@@ -1574,6 +1639,7 @@ export function parseArguments(args) {
     "--record-usage",
     "--usage-role",
     "--external-findings",
+    "--publish-metrics",
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -1624,6 +1690,7 @@ const CLI_ACTION_KEYS = [
   "assert-started",
   "friction-note",
   "record-usage",
+  "publish-metrics",
 ];
 /**
  * Name reported in `cli_output` metrics. Watch runs are tagged separately so
@@ -1731,6 +1798,10 @@ export function run(args, root = process.cwd(), services = {}) {
       services,
     );
     return { taskId: task.taskId, state: task.state, ...snapshot, checkedAt: evidence.checkedAt };
+  }
+  if (args["publish-metrics"]) {
+    const task = loadTask(root);
+    return publishTaskMetrics(task, args["publish-metrics"], root, services);
   }
   let task = refreshTask(loadTask(root), root);
   saveTask(task, root); // Persist invalidation even if the requested action fails.
