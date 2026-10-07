@@ -1,0 +1,114 @@
+{
+  "$schema": "golden-set/v1",
+  "tasks": [
+    {
+      "id": "g1-docs",
+      "kind": "docs-only",
+      "baseCommit": "b401fa62942e5306ca8c0f61ae247cf4cf85a210",
+      "referenceCommit": "8584c00c8b8b4ef9400fadf8495384d1c215ab28",
+      "humanRequest": "レシート税の税込・税抜基準換算（区分が異なっても印字税額による換算で完全一致照合するルール）と、保存時の税設定保持・復元ルールをdocsに記載する",
+      "acceptanceCriteria": [
+        "税込・税抜の基準換算ルール（印字税額による換算・完全一致照合・重複排除）が docs/technical-design.md に記載されている",
+        "保存時の全体設定の記録・復元ルール（receiptUserOverride の軸記録）が記載されている",
+        "docs lint（check-loop-docs）に合格する"
+      ],
+      "oracle": {
+        "type": "docs",
+        "checkLoopDocs": true,
+        "requiredContent": [
+          {
+            "file": "docs/technical-design.md",
+            "contains": "税込・税抜の基準換算は `taxAmountBasis.ts` に集約する"
+          },
+          {
+            "file": "docs/technical-design.md",
+            "contains": "Issue #890の回帰例"
+          },
+          {
+            "file": "docs/requirements.md",
+            "contains": "印字税額による換算後の金額が完全一致する場合は照合・税額配分を行う"
+          }
+        ]
+      },
+      "expectedMinTier": "T1"
+    },
+    {
+      "id": "g2-ui-fix",
+      "kind": "ui-fix",
+      "baseCommit": "e71882f597ad422a3659abbfd399b9a87041547c",
+      "referenceCommit": "6889bde2b334fafaf49128a7a717a3a93900e406",
+      "humanRequest": "下書きレビューで、解決済み（確定した）税内訳を確認表示へ反映する。確認カードの金額確認・税率別集計は確定済み区分と印字税額の換算で完全一致する場合のみ一致とし、換算後1円差・区分不明・矛盾する内訳は理由を表示して確認を促す",
+      "acceptanceCriteria": [
+        "解決済み税内訳が確認表示（ReviewDialogの確認カード）に反映される",
+        "換算後の1円差や区分不明は一致とせず理由を表示する",
+        "税内訳プレビューとガイダンス表示が仕様どおり動く"
+      ],
+      "oracle": {
+        "type": "tests",
+        "tests": [
+          "src/features/receipt-review/utils/reviewItemsTaxPreview.test.ts",
+          "src/features/receipt-review/utils/reviewGuidance.test.ts",
+          "src/features/receipt-review/hooks/useReviewDialog.test.tsx",
+          "src/features/receipt-review/components/ReviewDialog.test.tsx"
+        ]
+      },
+      "expectedMinTier": "T2"
+    },
+    {
+      "id": "g3-ui-feat",
+      "kind": "ui-feature",
+      "baseCommit": "c62890b13d29751870ef90fc1f81de51b8b943ed",
+      "referenceCommit": "edb3d875ce1eb7c283aef4d98e9eb5baba263391",
+      "humanRequest": "下書き確認で一致した金額確認・税率別集計の確認カードを非表示にする。一致した項目は表示せず、要確認の項目だけを残す",
+      "acceptanceCriteria": [
+        "金額確認・税率別集計カードは一致した場合に表示しない",
+        "要確認の項目は従来どおり理由つきで表示する"
+      ],
+      "oracle": {
+        "type": "tests",
+        "tests": [
+          "src/features/receipt-review/components/ReviewCheckCards.test.tsx",
+          "src/features/receipt-review/components/ReviewDialog.test.tsx",
+          "src/features/ai-expense-queue/components/AiExpenseQueuePanel.reviewItems.test.tsx"
+        ]
+      },
+      "expectedMinTier": "T2"
+    },
+    {
+      "id": "g4-data",
+      "kind": "data-deletion",
+      "baseCommit": "39134d2de517ba561b41827f659a1faf285ba35f",
+      "referenceCommit": "c62890b13d29751870ef90fc1f81de51b8b943ed",
+      "humanRequest": "E2E残滓データを掃除するdev限定のorphan purgeを実装する。APP_ENV=developmentのときだけ有効なHTTP endpoint経由で、孤立したE2E生成データを削除し、PROD/previewでは実行しない",
+      "acceptanceCriteria": [
+        "orphan purge endpointがAPP_ENV=developmentのみで動作する",
+        "シークレット認証なしの呼び出しは拒否される",
+        "孤立E2Eデータが削除対象として正しく選別・削除される"
+      ],
+      "oracle": {
+        "type": "tests",
+        "tests": ["convex/e2ePurge.test.ts", "convex/http.test.ts"]
+      },
+      "expectedMinTier": "T3"
+    },
+    {
+      "id": "g5-external",
+      "kind": "external-async",
+      "baseCommit": "8577c5c1bae444bb8e3fc560ff733052d7160ee0",
+      "referenceCommit": "c6fc5b7476585256ee2e050d83a17b36a989323b",
+      "humanRequest": "LINE通知ジョブで、送信直前にも再試行期限を確認する。期限切れのジョブは送信せず失敗として記録する",
+      "acceptanceCriteria": [
+        "送信実行の直前に再試行期限（deadline）を再確認する",
+        "期限切れジョブはLINEへ送信せず失敗として記録される"
+      ],
+      "oracle": {
+        "type": "tests",
+        "tests": [
+          "lib/usecase/notifications/processLineJob.test.ts",
+          "convex/notifications.test.ts"
+        ]
+      },
+      "expectedMinTier": "T3"
+    }
+  ]
+}
