@@ -6,7 +6,7 @@ on:
     # main への push では再実行しない。
     branches: [preview]
   pull_request:
-    branches: [main, preview]
+    branches: [main, preview, devin/20261007-ci-job-skip] # TEMP: 検証用PR宛先（最終pushでrevert）
   # main への push では自動実行しないが、チェック未実行のまま取り込まれた変更の
   # 再検証用に手動実行を残す。
   workflow_dispatch:
