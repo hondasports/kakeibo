@@ -299,6 +299,8 @@ pnpm exec playwright test e2e/<spec>.spec.ts --project=chromium
 
 WindowsでConvex CLIが設定成功後の終了処理だけassertする既知パターンは、成功メッセージだけでPASSにせず、最後のcleanup認証HTTPが200になることまで同期処理が確認する。
 
+CIと同じ「匿名使い捨てbackend」構成でE2Eを実行したい場合は `pnpm run e2e:isolated -- e2e/<spec>.spec.ts` を使う。`CONVEX_AGENT_MODE=anonymous` のlocal deploymentが起動し、現在のworktreeの `convex/**` がpushされてからspecが走る。終了時にbackendと `.env.local` は元の状態へ戻る。CIでこけたspecのローカル再現にも使える。
+
 E2E終了後はターミナル1のwatcherを `Ctrl+C` で停止する。
 
 ### E2E seed
@@ -320,6 +322,8 @@ PRのE2E workflowは、まずPRのbase/head間のchanged pathを機械的に分�
 
 判定ロジックは [`scripts/classify-e2e-relevance.mjs`](../scripts/classify-e2e-relevance.mjs) とその `test:process` で検証する。判定スクリプトやE2E workflow自身の変更はruntime-relevantとして扱い、E2Eの実行条件を弱めた変更を見逃しにくくする。
 
+CIで実行するbackendは共有cloud devではなく、ジョブごとの `CONVEX_AGENT_MODE=anonymous` な使い捨てlocal deployment（`scripts/start-ci-convex.mjs`）である。PR HEADの `convex/**` がpushされてからPlaywrightが走るため、「CIでこける→ローカルで確認→またCIでこける」の往復が起きにくい。共有状態を持たないのでpublic/authenticatedの直列化もなく、draft PRでもE2Eが走る。
+
 ### Convex reflection
 
 `convex/**` の新規/変更関数をローカルE2Eで使う場合、上記のwatcherが変更をlocal deploymentへ自動反映する。1回だけ反映したい場合はlocal環境同期後に次を使う。
@@ -328,7 +332,7 @@ PRのE2E workflowは、まずPRのbase/head間のchanged pathを機械的に分�
 pnpm run convex:dev -- --once
 ```
 
-この手順はlocal deploymentへ反映する。GitHub Actions E2Eが使うcloud dev deploymentへ反映する必要がある場合だけ、`pnpm run convex:dev:cloud -- --once` を明示的に使う。
+この手順はlocal deploymentへ反映する。GitHub ActionsのE2EはPR/ジョブ専用の匿名使い捨てlocal deploymentで実行するため、cloud devへの反映が必要なのはローカルから共有cloud devを検証したい場合だけ、そのときは `pnpm run convex:dev:cloud -- --once` を明示的に使う。
 
 required environment不足、env sync失敗、Convex CLI未反映を「未実行理由」として先へ進まない。復旧できなければBLOCKED / Incident。
 

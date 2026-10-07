@@ -10,11 +10,12 @@ name: E2E
 #   CLERK_SECRET_KEY                 — Clerk Dev instance の sk_test_...
 #   E2E_CLERK_USER_EMAIL             — テストユーザーのメールアドレス
 #   E2E_CLERK_USER_PASSWORD          — テストユーザーのパスワード
-#   DEV_VITE_CONVEX_SITE_URL         — Dev deployment の Convex HTTP URL
-#   VITE_CONVEX_URL                  — Dev deployment の Convex WebSocket URL
-#   DEV_E2E_CLEANUP_SECRET           — Dev deployment の E2E cleanup 認証シークレット
-#   DEV_CONVEX_DEPLOY_KEY            — Dev deployment の deploy key（CI で E2E_CLEANUP_SECRET を同期）
 #   E2E_CLERK_USER_ID                — CIジョブ内でE2E_CLERK_USER_EMAILから解決する値
+#
+# E2Eは PRの Convex関数を反映した PR/ジョブ専用の匿名使い捨て backend
+# （CONVEX_AGENT_MODE=anonymous の local deployment）に対して実行する。
+# 共有Dev deployment・DEV_* secrets には接続しない（Issue #956）。
+# backend の起動・env同期・終了は scripts/start-ci-convex.mjs が担う。
 #
 # 詳細: docs/development-process.md「E2E 確認方針」
 #       docs/environment-variables.md「GitHub Actions Secrets に保存する項目」
@@ -76,24 +77,19 @@ jobs:
     needs: classify
     # PR コードへ Secrets を渡すため、同一リポジトリの通常 PR に限定する。
     # Dependabot PR は GitHub の仕様で fork 相当として扱われ、Actions Secrets を利用できない。
-    # Draft PRs skip E2E (the shared-dev authenticated queue never cancels, so
-    # every review-fix push would queue a full run); ready_for_review runs it
-    # once on the reviewed head, and aftercare requires both E2E successes.
+    # backend はジョブ専用の使い捨てのため draft PR でも実行する
+    # （レビュー修正のたびに最新 HEAD の関数で E2E が走る）。
     if: |
       needs.classify.outputs.runtime_relevant == 'true' &&
-      github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: ${{ matrix.timeout }}
     concurrency:
-      # authenticated は共有Dev DB・固定ユーザーをcleanupするため、PRをまたいで直列化する。
-      # public は共有fixtureを変更しないため、同じPRの古い実行だけをキャンセルする。
-      group: e2e-${{ matrix.name }}-${{ matrix.name == 'authenticated' && 'shared-dev' || github.event.pull_request.number }}
-      # authenticated は共有Dev DBを使うため先行runをcancelせず、同じgroup内でqueueする。
-      # public はPR単位のgroupなので、同一PRの古いrunだけをcancelする。
-      queue: ${{ matrix.queue }}
-      cancel-in-progress: ${{ matrix.cancel_in_progress }}
+      # backend はジョブごとの使い捨てで共有状態を持たないため、
+      # PRをまたいだ直列化は不要。同じPRの古い実行だけをキャンセルする。
+      group: e2e-${{ matrix.name }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:
@@ -101,13 +97,9 @@ jobs:
           - name: public
             e2e_command: pnpm run e2e:public -- --project=chromium --workers=3
             timeout: 10
-            queue: single
-            cancel_in_progress: true
           - name: authenticated
             e2e_command: pnpm run e2e:smoke -- --project=chromium --grep-invert @public --workers=1
             timeout: 20
-            queue: max
-            cancel_in_progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -129,6 +121,18 @@ jobs:
           E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
         run: node scripts/resolve-e2e-clerk-user-id.mjs
 
+      - name: Resolve Convex version
+        id: convex-version
+        run: echo "version=$(node -p "require('convex/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Convex backend binary
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          # anonymous backend の実行binaryは ~/.cache/convex に置かれる。
+          # convex のバージョン（lockfile差分）が変わったときだけ再取得する。
+          path: ~/.cache/convex
+          key: convex-${{ steps.convex-version.outputs.version }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
@@ -145,48 +149,11 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
 
-      - name: Sync E2E cleanup secret to dev deployment
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.DEV_CONVEX_DEPLOY_KEY }}
-          E2E_CLEANUP_SECRET: ${{ secrets.DEV_E2E_CLEANUP_SECRET }}
-        run: |
-          if [ -z "$E2E_CLEANUP_SECRET" ]; then
-            echo "::error::DEV_E2E_CLEANUP_SECRET is not set."
-            exit 1
-          fi
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "::error::E2E_CLERK_USER_ID is not set."
-            exit 1
-          fi
-          if [ -z "$CONVEX_DEPLOY_KEY" ]; then
-            echo "::error::DEV_CONVEX_DEPLOY_KEY is not set."
-            exit 1
-          fi
-          pnpm exec convex env set APP_ENV development
-          pnpm exec convex env set RECEIPT_IMAGE_EXTRACTOR_MODE mock
-          node scripts/ensure-line-integration-mode.mjs
-          pnpm exec convex env set E2E_CLERK_USER_ID "$E2E_CLERK_USER_ID"
-          pnpm exec convex env set E2E_CLEANUP_SECRET "$E2E_CLEANUP_SECRET"
-
-      - name: Configure local Vite E2E
-        env:
-          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-        run: |
-          if [[ ! "$VITE_CONVEX_URL" =~ ^https://[a-z0-9-]+\.convex\.cloud/?$ ]]; then
-            echo "::error::VITE_CONVEX_URL must be an https://*.convex.cloud URL."
-            exit 1
-          fi
-          VITE_CONVEX_URL="${VITE_CONVEX_URL%/}"
-          if [ -z "$VITE_CLERK_PUBLISHABLE_KEY" ]; then
-            echo "::error::CLERK_PUBLISHABLE_KEY is not set."
-            exit 1
-          fi
-          echo "VITE_CONVEX_URL=$VITE_CONVEX_URL" >> "$GITHUB_ENV"
-          echo "VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY" >> "$GITHUB_ENV"
-
-      - name: Run local smoke E2E tests
-        run: ${{ matrix.e2e_command }}
+      # PR HEAD の Convex関数を匿名使い捨てbackendへpushし、env 同期・
+      # VITE_CONVEX_URL / VITE_CONVEX_SITE_URL / E2E_CLEANUP_SECRET の注入・
+      # 終了処理までを start-ci-convex.mjs が一括で担う。
+      - name: Run E2E tests on isolated backend
+        run: node scripts/start-ci-convex.mjs --run "${{ matrix.e2e_command }}" --timeout 180
         env:
           # Clerk Testing Token 取得用
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
@@ -194,9 +161,6 @@ jobs:
           # E2E テストユーザー認証情報（ログ出力禁止）
           E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          # CI 内の Vite dev server が接続する Dev deployment の cleanup / seed 設定
-          VITE_CONVEX_SITE_URL: ${{ secrets.DEV_VITE_CONVEX_SITE_URL }}
-          E2E_CLEANUP_SECRET: ${{ secrets.DEV_E2E_CLEANUP_SECRET }}
           # authenticated smoke だけ管理者通知設定fixtureを有効化する。
           E2E_SYSTEM_ADMIN_MEMBERSHIP_FIXTURE: ${{ matrix.name == 'authenticated' }}
 
