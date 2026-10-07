@@ -72,6 +72,20 @@ jobs:
             printf '%s\n' "- changed_paths: \`$CHANGED_COUNT\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # verify:prepush（ローカル）と同じ選定結果をCIのsummaryへ出し、
+      # ローカルで実行されたspecと比較できるようにする（CI自体は従来どおり実行）。
+      - name: Report verify:prepush spec selection
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          {
+            echo "### verify:prepush spec selection"
+            echo '```json'
+            node scripts/select-e2e-specs.mjs --base "$BASE_SHA" --head "$HEAD_SHA" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);console.log(JSON.stringify({specs:r.specs,unmapped:r.unmapped,fallback:r.fallback},null,2))})"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   e2e:
     name: E2E (Playwright / Chromium / ${{ matrix.name }})
     needs: classify
