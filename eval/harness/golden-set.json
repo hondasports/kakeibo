@@ -87,10 +87,7 @@
       ],
       "oracle": {
         "type": "tests",
-        "tests": [
-          "convex/e2ePurge.test.ts",
-          "convex/http.test.ts"
-        ]
+        "tests": ["convex/e2ePurge.test.ts", "convex/http.test.ts"]
       },
       "expectedMinTier": "T3"
     },
