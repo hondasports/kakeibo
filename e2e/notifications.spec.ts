@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { gotoAuthenticated } from "./helpers/auth";
+import { bypassClerkBotDetection, gotoAuthenticated } from "./helpers/auth";
 import {
   cleanupLineLink,
   cleanupNotificationData,
@@ -176,6 +176,7 @@ test.describe("通知設定（Issue #893）", () => {
   });
 
   test("@smoke 未認証と非管理者は /admin/notifications を利用できない", async ({ page }) => {
+    await bypassClerkBotDetection(page);
     await page.goto("/admin/notifications");
     // デプロイ環境ではClerk初期化に10秒を超えることがあるため余裕を持たせる
     await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeVisible({

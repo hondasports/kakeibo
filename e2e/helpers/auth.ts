@@ -1,9 +1,26 @@
-import { clerk } from "@clerk/testing/playwright";
+import { clerk, setupClerkTestingToken } from "@clerk/testing/playwright";
 import { type Page } from "@playwright/test";
 
 type GotoAuthenticatedOptions = {
   ensureGroup?: boolean;
 };
+
+/**
+ * 未認証状態で保護パスを直接開くテスト用の Clerk ボット検出バイパス。
+ *
+ * clerk.signIn 内部で自動登録される setupClerkTestingToken と同じものを、
+ * サインインを伴わない未認証レンダーの検証でも事前に登録する。
+ * GitHub Actions のようなデータセンターIPのヘッドレス環境では、実デプロイ
+ * （非 localhost ドメイン）上のコールドな Clerk 初期化がボット検出に掛かり
+ * `isLoaded` が立ち上がらずログイン画面が描画されないことがある。
+ *
+ * CLERK_TESTING_TOKEN は global-setup の clerkSetup() が process.env に
+ * 注入する。未設定（ローカルでシークレット未提供など）の場合は何もしない。
+ */
+export async function bypassClerkBotDetection(page: Page): Promise<void> {
+  if (!process.env.CLERK_TESTING_TOKEN) return;
+  await setupClerkTestingToken({ page });
+}
 
 /**
  * Clerk Testing Token でサインインしてページに遷移する認証ヘルパー。
