@@ -39,6 +39,7 @@ describe("HTTP router route registration", () => {
 
       expect(paths).toEqual([
         "/e2e/cleanup-auth-check",
+        "/e2e/head-probe",
         "/e2e/cleanup",
         "/e2e/purge-orphans",
         "/e2e/seed-system-admin-membership",
