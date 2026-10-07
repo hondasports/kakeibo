@@ -41,3 +41,6 @@ playwright/.clerk/
 # indexion のローカル状態（digest index・reconcile DB等）。kgfs/ はプロジェクト固有スペックで共有対象
 .indexion/*
 !.indexion/kgfs/
+
+# Convex anonymous/local deployment の state（e2e:isolated 等）
+.convex/

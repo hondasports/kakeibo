@@ -20,7 +20,7 @@ function redactSensitiveText(text, sensitiveValues) {
   );
 }
 
-function parseEnvFile(content) {
+export function parseEnvFile(content) {
   const values = new Map();
   for (const line of content.split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -32,7 +32,7 @@ function parseEnvFile(content) {
   return values;
 }
 
-function deriveClerkJwtIssuerDomain(publishableKey) {
+export function deriveClerkJwtIssuerDomain(publishableKey) {
   const normalizedKey = publishableKey.trim().replace(/^(['"])(.*)\1$/, "$2");
   const match = normalizedKey.match(/^pk_(?:test|live)_(.+)$/);
   if (!match) {
