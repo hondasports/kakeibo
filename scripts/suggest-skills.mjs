@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { classifyChangedFiles } from "./classify-e2e-relevance.mjs";
+import { machineRiskForChange, readChangedHunks } from "./machine-risk.mjs";
 
 const COMMIT_REF_PATTERN = /^[0-9a-zA-Z][0-9a-zA-Z._/-]{0,127}$/;
 
@@ -110,6 +111,34 @@ export function suggestSkillsForPaths(changedPaths = []) {
   };
 }
 
+/**
+ * Path rules plus the Machine Floor content rules (Issue #944): a hunk that
+ * touches auth/deletion/schema/external-write symbols also suggests
+ * security-review, even when the file path is innocuous. `diffFailed`
+ * (unreadable diff) adds the same suggestion — fail-closed like the floor.
+ */
+export function suggestSkillsForChange({ changedPaths = [], hunks = {}, diffFailed = false } = {}) {
+  const result = suggestSkillsForPaths(changedPaths);
+  const content = machineRiskForChange({ paths: changedPaths, hunks, diffFailed });
+  const contentHits = content.floorTriggerDetails.filter((detail) => detail.source === "content");
+  if (contentHits.length === 0) return result;
+  const reason = "差分内の認証・認可・データ削除・schema・外部write境界コード（content rule検知）";
+  const existing = result.suggestions.find((s) => s.skill === "security-review");
+  if (existing) {
+    existing.reasons.push(reason);
+    existing.matchedPaths = [
+      ...new Set([...existing.matchedPaths, ...contentHits.map((d) => d.path).filter(Boolean)]),
+    ].sort();
+  } else {
+    result.suggestions.push({
+      skill: "security-review",
+      reasons: [reason],
+      matchedPaths: [...new Set(contentHits.map((d) => d.path).filter(Boolean))].sort(),
+    });
+  }
+  return result;
+}
+
 /** Read the worktree diff (uncommitted + untracked) as the candidate path set. */
 export function readWorktreeChangedPaths({ cwd = process.cwd() } = {}) {
   const tracked = execFileSync(
@@ -209,7 +238,17 @@ export function parseArguments(args) {
 
 export function runSuggestSkills({ base, paths, cwd } = {}) {
   const changedPaths = paths ?? readChangedPaths({ base, cwd });
-  const result = suggestSkillsForPaths(changedPaths);
+  // Content check is best-effort for suggestions; an unreadable diff still
+  // flags security-review via the fail-closed path (Issue #944).
+  let hunks = {};
+  let diffFailed = false;
+  try {
+    const resolvedBase = base ?? resolvePrBase({ cwd });
+    hunks = readChangedHunks({ base: resolvedBase, cwd, paths: changedPaths });
+  } catch {
+    diffFailed = true;
+  }
+  const result = suggestSkillsForChange({ changedPaths, hunks, diffFailed });
 
   console.log("SKILL_SUGGEST status: PASS");
   console.log(`changed_paths: ${result.changedPaths.length}`);
