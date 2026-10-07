@@ -13,6 +13,7 @@
     ".devin",
     ".codex",
     ".husky",
+    ".github/workflows",
     "e2e/spec-map.json",
     "tests/workflow/localConvexWorkflow.test.ts",
     "scripts/loop-*.mjs",

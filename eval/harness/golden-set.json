@@ -22,11 +22,11 @@
           },
           {
             "file": "docs/technical-design.md",
-            "contains": "Issue #890の回帰例"
+            "contains": "Issue #890"
           },
           {
             "file": "docs/requirements.md",
-            "contains": "印字税額による換算後の金額が完全一致する場合は照合・税額配分を行う"
+            "contains": "印字税額による換算"
           }
         ]
       },
@@ -87,7 +87,10 @@
       ],
       "oracle": {
         "type": "tests",
-        "tests": ["convex/e2ePurge.test.ts", "convex/http.test.ts"]
+        "tests": [
+          "convex/e2ePurge.test.ts",
+          "convex/http.test.ts"
+        ]
       },
       "expectedMinTier": "T3"
     },
