@@ -15,4 +15,4 @@ PR作成後のlatest HEADに対してCI・レビュー指摘・承認・競合�
 - `--sync-pr` はPR作成後・修正HEADのレビュー完了・状態遷移など復元用checkpointが変わる節目で行う。同一本文ならwriteを省略する。bot確認日時や待機snapshotの更新だけを人間向け本文へ書き戻さない。handled記録は別ファイルで管理し、別Sessionでは最新コメントを再取得・再確認して作り直す。
 - DONE本文の同期でcheckやbotコメントが更新された場合は、`--check-pr` で現在の結果を確認する。観測結果をまた本文へ書く連鎖を作らない。新規の実指摘は通常どおりfindingsとして対応する。
 
-必要条件を満たしHEAD不変を再確認できたら `ready`。
+必要条件を満たしHEAD不変を再確認できたら `ready`。`ready`（DONE）直後に `node scripts/loop-runner.mjs --publish-metrics <番号>` を実行し、タスクのmetrics要約をPRのマーカー付きコメント（`<!-- agent-metrics:v1 task=<taskId> -->`）へ保存する。同じマーカーのコメントは更新されるため再実行しても1件のまま。コメントは状態ブロックとは別物で、PR本文・CIとは連鎖しない。

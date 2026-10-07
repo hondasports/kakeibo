@@ -11,9 +11,9 @@ runnerの通常出力は `state`・`workflow`（現在Stateのworkflow）・`mis
 3. REFINE: `--assessment <file>` → `--event ready`（Profile確定）。
 4. EXECUTE: 実装・commit → `--verify-required`（unitは差分関連のaffected）→ `--event ready`。単独kindは `--verify <kind> [--scope affected]`。
 5. REVIEW: 初回進入時はdraft PRを作り、`node scripts/collect-pr-findings.mjs --pr <番号>` の外部指摘を `--review-packet <dir> --external-findings <file>` でpacketへ含めて独立Reviewerへ渡す。full unit完了後に `--review <file>` → `--event clean | findings`（再レビューは条件を満たせば自動で増分）。
-6. AFTERCARE: `--sync-pr <番号>` → `gh pr ready <番号>` → `--aftercare <番号> --watch-aftercare` → `--event ready`（DONE=merge_ready）。状態や本文を更新しない観測は `--check-pr <番号>`。状態ブロックは `--export-file <path>` でファイルへ書き、`gh pr create --body-file` 等で本文へ結合する（Agentは状態ブロックをstdoutで読まない。`--export` は人が確認する用途）。
+6. AFTERCARE: `--sync-pr <番号>` → `gh pr ready <番号>` → `--aftercare <番号> --watch-aftercare` → `--event ready`（DONE=merge_ready）→ `--publish-metrics <番号>`（metrics要約をPRのマーカー付きコメントへ保存。状態を更新しない）。状態や本文を更新しない観測は `--check-pr <番号>`。状態ブロックは `--export-file <path>` でファイルへ書き、`gh pr create --body-file` 等で本文へ結合する（Agentは状態ブロックをstdoutで読まない。`--export` は人が確認する用途）。
 7. 再開: 同じworktreeでは引数なしで実行する。別Sessionでは `--restore-pr <番号>`。
-8. 計測: `--friction-note <text>`、`--record-usage <transcript.jsonl> [--usage-role reviewer]`、`node scripts/loop-metrics.mjs --task <id>`。
+8. 計測: `--friction-note <text>`、`--record-usage <transcript.jsonl> [--usage-role reviewer]`、`node scripts/loop-metrics.mjs --task <id>`（`--format summary-json [--out <file>]` でPRコメントと同じ1レコードの要約。PRを作らないeval用途）。PR横断の集計は `node scripts/collect-harness-metrics.mjs --since <YYYY-MM-DD> [--state merged|all] [--format table]`。
 
 JSONの必須キー（schemaは `.agent/schema/` 配下）:
 
