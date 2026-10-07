@@ -4,8 +4,10 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   classifyIncludes,
+  markerDir,
   needsProcessSuite,
   runPrepush,
+  sanitizeHookEnv,
   unitRelatedTargets,
 } from "./verify-prepush.mjs";
 
@@ -339,5 +341,39 @@ describe("runPrepush", () => {
       out: () => {},
     });
     expect(code3).toBe(1);
+  });
+});
+
+describe("hook env sanitization (pre-push経由のGIT_*汚染対策)", () => {
+  test("sanitizeHookEnv removes GIT_* hook vars and keeps others", () => {
+    const env = {
+      GIT_DIR: ".",
+      GIT_WORK_TREE: "/x",
+      GIT_INDEX_FILE: "/x/index",
+      GIT_QUARANTINE_PATH: "/x/q",
+      GIT_PREFIX: "sub/",
+      PATH: "/bin",
+      FOO: "bar",
+    };
+    const clean = sanitizeHookEnv(env);
+    expect(clean.GIT_DIR).toBeUndefined();
+    expect(clean.GIT_WORK_TREE).toBeUndefined();
+    expect(clean.GIT_INDEX_FILE).toBeUndefined();
+    expect(clean.GIT_QUARANTINE_PATH).toBeUndefined();
+    expect(clean.GIT_PREFIX).toBeUndefined();
+    expect(clean.PATH).toBe("/bin");
+    expect(clean.FOO).toBe("bar");
+  });
+
+  test("markerDir works even when GIT_DIR is poisoned (hook env leak regression)", () => {
+    const prev = process.env.GIT_DIR;
+    process.env.GIT_DIR = "/nonexistent-hack-dir";
+    try {
+      const dir = markerDir(repoRoot);
+      expect(dir).toContain("agent-prepush");
+    } finally {
+      if (prev === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = prev;
+    }
   });
 });

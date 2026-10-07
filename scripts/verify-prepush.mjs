@@ -55,7 +55,11 @@ const E2E_PORTS = [
 /* ------------------------------------------------------------------ git */
 
 function git(root, args) {
-  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  return execFileSync("git", args, {
+    cwd: root,
+    encoding: "utf8",
+    env: sanitizeHookEnv(),
+  }).trim();
 }
 
 export function markerDir(root = repoRoot) {
@@ -245,8 +249,28 @@ function defaultChromiumPath() {
 
 const LOG_DIR = path.join(os.tmpdir(), `suzumemo-prepush-${Date.now()}`);
 
+// gitがhookへ注入する環境変数。pre-push経由で起動された場合、子プロセス
+// （test fixture内のgit等）が別repoを指して壊れるため除去する。
+const HOOK_ENV_VARS = [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_COMMON_DIR",
+  "GIT_QUARANTINE_PATH",
+  "GIT_NAMESPACE",
+  "GIT_PREFIX",
+];
+
+export function sanitizeHookEnv(env = process.env) {
+  const clean = { ...env };
+  for (const key of HOOK_ENV_VARS) delete clean[key];
+  return clean;
+}
+
 function defaultRunStep(command, args, cwd, logFile) {
-  const out = spawnSync(command, args, { cwd, encoding: "utf8" });
+  const out = spawnSync(command, args, { cwd, encoding: "utf8", env: sanitizeHookEnv() });
   writeFileSync(logFile, [out.stdout, out.stderr].filter(Boolean).join("\n"));
   return out.status ?? 1;
 }
