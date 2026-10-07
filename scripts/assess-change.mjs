@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { classifyChangedFiles } from "./classify-e2e-relevance.mjs";
-import { machineRiskForChange, readChangedHunks } from "./machine-risk.mjs";
+import { isContentTarget, machineRiskForChange, readChangedHunks } from "./machine-risk.mjs";
 import { assessReviewDepth, REVIEW_TIERS } from "./review-depth.mjs";
 import { readChangedPaths, resolvePrBase, suggestSkillsForChange } from "./suggest-skills.mjs";
 
@@ -105,10 +105,11 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
     const args = parseArguments(process.argv.slice(2));
     const paths = args.paths ?? readChangedPaths({ base: args.base });
     // Content rules need the diff; a read failure fails closed to T3 (AC5).
-    // With explicit --paths and no base there is no diff to read.
+    // With explicit --paths and no base there is no diff to read, and paths
+    // outside the content targets cannot hide dangerous symbols anyway.
     let hunks = {};
     let diffFailed = false;
-    if (args.base || !args.paths) {
+    if ((args.base || !args.paths) && paths.some(isContentTarget)) {
       try {
         const base = args.base ?? resolvePrBase();
         hunks = readChangedHunks({ base, paths });

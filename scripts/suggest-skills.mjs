@@ -120,7 +120,11 @@ export function suggestSkillsForPaths(changedPaths = []) {
 export function suggestSkillsForChange({ changedPaths = [], hunks = {}, diffFailed = false } = {}) {
   const result = suggestSkillsForPaths(changedPaths);
   const content = machineRiskForChange({ paths: changedPaths, hunks, diffFailed });
-  const contentHits = content.floorTriggerDetails.filter((detail) => detail.source === "content");
+  // diff_read_failed is a fail-closed sentinel, not a symbol match — it must not
+  // suggest skills by itself.
+  const contentHits = content.floorTriggerDetails.filter(
+    (detail) => detail.source === "content" && detail.trigger !== "diff_read_failed",
+  );
   if (contentHits.length === 0) return result;
   const reason = "差分内の認証・認可・データ削除・schema・外部write境界コード（content rule検知）";
   const existing = result.suggestions.find((s) => s.skill === "security-review");
