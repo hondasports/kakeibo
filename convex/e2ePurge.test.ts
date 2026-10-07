@@ -8,7 +8,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
-import { e2ePurgeOrphansHandler } from "./e2ePurge";
+import { e2ePurgeOrphansHandler, runOrphanPurge } from "./e2ePurge";
 
 const E2E_SECRET = "test-secret";
 
@@ -512,6 +512,71 @@ describe("e2ePurgeOrphansHandler", () => {
       runMutation: vi.fn().mockResolvedValue({ deletedCount: 0, isDone: true, continueCursor: "" }),
     } as unknown as ActionCtx;
   }
+
+  function createGroupFailureCtx(failure: "batch" | "group") {
+    const ctx = {
+      runQuery: vi.fn().mockResolvedValue({
+        orphanIds: ["orphan-group" as Id<"groups">],
+        isDone: true,
+        continueCursor: "",
+      }),
+      runMutation: vi.fn().mockResolvedValue({ deletedCount: 0, isDone: true, continueCursor: "" }),
+      scheduler: { runAfter: vi.fn() },
+    };
+    if (failure === "batch") {
+      ctx.runMutation.mockRejectedValueOnce(new Error("poisoned group batch"));
+    } else {
+      ctx.runMutation.mockResolvedValueOnce({ deletedCount: 0, skippedCount: 0, failedCount: 1 });
+    }
+    return ctx;
+  }
+
+  it.each(["batch", "group"] as const)(
+    "最終ページの group 削除失敗（%s）があれば HTTP は残作業ありと返す",
+    async (failure) => {
+      process.env.APP_ENV = "development";
+      process.env.E2E_CLEANUP_SECRET = E2E_SECRET;
+      const ctx = createGroupFailureCtx(failure);
+
+      const response = await e2ePurgeOrphansHandler(ctx as unknown as ActionCtx, purgeRequest());
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        ok: boolean;
+        hasMore: boolean;
+        stats: Record<string, number>;
+      };
+      expect(body.ok).toBe(true);
+      expect(body.hasMore).toBe(true);
+      expect(body.stats.stepFailures).toBe(failure === "batch" ? 1 : 0);
+      expect(body.stats.groupDeleteFailed).toBe(failure === "group" ? 1 : 0);
+      expect(ctx.runQuery).toHaveBeenCalledTimes(1);
+      expect(ctx.runMutation).toHaveBeenCalledWith(internal.e2ePurge.purgeGroupsBatch, {
+        groupIds: ["orphan-group"],
+      });
+      expect(ctx.runMutation).toHaveBeenCalledWith(
+        internal.e2ePurge.purgeOrphanSeedUsersStep,
+        expect.anything(),
+      );
+    },
+  );
+
+  it.each(["batch", "group"] as const)(
+    "最終ページの group 削除失敗（%s）だけでは cron を即時再実行しない",
+    async (failure) => {
+      process.env.APP_ENV = "development";
+      const ctx = createGroupFailureCtx(failure);
+
+      const result = await runOrphanPurge._handler(ctx as unknown as ActionCtx, {});
+
+      expect(result.skipped).toBe(false);
+      expect(result.hasMore).toBe(true);
+      expect(result.stats.stepFailures).toBe(failure === "batch" ? 1 : 0);
+      expect(result.stats.groupDeleteFailed).toBe(failure === "group" ? 1 : 0);
+      expect(ctx.runQuery).toHaveBeenCalledTimes(1);
+      expect(ctx.scheduler.runAfter).not.toHaveBeenCalled();
+    },
+  );
 
   it("APP_ENV が development 以外なら 503 を返し、内部関数を呼ばない", async () => {
     process.env.APP_ENV = "production";

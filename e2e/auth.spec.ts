@@ -29,6 +29,9 @@ test.describe("ログアウト", () => {
     await expect(page.getByAltText("Suzumemo スズメモ")).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeVisible();
+    // デプロイ環境ではClerk初期化に10秒を超えることがあるため余裕を持たせる
+    await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeVisible({
+      timeout: 30_000,
+    });
   });
 });
