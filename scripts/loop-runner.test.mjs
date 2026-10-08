@@ -1546,7 +1546,7 @@ describe("persistent task gates", () => {
       context: "fresh",
       findings: [],
     });
-    expect(template.acceptanceCriteria).toEqual([{ id: "AC1", evidence: "" }]);
+    expect(template.acceptanceCriteria).toEqual([{ id: "AC1", evidence: "TODO" }]);
     // _notes carries reviewer-facing contract hints (finding status enum,
     // deltaFrom, machine floor) — its absence caused an invalid status enum
     // in a real fresh-context review.
@@ -2672,8 +2672,8 @@ describe("increment reuse and loop ergonomics", () => {
     );
     expect(template.deltaFrom).toBe(prior);
     expect(template.findings).toEqual([
-      { id: "F1", status: "fixed", severity: "major", evidence: "" },
-      { id: "F2", status: "dismissed", evidence: "" },
+      { id: "F1", status: "fixed", severity: "major", evidence: "TODO" },
+      { id: "F2", status: "dismissed", evidence: "TODO" },
     ]);
     expect(
       buildReviewPacket(task, path.join(parent, "full"), dir, { full: true }).reviewScope,

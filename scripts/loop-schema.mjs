@@ -72,11 +72,69 @@ export function validateSchema(schema, value, location = "$") {
  * while an on-disk edit still busts the entry.
  */
 const schemaCache = new Map();
-export function validateDocument(name, value, root = process.cwd()) {
+function schemaDocument(name, root = process.cwd()) {
   const file = path.join(root, ".agent/schema", `${name}.schema.json`);
   const stamp = statSync(file).mtimeMs;
   const hit = schemaCache.get(file);
   if (!hit || hit.stamp !== stamp)
     schemaCache.set(file, { stamp, schema: JSON.parse(readFileSync(file, "utf8")) });
-  validateSchema(schemaCache.get(file).schema, value);
+  return schemaCache.get(file).schema;
+}
+export function validateDocument(name, value, root = process.cwd()) {
+  validateSchema(schemaDocument(name, root), value);
+}
+/**
+ * Required keys for a submitted JSON document ("kind"), drawn from the schema's
+ * `required` list plus the keys a validator demands conditionally. Validators
+ * that require keys beyond a schema's `required` MUST derive them from this
+ * function so `--draft` output and submission validation can never diverge;
+ * later issues add keys by extending the schema/validator entries here (e.g.
+ * #950 prAllowed, #951 finding severity, #958 reproduction — see
+ * docs/agent-harness-reference.md).
+ *
+ * Top-level keys only; nested required keys live in the shared draft templates.
+ */
+const SCHEMA_BACKED_KINDS = new Set(["spec", "exit"]);
+const VALIDATOR_REQUIRED = {
+  // The agent assessment is defined by validateAssessment (review-depth.mjs);
+  // assessment.schema.json describes the machine assessment instead.
+  assessment: ["risk_assessment", "tier_rationale"],
+  review: [
+    "head",
+    "baseHead",
+    "reviewer",
+    "evidence",
+    "findings",
+    "acceptanceCriteria",
+    "assessment",
+  ],
+};
+const CONDITIONAL_REQUIRED = {
+  // Mirrors the event-specific exit requirements in validateTransition.
+  exit: (context = {}) => {
+    const { event, state, counters, limits } = context;
+    const keys = [];
+    if (["decision_required", "repeated_failure"].includes(event)) keys.push("reason");
+    if (event === "resolved" && state === "human_gate") keys.push("approval");
+    if (event === "resolved" && state === "incident") keys.push("resolution");
+    if (event === "findings") {
+      keys.push("reason");
+      if (limits && counters && (counters.review + 1) % limits.review_reassess_every === 0)
+        keys.push("reassessment");
+    }
+    if (event === "ci_failure") keys.push("reason", "reproduction", "ciFailure");
+    return keys;
+  },
+};
+export function requiredKeys(kind, context = {}, root = process.cwd()) {
+  const schemaRequired = SCHEMA_BACKED_KINDS.has(kind)
+    ? (schemaDocument(kind, root).required ?? [])
+    : [];
+  return [
+    ...new Set([
+      ...schemaRequired,
+      ...(VALIDATOR_REQUIRED[kind] ?? []),
+      ...(CONDITIONAL_REQUIRED[kind]?.(context) ?? []),
+    ]),
+  ];
 }

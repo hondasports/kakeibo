@@ -45,6 +45,7 @@ import {
   processSuiteExcludes,
   unitFullCommand,
   CHECK_COMMANDS,
+  requireAssessmentAboveFloor,
 } from "./loop-policy.mjs";
 import {
   metricsCommentMarker,
@@ -53,8 +54,19 @@ import {
   summarizeTask as summarizeTaskMetrics,
   taskSummaryContext,
 } from "./loop-metrics.mjs";
+import { buildDraft, reviewDraft, todoPointers, DRAFT_TODO } from "./loop-draft.mjs";
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
+/** Submitted JSON may not carry an unfilled draft placeholder (#948). */
+const readSubmission = (file, kind) => {
+  const document = readJson(file);
+  const todos = todoPointers(document);
+  requireValue(
+    todos.length === 0,
+    `Unfilled ${kind} draft placeholders (${DRAFT_TODO}): ${todos.join(", ")}`,
+  );
+  return document;
+};
 const readYaml = (filePath) => YAML.parse(readFileSync(filePath, "utf8"));
 /** Runtime adapter config (`.agent/runtime/<name>.yaml`); profiles are gone. */
 export function resolveRuntime({ runtime = null, root = process.cwd() } = {}) {
@@ -432,7 +444,7 @@ export function startTask(args, root) {
     cwd: root,
     stdio: "pipe",
   });
-  const spec = readJson(args.init);
+  const spec = readSubmission(args.init, "spec");
   // Open decisions are allowed in REFINE; leaving it requires a complete spec.
   // --model/--profile are still accepted by the argument parser but no longer used.
   const configuration = { runtime: resolveRuntime({ runtime: args.runtime, root }) };
@@ -1609,45 +1621,7 @@ export function buildReviewPacket(
   write(
     "review-template.json",
     `${JSON.stringify(
-      {
-        head: task.head,
-        baseHead: task.baseHead,
-        ...(deltaFrom ? { deltaFrom } : {}),
-        reviewer: "",
-        independent: task.assessment?.review?.independent === true,
-        context: "fresh",
-        _notes: [
-          "finding.status is open|fixed|dismissed|deferred (unique id, non-empty evidence); every prior finding id must appear",
-          "finding.severity is REQUIRED on every new finding — an omitted severity counts as major: blocker = fails an AC / security or data destruction / production outage; major = wrong behavior, missing coverage with regression risk, contract violation; minor = readability/maintainability, small inconsistencies; nit = formatting/naming preferences",
-          "status deferred is allowed only for severity minor|nit and needs followUp: https://github.com/<owner>/<repo>/issues/<n>; open blocker/major findings block clean, minor/nit may be deferred with a follow-up issue instead of fixed now",
-          "prior findings are prefilled with their last status; re-check each and write evidence (a closed finding untouched by the increment may cite the previous review)",
-          "deltaFrom (optional): SHA of a previously reviewed head — scopes review to the increment",
-          "assessment must satisfy the machine floor, not merely the reviewer's own rating",
-        ],
-        evidence: [],
-        findings: (task.findings ?? []).map((finding) => ({
-          id: finding.id,
-          status: finding.status,
-          ...(finding.severity ? { severity: finding.severity } : {}),
-          evidence: "",
-        })),
-        acceptanceCriteria: (task.spec?.acceptanceCriteria ?? []).map((ac) => ({
-          id: ac.id,
-          evidence: "",
-        })),
-        assessment: {
-          // Optional fields (applied_tier, verification_load) stay absent —
-          // a present-but-empty value fails validation, an absent one is unset.
-          risk_assessment: {
-            blast_radius: "",
-            data_security: "",
-            reversibility: "",
-            uncertainty: "",
-            floor_triggers: [],
-          },
-          tier_rationale: "",
-        },
-      },
+      reviewDraft({ head: task.head, baseHead: task.baseHead, deltaFrom, task }),
       null,
       2,
     )}\n`,
@@ -1733,6 +1707,8 @@ export function parseArguments(args) {
     "--external-findings",
     "--publish-metrics",
     "--ci-failures",
+    "--draft",
+    "--issue",
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -1786,18 +1762,19 @@ const CLI_ACTION_KEYS = [
   "publish-metrics",
   "ci-failures",
   "resolve-ci-failures",
+  "draft",
 ];
 /**
  * Name reported in `cli_output` metrics. Watch runs are tagged separately so
  * their larger output can be compared against non-watch commands.
  */
 export function cliCommandName(args) {
-  const action = CLI_ACTION_KEYS.find((key) => args[key]);
+  const action = CLI_ACTION_KEYS.find((key) => args[key] && !(args.draft && key === "event"));
   if (!action) return "none";
   return args["watch-aftercare"] ? `${action}+watch-aftercare` : action;
 }
 export function run(args, root = process.cwd(), services = {}) {
-  const actions = CLI_ACTION_KEYS.filter((key) => args[key]);
+  const actions = CLI_ACTION_KEYS.filter((key) => args[key] && !(args.draft && key === "event"));
   requireValue(actions.length <= 1, "Run one task action at a time");
   requireValue(
     !args["watch-aftercare"] || args.aftercare || args["check-pr"],
@@ -1978,6 +1955,74 @@ export function run(args, root = process.cwd(), services = {}) {
     const probe = JSON.parse(readFileSync(target, "utf8"));
     return { state: probe.state ?? null, next: nextActions(probe) };
   }
+  if (args.draft) {
+    // #948: emit a machine-prefilled draft JSON for the agent to complete.
+    // Read-only like --hook-state: loads the persisted task without refresh
+    // and never saves — the only write is the draft file under the git path.
+    const kind = args.draft;
+    requireValue(
+      ["spec", "assessment", "review", "exit"].includes(kind),
+      `--draft kind must be spec|assessment|review|exit (got ${kind})`,
+    );
+    requireValue(args.issue === undefined || kind === "spec", "--issue requires --draft spec");
+    requireValue(kind !== "exit" || args.event !== undefined, "--draft exit requires --event");
+    const target = taskPath(root);
+    const task = existsSync(target) ? JSON.parse(readFileSync(target, "utf8")) : null;
+    requireValue(
+      task !== null || kind === "spec",
+      `--draft ${kind} requires an initialized task (run --init first)`,
+    );
+    let issueBody;
+    if (args.issue !== undefined) {
+      const issue = JSON.parse(
+        (services.gh ?? gh)(["issue", "view", args.issue, "--json", "title,body"], root),
+      );
+      issueBody = issue.body ?? "";
+    }
+    // Only review/assessment drafts need revision context; a spec draft also
+    // runs pre-init where no base ref may resolve at all.
+    const needsRevision = kind === "assessment" || kind === "review";
+    const baseRef = task?.baseRef ?? "origin/preview";
+    const baseHead = needsRevision
+      ? git(["rev-parse", "--verify", `${baseRef}^{commit}`], root)
+      : null;
+    const head = needsRevision ? git(["rev-parse", "HEAD"], root) : null;
+    let machine = { floorTriggers: [], minimumTier: "T1" };
+    if (kind === "assessment") {
+      const paths = readChangedPathsRevisioned(root, baseHead, head);
+      machine = computeAssessment(task, paths, root).risk;
+      machine = {
+        floorTriggers: machine.machineFloorTriggers ?? [],
+        minimumTier: machine.machine ?? "T1",
+      };
+    }
+    const draft = buildDraft({
+      kind,
+      task,
+      event: args.event,
+      issueBody,
+      machine,
+      head,
+      baseHead,
+      limits: processConfig(root).limits,
+      root,
+    });
+    const dir = gitPath(root, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-path",
+      "agent-drafts",
+    ]);
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `${kind}${args.event ? `-${args.event}` : ""}.json`);
+    writeFileSync(file, `${JSON.stringify(draft, null, 2)}\n`, { mode: 0o600 });
+    recordMetric(task, root, { action: "draft", kind, event: args.event ?? null });
+    return {
+      ...(task ? { taskId: task.taskId, state: task.state } : {}),
+      kind,
+      draft: file,
+    };
+  }
   let task = refreshTask(loadTask(root), root);
   saveTask(task, root); // Persist invalidation even if the requested action fails.
   requireValue(
@@ -2024,7 +2069,7 @@ export function run(args, root = process.cwd(), services = {}) {
   }
   if (args.spec) {
     requireValue(task.state === "refine", "Spec changes require refine state");
-    task.spec = readJson(args.spec);
+    task.spec = readSubmission(args.spec, "spec");
     validateSpec(task.spec, root);
     task.risk = highestTier(task.risk, task.spec.predictedRisk);
     invalidate(task);
@@ -2034,8 +2079,14 @@ export function run(args, root = process.cwd(), services = {}) {
       ["refine", "execute", "review"].includes(task.state),
       "Assess in refine/execute/review",
     );
-    const assessment = readJson(args.assessment);
+    const assessment = readSubmission(args.assessment, "assessment");
     requireValue(validateAssessment(assessment).length === 0, "Invalid agent risk assessment");
+    // #948: machine-derived draft values are a floor, not a suggestion —
+    // data_security/reversibility/applied_tier may only be raised.
+    requireAssessmentAboveFloor(assessment, {
+      floorTriggers: task.assessment?.risk?.machineFloorTriggers ?? [],
+      minimumTier: task.assessment?.risk?.machine ?? "T1",
+    });
     task.agentAssessment = assessment;
     task.skills = args.skills?.split(",").filter(Boolean) ?? [];
     refreshTask(task, root);
@@ -2047,7 +2098,7 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args.review) {
     requireClean(root);
     requireValue(task.state === "review", "Record review in review state");
-    const report = readJson(args.review);
+    const report = readSubmission(args.review, "review");
     validateReview(task, report);
     task.review = report;
     task.findings = report.findings;
@@ -2097,7 +2148,12 @@ export function run(args, root = process.cwd(), services = {}) {
     }
     if (!["decision_required", "repeated_failure", "findings", "ci_failure"].includes(args.event))
       requireClean(root);
-    task = transitionTask(task, args.event, args.exit ? readJson(args.exit) : {}, root);
+    task = transitionTask(
+      task,
+      args.event,
+      args.exit ? readSubmission(args.exit, "exit") : {},
+      root,
+    );
   }
   saveTask(task, root);
   if (args.export || args["export-file"] || args["sync-pr"]) {
