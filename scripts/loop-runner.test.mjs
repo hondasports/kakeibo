@@ -162,10 +162,24 @@ describe("persistent task gates", () => {
     mergeable: "MERGEABLE",
     mergeStateStatus: "CLEAN",
     reviewDecision: "APPROVED",
-    statusCheckRollup: [{ name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" }],
+    statusCheckRollup: ["Agent harness", "CI scope", "Lint", "Build", "Test"].map((name) => ({
+      name,
+      status: "COMPLETED",
+      conclusion: "SUCCESS",
+    })),
     ...overrides,
   });
   const completeFindings = { pagesComplete: true, unhandledCount: 0, unresolvedThreadCount: 0 };
+  // #949 lite lane: the gate only sees the verify:prepush success marker file
+  // for the current HEAD (the runner never records the result itself).
+  const markPrepush = (dir, head) => {
+    const marker = execFileSync("git", ["rev-parse", "--git-path", `agent-prepush/${head}.ok`], {
+      cwd: dir,
+      encoding: "utf8",
+    }).trim();
+    mkdirSync(path.dirname(marker), { recursive: true });
+    writeFileSync(marker, "ok\n");
+  };
   it.each([
     ["aftercare", false],
     ["aftercare", true],
@@ -232,7 +246,11 @@ describe("persistent task gates", () => {
     task.review = reviewFixture(task);
     saveTask(task, dir);
     const original = readFileSync(taskPath(dir), "utf8");
-    let checks = delivery(task).statusCheckRollup;
+    // Phase 1: the always-required CI gate set is incomplete → not ready.
+    let checks = [
+      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      { name: "CI scope", status: "COMPLETED", conclusion: "SUCCESS" },
+    ];
     const services = {
       fetchPr: () => delivery(task, { statusCheckRollup: checks }),
       fetchFindings: () => completeFindings,
@@ -247,10 +265,16 @@ describe("persistent task gates", () => {
       expect(watchAftercare(task, "7", dir, { ...services, readOnly: true })).toMatchObject({
         ready: false,
       });
-    } else expect(() => run(args, dir, services)).toThrow("Required check not observed successful");
+    } else {
+      // #958: gate失敗はthrowではなく ready:false + gateError の観測結果で返る
+      const result = run(args, dir, services);
+      expect(result.ready).toBe(false);
+      expect(result.gateError).toMatch("Required check not observed successful");
+    }
     expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
     checks = [
       "Agent harness",
+      "CI scope",
       "Lint",
       "Build",
       "Test",
@@ -322,6 +346,11 @@ describe("persistent task gates", () => {
           conclusion: "SUCCESS",
           startedAt: "2026-01-02",
         },
+        ...["CI scope", "Lint", "Build", "Test"].map((name) => ({
+          name,
+          status: "COMPLETED",
+          conclusion: "SUCCESS",
+        })),
       ],
     });
     let reads = 0;
@@ -893,6 +922,11 @@ describe("persistent task gates", () => {
       writeFileSync(assessment, JSON.stringify(taskFixture().agentAssessment));
       cli("--assessment", assessment);
       cli("--verify-required");
+      // T1 lite lane: ready needs the verify:prepush marker for this HEAD.
+      markPrepush(
+        checkout,
+        execFileSync("git", ["rev-parse", "HEAD"], { cwd: checkout, encoding: "utf8" }).trim(),
+      );
       cli("--event", "ready");
       const task = loadTask(checkout);
       const report = path.join(parent, "review.json");
@@ -1632,7 +1666,17 @@ describe("persistent task gates", () => {
       unhandledCount: 0,
       unresolvedThreadCount: 0,
     };
-    const prPolls = [prFields([pending]), prFields([pending]), prFields([ok])];
+    // Ready needs the full always-required set (Agent harness + CI scope +
+    // Lint/Build/Test); a lone Agent harness success would poll forever.
+    const readyChecks = [
+      ok,
+      ...["CI scope", "Lint", "Build", "Test"].map((name) => ({
+        name,
+        status: "COMPLETED",
+        conclusion: "SUCCESS",
+      })),
+    ];
+    const prPolls = [prFields([pending]), prFields([pending]), prFields(readyChecks)];
     let recorded = false;
     const result = watchAftercare(task, 7, dir, {
       // Same {fetchPr, fetchFindings} shape as the production fetchers.
@@ -1697,6 +1741,9 @@ describe("persistent task gates", () => {
         statusCheckRollup: [
           check("Test", { status: "COMPLETED", conclusion: "SUCCESS" }),
           check("Agent harness", { status: "COMPLETED", conclusion: "SUCCESS" }),
+          ...["CI scope", "Lint", "Build"].map((name) =>
+            check(name, { status: "COMPLETED", conclusion: "SUCCESS" }),
+          ),
         ],
       }),
     ];
@@ -1814,7 +1861,11 @@ describe("persistent task gates", () => {
       mergeable: "MERGEABLE",
       mergeStateStatus: "CLEAN",
       reviewDecision: "APPROVED",
-      statusCheckRollup: [{ name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" }],
+      statusCheckRollup: ["Agent harness", "CI scope", "Lint", "Build", "Test"].map((name) => ({
+        name,
+        status: "COMPLETED",
+        conclusion: "SUCCESS",
+      })),
     };
     let calls = 0;
     const result = watchAftercare(task, 7, dir, {
@@ -2572,7 +2623,9 @@ describe("increment reuse and loop ergonomics", () => {
     refreshTask(task, dir);
     // The change became runtime-relevant, so the agent re-submits its assessment.
     expect(task.agentAssessment).toBeNull();
-    task.agentAssessment = structuredClone(agentAssessment);
+    // T2 keeps this on the standard lane — the affected→full unit evidence
+    // mechanics under test do not run on the T1 lite lane (#949).
+    task.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: "T2" };
     refreshTask(task, dir);
     task.skills = [...task.assessment.requiredSkills];
     expect(task.assessment.verification.unit).toBe(true);
