@@ -5,6 +5,8 @@ import { assessChange } from "./assess-change.mjs";
 import { isContentTarget, readChangedHunks } from "./machine-risk.mjs";
 import { REVIEW_AXES, REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
 import { validateReproduction } from "./ci-failure.mjs";
+import { ciCodeChanged } from "./ci-change-scope.mjs";
+import { hasPrepushMarker } from "./verify-prepush.mjs";
 import { assessmentDraftFloors } from "./loop-draft.mjs";
 
 export const highestTier = (...tiers) =>
@@ -112,14 +114,61 @@ export function currentEvidence(evidence, task) {
   const appliesTo = evidence?.appliesTo ?? evidence;
   return appliesTo?.head === task.head && appliesTo?.baseHead === task.baseHead;
 }
+/**
+ * #949 Lite lane: a T1 task with no machine floor triggers and no independent
+ * review requirement does not gate on local verification evidence — the CI
+ * checks are the verdict. Everything else rides the standard lane.
+ */
+export function isLiteLane(task, assessment = task.assessment) {
+  return (
+    assessment?.risk?.final === "T1" &&
+    (assessment.risk.machineFloorTriggers ?? []).length === 0 &&
+    assessment.review?.independent !== true
+  );
+}
+/**
+ * #949: CI checks that decide AFTERCARE readiness, with their acceptance
+ * semantics. Lint/Build/Test are always required — on .md-only diffs the CI
+ * scope job skips them, so SKIPPED counts only when the harness itself
+ * confirms (via ciCodeChanged, shared with the CI job) that no code changed.
+ * Anything else (unobserved, pending, failure) never counts.
+ */
+export function expectedCiChecks(paths, assessment) {
+  const mdOnly = !ciCodeChanged(paths);
+  const checks = [
+    { name: "Agent harness", accept: ["SUCCESS"], reason: "delivery gate" },
+    { name: "CI scope", accept: ["SUCCESS"], reason: "diff classification" },
+  ];
+  for (const name of ["Lint", "Build", "Test"])
+    checks.push(
+      mdOnly
+        ? { name, accept: ["SUCCESS", "SKIPPED"], reason: "md-only change: SKIPPED accepted" }
+        : { name, accept: ["SUCCESS"], reason: "required for code changes" },
+    );
+  if (assessment?.verification?.e2e)
+    checks.push(
+      { name: "E2E (Playwright / Chromium / public)", accept: ["SUCCESS"], reason: "e2e required" },
+      {
+        name: "E2E (Playwright / Chromium / authenticated)",
+        accept: ["SUCCESS"],
+        reason: "e2e required",
+      },
+    );
+  return checks;
+}
 /** Verification kinds required locally for this task (e2e is a GitHub delivery gate). */
 export function requiredVerificationKinds(task) {
-  return Object.entries(task.assessment?.verification ?? {})
+  const kinds = Object.entries(task.assessment?.verification ?? {})
     .filter(([kind, required]) => required && kind !== "e2e")
     .map(([kind]) => kind);
+  // Lite lane: only the process gate is verified locally; CI carries the rest.
+  return isLiteLane(task) ? kinds.filter((kind) => kind === "process") : kinds;
 }
 export function verificationSummary(task) {
   const summary = {};
+  // #949: on the Lite lane, kinds the lane defers to CI are displayed as
+  // "ci" (like e2e's "github") instead of a misleading "missing".
+  const locallyRequired = new Set(requiredVerificationKinds(task));
   for (const [kind, required] of Object.entries(task.assessment?.verification ?? {})) {
     if (!required) continue;
     if (kind === "e2e") {
@@ -127,6 +176,10 @@ export function verificationSummary(task) {
       continue;
     }
     const result = task.verification?.[kind];
+    if (!result && !locallyRequired.has(kind)) {
+      summary[kind] = "ci";
+      continue;
+    }
     summary[kind] = !result
       ? "missing"
       : !currentEvidence(result, task)
@@ -153,7 +206,7 @@ export function aftercareSummary(task) {
   };
 }
 /** Unmet machine-floor requirements toward the next transition, as short tokens. */
-export function missingRequirements(task) {
+export function missingRequirements(task, root) {
   const missing = [];
   // EXECUTE→REVIEW accepts affected-scope unit evidence; every later gate needs the full suite.
   const localVerificationMissing = ({ fullUnit = true } = {}) => {
@@ -186,7 +239,12 @@ export function missingRequirements(task) {
     if (!ids.length || !ids.every(text) || new Set(ids).size !== ids.length)
       missing.push("spec:acceptanceCriteria");
   }
-  if (task.state === "execute") localVerificationMissing({ fullUnit: false });
+  if (task.state === "execute") {
+    localVerificationMissing({ fullUnit: false });
+    // #949: Lite lane tasks still must have run verify:prepush on this HEAD.
+    if (root && task.agentAssessment && isLiteLane(task) && !prepushMarkerPresent(task, root))
+      missing.push("verify:prepush");
+  }
   if (task.state === "review") {
     localVerificationMissing();
     reviewMissing();
@@ -222,6 +280,8 @@ export function computeAssessment(task, paths, root = process.cwd()) {
     reviewerAssessment: reviewAssessment,
   });
   result.verificationPlan = verificationPlan(result, task, root);
+  // #949: the lane the task rides is part of the recorded assessment.
+  result.lane = isLiteLane(task, result) ? "lite" : "standard";
   return result;
 }
 /**
@@ -259,9 +319,8 @@ export function requireLocalVerification(task, { fullUnit = true } = {}) {
   requireValue(validateAssessment(task.agentAssessment).length === 0, "Invalid agent assessment");
   for (const skill of task.assessment.requiredSkills)
     requireValue(task.skills.includes(skill), `Required skill not acknowledged: ${skill}`);
-  for (const [kind, required] of Object.entries(task.assessment.verification)) {
-    // Browser E2E is a delivery gate, checked against GitHub in AFTERCARE.
-    if (!required || kind === "e2e") continue;
+  // Lite lane shrinks this to `process` alone via requiredVerificationKinds.
+  for (const kind of requiredVerificationKinds(task)) {
     const result = task.verification[kind];
     requireValue(
       currentEvidence(result, task) && result.success === true,
@@ -272,6 +331,19 @@ export function requireLocalVerification(task, { fullUnit = true } = {}) {
         isFullScopeEvidence(result),
         "Full unit verification is required at this gate (affected scope only satisfies EXECUTE→REVIEW)",
       );
+  }
+}
+/**
+ * #949 Lite lane: verify:prepush recorded a success marker on this HEAD.
+ * Delegates to the same lookup the writer uses (absolute --git-path plus a
+ * sanitized environment) so a GIT_*-polluted hook context cannot make the
+ * reader and the writer disagree about where the marker lives.
+ */
+export function prepushMarkerPresent(task, root) {
+  try {
+    return hasPrepushMarker(root, task.head);
+  } catch {
+    return false;
   }
 }
 /**
@@ -461,11 +533,20 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
       "CI repair limit reached; enter incident",
     );
   }
-  if (task.state === "execute" && event === "ready")
+  if (task.state === "execute" && event === "ready") {
     requireValue(
       !(task.ciFailures ?? []).some((f) => !f.resolvedAt),
       "Unresolved ciFailure records remain; run --resolve-ci-failures first",
     );
+    // #949: the Lite lane cannot merge without having run the same commands
+    // CI runs — the pre-push marker is the (unrecorded) proof it happened.
+    // Checked last so more specific gates report first.
+    if (isLiteLane(task))
+      requireValue(
+        prepushMarkerPresent(task, root),
+        "verify:prepush success marker missing for current HEAD (run pnpm verify:prepush)",
+      );
+  }
 }
 /**
  * #948: a submitted assessment may only raise the machine-derived draft
@@ -560,7 +641,7 @@ export function selectChecks(rawChecks) {
   }
   return selected;
 }
-export function checkAftercare(pr, task, findings) {
+export function checkAftercare(pr, task, findings, paths = []) {
   requireValue(
     pr.headRefOid === task.head && pr.baseRefOid === task.baseHead,
     "PR HEAD/base changed",
@@ -584,20 +665,15 @@ export function checkAftercare(pr, task, findings) {
       isSuccessfulCheck(check),
       `Unsuccessful or pending check: ${check.name ?? check.context}`,
     );
-  const expected = ["Agent harness"];
-  const names = { lint: "Lint", build: "Build", unit: "Test" };
-  for (const [kind, name] of Object.entries(names))
-    if (task.assessment.runtimeRelevant && task.assessment.verification[kind]) expected.push(name);
-  if (task.assessment.verification.e2e)
-    expected.push(
-      "E2E (Playwright / Chromium / public)",
-      "E2E (Playwright / Chromium / authenticated)",
-    );
-  for (const name of expected)
+  // #949: required checks and their acceptance come from expectedCiChecks —
+  // SKIPPED only counts where the harness itself confirms the diff is .md
+  // only. Unobserved/pending/failure never counts for any required check.
+  for (const { name, accept } of expectedCiChecks(paths, task.assessment))
     requireValue(
       checks.some(
         (check) =>
-          (check.name ?? check.context) === name && (check.conclusion ?? check.state) === "SUCCESS",
+          (check.name ?? check.context) === name &&
+          accept.includes(check.conclusion ?? check.state),
       ),
       `Required check not observed successful: ${name}`,
     );

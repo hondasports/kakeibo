@@ -8,6 +8,12 @@ function readyTask() {
   task.review = reviewFixture(task);
   return task;
 }
+const requiredRollup = () =>
+  ["Agent harness", "CI scope", "Lint", "Build", "Test"].map((name) => ({
+    name,
+    status: "COMPLETED",
+    conclusion: "SUCCESS",
+  }));
 function prFixture(task) {
   return {
     number: 1,
@@ -18,18 +24,22 @@ function prFixture(task) {
     mergeable: "MERGEABLE",
     mergeStateStatus: "CLEAN",
     reviewDecision: "",
-    statusCheckRollup: [{ name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" }],
+    statusCheckRollup: requiredRollup(),
   };
 }
 const findings = { pagesComplete: true, unhandledCount: 0, unresolvedThreadCount: 0 };
 describe("GitHub delivery gates", () => {
-  it("does not require skipped application CI for thorough local verification", () => {
+  it("accepts SKIPPED Lint/Build/Test only when the harness confirms .md-only paths", () => {
     const task = readyTask();
-    // thorough is derived from the tier/assessment, not a profile.
-    task.agentAssessment.applied_tier = "T3";
-    task.assessment = computeAssessment(task, ["README.md"]);
-    expect(task.assessment.verification.build).toBe(true);
-    expect(checkAftercare(prFixture(task), task, findings).ready).toBe(true);
+    const pr = prFixture(task);
+    for (const check of pr.statusCheckRollup)
+      if (["Lint", "Build", "Test"].includes(check.name)) check.conclusion = "SKIPPED";
+    // md-only diff: SKIPPED counts as a pass for the application CI jobs.
+    expect(checkAftercare(pr, task, findings, ["README.md"]).ready).toBe(true);
+    // A single code path flips acceptance back to SUCCESS-only (AC2).
+    expect(() => checkAftercare(pr, task, findings, ["src/app.ts"])).toThrow("Required check");
+    // An empty/unknown path list fails closed — SKIPPED is never accepted.
+    expect(() => checkAftercare(pr, task, findings)).toThrow("Required check");
   });
   it("recomputes floors from actual changed paths instead of trusting a PR snapshot", () => {
     const task = readyTask();
@@ -101,6 +111,10 @@ describe("GitHub delivery gates", () => {
   it("requires full-scope unit evidence at the PR checkpoint", () => {
     const task = readyTask();
     task.baseRef = "HEAD";
+    // Standard lane only: T1 lite tasks carry no local evidence requirement,
+    // so exercise the gate on a task that stays standard (T3).
+    task.agentAssessment.applied_tier = "T3";
+    task.risk = "T3";
     const paths = ["src/app.ts"];
     const assessment = computeAssessment(task, paths);
     expect(assessment.verification.unit).toBe(true);
@@ -139,13 +153,21 @@ describe("GitHub delivery gates", () => {
     ).toThrow("approval");
     task.baseRef = "HEAD";
     task.assessment = computeAssessment(task, ["src/app.ts"]);
-    expect(() => checkAftercare(pr, task, findings)).toThrow("Required check");
+    // Any required check missing keeps the gate closed.
+    expect(() =>
+      checkAftercare(
+        { ...pr, statusCheckRollup: pr.statusCheckRollup.filter((c) => c.name !== "Lint") },
+        task,
+        findings,
+        ["src/app.ts"],
+      ),
+    ).toThrow("Required check");
   });
   it("evaluates only the latest run per check name when a check was retried", () => {
     const task = readyTask();
     const pr = prFixture(task);
     pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      ...requiredRollup(),
       {
         name: "E2E (Playwright / Chromium / authenticated)",
         status: "COMPLETED",
@@ -172,7 +194,7 @@ describe("GitHub delivery gates", () => {
     const task = readyTask();
     const pr = prFixture(task);
     pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      ...requiredRollup(),
       {
         name: "E2E (Playwright / Chromium / authenticated)",
         status: "COMPLETED",
@@ -203,7 +225,7 @@ describe("GitHub delivery gates", () => {
     const task = readyTask();
     const pr = prFixture(task);
     pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      ...requiredRollup(),
       {
         name: "E2E (Playwright / Chromium / authenticated)",
         status: "COMPLETED",
@@ -233,7 +255,7 @@ describe("GitHub delivery gates", () => {
     const task = readyTask();
     const pr = prFixture(task);
     pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      ...requiredRollup(),
       {
         name: "E2E (Playwright / Chromium / authenticated)",
         status: "COMPLETED",
@@ -253,7 +275,7 @@ describe("GitHub delivery gates", () => {
     const task = readyTask();
     const pr = prFixture(task);
     pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      ...requiredRollup(),
       {
         name: "E2E (Playwright / Chromium / authenticated)",
         status: "IN_PROGRESS",
@@ -275,7 +297,7 @@ describe("GitHub delivery gates", () => {
     const task = readyTask();
     const pr = prFixture(task);
     pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      ...requiredRollup(),
       {
         name: "E2E (Playwright / Chromium / authenticated)",
         status: "COMPLETED",
@@ -309,11 +331,7 @@ describe("GitHub delivery gates", () => {
       conclusion: "SUCCESS",
       startedAt: "2026-10-03T02:00:00Z",
     };
-    pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
-      failure,
-      success,
-    ];
+    pr.statusCheckRollup = [...requiredRollup(), failure, success];
     expect(() => checkAftercare(pr, task, findings)).toThrow("Unsuccessful");
     pr.statusCheckRollup[1] = success;
     pr.statusCheckRollup[2] = failure;
@@ -323,7 +341,7 @@ describe("GitHub delivery gates", () => {
     const task = readyTask();
     const pr = prFixture(task);
     pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      ...requiredRollup(),
       { context: "ci/context-check", state: "PENDING", createdAt: "2026-10-03T02:00:00Z" },
       { context: "ci/context-check", state: "SUCCESS", createdAt: "2026-10-03T02:10:00Z" },
     ];
@@ -333,7 +351,7 @@ describe("GitHub delivery gates", () => {
     const task = readyTask();
     const pr = prFixture(task);
     pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      ...requiredRollup(),
       {
         name: "E2E (Playwright / Chromium / authenticated)",
         status: "IN_PROGRESS",
@@ -364,7 +382,7 @@ describe("GitHub delivery gates", () => {
     const task = readyTask();
     const pr = prFixture(task);
     pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      ...requiredRollup(),
       { context: "ci/context-check", state: "SUCCESS", createdAt: "2026-10-03T02:00:00Z" },
       { context: "ci/context-check", state: "PENDING", createdAt: "2026-10-03T02:10:00Z" },
     ];
@@ -374,7 +392,7 @@ describe("GitHub delivery gates", () => {
     const task = readyTask();
     const pr = prFixture(task);
     pr.statusCheckRollup = [
-      { name: "Agent harness", status: "COMPLETED", conclusion: "SUCCESS" },
+      ...requiredRollup(),
       {
         name: "E2E (Playwright / Chromium / authenticated)",
         status: "COMPLETED",

@@ -33,6 +33,7 @@ import {
   computeAssessment,
   highestTier,
   checkAftercare,
+  expectedCiChecks,
   selectChecks,
   missingRequirements,
   verificationSummary,
@@ -216,6 +217,17 @@ export function featurePatchSha256(
  * worktree set is re-read every call so uncommitted edits never go stale.
  */
 const committedPathsCache = new Map();
+/**
+ * PR base→head paths for aftercare gating; unreadable revisions return [] so
+ * checkAftercare fails closed (SKIPPED never accepted on an unknown diff).
+ */
+function safeChangedPaths(root, task) {
+  try {
+    return readChangedPathsRevisioned(root, task.baseHead, task.head);
+  } catch {
+    return [];
+  }
+}
 export function readChangedPathsRevisioned(root, baseHead, head) {
   // `baseHead`/`head` are the caller's just-read resolved SHAs; keying and
   // diffing on resolved positions means a moved ref can never alias a stale
@@ -879,14 +891,15 @@ export function deferredBlock(task) {
 export function stateBlock(task) {
   return `${STATE_START}\n\`\`\`json\n${JSON.stringify(compactTaskForExport(task), null, 1)}\n\`\`\`\n${STATE_END}`;
 }
-function nextActions(task) {
-  const missing = missingRequirements(task);
+function nextActions(task, root) {
+  const missing = missingRequirements(task, root);
   const actions = [];
   for (const item of missing) {
     if (item === "assessment" || item === "assessment(invalid)")
       actions.push("node scripts/loop-runner.mjs --assessment <file>");
     else if (item === "openMaterialDecisions")
       actions.push("resolve spec openMaterialDecisions or --event decision_required");
+    else if (item === "verify:prepush") actions.push("pnpm verify:prepush");
     else if (item.startsWith("verify:")) {
       const verify =
         task.state === "review"
@@ -926,7 +939,7 @@ export const STATE_WORKFLOWS = {
   aftercare: ".agent/workflow/aftercare.md",
   incident: ".agent/workflow/incident.md",
 };
-export function summarizeTask(task) {
+export function summarizeTask(task, root) {
   return {
     taskId: task.taskId,
     state: task.state,
@@ -934,11 +947,12 @@ export function summarizeTask(task) {
     head: task.head,
     baseHead: task.baseHead,
     risk: task.risk,
-    missing: missingRequirements(task),
+    lane: task.assessment?.lane ?? null,
+    missing: missingRequirements(task, root),
     verification: verificationSummary(task),
     openFindings: (task.findings ?? []).filter((finding) => finding.status === "open").length,
     aftercare: aftercareSummary(task),
-    next: nextActions(task),
+    next: nextActions(task, root),
   };
 }
 /** Evidence manifest per verification kind — paths/hashes/summaries, never raw logs. */
@@ -995,7 +1009,7 @@ export function reviewerVerificationManifest(task) {
 }
 function explainTask(task, root) {
   return {
-    ...summarizeTask(task),
+    ...summarizeTask(task, root),
     requiredSkills: task.assessment?.requiredSkills ?? [],
     skills: task.skills ?? [],
     riskDetail: {
@@ -1144,7 +1158,7 @@ const requireIntervalSeconds = (value) =>
     "--interval-seconds must be a number >= 1",
   );
 /** Compact per-poll snapshot for --watch-aftercare; never throws on the gate. */
-export function aftercareSnapshot(prFields, task, findings, pr) {
+export function aftercareSnapshot(prFields, task, findings, pr, paths = []) {
   const checks = selectChecks(prFields.statusCheckRollup ?? []);
   const checkName = (check) => check.name ?? check.context ?? "";
   const pending = checks.filter(checkPending).map(checkName);
@@ -1157,7 +1171,7 @@ export function aftercareSnapshot(prFields, task, findings, pr) {
     .map(checkName);
   let ready = false;
   try {
-    checkAftercare(prFields, task, findings);
+    checkAftercare(prFields, task, findings, paths);
     ready = true;
   } catch {
     ready = false;
@@ -1165,6 +1179,10 @@ export function aftercareSnapshot(prFields, task, findings, pr) {
   return {
     pr: prFields.number ?? pr,
     ready,
+    // #949: the lane and the required checks + acceptance rule are part of
+    // the observation output (--check-pr / --watch-aftercare).
+    lane: task.assessment?.lane ?? null,
+    expectedChecks: expectedCiChecks(paths, task.assessment),
     pending,
     failed,
     unhandledFindings: findings?.unhandledCount ?? null,
@@ -1276,6 +1294,7 @@ export function watchAftercare(
   let signature = null;
   let prevSnapshot = null;
   let polls = 0;
+  const watchPaths = safeChangedPaths(root, task);
   while (true) {
     polls += 1;
     let snapshot;
@@ -1283,7 +1302,7 @@ export function watchAftercare(
       const prFields = pollPr();
       const findings = pollFindings();
       lastPoll = { prFields, findings };
-      snapshot = aftercareSnapshot(prFields, task, findings, pr);
+      snapshot = aftercareSnapshot(prFields, task, findings, pr, watchPaths);
     } catch (error) {
       // A transient fetch failure is a poll event, not a watch failure.
       snapshot = { pr, ready: false, error: String(error?.message ?? error) };
@@ -1396,9 +1415,10 @@ export function inspectPullRequest(task, pr, handled, root, services = {}) {
   // extra fetch on the ready path is the single `after` fetchPr (TOCTOU check).
   const before = services.before ?? fetchPr();
   const findings = services.findings ?? fetchFindings();
-  const evidence = checkAftercare(before, task, findings);
+  const prPaths = safeChangedPaths(root, task);
+  const evidence = checkAftercare(before, task, findings, prPaths);
   const after = fetchPr();
-  checkAftercare(after, task, findings);
+  checkAftercare(after, task, findings, prPaths);
   requireValue(
     before.baseRefName === after.baseRefName && before.headRefOid === after.headRefOid,
     "PR changed during aftercare",
@@ -1411,7 +1431,7 @@ export function inspectPullRequest(task, pr, handled, root, services = {}) {
   );
   return {
     evidence,
-    snapshot: aftercareSnapshot(after, task, findings, pr),
+    snapshot: aftercareSnapshot(after, task, findings, pr, prPaths),
     // #958: flaky診断など観測専用の下流利用（追加フィールドはgateに使わない）
     prFields: after,
   };
@@ -1567,7 +1587,7 @@ export function buildReviewPacket(
       )}\n`,
     );
   }
-  write("task-summary.json", `${JSON.stringify(summarizeTask(task), null, 2)}\n`);
+  write("task-summary.json", `${JSON.stringify(summarizeTask(task, root), null, 2)}\n`);
   write(
     "verification-manifest.json",
     `${JSON.stringify(reviewerVerificationManifest(task), null, 2)}\n`,
@@ -1926,7 +1946,13 @@ export function run(args, root = process.cwd(), services = {}) {
       // checkAftercareのgate失敗（check赤・未処理finding等）でもflaky診断を
       // 返す（観測面としてready:falseで応答）。HEAD/base変更やローカル改変
       // などの整合性エラーはgate失敗ではないので従来どおり投げる。
-      const snapshot = aftercareSnapshot(before, task, findings, args["check-pr"]);
+      const snapshot = aftercareSnapshot(
+        before,
+        task,
+        findings,
+        args["check-pr"],
+        safeChangedPaths(root, task),
+      );
       if (snapshot.ready) throw error;
       return {
         taskId: task.taskId,
@@ -1953,7 +1979,7 @@ export function run(args, root = process.cwd(), services = {}) {
     const target = taskPath(root);
     if (!existsSync(target)) return { state: null, next: [] };
     const probe = JSON.parse(readFileSync(target, "utf8"));
-    return { state: probe.state ?? null, next: nextActions(probe) };
+    return { state: probe.state ?? null, next: nextActions(probe, root) };
   }
   if (args.draft) {
     // #948: emit a machine-prefilled draft JSON for the agent to complete.
@@ -2133,7 +2159,7 @@ export function run(args, root = process.cwd(), services = {}) {
           state: task.state,
           watch: { events: result.events, last: result.last },
         };
-      return { ...summarizeTask(task), watch: { events: result.events, last: result.last } };
+      return { ...summarizeTask(task, root), watch: { events: result.events, last: result.last } };
     } else {
       task = githubAftercare(task, args.aftercare, args.handled, root);
     }
@@ -2197,7 +2223,8 @@ export function run(args, root = process.cwd(), services = {}) {
         () => (deferred ? `\n\n${deferred}` : ""),
       );
     else if (deferred) body = `${body}\n\n${deferred}`;
-    if (body === pr.body) return { ...summarizeTask(task), pr: args["sync-pr"], synced: false };
+    if (body === pr.body)
+      return { ...summarizeTask(task, root), pr: args["sync-pr"], synced: false };
     const temp = mkdtempSync(path.join(tmpdir(), "agent-state-"));
     try {
       const file = path.join(temp, "body.md");
@@ -2206,7 +2233,7 @@ export function run(args, root = process.cwd(), services = {}) {
     } finally {
       rmSync(temp, { recursive: true, force: true });
     }
-    return { ...summarizeTask(task), pr: args["sync-pr"], synced: true };
+    return { ...summarizeTask(task, root), pr: args["sync-pr"], synced: true };
   }
   return task;
 }
@@ -2246,7 +2273,7 @@ export function cliMain(
     const output =
       typeof result === "string"
         ? result
-        : JSON.stringify(result.version === 2 ? summarizeTask(result) : result, null, 2);
+        : JSON.stringify(result.version === 2 ? summarizeTask(result, root) : result, null, 2);
     log(output);
     // Measure what was emitted: the print call appends a trailing newline.
     recordCliOutput(root, command, `${output}\n`, 0);

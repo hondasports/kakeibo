@@ -16,6 +16,6 @@ Acceptance Criteriaを満たす最小差分を実装し、必要な検証が通�
 
 ## Exit
 
-`loop-runner --verify-required` でHEADに紐づくprocess・必要なlint/unit/buildを記録する。unitはここでは差分関連（affected）で足り、full unitはREVIEW中にReviewerと並行して完了させる。ブラウザ受入条件がある場合は対象E2Eをlocal実行する。E2Eが必須と判定され、PR CIで確認する場合はpendingとして残し、AFTERCAREでpublic/authenticated両方の成功を要求する。文書・工程管理のみなど差分判定でE2E対象外となる変更には、このCI待ちを追加しない。実行対象の判定は `node scripts/classify-e2e-relevance.mjs --base <base SHA> --head <head SHA>` の出力に従う（`runtime_relevant: true` なら対象）。判定ルールの正本は `docs/development-process.md#pr-ci-e2eの差分判定` で、判定の理由を知りたいときだけ参照する。
+`loop-runner --verify-required` でHEADに紐づくprocess・必要なlint/unit/buildを記録する（Lite laneではprocessのみを記録し、対象unit・型・lint・対象E2Eの判定はCIのcheckが正本。代わりに `ready` は現在HEADの `verify:prepush` 成功マーカーを要求する）。unitはここでは差分関連（affected）で足り、full unitはREVIEW中にReviewerと並行して完了させる。ブラウザ受入条件がある場合は対象E2Eをlocal実行する。E2Eが必須と判定され、PR CIで確認する場合はpendingとして残し、AFTERCAREでpublic/authenticated両方の成功を要求する。文書・工程管理のみなど差分判定でE2E対象外となる変更には、このCI待ちを追加しない。実行対象の判定は `node scripts/classify-e2e-relevance.mjs --base <base SHA> --head <head SHA>` の出力に従う（`runtime_relevant: true` なら対象）。判定ルールの正本は `docs/development-process.md#pr-ci-e2eの差分判定` で、判定の理由を知りたいときだけ参照する。
 
 実装とこの工程の要求検証が揃い、未解決blockerがなければ `ready`。ユーザーがPR作業を許可したタスクで初めてREVIEWへ進む場合は、branchをpushしてdraft PRを作り、外部レビューを内部レビューと並行させる（状態ブロックはAFTERCAREで同期する）。pushは `.husky/pre-push` の `verify:prepush`（型・lint/format・対象unit・条件付きprocess・対象E2E）を必ず通す。E2E事前条件を満たせず迂回する場合だけ `git push --no-verify` を使い、PR本文にその事実を記載する。仕様判断が必要なら `decision_required`。

@@ -111,6 +111,24 @@ node scripts/loop-runner.mjs --review-packet /tmp/issue-900-full --full-review
 
 指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、2roundごとにreassessmentを要求する。5round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。遷移時に証跡を無条件失効させることはない——証跡の失効は実際のHEAD/base変更時だけ判定する。却下で終わる指摘やmetadata-onlyの修正で全検証をやり直させないためである。同じラウンドのopen findingはまとめて修正・再検証する（`.agent/workflow/review.md` 参照）。
 
+## Lite lane
+
+評価が `final tier = T1` かつMachine Floor triggerなし・独立レビュー不要のタスクはLite laneを走る（computed assessmentの `lane: "lite"`。それ以外は `"standard"`）。Lite laneではローカル検証を `process` だけに絞り、対象unit・型・lint・対象E2Eの判定はCIに委ねる。runnerはその結果を検証証跡として記録しない。
+
+- `--verify-required` とcheckpoint検証はprocessだけを要求・実行する。REVIEWの `clean` でもfull unitの証跡は不要。
+- EXECUTE→REVIEWの `ready` には、現在HEADに対応する `agent-prepush/<head>.ok` 成功マーカーが必要（`pnpm verify:prepush` またはpre-push hookが刻む。証跡JSONではなくファイルの存在だけを見る）。マーカーがなければreadyは拒否される。
+- `aftercare` および `--check-pr` の必須checkは `expectedCiChecks(paths, assessment)` が決め、 `--check-pr` は各checkの `accept` と `reason` を `expectedChecks` として表示する。
+
+| check | accept | reason |
+| --- | --- | --- |
+| `Agent harness` | `SUCCESS` のみ | delivery gate |
+| `CI scope` | `SUCCESS` のみ | diff classification |
+| `Lint` / `Build` / `Test` | `.md`だけの差分（`ciCodeChanged` がハーネス自身で判定）なら `SUCCESS` または `SKIPPED`。それ以外は `SUCCESS` のみ | md-only: SKIPPED accepted / required for code changes |
+| `E2E (Playwright / Chromium / public)` `E2E (Playwright / Chromium / authenticated)` | `SUCCESS` のみ | `assessment.verification.e2e` がtrueのとき必須 |
+| その他（`Vercel` 等） | 現行どおりのglobal判定（observed checkは成功が必要） | — |
+
+SKIPPEDを合格として扱うのは、ハーネス自身が `.md` だけの変更と確認できた場合に限る。差分が読めない・空の場合はSUCCESS必須側へfail closedする。CI scope jobが `no_code` 判定した場合にLint/Build/TestがSKIPPEDになる経路は `.github/workflows/ci.yml` 参照。
+
 ## PRとAFTERCARE
 
 ユーザーがPR作業を許可したタスクでは、初回のEXECUTE→REVIEW進入時にbranchをpushし、Human Requestと更新履歴ブロックを持つdraft PRを作る（`gh pr create --draft`）。状態ブロックはまだ含めない（`--export` はAFTERCARE以降のみ）。CodeRabbitはdraftもレビューするため、外部レビューが内部の独立レビューと並行して進む。draft PRでは `Agent harness` とE2Eのjobをスキップする（checkはSKIPPEDとなり、AFTERCAREが要求するSUCCESSを満たさない）。lint/test/buildのCIはdraftでも実行される。REVIEW clean後に `--sync-pr` で状態ブロックを入れてから `gh pr ready <番号>` でready化すると、`ready_for_review` で `Agent harness` とE2Eが同じHEADに対して実行される。draftはGitHubでmergeできず、AFTERCAREもnon-draftを要求するため、draft中のスキップが最終ゲートを弱めることはない。PR作業の許可がないタスクでは従来どおりAFTERCAREでPRを作る。REVIEW中のdraft PRには状態ブロックがないため、その間にSessionを失った場合は `--restore-pr` で復元できない。作業worktreeのGitメタデータから再開し、worktreeも失った場合はREFINEからやり直す。
@@ -159,7 +177,7 @@ node scripts/loop-runner.mjs --event ready --handled /tmp/handled.txt
 node scripts/loop-runner.mjs --sync-pr 123
 ```
 
-状態や本文を更新せず現在のPRを確認する場合は `--check-pr` を使う。AFTERCARE/DONEで利用でき、PR CIと共通のlocal検証・レビューcheckpointを照合した後、GitHubを再取得してHEAD/base・最新CI・approval・mergeability・findingを確認する。成功時は `ready: true` と要約を返す。gate条件（check失敗・未処理finding・approval欠落等）を満たさない場合は `ready: false` と `gateError`（失敗理由）を返す。HEAD/baseの変化やローカル改変などの整合性エラーは従来どおり失敗する。古いDONE記録だけを成功根拠にしない。
+状態や本文を更新せず現在のPRを確認する場合は `--check-pr` を使う。AFTERCARE/DONEで利用でき、PR CIと共通のlocal検証・レビューcheckpointを照合した後、GitHubを再取得してHEAD/base・最新CI・approval・mergeability・findingを確認する。成功時は `ready: true` と要約を返す。gate条件（check失敗・未処理finding・approval欠落等）を満たさない場合は `ready: false` と `gateError`（失敗理由）を返す。`lane`（lite/standard）と `expectedChecks`（要求check名・accept・reason）も返し、何が不合格の根拠かをそのまま確認できる。HEAD/baseの変化やローカル改変などの整合性エラーは従来どおり失敗する。古いDONE記録だけを成功根拠にしない。
 
 ```bash
 node scripts/loop-runner.mjs --check-pr 123 --handled /tmp/handled.txt
