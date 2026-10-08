@@ -2,19 +2,14 @@
 
 PR作成後のlatest HEADに対してCI・レビュー指摘・承認・競合・mergeabilityを確認し、merge_readyまで進める。
 
-`node scripts/loop-runner.mjs --next` を実行する。`--sync-pr`（状態ブロックをPR本文へ。draftのままではready扱いにならない）→ `gh pr ready`（draftのとき。`ready_for_review` で `Agent harness` とE2Eが実行される）→ watch待機 → `ready` 遷移 → `--publish-metrics` まで機械実行する。止まるのは `action_required`（未処理指摘・未解決thread・承認待ち・revision変更）とCI失敗（`needs:"ci_reproduce"`、`{failedTests, traceUrl, reproduce}` を返す）とCI pending（`needs:"ci_pending"`）である。draft PRがなければ先にPRを作る（EXECUTEで `prAllowed===true` のとき `--next` が自動作成済みのはず）。
+## 判断
 
-- `node scripts/collect-pr-findings.mjs --pr <番号>` で外部findingを収集し、仕様と照合して修正または根拠付きで棄却する。
-- CI失敗の再現（`needs:"ci_reproduce"`）: `--ci-failures <番号>` で機械抽出する（`{check,head,runUrl,artifactUrl,failedTests,reproduce}`）。`reproduce` コマンドでローカル再現を試し、結果を `ci_failure` の exit へ `--draft exit --event ci_failure` の下書きに抽出レコードとreproduction結果を記入して必ず記録し、EXECUTE へ戻す（複数check同時失敗は `ciFailure` を配列で1遷移にまとめる。`note` は任意だが再現状況の根拠を書くことを推奨）。`result` は `reproduced` または `not_reproduced`。`not_reproduced`（ローカルで再現しない）は修復を推測せず INCIDENT へ遷移する。`--next` はこのイベントを発火しない — Agentが再現を試してから記録する。
-- `ci_failure` で戻ったEXECUTEは未解決レコードがある限り `ready` で止まる。修正を push したら `--resolve-ci-failures` を実行する。runner自身がpush前検証（E2E/unitは失敗spec/testファイルを対象化、lint/build等のジョブ失敗は全量）を走らせ、exit 0 のときだけ解決扱いになる（成功マーカーだけでは解決にならない）。
-- E2Eのリトライは local/CI とも 1 回に統一。リトライで通った flaky テストは CI の job summary と `--check-pr` の `flakyTests` に出る。flaky を観測したら follow-up Issue を起票する。
-- 新規findingは `findings` でEXECUTEへ戻す。
-- owner approval等の人間承認が必要なら `decision_required` とする。
-- pending、API取得失敗、required check未観測、HEAD変更はready扱いしない。
-- CI待ちは `--aftercare <番号> --watch-aftercare` でpollできる。初回snapshotは `changed:false` のeventとして必ず返し、以後は状態変化時だけ差分event（変化した項目＋`added`/`removed`のpending/failed＋消えたキー名の `removedKeys`）を返す。結果の `watch.last` に最終snapshot全体を含む。変化なしのpollは出力なし。待たず即時確認が既定。
-- 状態や本文を更新しない観測には `--check-pr <番号>` を使う。AFTERCARE/DONEで同じHEAD/base・検証・レビュー・最新CI・finding判定を適用し、taskの成功記録を書き換えない。待機は `--check-pr <番号> --watch-aftercare` に集約し、別のCI確認ループを重ねない。PRの状態確認は `--check-pr` に統一し、`gh pr view` で本文（body）を取得しない——状態ブロックごとcontextへ読み込まれるため。`gh` が必要な場合だけ `--json` で body 以外のフィールドを指定する。
-- read-only監視で未処理指摘・未解決thread・新しい失敗・承認待ち・revision変更を検出したら `ready: false, reason: action_required` でAgentへ戻す。判断が必要な状態のまま待機を繰り返さない。
-- `--sync-pr` はPR作成後・修正HEADのレビュー完了・状態遷移など復元用checkpointが変わる節目で行う。同一本文ならwriteを省略する。bot確認日時や待機snapshotの更新だけを人間向け本文へ書き戻さない。handled記録は別ファイルで管理し、別Sessionでは最新コメントを再取得・再確認して作り直す。
-- DONE本文の同期でcheckやbotコメントが更新された場合は、`--check-pr` で現在の結果を確認する。観測結果をまた本文へ書く連鎖を作らない。新規の実指摘は通常どおりfindingsとして対応する。
+- 外部findingは `node scripts/collect-pr-findings.mjs --pr <番号>` で収集し、仕様と照合して修正または根拠付きで棄却する。
+- CI失敗（`needs:"ci_reproduce"`）は `--ci-failures <番号>` の `reproduce` コマンドでローカル再現を試し、結果を `--draft exit --event ci_failure` の下書きに記入して記録する。`not_reproduced`（ローカルで再現しない）は修復を推測せずINCIDENTへ。未解決recordはEXECUTEの `ready` を塞ぎ、修正push後は `--resolve-ci-failures` が検証を実走して解決扱いにする。
+- E2Eのリトライはlocal/CIとも1回に統一。flakyを観測したらfollow-up Issueを起票する。
+- owner approval等の人間承認が必要なら `decision_required`。pending・API取得失敗・required check未観測・HEAD変更はready扱いしない。判断が必要な状態のまま待機を繰り返さない。
+- `--sync-pr` はcheckpointが変わる節目で行い、同一本文ならwriteを省略する。観測だけなら `--check-pr`（状態・本文を更新しない）。
 
-必要条件を満たしHEAD不変を再確認できたら `ready`。`ready`（DONE）直後にmetrics要約をPRのマーカー付きコメント（`<!-- agent-metrics:v1 task=<taskId> -->`）へ保存する（`--next` ではこの工程の最後に自動実行される）。同じマーカーのコメントは更新されるため再実行しても1件のまま。コメントは状態ブロックとは別物で、PR本文・CIとは連鎖しない。
+## Exit
+
+`node scripts/loop-runner.mjs --next` を実行する（`--sync-pr` → ready化 → watch → `ready` → `--publish-metrics` まで機械実行）。止まるのは `action_required`・`ci_reproduce`・`ci_pending`。詳細は `docs/agent-harness.md#prとaftercare`、遷移・上限は `docs/agent-harness-states.md`。

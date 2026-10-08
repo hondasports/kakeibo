@@ -2,6 +2,8 @@ import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { checkHarnessStatesDoc, STATES_DOC_PATH } from "./generate-harness-docs.mjs";
+
 const DOC_SCAN_GLOBS = [
   /^AGENTS\.md$/,
   /^README\.md$/,
@@ -45,6 +47,32 @@ const REFERENCE_ALLOWLIST = [/^\.env\.local$/, /^docs\/generated\//, /^convex\/e
 const MARKDOWN_LINK_PATTERN = /\[[^\]]*\]\(([^)\s]+)\)/g;
 const SKILL_NAME_PATTERN = /^skills\/([a-z0-9-]+)\/SKILL\.md$/;
 const SECTION_HEADING_PATTERN = /^## (\d+)\. /gm;
+const HEADING_PATTERN = /^#{1,6} +(.*)$/gm;
+
+/** Stateの上限値キー名は process.yaml が正本で、文書では agent-harness-states.md（生成物）だけに書く。 */
+const LIMIT_KEY_PATTERN =
+  /\b(?:same_failure_max|review_reassess_every|review_max_rounds|ci_fix_max_rounds)\b/;
+
+/** GitHubが見出しに付けるアンカーのslugに近い変換（小文字化・空白を-へ・句読点除去）。 */
+export function anchorSlug(heading) {
+  return String(heading)
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\p{M}_\- ]/gu, "")
+    .replace(/ /g, "-");
+}
+
+function collectAnchors(content) {
+  const anchors = new Set();
+  const seen = new Map();
+  for (const match of String(content).matchAll(HEADING_PATTERN)) {
+    const base = anchorSlug(match[1]);
+    const count = seen.get(base) ?? 0;
+    seen.set(base, count + 1);
+    anchors.add(count === 0 ? base : `${base}-${count}`);
+  }
+  return anchors;
+}
 
 /** Normalize repository paths before validation. */
 function normalizePath(value) {
@@ -204,14 +232,24 @@ export function checkPathReferences(repoRoot, docPath, content) {
 
   for (const match of String(content).matchAll(MARKDOWN_LINK_PATTERN)) {
     const target = match[1];
-    if (/^(?:https?:|mailto:|#)/.test(target)) continue;
-    // A `#fragment` suffix names a section anchor, not part of the file name —
-    // only the file portion must exist.
-    const filePart = target.split("#")[0];
+    if (/^(?:https?:|mailto:)/.test(target)) continue;
+    // A `#fragment` suffix names a section anchor: check both the file and the heading.
+    const [filePart, anchor] = target.split("#");
     // Markdown links are resolved relative to the document (GitHub semantics).
     const { relativePath, exists } = resolveCandidate(repoRoot, docDir, filePart);
     if (!exists) {
       errors.push(`${docPath}: リンク先 ${target} (${relativePath}) が存在しません`);
+      continue;
+    }
+    if (anchor) {
+      const targetContent =
+        relativePath === docPath
+          ? content
+          : readFileSync(path.join(repoRoot, relativePath), "utf8");
+      const anchorName = decodeURIComponent(anchor).toLowerCase();
+      if (!collectAnchors(targetContent).has(anchorName)) {
+        errors.push(`${docPath}: リンク先 ${target} のセクション ${anchor} が存在しません`);
+      }
     }
   }
 
@@ -289,6 +327,19 @@ export function checkBannedVocabulary(docPath, content) {
   return errors;
 }
 
+/** State上限値のキー名は生成物の agent-harness-states.md だけに出す（正本は process.yaml）。 */
+export function checkLimitKeyMentions(docPath, content) {
+  const errors = [];
+  if (docPath === STATES_DOC_PATH) return errors;
+  const match = String(content).match(LIMIT_KEY_PATTERN);
+  if (match) {
+    errors.push(
+      `${docPath}: 上限値キー "${match[0]}" は ${STATES_DOC_PATH}（process.yamlから自動生成）だけに書く`,
+    );
+  }
+  return errors;
+}
+
 /** Run all repository-level Agent Harness documentation consistency checks. */
 export function checkLoopDocs(repoRoot) {
   const errors = [];
@@ -316,12 +367,16 @@ export function checkLoopDocs(repoRoot) {
   errors.push(...checkAgentsSkillReferences(repoRoot));
   errors.push(...checkSkillsDiscoverability(repoRoot));
 
+  const generatedDrift = checkHarnessStatesDoc(repoRoot);
+  if (generatedDrift) errors.push(generatedDrift);
+
   const packageScripts = loadPackageScripts(repoRoot);
   for (const docPath of docFiles) {
     const content = readFileSync(path.join(repoRoot, docPath), "utf8");
     errors.push(...checkPathReferences(repoRoot, docPath, content));
     errors.push(...checkCommandReferences(repoRoot, docPath, content, packageScripts));
     errors.push(...checkBannedVocabulary(docPath, content));
+    errors.push(...checkLimitKeyMentions(docPath, content));
     if (SKILL_NAME_PATTERN.test(docPath)) {
       errors.push(...checkSkillFrontmatter(repoRoot, docPath));
     }

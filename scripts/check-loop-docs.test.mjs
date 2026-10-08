@@ -7,12 +7,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   checkBannedVocabulary,
   checkCommandReferences,
+  checkLimitKeyMentions,
   checkLoopDocs,
   checkPathReferences,
   checkSectionNumbering,
   extractSkillReferences,
   parseFrontmatter,
 } from "./check-loop-docs.mjs";
+import { checkHarnessStatesDoc, generateHarnessStatesDoc } from "./generate-harness-docs.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tempDirs = [];
@@ -357,6 +359,135 @@ describe("scan scope", () => {
     const result = checkLoopDocs(repo);
     expect(result.docFiles).not.toContain("docs/linked/hidden.md");
     expect(result.errors.some((e) => e.includes("PREPARE"))).toBe(false);
+  });
+});
+
+describe("link anchor validation", () => {
+  it("accepts a markdown link whose fragment matches a heading in the target", () => {
+    const repo = makeRepo();
+    write(repo, "docs/target.md", "# T\n\n## 実装と検証\n\nbody\n");
+    write(repo, "docs/source.md", "[x](target.md#実装と検証)");
+    const errors = checkPathReferences(repo, "docs/source.md", "[x](target.md#実装と検証)");
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects a markdown link whose fragment is missing in the target", () => {
+    const repo = makeRepo();
+    write(repo, "docs/target.md", "# T\n\n## other section\n\nbody\n");
+    const errors = checkPathReferences(repo, "docs/source.md", "[x](target.md#実装と検証)");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("セクション");
+  });
+
+  it("accepts duplicate headings via GitHub's -N suffix numbering", () => {
+    const repo = makeRepo();
+    write(repo, "docs/target.md", "## repeat\n## repeat\n## repeat\n");
+    const errors = checkPathReferences(repo, "docs/source.md", "[x](target.md#repeat-2)");
+    expect(errors).toEqual([]);
+  });
+
+  it("skips fragments on external URLs", () => {
+    const repo = makeRepo();
+    const errors = checkPathReferences(
+      repo,
+      "docs/source.md",
+      "[x](https://example.com/doc#anything)",
+    );
+    expect(errors).toEqual([]);
+  });
+});
+
+describe("limit key mentions", () => {
+  it("rejects limit key names in handwritten docs", () => {
+    const errors = checkLimitKeyMentions("docs/x.md", "上限は review_max_rounds を参照");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("agent-harness-states.md");
+  });
+
+  it("rejects every limit key", () => {
+    for (const key of [
+      "same_failure_max",
+      "review_reassess_every",
+      "review_max_rounds",
+      "ci_fix_max_rounds",
+    ]) {
+      expect(checkLimitKeyMentions("docs/x.md", `値 ${key}`)).toHaveLength(1);
+    }
+  });
+
+  it("allows the generated states doc to name the keys", () => {
+    expect(checkLimitKeyMentions("docs/agent-harness-states.md", "review_max_rounds: 5")).toEqual(
+      [],
+    );
+  });
+
+  it("does not flag unrelated words", () => {
+    expect(checkLimitKeyMentions("docs/x.md", "round数の上限")).toEqual([]);
+  });
+});
+
+describe("generated states doc drift", () => {
+  const PROCESS_YAML = [
+    "initial: refine",
+    "limits:",
+    "  same_failure_max: 3",
+    "states:",
+    "  refine:",
+    "    workflow: .agent/workflow/refine.md",
+    "    on:",
+    "      ready: execute",
+    "  execute:",
+    "    workflow: .agent/workflow/execute.md",
+    "    on:",
+    "      ready: review",
+    "  review:",
+    "    terminal: false",
+    "    on:",
+    "      clean: done",
+    "  done:",
+    "    terminal: true",
+    "",
+  ].join("\n");
+
+  function repoWithStatesDoc() {
+    const repo = makeRepo();
+    write(repo, ".agent/process.yaml", PROCESS_YAML);
+    write(repo, "docs/agent-harness-states.md", generateHarnessStatesDoc(PROCESS_YAML));
+    return repo;
+  }
+
+  it("returns null when the committed doc matches process.yaml", () => {
+    expect(checkHarnessStatesDoc(repoWithStatesDoc())).toBeNull();
+  });
+
+  it("fails when process.yaml drifts from the committed doc", () => {
+    const repo = repoWithStatesDoc();
+    write(
+      repo,
+      ".agent/process.yaml",
+      PROCESS_YAML.replace("same_failure_max: 3", "same_failure_max: 4"),
+    );
+    const error = checkHarnessStatesDoc(repo);
+    expect(error).toContain("一致しません");
+    expect(error).toContain("generate-harness-docs.mjs");
+  });
+
+  it("fails through checkLoopDocs when the generated doc is stale", () => {
+    const repo = repoWithStatesDoc();
+    write(repo, "AGENTS.md", "x");
+    write(repo, "docs/development-process.md", "# doc");
+    write(
+      repo,
+      ".agent/process.yaml",
+      PROCESS_YAML.replace("same_failure_max: 3", "same_failure_max: 9"),
+    );
+    const result = checkLoopDocs(repo);
+    expect(result.errors.some((e) => e.includes("agent-harness-states.md"))).toBe(true);
+  });
+
+  it("returns null when process.yaml is absent", () => {
+    const repo = makeRepo();
+    expect(checkHarnessStatesDoc(repo)).toBeNull();
   });
 });
 
