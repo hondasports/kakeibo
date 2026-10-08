@@ -270,6 +270,12 @@ export function startTask(args, root) {
     stdio: "pipe",
   });
   const spec = readSubmission(args.init, "spec");
+  // #954: the reference form is wire-only — init must take the full spec just
+  // like --spec, so a state block can never seed a fresh task.
+  requireValue(
+    typeof spec?.ref !== "string",
+    "--init requires the full spec form, not a state-block reference",
+  );
   // Open decisions are allowed in REFINE; leaving it requires a complete spec.
   // --model/--profile are still accepted by the argument parser but no longer used.
   const configuration = { runtime: resolveRuntime({ runtime: args.runtime, root }) };

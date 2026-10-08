@@ -1009,6 +1009,37 @@ describe("persistent task gates", () => {
     expect(() => parseStateBlock(stripped, dir)).toThrow("specInline");
   });
 
+  it("rejects a ref-form spec at --init (#954 F6)", () => {
+    const { git } = repository();
+    const parent = mkdtempSync(path.join(tmpdir(), "loop-init-ref-"));
+    dirs.push(parent);
+    const checkout = path.join(parent, "checkout-ref");
+    git("worktree", "add", "-b", "codex/refinit", checkout, "preview");
+    const refSpec = path.join(parent, "spec-ref.json");
+    writeFileSync(
+      refSpec,
+      JSON.stringify({
+        ref: "issue#954",
+        fingerprint: "abc123",
+        predictedRisk: "T2",
+        acIds: ["AC1"],
+        openDecisions: 0,
+      }),
+    );
+    expect(() =>
+      run(
+        {
+          init: refSpec,
+          task: "refinit",
+          runtime: "codex",
+          implementer: "author",
+          base: "preview",
+        },
+        checkout,
+      ),
+    ).toThrow("full spec form");
+  });
+
   it(
     "runs the startup-to-PR path through the real CLI in an isolated worktree",
     { timeout: 30000 },
