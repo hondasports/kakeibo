@@ -43,6 +43,8 @@
     "scripts/resolve-agent-profile.test.mjs",
     "scripts/ci-change-scope.mjs",
     "scripts/ci-change-scope.test.mjs",
+    "scripts/ci-failure.mjs",
+    "scripts/ci-failure.test.mjs",
     "scripts/start-ci-convex.mjs",
     "scripts/start-ci-convex.test.mjs",
     "scripts/start-local-convex.mjs",

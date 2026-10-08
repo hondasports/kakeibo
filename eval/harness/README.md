@@ -4,7 +4,7 @@
 ハーネス版どうしを比較して確認する仕組み（Issue #943）。
 
 - `golden-set.json` … 過去のPRから作った代表タスク5件（g1〜g5）。`oracle` は採点専用で、Agentには見せない。
-- `harness-paths.json` … 評価対象のハーネスを過去コミットへoverlayするファイル一覧。ハーネスファイルを追加・移動したIssueはこの一覧も更新する。
+- `harness-paths.json` … 評価対象のハーネスを過去コミットへoverlayするファイル一覧。ハーネスファイルを追加・移動したIssueはこの一覧も更新する。`prepare` はこの一覧を **`<ref>` 側から読む**（`git show <ref>:eval/harness/harness-paths.json`）ため、呼び出し側のcheckoutより新しいハーネスが独自の依存ファイルを連れてきても正しくoverlayされる。`<ref>` にファイルが無い場合のみ実行側の一覧へfallbackする。
 - `baseline/<harnessVersion>.jsonl` … 現行ハーネスの実績（1タスク1行。`taskId` はgolden id）。
 
 ## 計測の分担
