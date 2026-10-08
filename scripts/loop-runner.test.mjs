@@ -42,6 +42,7 @@ import {
   repositorySlugFromRemoteUrl,
   resolveRepositorySlug,
   compactTaskForExport,
+  deferredBlock,
   hydrateExportedTask,
   acceptanceCriteriaHash,
   STATE_WORKFLOWS,
@@ -950,11 +951,12 @@ describe("persistent task gates", () => {
     expect(loadTask(dir).state).toBe("incident");
     expect(() => runVerification(task, "process", dir, () => ({ status: 0 }))).toThrow("execute");
   });
-  it("requires reassessment every three rounds and stops at the configured cap", () => {
+  it("requires reassessment every two rounds and stops at the configured cap (AC5)", () => {
     const task = taskFixture(root, { state: "review" });
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 5; i++) {
       task.state = "review";
-      if ((i + 1) % 3 === 0)
+      // Rounds 2 and 4 demand a strategy reassessment.
+      if ((i + 1) % 2 === 0)
         expect(() => transitionTask(task, "findings", { reason: "finding" }, root)).toThrow(
           "reassessment",
         );
@@ -2201,6 +2203,77 @@ describe("increment reuse and loop ergonomics", () => {
     expect(() => validateReview(task, reviewFixture(task, { assessment: undefined }))).toThrow(
       "Reviewer assessment invalid",
     );
+  });
+  it("AC1: nit/minor findings deferred with a follow-up issue do not block clean", () => {
+    const task = taskFixture();
+    task.state = "review";
+    const followUp = "https://github.com/hondasports/kakeibo/issues/999";
+    task.review = reviewFixture(task, {
+      findings: [
+        { id: "F1", severity: "nit", status: "deferred", evidence: "naming", followUp },
+        { id: "F2", severity: "minor", status: "deferred", evidence: "dup", followUp },
+        { id: "F3", severity: "major", status: "fixed", evidence: "done" },
+      ],
+    });
+    task.findings = structuredClone(task.review.findings);
+    expect(() => validateReview(task, task.review)).not.toThrow();
+    expect(resolveLoopStep({ task, event: "clean", root }).nextState).toBe("aftercare");
+    expect(missingRequirements(task)).toEqual([]);
+  });
+  it("AC2-AC4: major or severity-less deferred findings and bad follow-up URLs are rejected", () => {
+    const task = taskFixture();
+    task.state = "review";
+    const followUp = "https://github.com/hondasports/kakeibo/issues/999";
+    const deferred = (extra) =>
+      reviewFixture(task, {
+        findings: [{ id: "F1", status: "deferred", evidence: "postpone", followUp, ...extra }],
+      });
+    // AC2: major (or blocker) cannot be deferred.
+    for (const severity of ["major", "blocker"])
+      expect(() => validateReview(task, deferred({ severity }))).toThrow("minor/nit");
+    // AC3: an omitted severity counts as major and cannot be deferred either.
+    expect(() => validateReview(task, deferred({}))).toThrow("minor/nit");
+    // AC4: deferred needs a real issue URL.
+    for (const badUrl of [
+      undefined,
+      "https://github.com/hondasports/kakeibo/pull/999",
+      "https://example.com/issues/1",
+      "not-a-url",
+      "https://github.com/hondasports/kakeibo/issues/",
+    ])
+      expect(() => validateReview(task, deferred({ severity: "nit", followUp: badUrl }))).toThrow(
+        "followUp",
+      );
+    // open minor/nit findings still block clean exactly like before.
+    task.review = deferred({ severity: "nit" });
+    task.review.findings[0].status = "open";
+    task.findings = task.review.findings;
+    expect(missingRequirements(task)).toContain("finding:F1");
+  });
+  it("AC6: deferred findings export with the state block and legacy blocks without them stay compatible", () => {
+    const task = taskFixture();
+    task.findings = [
+      {
+        id: "F1",
+        severity: "nit",
+        status: "deferred",
+        evidence: "cosmetic",
+        followUp: "https://github.com/hondasports/kakeibo/issues/999",
+      },
+      { id: "F2", severity: "major", status: "fixed", evidence: "done" },
+    ];
+    const exported = compactTaskForExport(task);
+    expect(exported.deferredFindings).toEqual([
+      { id: "F1", severity: "nit", followUp: "https://github.com/hondasports/kakeibo/issues/999" },
+    ]);
+    expect(deferredBlock(task)).toContain("issues/999");
+    expect(deferredBlock(taskFixture())).toBe("");
+    // Round-trip keeps the list; a legacy block without the key hydrates fine.
+    expect(parseStateBlock(stateBlock(task)).deferredFindings).toEqual(exported.deferredFindings);
+    const { deferredFindings: _dropped, ...legacy } = exported;
+    expect(legacy.deferredFindings).toBeUndefined();
+    expect(() => hydrateExportedTask(structuredClone(legacy))).not.toThrow();
+    expect(() => validateTask(hydrateExportedTask(structuredClone(legacy)))).not.toThrow();
   });
   it("keeps metadata-reading tests inside the mandatory process suite", () => {
     // `unit` evidence is extended through metadata-only increments only because
