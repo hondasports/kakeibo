@@ -31,3 +31,5 @@ draft PRがある場合は、packet生成前に `node scripts/collect-pr-finding
 Reviewerは増分・影響caller・open findingから確認し、影響のないACの証跡は過去レビューを参照する。全ACの `{id, evidence}` 記録は変わらず必須である。共有契約や前提が変わった場合は全差分へ広げる。報告全文はファイルに保存し、実装担当への返却は結論・指摘件数・対象HEAD・報告参照先を中心にする。
 
 open findingが0件でfull unitを含む必須検証が揃っていれば `clean`。findingが残れば `findings`。2ラウンドごとに方針を再評価し、上限（5ラウンド）到達は未完了としてINCIDENTで扱う。
+
+レビュー記録のJSONは `--draft review`（下書きの必須キーと過去findingの事前記入を含む）にReviewerの結果を記入して `--review` で提出する。`TODO` のまま残った項目は拒否される。

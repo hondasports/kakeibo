@@ -11,7 +11,7 @@
 `AGENTS.md` はGit管理された実行契約であり、worktree作成時にGitが対象branchの版を展開する。Agentが毎回新規作成するSkillではない。作業先worktreeの版を参照し、同じSession内では同一内容をcanonical checkoutから重複して読み込まず、既読・未変更の内容も再読しない。checkoutや更新で契約内容が変わった場合は読み直す。
 
 1. 専用worktreeでclean baselineを確認する。
-2. 作業仕様JSONをリポジトリ外（例: `/tmp/spec.json`）に作る。必須フィールドは `.agent/schema/spec.schema.json` を参照。`predictedRisk` も必須。Human Requestを改変せずGoal/AC/Non-goals/Assumptions/Verification Strategyを整理する。
+2. 作業仕様JSONをリポジトリ外（例: `/tmp/spec.json`）に作る。`node scripts/loop-runner.mjs --draft spec [--issue <番号>]` の下書きに残りの項目を記入する（`--issue` 指定時はIssue本文の「やりたいこと」節を `humanRequest` へそのまま写し、言及されたpathから `predictedRisk` の初期値を推定する）。必須フィールドは `.agent/schema/spec.schema.json` を参照。`predictedRisk` も必須。Human Requestを改変せずGoal/AC/Non-goals/Assumptions/Verification Strategyを整理する。
 3. 次を実行し、現在のworkflowを読む。
 
 ```bash
@@ -20,9 +20,10 @@ node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --runtime co
 
 Devinでは `--runtime devin`、Claude Codeでは `--runtime claude-code` を指定する。旧来のモデル指定オプションは互換のため受理されるが、何も記録・参照しない。
 
-4. REFINEの評価を記録し、EXECUTEへ進む。`--assessment` のJSONには `risk_assessment`・`tier_rationale`・`applied_tier` を含める。
+4. REFINEの評価を記録し、EXECUTEへ進む。`--draft assessment` の下書きにはMachine分類由来の初期値（data_security・reversibility・floor_triggers・applied_tier）が入り、残りの軸はTODOなので埋めて提出する。初期値より低い値は拒否される。
 
 ```bash
+node scripts/loop-runner.mjs --draft assessment
 node scripts/loop-runner.mjs --assessment /tmp/assessment.json
 node scripts/loop-runner.mjs --event ready
 ```
@@ -31,7 +32,7 @@ base既定値は `origin/preview`。別baseは開始時に `--base` で指定す
 
 通常出力は要約だけを返す。taskId・state・workflow（現在Stateのworkflowパス）・head/base・risk・missing・verification・openFindings・aftercare・next を含み、spec・history・configuration・評価本文・ログ本文は含まない。不足要件の根拠が必要な場合だけ `--explain`、検証証跡のmanifestだけ `--artifacts`、状態スナップショットは `--status` で確認する。状態ブロック全体は `--export` / `--export-file <path>` / `--sync-pr` でのみ出力する。Runtime hooks向けの読み取り専用 `--hook-state` は `{state, next}` だけを返し（未initは `state: null`）、taskを更新しない。
 
-仕様の修正はREFINEで `--spec /tmp/spec.json`。未決事項があれば `--event decision_required --exit /tmp/exit.json` で停止する。exitにはreasonを記録する。Human Gateの解除には `approval: {"source":"user","reference":"対象と操作を承認したユーザー指示の参照"}` が必要。承認記録はAgentの責任であり、このJSONだけで人間の本人性を証明するものではない。
+仕様の修正はREFINEで `--spec /tmp/spec.json`。未決事項があれば `--event decision_required --exit /tmp/exit.json` で停止する。exit JSONは `--draft exit --event <event>` の下書きが必要キー（reason・approval・resolution・reassessment・reproduction・ciFailureの該当分）だけを出力するので、TODOを埋めて提出する。Human Gateの解除には `approval: {"source":"user","reference":"対象と操作を承認したユーザー指示の参照"}` が必要。承認記録はAgentの責任であり、このJSONだけで人間の本人性を証明するものではない。提出JSONの必須キーは `requiredKeys(kind, context)`（`scripts/loop-schema.mjs`）が schema.required と validator の条件キーから一元生成する正本であり、`--draft`・`readSubmission` のTODO検査・`validateTransition` のexit存在確認のすべてがこれを使う。
 
 ## 実装と検証
 
@@ -74,7 +75,7 @@ base不変の増分commitについては第2の再利用経路がある。増分
 
 ## レビュー
 
-Reviewerへ目的・AC・実差分・検証結果・関連契約を渡す。T3、未解決前提のあるT2はfresh contextの独立Reviewerが必要。レビュー結果JSONには次を含める。
+Reviewerへ目的・AC・実差分・検証結果・関連契約を渡す。T3、未解決前提のあるT2はfresh contextの独立Reviewerが必要。レビュー結果JSONは `--draft review`（またはpacketのreview-template.json）の下書きに記入する。含める内容は次のとおり。
 
 - `head`、`baseHead`: 対象のcommit SHA
 - `reviewer`: 実装担当と区別できるID

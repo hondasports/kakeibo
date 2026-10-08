@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { validateDocument } from "./loop-schema.mjs";
+import { requiredKeys, validateDocument } from "./loop-schema.mjs";
 import { assessChange } from "./assess-change.mjs";
 import { isContentTarget, readChangedHunks } from "./machine-risk.mjs";
-import { REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
+import { REVIEW_AXES, REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
 import { validateReproduction } from "./ci-failure.mjs";
+import { assessmentDraftFloors } from "./loop-draft.mjs";
 
 export const highestTier = (...tiers) =>
   REVIEW_TIERS[Math.max(...tiers.filter(Boolean).map((tier) => REVIEW_TIERS.indexOf(tier)), 0)];
@@ -407,15 +408,27 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
       "Current GitHub aftercare evidence is required",
     );
   }
+  // #948: the conditional exit keys a submission must carry are defined once,
+  // in requiredKeys() — --draft exit emits exactly this set, and the presence
+  // checks below key off the same list instead of restating the conditions.
+  const requiredExitKeys = requiredKeys(
+    "exit",
+    {
+      event,
+      state: task.state,
+      counters: task.counters,
+      limits,
+    },
+    root,
+  );
   if (["decision_required", "repeated_failure"].includes(event))
     requireValue(text(exit.reason), "Stop reason is required");
-  if (event === "resolved" && task.state === "human_gate") {
+  if (requiredExitKeys.includes("approval"))
     requireValue(
       exit.approval?.source === "user" && text(exit.approval.reference),
       "Explicit user approval reference is required",
     );
-  }
-  if (event === "resolved" && task.state === "incident")
+  if (requiredExitKeys.includes("resolution"))
     requireValue(text(exit.resolution), "Incident resolution evidence is required");
   if (event === "findings") {
     requireValue(text(exit.reason), "Finding evidence is required");
@@ -423,7 +436,7 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
       task.counters.review < limits.review_max_rounds,
       "Review limit reached; enter incident",
     );
-    if ((task.counters.review + 1) % limits.review_reassess_every === 0)
+    if (requiredExitKeys.includes("reassessment"))
       requireValue(text(exit.reassessment), "Review strategy reassessment is required");
   }
   if (event === "ci_failure") {
@@ -453,6 +466,30 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
       !(task.ciFailures ?? []).some((f) => !f.resolvedAt),
       "Unresolved ciFailure records remain; run --resolve-ci-failures first",
     );
+}
+/**
+ * #948: a submitted assessment may only raise the machine-derived draft
+ * values (data_security, reversibility, applied_tier), never lower them.
+ * Axes without a trigger carry no floor (the agent judges freely).
+ */
+export function requireAssessmentAboveFloor(
+  assessment,
+  { floorTriggers = [], minimumTier = "T1" } = {},
+) {
+  const floors = assessmentDraftFloors(floorTriggers);
+  for (const [axis, floor] of Object.entries(floors)) {
+    if (!floor) continue;
+    const allowed = REVIEW_AXES[axis];
+    requireValue(
+      allowed.indexOf(assessment?.risk_assessment?.[axis]) >= allowed.indexOf(floor),
+      `assessment ${axis} must not be below the machine floor (${floor})`,
+    );
+  }
+  requireValue(
+    assessment?.applied_tier === undefined ||
+      REVIEW_TIERS.indexOf(assessment.applied_tier) >= REVIEW_TIERS.indexOf(minimumTier),
+    `assessment applied_tier must not be below the machine floor (${minimumTier})`,
+  );
 }
 /** Start-time key: when the run began, not when it finished. */
 const checkStartKey = (check) =>
