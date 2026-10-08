@@ -35,10 +35,12 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const SPEC_MAP_PATH = path.join(repoRoot, "e2e", "spec-map.json");
 const E2E_SPEC_PATTERN = /^e2e\/[^/]+\.spec\.ts$/;
 
-/** specファイルに付けられた実行タグ（@smoke / @public）を拾う。 */
+/** specファイルに付けられた実行タグ（@smoke / @public）を拾う。コメント内の言及は拾わない。 */
 function specTags(body) {
+  // コメント（//行・/*ブロック*/）を除去してからタグを探す
+  const code = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   const tags = new Set();
-  for (const match of body.matchAll(/@(smoke|public)\b/g)) tags.add(match[1]);
+  for (const match of code.matchAll(/@(smoke|public)\b/g)) tags.add(match[1]);
   return tags;
 }
 
@@ -129,6 +131,9 @@ export function selectSpecs({
 } = {}) {
   const classification = classifyChangedFiles(changedFiles);
   const includes = includeSpecs.map(normalizeChangedPath);
+  // 削除済みspec・map内の陳腐なリテラル名は実行対象から外す
+  const existing = new Set([...specFiles, ...includes]);
+  const existingOnly = (names) => [...names].filter((spec) => existing.has(spec));
   if (!classification.runtimeRelevant) {
     return {
       runtimeRelevant: false,
@@ -140,7 +145,7 @@ export function selectSpecs({
   }
   const smoke = specsByTag("smoke", { specFiles, cwd });
   const { specs, unmapped } = mapChangedFiles(changedFiles, map, specFiles);
-  const selected = new Set([...specs, ...smoke, ...includes]);
+  const selected = new Set(existingOnly([...specs, ...smoke, ...includes]));
   let fallback = false;
   if (unmapped.length > 0) {
     fallback = true;

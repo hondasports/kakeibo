@@ -126,6 +126,37 @@ describe("selectSpecs (AC1-AC3)", () => {
     );
     expect([...specs].sort()).toEqual(["e2e/a.extra.spec.ts", "e2e/a.spec.ts"]);
   });
+
+  test("コメント内の@タグ言及はタグ扱いしない", () => {
+    const dir = fixture({
+      "real.spec.ts": 'test("@smoke 実タグ", async () => {});',
+      "mention.spec.ts":
+        '// これは @smoke を説明するコメント\n/* @public も同様 */\ntest("x", async () => {});',
+    });
+    const specFiles = listSpecFiles(path.join(dir, "e2e"));
+    expect(specsByTag("smoke", { specFiles, cwd: dir })).toEqual(["e2e/real.spec.ts"]);
+    expect(specsByTag("public", { specFiles, cwd: dir })).toEqual([]);
+  });
+
+  test("削除されたspecやmap内の陳腐なリテラル名は選定に残らない", () => {
+    const dir = fixture({
+      "kept.spec.ts": 'test("@smoke x", async () => {});',
+    });
+    writeFileSync(
+      path.join(dir, "e2e", "spec-map.json"),
+      JSON.stringify({ "src/a/**": ["e2e/kept.spec.ts", "e2e/deleted.spec.ts"] }),
+    );
+    const specFiles = listSpecFiles(path.join(dir, "e2e"));
+    const result = selectSpecs({
+      changedFiles: ["src/a/x.ts", "e2e/removed.spec.ts"],
+      cwd: dir,
+      specFiles,
+      map: loadSpecMap(path.join(dir, "e2e", "spec-map.json")),
+    });
+    expect(result.specs).toContain("e2e/kept.spec.ts");
+    expect(result.specs).not.toContain("e2e/deleted.spec.ts");
+    expect(result.specs).not.toContain("e2e/removed.spec.ts");
+  });
 });
 
 describe("parseArguments", () => {

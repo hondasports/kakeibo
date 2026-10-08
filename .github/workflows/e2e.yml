@@ -74,6 +74,9 @@ jobs:
 
       # verify:prepush（ローカル）と同じ選定結果をCIのsummaryへ出し、
       # ローカルで実行されたspecと比較できるようにする（CI自体は従来どおり実行）。
+      # ただし「同じ選定」は preview 向け PR でのみ成立する。verify:prepush は
+      # origin/preview を既定の base にするため、他ブランチ向け PR では
+      # ここに出る選定とローカル結果が一致し得ない（--base で明示すれば一致）。
       - name: Report verify:prepush spec selection
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

@@ -44,8 +44,14 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const MARKER_KEEP = 20;
 const E2E_SPEC_PATTERN = /^e2e\/[^/]+\.spec\.ts$/;
 const UNIT_TEST_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
-const PROCESS_TRIGGER = /^(?:scripts\/|\.agent\/|docs\/agent-harness)/;
-const E2E_ENV_VARS = ["VITE_CLERK_PUBLISHABLE_KEY", "CLERK_SECRET_KEY", "E2E_CLERK_USER_EMAIL"];
+const PROCESS_TRIGGER = /^(?:scripts\/|\.agent\/|docs\/agent-harness|e2e\/spec-map\.json)/;
+// start-ci-convex.mjs が必須とするe2e env。E2E_CLERK_USER_ID は --probe 以外で必須。
+const E2E_ENV_VARS = [
+  "VITE_CLERK_PUBLISHABLE_KEY",
+  "CLERK_SECRET_KEY",
+  "E2E_CLERK_USER_EMAIL",
+  "E2E_CLERK_USER_ID",
+];
 const E2E_PORTS = [
   { port: 5173, label: "Vite dev (pnpm run devが起動している場合は停止する)" },
   { port: 3210, label: "Convex local backend (api)" },
@@ -118,11 +124,17 @@ export function classifyIncludes(
   const unitTests = [];
   const missing = [];
   for (const include of includePaths) {
-    if (!exists(include)) {
+    if (path.isAbsolute(include) || include.startsWith("..")) {
+      missing.push(`${include} (repo相対パスで指定してください)`);
+    } else if (!exists(include)) {
       missing.push(include);
     } else if (E2E_SPEC_PATTERN.test(include)) {
       e2eSpecs.push(include);
-    } else if (UNIT_TEST_PATTERN.test(include)) {
+    } else if (
+      UNIT_TEST_PATTERN.test(include) &&
+      !include.startsWith("e2e/") &&
+      !include.includes(".integration.test.")
+    ) {
       unitTests.push(include);
     } else {
       missing.push(`${include} (e2e specかunit testファイルではない)`);
@@ -155,21 +167,29 @@ export function needsProcessSuite(changedFiles) {
 
 /* -------------------------------------------------------------- preflight */
 
-/** TCP connectが成功するならそのポートは使用中。 */
+/** TCP connectが成功するならそのポートは使用中。IPv4/IPv6両方を見る。 */
 export function portBusy(
   port,
-  { host = "127.0.0.1", timeoutMs = 800, connect = net.connect } = {},
+  { hosts = ["127.0.0.1", "::1"], timeoutMs = 800, connect = net.connect } = {},
 ) {
-  return new Promise((resolve) => {
-    const socket = connect({ port, host });
-    const done = (busy) => {
-      socket.destroy();
-      resolve(busy);
-    };
-    socket.once("connect", () => done(true));
-    socket.once("error", () => done(false));
-    socket.setTimeout(timeoutMs, () => done(false));
-  });
+  const probe = (host) =>
+    new Promise((resolve) => {
+      let socket;
+      try {
+        socket = connect({ port, host });
+      } catch {
+        resolve(false);
+        return;
+      }
+      const done = (busy) => {
+        socket.destroy();
+        resolve(busy);
+      };
+      socket.once("connect", () => done(true));
+      socket.once("error", () => done(false));
+      socket.setTimeout(timeoutMs, () => done(false));
+    });
+  return Promise.all(hosts.map(probe)).then((results) => results.some(Boolean));
 }
 
 /** e2e:isolated の事前条件を検査し、満たさない条件を列挙する。 */
@@ -195,18 +215,15 @@ export async function e2ePreflight({
     }
   }
   const envLocalPath = path.join(cwd, ".env.local");
-  if (!existsSync(envLocalPath)) {
+  const fileEnv = existsSync(envLocalPath)
+    ? parseEnvFile(readFileSync(envLocalPath, "utf8"))
+    : new Map();
+  // start-ci-convex.mjs と同じく process.env 優先、.env.local はフォールバック
+  const missing = requiredEnv.filter((key) => !process.env[key] && !fileEnv.get(key));
+  if (missing.length > 0) {
     failures.push(
-      `.env.local がありません（必要: ${requiredEnv.join(", ")}）。docs/environment-variables.md を参照`,
+      `E2E環境変数が不足: ${missing.join(", ")}（process.env または .env.local に設定。docs/environment-variables.md を参照）`,
     );
-  } else {
-    const env = parseEnvFile(readFileSync(envLocalPath, "utf8"));
-    const missing = requiredEnv.filter((key) => !env.get(key));
-    if (missing.length > 0) {
-      failures.push(
-        `.env.local に不足: ${missing.join(", ")}。docs/environment-variables.md を参照`,
-      );
-    }
   }
   const chromium = chromiumPath();
   if (!chromium || !existsSync(chromium)) {
@@ -218,8 +235,26 @@ export async function e2ePreflight({
 }
 
 function defaultBackendBinaryPresent() {
-  // convex CLIは初回 `convex dev` 時に local backend バイナリを ~/.convex 配下へ取得する
-  return Promise.resolve(existsSync(path.join(os.homedir(), ".convex")));
+  // convex CLIは local backend バイナリを <cacheDir>/convex/binaries/<version>/
+  // へ取得する（convex/dist/cli/lib/localDeployment/filePaths.js 準拠）。
+  // ~/.convex はstate dirでありバイナリの有無とは無関係なので、実ファイルを見る。
+  const cacheRoot =
+    process.platform === "win32"
+      ? path.join(
+          process.env.LOCALAPPDATA ??
+            path.join(process.env.USERPROFILE ?? os.homedir(), "AppData", "Local"),
+          "convex",
+        )
+      : path.join(os.homedir(), ".cache", "convex");
+  const binariesDir = path.join(cacheRoot, "binaries");
+  try {
+    const binary = `convex-local-backend${process.platform === "win32" ? ".exe" : ""}`;
+    return Promise.resolve(
+      readdirSync(binariesDir).some((ver) => existsSync(path.join(binariesDir, ver, binary))),
+    );
+  } catch {
+    return Promise.resolve(false);
+  }
 }
 
 function defaultNetworkReachable() {
@@ -270,7 +305,13 @@ export function sanitizeHookEnv(env = process.env) {
 }
 
 function defaultRunStep(command, args, cwd, logFile) {
-  const out = spawnSync(command, args, { cwd, encoding: "utf8", env: sanitizeHookEnv() });
+  // e2e:isolated はconvexログを全部流すので既定の1MBでは溢れる
+  const out = spawnSync(command, args, {
+    cwd,
+    encoding: "utf8",
+    env: sanitizeHookEnv(),
+    maxBuffer: 256 * 1024 * 1024,
+  });
   writeFileSync(logFile, [out.stdout, out.stderr].filter(Boolean).join("\n"));
   return out.status ?? 1;
 }
@@ -310,7 +351,7 @@ function buildSteps({ changedFiles, selection, includes, root }) {
       label: `unit (vitest related, ${related.length} files)`,
       command: "pnpm",
       args: ["exec", "vitest", "related", "--run", "--passWithNoTests", ...related],
-      rerun: `pnpm exec vitest related --run ${related.join(" ")}`,
+      rerun: `pnpm exec vitest related --run --passWithNoTests ${related.join(" ")}`,
     });
   }
   if (includes.unitTests.length > 0) {
@@ -318,8 +359,8 @@ function buildSteps({ changedFiles, selection, includes, root }) {
       id: "unit-include",
       label: `unit (--include, ${includes.unitTests.length} files)`,
       command: "pnpm",
-      args: ["exec", "vitest", "run", ...includes.unitTests],
-      rerun: `pnpm exec vitest run ${includes.unitTests.join(" ")}`,
+      args: ["exec", "vitest", "run", "--passWithNoTests", ...includes.unitTests],
+      rerun: `pnpm exec vitest run --passWithNoTests ${includes.unitTests.join(" ")}`,
     });
   }
   if (needsProcessSuite(changedFiles)) {
@@ -353,18 +394,41 @@ export async function runPrepush({
   runStep = defaultRunStep,
   gitOps = {
     head: (root) => git(root, ["rev-parse", "HEAD"]),
-    base: (root) => git(root, ["merge-base", "HEAD", "origin/preview"]),
-    changedFiles: (root, base, head) =>
-      git(root, [
+    base: (root) => {
+      // origin/preview が無い環境（shallow clone・オフライン等）でも落ちない
+      for (const ref of ["origin/preview", "preview", "origin/main", "main"]) {
+        try {
+          return git(root, ["merge-base", "HEAD", ref]);
+        } catch {
+          // 次の候補へ
+        }
+      }
+      return null;
+    },
+    changedFiles: (root, base, head) => {
+      // baseが取れない場合は「コミット済み最新変更+worktree変更」を対象にする
+      const range =
+        base ??
+        (() => {
+          try {
+            return git(root, ["rev-parse", "HEAD~1"]);
+          } catch {
+            return null;
+          }
+        })();
+      if (!range) return [];
+      return git(root, [
         "--no-pager",
         "diff",
         "--name-only",
         "--no-renames",
-        "--diff-filter=ACDMRTUXB",
-        `${base}...${head}`,
+        // D除外: 削除されたファイルは検証対象にしない（select側でも存在確認する）
+        "--diff-filter=ACMRTUXB",
+        `${range}...${head}`,
       ])
         .split("\n")
-        .filter(Boolean),
+        .filter(Boolean);
+    },
     dirty: gitStatusDirty,
   },
   changedFilesOverride = null,
@@ -380,6 +444,7 @@ export async function runPrepush({
     exists: (p) => existsSync(path.join(cwd, p)),
   });
   if (includes.missing.length > 0) {
+    dropMarker(markerBaseDir(cwd), head);
     out(
       `verify:prepush FAILED\n--include のファイルが見つかりません:\n  ${includes.missing.join("\n  ")}`,
     );
@@ -391,12 +456,18 @@ export async function runPrepush({
     cwd,
   });
   const steps = buildSteps({ changedFiles, selection, includes, root: cwd });
+  // unmappedはE2E実行前に必ず出す（step失敗時にも情報が残るように）
+  if (selection.unmapped.length > 0) {
+    out(
+      `注意: spec-mapにないパスが ${selection.unmapped.length} 件（安全側で@smoke+@publicを選定）。mapへ追記してください:\n  ${selection.unmapped.join("\n  ")}`,
+    );
+  }
   if (selection.specs.length > 0) {
     const failures = await preflight({ cwd });
     if (failures.length > 0) {
       dropMarker(markerBaseDir(cwd), head);
       out(
-        `verify:prepush FAILED\nE2E事前条件を満���していません:\n${failures.map((f) => `  - ${f}`).join("\n")}\n迂回が必要な場合は git push --no-verify を使い、PR本文に記載してください。`,
+        `verify:prepush FAILED\nE2E事前条件を満たしていません:\n${failures.map((f) => `  - ${f}`).join("\n")}\n迂回が必要な場合は git push --no-verify を使い、PR本文に記載してください。`,
       );
       return 1;
     }
@@ -419,12 +490,10 @@ export async function runPrepush({
     passed += 1;
     out(`✓ ${step.label} (${seconds}s)`);
   }
-  if (selection.unmapped.length > 0) {
-    out(
-      `注意: spec-mapにないパスが ${selection.unmapped.length} 件（安全側で@smoke+@publicを選定）。mapへ追記してください:\n  ${selection.unmapped.join("\n  ")}`,
-    );
-  }
   if (dirty) {
+    // dirty下での成功はHEADと検証対象が一致しないので、同じHEADの古い
+    // マーカーも信用できない → 書かないだけでなく落とす（失敗と同じ扱い）
+    dropMarker(markerBaseDir(cwd), head);
     out("worktreeがdirtyのため成功マーカーは書きません（HEADとマーカー内容を一致させるため）");
   } else {
     writeMarker(markerBaseDir(cwd), head);
