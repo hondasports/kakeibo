@@ -32,6 +32,7 @@ import {
   gh,
   githubAftercare,
   inspectPullRequest,
+  issueSpecFingerprint,
   requireIntervalSeconds,
   resolveRepositorySlug,
   restoreTask,
@@ -41,6 +42,7 @@ import {
 } from "./pr.mjs";
 import { buildReviewPacket, collectReviewCiEvidence, waitForReviewCi } from "./review.mjs";
 import {
+  ISSUE_TASK_PATTERN,
   STATE_WORKFLOWS,
   acceptanceCriteriaHash,
   git,
@@ -76,6 +78,17 @@ export function summarizeTask(task, root) {
     aftercare: aftercareSummary(task),
     next: nextActions(task, root),
   };
+}
+/**
+ * #954: keep `task.specFingerprint` = the issue's Agent Spec hash for
+ * issue-linked tasks; cleared otherwise. Emitted into the v2 state block as
+ * `spec.fingerprint`; when absent the export ships the spec inline instead.
+ */
+function stampIssueSpecFingerprint(task, root, services = {}) {
+  const issue = ISSUE_TASK_PATTERN.exec(task.taskId ?? "")?.[1];
+  const fingerprint = issue ? issueSpecFingerprint(issue, root, services) : null;
+  if (fingerprint) task.specFingerprint = fingerprint;
+  else delete task.specFingerprint;
 }
 export function explainTask(task, root) {
   return {
@@ -631,7 +644,15 @@ export function run(args, root = process.cwd(), services = {}) {
     args["external-findings"] === undefined || args["review-packet"],
     "--external-findings requires --review-packet",
   );
-  if (args.init) return startTask(args, root);
+  if (args.init) {
+    const task = startTask(args, root);
+    // #954: anchor issue-linked specs to the issue's Agent Spec fingerprint so
+    // restore can detect spec edits. Best-effort: export falls back to
+    // shipping the spec inline when the issue is unreadable here.
+    stampIssueSpecFingerprint(task, root, services);
+    saveTask(task, root);
+    return task;
+  }
   if (args["restore-pr"]) {
     requireValue(!existsSync(taskPath(root)), "A local task already exists");
     const pr = JSON.parse(
@@ -646,7 +667,7 @@ export function run(args, root = process.cwd(), services = {}) {
         root,
       ),
     );
-    return restoreTask(pr, root);
+    return restoreTask(pr, root, services);
   }
   if (args["record-usage"]) {
     // Observation only: never refreshes, invalidates or saves the task.
@@ -917,9 +938,18 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args.spec) {
     requireValue(task.state === "refine", "Spec changes require refine state");
     task.spec = readSubmission(args.spec, "spec");
+    // #954: state-block references are emitted by the runner, never submitted —
+    // a resubmission must carry the full spec (the fingerprint is re-stamped
+    // from the issue below).
+    requireValue(
+      typeof task.spec?.ref !== "string",
+      "--spec requires the full spec form, not a state-block reference",
+    );
     validateSpec(task.spec, root);
     task.risk = highestTier(task.risk, task.spec.predictedRisk);
     invalidate(task);
+    // A resubmitted spec re-anchors to the issue's (possibly edited) Agent Spec.
+    stampIssueSpecFingerprint(task, root, services);
   }
   if (args.assessment) {
     requireValue(

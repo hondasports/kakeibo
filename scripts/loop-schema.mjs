@@ -14,6 +14,7 @@ const keywords = new Set([
   "minItems",
   "minLength",
   "minimum",
+  "pattern",
   "enum",
   "const",
   "anyOf",
@@ -51,6 +52,8 @@ export function validateSchema(schema, value, location = "$") {
   if (schema.enum && !schema.enum.includes(value)) fail("invalid enum value");
   if (typeof value === "string" && value.trim().length < (schema.minLength ?? 0))
     fail("empty string");
+  if (schema.pattern && !(typeof value === "string" && new RegExp(schema.pattern).test(value)))
+    fail(`does not match ${schema.pattern}`);
   if (typeof value === "number" && value < (schema.minimum ?? -Infinity)) fail("below minimum");
   if (Array.isArray(value)) {
     if (value.length < (schema.minItems ?? 0)) fail("too few items");
@@ -127,8 +130,11 @@ const CONDITIONAL_REQUIRED = {
   },
 };
 export function requiredKeys(kind, context = {}, root = process.cwd()) {
+  // A schema with alternatives (anyOf) puts `required` on each branch; the
+  // first branch is the canonical submitted form (e.g. a full spec — the
+  // state-block v2 reference shape is never a draftable submission).
   const schemaRequired = SCHEMA_BACKED_KINDS.has(kind)
-    ? (schemaDocument(kind, root).required ?? [])
+    ? (schemaDocument(kind, root).required ?? schemaDocument(kind, root).anyOf?.[0]?.required ?? [])
     : [];
   return [
     ...new Set([

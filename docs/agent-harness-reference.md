@@ -15,7 +15,7 @@
 3. 次を実行し、現在のworkflowを読む。
 
 ```bash
-node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --runtime codex --implementer session-123
+node scripts/loop-runner.mjs --init /tmp/spec.json --task i123 --runtime codex --implementer session-123
 ```
 
 Devinでは `--runtime devin`、Claude Codeでは `--runtime claude-code` を指定する。旧来のモデル指定オプションは互換のため受理されるが、何も記録・参照しない。
@@ -168,7 +168,7 @@ gh pr create --draft --title "..." --body-file /tmp/pr-body-full.md
 
 `--export` は人がターミナルで内容を確認する用途と互換性のために残す。
 
-状態ブロックは復元とPR gateに必要な内容だけを載せる。assessmentは復元時もCIでも実差分から再計算するため `null`、検証証跡の `summary` はexit codeだけを残しログ末尾はローカルartifactに置く。historyは直近12件に加えて、最新の `review_recorded` と `review.deltaFrom` が指す `review_recorded` を残し、省略件数を `historyOmitted` に累積する。`review` 本体と完全に同じ内容は参照に置き換える。`findings` が `review.findings` と同一なら省略し、最新の `review_recorded` のfindings・AC証跡が `review` と同一なら `sameAsReview: true` にする。`--restore-pr` とPR CIは解析時にこれらを `review` から復元し、参照が壊れていれば拒否する。それより古い `review_recorded` はAC証跡だけを残す（findingは後のレビューが同じidで引き継ぐ）。完全なhistoryはworktreeのGitメタデータ（`git rev-parse --git-path agent-task.json`）に残る。実PRでの圧縮率は56〜68%で、GitHubのPR本文上限（65,536文字）にも余裕ができる。PR作成後・状態更新後は `--sync-pr <番号>` で既存本文を保持してブロックを更新する。この操作はGitHubへのwriteであり、ユーザーが許可したPR作業の範囲でのみ実行する。
+状態ブロック（`state-block/v2`）は復元とPR gateに必要な内容だけを載せる。`spec.ref` がissue連携タスクでは `issue#<番号>` で、`spec.fingerprint` がIssue本文の `## Agent Spec` 節のsha256を指す（`--init` / `--spec` 時に採取）。`--restore-pr` は復元時にIssueを再取得してfingerprintを照合し、不一致ならREFINEへ戻してspec再提出を求める（specの正本はIssue、ブロックは参照）。fingerprintが採れない場合や非issueタスクでは `specInline` に完全なspecを乗せる。spec本体の代わりに `{fingerprint, ref, predictedRisk, acIds, openDecisions}` を渡し、gateはこれらだけでspec不変条件（open decisionなし・AC一意）・predictedRisk・AC証跡網羅を検査する。historyは一切載せず省略件数を `historyOmitted` に累積する（完全なhistoryはworktreeのGitメタデータに残る）。configurationはruntime名だけ（復元時にruntime設定を再解決）、assessmentは復元時もCIでも実差分から再計算するため載せない。検証証跡は `{head, baseHead, exitCode}` の最小形にする。`review` は `deltaFrom` を落とす（ローカルhistory無しに再検証できないため）。`findings` が `review.findings` と同一なら省略して復元時に参照復元し、`deferredFindings`・未解決の `ciFailures`・`reviewCi`・`aftercare` はそのまま往復する。完全な旧形式（v1・`schema`フィールドなし）のブロックも読み込め、`lane`・`sameAsReview` 等の旧参照も復元する（壊れていれば拒否）。PR作成後・状態更新後は `--sync-pr <番号>` で既存本文を保持してブロックを更新する。この操作はGitHubへのwriteであり、ユーザーが許可したPR作業の範囲でのみ実行する。
 
 `--sync-pr` は同期後の本文が既存本文と完全一致する場合、GitHub editを行わず `synced: false` を返す。更新時は `synced: true`。Human Requestや更新履歴は保持する。頻繁なCI観測やbot確認日時だけを本文へ追記せず、復元用の状態が変わる節目で同期する。
 
@@ -183,11 +183,11 @@ node scripts/loop-runner.mjs --record-usage <reviewer-transcript.jsonl> --usage-
 
 ```bash
 node scripts/loop-metrics.mjs            # 全期間の集計
-node scripts/loop-metrics.mjs --task issue-123   # タスク別集計
+node scripts/loop-metrics.mjs --task i123   # タスク別集計
 node scripts/loop-metrics.mjs --path /tmp/other.jsonl
 ```
 
-`loop:metrics` はJSONLを集計し、action別件数・durationMs・verifyのkind別pass/fail・scope別件数・revision_changedのinvalidated/assessmentCarried・review_packetのscope別件数・transitionイベント別件数を返す。cli_outputはcommand別のoutputBytes（合計・平均・最大）を `byCommand` に返す。usageはtranscriptごとの最新記録だけを数え、role別と合計を `usage` に返す。作業中に感じた摩擦は `--friction-note <text>` で `task.frictionNote` へ記録でき、history・metrics・export状態ブロックに残る。ハーネス改善タスクの定性入力として使う。
+`loop:metrics` はJSONLを集計し、action別件数・durationMs・verifyのkind別pass/fail・scope別件数・revision_changedのinvalidated/assessmentCarried・review_packetのscope別件数・transitionイベント別件数を返す。cli_outputはcommand別のoutputBytes（合計・平均・最大）を `byCommand` に返す。usageはtranscriptごとの最新記録だけを数え、role別と合計を `usage` に返す。作業中に感じた摩擦は `--friction-note <text>` で `task.frictionNote` へ記録でき、history・metricsに残る（v2状態ブロックは最小化のため含めない）。ハーネス改善タスクの定性入力として使う。
 
 `Agent harness` CIはMarkdownのみの変更でも動き、実PR HEAD/base・実差分・仕様・検証・レビューを照合する。非bot PRは状態ブロック必須（draft PRではjobごとスキップし、ready化で実行する）。GitHubが認識するdependabot/github-actionsのBot投稿は例外とし、processテストとドキュメントチェックは実行する。既存PRもこのworkflowが走る時点で状態ブロックが必要になる。CIを必須チェックへ登録するbranch protection設定は別途管理者の操作が必要であり、このPRでは権限設定を変更しない。
 
