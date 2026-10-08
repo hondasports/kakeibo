@@ -22,12 +22,17 @@ export default defineConfig({
   expect: {
     timeout: 10_000,
   },
-  /* CI 環境では flaky テストを最大 2 回リトライ */
-  retries: process.env.CI ? 2 : 0,
+  /* flaky テストの自動リトライは local/CI ともに 1 回に統一（#958） */
+  retries: 1,
   /* 単一のClerkテストユーザーと共有Dev DBを使うため、cleanup競合を避けて常に直列実行する */
   workers: 1,
   /* 失敗時のみスクリーンショット・trace を保存（認証情報が含まれる可能性があるため短期保持） */
-  reporter: [["html", { open: "never" }], ["list"]],
+  reporter: [
+    ["html", { open: "never" }],
+    ["list"],
+    /* flaky(passed-on-retry)の機械抽出用。CI summaryと --check-pr が読む */
+    ["json", { outputFile: "e2e-results/results.json" }],
+  ],
   use: {
     /* テスト対象 URL。環境変数 E2E_BASE_URL が設定されていれば Vercel Preview を対象にする */
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173",
