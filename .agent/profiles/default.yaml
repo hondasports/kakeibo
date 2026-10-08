@@ -1,7 +1,0 @@
-default_profile: standard
-available:
-  - fast
-  - standard
-  - deep
-  - max
-rule_version: 1

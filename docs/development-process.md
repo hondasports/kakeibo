@@ -7,7 +7,7 @@
 - Agent実行契約: `AGENTS.md`
 - Agent State Machine: `.agent/process.yaml`
 - Stateごとの実行契約: `.agent/workflow/*.md`
-- Task Profile / Runtime差分: `.agent/profiles/`, `.agent/runtime/`
+- Runtime差分: `.agent/runtime/`
 - Change Assessment: `node scripts/assess-change.mjs`
 - Workspace preflight: `node scripts/check-task-worktree.mjs --require-clean`
 - ループ文書の機械検査: `node scripts/check-loop-docs.mjs`
@@ -203,7 +203,7 @@ Agent taskで残す価値があるもの:
 
 具体的な開始・再開・状態保存は [Agent Harness詳細仕様](agent-harness-reference.md) を参照する（起動手順は [Agent Harness操作手順](agent-harness.md)）。
 
-軽量化とREFINE終了時のProfile自動判定を実装する際は [Agent Harness設計](agent-harness-design.md) を正本とする。この設計は段階的に実装中であり、本節の現行運用とState Transitionを設計文書だけで変更しない。
+軽量化を実装する際は [Agent Harness設計](agent-harness-design.md) を正本とする。この設計は段階的に実装中であり、本節の現行運用とState Transitionを設計文書だけで変更しない。
 
 ### REFINE
 
@@ -235,11 +235,11 @@ PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest 
 
 E2Eが必須と判定された変更でブラウザ受入条件がない場合は、PR CIで実行し、AFTERCAREでpublic/authenticated両方の成功を要求する。文書・工程管理のみなど差分判定でE2E対象外となる変更には、E2E成功を必須条件として追加しない。実行対象の判定は「PR CI E2Eの差分判定」に従う。
 
-### Task Profile
+### Task Tier
 
-Core Harnessはモデル非依存。`.agent/profiles/` は `fast / standard / deep / max` のタスク強度を定義し、autonomy・delegation・verification・context量だけを調整する。Model名ごとのProfileは作らない。
+Core Harnessはモデル非依存。タスク強度はTier（T1〜T3）に一本化され、Profile機構は廃止した。
 
-ProfileはREFINE終了時にタスクの評価（`blast_radius`・`uncertainty`・検証負荷routine/complex）から規則で自動判定する。`--profile` の明示指定は常に優先し、自動選択は実装中の評価変化に応じて上位へだけ再判定する。Risk Floor・Human Gate・State TransitionはTask Profileから変更しない。Runtime固有設定は `.agent/runtime/` に置く。
+thorough検証（lint/unit/build必須）はTierと評価軸から機械判定する：final tierがT3、またはuncertaintyがknown_pattern以外、またはblast_radiusがshared_or_system_wideの場合。`--profile` は後方互換のため受理されるが無視される。Risk Floor・Human Gate・State Transitionは常に維持する。Runtime固有設定は `.agent/runtime/` に置く。
 
 ループ文書自身（AGENTS.md・README・`.agent/workflow/`・skills/・この文書）の整合は `node scripts/check-loop-docs.mjs` が機械検査する。
 ## 6. Verification
