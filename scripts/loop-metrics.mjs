@@ -1,5 +1,6 @@
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -255,7 +256,7 @@ export function summarizeTask(entries, taskId, context = {}) {
   return summary;
 }
 
-/** `<process.yaml version>+<git blob SHA of scripts/loop-runner.mjs, first 12 chars>`. */
+/** `<process.yaml version>+<sha256 over the blob SHAs of scripts/loop-runner.mjs and every scripts/loop/*.mjs, first 12 chars>`. */
 export function harnessVersion(root = process.cwd()) {
   let version = null;
   try {
@@ -266,12 +267,18 @@ export function harnessVersion(root = process.cwd()) {
   }
   let blobSha = "unknown";
   try {
-    blobSha = execFileSync("git", ["hash-object", "scripts/loop-runner.mjs"], {
-      cwd: root,
-      encoding: "utf8",
-    })
-      .trim()
-      .slice(0, 12);
+    const files = ["scripts/loop-runner.mjs"];
+    const loopDir = path.join(root, "scripts", "loop");
+    if (existsSync(loopDir)) {
+      for (const name of readdirSync(loopDir))
+        if (name.endsWith(".mjs")) files.push(path.join("scripts", "loop", name));
+    }
+    const blobs = files
+      .map((file) =>
+        execFileSync("git", ["hash-object", file], { cwd: root, encoding: "utf8" }).trim(),
+      )
+      .sort();
+    blobSha = createHash("sha256").update(blobs.join("\n")).digest("hex").slice(0, 12);
   } catch {
     // Non-git or reduced checkouts still emit a summary (review f-3).
   }
