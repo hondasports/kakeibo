@@ -10,7 +10,7 @@ T1はセルフレビュー可。T2で `uncertainty=some_unknowns`、またはT3�
 
 ## 検証との並行
 
-REVIEW clean以降のゲートはcurrent HEADのfull unit証跡を要求する。packetを渡したら、Reviewerの作業と並行して `node scripts/loop-runner.mjs --verify-required` で残りのfull unitを完了させる。並行するのはrunnerとReviewerだけで、`--review` の記録は `--verify-required` の終了を待ってから行う（状態を更新するrunnerは同時に1つ。別runnerが先に保存していると保存は拒否される）。失敗した場合はfindingとして扱い、`findings` でEXECUTEへ戻す。
+REVIEW clean以降のゲートはcurrent HEADのfull unit証跡を要求する（Lite lane除く：ローカル証跡はprocessのみで、判定はCIのcheckが正本）。packetを渡したら、Reviewerの作業と並行して `node scripts/loop-runner.mjs --verify-required` で残りのfull unitを完了させる。並行するのはrunnerとReviewerだけで、`--review` の記録は `--verify-required` の終了を待ってから行う（状態を更新するrunnerは同時に1つ。別runnerが先に保存していると保存は拒否される）。失敗した場合はfindingとして扱い、`findings` でEXECUTEへ戻す。
 
 ## Review loop
 
@@ -30,4 +30,4 @@ draft PRがある場合は、packet生成前に `node scripts/collect-pr-finding
 
 Reviewerは増分・影響caller・open findingから確認し、影響のないACの証跡は過去レビューを参照する。全ACの `{id, evidence}` 記録は変わらず必須である。共有契約や前提が変わった場合は全差分へ広げる。報告全文はファイルに保存し、実装担当への返却は結論・指摘件数・対象HEAD・報告参照先を中心にする。
 
-open findingが0件でfull unitを含む必須検証が揃っていれば `clean`。findingが残れば `findings`。2ラウンドごとに方針を再評価し、上限（5ラウンド）到達は未完了としてINCIDENTで扱う。
+open findingが0件でfull unitを含む必須検証が揃っていれば `clean`（Lite laneは `lane: "lite"` のタスクでfull unit証跡を要求しない）。findingが残れば `findings`。2ラウンドごとに方針を再評価し、上限（5ラウンド）到達は未完了としてINCIDENTで扱う。

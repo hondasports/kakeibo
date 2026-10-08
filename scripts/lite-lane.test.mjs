@@ -6,7 +6,7 @@
 // AC5: lite lane still blocked on process evidence and harness/scope failures.
 // AC6: no verify:prepush success marker for HEAD → execute ready rejected.
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -18,9 +18,9 @@ import {
   prepushMarkerPresent,
   requireLocalVerification,
   requiredVerificationKinds,
+  verificationSummary,
 } from "./loop-policy.mjs";
 import { transitionTask } from "./loop-runner.mjs";
-import { rmSync } from "node:fs";
 import { taskFixture, reviewFixture, agentAssessment } from "./loop-test-fixtures.mjs";
 
 const root = process.cwd();
@@ -165,6 +165,32 @@ describe("checkAftercare on the lite lane", () => {
     delete task.verification.process;
     expect(() => requireLocalVerification(task)).toThrow(/process/i);
     expect(requiredVerificationKinds(task)).toEqual(["process"]);
+  });
+  it("shows lane-deferred kinds as ci, not missing (F-3)", () => {
+    const task = liteTask();
+    task.assessment.verification = {
+      process: true,
+      lint: true,
+      unit: true,
+      build: true,
+      e2e: true,
+    };
+    delete task.verification.process;
+    const summary = verificationSummary(task);
+    expect(summary.lint).toBe("ci");
+    expect(summary.unit).toBe("ci");
+    expect(summary.build).toBe("ci");
+    expect(summary.e2e).toBe("github");
+    expect(summary.process).toBe("missing");
+    // Standard lane keeps reporting them as missing.
+    const standard = taskFixture();
+    standard.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: "T2" };
+    standard.assessment = {
+      ...standard.assessment,
+      risk: { ...standard.assessment.risk, final: "T2" },
+      verification: { process: true, lint: true, unit: true, build: true, e2e: true },
+    };
+    expect(verificationSummary(standard).lint).toBe("missing");
   });
 });
 

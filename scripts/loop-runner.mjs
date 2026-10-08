@@ -2002,7 +2002,7 @@ export function run(args, root = process.cwd(), services = {}) {
     const target = taskPath(root);
     if (!existsSync(target)) return { state: null, next: [] };
     const probe = JSON.parse(readFileSync(target, "utf8"));
-    return { state: probe.state ?? null, next: nextActions(probe) };
+    return { state: probe.state ?? null, next: nextActions(probe, root) };
   }
   let task = refreshTask(loadTask(root), root);
   saveTask(task, root); // Persist invalidation even if the requested action fails.

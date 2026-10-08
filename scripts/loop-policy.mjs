@@ -1,5 +1,4 @@
 import { existsSync, readFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { validateDocument } from "./loop-schema.mjs";
 import { assessChange } from "./assess-change.mjs";
@@ -7,6 +6,7 @@ import { isContentTarget, readChangedHunks } from "./machine-risk.mjs";
 import { REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
 import { validateReproduction } from "./ci-failure.mjs";
 import { ciCodeChanged } from "./ci-change-scope.mjs";
+import { hasPrepushMarker } from "./verify-prepush.mjs";
 
 export const highestTier = (...tiers) =>
   REVIEW_TIERS[Math.max(...tiers.filter(Boolean).map((tier) => REVIEW_TIERS.indexOf(tier)), 0)];
@@ -165,6 +165,9 @@ export function requiredVerificationKinds(task) {
 }
 export function verificationSummary(task) {
   const summary = {};
+  // #949: on the Lite lane, kinds the lane defers to CI are displayed as
+  // "ci" (like e2e's "github") instead of a misleading "missing".
+  const locallyRequired = new Set(requiredVerificationKinds(task));
   for (const [kind, required] of Object.entries(task.assessment?.verification ?? {})) {
     if (!required) continue;
     if (kind === "e2e") {
@@ -172,6 +175,10 @@ export function verificationSummary(task) {
       continue;
     }
     const result = task.verification?.[kind];
+    if (!result && !locallyRequired.has(kind)) {
+      summary[kind] = "ci";
+      continue;
+    }
     summary[kind] = !result
       ? "missing"
       : !currentEvidence(result, task)
@@ -325,16 +332,15 @@ export function requireLocalVerification(task, { fullUnit = true } = {}) {
       );
   }
 }
-/** #949 Lite lane: verify:prepush recorded a success marker on this HEAD. */
+/**
+ * #949 Lite lane: verify:prepush recorded a success marker on this HEAD.
+ * Delegates to the same lookup the writer uses (absolute --git-path plus a
+ * sanitized environment) so a GIT_*-polluted hook context cannot make the
+ * reader and the writer disagree about where the marker lives.
+ */
 export function prepushMarkerPresent(task, root) {
   try {
-    const marker = execFileSync(
-      "git",
-      ["rev-parse", "--git-path", `agent-prepush/${task.head}.ok`],
-      { cwd: root, encoding: "utf8" },
-    ).trim();
-    // --git-path may answer relative to the worktree root, not the cwd.
-    return existsSync(path.resolve(root, marker));
+    return hasPrepushMarker(root, task.head);
   } catch {
     return false;
   }
