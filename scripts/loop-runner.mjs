@@ -796,11 +796,15 @@ export function compactTaskForExport(task) {
   }
   const omitted = history.length - kept.length;
   const { findings, ...rest } = task;
+  const deferred = (findings ?? [])
+    .filter((finding) => finding.status === "deferred")
+    .map(({ id, severity, followUp }) => ({ id, severity, followUp }));
   return {
     ...rest,
     ...(findings === undefined || (review && sameJson(findings, review.findings))
       ? {}
       : { findings }),
+    ...(deferred.length ? { deferredFindings: deferred } : {}),
     assessment: null,
     verification,
     history: kept,
@@ -822,6 +826,21 @@ export function hydrateExportedTask(task) {
     entry.acceptanceCriteria = structuredClone(review.acceptanceCriteria);
   }
   return task;
+}
+export const DEFERRED_START = "<!-- suzumemo-agent-deferred:start -->";
+export const DEFERRED_END = "<!-- suzumemo-agent-deferred:end -->";
+/**
+ * Human-readable list of deferred findings, published next to the state
+ * block so reviewers see what was postponed and where it went. Lives outside
+ * the JSON markers (parseStateBlock requires exactly ```json ... ```).
+ */
+export function deferredBlock(task) {
+  const deferred = (task.findings ?? []).filter((finding) => finding.status === "deferred");
+  if (!deferred.length) return "";
+  const items = deferred
+    .map((finding) => `- \`${finding.id}\` (${finding.severity}) → ${finding.followUp}`)
+    .join("\n");
+  return `${DEFERRED_START}\nDeferred findings (follow-up issues):\n${items}\n${DEFERRED_END}`;
 }
 export function stateBlock(task) {
   return `${STATE_START}\n\`\`\`json\n${JSON.stringify(compactTaskForExport(task), null, 1)}\n\`\`\`\n${STATE_END}`;
@@ -1521,8 +1540,9 @@ export function buildReviewPacket(
         independent: task.assessment?.review?.independent === true,
         context: "fresh",
         _notes: [
-          "finding.status is open|fixed|dismissed (unique id, non-empty evidence); every prior finding id must appear",
-          "finding.severity (optional): blocker|major|minor|nit — report every finding in this round, all severities at once",
+          "finding.status is open|fixed|dismissed|deferred (unique id, non-empty evidence); every prior finding id must appear",
+          "finding.severity is REQUIRED on every new finding — an omitted severity counts as major: blocker = fails an AC / security or data destruction / production outage; major = wrong behavior, missing coverage with regression risk, contract violation; minor = readability/maintainability, small inconsistencies; nit = formatting/naming preferences",
+          "status deferred is allowed only for severity minor|nit and needs followUp: https://github.com/<owner>/<repo>/issues/<n>; open blocker/major findings block clean, minor/nit may be deferred with a follow-up issue instead of fixed now",
           "prior findings are prefilled with their last status; re-check each and write evidence (a closed finding untouched by the increment may cite the previous review)",
           "deltaFrom (optional): SHA of a previously reviewed head — scopes review to the increment",
           "assessment must satisfy the machine floor, not merely the reviewer's own rating",
@@ -1942,12 +1962,25 @@ export function run(args, root = process.cwd(), services = {}) {
       pr.headRefOid === task.head && pr.baseRefOid === task.baseHead,
       "PR revision differs from local task",
     );
-    const body = pr.body.includes(STATE_START)
+    let body = pr.body.includes(STATE_START)
       ? pr.body.replace(
           /<!-- suzumemo-agent-state:start -->[\s\S]*?<!-- suzumemo-agent-state:end -->/,
           () => block,
         )
       : `${pr.body}\n\n${block}`;
+    const deferred = deferredBlock(task);
+    // A dangling START marker without END (manual corruption only — the
+    // tool never emits one) would satisfy includes(START) while the
+    // replace below needs END, silently dropping the fresh deferred
+    // list. Strip it first so the block is re-appended cleanly.
+    if (body.includes(DEFERRED_START) && !body.includes(DEFERRED_END))
+      body = body.replace(/[^\n]*<!-- suzumemo-agent-deferred:start -->/g, "");
+    if (body.includes(DEFERRED_START))
+      body = body.replace(
+        /\n*<!-- suzumemo-agent-deferred:start -->[\s\S]*?<!-- suzumemo-agent-deferred:end -->/,
+        () => (deferred ? `\n\n${deferred}` : ""),
+      );
+    else if (deferred) body = `${body}\n\n${deferred}`;
     if (body === pr.body) return { ...summarizeTask(task), pr: args["sync-pr"], synced: false };
     const temp = mkdtempSync(path.join(tmpdir(), "agent-state-"));
     try {
