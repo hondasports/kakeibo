@@ -849,7 +849,8 @@ function nextActions(task) {
   const missing = missingRequirements(task);
   const actions = [];
   for (const item of missing) {
-    if (item === "assessment") actions.push("node scripts/loop-runner.mjs --assessment <file>");
+    if (item === "assessment" || item === "assessment(invalid)")
+      actions.push("node scripts/loop-runner.mjs --assessment <file>");
     else if (item === "openMaterialDecisions")
       actions.push("resolve spec openMaterialDecisions or --event decision_required");
     else if (item.startsWith("verify:")) {
