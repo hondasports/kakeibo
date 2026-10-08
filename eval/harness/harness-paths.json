@@ -17,6 +17,7 @@
     "e2e/spec-map.json",
     "tests/workflow/localConvexWorkflow.test.ts",
     "scripts/loop-*.mjs",
+    "scripts/loop",
     "scripts/assess-change.mjs",
     "scripts/assess-change.test.mjs",
     "scripts/machine-risk.mjs",

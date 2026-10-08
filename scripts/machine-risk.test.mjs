@@ -14,6 +14,14 @@ describe("machineRiskForPaths", () => {
     });
   });
 
+  it("forces T3 for harness loop modules under scripts/loop/ (#953)", () => {
+    expect(machineRiskForPaths(["scripts/loop/state.mjs"])).toMatchObject({
+      minimumTier: "T3",
+      floorTriggers: ["complex_state_transition_or_orchestration_port"],
+    });
+    expect(machineRiskForPaths(["scripts/loop/next.test.mjs"]).minimumTier).toBe("T3");
+  });
+
   it("keeps ordinary local changes at T1 machine floor", () => {
     expect(machineRiskForPaths(["src/features/foo/Foo.tsx"]).minimumTier).toBe("T1");
   });
