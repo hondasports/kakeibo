@@ -40,7 +40,6 @@ import {
   missingRequirements,
   verificationSummary,
   aftercareSummary,
-  verificationReusable,
   validateCheckpoint,
   requiredVerificationKinds,
   currentEvidence,
@@ -181,41 +180,6 @@ function invalidate(task) {
   task.skills = [];
 }
 /**
- * Revision-keyed memo for the merge-base patch hash: a single run asks for the
- * same (baseRef, head) digest once per verification kind and again during
- * invalidation/review-packet building, each spawning a full `git diff
- * --binary`. Keyed on head+base so a moved revision never reuses a stale
- * value; misses and nulls both memoize (null stays fail-closed).
- */
-const patchSha256Cache = new Map();
-export function featurePatchSha256(
-  task,
-  root,
-  head = task.head,
-  services = {},
-  base = task.baseHead ?? task.baseRef,
-) {
-  const run = services.git ?? git;
-  // Key and diff on a resolved base (baseHead), not the baseRef name, so a
-  // moved ref can never alias a stale entry. Callers that just resolved a
-  // fresh base pass it explicitly: during invalidateRevision task.baseHead
-  // still holds the *previous* recorded base, and a non-forward base move
-  // must recompute against the live position (missing merge-base → null →
-  // fail-closed invalidation).
-  const key = `${path.resolve(root)}${base}${head}`;
-  if (patchSha256Cache.has(key)) return patchSha256Cache.get(key);
-  let value = null;
-  try {
-    value = createHash("sha256")
-      .update(run(["diff", "--binary", "--no-renames", `${base}...${head}`], root))
-      .digest("hex");
-  } catch {
-    value = null;
-  }
-  patchSha256Cache.set(key, value);
-  return value;
-}
-/**
  * changedPaths (committed ∪ worktree) with the committed diff memoized per
  * (root, base, head): the committed set is fixed for a revision while the
  * worktree set is re-read every call so uncommitted edits never go stale.
@@ -256,132 +220,19 @@ function isUnitRelatedPath(filePath) {
   return !isMetadataOnlyPath(file) && !file.startsWith("e2e/") && UNIT_RELATED_PATTERN.test(file);
 }
 
-/** Increment paths between two commits; null on failure → fail closed. */
-function incrementChangedPaths(from, to, root) {
-  try {
-    return git(
-      ["diff", "--name-only", "--no-renames", "--diff-filter=ACDMRTUXB", "-z", from, to],
-      root,
-    )
-      .split("\0")
-      .map(normalizeChangedPath)
-      .filter(Boolean);
-  } catch {
-    return null;
-  }
-}
 /**
- * Revision-change invalidation: verification evidence may be carried over only
- * when both the feature patch and the verified tree are byte-identical to the
- * new revision — the same commands over the same tree inputs reproduce the
- * same result. Commands can still read inputs outside the tree (toolchain,
- * gitignored files, environment); that residual is accepted because CI
- * re-executes every required check on the real PR head. `run` keeps recording
- * where the verification actually executed and never gets rewritten.
- * Everything else (review, aftercare, assessment, skills) still invalidates
- * wholesale.
- *
- * A second, narrower reuse path covers increments whose paths are all
- * metadata-only (docs prose, issue templates, git hooks). Lint and build
- * cannot observe that content at all. Unit CAN: the full vitest suite
- * includes workflow/docs contract tests that read .md files. That is sound
- * only because `process` is unconditionally required, never extended, and its
- * suite contains every metadata-reading test — a mandatory fresh process
- * run decides whether a metadata increment is actually green. The guard test
- * in loop-runner.test.mjs keeps that containment invariant true.
+ * Revision-change invalidation (#953): whenever head or base moves, every
+ * recorded verification becomes stale — there is no local evidence reuse.
+ * Review, aftercare, reviewCi, assessment, and skills invalidate wholesale.
  */
-/** Canonical githooks(5) hook basenames — the only .husky/ files lint cannot observe. */
-const HUSKY_HOOK_NAMES = new Set([
-  "applypatch-msg",
-  "pre-applypatch",
-  "post-applypatch",
-  "pre-commit",
-  "pre-merge-commit",
-  "prepare-commit-msg",
-  "commit-msg",
-  "post-commit",
-  "pre-rebase",
-  "post-checkout",
-  "post-merge",
-  "pre-push",
-  "pre-receive",
-  "update",
-  "proc-receive",
-  "post-receive",
-  "post-update",
-  "reference-transaction",
-  "push-to-checkout",
-  "pre-auto-gc",
-  "post-rewrite",
-  "sendemail-validate",
-  "fsmonitor-watchman",
-  "p4-changelist",
-  "p4-prepare-changelist",
-  "p4-post-changelist",
-  "p4-pre-submit",
-  "post-index-change",
-]);
-/** lint (oxfmt/oxlint) cannot observe .md (ignored) or extensionless hook files. */
-const lintInvisiblePath = (p) =>
-  p.endsWith(".md") || HUSKY_HOOK_NAMES.has(p.slice(".husky/".length));
-
-function invalidateRevision(task, root, head, baseHead) {
-  const patchSha256 = featurePatchSha256(task, root, head, {}, baseHead);
-  let headTree = null;
-  try {
-    headTree = git(["rev-parse", `${head}^{tree}`], root);
-  } catch {
-    headTree = null;
-  }
-  const incrementPaths =
-    head !== task.head && baseHead === task.baseHead
-      ? incrementChangedPaths(task.head, head, root)
-      : null;
-  const metadataOnlyIncrement =
-    incrementPaths !== null &&
-    incrementPaths.length > 0 &&
-    incrementPaths.every(isMetadataOnlyPath);
-  const kept = {};
-  const reused = [];
-  for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
-    const fingerprintReusable = verificationReusable(evidence, {
-      patchSha256,
-      headTree,
-      contractVersion: EVIDENCE_CONTRACT_VERSION,
-    });
-    const incrementReusable =
-      !fingerprintReusable &&
-      metadataOnlyIncrement &&
-      kind !== "process" &&
-      // lint runs `oxfmt --check`, which observes YAML/JSON inside
-      // .github/ISSUE_TEMPLATE/ and well-known filenames (README,
-      // Jakefile, Pipfile) anywhere — only .md and canonical git hook
-      // basenames under .husky/ are provably invisible to it.
-      (kind !== "lint" || incrementPaths.every(lintInvisiblePath)) &&
-      evidence?.success === true &&
-      evidence?.appliesTo?.contractVersion === EVIDENCE_CONTRACT_VERSION &&
-      evidence?.appliesTo?.head === task.head &&
-      evidence?.appliesTo?.baseHead === task.baseHead;
-    if (!fingerprintReusable && !incrementReusable) continue;
-    evidence.reuse = {
-      basis: fingerprintReusable ? "identical_patch_and_tree" : "metadata_only_increment",
-      from: { head: evidence.appliesTo.head, baseHead: evidence.appliesTo.baseHead },
-      at: new Date().toISOString(),
-    };
-    if (incrementReusable) evidence.reuse.incrementPaths = incrementPaths;
-    evidence.appliesTo.head = head;
-    evidence.appliesTo.baseHead = baseHead;
-    kept[kind] = evidence;
-    reused.push(kind);
-  }
-  task.verification = kept;
+function invalidateRevision(task) {
+  task.verification = {};
   task.review = null;
   task.aftercare = null;
   task.reviewCi = null;
   task.assessment = null;
   task.agentAssessment = null;
   task.skills = [];
-  return reused;
 }
 /**
  * Machine-derived part of an assessment. When a new revision leaves all of it
@@ -412,7 +263,7 @@ export function refreshTask(task, root) {
       skills: task.skills ?? [],
     };
     const previousVerification = Object.keys(task.verification ?? {}).length;
-    const reused = invalidateRevision(task, root, head, baseHead);
+    invalidateRevision(task);
     task.head = head;
     task.baseHead = baseHead;
     if (!["refine", "incident", "human_gate"].includes(task.state)) task.state = "execute";
@@ -429,11 +280,10 @@ export function refreshTask(task, root) {
         assessmentCarried = true;
       }
     }
-    history(task, "revision_changed", { reusedVerification: reused, assessmentCarried });
+    history(task, "revision_changed", { assessmentCarried });
     recordMetric(task, root, {
       action: "revision_changed",
-      reused: reused.length,
-      invalidated: previousVerification - reused.length,
+      invalidated: previousVerification,
       assessmentCarried,
     });
   }
@@ -560,7 +410,6 @@ export function recordFailure(task, signature, root) {
       to: task.state,
     });
 }
-export const EVIDENCE_CONTRACT_VERSION = 1;
 /**
  * Best-effort metrics sink shared across linked worktrees (the common git
  * dir), never the worktree-private `--git-path` location. Failures never
@@ -711,9 +560,6 @@ export function runVerification(
     task.head === before.head && task.baseHead === before.baseHead,
     "Revision changed during verification",
   );
-  // Null fingerprints keep the evidence valid for this revision but it can
-  // never be reused for another — fail-closed.
-  const patchSha256 = featurePatchSha256(task, root);
   const log = readFileSync(artifactPath, "utf8");
   task.verification[kind] = {
     run: {
@@ -727,9 +573,6 @@ export function runVerification(
     appliesTo: {
       head: before.head,
       baseHead: before.baseHead,
-      headTree: git(["rev-parse", `${before.head}^{tree}`], root),
-      patchSha256,
-      contractVersion: EVIDENCE_CONTRACT_VERSION,
     },
     success: true,
     commands,
@@ -866,6 +709,10 @@ export function compactTaskForExport(task) {
 }
 /** Inverse of the reference compaction above; plain (legacy) blocks pass through unchanged. */
 export function hydrateExportedTask(task) {
+  // #953: legacy blocks may carry the removed reuse/lane fields — ignore them.
+  delete task.lane;
+  if (task.assessment && typeof task.assessment === "object") delete task.assessment.lane;
+  for (const evidence of Object.values(task.verification ?? {})) delete evidence?.reuse;
   const review = task.review;
   if (review && task.findings === undefined && Array.isArray(review.findings))
     task.findings = structuredClone(review.findings);
@@ -952,7 +799,6 @@ export function summarizeTask(task, root) {
     head: task.head,
     baseHead: task.baseHead,
     risk: task.risk,
-    lane: task.assessment?.lane ?? null,
     missing: missingRequirements(task, root),
     verification: verificationSummary(task),
     openFindings: (task.findings ?? []).filter((finding) => finding.status === "open").length,
@@ -986,14 +832,13 @@ export function artifactManifest(task, root = process.cwd()) {
       appliesTo: evidence.appliesTo ?? null,
       summary: evidence.summary ?? null,
       artifact,
-      reuse: evidence.reuse ?? null,
     };
   }
   return manifest;
 }
 /**
  * Reviewer-facing verification evidence for review packets — same conclusion
- * (success, scope, reuse basis, log tail, artifact path) without the
+ * (success, scope, log tail, artifact path) without the
  * fingerprints a reviewer never checks (run/appliesTo hashes, resolved
  * absolute paths, artifact sha256/bytes). The full manifest stays available
  * via `--artifacts` in the implementer's worktree.
@@ -1005,7 +850,6 @@ export function reviewerVerificationManifest(task) {
       success: evidence.success === true,
       scope: evidence.run?.scope ?? null,
       ...(evidence.run?.affectedFiles ? { affectedFiles: evidence.run.affectedFiles } : {}),
-      reuse: evidence.reuse?.basis ?? null,
       summary: evidence.summary ?? null,
       artifact: evidence.artifact?.path ?? null,
     };
@@ -1184,9 +1028,6 @@ export function aftercareSnapshot(prFields, task, findings, pr, paths = []) {
   return {
     pr: prFields.number ?? pr,
     ready,
-    // #949: the lane and the required checks + acceptance rule are part of
-    // the observation output (--check-pr / --watch-aftercare).
-    lane: task.assessment?.lane ?? null,
     expectedChecks: expectedCiChecks(paths, task.assessment),
     pending,
     failed,
@@ -1697,12 +1538,6 @@ export function buildReviewPacket(
           "Full evidence manifest (run/appliesTo fingerprints, artifact sha256/bytes): run `node scripts/loop-runner.mjs --artifacts` in the implementer's worktree.",
         ],
         verificationPlan: task.assessment?.verificationPlan ?? null,
-        reuseCandidates: {
-          featurePatchSha256: featurePatchSha256(task, root),
-          reusedVerification: Object.entries(task.verification ?? {})
-            .filter(([, evidence]) => evidence?.reuse)
-            .map(([kind]) => kind),
-        },
       },
       null,
       2,

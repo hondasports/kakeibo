@@ -45,9 +45,9 @@ const TEST_FILE_BASENAME = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 
 /**
  * Paths whose content cannot change lint/unit/build outcomes: Markdown prose,
- * issue templates, and local git hooks. Process verification still covers
- * docs/script integrity, so `process` evidence is never extended through
- * these paths — this predicate is stricter than isProcessOnlyPath on purpose.
+ * issue templates, and local git hooks. Used to scope `--verify unit --scope
+ * affected` to paths unit can actually observe (isUnitRelatedPath). This
+ * predicate is stricter than isProcessOnlyPath on purpose.
  * A test-pattern basename inside a metadata dir is NOT metadata-only: vitest
  * would still pick it up and change `vitest run` output.
  */

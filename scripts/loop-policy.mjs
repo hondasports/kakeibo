@@ -72,22 +72,6 @@ export const VERIFICATION_SCOPES = {
   build: { execution: "local", scope: "production build" },
   e2e: { execution: "github", scope: "playwright e2e (delivery gate)" },
 };
-/**
- * Whether recorded verification evidence may apply to a different revision.
- * Reuse requires both the feature patch AND the verified tree to be
- * byte-identical — the same commands over the same content produce the same
- * result, with no input-list inference to get wrong. Every unknown fails
- * closed.
- */
-export function verificationReusable(evidence, { patchSha256, headTree, contractVersion }) {
-  if (!evidence || evidence.success !== true) return false;
-  const appliesTo = evidence.appliesTo;
-  if (!appliesTo || typeof appliesTo.patchSha256 !== "string" || !appliesTo.patchSha256)
-    return false;
-  if (appliesTo.contractVersion !== contractVersion) return false;
-  if (typeof patchSha256 !== "string" || appliesTo.patchSha256 !== patchSha256) return false;
-  return typeof headTree === "string" && appliesTo.headTree === headTree;
-}
 export function requireValue(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -113,14 +97,6 @@ export function currentEvidence(evidence, task) {
   // review/aftercare records keep `head`/`baseHead` at the top level.
   const appliesTo = evidence?.appliesTo ?? evidence;
   return appliesTo?.head === task.head && appliesTo?.baseHead === task.baseHead;
-}
-/**
- * #949 Lite lane → #952: 合否の正本はCIのcheck、ローカルの必須証跡は
- * processのみ（残りはpre-push実行）を全Tierへ展開したため常にtrue。
- * 関数自体は #953 で呼び出し元ごと撤去するまで残す。
- */
-export function isLiteLane(task, assessment = task.assessment) {
-  return true;
 }
 /**
  * #949: CI checks that decide AFTERCARE readiness, with their acceptance
@@ -161,7 +137,7 @@ export function expectedReviewCiChecks(paths, assessment) {
 }
 /**
  * #952: T2/T3のREVIEW cleanは現在HEADのCI checkを正本とする
- * （ローカルfull unit証跡の代わり）。T1は #949 のLite laneと同じく
+ * （ローカルfull unit証跡の代わり）。全Tier同じ扱い（#952/#953）。
  * ローカルprocess証跡だけでcleanし、CI待ちはAFTERCAREに残す。
  */
 export const requiresReviewCi = (task) => task.risk !== "T1";
@@ -223,13 +199,13 @@ export function requiredVerificationKinds(task) {
   const kinds = Object.entries(task.assessment?.verification ?? {})
     .filter(([kind, required]) => required && kind !== "e2e")
     .map(([kind]) => kind);
-  // Lite lane: only the process gate is verified locally; CI carries the rest.
-  return isLiteLane(task) ? kinds.filter((kind) => kind === "process") : kinds;
+  // Only the process gate is verified locally; CI is the verdict for the rest.
+  return kinds.filter((kind) => kind === "process");
 }
 export function verificationSummary(task) {
   const summary = {};
-  // #949: on the Lite lane, kinds the lane defers to CI are displayed as
-  // "ci" (like e2e's "github") instead of a misleading "missing".
+  // Kinds deferred to CI display as "ci" (like e2e's "github") instead of a
+  // misleading "missing".
   const locallyRequired = new Set(requiredVerificationKinds(task));
   for (const [kind, required] of Object.entries(task.assessment?.verification ?? {})) {
     if (!required) continue;
@@ -248,11 +224,7 @@ export function verificationSummary(task) {
         ? "stale"
         : result.success !== true
           ? "failed"
-          : [
-              "pass",
-              ...(result.reuse ? ["reused"] : []),
-              ...(isFullScopeEvidence(result) ? [] : ["affected"]),
-            ]
+          : ["pass", ...(isFullScopeEvidence(result) ? [] : ["affected"])]
               .join(",")
               .replace(/^pass,(.+)$/, "pass($1)");
   }
@@ -303,8 +275,8 @@ export function missingRequirements(task, root) {
   }
   if (task.state === "execute") {
     localVerificationMissing({ fullUnit: false });
-    // #949: Lite lane tasks still must have run verify:prepush on this HEAD.
-    if (root && task.agentAssessment && isLiteLane(task) && !prepushMarkerPresent(task, root))
+    // Every tier must have run verify:prepush on this HEAD before EXECUTE→REVIEW.
+    if (root && task.agentAssessment && !prepushMarkerPresent(task, root))
       missing.push("verify:prepush");
   }
   if (task.state === "review") {
@@ -342,8 +314,6 @@ export function computeAssessment(task, paths, root = process.cwd()) {
     reviewerAssessment: reviewAssessment,
   });
   result.verificationPlan = verificationPlan(result, task, root);
-  // #949: the lane the task rides is part of the recorded assessment.
-  result.lane = isLiteLane(task, result) ? "lite" : "standard";
   return result;
 }
 /**
@@ -381,7 +351,7 @@ export function requireLocalVerification(task, { fullUnit = true } = {}) {
   requireValue(validateAssessment(task.agentAssessment).length === 0, "Invalid agent assessment");
   for (const skill of task.assessment.requiredSkills)
     requireValue(task.skills.includes(skill), `Required skill not acknowledged: ${skill}`);
-  // Lite lane shrinks this to `process` alone via requiredVerificationKinds.
+  // Locally required kinds collapse to `process` alone via requiredVerificationKinds.
   for (const kind of requiredVerificationKinds(task)) {
     const result = task.verification[kind];
     requireValue(
@@ -396,7 +366,7 @@ export function requireLocalVerification(task, { fullUnit = true } = {}) {
   }
 }
 /**
- * #949 Lite lane: verify:prepush recorded a success marker on this HEAD.
+ * verify:prepush recorded a success marker on this HEAD.
  * Delegates to the same lookup the writer uses (absolute --git-path plus a
  * sanitized environment) so a GIT_*-polluted hook context cannot make the
  * reader and the writer disagree about where the marker lives.
@@ -603,14 +573,13 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
       !(task.ciFailures ?? []).some((f) => !f.resolvedAt),
       "Unresolved ciFailure records remain; run --resolve-ci-failures first",
     );
-    // #949: the Lite lane cannot merge without having run the same commands
-    // CI runs — the pre-push marker is the (unrecorded) proof it happened.
+    // No task may merge without having run the same commands CI runs — the
+    // pre-push marker is the (unrecorded) proof it happened.
     // Checked last so more specific gates report first.
-    if (isLiteLane(task))
-      requireValue(
-        prepushMarkerPresent(task, root),
-        "verify:prepush success marker missing for current HEAD (run pnpm verify:prepush)",
-      );
+    requireValue(
+      prepushMarkerPresent(task, root),
+      "verify:prepush success marker missing for current HEAD (run pnpm verify:prepush)",
+    );
   }
 }
 /**

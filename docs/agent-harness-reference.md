@@ -87,11 +87,9 @@ affectedは変更ファイルのうちvitestが関連テストを解決できる
 node scripts/loop-runner.mjs --verify unit --scope affected
 ```
 
-検証ログは `git rev-parse --git-path agent-evidence` 配下にartifactとして保存され、worktreeを汚さない。証跡manifestは実実行の `run`（HEAD/base・時刻・時間）と適用対象の `appliesTo`（HEAD/base・head tree・feature patch SHA-256・contract version）を分けて記録し、exit summary・artifactのpath/SHA-256/bytesを保持する。成功時のログ本文は通常出力に含めない。失敗時のエラーはexit code・artifact path・末尾行だけを返し、全文はartifactを参照する。
+検証ログは `git rev-parse --git-path agent-evidence` 配下にartifactとして保存され、worktreeを汚さない。証跡manifestは実実行の `run`（HEAD/base・時刻・時間）と適用対象の `appliesTo`（HEAD/base）を分けて記録し、exit summary・artifactのpath/SHA-256/bytesを保持する。成功時のログ本文は通常出力に含めない。失敗時のエラーはexit code・artifact path・末尾行だけを返し、全文はartifactを参照する。
 
-HEAD/base更新で古い検証・レビューは失効するが、verification証跡だけは安全に部分再利用できる。feature patch（merge-base差分のSHA-256）と検証対象のhead treeがともに不変な場合のみ `appliesTo` を新revisionへ更新し、`reuse.from` に元revisionを記録する。同一のtree入力には同一の結果を再現できる——入力推論は行わない。ツールチェーン・gitignore済みファイルなどtree外の入力はfingerprintできない残差だが、必須確認はCIが実HEAD上で再実行するため再利用はローカル短絡に留まる。`run` は実実行の記録のまま書き換えない。fingerprintの計算不能・contract version不一致・必須metadata欠落はすべてfail-closedで失効する。review・aftercareは再利用しない。assessment・skillsは前述のMachine分類不変時だけ引き継ぐ。`git fetch origin` 後も状態を再確認する。
-
-base不変の増分commitについては第2の再利用経路がある。増分差分 `旧HEAD..新HEAD` の全pathがmetadata-only（Markdown・`.github/ISSUE_TEMPLATE/`・`.husky/`）の場合、process以外の証跡の `appliesTo` を延長する。`reuse.basis` は `identical_patch_and_tree` または `metadata_only_increment` を記録し、後者は増分path一覧も保持する。増分が取得不能・空・非metadataを含む場合はこの経路を使わない。process証跡はdocs整合を検査するためmetadata変更でも再実行する。lintは `oxfmt --check` がISSUE_TEMPLATE配下のYAML/JSONやwell-known filename（README・Jakefile・Pipfile等）を観測し得るため、増分が `.md` と `.husky/` 配下の正規hook名のみの場合に限り延長される。buildはmetadataを観測しない。unitのfull suiteにはmetadataを読むworkflow/docs契約テストが含まれ得るが、それらは全てprocess suite（延長不可・必須・毎回再実行）に閉じ込められており、process側が増分の正当性を判定する。metadata dir配下の `*.{test,spec}.*` はvitestがdot-dir内も探索するためmetadata-onlyから除外される。test:process外にmetadataを読むテストが追加されるとguard testが失敗する。
+HEADまたはbaseが変わるとverification証跡は全て失効する（#953で再利用機構は撤去した）。失効は実際のHEAD/base変更時だけ判定し、遷移（findings/ci_failure等）では失効しない。review・aftercare・reviewCi・assessment・skillsも同時に失効するが、assessment・skillsは前述のMachine分類不変時だけ引き継ぐ。`git fetch origin` 後も状態を再確認する。
 
 同じ検証コマンド・終了コードが連続して3回失敗した場合はINCIDENTへ停止する。修正前後で原因が変わったと判断する場合も、INCIDENTのresolutionに切り分け証拠を記録して解除する。単なる再試行でカウンタをリセットしない。
 
@@ -117,7 +115,7 @@ node scripts/loop-runner.mjs --event clean
 
 Reviewerの本人性や実施内容はAgentが正しく記録する責任を持つ。CLIは担当ID、fresh宣言、HEAD、必須深度、全AC、残存findingを検査する。過去findingは次roundにも同じIDで引き継ぐ。
 
-独立Reviewerへ渡す材料は `--review-packet <dir>` で生成する。packet.json（目的・AC・changedPaths・risk・reuseCandidates。verificationの要約はtask-summary.jsonを参照）、diff.patch、task-summary.json、verification-manifest.json（Reviewer向けの要約。kindごとに成否・scope・reuseのbasis・末尾ログ・artifact相対パスのみ。run/appliesToフィンガープリントやartifactのsha256・絶対パスは含まない。完全なmanifestは実装担当のworktreeで `--artifacts` を実行して取得する）、review-template.json（validateReview準拠の雛形。過去findingのid・status・severityを事前記入し、evidenceはReviewerが再確認して書く）、contracts/（AGENTS.md・workflow-review.md・required-skills）を書き出す。REVIEW状態かつclean treeが必須で、生成物はcommitしない。reuseCandidatesにはfeature patch fingerprintと再利用済みkindだけを記録し、review証跡は再利用しない。
+独立Reviewerへ渡す材料は `--review-packet <dir>` で生成する。packet.json（目的・AC・changedPaths・risk。verificationの要約はtask-summary.jsonを参照）、diff.patch、task-summary.json、verification-manifest.json（Reviewer向けの要約。kindごとに成否・scope・末尾ログ・artifact相対パスのみ。run/appliesToやartifactのsha256・絶対パスは含まない。完全なmanifestは実装担当のworktreeで `--artifacts` を実行して取得する）、review-template.json（validateReview準拠の雛形。過去findingのid・status・severityを事前記入し、evidenceはReviewerが再確認して書く）、contracts/（AGENTS.md・workflow-review.md・required-skills）を書き出す。REVIEW状態かつclean treeが必須で、生成物はcommitしない。
 
 ```bash
 node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet
@@ -131,11 +129,11 @@ node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet-r2   #
 node scripts/loop-runner.mjs --review-packet /tmp/issue-900-full --full-review
 ```
 
-指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、2roundごとにreassessmentを要求する。5round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。遷移時に証跡を無条件失効させることはない——証跡の失効は実際のHEAD/base変更時だけ判定する。却下で終わる指摘やmetadata-onlyの修正で全検証をやり直させないためである。同じラウンドのopen findingはまとめて修正・再検証する（`.agent/workflow/review.md` 参照）。
+指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、2roundごとにreassessmentを要求する。5round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。遷移時に証跡を無条件失効させることはない——証跡の失効は実際のHEAD/base変更時だけ判定する。却下で終わる指摘で検証をやり直させないためである。同じラウンドのopen findingはまとめて修正・再検証する（`.agent/workflow/review.md` 参照）。
 
-## CI中心の検証（旧Lite lane）
+## CI中心の検証
 
-#952以降、合否の正本はCIのcheckであり、ローカルの必須検証は全Tierとも `process` のみ（lint/unit/buildはpre-push実行で担保し、runnerは結果を証跡として記録しない）。旧Lite laneの条件分岐は撤去途中で、computed assessmentの `lane` は全タスク `"lite"` を返す（#953でフィールド自体を撤去するまでの過渡状態）。
+#952以降、合否の正本はCIのcheckであり、ローカルの必須検証は全Tierとも `process` のみ（lint/unit/buildはpre-push実行で担保し、runnerは結果を証跡として記録しない）。#953でlaneの区別自体を撤去した——全タスクが同じルールで動く。
 
 - `--verify-required` とcheckpoint検証はprocessだけを要求・実行する。REVIEWの `clean` はT1がローカル証跡のみ、T2/T3はそれに加えて現在HEADのCI check評価（`reviewCi`）を要求する。
 - EXECUTE→REVIEWの `ready` には、現在HEADに対応する `agent-prepush/<head>.ok` 成功マーカーが必要（`pnpm verify:prepush` またはpre-push hookが刻む。証跡JSONではなくファイルの存在だけを見る）。マーカーがなければreadyは拒否される。
@@ -174,7 +172,7 @@ gh pr create --draft --title "..." --body-file /tmp/pr-body-full.md
 
 `--sync-pr` は同期後の本文が既存本文と完全一致する場合、GitHub editを行わず `synced: false` を返す。更新時は `synced: true`。Human Requestや更新履歴は保持する。頻繁なCI観測やbot確認日時だけを本文へ追記せず、復元用の状態が変わる節目で同期する。
 
-観測用のmetricsは `git rev-parse --git-common-dir` 配下の `agent-metrics.jsonl` へ1行JSONで追記する。verify（kind・durationMs・result・scope・artifactBytes・失敗signature）、revision_changed（reused/invalidated件数・assessmentCarried）、transition、aftercare、watch_aftercare（poll回数）、review_packet（scope）、friction_note（本文先頭500文字）、usage（後述）を記録する。加えて、CLIがAgentへ返したstdout/stderrのバイト数を `cli_output`（command・outputBytes・exit）として記録する。出力本文は記録せず、`--watch-aftercare` 付きの実行はcommandへ `+watch-aftercare` を付記して区別する。アクション指定のない引数なし実行（通常の再開）は `none` として記録する。taskが読めない実行（init前や早期失敗）はtask=nullで記録する。common dir配下なのでlinked worktreeを跨いで集計でき、worktreeは汚れない。追記はbest-effortであり、失敗しても本処理を止めない。環境変数 `AGENT_METRICS_FILE` で出力先を上書きでき、Vitest実行中（`VITEST` 設定時）に上書きがなければ記録しない。テストが実リポジトリの集計を汚さないためである。
+観測用のmetricsは `git rev-parse --git-common-dir` 配下の `agent-metrics.jsonl` へ1行JSONで追記する。verify（kind・durationMs・result・scope・artifactBytes・失敗signature）、revision_changed（invalidated件数・assessmentCarried）、transition、aftercare、watch_aftercare（poll回数）、review_packet（scope）、friction_note（本文先頭500文字）、usage（後述）を記録する。加えて、CLIがAgentへ返したstdout/stderrのバイト数を `cli_output`（command・outputBytes・exit）として記録する。出力本文は記録せず、`--watch-aftercare` 付きの実行はcommandへ `+watch-aftercare` を付記して区別する。アクション指定のない引数なし実行（通常の再開）は `none` として記録する。taskが読めない実行（init前や早期失敗）はtask=nullで記録する。common dir配下なのでlinked worktreeを跨いで集計でき、worktreeは汚れない。追記はbest-effortであり、失敗しても本処理を止めない。環境変数 `AGENT_METRICS_FILE` で出力先を上書きでき、Vitest実行中（`VITEST` 設定時）に上書きがなければ記録しない。テストが実リポジトリの集計を汚さないためである。
 
 トークン量はセッションtranscriptから記録する。Claude Codeは `~/.claude/projects/<project>/<session>.jsonl`、Codexは `~/.codex/sessions/**/rollout-*.jsonl` を渡す。Claude Codeはresponse idで重複を除き、Codexは最後の累積値を使う。input（uncached）・cache read・cache write・output・reasoning（outputの内数）・呼び出し数を記録する。taskもPR本文も変更しない観測専用の操作である。独立Reviewerのtranscriptは `--usage-role reviewer` で記録する。
 
@@ -189,7 +187,7 @@ node scripts/loop-metrics.mjs --task issue-123   # タスク別集計
 node scripts/loop-metrics.mjs --path /tmp/other.jsonl
 ```
 
-`loop:metrics` はJSONLを集計し、action別件数・durationMs・verifyのkind別pass/fail・scope別件数・revision_changedのreused/invalidated/assessmentCarried・review_packetのscope別件数・transitionイベント別件数を返す。cli_outputはcommand別のoutputBytes（合計・平均・最大）を `byCommand` に返す。usageはtranscriptごとの最新記録だけを数え、role別と合計を `usage` に返す。作業中に感じた摩擦は `--friction-note <text>` で `task.frictionNote` へ記録でき、history・metrics・export状態ブロックに残る。ハーネス改善タスクの定性入力として使う。
+`loop:metrics` はJSONLを集計し、action別件数・durationMs・verifyのkind別pass/fail・scope別件数・revision_changedのinvalidated/assessmentCarried・review_packetのscope別件数・transitionイベント別件数を返す。cli_outputはcommand別のoutputBytes（合計・平均・最大）を `byCommand` に返す。usageはtranscriptごとの最新記録だけを数え、role別と合計を `usage` に返す。作業中に感じた摩擦は `--friction-note <text>` で `task.frictionNote` へ記録でき、history・metrics・export状態ブロックに残る。ハーネス改善タスクの定性入力として使う。
 
 `Agent harness` CIはMarkdownのみの変更でも動き、実PR HEAD/base・実差分・仕様・検証・レビューを照合する。非bot PRは状態ブロック必須（draft PRではjobごとスキップし、ready化で実行する）。GitHubが認識するdependabot/github-actionsのBot投稿は例外とし、processテストとドキュメントチェックは実行する。既存PRもこのworkflowが走る時点で状態ブロックが必要になる。CIを必須チェックへ登録するbranch protection設定は別途管理者の操作が必要であり、このPRでは権限設定を変更しない。
 
@@ -199,7 +197,7 @@ node scripts/loop-runner.mjs --event ready --handled /tmp/handled.txt
 node scripts/loop-runner.mjs --sync-pr 123
 ```
 
-状態や本文を更新せず現在のPRを確認する場合は `--check-pr` を使う。AFTERCARE/DONEで利用でき、PR CIと共通のlocal検証・レビューcheckpointを照合した後、GitHubを再取得してHEAD/base・最新CI・approval・mergeability・findingを確認する。成功時は `ready: true` と要約を返す。gate条件（check失敗・未処理finding・approval欠落等）を満たさない場合は `ready: false` と `gateError`（失敗理由）を返す。`lane`（lite/standard）と `expectedChecks`（要求check名・accept・reason）も返し、何が不合格の根拠かをそのまま確認できる。HEAD/baseの変化やローカル改変などの整合性エラーは従来どおり失敗する。古いDONE記録だけを成功根拠にしない。
+状態や本文を更新せず現在のPRを確認する場合は `--check-pr` を使う。AFTERCARE/DONEで利用でき、PR CIと共通のlocal検証・レビューcheckpointを照合した後、GitHubを再取得してHEAD/base・最新CI・approval・mergeability・findingを確認する。成功時は `ready: true` と要約を返す。gate条件（check失敗・未処理finding・approval欠落等）を満たさない場合は `ready: false` と `gateError`（失敗理由）を返す。`expectedChecks`（要求check名・accept・reason）も返し、何が不合格の根拠かをそのまま確認できる。HEAD/baseの変化やローカル改変などの整合性エラーは従来どおり失敗する。古いDONE記録だけを成功根拠にしない。
 
 ```bash
 node scripts/loop-runner.mjs --check-pr 123 --handled /tmp/handled.txt

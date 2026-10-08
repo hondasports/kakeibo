@@ -35,7 +35,6 @@ import {
   buildReviewPacket,
   inspectPullRequest,
   watchAftercare,
-  featurePatchSha256,
   readChangedPathsRevisioned,
   aftercareFetchers,
   collectFindingsArgs,
@@ -172,7 +171,7 @@ describe("persistent task gates", () => {
     ...overrides,
   });
   const completeFindings = { pagesComplete: true, unhandledCount: 0, unresolvedThreadCount: 0 };
-  // #949 lite lane: the gate only sees the verify:prepush success marker file
+  // The gate only sees the verify:prepush success marker file
   // for the current HEAD (the runner never records the result itself).
   const markPrepush = (dir, head) => {
     const marker = execFileSync(
@@ -916,7 +915,7 @@ describe("persistent task gates", () => {
       writeFileSync(assessment, JSON.stringify(taskFixture().agentAssessment));
       cli("--assessment", assessment);
       cli("--verify-required");
-      // T1 lite lane: ready needs the verify:prepush marker for this HEAD.
+      // ready needs the verify:prepush marker for this HEAD.
       markPrepush(
         checkout,
         execFileSync("git", ["rev-parse", "HEAD"], { cwd: checkout, encoding: "utf8" }).trim(),
@@ -937,7 +936,7 @@ describe("persistent task gates", () => {
       expect(status).not.toHaveProperty("configuration");
       const explain = JSON.parse(cli("--explain"));
       expect(explain.missing).toContain("aftercare");
-      expect(explain.verificationDetail.process.appliesTo.contractVersion).toBe(1);
+      expect(explain.verificationDetail.process.appliesTo.head).toBe(task.head);
       const artifacts = JSON.parse(cli("--artifacts"));
       expect(artifacts.artifacts.process.artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
       expect(artifacts.artifacts.process.artifact.available).toBe(true);
@@ -1253,13 +1252,10 @@ describe("persistent task gates", () => {
     expect(evidence.success).toBe(true);
     expect(evidence.run).toMatchObject({ head: task.head, baseHead: task.baseHead });
     expect(evidence.run.durationMs).toBeGreaterThanOrEqual(0);
-    expect(evidence.appliesTo).toMatchObject({
+    expect(evidence.appliesTo).toEqual({
       head: task.head,
       baseHead: task.baseHead,
-      contractVersion: 1,
     });
-    expect(evidence.appliesTo.headTree).toMatch(/^[0-9a-f]{40}$/);
-    expect(evidence.appliesTo.patchSha256).toMatch(/^[0-9a-f]{64}$/);
     // Persisted artifact paths stay relative to the evidence root so the state
     // block never leaks local filesystem layout into the PR body.
     expect(path.isAbsolute(evidence.artifact.path)).toBe(false);
@@ -1303,7 +1299,9 @@ describe("persistent task gates", () => {
     task.verification.process = verificationManifestFixture(task);
     expect(currentEvidence(task.verification.process, task)).toBe(true);
     const manifest = artifactManifest(task).process;
-    expect(manifest.appliesTo.contractVersion).toBe(1);
+    // #953: appliesTo is now just the recorded HEAD/base binding — no
+    // fingerprints, no contract version (evidence reuse was removed).
+    expect(manifest.appliesTo).toEqual({ head: task.head, baseHead: task.baseHead });
     // Manifests survive restore without artifact bodies: availability is probed.
     expect(manifest.artifact.available).toBe(false);
   });
@@ -1401,37 +1399,18 @@ describe("persistent task gates", () => {
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", `upstream ${file}`);
     git("switch", "codex/task");
   };
-  it("reuses verification evidence across base drift when the head tree is unchanged", () => {
+  it("drops all verification evidence on base drift (#953: no reuse)", () => {
     const { dir, git, task } = repository();
     runVerification(task, "process", dir, () => ({ status: 0 }));
     saveTask(task, dir);
-    const before = task.verification.process;
-    upstreamCommit(dir, git, "src/app.ts", "export {};\n");
-    const refreshed = refreshTask(loadTask(dir), dir);
-    const evidence = refreshed.verification.process;
-    // The run record stays at the revision that actually executed it.
-    expect(evidence.run.head).toBe(before.run.head);
-    expect(evidence.appliesTo.head).toBe(refreshed.head);
-    expect(evidence.appliesTo.baseHead).toBe(refreshed.baseHead);
-    expect(evidence.appliesTo.baseHead).not.toBe(before.appliesTo.baseHead);
-    expect(evidence.reuse).toMatchObject({
-      from: { head: before.appliesTo.head, baseHead: before.appliesTo.baseHead },
-    });
-    expect(verificationSummary(refreshed).process).toBe("pass(reused)");
-    expect(refreshed.history.at(-1).reusedVerification).toEqual(["process"]);
-  });
-  it("keeps evidence when upstream drift leaves the head tree untouched", () => {
-    const { dir, git, task } = repository();
-    runVerification(task, "process", dir, () => ({ status: 0 }));
-    saveTask(task, dir);
-    // Even harness-relevant upstream files cannot invalidate a verification of
-    // this tree — the head does not contain them.
+    // Even a head-tree-untouched upstream move invalidates every kind —
+    // evidence reuse was removed; only the recorded HEAD/base bind counts.
     upstreamCommit(dir, git, "docs/upstream.md");
     const refreshed = refreshTask(loadTask(dir), dir);
-    expect(refreshed.verification.process.reuse).toBeDefined();
-    expect(refreshed.history.at(-1).reusedVerification).toEqual(["process"]);
+    expect(refreshed.verification).toEqual({});
+    expect(verificationSummary(refreshed).process).toBe("missing");
   });
-  it("reuses evidence across a message-only amend when the tree is identical", () => {
+  it("drops evidence after any head move, including a message-only amend", () => {
     const { dir, git, task } = repository();
     writeFileSync(path.join(dir, "feature.txt"), "feature\n");
     git("add", ".");
@@ -1441,13 +1420,9 @@ describe("persistent task gates", () => {
     saveTask(task, dir);
     git("-c", "core.hooksPath=/dev/null", "commit", "--amend", "-m", "renamed");
     const refreshed = refreshTask(loadTask(dir), dir);
-    const evidence = refreshed.verification.process;
-    // Same patch, same tree, new commit SHA — evidence carries over.
-    expect(evidence.appliesTo.head).toBe(refreshed.head);
-    expect(evidence.reuse.from.head).not.toBe(refreshed.head);
-    expect(verificationSummary(refreshed).process).toBe("pass(reused)");
+    expect(refreshed.verification).toEqual({});
   });
-  it("drops evidence after a rebase even when the feature patch is identical", () => {
+  it("drops evidence after a rebase", () => {
     const { dir, git, task } = repository();
     writeFileSync(path.join(dir, "feature.txt"), "feature\n");
     git("add", ".");
@@ -1456,24 +1431,9 @@ describe("persistent task gates", () => {
     runVerification(task, "process", dir, () => ({ status: 0 }));
     saveTask(task, dir);
     upstreamCommit(dir, git, "src/upstream.ts", "export {};\n");
-    // Rebasing keeps the patch byte-identical but embeds new base content —
-    // the head tree differs, so verification must re-run on the new content.
-    const beforeSha = task.verification.process.appliesTo.patchSha256;
     git("-c", "core.hooksPath=/dev/null", "rebase", "preview");
-    // Prove the patch fingerprint held — the drop below must come from the
-    // head-tree fingerprint, not a patch mismatch.
-    const afterSha = createHash("sha256")
-      .update(
-        execFileSync("git", ["diff", "--binary", "--no-renames", "preview...HEAD"], {
-          cwd: dir,
-          encoding: "utf8",
-        }).trim(),
-      )
-      .digest("hex");
-    expect(afterSha).toBe(beforeSha);
     const refreshed = refreshTask(loadTask(dir), dir);
     expect(refreshed.verification).toEqual({});
-    expect(refreshed.history.at(-1).reusedVerification).toEqual([]);
   });
   it("drops verification evidence when the feature patch changes", () => {
     const { dir, git, task } = repository();
@@ -1485,14 +1445,7 @@ describe("persistent task gates", () => {
     const refreshed = refreshTask(loadTask(dir), dir);
     expect(refreshed.verification).toEqual({});
   });
-  it("drops evidence fail-closed on contract mismatch or missing reuse metadata", () => {
-    const { dir, git, task } = repository();
-    runVerification(task, "process", dir, () => ({ status: 0 }));
-    task.verification.process.appliesTo.contractVersion = 999;
-    saveTask(task, dir);
-    upstreamCommit(dir, git, "src/app.ts", "export {};\n");
-    expect(refreshTask(loadTask(dir), dir).verification).toEqual({});
-    // Legacy flat evidence without appliesTo is never reusable either.
+  it("drops legacy flat evidence (no appliesTo) on revision change", () => {
     const { dir: dir2, git: git2, task: task2 } = repository();
     task2.verification.process = {
       head: task2.head,
@@ -1503,7 +1456,7 @@ describe("persistent task gates", () => {
     upstreamCommit(dir2, git2, "src/legacy.ts", "export {};\n");
     expect(refreshTask(loadTask(dir2), dir2).verification).toEqual({});
   });
-  it("never reuses review or aftercare evidence on revision change", () => {
+  it("invalidates review and aftercare evidence on revision change", () => {
     const { dir, git, task } = repository();
     runVerification(task, "process", dir, () => ({ status: 0 }));
     task.state = "aftercare";
@@ -1518,7 +1471,7 @@ describe("persistent task gates", () => {
     saveTask(task, dir);
     upstreamCommit(dir, git, "src/app.ts", "export {};\n");
     const refreshed = refreshTask(loadTask(dir), dir);
-    expect(refreshed.verification.process).toBeDefined();
+    expect(refreshed.verification).toEqual({});
     expect(refreshed.review).toBeNull();
     expect(refreshed.aftercare).toBeNull();
     expect(refreshed.state).toBe("execute");
@@ -1573,7 +1526,7 @@ describe("persistent task gates", () => {
     });
     expect(packet.changedPaths).toContain("feature.txt");
     expect(packet.acceptanceCriteria[0].id).toBe("AC1");
-    expect(packet.reuseCandidates.featurePatchSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet).not.toHaveProperty("reuseCandidates");
     const template = JSON.parse(readFileSync(path.join(out, "review-template.json"), "utf8"));
     expect(template).toMatchObject({
       head: task.head,
@@ -1587,13 +1540,12 @@ describe("persistent task gates", () => {
     // in a real fresh-context review.
     expect(template._notes.join(" ")).toContain("open|fixed|dismissed");
     expect(readFileSync(path.join(out, "diff.patch"), "utf8")).toContain("feature.txt");
-    // Reviewer-facing manifest: the conclusion (success, scope, reuse basis,
-    // log tail, artifact path) without fingerprints the reviewer never checks.
+    // Reviewer-facing manifest: the conclusion (success, scope, log tail,
+    // artifact path) without fingerprints the reviewer never checks.
     const manifest = JSON.parse(readFileSync(path.join(out, "verification-manifest.json"), "utf8"));
     expect(manifest.process).toMatchObject({
       success: true,
       scope: "full",
-      reuse: null,
       artifact: expect.stringContaining("process"),
     });
     expect(manifest.process.summary.exitCode).toBe(0);
@@ -1609,7 +1561,7 @@ describe("persistent task gates", () => {
     });
     expect(existsSync(path.join(out, "contracts", "workflow-review.md"))).toBe(true);
   });
-  it("preserves a complete review patch and feature hash larger than 1 MiB", () => {
+  it("preserves a complete review patch larger than 1 MiB", () => {
     const { dir, git, task } = repository();
     writeFileSync(path.join(dir, "large-feature.txt"), "large diff line\n".repeat(80_000));
     git("add", ".");
@@ -1622,18 +1574,11 @@ describe("persistent task gates", () => {
       { cwd: dir, maxBuffer: 32 * 1024 * 1024 },
     );
     expect(expectedDiff.length).toBeGreaterThan(1024 * 1024);
-    const expectedHash = createHash("sha256")
-      .update(expectedDiff.toString("utf8").trim())
-      .digest("hex");
-    expect(featurePatchSha256(task, dir)).toBe(expectedHash);
-
     const parent = mkdtempSync(path.join(tmpdir(), "loop-large-packet-"));
     dirs.push(parent);
     const out = path.join(parent, "packet");
     buildReviewPacket(task, out, dir);
     expect(readFileSync(path.join(out, "diff.patch")).equals(expectedDiff)).toBe(true);
-    const packet = JSON.parse(readFileSync(path.join(out, "packet.json"), "utf8"));
-    expect(packet.reuseCandidates.featurePatchSha256).toBe(expectedHash);
   });
   it("refuses review packets outside review state or with a dirty tree", () => {
     const { dir, task } = repository();
@@ -1943,7 +1888,8 @@ describe("persistent task gates", () => {
       delete process.env.AGENT_METRICS_FILE;
     }
     const revision = readMetrics().at(-1);
-    expect(revision).toMatchObject({ action: "revision_changed", reused: 1, invalidated: 0 });
+    expect(revision).toMatchObject({ action: "revision_changed", invalidated: 1 });
+    expect(revision).not.toHaveProperty("reused");
   });
   it("records cli_output size for stdout and stderr without changing them", () => {
     const { dir, task } = repository();
@@ -2144,7 +2090,7 @@ describe("persistent task gates", () => {
   });
 });
 
-describe("increment reuse and loop ergonomics", () => {
+describe("revision invalidation and loop ergonomics", () => {
   /** Move `preview` one commit ahead on the given file, then switch back. */
   const upstreamCommit = (dir, git, file, content = "upstream\n") => {
     git("switch", "preview");
@@ -2154,35 +2100,6 @@ describe("increment reuse and loop ergonomics", () => {
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", `upstream ${file}`);
     git("switch", "codex/task");
   };
-  it("memoizes the feature patch hash per (baseRef, head) and busts on revision change", () => {
-    const { dir, git, task } = repository();
-    const calls = [];
-    const spy = (args) => {
-      calls.push(args);
-      return "patch";
-    };
-    const h1 = task.head;
-    expect(featurePatchSha256(task, dir, h1, { git: spy })).toBe(
-      featurePatchSha256(task, dir, h1, { git: spy }),
-    );
-    expect(calls).toHaveLength(1); // same revision: the diff runs once
-    const h2 = "f".repeat(40);
-    featurePatchSha256(task, dir, h2, { git: spy });
-    expect(calls).toHaveLength(2); // a different head never reuses the entry
-    featurePatchSha256(task, dir, h2, { git: spy });
-    expect(calls).toHaveLength(2);
-    // Against real diffs, a moved revision yields a different hash.
-    mkdirSync(path.join(dir, "src"), { recursive: true });
-    writeFileSync(path.join(dir, "src/a.ts"), "export {};\n");
-    git("add", ".");
-    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "a");
-    const real1 = featurePatchSha256(task, dir, git("rev-parse", "HEAD"));
-    writeFileSync(path.join(dir, "src/a.ts"), "export const a = 1;\n");
-    git("add", ".");
-    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "a2");
-    const real2 = featurePatchSha256(task, dir, git("rev-parse", "HEAD"));
-    expect(real2).not.toBe(real1);
-  });
   it("memoizes committed paths per (baseHead, head) while re-reading worktree paths", () => {
     const { dir, git } = repository();
     const baseHead = git("rev-parse", "preview");
@@ -2210,27 +2127,17 @@ describe("increment reuse and loop ergonomics", () => {
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", "feat");
     task.head = git("rev-parse", "HEAD");
     runVerification(task, "process", dir, () => ({ status: 0 }));
-    expect(task.verification.process.appliesTo.patchSha256).toBeTruthy();
+    expect(task.verification.process.appliesTo.head).toBe(task.head);
     saveTask(task, dir);
-    // preview fast-forwards to head: the live feature patch becomes empty,
-    // so the recorded fingerprint no longer matches and evidence invalidates.
+    // preview fast-forwards to head: the recorded base no longer matches and
+    // evidence invalidates.
     git("switch", "preview");
     git("merge", "--ff-only", "codex/task");
     git("switch", "codex/task");
     const refreshed = refreshTask(loadTask(dir), dir);
     expect(refreshed.verification.process).toBeUndefined();
   });
-  it("returns a null patch fingerprint for a base with no merge-base", () => {
-    const { dir, git, task } = repository();
-    const head = git("rev-parse", "HEAD");
-    // An unrelated root commit shares no history with head.
-    git("switch", "--orphan", "orphan-root");
-    git("-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-m", "unrelated root");
-    const orphan = git("rev-parse", "HEAD");
-    git("switch", "codex/task");
-    expect(featurePatchSha256(task, dir, head, {}, orphan)).toBeNull();
-  });
-  it("extends non-process evidence through metadata-only increments", () => {
+  it("drops all evidence on any increment, metadata-only or not (#953)", () => {
     const { dir, git, task } = repository();
     runVerification(task, "process", dir, () => ({ status: 0 }));
     for (const kind of ["lint", "unit", "build"])
@@ -2241,102 +2148,10 @@ describe("increment reuse and loop ergonomics", () => {
     git("add", ".");
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs fix");
     const refreshed = refreshTask(loadTask(dir), dir);
-    expect(refreshed.verification.process).toBeUndefined();
-    for (const kind of ["lint", "unit", "build"]) {
-      const evidence = refreshed.verification[kind];
-      expect(evidence.appliesTo.head).toBe(refreshed.head);
-      expect(evidence.reuse).toMatchObject({ basis: "metadata_only_increment" });
-      expect(evidence.reuse.incrementPaths).toEqual(["docs/note.md"]);
-    }
-    expect(refreshed.history.at(-1).reusedVerification).toEqual(
-      expect.arrayContaining(["lint", "unit", "build"]),
-    );
-    expect(refreshed.history.at(-1).reusedVerification).not.toContain("process");
-  });
-  it("does not extend lint evidence when a metadata increment has oxfmt-checked files", () => {
-    const { dir, git, task } = repository();
-    for (const kind of ["lint", "unit", "build"])
-      task.verification[kind] = verificationManifestFixture(task, kind);
-    saveTask(task, dir);
-    mkdirSync(path.join(dir, ".github", "ISSUE_TEMPLATE"), { recursive: true });
-    writeFileSync(path.join(dir, ".github", "ISSUE_TEMPLATE", "bug.yml"), "name: bug\n");
-    git("add", ".");
-    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "issue template yaml");
-    const refreshed = refreshTask(loadTask(dir), dir);
-    expect(refreshed.verification.lint).toBeUndefined();
-    for (const kind of ["unit", "build"]) {
-      expect(refreshed.verification[kind].reuse).toMatchObject({
-        basis: "metadata_only_increment",
-      });
-      expect(refreshed.verification[kind].appliesTo.head).toBe(refreshed.head);
-    }
-  });
-  it("does not extend lint evidence for extension-bearing files under .husky", () => {
-    const { dir, git, task } = repository();
-    for (const kind of ["lint", "unit"])
-      task.verification[kind] = verificationManifestFixture(task, kind);
-    saveTask(task, dir);
-    mkdirSync(path.join(dir, ".husky"), { recursive: true });
-    writeFileSync(path.join(dir, ".husky", "hook.json"), "{}\n");
-    git("add", ".");
-    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky json");
-    const refreshed = refreshTask(loadTask(dir), dir);
-    expect(refreshed.verification.lint).toBeUndefined();
-    expect(refreshed.verification.unit.reuse).toMatchObject({
-      basis: "metadata_only_increment",
-    });
-  });
-  it("does not extend lint evidence for well-known filenames under .husky", () => {
-    const { dir, git, task } = repository();
-    for (const kind of ["lint", "unit"])
-      task.verification[kind] = verificationManifestFixture(task, kind);
-    saveTask(task, dir);
-    mkdirSync(path.join(dir, ".husky"), { recursive: true });
-    writeFileSync(path.join(dir, ".husky", "README"), "# hooks\n");
-    writeFileSync(path.join(dir, ".husky", "pre-commit"), "echo lint\n");
-    git("add", ".");
-    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky readme + hook");
-    const refreshed = refreshTask(loadTask(dir), dir);
-    expect(refreshed.verification.lint).toBeUndefined();
-    expect(refreshed.verification.unit.reuse).toMatchObject({
-      basis: "metadata_only_increment",
-    });
-  });
-  it("extends lint evidence for canonical hook basenames under .husky", () => {
-    const { dir, git, task } = repository();
-    for (const kind of ["lint", "unit"])
-      task.verification[kind] = verificationManifestFixture(task, kind);
-    saveTask(task, dir);
-    mkdirSync(path.join(dir, ".husky"), { recursive: true });
-    writeFileSync(path.join(dir, ".husky", "pre-push"), "echo test\n");
-    git("add", ".");
-    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "husky hook");
-    const refreshed = refreshTask(loadTask(dir), dir);
-    for (const kind of ["lint", "unit"])
-      expect(refreshed.verification[kind].reuse).toMatchObject({
-        basis: "metadata_only_increment",
-      });
-  });
-  it("drops evidence when an increment touches runtime paths or the base moved", () => {
-    const { dir, git, task } = repository();
-    for (const kind of ["lint", "unit", "build"])
-      task.verification[kind] = verificationManifestFixture(task, kind);
-    saveTask(task, dir);
-    mkdirSync(path.join(dir, "docs"), { recursive: true });
-    writeFileSync(path.join(dir, "docs", "note.md"), "docs\n");
-    writeFileSync(path.join(dir, "scripts", "feature.ts"), "export {};\n");
-    git("add", ".");
-    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs + code");
-    expect(refreshTask(loadTask(dir), dir).verification).toEqual({});
-  });
-  it("does not take the increment path when only the base moved", () => {
-    const { dir, git, task } = repository();
-    for (const kind of ["lint", "unit"]) runVerification(task, kind, dir, () => ({ status: 0 }));
-    saveTask(task, dir);
-    upstreamCommit(dir, git, "docs/upstream.md", "upstream\n");
-    const refreshed = refreshTask(loadTask(dir), dir);
-    expect(refreshed.verification.lint.reuse.basis).toBe("identical_patch_and_tree");
-    expect(refreshed.verification.unit.reuse.basis).toBe("identical_patch_and_tree");
+    // No kind extends through an increment — every record invalidates.
+    expect(refreshed.verification).toEqual({});
+    expect(refreshed.history.at(-1).event).toBe("revision_changed");
+    expect(refreshed.history.at(-1)).not.toHaveProperty("reusedVerification");
   });
   it("keeps verification and assessment through findings and ci_failure transitions", () => {
     const { dir, task } = repository();
@@ -2505,58 +2320,25 @@ describe("increment reuse and loop ergonomics", () => {
     expect(() => hydrateExportedTask(structuredClone(legacy))).not.toThrow();
     expect(() => validateTask(hydrateExportedTask(structuredClone(legacy)))).not.toThrow();
   });
-  it("keeps metadata-reading tests inside the mandatory process suite", () => {
-    // `unit` evidence is extended through metadata-only increments only because
-    // every test whose outcome can depend on metadata content runs under the
-    // `process` verification that is never extended. This heuristic guard fails
-    // loudly when a new metadata-referencing test (or test helper) lands
-    // outside the process suite. git pathspec has no brace expansion, so
-    // .test/.spec are listed separately; tests/** covers non-test helpers.
-    const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
-    const processTests = new Set(
-      pkg.scripts["test:process"].match(/[\w./-]+\.(?:test|spec)\.(?:mjs|ts|tsx|js)/g) ?? [],
+  it("restores legacy state blocks carrying removed reuse/lane fields (#953 AC5)", () => {
+    // Pre-#953 blocks may carry verification.<kind>.reuse and `lane` — the
+    // loader ignores them instead of erroring, and they never come back out.
+    const legacy = compactTaskForExport(taskFixture());
+    legacy.lane = "lite";
+    legacy.assessment = { ...structuredClone(taskFixture().assessment), lane: "lite" };
+    legacy.verification.process.reuse = {
+      basis: "legacy_reuse_basis",
+      from: { head: "0".repeat(40), baseHead: "9".repeat(40) },
+      at: "2026-01-01T00:00:00.000Z",
+    };
+    const hydrated = parseStateBlock(
+      `${STATE_START}\n\`\`\`json\n${JSON.stringify(legacy)}\n\`\`\`\n${STATE_END}`,
     );
-    const testFiles = [
-      ...new Set(
-        execFileSync("git", ["ls-files", "**/*.test.*", "**/*.spec.*", "tests/**"], {
-          cwd: root,
-          encoding: "utf8",
-        })
-          .split("\n")
-          .filter(Boolean),
-      ),
-    ];
-    // A quoted metadata path literal: whole-literal .md paths including ?raw
-    // suffixes and ${} interpolation, plus ISSUE_TEMPLATE/.husky tokens
-    // anywhere inside a quoted string. Unquoted property access like
-    // `tokens.space.md` and longer prose containing a path do not match.
-    const METADATA_PATH_REF =
-      /["'`][\w./$*{}-]+\.md(?:\?[^"'`]*)?["'`]|["'`][^"'`]*(?:ISSUE_TEMPLATE|\.husky)[^"'`]*["'`]/;
-    const offenders = testFiles.filter(
-      (file) =>
-        !processTests.has(file) &&
-        !file.startsWith("e2e/") &&
-        METADATA_PATH_REF.test(readFileSync(path.join(root, file), "utf8")),
-    );
-    expect(offenders).toEqual([]);
-
-    // Non-test build/unit-reachable code must not read metadata at all: a
-    // `?raw` .md import (or a metadata-dir reference) inside src/convex would
-    // change build and transitive unit outcomes while evidence is extended.
-    // Scripts are exempt — they are process-domain readers by design and their
-    // tests already live in the process suite.
-    const sourceOffenders = execFileSync("git", ["ls-files", "src/**", "convex/**"], {
-      cwd: root,
-      encoding: "utf8",
-    })
-      .split("\n")
-      .filter(
-        (file) =>
-          /\.(?:[cm]?[jt]sx?)$/.test(file) &&
-          !/\.(?:test|spec)\.[^.]+$/.test(file) &&
-          METADATA_PATH_REF.test(readFileSync(path.join(root, file), "utf8")),
-      );
-    expect(sourceOffenders).toEqual([]);
+    expect(hydrated.lane).toBeUndefined();
+    expect(hydrated.assessment).not.toHaveProperty("lane");
+    expect(hydrated.verification.process.reuse).toBeUndefined();
+    expect(() => validateTask(hydrated)).not.toThrow();
+    expect(compactTaskForExport(hydrated).verification.process.reuse).toBeUndefined();
   });
   it("records friction notes into task state, history and the state block", () => {
     const { dir, task } = repository();
@@ -3042,15 +2824,14 @@ describe("increment reuse and loop ergonomics", () => {
     );
     expect(STATE_WORKFLOWS).toEqual(fromProcess);
   });
-  it("labels reused affected unit evidence so the full-suite gap stays visible", () => {
+  it("labels affected-scope unit evidence so the full-suite gap stays visible", () => {
     const task = taskFixture(root);
     task.assessment.verification.unit = true;
     task.verification.unit = {
       ...verificationManifestFixture(task, "unit"),
       run: { head: task.head, baseHead: task.baseHead, scope: "affected" },
-      reuse: { basis: "identical_patch_and_tree" },
     };
-    expect(verificationSummary(task).unit).toBe("pass(reused,affected)");
+    expect(verificationSummary(task).unit).toBe("pass(affected)");
     expect(task.assessment.verificationPlan.find((plan) => plan.kind === "unit").scope).toContain(
       "excluding test:process",
     );
