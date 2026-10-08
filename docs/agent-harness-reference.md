@@ -50,6 +50,8 @@ base既定値は `origin/preview`。別baseは開始時に `--base` で指定す
 | incident / human_gate | 何もしない | `resolution` / `approval` |
 | done | 何もしない | `needs:null`（`done:true`） |
 
+機械stepが例外を投げた場合は素のエラーではなく `needs:"gate"`（遷移ゲート）・`"metrics"`（metrics投稿）・`"usage"`（引数不正）等で `{error}` を返し、原因を直して `--next` を再実行する。`--next --review` はreview state以外では `needs:"usage"` で拒否される。
+
 `spec.prAllowed`（boolean、省略時false）はEXECUTE末尾のpush・draft PR作成の許可ゲート。falseなら遷移後に `needs:"pr_permission"` で止まり、リモートへの書き込みは一切行わない。
 
 `--next --review <file>` でレビュー提出を兼ねるとき、`--review` は単独アクションとしては数えない（`--next` への入力）。`--handled <file>`（外部指摘の処理済み記録）と `--interval-seconds`（watch間隔）はそのまま渡せる。

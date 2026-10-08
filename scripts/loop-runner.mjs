@@ -1818,8 +1818,21 @@ export function runNext(args, root = process.cwd(), services = {}) {
   saveTask(task, root);
   const steps = [];
   const note = (step, ok = true) => {
-    steps.push(step);
+    // steps[] は成功step名だけ（単一JSON契約）。失敗はmetricsにok=falseで残す。
+    if (ok) steps.push(step);
     recordMetric(task, root, { action: "next", step, ok });
+  };
+  // runNextの返却は常に1個のJSON — どのstepも素のthrowで抜けない。
+  const stepOr = (step, needs, fn, extra = {}) => {
+    try {
+      return fn();
+    } catch (error) {
+      note(step, false);
+      return stop(needs, {
+        error: tailLines({ stdout: String(error?.message ?? error) }),
+        ...extra,
+      });
+    }
   };
   const stop = (needs, extra = {}) => ({
     taskId: task.taskId,
@@ -1829,6 +1842,8 @@ export function runNext(args, root = process.cwd(), services = {}) {
     next: nextActions(task, root),
     ...extra,
   });
+  if (args.review && task.state !== "review")
+    return stop("usage", { error: "--review is only accepted in review state" });
   const ghRunner = services.gh ?? ((a, r) => gh(a, r));
   const discoverPr = () => {
     if (task.aftercare?.pr) return task.aftercare.pr;
@@ -1857,7 +1872,10 @@ export function runNext(args, root = process.cwd(), services = {}) {
             : "spec";
       return stop(needs, { missing });
     }
-    task = transitionTask(task, "ready", {}, root);
+    const failed = stepOr("ready", "gate", () => {
+      task = transitionTask(task, "ready", {}, root);
+    });
+    if (failed) return failed;
     saveTask(task, root);
     note("ready");
     return stop("implementation");
@@ -1869,14 +1887,6 @@ export function runNext(args, root = process.cwd(), services = {}) {
       return stop("commit");
     }
     note("clean");
-    const unresolved = () => (task.ciFailures ?? []).filter((f) => !f.resolvedAt);
-    if (unresolved().length) {
-      resolveCiFailures(task, root, services);
-      saveTask(task, root);
-      const remaining = unresolved();
-      note("ci_recheck", remaining.length === 0);
-      if (remaining.length) return stop("ci_reproduce", { ciFailures: remaining });
-    }
     if (!hasPrepushMarker(root, task.head)) {
       const out = (services.verifyPrepush ?? defaultVerifyPrepush)(
         ["scripts/verify-prepush.mjs"],
@@ -1890,17 +1900,34 @@ export function runNext(args, root = process.cwd(), services = {}) {
           outputTail: tailLines(out),
         });
     } else note("prepush_marker");
+    // F4: 対象化した `--include` 再現runも同じmarkerを書くので、full prepushの
+    // marker確認はciFailure再確認より先に行う（targeted runがfullを偽装しない）。
+    const unresolved = () => (task.ciFailures ?? []).filter((f) => !f.resolvedAt);
+    if (unresolved().length) {
+      const failed = stepOr("ci_recheck", "ci_reproduce", () => {
+        resolveCiFailures(task, root, services);
+      });
+      if (failed) return failed;
+      saveTask(task, root);
+      const remaining = unresolved();
+      note("ci_recheck", remaining.length === 0);
+      if (remaining.length) return stop("ci_reproduce", { ciFailures: remaining });
+    }
     try {
       task = runRequiredVerification(task, root, services.runVerification);
     } catch (error) {
       note("verify", false);
-      return stop("verify", {
+      const needs = !task.assessment ? "assessment" : "verify";
+      return stop(needs, {
         error: tailLines({ stdout: String(error?.message ?? error) }),
       });
     }
     saveTask(task, root);
     note("verify");
-    task = transitionTask(task, "ready", {}, root);
+    const gateFail = stepOr("ready", "gate", () => {
+      task = transitionTask(task, "ready", {}, root);
+    });
+    if (gateFail) return gateFail;
     saveTask(task, root);
     note("ready");
     // AC3: spec.prAllowed=falseはpush・PR作成を行わない許可ゲート。
@@ -1930,6 +1957,7 @@ export function runNext(args, root = process.cwd(), services = {}) {
             error: tailLines({ stdout: String(error?.message ?? error) }),
           });
         }
+        note("pr");
         pr = discoverPr();
       }
       const dir = gitPath(root, [
@@ -1957,8 +1985,11 @@ export function runNext(args, root = process.cwd(), services = {}) {
           externalFindings = undefined;
         }
       }
-      const packet = buildReviewPacket(task, dir, root, { externalFindings });
-      note("packet");
+      let packet;
+      const failed = stepOr("packet", "review", () => {
+        packet = buildReviewPacket(task, dir, root, { externalFindings });
+      });
+      if (failed) return failed;
       return stop("review", {
         packet,
         pr: pr ?? null,
@@ -1978,8 +2009,12 @@ export function runNext(args, root = process.cwd(), services = {}) {
     }
     saveTask(task, root);
     note("verify");
-    const report = readSubmission(args.review, "review");
-    validateReview(task, report);
+    let report;
+    const submitFail = stepOr("review", "review", () => {
+      report = readSubmission(args.review, "review");
+      validateReview(task, report);
+    });
+    if (submitFail) return submitFail;
     task.review = report;
     task.findings = report.findings;
     history(task, "review_recorded", {
@@ -2013,12 +2048,19 @@ export function runNext(args, root = process.cwd(), services = {}) {
           findings: ids,
           command: "node scripts/loop-runner.mjs --event findings --exit <file>",
         });
-      task = transitionTask(task, "findings", { reason: ids.join(",") }, root);
+      const failed = stepOr("findings", "gate", () => {
+        task = transitionTask(task, "findings", { reason: ids.join(",") }, root);
+      });
+      if (failed) return failed;
       saveTask(task, root);
       note("findings");
+      if (task.state === "incident") return stop("resolution");
       return stop("fix", { findings: ids });
     }
-    task = transitionTask(task, "clean", {}, root);
+    const failed = stepOr("clean", "review", () => {
+      task = transitionTask(task, "clean", {}, root);
+    });
+    if (failed) return failed;
     saveTask(task, root);
     note("clean");
     return stop("aftercare");
@@ -2026,22 +2068,34 @@ export function runNext(args, root = process.cwd(), services = {}) {
   if (task.state === "aftercare") {
     const pr = discoverPr();
     if (!pr) return stop("pr");
-    syncPrStateBlock(task, pr, root, services);
-    note("sync-pr");
+    let failed = stepOr("sync-pr", "pr", () => {
+      syncPrStateBlock(task, pr, root, services);
+    });
+    if (failed) return failed;
     const fetchers = aftercareFetchers(pr, args.handled, root, services);
-    const prFields = (services.fetchPr ?? fetchers.fetchPr)();
+    let prFields;
+    failed = stepOr("fetch-pr", "pr", () => {
+      prFields = (services.fetchPr ?? fetchers.fetchPr)();
+    });
+    if (failed) return failed;
     if (prFields.isDraft === true) {
-      ghRunner(["pr", "ready", String(pr)], root);
-      note("pr_ready");
+      failed = stepOr("pr_ready", "pr", () => {
+        ghRunner(["pr", "ready", String(pr)], root);
+      });
+      if (failed) return failed;
     }
     const interval = args["interval-seconds"];
     requireIntervalSeconds(interval);
-    const result = watchAftercare(task, pr, root, {
-      ...services,
-      handled: args.handled,
-      intervalSeconds: interval === undefined ? undefined : Number(interval),
+    let result;
+    failed = stepOr("aftercare", "action_required", () => {
+      result = watchAftercare(task, pr, root, {
+        ...services,
+        handled: args.handled,
+        intervalSeconds: interval === undefined ? undefined : Number(interval),
+      });
+      task = result.task;
     });
-    task = result.task;
+    if (failed) return failed;
     saveTask(task, root);
     note("aftercare", result.ready);
     if (!result.ready) {
@@ -2072,18 +2126,29 @@ export function runNext(args, root = process.cwd(), services = {}) {
       if (actionRequired) return stop("action_required", { watch: last });
       return stop("ci_pending", { watch: last });
     }
-    requireClean(root);
-    task = transitionTask(task, "ready", {}, root);
+    try {
+      requireClean(root);
+    } catch {
+      return stop("commit");
+    }
+    // F6: publishはdone遷移の前に行う — 遷移後に失敗するとdoneから再試行できない
+    // （markerコメントは冪等なので先に投稿しても1件のまま）。
+    failed = stepOr("publish-metrics", "metrics", () => {
+      publishTaskMetrics(task, pr, root, services);
+    });
+    if (failed) return failed;
+    failed = stepOr("ready", "gate", () => {
+      task = transitionTask(task, "ready", {}, root);
+    });
+    if (failed) return failed;
     saveTask(task, root);
     note("ready");
-    publishTaskMetrics(task, pr, root, services);
-    note("publish-metrics");
-    return { taskId: task.taskId, state: task.state, needs: null, steps, done: true };
+    return { ...stop(null), done: true };
   }
   if (task.state === "incident") return stop("resolution");
   if (task.state === "human_gate") return stop("approval");
   // done
-  return { taskId: task.taskId, state: task.state, needs: null, steps, done: true };
+  return { ...stop(null), done: true };
 }
 const tailLines = (out) =>
   String(out?.stdout ?? out?.stderr ?? "")
@@ -2127,8 +2192,9 @@ export function draftPrBody(task, root = process.cwd()) {
   let body = readFileSync(templatePath, "utf8");
   body = body.replace("## 概要", `## 概要\n\n${summary}`);
   body = body.replace("## 変更内容", `## 変更内容\n\n- ${summary}`);
-  if (issue)
-    body = body.replaceAll("Closes #", `Closes #${issue} `).replace(`#${issue} `, `#${issue}`);
+  // F7: テンプレのHTMLコメント例 `Closes #123` を壊さないよう、数字が続かない
+  // 本物の `Closes #` だけを置き換える。
+  if (issue) body = body.replace(/Closes #(?!\d)/, `Closes #${issue} `);
   body = body.replace("Risk: ", `Risk: ${risk}`);
   body = body.replace("結果:", "結果: 成功（`--next` 実行: process/lint/unit/build、E2EはCI）");
   body = body.replace(
@@ -2162,7 +2228,19 @@ export function ensureTaskPr(task, root = process.cwd(), services = {}) {
     // `gh pr create` has no --json: stdout is the PR URL. Tolerate JSON output
     // too (test doubles), then fall back to re-listing the branch's open PR.
     const out = ghRunner(
-      ["pr", "create", "--draft", "--title", derivePrTitle(task), "--body-file", file],
+      [
+        "pr",
+        "create",
+        "--draft",
+        "--title",
+        derivePrTitle(task),
+        "--body-file",
+        file,
+        "--base",
+        task.baseRef ?? "preview",
+        "--head",
+        task.branch,
+      ],
       root,
     );
     let number;

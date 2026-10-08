@@ -15,7 +15,7 @@ runnerの通常出力は `state`・`workflow`（現在Stateのworkflow）・`mis
 7. 再開: 同じworktreeでは `--next`。別Sessionでは `--restore-pr <番号>`。
 8. 計測: `--friction-note <text>`、`--record-usage <transcript.jsonl> [--usage-role reviewer]`、`node scripts/loop-metrics.mjs --task <id>`（`--format summary-json [--out <file>]` でPRコメントと同じ1レコードの要約。PRを作らないeval用途）。PR横断の集計は `node scripts/collect-harness-metrics.mjs --since <YYYY-MM-DD> [--state merged|all] [--format table]`。
 
-`--next` は `{taskId, state, needs, steps, next}` の1個のJSONだけ返す。stepsには成功した機械stepの名前だけ入る。`needs` は次に人間/Agentが供給するもの: `spec|assessment|skills|decisions|implementation|commit|verify:prepush|ci_reproduce|verify|pr_permission|review|reassessment|fix|aftercare|pr|action_required|ci_pending|resolution|approval`。`--next` が `decision_required`・`resolved`・human-gate-release・`ci_failure` イベントを発火することはない — 判断は常にAgent側で、個別コマンド（`--event findings --exit` 等）は [詳細仕様](agent-harness-reference.md) を参照。
+`--next` は `{taskId, state, needs, steps, next}` の1個のJSONだけ返す。stepsには成功した機械stepの名前だけ入る。`needs` は次に人間/Agentが供給するもの: `spec|assessment|skills|decisions|implementation|commit|verify:prepush|ci_reproduce|verify|pr_permission|review|reassessment|fix|aftercare|pr|action_required|ci_pending|resolution|approval|gate|metrics|usage`。`gate`/`metrics`/`usage` は機械stepが例外になった停止（`error` に末尾ログが入る）で、原因を直して `--next` を再実行する。`--next` が `decision_required`・`resolved`・human-gate-release・`ci_failure` イベントを発火することはない — 判断は常にAgent側で、個別コマンド（`--event findings --exit` 等）は [詳細仕様](agent-harness-reference.md) を参照。
 
 提出JSONは `--draft <spec|assessment|review|exit>` で下書き（`<git-path>/agent-drafts/`）を作り、残った `TODO` だけ埋めて提出する。`TODO` が残っていると拒否され、該当するJSON Pointerが返る。必須キーは `requiredKeys(kind, context)`（`scripts/loop-schema.mjs`）がスキーマと検証関数から一元生成するので、下書きと検証はずれない。要点だけ列記する:
 

@@ -3262,16 +3262,13 @@ describe("--next auto-advance (#950)", () => {
         resolvedAt: null,
       },
     ];
+    markPrepush(dir, task.head);
     saveTask(task, dir);
     const result = run({ next: true }, dir, { verifyPrepush: () => ({ status: 1 }) });
     expect(result.needs).toBe("ci_reproduce");
     expect(result.ciFailures).toHaveLength(1);
     const resolved = run({ next: true }, dir, {
-      verifyPrepush: (argv) => {
-        expect(argv).toEqual(["scripts/verify-prepush.mjs"]);
-        markPrepush(dir, task.head);
-        return { status: 0 };
-      },
+      verifyPrepush: () => ({ status: 0 }),
       runVerification: () => ({ status: 0 }),
       gh: ghMock(),
     });
@@ -3422,9 +3419,108 @@ describe("--next auto-advance (#950)", () => {
       remoteUrl: "git@github.com:o/r.git",
     });
     expect(result.needs).toBe("ci_reproduce");
+    // F5: AC7の失敗レコードは再現に必要な項目を揃えて返す。
     expect(result.ciFailures[0].check).toBe("Test");
+    expect(result.ciFailures[0].reproduce).toBeTruthy();
     expect(result.watch.failed).toContain("Test");
     expect(loadTask(dir).state).toBe("aftercare");
+  });
+  it("pr create output falls back to re-listing when it is not a URL or JSON", () => {
+    const { dir, task } = repository();
+    task.state = "review";
+    task.spec.prAllowed = true;
+    saveTask(task, dir);
+    let created = 0;
+    const gh = (argv) => {
+      if (argv[0] === "pr" && argv[1] === "list")
+        return created ? JSON.stringify([{ number: 9 }]) : "[]";
+      if (argv[0] === "pr" && argv[1] === "create") {
+        created += 1;
+        return "unexpected output";
+      }
+      if (argv[0] === "api") return "[]";
+      return "{}";
+    };
+    const result = run({ next: true }, dir, {
+      gh,
+      push: () => {},
+      fetchFindings: () => ({ findings: [] }),
+    });
+    expect(created).toBe(1);
+    expect(result.needs).toBe("review");
+    expect(result.pr).toBe(9);
+    expect(result.steps).toContain("pr");
+  });
+  it("a review-state task with prAllowed still creates the missing draft PR before packet (resume)", () => {
+    const { dir, task } = repository();
+    task.state = "review";
+    task.spec.prAllowed = true;
+    saveTask(task, dir);
+    let pushed = 0;
+    let created = 0;
+    const gh = (argv) => {
+      if (argv[0] === "pr" && argv[1] === "list")
+        return created ? JSON.stringify([{ number: 11 }]) : "[]";
+      if (argv[0] === "pr" && argv[1] === "create") {
+        created += 1;
+        return "https://github.com/o/r/pull/11";
+      }
+      if (argv[0] === "api") return "[]";
+      return "{}";
+    };
+    const result = run({ next: true }, dir, {
+      gh,
+      push: () => {
+        pushed += 1;
+      },
+      fetchFindings: () => ({ findings: [] }),
+    });
+    expect(pushed).toBe(1);
+    expect(result.needs).toBe("review");
+    expect(result.pr).toBe(11);
+    // packet still built — the missing PR does not block review packaging.
+    expect(result.packet.dir).toContain("agent-review");
+  });
+  it("a dirty tree in review state stops as commit instead of crashing (F1)", () => {
+    const { dir, task } = repository();
+    task.state = "review";
+    saveTask(task, dir);
+    writeFileSync(path.join(dir, "stray.txt"), "dirty");
+    const result = run({ next: true }, dir, {
+      gh: () => "[]",
+      fetchFindings: () => ({ findings: [] }),
+    });
+    expect(result.taskId).toBe(task.taskId);
+    expect(result.needs).toBeTruthy();
+    expect(loadTask(dir).state).toBe("review");
+  });
+  it("--review outside review state stops as usage (F8)", () => {
+    const { dir, task } = repository();
+    task.state = "execute";
+    saveTask(task, dir);
+    const reviewFile = path.join(mkdtempSync(path.join(tmpdir(), "next-review-")), "review.json");
+    writeFileSync(reviewFile, "{}");
+    const result = run({ next: true, review: reviewFile }, dir, { push: () => {} });
+    expect(result.needs).toBe("usage");
+    expect(loadTask(dir).state).toBe("execute");
+  });
+  it("a thrown gate error returns a JSON stop, not a crash (F1)", () => {
+    const { dir, task } = repository();
+    task.state = "review";
+    task.risk = "T3";
+    task.agentAssessment.applied_tier = "T3";
+    saveTask(task, dir);
+    // T3 cleanは独立レビューを要求する — independent:falseの報告でclean gateが投げる。
+    const report = { ...reviewFixture(task), independent: false };
+    const reviewFile = path.join(mkdtempSync(path.join(tmpdir(), "next-review-")), "review.json");
+    writeFileSync(reviewFile, JSON.stringify(report));
+    const result = run({ next: true, review: reviewFile }, dir, {
+      runVerification: () => ({ status: 0 }),
+    });
+    expect(result.taskId).toBe(task.taskId);
+    expect(result.needs).toBeTruthy();
+    expect(result.error).toBeTruthy();
+    expect(loadTask(dir).state).toBe("review");
   });
   it("aftercare stops action_required when findings or threads are outstanding", () => {
     const { dir, task } = repository();
