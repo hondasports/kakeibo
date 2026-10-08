@@ -302,8 +302,6 @@ export function checkLoopDocs(repoRoot) {
       ".agent/schema/assessment.schema.json",
       ".agent/runtime/codex.yaml",
       ".agent/runtime/devin.yaml",
-      ".agent/profiles/default.yaml",
-      ".agent/profiles/standard.yaml",
       ".agent/workflow/refine.md",
       ".agent/workflow/execute.md",
       ".agent/workflow/review.md",

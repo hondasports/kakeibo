@@ -25,7 +25,7 @@ const RULES = [
     match: (filePath) =>
       filePath.startsWith(".agent/") ||
       filePath.startsWith(".github/workflows/") ||
-      /^scripts\/(?:loop-|assess-|machine-risk|resolve-agent-profile)/.test(filePath),
+      /^scripts\/(?:loop-|assess-|machine-risk)/.test(filePath),
   },
   {
     trigger: "external_service_write_or_webhook",

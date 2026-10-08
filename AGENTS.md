@@ -37,8 +37,8 @@ repository編集タスクの開始時は `docs/agent-harness.md`（起動用ク�
 
 ## Runtime
 
-Codex / Devin / Claude CodeなどのRuntime固有設定は `.agent/runtime/`、タスク強度は `.agent/profiles/` に置く。Model名でProfileを増やさない。ProfileはREFINE終了時にタスクの評価（影響範囲・不確実性・検証負荷）から規則で自動判定し、`--profile` の明示指定を最優先する。Core HarnessのRisk Floor・Human Gate・State TransitionはProfileで上書きしない。
+Codex / Devin / Claude CodeなどのRuntime固有設定は `.agent/runtime/` に置く。タスク強度はTier（T1〜T3）に一本化され、Profile機構は廃止した（`--profile` は受理されるが無視される）。thorough検証（lint/unit/build必須）はTierと評価軸（T3、またはuncertainty != known_pattern、またはblast_radius=shared_or_system_wide）から機械判定する。Core HarnessのRisk Floor・Human Gate・State Transitionは常に維持する。
 
-軽量化の設計正本は `docs/agent-harness-design.md`。Profile自動判定は実装済みであり、現行操作は `docs/agent-harness.md`（詳細仕様は `docs/agent-harness-reference.md`）に従う。
+軽量化の設計正本は `docs/agent-harness-design.md`。現行操作は `docs/agent-harness.md`（詳細仕様は `docs/agent-harness-reference.md`）に従う。
 
 環境・公開手順は `docs/development-process.md` を参照する。

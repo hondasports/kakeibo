@@ -23,9 +23,10 @@ function prFixture(task) {
 }
 const findings = { pagesComplete: true, unhandledCount: 0, unresolvedThreadCount: 0 };
 describe("GitHub delivery gates", () => {
-  it("does not require skipped application CI for profile-only local verification increases", () => {
+  it("does not require skipped application CI for thorough local verification", () => {
     const task = readyTask();
-    task.configuration.profile.verification = "thorough";
+    // thorough is derived from the tier/assessment, not a profile.
+    task.agentAssessment.applied_tier = "T3";
     task.assessment = computeAssessment(task, ["README.md"]);
     expect(task.assessment.verification.build).toBe(true);
     expect(checkAftercare(prFixture(task), task, findings).ready).toBe(true);
@@ -46,24 +47,16 @@ describe("GitHub delivery gates", () => {
     );
     expect(() => validateCheckpoint(task, { ...context, head: "changed" })).toThrow("HEAD/base");
   });
-  it("rejects states without a decided profile selection", () => {
+  it("accepts state blocks with or without legacy profile fields", () => {
     const task = readyTask();
     const context = { head: task.head, baseHead: task.baseHead, paths: ["README.md"] };
+    // Fixture keeps legacy selection/profileSource/profile keys — still valid.
+    expect(() => validateCheckpoint(task, context)).not.toThrow();
+    // New tasks record none of them — also valid.
     delete task.configuration.selection;
-    expect(() => validateCheckpoint(task, context)).toThrow("selection");
-    task.configuration.selection = {
-      selected: "standard",
-      source: "provisional",
-      ruleVersion: 1,
-    };
-    expect(() => validateCheckpoint(task, context)).toThrow("Profile decision");
-    task.configuration.selection = {
-      selected: "deep",
-      source: "auto",
-      ruleVersion: 1,
-      inputs: {},
-    };
-    expect(() => validateCheckpoint(task, context)).toThrow("Profile decision");
+    delete task.configuration.profile;
+    delete task.configuration.profileSource;
+    expect(() => validateCheckpoint(task, context)).not.toThrow();
   });
   it("requires state for non-bot PRs even when only markdown changes", () => {
     const task = readyTask();
@@ -402,6 +395,9 @@ describe("GitHub delivery gates", () => {
     task.review.assessment.applied_tier = "T3";
     expect(computeAssessment(task, ["README.md"]).risk.final).toBe("T3");
     task.risk = "T3";
+    // T3 requires thorough verification; legacy-shaped evidence counts as full.
+    for (const kind of ["lint", "unit", "build"])
+      task.verification[kind] = { head: task.head, baseHead: task.baseHead, success: true };
     task.review.independent = false;
     expect(() =>
       validateCheckpoint(task, { head: task.head, baseHead: task.baseHead, paths: ["README.md"] }),

@@ -19,7 +19,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
-import { decideProfile, resolveAgentProfile } from "./resolve-agent-profile.mjs";
 import { readBranchChangedPaths, readWorktreeChangedPaths } from "./suggest-skills.mjs";
 import { isMetadataOnlyPath, normalizeChangedPath } from "./classify-e2e-relevance.mjs";
 import { validateAssessment } from "./review-depth.mjs";
@@ -56,6 +55,14 @@ import {
 } from "./loop-metrics.mjs";
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
+const readYaml = (filePath) => YAML.parse(readFileSync(filePath, "utf8"));
+/** Runtime adapter config (`.agent/runtime/<name>.yaml`); profiles are gone. */
+export function resolveRuntime({ runtime = null, root = process.cwd() } = {}) {
+  if (!runtime) return null;
+  const runtimePath = path.join(root, ".agent", "runtime", `${runtime}.yaml`);
+  if (!existsSync(runtimePath)) throw new Error(`unknown runtime: ${runtime}`);
+  return readYaml(runtimePath);
+}
 // Full promotion patches can exceed Node's default 1 MiB subprocess buffer.
 const GIT_MAX_BUFFER = 32 * 1024 * 1024;
 const git = (args, root) =>
@@ -427,12 +434,8 @@ export function startTask(args, root) {
   });
   const spec = readJson(args.init);
   // Open decisions are allowed in REFINE; leaving it requires a complete spec.
-  // --model is still accepted by the argument parser but no longer used.
-  const configuration = resolveAgentProfile({
-    profile: args.profile,
-    runtime: args.runtime,
-    root,
-  });
+  // --model/--profile are still accepted by the argument parser but no longer used.
+  const configuration = { runtime: resolveRuntime({ runtime: args.runtime, root }) };
   const task = {
     version: 2,
     taskId: args.task,
@@ -470,9 +473,6 @@ export function resolveLoopStep({ task, state, event, exit = {}, root = process.
 export function transitionTask(task, event, exit, root) {
   const step = resolveLoopStep({ task, event, exit, root });
   const from = task.state;
-  // REFINE completion fixes the profile from the recorded evaluation before EXECUTE.
-  if (task.state === "refine" && event === "ready")
-    decideProfile(task, { root, strict: true, trigger: "refine_ready" });
   history(task, event, { exit });
   if (event === "findings") task.counters.review += 1;
   if (event === "ci_failure") {
@@ -871,7 +871,8 @@ function nextActions(task) {
   const missing = missingRequirements(task);
   const actions = [];
   for (const item of missing) {
-    if (item === "assessment") actions.push("node scripts/loop-runner.mjs --assessment <file>");
+    if (item === "assessment" || item === "assessment(invalid)")
+      actions.push("node scripts/loop-runner.mjs --assessment <file>");
     else if (item === "openMaterialDecisions")
       actions.push("resolve spec openMaterialDecisions or --event decision_required");
     else if (item.startsWith("verify:")) {
@@ -888,8 +889,6 @@ function nextActions(task) {
     else if (item.startsWith("finding:"))
       actions.push(`resolve finding ${item.slice(8)} then re-review (--event findings)`);
     else if (item === "aftercare") actions.push("node scripts/loop-runner.mjs --aftercare <pr>");
-    else if (item.startsWith("profile:"))
-      actions.push(`complete profile input ${item.slice(8)} via --assessment`);
     else if (item === "spec:acceptanceCriteria")
       actions.push("fix --spec acceptanceCriteria (unique non-empty ids)");
     else actions.push(item);
@@ -923,10 +922,6 @@ export function summarizeTask(task) {
     head: task.head,
     baseHead: task.baseHead,
     risk: task.risk,
-    profile: {
-      selected: task.configuration?.selection?.selected,
-      source: task.configuration?.selection?.source,
-    },
     missing: missingRequirements(task),
     verification: verificationSummary(task),
     openFindings: (task.findings ?? []).filter((finding) => finding.status === "open").length,
@@ -997,7 +992,6 @@ function explainTask(task, root) {
       agent: task.agentAssessment?.applied_tier ?? null,
     },
     verificationDetail: artifactManifest(task, root),
-    profileSource: task.configuration?.profileSource ?? null,
   };
 }
 export function parseStateBlock(body) {
@@ -1993,7 +1987,7 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args["assert-started"]) {
     validateSpec(task.spec, root);
     requireValue(task.state === "execute", "Changes may only be committed in execute state");
-    return { taskId: task.taskId, state: task.state, profile: task.configuration.profileSource };
+    return { taskId: task.taskId, state: task.state };
   }
   if (args["resolve-ci-failures"]) {
     // #958 AC5: 未解決ciFailureをrunner自身がverify:prepushで解決する。
@@ -2045,9 +2039,6 @@ export function run(args, root = process.cwd(), services = {}) {
     task.agentAssessment = assessment;
     task.skills = args.skills?.split(",").filter(Boolean) ?? [];
     refreshTask(task, root);
-    // Re-determination runs only past the first decision: changed evaluation
-    // inputs can raise the profile; auto selection never moves downward.
-    if (task.state !== "refine") decideProfile(task, { root, trigger: "assessment" });
     history(task, "assessed");
   }
   if (args.verify)
@@ -2191,6 +2182,10 @@ export function cliMain(
   try {
     const args = parseArguments(argv);
     command = cliCommandName(args);
+    if (args.profile !== undefined)
+      errorLog(
+        "warning: --profile is deprecated and ignored; verification intensity comes from the tier/assessment",
+      );
     const result = run(args, root);
     const output =
       typeof result === "string"

@@ -63,7 +63,7 @@
     },
     "configuration": {
       "type": "object",
-      "required": ["profileSource", "profile", "selection", "runtime"],
+      "required": ["runtime"],
       "properties": {
         "profileSource": {
           "type": "string",
