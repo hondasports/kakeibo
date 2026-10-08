@@ -320,7 +320,7 @@ function gitStatusDirty(root) {
   return git(root, ["status", "--porcelain"]).length > 0;
 }
 
-function buildSteps({ changedFiles, selection, includes, root }) {
+function buildSteps({ changedFiles, selection, includes }) {
   const steps = [
     {
       id: "typecheck",
@@ -406,7 +406,8 @@ export async function runPrepush({
       return null;
     },
     changedFiles: (root, base, head) => {
-      // baseが取れない場合は「コミット済み最新変更+worktree変更」を対象にする
+      // baseが取れない場合は差分範囲を最終コミット（HEAD~1...head）に縮小する。
+      // 未コミットの作業ツリー変更は含まれない点に注意（呼び出し側で警告する）。
       const range =
         base ??
         (() => {
@@ -439,6 +440,11 @@ export async function runPrepush({
   const args = parseArguments(argv);
   const head = gitOps.head(cwd);
   const base = args.base ?? gitOps.base(cwd);
+  if (!base) {
+    out(
+      "警告: base refが解決できないため差分範囲を最終コミット（HEAD~1...HEAD）に縮小します。未コミットの作業ツリー変更は検証対象に含まれません。",
+    );
+  }
   const changedFiles = changedFilesOverride ?? gitOps.changedFiles(cwd, base, head);
   const includes = classifyIncludes(args.include, {
     exists: (p) => existsSync(path.join(cwd, p)),
@@ -455,7 +461,7 @@ export async function runPrepush({
     includeSpecs: includes.e2eSpecs,
     cwd,
   });
-  const steps = buildSteps({ changedFiles, selection, includes, root: cwd });
+  const steps = buildSteps({ changedFiles, selection, includes });
   // unmappedはE2E実行前に必ず出す（step失敗時にも情報が残るように）
   if (selection.unmapped.length > 0) {
     out(

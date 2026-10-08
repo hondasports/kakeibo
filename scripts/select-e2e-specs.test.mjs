@@ -138,6 +138,16 @@ describe("selectSpecs (AC1-AC3)", () => {
     expect(specsByTag("public", { specFiles, cwd: dir })).toEqual([]);
   });
 
+  test("タイトル文字列内の // はコメントとして削らない（f-14）", () => {
+    const dir = fixture({
+      "slash.spec.ts":
+        'test("a // b @smoke", async () => {});\ntest("c", async () => {}); // @public と後行コメント',
+    });
+    const specFiles = listSpecFiles(path.join(dir, "e2e"));
+    expect(specsByTag("smoke", { specFiles, cwd: dir })).toEqual(["e2e/slash.spec.ts"]);
+    expect(specsByTag("public", { specFiles, cwd: dir })).toEqual([]);
+  });
+
   test("削除されたspecやmap内の陳腐なリテラル名は選定に残らない", () => {
     const dir = fixture({
       "kept.spec.ts": 'test("@smoke x", async () => {});',

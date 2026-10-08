@@ -35,10 +35,33 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const SPEC_MAP_PATH = path.join(repoRoot, "e2e", "spec-map.json");
 const E2E_SPEC_PATTERN = /^e2e\/[^/]+\.spec\.ts$/;
 
+/** 行内で文字列リテラル外の `//` 以降を削る。タイトル内の "a // b" 等を壊さない。 */
+function stripLineComment(line) {
+  let quote = null;
+  for (let i = 0; i < line.length - 1; i += 1) {
+    const ch = line[i];
+    if (quote) {
+      if (ch === "\\") i += 1;
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === "`") {
+      quote = ch;
+      continue;
+    }
+    if (ch === "/" && line[i + 1] === "/") return line.slice(0, i);
+  }
+  return line;
+}
+
 /** specファイルに付けられた実行タグ（@smoke / @public）を拾う。コメント内の言及は拾わない。 */
 function specTags(body) {
   // コメント（//行・/*ブロック*/）を除去してからタグを探す
-  const code = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  const code = body
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .map(stripLineComment)
+    .join("\n");
   const tags = new Set();
   for (const match of code.matchAll(/@(smoke|public)\b/g)) tags.add(match[1]);
   return tags;
