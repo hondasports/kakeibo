@@ -115,16 +115,12 @@ export function currentEvidence(evidence, task) {
   return appliesTo?.head === task.head && appliesTo?.baseHead === task.baseHead;
 }
 /**
- * #949 Lite lane: a T1 task with no machine floor triggers and no independent
- * review requirement does not gate on local verification evidence — the CI
- * checks are the verdict. Everything else rides the standard lane.
+ * #949 Lite lane → #952: 合否の正本はCIのcheck、ローカルの必須証跡は
+ * processのみ（残りはpre-push実行）を全Tierへ展開したため常にtrue。
+ * 関数自体は #953 で呼び出し元ごと撤去するまで残す。
  */
 export function isLiteLane(task, assessment = task.assessment) {
-  return (
-    assessment?.risk?.final === "T1" &&
-    (assessment.risk.machineFloorTriggers ?? []).length === 0 &&
-    assessment.review?.independent !== true
-  );
+  return true;
 }
 /**
  * #949: CI checks that decide AFTERCARE readiness, with their acceptance
@@ -155,6 +151,72 @@ export function expectedCiChecks(paths, assessment) {
       },
     );
   return checks;
+}
+/**
+ * #952: REVIEW clean時に要求するCI check。`Agent harness` はdraft中skipされ、
+ * ready化後に本実行されるため、clean判定ではなくAFTERCAREで要求する。
+ */
+export function expectedReviewCiChecks(paths, assessment) {
+  return expectedCiChecks(paths, assessment).filter((check) => check.name !== "Agent harness");
+}
+/**
+ * #952: T2/T3のREVIEW cleanは現在HEADのCI checkを正本とする
+ * （ローカルfull unit証跡の代わり）。T1は #949 のLite laneと同じく
+ * ローカルprocess証跡だけでcleanし、CI待ちはAFTERCAREに残す。
+ */
+export const requiresReviewCi = (task) => task.risk !== "T1";
+/** Recorded CI review evidence must cover the task's current head/base. */
+export function requireReviewCiEvidence(task) {
+  requireValue(
+    task.reviewCi?.ok === true &&
+      task.reviewCi.head === task.head &&
+      task.reviewCi.baseHead === task.baseHead,
+    "Current CI review evidence is required (evaluate the PR checks on this HEAD)",
+  );
+}
+/**
+ * #952: evaluate the PR's statusCheckRollup against expectedReviewCiChecks.
+ * verdict: ok | pending | failure | unexpected_skip | head_mismatch.
+ * `unexpected_skip` covers SKIPPED where the accept list excludes it — a
+ * `.md`以外を含む変更での Lint/Build/Test のSKIPPEDはCI条件の誤りを疑うため
+ * 不合格として別扱いにする。`head_mismatch` は別HEADのcheck（AC3）を数えない。
+ */
+export function evaluateReviewCi(prFields, task, paths = []) {
+  const required = expectedReviewCiChecks(paths, task.assessment);
+  if (!prFields || prFields.headRefOid !== task.head || prFields.baseRefOid !== task.baseHead)
+    return { verdict: "head_mismatch", required, observed: [] };
+  const checks = selectChecks(prFields.statusCheckRollup ?? []);
+  const observed = required.map((expected) => {
+    const check = checks.find((entry) => (entry.name ?? entry.context) === expected.name);
+    let state = "unobserved";
+    if (check) {
+      const conclusion = check.conclusion ?? check.state;
+      if (isPendingCheck(check)) state = "pending";
+      else if (expected.accept.includes(conclusion)) state = "accepted";
+      else if (conclusion === "SKIPPED") state = "unexpected_skip";
+      else state = "failure";
+    }
+    return {
+      ...expected,
+      state,
+      conclusion: check?.conclusion ?? check?.state ?? null,
+      detailsUrl: check?.detailsUrl ?? check?.details_url ?? null,
+      runUrl: check?.runUrl ?? check?.run_url ?? null,
+    };
+  });
+  const failed = observed.filter((c) => c.state === "failure").map((c) => c.name);
+  const skipped = observed.filter((c) => c.state === "unexpected_skip").map((c) => c.name);
+  const pending = observed
+    .filter((c) => c.state === "pending" || c.state === "unobserved")
+    .map((c) => c.name);
+  const verdict = failed.length
+    ? "failure"
+    : skipped.length
+      ? "unexpected_skip"
+      : pending.length
+        ? "pending"
+        : "ok";
+  return { verdict, required, observed, failed, skipped, pending };
 }
 /** Verification kinds required locally for this task (e2e is a GitHub delivery gate). */
 export function requiredVerificationKinds(task) {
@@ -463,6 +525,9 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
       !task.assessment.review.independent || task.review.independent === true,
       "Independent review is required",
     );
+    // #952: T2/T3のcleanは現在HEADのCI結果を正本とする。runnerが評価して
+    // 記録した証跡を要求する（この関数自身はCIを取得しない）。
+    if (requiresReviewCi(task)) requireReviewCiEvidence(task);
   }
   if (task.state === "aftercare" && event === "ready") {
     requireLocalVerification(task);
@@ -717,5 +782,8 @@ export function validateCheckpoint(task, { head, baseHead, paths, root = process
     !assessment.review.independent || current.review.independent === true,
     "Independent reviewer evidence is required",
   );
+  // #952: the state block must also carry the recorded CI review evidence for
+  // T2/T3 — the same contract the REVIEW clean gate enforces.
+  if (requiresReviewCi(current)) requireReviewCiEvidence(current);
   return assessment;
 }

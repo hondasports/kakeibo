@@ -60,6 +60,7 @@ import {
   reviewFixture,
   verificationManifestFixture,
 } from "./loop-test-fixtures.mjs";
+import { requiredVerificationKinds } from "./loop-policy.mjs";
 import {
   computeAssessment,
   currentEvidence,
@@ -558,38 +559,27 @@ describe("persistent task gates", () => {
     expect(parseStateBlock(writes[0]).spec.assumptions).toContain("Literal $& and $` are data");
   });
 
-  it("runs missing required verification serially and retains completed evidence on failure", () => {
+  it("#952: only the process kind runs locally; a failure retains lastFailure", () => {
     const { dir, task } = repository();
-    // thorough (lint/unit/build) is derived from the tier/assessment, not a
-    // profile: a T3 applied tier keeps it true across the assessment
-    // recompute that follows each verification run.
+    // On the unified lane every tier requires only `process` locally —
+    // thorough kinds are covered by CI (#952), so a T3 tier no longer
+    // turns on serial local lint/unit/build runs.
     task.agentAssessment.applied_tier = "T3";
     task.assessment = computeAssessment(task, ["README.md"], dir);
-    expect(task.assessment.verification.build).toBe(true);
+    expect(requiredVerificationKinds(task)).toEqual(["process"]);
+    delete task.verification.process;
     const kinds = [];
     expect(() =>
       runRequiredVerification(task, dir, (command) => {
-        const kind =
-          command.includes("lint") || command.includes("format:check")
-            ? "lint"
-            : command.includes("vitest")
-              ? "unit"
-              : "other";
-        kinds.push(kind);
-        if (kind === "unit") {
-          expect(loadTask(dir).verification.lint.success).toBe(true);
-          return { status: 1 };
-        }
-        return { status: 0 };
+        kinds.push(command.join(" "));
+        return { status: command.join(" ").includes("test:process") ? 1 : 0 };
       }),
-    ).toThrow("Verification failed: unit");
-    expect(kinds).toEqual(["lint", "lint", "unit"]);
-    expect(loadTask(dir).verification.lint.success).toBe(true);
-    expect(loadTask(dir).verification.build).toBeUndefined();
-    expect(loadTask(dir).lastFailure.kind).toBe("unit");
+    ).toThrow("Verification failed: process");
+    expect(kinds).toEqual(["node scripts/check-loop-docs.mjs", "pnpm run test:process"]);
+    expect(loadTask(dir).lastFailure.kind).toBe("process");
     runRequiredVerification(loadTask(dir), dir, () => ({ status: 0 }));
-    expect(Object.keys(loadTask(dir).verification)).toEqual(["process", "lint", "unit", "build"]);
-    expect(loadTask(dir).verification.unit.run.scope).toBe("full");
+    expect(Object.keys(loadTask(dir).verification)).toEqual(["process"]);
+    expect(loadTask(dir).verification.lint).toBeUndefined();
   });
 
   it("creates an incremental packet with prior AC evidence and available full context", () => {
@@ -980,9 +970,14 @@ describe("persistent task gates", () => {
     task.assessment = computeAssessment(task, ["convex/schema.ts"]);
     expect(() => resolveLoopStep({ task, event: "ready", root })).toThrow("skill");
     task.skills = task.assessment.requiredSkills;
-    expect(() => resolveLoopStep({ task, event: "ready", root })).toThrow("verification");
-    for (const kind of ["lint", "unit", "build"])
-      task.verification[kind] = { head: task.head, baseHead: task.baseHead, success: true };
+    // #952: T3のEXECUTE readyもprepush markerが正本（ローカル証跡の代わり）。
+    // 一意headでこのworktreeの.gitへ残すmarkerが前回実行と衝突しないようにする。
+    task.head = createHash("sha256").update(String(Date.now())).digest("hex");
+    task.review = null;
+    // The head change invalidates the fixture's process evidence — refresh it.
+    task.verification.process = { head: task.head, baseHead: task.baseHead, success: true };
+    expect(() => resolveLoopStep({ task, event: "ready", root })).toThrow("verify:prepush");
+    markPrepush(root, task.head);
     expect(resolveLoopStep({ task, event: "ready", root }).nextState).toBe("review");
     task.state = "review";
     task.review = reviewFixture(task, { independent: false, reviewer: "author" });
@@ -994,6 +989,8 @@ describe("persistent task gates", () => {
     task.review.head = "stale";
     expect(() => resolveLoopStep({ task, event: "clean", root })).toThrow("HEAD");
     task.review = reviewFixture(task);
+    // #952: T3のcleanは現在HEADのCI評価を記録した証跡を要求する。
+    task.reviewCi = { ok: true, head: task.head, baseHead: task.baseHead };
     expect(resolveLoopStep({ task, event: "clean", root }).nextState).toBe("aftercare");
     task.state = "aftercare";
     expect(() => resolveLoopStep({ task, event: "ready", root })).toThrow("GitHub");
@@ -2617,7 +2614,7 @@ describe("increment reuse and loop ergonomics", () => {
     refreshTask(task, dir);
     expect(task.agentAssessment).toBeNull();
   });
-  it("accepts affected unit evidence for EXECUTE→REVIEW and completes the full suite in review", () => {
+  it("#952: T2 runs process only locally — prepush gates ready and CI evidence gates clean", () => {
     const { dir, git, task } = repository();
     writeFileSync(path.join(dir, "src-feature.ts"), "export {};\n");
     git("add", ".");
@@ -2625,37 +2622,34 @@ describe("increment reuse and loop ergonomics", () => {
     refreshTask(task, dir);
     // The change became runtime-relevant, so the agent re-submits its assessment.
     expect(task.agentAssessment).toBeNull();
-    // T2 keeps this on the standard lane — the affected→full unit evidence
-    // mechanics under test do not run on the T1 lite lane (#949).
     task.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: "T2" };
     refreshTask(task, dir);
+    task.risk = "T2";
     task.skills = [...task.assessment.requiredSkills];
-    expect(task.assessment.verification.unit).toBe(true);
+    // requiredVerificationKinds is `process` alone on the unified lane (#952).
     const commands = [];
     const runner = (command) => {
       commands.push(command);
       return { status: 0 };
     };
     runRequiredVerification(task, dir, runner);
-    const unitCommand = commands.find((command) => command.includes("vitest"));
-    expect(unitCommand.slice(0, 4)).toEqual(["pnpm", "exec", "vitest", "related"]);
-    expect(unitCommand).toContain("--passWithNoTests");
-    expect(task.verification.unit.run.scope).toBe("affected");
-    expect(verificationSummary(task).unit).toBe("pass(affected)");
+    expect(task.verification.unit).toBeUndefined();
     expect(missingRequirements(task)).toEqual([]);
+    expect(() => transitionTask(task, "ready", {}, dir)).toThrow(/verify:prepush/);
+    const marker = execFileSync(
+      "git",
+      ["rev-parse", "--path-format=absolute", "--git-path", `agent-prepush/${task.head}.ok`],
+      { cwd: dir, encoding: "utf8" },
+    ).trim();
+    mkdirSync(path.dirname(marker), { recursive: true });
+    writeFileSync(marker, "ok\n");
     transitionTask(task, "ready", {}, dir);
     expect(task.state).toBe("review");
-    expect(missingRequirements(task)).toContain("verify:unit(full)");
     task.review = reviewFixture(task);
     expect(() => transitionTask(structuredClone(task), "clean", {}, dir)).toThrow(
-      "Full unit verification",
+      /CI review evidence/,
     );
-    commands.length = 0;
-    runRequiredVerification(task, dir, runner);
-    expect(commands).toEqual([["pnpm", "exec", "vitest", "run"]]);
-    expect(task.state).toBe("review");
-    expect(task.verification.unit.run.scope).toBe("full");
-    expect(missingRequirements(task)).not.toContain("verify:unit(full)");
+    task.reviewCi = { ok: true, head: task.head, baseHead: task.baseHead };
     transitionTask(task, "clean", {}, dir);
     expect(task.state).toBe("aftercare");
   });

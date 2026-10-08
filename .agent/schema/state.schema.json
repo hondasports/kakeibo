@@ -49,10 +49,22 @@
       "const": 2
     },
     "state": {
-      "enum": ["refine", "execute", "review", "aftercare", "incident", "human_gate", "done"]
+      "enum": [
+        "refine",
+        "execute",
+        "review",
+        "aftercare",
+        "incident",
+        "human_gate",
+        "done"
+      ]
     },
     "risk": {
-      "enum": ["T1", "T2", "T3"]
+      "enum": [
+        "T1",
+        "T2",
+        "T3"
+      ]
     },
     "attempt": {
       "type": "integer",
@@ -63,7 +75,9 @@
     },
     "configuration": {
       "type": "object",
-      "required": ["runtime"],
+      "required": [
+        "runtime"
+      ],
       "properties": {
         "profileSource": {
           "type": "string",
@@ -74,13 +88,26 @@
         },
         "selection": {
           "type": "object",
-          "required": ["selected", "source", "ruleVersion"],
+          "required": [
+            "selected",
+            "source",
+            "ruleVersion"
+          ],
           "properties": {
             "selected": {
-              "enum": ["fast", "standard", "deep", "max"]
+              "enum": [
+                "fast",
+                "standard",
+                "deep",
+                "max"
+              ]
             },
             "source": {
-              "enum": ["provisional", "user", "auto"]
+              "enum": [
+                "provisional",
+                "user",
+                "auto"
+              ]
             },
             "ruleVersion": {}
           }
@@ -101,7 +128,11 @@
     },
     "counters": {
       "type": "object",
-      "required": ["review", "ci", "sameFailure"],
+      "required": [
+        "review",
+        "ci",
+        "sameFailure"
+      ],
       "properties": {
         "review": {
           "type": "integer",
@@ -125,19 +156,34 @@
       }
     },
     "assessment": {
-      "type": ["object", "null"]
+      "type": [
+        "object",
+        "null"
+      ]
     },
     "agentAssessment": {
-      "type": ["object", "null"]
+      "type": [
+        "object",
+        "null"
+      ]
     },
     "review": {
-      "type": ["object", "null"]
+      "type": [
+        "object",
+        "null"
+      ]
     },
     "aftercare": {
-      "type": ["object", "null"]
+      "type": [
+        "object",
+        "null"
+      ]
     },
     "lastFailure": {
-      "type": ["object", "null"]
+      "type": [
+        "object",
+        "null"
+      ]
     },
     "findings": {
       "type": "array",
@@ -163,6 +209,12 @@
     "historyOmitted": {
       "type": "integer",
       "minimum": 0
+    },
+    "reviewCi": {
+      "type": [
+        "object",
+        "null"
+      ]
     }
   },
   "additionalProperties": false

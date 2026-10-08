@@ -34,6 +34,8 @@ import {
   highestTier,
   checkAftercare,
   expectedCiChecks,
+  evaluateReviewCi,
+  requiresReviewCi,
   selectChecks,
   missingRequirements,
   verificationSummary,
@@ -375,6 +377,7 @@ function invalidateRevision(task, root, head, baseHead) {
   task.verification = kept;
   task.review = null;
   task.aftercare = null;
+  task.reviewCi = null;
   task.assessment = null;
   task.agentAssessment = null;
   task.skills = [];
@@ -1339,6 +1342,22 @@ export function watchAftercare(
     pause(intervalSeconds * 1000);
   }
 }
+/**
+ * #952: poll the PR's CI rollup until evaluateReviewCi settles to a verdict
+ * other than "pending" (or head_mismatch), or `maxSeconds` elapse. Uses the
+ * same tick/pause machinery as watchAftercare.
+ */
+export function waitForReviewCi(
+  evaluate,
+  { intervalSeconds = 60, maxSeconds = 900, sleep = defaultSleep, tick = () => Date.now() } = {},
+) {
+  const deadline = tick() + maxSeconds * 1000;
+  while (true) {
+    const outcome = evaluate();
+    if (outcome.verdict !== "pending" || tick() >= deadline) return outcome;
+    sleep(intervalSeconds * 1000);
+  }
+}
 export function githubAftercare(task, pr, handled, root, services = {}) {
   requireValue(task.state === "aftercare", "GitHub aftercare runs in aftercare");
   task.aftercare = null;
@@ -1519,7 +1538,7 @@ export function buildReviewPacket(
   task,
   dir,
   root,
-  { deltaFrom, full = false, externalFindings } = {},
+  { deltaFrom, full = false, externalFindings, ci } = {},
 ) {
   requireValue(task.state === "review", "Review packets are generated in review state");
   requireClean(root);
@@ -1590,10 +1609,11 @@ export function buildReviewPacket(
     );
   }
   write("task-summary.json", `${JSON.stringify(summarizeTask(task, root), null, 2)}\n`);
-  write(
-    "verification-manifest.json",
-    `${JSON.stringify(reviewerVerificationManifest(task), null, 2)}\n`,
-  );
+  // #952: 独立Reviewerへローカル証跡の代わりにCI結果を渡す — 各checkの
+  // conclusion/run URLと、判定に使ったaccept/reasonをmanifestへ載せる。
+  const manifest = reviewerVerificationManifest(task);
+  if (ci) manifest.ciChecks = { required: ci.required, observed: ci.observed };
+  write("verification-manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
   write(
     "packet.json",
     `${JSON.stringify(
@@ -1985,9 +2005,30 @@ export function runNext(args, root = process.cwd(), services = {}) {
           externalFindings = undefined;
         }
       }
+      // #952: draft PRのCI結果を独立レビューの検証情報としてpacketへ載せる。
+      let ci;
+      if (pr) {
+        try {
+          const fetchers = aftercareFetchers(pr, args.handled, root, services);
+          ci = evaluateReviewCi(
+            (services.fetchPr ?? fetchers.fetchPr)(),
+            task,
+            safeChangedPaths(root, task),
+          );
+          ci.flaky = ciFlakyDiagnostics({
+            rollup: (services.fetchPr ?? fetchers.fetchPr)().statusCheckRollup ?? [],
+            head: task.head,
+            slug: services.resolveRepo ? services.resolveRepo() : fetchers.slug(),
+            root,
+            gh: (a, r) => ghRunner(a, r),
+          })?.flaky;
+        } catch {
+          ci = undefined;
+        }
+      }
       let packet;
       const failed = stepOr("packet", "review", () => {
-        packet = buildReviewPacket(task, dir, root, { externalFindings });
+        packet = buildReviewPacket(task, dir, root, { externalFindings, ci });
       });
       if (failed) return failed;
       return stop("review", {
@@ -2056,6 +2097,57 @@ export function runNext(args, root = process.cwd(), services = {}) {
       note("findings");
       if (task.state === "incident") return stop("resolution");
       return stop("fix", { findings: ids });
+    }
+    // #952: T2/T3のREVIEW cleanは現在HEADのCI checkを正本とする。draft PRの
+    // statusCheckRollupを評価し、全checkがacceptを満たすまでpollで待つ
+    // （Agent harnessのみAFTERCAREへ送る）。失敗はci_failure相当（再現必須）、
+    // .md以外でのSKIPPEDはci_unexpected_skipで止める。
+    if (requiresReviewCi(task)) {
+      const pr = discoverPr();
+      if (!pr)
+        return stop("pr", {
+          error: "REVIEW clean requires the draft PR's CI checks (spec.prAllowed)",
+        });
+      const interval = args["interval-seconds"];
+      requireIntervalSeconds(interval);
+      const fetchers = aftercareFetchers(pr, args.handled, root, services);
+      const paths = safeChangedPaths(root, task);
+      const evaluate = () =>
+        evaluateReviewCi((services.fetchPr ?? fetchers.fetchPr)(), task, paths);
+      let outcome;
+      const watchFailed = stepOr("ci", "ci_pending", () => {
+        outcome = waitForReviewCi(evaluate, {
+          intervalSeconds: interval === undefined ? undefined : Number(interval),
+          sleep: services.sleep,
+          tick: services.tick,
+          maxSeconds: services.maxSeconds,
+        });
+      });
+      if (watchFailed) return watchFailed;
+      if (outcome.verdict === "failure") {
+        const slug = services.resolveRepo ? services.resolveRepo() : fetchers.slug();
+        const ciFailures = extractCiFailures({
+          rollup: (services.fetchPr ?? fetchers.fetchPr)().statusCheckRollup ?? [],
+          head: task.head,
+          slug,
+          root,
+          gh: (a, r) => ghRunner(a, r),
+        });
+        task.ciFailures = [...(task.ciFailures ?? []), ...ciFailures];
+        saveTask(task, root);
+        return stop("ci_reproduce", { ciFailures, watch: outcome });
+      }
+      if (outcome.verdict === "unexpected_skip")
+        return stop("ci_unexpected_skip", { watch: outcome });
+      if (outcome.verdict !== "ok") return stop("ci_pending", { watch: outcome });
+      task.reviewCi = {
+        ok: true,
+        head: task.head,
+        baseHead: task.baseHead,
+        checks: outcome.observed,
+        checkedAt: new Date().toISOString(),
+      };
+      note("ci");
     }
     const failed = stepOr("clean", "review", () => {
       task = transitionTask(task, "clean", {}, root);

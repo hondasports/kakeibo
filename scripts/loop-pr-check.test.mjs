@@ -108,28 +108,23 @@ describe("GitHub delivery gates", () => {
     expect(event.pull_request.body.length).toBeLessThan(JSON.stringify(task, null, 2).length);
     expect(checkPullRequest(event, { readPaths: () => ["README.md"] }).risk.final).toBe("T1");
   });
-  it("requires full-scope unit evidence at the PR checkpoint", () => {
+  it("#952: the PR checkpoint gates on process evidence only (CI carries the rest)", () => {
     const task = readyTask();
     task.baseRef = "HEAD";
-    // Standard lane only: T1 lite tasks carry no local evidence requirement,
-    // so exercise the gate on a task that stays standard (T3).
     task.agentAssessment.applied_tier = "T3";
     task.risk = "T3";
     const paths = ["src/app.ts"];
     const assessment = computeAssessment(task, paths);
-    expect(assessment.verification.unit).toBe(true);
     task.skills = [...assessment.requiredSkills];
-    for (const kind of ["process", "lint", "unit", "build"])
-      task.verification[kind] = { head: task.head, baseHead: task.baseHead, success: true };
+    task.verification.process = { head: task.head, baseHead: task.baseHead, success: true };
     const context = { head: task.head, baseHead: task.baseHead, paths };
+    // #952: T2/T3 must also carry recorded CI review evidence in the block.
+    expect(() => validateCheckpoint(task, context)).toThrow(/CI review evidence/);
+    task.reviewCi = { ok: true, head: task.head, baseHead: task.baseHead };
     expect(() => validateCheckpoint(task, context)).not.toThrow();
-    task.verification.unit.run = { scope: "affected" };
-    expect(() => validateCheckpoint(task, context)).toThrow("Full unit verification");
-    // A run record without an explicit full scope never counts as full.
-    task.verification.unit.run = {};
-    expect(() => validateCheckpoint(task, context)).toThrow("Full unit verification");
-    task.verification.unit.run = { scope: "full" };
-    expect(() => validateCheckpoint(task, context)).not.toThrow();
+    // Local lint/unit/build evidence is not part of the checkpoint contract.
+    delete task.verification.process;
+    expect(() => validateCheckpoint(task, context)).toThrow(/process/i);
   });
   it("rejects pending checks, stale HEAD, missing required checks, and unhandled findings", () => {
     const task = readyTask();

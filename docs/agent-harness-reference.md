@@ -45,7 +45,7 @@ base既定値は `origin/preview`。別baseは開始時に `--base` で指定す
 | refine | spec・assessment（#948のTODO検出を含む）の検証 → `ready` | spec不足:`spec` / assessment不足:`assessment` / 必須skill未読:`skills` / material decision:`decisions` → 通過後 `implementation` |
 | execute | clean tree確認 → `verify:prepush`（現在HEADの成功マーカーがなければ）→ 未解決ciFailureの再確認（`--resolve-ci-failures`相当、`--include`対象化付き）→ 残り必須検証 → `ready` → `spec.prAllowed===true` なら push＋draft PR作成 → REVIEWでpacket生成 | dirty tree:`commit` / prepush失敗:`verify:prepush`（失敗check名と再実行コマンドを返す）/ CI失敗未解決:`ci_reproduce` / 検証失敗:`verify` / prAllowed false:`pr_permission` / 同一原因3回失敗はrecordFailure経由でINCIDENT |
 | review（--reviewなし） | PRがあれば外部指摘を収集 → `--review-packet`（増分条件は既存ロジック） | 常に `needs:"review"`（packetパスと独立レビュー要否を返す） |
-| review（--review file） | REVIEW cleanに必要な残り検証（Lite laneはprocessのみ、それ以外はfull unit。`--next` 自体にlane分岐はなく `requiredVerificationKinds` に従う）→ レビュー記録 → open finding 0なら `clean`、あれば `findings`（reasonはfinding id一覧） | 検証失敗:`verify` / 再評価必須回:`reassessment` / findings後:`fix` / clean後:`aftercare` |
+| review（--review file） | REVIEW cleanに必要な残り検証（全Tierともローカルはprocessのみ）→ レビュー記録 → open finding 0なら、T2/T3はdraft PRの現在HEADのCI checkを評価して `clean`（T1は従来どおり）、あれば `findings`（reasonはfinding id一覧） | 検証失敗:`verify` / 再評価必須回:`reassessment` / findings後:`fix` / CI待ち:`ci_pending` / CI失敗:`ci_reproduce` / 意図しないSKIPPED:`ci_unexpected_skip` / clean後:`aftercare` |
 | aftercare | `--sync-pr` → draftなら `gh pr ready` → `--aftercare --watch-aftercare` → `ready` → `--publish-metrics` | `action_required`（未処理指摘・thread・承認待ち・revision変更）/ CI失敗:`ci_reproduce`（`ciFailure{failedTests,traceUrl,reproduce}`）/ pending:`ci_pending` / PR無し:`pr` |
 | incident / human_gate | 何もしない | `resolution` / `approval` |
 | done | 何もしない | `needs:null`（`done:true`） |
@@ -79,7 +79,7 @@ node scripts/loop-runner.mjs --event ready
 
 `--verify-required` は現在の評価で必須のlocal検証を直列実行し、成功したkindごとに証跡を保存する。現在HEAD/baseで成功済みのkindは省略し、最初の失敗で停止する。E2Eは従来どおりGitHubのdelivery gateとなる。修正・再開時にHEAD/baseが変われば通常の失効判定を適用する。単独kindの `--verify <kind>` も利用できる。状態ファイルを更新するrunnerを同じworktreeで並行起動しない。
 
-unitの範囲はゲートごとに異なる。EXECUTEの `--verify-required` はunitを差分関連（affected）で実行し、EXECUTE→REVIEWはそれで満たせる。REVIEW clean・AFTERCARE ready・PR checkpoint（`Agent harness` CI）はcurrent HEADのfull unit証跡を必須とし、affectedの証跡では通らない（不足は `verify:unit(full)` と表示される）。REVIEW状態の `--verify-required` は残りのfull unitだけを実行するので、独立Reviewerへpacketを渡した後、レビューと並行して実行できる。並行するのはrunnerとReviewerであり、`--review` の記録は `--verify-required` の終了後に行う。状態ファイルは読み込み時点から別runnerに書き換えられていると保存を拒否する（lost updateを防ぐ）ので、その場合はコマンドを再実行する。full unitが失敗したら `--event findings` でEXECUTEへ戻す。
+#952以降、ローカルの必須検証は全Tierとも `process` のみ（`requiredVerificationKinds`）。lint/unit/buildの合否はCIのcheckを正本とし、push前は `verify:prepush` の成功マーカー（`pnpm verify:prepush` で作成）がEXECUTE→REVIEWをゲートする。T2/T3のREVIEW cleanでは、runnerがdraft PRのstatusCheckRollupを `expectedCiChecks`（`Agent harness` を除く。draft中はskipされるためAFTERCAREで要求）のaccept条件と照合し、全checkが合格するまでpollで待つ（`--interval-seconds`）。失敗checkは `ci_reproduce`（#958の再現ゲート）で止まり、`.md`以外を含む変更でLint/Build/TestがSKIPPEDになっている場合はCI条件の誤りとして `ci_unexpected_skip` で止まる。別HEADのcheckは合否に数えない。合格が揃うと証跡を `reviewCi` に記録しcleanへ進む。Reviewerへの検証情報はpacketの `verification-manifest.json` にCI check結果（名前・conclusion・run URL）と各checkのaccept/reasonとして載る。状態ファイルは読み込み時点から別runnerに書き換えられていると保存を拒否する（lost updateを防ぐ）ので、その場合はコマンドを再実行する。
 
 affectedは変更ファイルのうちvitestが関連テストを解決できるもの（テスト可能な拡張子・`e2e/`・metadata-only以外・存在するファイル）へ `vitest related --passWithNoTests` を実行し（process suiteのファイルはfullと同様に除外する）、証跡にscopeと対象ファイルを記録する。候補が0件の場合はfull commandへ戻り、証跡は `scope: "full"` と記録される。単独でも指定できる。
 
@@ -133,11 +133,11 @@ node scripts/loop-runner.mjs --review-packet /tmp/issue-900-full --full-review
 
 指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、2roundごとにreassessmentを要求する。5round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。遷移時に証跡を無条件失効させることはない——証跡の失効は実際のHEAD/base変更時だけ判定する。却下で終わる指摘やmetadata-onlyの修正で全検証をやり直させないためである。同じラウンドのopen findingはまとめて修正・再検証する（`.agent/workflow/review.md` 参照）。
 
-## Lite lane
+## CI中心の検証（旧Lite lane）
 
-評価が `final tier = T1` かつMachine Floor triggerなし・独立レビュー不要のタスクはLite laneを走る（computed assessmentの `lane: "lite"`。それ以外は `"standard"`）。Lite laneではローカル検証を `process` だけに絞り、対象unit・型・lint・対象E2Eの判定はCIに委ねる。runnerはその結果を検証証跡として記録しない。
+#952以降、合否の正本はCIのcheckであり、ローカルの必須検証は全Tierとも `process` のみ（lint/unit/buildはpre-push実行で担保し、runnerは結果を証跡として記録しない）。旧Lite laneの条件分岐は撤去途中で、computed assessmentの `lane` は全タスク `"lite"` を返す（#953でフィールド自体を撤去するまでの過渡状態）。
 
-- `--verify-required` とcheckpoint検証はprocessだけを要求・実行する。REVIEWの `clean` でもfull unitの証跡は不要。
+- `--verify-required` とcheckpoint検証はprocessだけを要求・実行する。REVIEWの `clean` はT1がローカル証跡のみ、T2/T3はそれに加えて現在HEADのCI check評価（`reviewCi`）を要求する。
 - EXECUTE→REVIEWの `ready` には、現在HEADに対応する `agent-prepush/<head>.ok` 成功マーカーが必要（`pnpm verify:prepush` またはpre-push hookが刻む。証跡JSONではなくファイルの存在だけを見る）。マーカーがなければreadyは拒否される。
 - `aftercare` および `--check-pr` の必須checkは `expectedCiChecks(paths, assessment)` が決め、 `--check-pr` は各checkの `accept` と `reason` を `expectedChecks` として表示する。
 

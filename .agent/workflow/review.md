@@ -10,7 +10,7 @@ T1はセルフレビュー可。T2で `uncertainty=some_unknowns`、またはT3�
 
 ## 検証との並行
 
-REVIEW clean以降のゲートはcurrent HEADのfull unit証跡を要求する（Lite lane除く：ローカル証跡はprocessのみで、判定はCIのcheckが正本）。`--next --review <file>` はレビュー記録の前に残りの必須検証を先に実行する。手動でReviewerと並行させる場合は `--verify-required` で残りのfull unitを先に完了させ、`--review` の記録はその終了を待ってから行う（状態を更新するrunnerは同時に1つ。別runnerが先に保存していると保存は拒否される）。失敗した場合はfindingとして扱い、`findings` でEXECUTEへ戻す。
+REVIEW cleanにローカルで要求される検証は全Tierともprocessのみである（#952）。lint/unit/buildの合否はCIのcheckが正本で、push前は `verify:prepush` の成功マーカーがEXECUTE→REVIEWをゲートする。draftのPRではci.yml・e2e.ymlがレビューと並行して実行される（Agent harnessのみdraft中skip）。T2/T3のcleanはdraft PRの現在HEADのCI checkが全て合格条件を満たすことが前提で、`--next --review <file>` はレビュー記録後にCIの結果をpollで評価してから `clean` する（T1は従来どおりAFTERCAREで評価）。Reviewerにはpacketの `verification-manifest.json` にCI check結果とaccept/reasonを載せて渡す。手動経路でも同じ評価は `--next --review` の1ステップで行われる。
 
 ## Review loop
 
@@ -32,8 +32,8 @@ Reviewerは増分・影響caller・open findingから確認し、影響のない
 
 ## Exit
 
-`node scripts/loop-runner.mjs --next` を実行する。PRがあれば外部レビュー指摘を収集し、`--review-packet` 相当のpacketを生成して `needs:"review"` で止まる（独立レビュー要否も返す）。Reviewerの報告ファイルを受け取ったら `node scripts/loop-runner.mjs --next --review <file>` を実行する: REVIEW cleanに必要な残り検証（Lite laneはprocess、それ以外はfull unit）を先に実行し、レビューを記録して、open findingが0件なら `clean` でAFTERCAREへ、残れば `findings` でEXECUTEへ遷移する（reasonはfinding id一覧が自動で入る）。2ラウンドごとの方針再評価が必要な回では `needs:"reassessment"` で止まるので、`--event findings --exit <file>` で根拠を記録する。
+`node scripts/loop-runner.mjs --next` を実行する。PRがあれば外部レビュー指摘を収集し、`--review-packet` 相当のpacketを生成して `needs:"review"` で止まる（独立レビュー要否も返す）。Reviewerの報告ファイルを受け取ったら `node scripts/loop-runner.mjs --next --review <file>` を実行する: REVIEW cleanに必要な残り検証（全Tierともローカルはprocessのみ）を先に実行し、レビューを記録して、open findingが0件なら、T2/T3はdraft PRの現在HEADのCI check評価を経て `clean` でAFTERCAREへ（CI待ちは `needs:"ci_pending"`、失敗は `ci_reproduce`、意図しないSKIPPEDは `ci_unexpected_skip`）、残れば `findings` でEXECUTEへ遷移する（reasonはfinding id一覧が自動で入る）。2ラウンドごとの方針再評価が必要な回では `needs:"reassessment"` で止まるので、`--event findings --exit <file>` で根拠を記録する。
 
-cleanの条件は「blocker / majorのopen findingが0件」でfull unitを含む必須検証が揃うこと（Lite laneは `lane: "lite"` のタスクでfull unit証跡を要求しない）。上限（5ラウンド）到達は未完了としてINCIDENTで扱う。
+cleanの条件は「blocker / majorのopen findingが0件」に加えて、T2/T3は現在HEADのCI check評価（`reviewCi`証跡）が揃うこと（T1はローカルprocess証跡のみ）。上限（5ラウンド）到達は未完了としてINCIDENTで扱う。
 
 レビュー記録のJSONは `--draft review`（下書きの必須キーと過去findingの事前記入を含む）にReviewerの結果を記入する。`TODO` のまま残った項目は拒否される。
