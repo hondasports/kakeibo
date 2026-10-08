@@ -38,6 +38,49 @@
       "type": "string",
       "minLength": 1
     },
+    "ciFailure": {
+      "type": "object",
+      "required": ["check"],
+      "properties": {
+        "check": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head": {
+          "type": "string"
+        },
+        "runUrl": {
+          "type": ["string", "null"]
+        },
+        "artifactUrl": {
+          "type": ["string", "null"]
+        },
+        "failedTests": {
+          "type": "array"
+        },
+        "reproduce": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "reproduction": {
+      "type": "object",
+      "required": ["command", "result"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "enum": ["reproduced", "not_reproduced"]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "approval": {
       "type": "object",
       "required": ["source", "reference"],

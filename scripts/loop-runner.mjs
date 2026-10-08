@@ -24,6 +24,7 @@ import { readBranchChangedPaths, readWorktreeChangedPaths } from "./suggest-skil
 import { isMetadataOnlyPath, normalizeChangedPath } from "./classify-e2e-relevance.mjs";
 import { validateAssessment } from "./review-depth.mjs";
 import { readTranscriptUsage, USAGE_ROLES } from "./agent-usage.mjs";
+import { checkKind, ciFlakyDiagnostics, extractCiFailures } from "./ci-failure.mjs";
 import {
   validateTask,
   validateSpec,
@@ -474,7 +475,18 @@ export function transitionTask(task, event, exit, root) {
     decideProfile(task, { root, strict: true, trigger: "refine_ready" });
   history(task, event, { exit });
   if (event === "findings") task.counters.review += 1;
-  if (event === "ci_failure") task.counters.ci += 1;
+  if (event === "ci_failure") {
+    task.counters.ci += 1;
+    // #958: 失敗checkレコードを未解決として保持し、execute readyがブロックする
+    task.ciFailures = task.ciFailures ?? [];
+    task.ciFailures.push({
+      ...exit.ciFailure,
+      reproduction: exit.reproduction,
+      recordedAt: new Date().toISOString(),
+      resolvedAt: null,
+      resolvedHead: null,
+    });
+  }
   // Evidence is not wiped here: nothing has changed yet. Invalidation happens
   // only on real revision change in refreshTask, so a dismissed finding or a
   // metadata-only fix does not force full re-verification.
@@ -486,7 +498,10 @@ export function transitionTask(task, event, exit, root) {
   const limits = processConfig(root).limits;
   if (
     (event === "findings" && task.counters.review >= limits.review_max_rounds) ||
-    (event === "ci_failure" && task.counters.ci >= limits.ci_fix_max_rounds)
+    (event === "ci_failure" &&
+      (task.counters.ci >= limits.ci_fix_max_rounds ||
+        // AC4: ローカルで再現できないCI失敗は修復推測せずINCIDENT送り
+        exit.reproduction?.result === "not_reproduced"))
   )
     task.state = "incident";
   recordMetric(task, root, { action: "transition", event, from, to: task.state });
@@ -974,6 +989,53 @@ export function parseStateBlock(body) {
 }
 const gh = (args, root) =>
   execFileSync("gh", args, { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
+/**
+ * #958: ciFailure解決の実行体。verify-prepush.mjsは#957で導入されるため
+ * 静的importせずspawnで呼ぶ（未マージ環境ではENOENTの明示エラー）。
+ * hook経由起動を考慮してGIT_*を除去したenvで実行する。
+ */
+export function defaultVerifyPrepush(argv, root) {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
+  return spawnSync(process.execPath, argv, {
+    cwd: root,
+    encoding: "utf8",
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+/**
+ * 未解決ciFailureをrunner自身が verify:prepush で解決する（AC5）。
+ * e2e/unitの失敗は failedTests のファイルを --include で対象化し、
+ * lint/build/process等のジョブ失敗は --include なしの全量実行。
+ * exit 0のみ解決（marker残存だけでは解決にならない）。
+ */
+export function resolveCiFailures(task, root, services = {}) {
+  const runVerify = services.verifyPrepush ?? defaultVerifyPrepush;
+  const results = [];
+  for (const failure of task.ciFailures ?? []) {
+    if (failure.resolvedAt) continue;
+    const files = ["e2e", "unit"].includes(checkKind(failure.check))
+      ? [...new Set((failure.failedTests ?? []).map((t) => t.file).filter(Boolean))]
+      : [];
+    const argv = ["scripts/verify-prepush.mjs", ...(files.length ? ["--include", ...files] : [])];
+    const out = runVerify(argv, root);
+    const status = out.status ?? 1;
+    if (status === 0) {
+      failure.resolvedAt = new Date().toISOString();
+      failure.resolvedHead = task.head;
+      history(task, "ci_failure_resolved", { check: failure.check, head: task.head });
+    }
+    results.push({
+      check: failure.check,
+      includeFiles: files,
+      status,
+      resolved: status === 0,
+    });
+  }
+  recordMetric(task, root, { action: "resolve_ci_failures", results });
+  return results;
+}
 const AFTERCARE_PR_FIELDS =
   "number,state,isDraft,headRefOid,baseRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup";
 /** owner/name slug parsed from a git remote URL (ssh or https); null when it does not match. */
@@ -1313,7 +1375,12 @@ export function inspectPullRequest(task, pr, handled, root, services = {}) {
       git(["rev-parse", `${task.baseRef}^{commit}`], root) === task.baseHead,
     "Local revision changed during PR observation",
   );
-  return { evidence, snapshot: aftercareSnapshot(after, task, findings, pr) };
+  return {
+    evidence,
+    snapshot: aftercareSnapshot(after, task, findings, pr),
+    // #958: flaky診断など観測専用の下流利用（追加フィールドはgateに使わない）
+    prFields: after,
+  };
 }
 /** Recompute delivery requirements without rewriting the restored checkpoint. */
 function currentCheckpointTask(task, root) {
@@ -1609,6 +1676,7 @@ export function parseArguments(args) {
     "--verify-required",
     "--full-review",
     "--hook-state",
+    "--resolve-ci-failures",
   ]);
   const options = new Set([
     "--init",
@@ -1641,6 +1709,7 @@ export function parseArguments(args) {
     "--usage-role",
     "--external-findings",
     "--publish-metrics",
+    "--ci-failures",
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -1692,6 +1761,8 @@ const CLI_ACTION_KEYS = [
   "friction-note",
   "record-usage",
   "publish-metrics",
+  "ci-failures",
+  "resolve-ci-failures",
 ];
 /**
  * Name reported in `cli_output` metrics. Watch runs are tagged separately so
@@ -1772,6 +1843,30 @@ export function run(args, root = process.cwd(), services = {}) {
     recordMetric(task, root, entry);
     return { taskId: task.taskId, state: task.state, ...entry };
   }
+  if (args["ci-failures"]) {
+    // #958: 失敗checkの機械抽出（read-only）。ci_failure遷移exitへ貼る
+    // ciFailure recordとローカル再現コマンドをここで生成する。
+    const task = loadTask(root);
+    const { fetchPr } = aftercareFetchers(args["ci-failures"], args.handled, root, services);
+    const prFields = (services.fetchPr ?? fetchPr)();
+    const head = prFields.headRefOid ?? task.head;
+    const slug = services.resolveRepo
+      ? services.resolveRepo()
+      : resolveRepositorySlug(root, services);
+    requireValue(slug, "Repository slug could not be resolved");
+    const ghRunner = services.gh ?? ((a, r) => gh(a, r));
+    return {
+      taskId: task.taskId,
+      state: task.state,
+      ciFailures: extractCiFailures({
+        rollup: prFields.statusCheckRollup ?? [],
+        head,
+        slug,
+        root,
+        gh: ghRunner,
+      }),
+    };
+  }
   if (args["check-pr"]) {
     const task = loadTask(root);
     if (args["watch-aftercare"]) {
@@ -1791,14 +1886,33 @@ export function run(args, root = process.cwd(), services = {}) {
         ...(result.reason ? { reason: result.reason } : {}),
       };
     }
-    const { evidence, snapshot } = inspectPullRequest(
+    const { evidence, snapshot, prFields } = inspectPullRequest(
       task,
       args["check-pr"],
       args.handled,
       root,
       services,
     );
-    return { taskId: task.taskId, state: task.state, ...snapshot, checkedAt: evidence.checkedAt };
+    // #958: flaky(passed-on-retry)を観測面に出す。取得失敗は情報欠落のみで止めない
+    let flakyTests = [];
+    try {
+      flakyTests = ciFlakyDiagnostics({
+        rollup: prFields.statusCheckRollup ?? [],
+        head: prFields.headRefOid,
+        slug: services.resolveRepo ? services.resolveRepo() : resolveRepositorySlug(root, services),
+        root,
+        gh: services.gh ?? ((a, r) => gh(a, r)),
+      });
+    } catch {
+      flakyTests = [];
+    }
+    return {
+      taskId: task.taskId,
+      state: task.state,
+      ...snapshot,
+      flakyTests,
+      checkedAt: evidence.checkedAt,
+    };
   }
   if (args["publish-metrics"]) {
     const task = loadTask(root);
@@ -1827,6 +1941,13 @@ export function run(args, root = process.cwd(), services = {}) {
     validateSpec(task.spec, root);
     requireValue(task.state === "execute", "Changes may only be committed in execute state");
     return { taskId: task.taskId, state: task.state, profile: task.configuration.profileSource };
+  }
+  if (args["resolve-ci-failures"]) {
+    // #958 AC5: 未解決ciFailureをrunner自身がverify:prepushで解決する。
+    // exit 0のみresolvedAt/resolvedHeadを記録（markerのみでは不十分）。
+    const results = resolveCiFailures(task, root, services);
+    saveTask(task, root);
+    return { taskId: task.taskId, state: task.state, ciFailureResolutions: results };
   }
   if (args.status) return task;
   if (args.explain) return explainTask(task, root);

@@ -4,6 +4,7 @@ import { validateDocument } from "./loop-schema.mjs";
 import { assessChange } from "./assess-change.mjs";
 import { isContentTarget, readChangedHunks } from "./machine-risk.mjs";
 import { REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
+import { validateReproduction } from "./ci-failure.mjs";
 import { PROFILE_ORDER, profileInputs, missingProfileInputs } from "./resolve-agent-profile.mjs";
 
 export const highestTier = (...tiers) =>
@@ -410,11 +411,26 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
   }
   if (event === "ci_failure") {
     requireValue(text(exit.reason), "CI failure evidence is required");
+    // #958: 再現確認は遷移exitの必須証跡。command/result(reproduced|not_reproduced)/note
+    requireValue(
+      validateReproduction(exit.reproduction).length === 0,
+      "ci_failure exit requires reproduction {command,result:reproduced|not_reproduced,note}",
+    );
+    // 失敗checkの機械抽出レコード（--ci-failures で生成）
+    requireValue(
+      typeof exit.ciFailure === "object" && exit.ciFailure != null && text(exit.ciFailure.check),
+      "ci_failure exit requires ciFailure record (run --ci-failures <pr>)",
+    );
     requireValue(
       task.counters.ci < limits.ci_fix_max_rounds,
       "CI repair limit reached; enter incident",
     );
   }
+  if (task.state === "execute" && event === "ready")
+    requireValue(
+      !(task.ciFailures ?? []).some((f) => !f.resolvedAt),
+      "Unresolved ciFailure records remain; run --resolve-ci-failures first",
+    );
 }
 /** Start-time key: when the run began, not when it finished. */
 const checkStartKey = (check) =>

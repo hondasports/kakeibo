@@ -145,6 +145,12 @@
         "type": "object"
       }
     },
+    "ciFailures": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
     "frictionNote": {
       "type": "string"
     },

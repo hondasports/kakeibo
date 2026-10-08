@@ -173,6 +173,20 @@ CI完了を待つ場合は `--watch-aftercare` を付けてpollできる。初�
 node scripts/loop-runner.mjs --aftercare 123 --watch-aftercare --interval-seconds 30
 ```
 
+CI失敗時は `--ci-failures <番号>` で失敗checkを機械抽出する（read-only、状態を更新しない）。結果は `{check, head, runUrl, artifactUrl, failedTests[{file,title}], reproduce}` の配列で、`reproduce` はローカル再現コマンド（E2Eは `pnpm run e2e:isolated -- <file> --grep "<title>"` を失敗testごとに `&&` 連結、unitは `vitest run <file> -t "<title>"`、lint/buildは該当コマンド全体）。このレコードと再現結果 `{command, result: reproduced|not_reproduced, note}` を `ci_failure` イベントのexitとして必須で渡す。`not_reproduced` は修復を推測せず INCIDENT へ遷移する。
+
+```bash
+node scripts/loop-runner.mjs --ci-failures 123
+```
+
+`ci_failure` でEXECUTEへ戻ったtaskは、未解決のciFailureレコードがある限り `ready` をブロックされる。修正をpushしたら `--resolve-ci-failures` を実行する。runner自身がpush前検証を実行する（E2E/unitの失敗は失敗spec/testファイルを対象化、lint/build等のジョブ単位失敗は全量実行）。exit 0 の記録だけが `resolvedAt`/`resolvedHead` を刻む。成功マーカーや自己申告の残存だけでは解決にならない。
+
+```bash
+node scripts/loop-runner.mjs --resolve-ci-failures
+```
+
+`--check-pr` の出力には `flakyTests`（成功E2E checkのjobログから拾った passed-on-retry、`{check,file,title}`）を含む。playwright JSONレポート（`e2e-results/results.json`）もCI job summaryへ出力され、flaky観測時はfollow-up Issueを起票する。E2Eリトライはlocal/CIとも1回に統一。
+
 aftercareおよびDONEへの遷移直前はGitHubを再取得し、最新HEAD/base、CI全体、必須チェック、approval、mergeability、ページ取得完了、未処理指摘0件を確認する。E2E必須ならpublic/authenticated両方の成功を要求する。handledは `scripts/collect-pr-findings.mjs` の `<finding id> <updatedAt>` 形式。収集時、本文はGitHub上で表示されないマークアップ（HTMLコメント・行全体のリンク参照定義）を除去し、除去でできた3行以上の連続空行は2行へ詰めてから上限まで切り詰める。フェンス・インラインコード内のマークアップは表示されるため保持する。除去量は `strippedChars`、正規化後に本文が空になる候補は `bodyInvisibleOnly` で分かる。本文が切れている候補は全文を読んで判定する。収集コマンドのPASSだけではaftercareを完了できない。
 
 別worktreeから再開する場合は対象branch/HEADをcheckoutし、`--restore-pr <番号>` で復元する。復元先に既存タスクがある場合や別branchの状態は拒否する。PR本文のsnapshotが古い場合は過去のRisk・finding・counterを保持し、検証を失効してEXECUTEへ戻す。復元前にcurrent PR HEAD/baseをfetchしてcheckoutする。PR本文への同期でチェックが再実行された場合はその完了を確認する。DONEはmerge_readyを表し、merge自体はユーザーの許可に従う。

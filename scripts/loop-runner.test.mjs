@@ -49,6 +49,7 @@ import {
   STATE_END,
   metricsPath,
   autoDeltaFrom,
+  resolveCiFailures,
   STATE_BLOCK_RECENT_HISTORY,
 } from "./loop-runner.mjs";
 import {
@@ -95,6 +96,24 @@ const eligibleReview = (task) => ({
   independent: true,
   risk: "T3",
   acHash: acceptanceCriteriaHash(task.spec),
+});
+/** #958: ci_failure遷移に必須のexit（reason+ciFailure+reproduction）のfixture。 */
+const ciFailureExit = (overrides = {}) => ({
+  reason: "CI failed",
+  ciFailure: {
+    check: "E2E (Playwright / Chromium / authenticated)",
+    head: "a".repeat(40),
+    runUrl: "https://github.com/o/r/actions/runs/1",
+    artifactUrl: "https://github.com/o/r/actions/runs/1/artifacts/2",
+    failedTests: [{ file: "e2e/receipt.spec.ts", title: "fails" }],
+    reproduce: "pnpm exec playwright test e2e/receipt.spec.ts --project=authenticated",
+  },
+  reproduction: {
+    command: "pnpm exec playwright test e2e/receipt.spec.ts --project=authenticated",
+    result: "reproduced",
+    note: "same failure locally",
+  },
+  ...overrides,
 });
 function repository() {
   template ??= buildTemplateRepository();
@@ -968,7 +987,63 @@ describe("persistent task gates", () => {
     expect(task.state).toBe("incident");
     task.counters.ci = 2;
     task.state = "aftercare";
-    transitionTask(task, "ci_failure", { reason: "CI failed" }, root);
+    transitionTask(task, "ci_failure", ciFailureExit(), root);
+    expect(task.state).toBe("incident");
+  });
+  it("requires ciFailure + reproduction on ci_failure and blocks ready until resolved", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    // exit欠落は遷移自体を拒否する（AC3/AC5の機械gate）
+    expect(() => transitionTask(task, "ci_failure", { reason: "x" }, dir)).toThrow(
+      /ci_failure exit requires reproduction/,
+    );
+    expect(() =>
+      transitionTask(
+        task,
+        "ci_failure",
+        {
+          reason: "x",
+          reproduction: ciFailureExit().reproduction,
+        },
+        dir,
+      ),
+    ).toThrow(/ci_failure exit requires ciFailure record/);
+    transitionTask(task, "ci_failure", ciFailureExit(), dir);
+    expect(task.state).toBe("execute");
+    // ciFailureゲートだけを見るため検証要件を潰す（他要件は別テストの管轄）
+    task.assessment = { ...task.assessment, verification: {}, requiredSkills: [] };
+    // 未解決ciFailureは ready を fail-closed させる
+    expect(() => resolveLoopStep({ task, event: "ready", root: dir })).toThrow(
+      /Unresolved ciFailure records remain/,
+    );
+    // runner自身の解決: verify 0のみ解決扱い
+    const failFirst = resolveCiFailures(task, dir, { verifyPrepush: () => ({ status: 1 }) });
+    expect(failFirst[0].resolved).toBe(false);
+    expect(task.ciFailures[0].resolvedAt).toBeNull();
+    const passNext = resolveCiFailures(task, dir, { verifyPrepush: () => ({ status: 0 }) });
+    expect(passNext[0].resolved).toBe(true);
+    expect(task.ciFailures[0].resolvedAt).toBeTruthy();
+    expect(task.ciFailures[0].resolvedHead).toBe(task.head);
+    // 解決済みは ready をブロックしない（他要件の欠落はこの検証対象外）
+    expect(() => resolveLoopStep({ task, event: "ready", root: dir })).not.toThrow(
+      /Unresolved ciFailure records remain/,
+    );
+  });
+  it("routes not_reproduced CI failures to incident", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    transitionTask(
+      task,
+      "ci_failure",
+      ciFailureExit({
+        reproduction: {
+          command: "pnpm run e2e:isolated",
+          result: "not_reproduced",
+          note: "green locally, red on CI only",
+        },
+      }),
+      dir,
+    );
     expect(task.state).toBe("incident");
   });
   it("round-trips durable PR snapshots and rejects missing/duplicate snapshots", () => {
@@ -2119,7 +2194,7 @@ describe("increment reuse and loop ergonomics", () => {
     expect(task.verification.process).toBeDefined();
     expect(task.agentAssessment).toBeTruthy();
     task.state = "aftercare";
-    transitionTask(task, "ci_failure", { reason: "lint failed" }, dir);
+    transitionTask(task, "ci_failure", ciFailureExit(), dir);
     expect(task.verification.process).toBeDefined();
     expect(task.agentAssessment).toBeTruthy();
   });
