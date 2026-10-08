@@ -269,7 +269,22 @@ required checksがPASSした後は、content change / material failure / unresol
 
 ### Functional E2E
 
-browser層の受入条件がある変更では、push前に対象specをlocal Convexで実行する。対象specの要否はPRのE2E差分判定と同じ基準を使い、`node scripts/suggest-skills.mjs` のruntime_relevant出力で確認できる。長大な出力を避けるため、テスト実行は `pnpm test:agent` / `pnpm e2e:agent` のcompact出力を優先する。ローカルE2Eは実DB、Clerk認証、Convex HTTP／mutation、画面の状態遷移をまとめて確認する層とし、関数単位の分岐は `convex-test`、外部公開URLが必要な確認だけcloud deploymentへ分ける。レシート抽出は `RECEIPT_IMAGE_EXTRACTOR_MODE=mock` とし、OpenAI APIは呼ばない。
+push前の検証は `.husky/pre-push` から走る `pnpm run verify:prepush` に一本化する。内容は型（`tsc -b`）→ lint/format → `vitest related`（差分に関係するunit）→ `test:process`（`scripts/`・`.agent/`・`docs/agent-harness*`変更時のみ）→ 対象E2E（`e2e:isolated`）。E2Eの対象specは `e2e/spec-map.json` の変更パスglobで選び、`@smoke` のspecを最低ラインとして必ず合流させる。mapにないパスを変更した場合は安全側に `@smoke` + `@public` 全件を選び、map追記を促すファイル名を表示する。ローカル実行はマージ判定材料ではない（判定はCIのcheckが正本）。
+
+CIで失敗したテストをローカルで再現するときは `--include` で対象を追加する（複数指定可）。
+
+```bash
+pnpm run verify:prepush -- --include e2e/settings.spec.ts --include src/features/foo/foo.test.ts
+```
+
+E2Eの実行には事前条件がある。満たさない場合はE2Eを実行せずに満たしていない条件と対処方法を表示して止まる。どうしても迂回する場合は `git push --no-verify` を使い、その事実をPR本文に記載する。
+
+- Convex local backendのバイナリが取得済み、またはダウンロードできるネットワークがあること（convex CLIのキャッシュは `~/.convex` 配下。制限された環境では先に `pnpm run e2e:isolated -- --probe` で取得しておく）
+- `5173`（Vite dev、`pnpm run dev` 起動中は衝突するので停止する）と `3210`/`3211`（local backend）のポートが空いていること
+- `.env.local` に `VITE_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` / `E2E_CLERK_USER_EMAIL` があること（`docs/environment-variables.md` 参照）
+- PlaywrightのChromiumがインストール済みであること（`pnpm exec playwright install chromium`）
+
+ローカルE2Eは実DB、Clerk認証、Convex HTTP／mutation、画面の状態遷移をまとめて確認する層とし、関数単位の分岐は `convex-test`、外部公開URLが必要な確認だけcloud deploymentへ分ける。レシート抽出は `RECEIPT_IMAGE_EXTRACTOR_MODE=mock` とし、OpenAI APIは呼ばない。
 
 初回または新しいtask worktreeでは、次の順に準備する。通常の `pnpm run dev` はlocal Convex watcherとViteを同時に起動する。
 
