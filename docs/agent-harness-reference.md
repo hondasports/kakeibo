@@ -185,7 +185,7 @@ node scripts/loop-runner.mjs --ci-failures 123
 node scripts/loop-runner.mjs --resolve-ci-failures
 ```
 
-`--check-pr` の出力には `flakyTests`（成功E2E checkのjobログから拾った passed-on-retry、`{check,file,title}`）を含む。playwright JSONレポート（`e2e-results/results.json`）もCI job summaryへ出力され、flaky観測時はfollow-up Issueを起票する。E2Eリトライはlocal/CIとも1回に統一。
+`--check-pr` の出力には `flakyTests`（成功E2E checkのjobログから拾った passed-on-retry、`{check,file,title}`）と `flakyErrors`（ログ取得失敗の `{check,error}`、なければ `[]`）を含む。playwright JSONレポート（`e2e-results/results.json`）もCI job summaryへ出力され、flaky観測時はfollow-up Issueを起票する。E2Eリトライはlocal/CIとも1回に統一。
 
 aftercareおよびDONEへの遷移直前はGitHubを再取得し、最新HEAD/base、CI全体、必須チェック、approval、mergeability、ページ取得完了、未処理指摘0件を確認する。E2E必須ならpublic/authenticated両方の成功を要求する。handledは `scripts/collect-pr-findings.mjs` の `<finding id> <updatedAt>` 形式。収集時、本文はGitHub上で表示されないマークアップ（HTMLコメント・行全体のリンク参照定義）を除去し、除去でできた3行以上の連続空行は2行へ詰めてから上限まで切り詰める。フェンス・インラインコード内のマークアップは表示されるため保持する。除去量は `strippedChars`、正規化後に本文が空になる候補は `bodyInvisibleOnly` で分かる。本文が切れている候補は全文を読んで判定する。収集コマンドのPASSだけではaftercareを完了できない。
 

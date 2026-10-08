@@ -68,8 +68,25 @@ export function parseFailedTests(log = "") {
   const tests = [];
   const seen = new Set();
   const add = (file, title) => {
+    if (!file) return;
+    // error-modeのepilogue `N)` 行は最深step名を末尾へ ` › step` 連結する。
+    // ` › ` を空白化すると title+step が1語列になり、--grep が何も選択しない
+    // 誤エントリを生む。同一fileでtitleが前方一致するなら短い側（真のtitle）を残す
+    // （短いtitleは--grepの部分一致で長い側のtestも拾うので再現力は失われない）。
+    for (let i = 0; i < tests.length; i += 1) {
+      const t = tests[i];
+      if (t.file !== file) continue;
+      if (t.title === title) return;
+      if (t.title.startsWith(`${title} `)) {
+        seen.delete(`${t.file}${t.title}`);
+        seen.add(`${file}${title}`);
+        tests[i] = { file, title };
+        return;
+      }
+      if (title.startsWith(`${t.title} `)) return;
+    }
     const key = `${file}${title}`;
-    if (!file || seen.has(key)) return;
+    if (seen.has(key)) return;
     seen.add(key);
     tests.push({ file, title });
   };
@@ -246,30 +263,34 @@ export function validateReproduction(input) {
 
 /**
  * --check-pr用flaky診断（AC6）: 成功したE2E checkのjobログから
- * passed-on-retryのテストを拾う。失敗は呼び出し側で握りつぶす。
+ * passed-on-retryのテストを拾う。{tests, errors} を返し、
+ * ログ取得失敗は errors として観測面に残す（silent [] 化を防ぐ）。
  */
 export function ciFlakyDiagnostics({ rollup = [], head, slug, root, gh }) {
+  const empty = { tests: [], errors: [] };
   const e2eChecks = new Set(
     (rollup ?? [])
       .map((c) => c.name ?? c.context ?? "")
       .filter((name) => name && checkKind(name) === "e2e"),
   );
-  if (!e2eChecks.size || !head || !slug) return [];
+  if (!e2eChecks.size || !head || !slug) return empty;
   const raw = ghApi(gh, [`repos/${slug}/commits/${head}/check-runs?per_page=100`], root);
   const runs = JSON.parse(raw.slice(raw.indexOf("{")));
-  const out = [];
   for (const run of runs.check_runs ?? []) {
     if (!e2eChecks.has(run.name)) continue;
+    // flaky(passed-on-retry)は成功したcheckにだけ意味がある。失敗checkの
+    // ログは job log を余計に引くだけなので取得しない
+    if (String(run.conclusion ?? "").toUpperCase() !== "SUCCESS") continue;
     const { jobId } = parseJobUrl(run.html_url ?? "");
     if (!jobId) continue;
     try {
       const log = ghApi(gh, [`repos/${slug}/actions/jobs/${jobId}/logs`], root);
-      for (const t of parseFlakyTests(log)) out.push({ check: run.name, ...t });
-    } catch {
-      /* このcheckのログ取得失敗は他checkを止めない */
+      for (const t of parseFlakyTests(log)) empty.tests.push({ check: run.name, ...t });
+    } catch (error) {
+      empty.errors.push({ check: run.name, error: String(error?.message ?? error) });
     }
   }
-  return out;
+  return empty;
 }
 
 /** playwright JSON report → flaky(passed-on-retry)の {file,title} 一覧 */

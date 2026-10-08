@@ -52,6 +52,20 @@ describe("parseJobUrl", () => {
 });
 
 describe("parseFailedTests / parseFlakyTests", () => {
+  it("dedupes error-mode `N)` epilogue ` › step` suffix against the clean title", () => {
+    const log = [
+      // error-mode epilogue: deepest failing stepが末尾に連結される
+      "  1) [public] › e2e/home.spec.ts:3:1 › suite › title › click step",
+      "  ✘ [public] › e2e/home.spec.ts:3:1 › suite › title (1.2s)",
+      // 別テストは別エントリとして残る
+      "  2) [public] › e2e/home.spec.ts:5:1 › suite › other",
+    ].join("\n");
+    expect(parseFailedTests(log)).toEqual([
+      { file: "e2e/home.spec.ts", title: "suite title" },
+      { file: "e2e/home.spec.ts", title: "suite other" },
+    ]);
+  });
+
   it("extracts playwright failures with public/authenticated project names", () => {
     const log = [
       "  1) [authenticated] › e2e/receipt.spec.ts:10:5 › fails hard",
@@ -296,6 +310,51 @@ describe("flakyFromJsonReport / ciFlakyDiagnostics", () => {
       root: "/tmp",
       gh,
     });
-    expect(out).toEqual([{ check: E2E_PUB, file: "e2e/home.spec.ts", title: "wobble" }]);
+    expect(out.tests).toEqual([{ check: E2E_PUB, file: "e2e/home.spec.ts", title: "wobble" }]);
+    expect(out.errors).toEqual([]);
+  });
+
+  it("skips failed e2e checks and surfaces log fetch errors", () => {
+    const gh = (args) => {
+      const joined = args.join(" ");
+      if (joined.includes("check-runs"))
+        return JSON.stringify({
+          check_runs: [
+            {
+              name: E2E_PUB,
+              conclusion: "success",
+              html_url: "https://github.com/o/r/actions/runs/5/job/11",
+            },
+            {
+              name: "E2E (authenticated / auth)",
+              conclusion: "failure",
+              html_url: "https://github.com/o/r/actions/runs/5/job/12",
+            },
+            {
+              name: "E2E (public / other)",
+              conclusion: "success",
+              html_url: "https://github.com/o/r/actions/runs/5/job/13",
+            },
+          ],
+        });
+      if (joined.includes("jobs/11/logs"))
+        return "  1 flaky\n    [public] › e2e/home.spec.ts:3:1 › wobble\n";
+      if (joined.includes("jobs/13/logs")) throw new Error("log unavailable");
+      throw new Error(`unmocked: ${joined}`);
+    };
+    const out = ciFlakyDiagnostics({
+      rollup: [
+        { name: E2E_PUB, status: "COMPLETED", conclusion: "SUCCESS" },
+        { name: "E2E (authenticated / auth)", status: "COMPLETED", conclusion: "FAILURE" },
+        { name: "E2E (public / other)", status: "COMPLETED", conclusion: "SUCCESS" },
+      ],
+      head: "abc123",
+      slug: "o/r",
+      root: "/tmp",
+      gh,
+    });
+    // 失敗check(job 12)はログを取得しない（flaky=pass-on-retryは成功checkのみ意味がある）
+    expect(out.tests).toEqual([{ check: E2E_PUB, file: "e2e/home.spec.ts", title: "wobble" }]);
+    expect(out.errors).toEqual([{ check: "E2E (public / other)", error: "log unavailable" }]);
   });
 });

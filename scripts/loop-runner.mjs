@@ -1896,21 +1896,24 @@ export function run(args, root = process.cwd(), services = {}) {
       };
     }
     // #958: flaky(passed-on-retry)を観測面に出す。PRが赤でも診断が見えるよう
-    // gate判定より先にPR状態を取り、flaky抽出を済ませる。取得失敗は情報欠落のみ。
+    // gate判定より先にPR状態を取り、flaky抽出を済ませる。取得失敗はflakyErrorsに残す。
     const fetchers = aftercareFetchers(args["check-pr"], args.handled, root, services);
     const before = services.before ?? (services.fetchPr ?? fetchers.fetchPr)();
     const findings = services.findings ?? (services.fetchFindings ?? fetchers.fetchFindings)();
     let flakyTests = [];
+    let flakyErrors = [];
     try {
-      flakyTests = ciFlakyDiagnostics({
+      const diagnostics = ciFlakyDiagnostics({
         rollup: before.statusCheckRollup ?? [],
         head: before.headRefOid,
         slug: fetchers.slug(),
         root,
         gh: services.gh ?? ((a, r) => gh(a, r)),
       });
-    } catch {
-      flakyTests = [];
+      flakyTests = diagnostics.tests;
+      flakyErrors = diagnostics.errors;
+    } catch (error) {
+      flakyErrors = [{ error: String(error?.message ?? error) }];
     }
     try {
       const { evidence, snapshot } = inspectPullRequest(
@@ -1925,6 +1928,7 @@ export function run(args, root = process.cwd(), services = {}) {
         state: task.state,
         ...snapshot,
         flakyTests,
+        flakyErrors,
         checkedAt: evidence.checkedAt,
       };
     } catch (error) {
@@ -1938,6 +1942,7 @@ export function run(args, root = process.cwd(), services = {}) {
         state: task.state,
         ...snapshot,
         flakyTests,
+        flakyErrors,
         gateError: error.message,
       };
     }
