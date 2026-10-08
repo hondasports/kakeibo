@@ -528,6 +528,22 @@ export function hydrateExportedTask(task) {
  * `success` checks behave exactly as on the emitting task.
  */
 export function hydrateStateBlockV2(block) {
+  // The schema pins spec.ref to inline|issue#<n>; here the anchor must also be
+  // this task's own issue — a block claiming another issue's fingerprint would
+  // pin the spec check to a spec that is not this task's. "inline" stays
+  // allowed for issue-linked tasks (the emit-time fingerprint-fetch fallback).
+  requireValue(
+    block.spec?.ref === "inline" || block.spec?.ref === specRefForTask(block),
+    "State block spec ref does not match this task's issue anchor",
+  );
+  // Inline blocks are self-sufficient: the full spec rides in specInline, so
+  // one without it would restore the slim reference shape (no goal/nonGoals/
+  // verificationStrategy) instead of the real spec. The schema subset cannot
+  // express this conditional requirement, so it is enforced here.
+  requireValue(
+    block.spec?.ref !== "inline" || block.specInline !== undefined,
+    "Inline state block specs require specInline",
+  );
   const task = {
     version: 2,
     taskId: block.taskId,
@@ -539,7 +555,7 @@ export function hydrateStateBlockV2(block) {
     branch: block.branch,
     risk: block.risk,
     attempt: block.attempt ?? 0,
-    spec: block.spec?.ref === "inline" ? (block.specInline ?? block.spec) : block.spec,
+    spec: block.spec?.ref === "inline" ? block.specInline : block.spec,
     configuration: { runtime: { name: block.runtime } },
     skills: block.skills ?? [],
     verification: {},

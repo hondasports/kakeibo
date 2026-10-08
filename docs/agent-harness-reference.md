@@ -15,7 +15,7 @@
 3. 次を実行し、現在のworkflowを読む。
 
 ```bash
-node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --runtime codex --implementer session-123
+node scripts/loop-runner.mjs --init /tmp/spec.json --task i123 --runtime codex --implementer session-123
 ```
 
 Devinでは `--runtime devin`、Claude Codeでは `--runtime claude-code` を指定する。旧来のモデル指定オプションは互換のため受理されるが、何も記録・参照しない。
@@ -183,7 +183,7 @@ node scripts/loop-runner.mjs --record-usage <reviewer-transcript.jsonl> --usage-
 
 ```bash
 node scripts/loop-metrics.mjs            # 全期間の集計
-node scripts/loop-metrics.mjs --task issue-123   # タスク別集計
+node scripts/loop-metrics.mjs --task i123   # タスク別集計
 node scripts/loop-metrics.mjs --path /tmp/other.jsonl
 ```
 

@@ -938,6 +938,13 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args.spec) {
     requireValue(task.state === "refine", "Spec changes require refine state");
     task.spec = readSubmission(args.spec, "spec");
+    // #954: state-block references are emitted by the runner, never submitted —
+    // a resubmission must carry the full spec (the fingerprint is re-stamped
+    // from the issue below).
+    requireValue(
+      typeof task.spec?.ref !== "string",
+      "--spec requires the full spec form, not a state-block reference",
+    );
     validateSpec(task.spec, root);
     task.risk = highestTier(task.risk, task.spec.predictedRisk);
     invalidate(task);

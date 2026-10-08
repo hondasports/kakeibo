@@ -867,6 +867,12 @@ describe("persistent task gates", () => {
     const restored = loadTask(dir);
     expect(restored.state).toBe("refine");
     expect(summarizeTask(restored, dir).missing).toContain("spec:acceptanceCriteria");
+    // missing[] is advisory — the transition gate itself must also refuse a
+    // reference-form spec, otherwise a surviving assessment would slip the
+    // task out of REFINE without a --spec resubmission (#954 F1).
+    expect(() => transitionTask(restored, "ready", {}, dir)).toThrow(
+      "Reference-form spec cannot leave REFINE",
+    );
     // An issue that lost its Agent Spec section behaves like an edit.
     restoreTask(pr(), dir, { issueBody: () => "# Issue\n(no spec)\n" });
     expect(loadTask(dir).state).toBe("refine");
@@ -952,6 +958,55 @@ describe("persistent task gates", () => {
     expect(restored.findings).toEqual(restored.review.findings);
     expect(restored.deferredFindings).toHaveLength(1);
     expect(() => validateTask(restored, dir)).not.toThrow();
+  });
+
+  it("rejects a v2 spec.ref that is not this task's own issue anchor (#954 F2)", () => {
+    const { dir, task } = repository();
+    task.taskId = "i954";
+    const issueBody = "# Issue\n\n## Agent Spec\n\ngoal text\n";
+    task.specFingerprint = specSectionFingerprint(issueBody);
+    const body = stateBlock(task);
+    const tamper = (mutate) => {
+      const parsed = JSON.parse(body.match(/```json\s*([\s\S]*?)```/)[1]);
+      mutate(parsed);
+      return body.replace(
+        /```json[\s\S]*?```/,
+        "```json\n" + JSON.stringify(parsed, null, 2) + "\n```",
+      );
+    };
+    expect(JSON.parse(body.match(/```json\s*([\s\S]*?)```/)[1]).spec.ref).toBe("issue#954");
+    // Another issue's anchor never pins this task's fingerprint check.
+    expect(() =>
+      parseStateBlock(
+        tamper((parsed) => {
+          parsed.spec.ref = "issue#999";
+        }),
+        dir,
+      ),
+    ).toThrow("issue anchor");
+    // Arbitrary refs fail schema validation outright.
+    expect(() =>
+      parseStateBlock(
+        tamper((parsed) => {
+          parsed.spec.ref = "nowhere";
+        }),
+        dir,
+      ),
+    ).toThrow("does not match");
+  });
+
+  it("requires specInline for inline v2 blocks (#954 F3)", () => {
+    const { dir, task } = repository();
+    // A non-issue task ships the full spec inline.
+    const body = stateBlock(task);
+    const parsed = JSON.parse(body.match(/```json\s*([\s\S]*?)```/)[1]);
+    expect(parsed.spec.ref).toBe("inline");
+    expect(parsed.specInline).toBeDefined();
+    const stripped = body.replace(
+      /```json[\s\S]*?```/,
+      "```json\n" + JSON.stringify({ ...parsed, specInline: undefined }, null, 2) + "\n```",
+    );
+    expect(() => parseStateBlock(stripped, dir)).toThrow("specInline");
   });
 
   it(

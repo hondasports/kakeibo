@@ -489,6 +489,14 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
   );
   requireValue(!exit.blockers?.length, "Resolve blockers before transitioning");
   if (task.state === "refine" && event === "ready") {
+    // #954: the reference form ({ref, fingerprint, acIds}) is wire-only — a
+    // restored task carries it while the issue stays canonical, but it never
+    // satisfies REFINE's spec gate: leaving REFINE requires a full spec
+    // resubmitted via --spec (which also re-anchors the fingerprint).
+    requireValue(
+      typeof task.spec?.ref !== "string",
+      "Reference-form spec cannot leave REFINE — resubmit the full spec via --spec",
+    );
     validateSpec(task.spec, root);
     // The recorded assessment feeds thorough verification derivation; leaving
     // REFINE without it stays blocked (as with the removed profile decision).

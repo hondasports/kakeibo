@@ -14,6 +14,7 @@ const keywords = new Set([
   "minItems",
   "minLength",
   "minimum",
+  "pattern",
   "enum",
   "const",
   "anyOf",
@@ -51,6 +52,8 @@ export function validateSchema(schema, value, location = "$") {
   if (schema.enum && !schema.enum.includes(value)) fail("invalid enum value");
   if (typeof value === "string" && value.trim().length < (schema.minLength ?? 0))
     fail("empty string");
+  if (schema.pattern && !(typeof value === "string" && new RegExp(schema.pattern).test(value)))
+    fail(`does not match ${schema.pattern}`);
   if (typeof value === "number" && value < (schema.minimum ?? -Infinity)) fail("below minimum");
   if (Array.isArray(value)) {
     if (value.length < (schema.minItems ?? 0)) fail("too few items");
