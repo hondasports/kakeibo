@@ -1,6 +1,6 @@
 # Agent Harness操作手順
 
-現行CLIの起動用クイックリファレンス。起動時に読むのはこのファイルだけでよい。詳細仕様（証跡の再利用条件・metrics・CI扱い・監視の中断条件など）は [Agent Harness詳細仕様](agent-harness-reference.md) にあり、必要になった節だけを読む。軽量化の設計正本は [Agent Harness設計](agent-harness-design.md)。
+現行CLIの起動用クイックリファレンス。起動時に読むのはこのファイルだけでよい。詳細仕様（証跡の失効条件・metrics・CI扱い・監視の中断条件など）は [Agent Harness詳細仕様](agent-harness-reference.md) にあり、必要になった節だけを読む。軽量化の設計正本は [Agent Harness設計](agent-harness-design.md)。
 
 ## 手順
 

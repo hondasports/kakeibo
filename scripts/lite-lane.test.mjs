@@ -1,9 +1,8 @@
-// #949: Lite lane — T1 tasks defer local thorough verification to CI.
-// AC1: .md-only T1 reaches DONE with Lint/Build/Test SKIPPED.
-// AC2: non-.md T1 with SKIPPED/unobserved/pending/failed required check → not ready.
-// AC3: any floor trigger or independent review → not lite.
-// AC4: T2/T3 keep the standard lane (thorough local verification).
-// AC5: lite lane still blocked on process evidence and harness/scope failures.
+// #949→#953: CI-is-verdict for every tier — local gating is process evidence
+// plus the verify:prepush marker; Lint/Build/Test verdicts come from CI checks.
+// AC1: .md-only task reaches DONE with Lint/Build/Test SKIPPED.
+// AC2: non-.md task with SKIPPED/unobserved/pending/failed required check → not ready.
+// AC5: still blocked on process evidence and harness/scope failures.
 // AC6: no verify:prepush success marker for HEAD → execute ready rejected.
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -14,7 +13,6 @@ import {
   checkAftercare,
   computeAssessment,
   expectedCiChecks,
-  isLiteLane,
   prepushMarkerPresent,
   requireLocalVerification,
   requiredVerificationKinds,
@@ -58,11 +56,7 @@ function repository() {
   return { dir, git, task };
 }
 
-const liteTask = () => {
-  const task = taskFixture();
-  expect(isLiteLane(task)).toBe(true);
-  return task;
-};
+const liteTask = () => taskFixture();
 const rollup = (conclusions = {}) =>
   ["Agent harness", "CI scope", "Lint", "Build", "Test"].map((name) => ({
     name,
@@ -82,30 +76,6 @@ const delivery = (task, checks) => ({
 });
 const findings = { pagesComplete: true, unhandledCount: 0, unresolvedThreadCount: 0 };
 
-describe("isLiteLane", () => {
-  it("#952: always true — the CI-is-verdict lane now applies to every tier", () => {
-    expect(isLiteLane(taskFixture())).toBe(true);
-    const trigger = taskFixture();
-    trigger.assessment.risk.machineFloorTriggers = [
-      "complex_state_transition_or_orchestration_port",
-    ];
-    expect(isLiteLane(trigger)).toBe(true);
-    const floored = taskFixture();
-    floored.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: "T3" };
-    floored.assessment = computeAssessment(floored, ["convex/schema.ts"]);
-    expect(isLiteLane(floored)).toBe(true);
-    const reviewed = taskFixture();
-    reviewed.assessment = { ...reviewed.assessment, review: { independent: true } };
-    expect(isLiteLane(reviewed)).toBe(true);
-    for (const tier of ["T2", "T3"]) {
-      const task = taskFixture();
-      task.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: tier };
-      task.assessment = computeAssessment(task, ["README.md"]);
-      expect(isLiteLane(task)).toBe(true);
-    }
-  });
-});
-
 describe("expectedCiChecks", () => {
   it("always requires harness+scope and gates SKIPPED on a verified .md-only diff", () => {
     const task = liteTask();
@@ -124,7 +94,7 @@ describe("expectedCiChecks", () => {
   });
 });
 
-describe("checkAftercare on the lite lane", () => {
+describe("checkAftercare", () => {
   it("AC1: .md-only T1 is ready with Lint/Build/Test SKIPPED", () => {
     const task = liteTask();
     task.review = reviewFixture(task);
@@ -147,7 +117,7 @@ describe("checkAftercare on the lite lane", () => {
     const failed = delivery(task, rollup({ Lint: "FAILURE" }));
     expect(() => checkAftercare(failed, task, findings, paths)).toThrow(/Unsuccessful|Required/);
   });
-  it("AC5: lite lane is still blocked on Agent harness / CI scope failures", () => {
+  it("AC5: still blocked on Agent harness / CI scope failures", () => {
     const task = liteTask();
     task.review = reviewFixture(task);
     for (const name of ["Agent harness", "CI scope"]) {
@@ -155,13 +125,13 @@ describe("checkAftercare on the lite lane", () => {
       expect(() => checkAftercare(pr, task, findings, ["README.md"])).toThrow(/Unsuccessful/);
     }
   });
-  it("AC5: process evidence is still required on the lite lane", () => {
+  it("AC5: process evidence is still required", () => {
     const task = liteTask();
     delete task.verification.process;
     expect(() => requireLocalVerification(task)).toThrow(/process/i);
     expect(requiredVerificationKinds(task)).toEqual(["process"]);
   });
-  it("shows lane-deferred kinds as ci, not missing (F-3)", () => {
+  it("shows CI-deferred kinds as ci, not missing (F-3)", () => {
     const task = liteTask();
     task.assessment.verification = {
       process: true,
@@ -177,7 +147,7 @@ describe("checkAftercare on the lite lane", () => {
     expect(summary.build).toBe("ci");
     expect(summary.e2e).toBe("github");
     expect(summary.process).toBe("missing");
-    // #952: the lane is global — non-required kinds show as ci for every tier.
+    // #952/#953: non-required kinds show as ci for every tier.
     const standard = taskFixture();
     standard.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: "T2" };
     standard.assessment = {
@@ -193,15 +163,13 @@ describe("verify:prepush marker (AC6)", () => {
   it("rejects execute ready without the HEAD marker and accepts it with one", () => {
     const { dir, git, task } = repository();
     task.state = "execute";
-    // A real README commit so the diff stays .md-only and the task stays lite.
+    // A real README commit so the diff stays .md-only.
     writeFileSync(path.join(dir, "README.md"), "changed\n");
     git("add", ".");
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", "docs");
     task.head = git("rev-parse", "HEAD");
     task.skills = [...task.assessment.requiredSkills];
-    const lite = { ...task, assessment: computeAssessment(task, ["README.md"], dir) };
-    expect(isLiteLane(lite)).toBe(true);
-    task.assessment = lite.assessment;
+    task.assessment = computeAssessment(task, ["README.md"], dir);
     task.agentAssessment = structuredClone(agentAssessment);
     task.verification.process = { head: task.head, baseHead: task.baseHead, success: true };
     expect(prepushMarkerPresent(task, dir)).toBe(false);
@@ -225,7 +193,6 @@ describe("verify:prepush marker (AC6)", () => {
     task.skills = [...task.assessment.requiredSkills];
     for (const kind of requiredVerificationKinds(task))
       task.verification[kind] = { head: task.head, baseHead: task.baseHead, success: true };
-    expect(isLiteLane(task)).toBe(true);
     expect(() => transitionTask(task, "ready", {}, dir)).toThrow(/verify:prepush/);
     const marker = path.resolve(
       dir,

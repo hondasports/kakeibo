@@ -201,7 +201,7 @@ const sumBy = (list, pick) => list.reduce((total, item) => total + number(pick(i
  * One-line, self-describing metrics summary for a single task. Only counts and
  * ids — never paths, transcript text or env values — so it is safe to publish.
  * `context` supplies task-state fields entries cannot carry:
- * {tier, profile, lane, ciFixRounds, harnessVersion}. Falsy profile/lane/tier
+ * {tier, profile, ciFixRounds, harnessVersion}. Falsy profile/tier
  * are omitted rather than nulled.
  */
 export function summarizeTask(entries, taskId, context = {}) {
@@ -251,7 +251,6 @@ export function summarizeTask(entries, taskId, context = {}) {
   };
   if (context.tier) summary.tier = context.tier;
   if (context.profile) summary.profile = context.profile;
-  if (context.lane) summary.lane = context.lane;
   if (context.harnessVersion == null) delete summary.harnessVersion;
   return summary;
 }
@@ -300,7 +299,6 @@ export function taskSummaryContext(task, root = process.cwd()) {
   return {
     tier: task?.risk ?? null,
     profile: task?.configuration?.selection?.selected ?? null,
-    lane: task?.lane ?? null,
     ciFixRounds: Number.isFinite(task?.counters?.ci) ? task.counters.ci : null,
     harnessVersion: harnessVersion(root),
   };
@@ -316,7 +314,6 @@ export function renderMetricsComment(summary) {
     ["Harness", summary.harnessVersion ?? "unknown"],
     ["Tier", summary.tier ?? "—"],
     ...(summary.profile ? [["Profile", summary.profile]] : []),
-    ...(summary.lane ? [["Lane", summary.lane]] : []),
     ["Tokens (implementer)", fmtTokens(summary.tokens?.implementer)],
     ["Tokens (reviewer)", fmtTokens(summary.tokens?.reviewer)],
     [
