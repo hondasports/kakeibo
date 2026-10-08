@@ -15,7 +15,7 @@
     "pretest": "node scripts/check-test-environment.mjs",
     "test": "vitest --maxWorkers=4",
     "test:agent": "node scripts/run-compact-tests.mjs vitest",
-    "test:process": "vitest run scripts/review-depth.test.mjs scripts/check-task-worktree.test.mjs scripts/classify-e2e-relevance.test.mjs scripts/ci-change-scope.test.mjs scripts/check-loop-docs.test.mjs scripts/collect-pr-findings.test.mjs scripts/suggest-skills.test.mjs scripts/machine-risk.test.mjs scripts/assess-change.test.mjs scripts/resolve-agent-profile.test.mjs scripts/loop-runner.test.mjs scripts/loop-pr-check.test.mjs scripts/loop-metrics.test.mjs scripts/agent-usage.test.mjs scripts/start-ci-convex.test.mjs scripts/metrics-publish.test.mjs scripts/agent-hooks.test.mjs tests/workflow/localConvexWorkflow.test.ts",
+    "test:process": "vitest run scripts/review-depth.test.mjs scripts/check-task-worktree.test.mjs scripts/classify-e2e-relevance.test.mjs scripts/ci-change-scope.test.mjs scripts/check-loop-docs.test.mjs scripts/collect-pr-findings.test.mjs scripts/suggest-skills.test.mjs scripts/machine-risk.test.mjs scripts/assess-change.test.mjs scripts/loop-runner.test.mjs scripts/loop-pr-check.test.mjs scripts/loop-metrics.test.mjs scripts/agent-usage.test.mjs scripts/start-ci-convex.test.mjs scripts/metrics-publish.test.mjs scripts/agent-hooks.test.mjs tests/workflow/localConvexWorkflow.test.ts",
     "test:preflight": "node scripts/check-test-environment.mjs --coverage",
     "test:coverage": "node scripts/run-coverage.mjs",
     "prepare": "husky",
@@ -39,7 +39,6 @@
     "loop:pr-findings": "node scripts/collect-pr-findings.mjs",
     "loop:suggest-skills": "node scripts/suggest-skills.mjs",
     "loop:assess": "node scripts/assess-change.mjs",
-    "loop:profile": "node scripts/resolve-agent-profile.mjs",
     "loop:state": "node scripts/loop-runner.mjs",
     "loop:metrics": "node scripts/loop-metrics.mjs"
   },

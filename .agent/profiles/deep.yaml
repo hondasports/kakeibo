@@ -1,6 +1,0 @@
-name: deep
-autonomy: high
-delegation: adaptive
-verification: thorough
-context:
-  strategy: on_demand

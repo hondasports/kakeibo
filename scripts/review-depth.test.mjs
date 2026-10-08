@@ -71,20 +71,16 @@ describe("assessment validation", () => {
     expect(validateAssessment({ ...baseInput, applied_tier: "T9" })).toContain(
       "applied_tier must be one of T1/T2/T3",
     );
-    expect(
-      validateAssessment({
-        ...baseInput,
-        verification_load: { level: "routine", rationale: "process checks only" },
-      }),
-    ).toEqual([]);
+    // verification_load is a legacy optional field: accepted and ignored
+    // regardless of shape, so old assessment inputs keep validating.
     for (const verification_load of [
+      { level: "routine", rationale: "process checks only" },
       "routine",
       { level: "heavy", rationale: "x" },
-      { level: "routine", rationale: "" },
       { level: "routine" },
     ]) {
       expect(validateAssessment({ ...structuredClone(baseInput), verification_load })).toHaveLength(
-        1,
+        0,
       );
     }
   });

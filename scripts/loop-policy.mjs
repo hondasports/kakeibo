@@ -4,7 +4,6 @@ import { validateDocument } from "./loop-schema.mjs";
 import { assessChange } from "./assess-change.mjs";
 import { isContentTarget, readChangedHunks } from "./machine-risk.mjs";
 import { REVIEW_TIERS, validateAssessment } from "./review-depth.mjs";
-import { PROFILE_ORDER, profileInputs, missingProfileInputs } from "./resolve-agent-profile.mjs";
 
 export const highestTier = (...tiers) =>
   REVIEW_TIERS[Math.max(...tiers.filter(Boolean).map((tier) => REVIEW_TIERS.indexOf(tier)), 0)];
@@ -103,10 +102,7 @@ export function validateTask(task, root) {
   validateDocument("spec", task.spec, root);
   if (task.assessment) validateDocument("assessment", task.assessment, root);
   requireValue(REVIEW_TIERS.includes(task.risk), "Invalid retained risk");
-  requireValue(
-    text(task.configuration?.profileSource) && text(task.configuration?.runtime?.name),
-    "Profile/runtime must be loaded at startup",
-  );
+  requireValue(text(task.configuration?.runtime?.name), "Runtime must be loaded at startup");
 }
 export function currentEvidence(evidence, task) {
   // New-style verification evidence carries `appliesTo`; legacy entries and
@@ -179,13 +175,6 @@ export function missingRequirements(task) {
   };
   if (task.state === "refine") {
     if (!task.agentAssessment) missing.push("assessment");
-    else if (task.configuration?.selection?.source !== "user")
-      for (const field of missingProfileInputs(
-        profileInputs(task.agentAssessment, {
-          fallbackLoad: task.configuration?.selection?.inputs?.verification_load,
-        }),
-      ))
-        missing.push(`profile:${field}`);
     if ((task.spec?.openMaterialDecisions ?? []).length > 0) missing.push("openMaterialDecisions");
     const ids = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id);
     if (!ids.length || !ids.every(text) || new Set(ids).size !== ids.length)
@@ -226,9 +215,6 @@ export function computeAssessment(task, paths, root = process.cwd()) {
     agentAssessment: task.agentAssessment,
     reviewerAssessment: reviewAssessment,
   });
-  if (task.configuration?.profile?.verification === "thorough") {
-    Object.assign(result.verification, { lint: true, unit: true, build: true });
-  }
   result.verificationPlan = verificationPlan(result, task, root);
   return result;
 }
@@ -238,7 +224,6 @@ export function computeAssessment(task, paths, root = process.cwd()) {
  */
 function verificationPlan(result, task, root) {
   const acs = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id).filter(Boolean);
-  const thorough = task.configuration?.profile?.verification === "thorough";
   return Object.entries(result.verification).map(([kind, required]) => {
     const meta = VERIFICATION_SCOPES[kind] ?? { execution: "local", scope: "unknown" };
     const reason =
@@ -248,8 +233,8 @@ function verificationPlan(result, task, root) {
           ? "not required"
           : result.runtimeRelevant
             ? "runtime-relevant paths changed"
-            : thorough
-              ? "profile verification=thorough"
+            : result.thorough
+              ? "tier/uncertainty requires thorough verification"
               : "required";
     return {
       kind,
@@ -358,7 +343,12 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
     "Exit does not match transition",
   );
   requireValue(!exit.blockers?.length, "Resolve blockers before transitioning");
-  if (task.state === "refine" && event === "ready") validateSpec(task.spec, root);
+  if (task.state === "refine" && event === "ready") {
+    validateSpec(task.spec, root);
+    // The recorded assessment feeds thorough verification derivation; leaving
+    // REFINE without it stays blocked (as with the removed profile decision).
+    requireValue(task.agentAssessment, "Assessment is required to leave REFINE");
+  }
   if (task.state === "execute" && event === "ready")
     requireLocalVerification(task, { fullUnit: false });
   if (task.state === "review" && event === "clean") {
@@ -550,19 +540,6 @@ export function validateCheckpoint(task, { head, baseHead, paths, root = process
     "Agent state does not match PR HEAD/base",
   );
   requireValue(["aftercare", "done"].includes(task.state), "Agent task has not completed review");
-  const selection = task.configuration?.selection;
-  requireValue(
-    selection &&
-      ["user", "auto"].includes(selection.source) &&
-      PROFILE_ORDER.includes(selection.selected) &&
-      selection.selected === task.configuration?.profile?.name,
-    "Profile decision record is required (decided at REFINE completion or user-specified)",
-  );
-  if (selection.source === "auto")
-    requireValue(
-      selection.inputs && selection.ruleVersion,
-      "Auto profile decision needs recorded inputs and rule version",
-    );
   const assessment = computeAssessment(task, paths, root);
   requireValue(
     task.risk === highestTier(task.risk, assessment.risk.final),

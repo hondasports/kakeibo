@@ -460,14 +460,12 @@ describe("persistent task gates", () => {
 
   it("runs missing required verification serially and retains completed evidence on failure", () => {
     const { dir, task } = repository();
-    task.assessment.verification = {
-      process: true,
-      lint: true,
-      unit: true,
-      build: true,
-      e2e: true,
-    };
-    task.configuration.profile.verification = "thorough";
+    // thorough (lint/unit/build) is derived from the tier/assessment, not a
+    // profile: a T3 applied tier keeps it true across the assessment
+    // recompute that follows each verification run.
+    task.agentAssessment.applied_tier = "T3";
+    task.assessment = computeAssessment(task, ["README.md"], dir);
+    expect(task.assessment.verification.build).toBe(true);
     const kinds = [];
     expect(() =>
       runRequiredVerification(task, dir, (command) => {
@@ -786,17 +784,15 @@ describe("persistent task gates", () => {
         taskId: "integration",
         state: "refine",
         risk: "T1",
-        profile: { selected: "standard", source: "provisional" },
       });
-      for (const key of ["configuration", "assessment", "history", "spec"])
+      for (const key of ["configuration", "assessment", "history", "spec", "profile"])
         expect(initial).not.toHaveProperty(key);
-      const provisional = loadTask(checkout).configuration;
-      expect(provisional.profile.name).toBe("standard");
-      expect(provisional.selection).toMatchObject({
-        selected: "standard",
-        source: "provisional",
-      });
-      // Leaving REFINE requires the determination inputs recorded via --assessment.
+      // Profiles are gone: configuration records only the runtime.
+      const config = loadTask(checkout).configuration;
+      expect(config.runtime.name).toBe("codex");
+      expect(config).not.toHaveProperty("profile");
+      expect(config).not.toHaveProperty("selection");
+      // Leaving REFINE requires the assessment recorded via --assessment.
       expect(() => cli("--event", "ready")).toThrow();
       const refineAssessment = path.join(parent, "refine-assessment.json");
       writeFileSync(
@@ -808,17 +804,11 @@ describe("persistent task gates", () => {
       );
       cli("--assessment", refineAssessment);
       cli("--event", "ready");
+      // No profile decision is recorded anymore; a legacy verification_load
+      // field in the assessment input is accepted and ignored.
       const decided = loadTask(checkout).configuration;
-      expect(decided.profile.name).toBe("fast");
-      expect(decided.selection).toMatchObject({
-        selected: "fast",
-        source: "auto",
-        inputs: {
-          blast_radius: "local",
-          uncertainty: "known_pattern",
-          verification_load: "routine",
-        },
-      });
+      expect(decided).not.toHaveProperty("selection");
+      expect(decided).not.toHaveProperty("profile");
       writeFileSync(path.join(checkout, "README.md"), "change");
       execFileSync("git", ["add", "."], { cwd: checkout });
       execFileSync("git", ["-c", "core.hooksPath=/dev/null", "commit", "-m", "change"], {
@@ -829,8 +819,6 @@ describe("persistent task gates", () => {
       const assessment = path.join(parent, "assessment.json");
       writeFileSync(assessment, JSON.stringify(taskFixture().agentAssessment));
       cli("--assessment", assessment);
-      // The same evaluation inputs must not trigger re-determination.
-      expect(loadTask(checkout).configuration.selection.revisions).toHaveLength(1);
       cli("--verify-required");
       cli("--event", "ready");
       const task = loadTask(checkout);
@@ -1019,9 +1007,10 @@ describe("persistent task gates", () => {
       },
       checkout,
     );
-    expect(task.configuration.profile.name).toBe("standard");
+    expect(task.configuration.runtime.name).toBe("codex");
     expect(task.configuration).not.toHaveProperty("model");
-    expect(task.configuration.selection.source).toBe("provisional");
+    expect(task.configuration).not.toHaveProperty("profile");
+    expect(task.configuration).not.toHaveProperty("selection");
   });
   it("requires the exact execute state for verification", () => {
     const { dir, task } = repository();
@@ -1099,10 +1088,9 @@ describe("persistent task gates", () => {
       taskId: task.taskId,
       state: "execute",
       head: task.head,
-      profile: { selected: "standard" },
       openFindings: 0,
     });
-    for (const key of ["configuration", "assessment", "history", "spec", "findings"])
+    for (const key of ["configuration", "assessment", "history", "spec", "findings", "profile"])
       expect(summary).not.toHaveProperty(key);
     expect(summary.next).toEqual(["node scripts/loop-runner.mjs --event ready"]);
     task.verification.process.head = "stale";
@@ -1147,18 +1135,12 @@ describe("persistent task gates", () => {
     task.taskId = "../escape";
     expect(() => runVerification(task, "process", dir, () => ({ status: 0 }))).toThrow("task id");
   });
-  it("surfaces refine gaps for missing profile inputs and invalid specs", () => {
+  it("surfaces refine gaps for missing assessment and invalid specs", () => {
     const task = taskFixture(root, { state: "refine" });
-    // blast_radius/uncertainty come from the assessment; verification_load has
-    // the selection-input fallback — baseline reports no gap.
     expect(summarizeTask(task).missing).toEqual([]);
-    delete task.agentAssessment.risk_assessment.blast_radius;
-    expect(summarizeTask(task).missing).toContain("profile:risk_assessment.blast_radius");
-    // A user-specified profile needs no determination inputs, mirroring the gate.
-    task.configuration.selection.source = "user";
-    expect(summarizeTask(task).missing).toEqual([]);
-    task.configuration.selection.source = "auto";
-    task.agentAssessment.risk_assessment.blast_radius = "local";
+    delete task.agentAssessment;
+    expect(summarizeTask(task).missing).toContain("assessment");
+    task.agentAssessment = structuredClone(agentAssessment);
     task.spec.acceptanceCriteria = [
       { id: "AC1", text: "one" },
       { id: "AC1", text: "duplicate" },

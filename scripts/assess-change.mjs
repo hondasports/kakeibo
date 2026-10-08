@@ -39,9 +39,21 @@ export function assessChange({
       (!agentAssessment ||
         uncertainty === "some_unknowns" ||
         reviewerAssessment?.risk_assessment?.uncertainty === "some_unknowns"));
-  const verification = classification.runtimeRelevant
-    ? { process: true, lint: true, unit: true, build: true, e2e: true }
-    : { process: true, lint: false, unit: false, build: false, e2e: false };
+  // Thorough verification (what profiles used to encode) is derived from the
+  // assessment inputs: a T3 change, or an assessment signalling unknowns or a
+  // system-wide blast radius, needs lint/unit/build even on non-runtime paths.
+  const thorough =
+    finalTier === "T3" ||
+    [agentAssessment, reviewerAssessment].some(
+      (assessment) =>
+        assessment &&
+        (assessment.risk_assessment?.uncertainty !== "known_pattern" ||
+          assessment.risk_assessment?.blast_radius === "shared_or_system_wide"),
+    );
+  const verification =
+    classification.runtimeRelevant || thorough
+      ? { process: true, lint: true, unit: true, build: true, e2e: classification.runtimeRelevant }
+      : { process: true, lint: false, unit: false, build: false, e2e: false };
 
   return {
     risk: {
@@ -55,6 +67,7 @@ export function assessChange({
     },
     requiredSkills: skillResult.suggestions.map((item) => item.skill),
     verification,
+    thorough,
     review: { independent },
     runtimeRelevant: classification.runtimeRelevant,
   };

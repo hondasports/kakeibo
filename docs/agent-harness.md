@@ -4,11 +4,11 @@
 
 ## 手順
 
-runnerの通常出力は `state`・`workflow`（現在Stateのworkflow）・`missing`・`next` を返すので、`workflow` を読み `next` を実行する。taskId・head/base・risk・profile・verification・openFindings・aftercare も含まれ、spec・history・評価本文・ログ本文は含まれない。根拠は `--explain`、証跡manifestは `--artifacts`、状態スナップショットは `--status`、状態ブロックは `--export` / `--export-file` / `--sync-pr` のみ。
+runnerの通常出力は `state`・`workflow`（現在Stateのworkflow）・`missing`・`next` を返すので、`workflow` を読み `next` を実行する。taskId・head/base・risk・verification・openFindings・aftercare も含まれ、spec・history・評価本文・ログ本文は含まれない。根拠は `--explain`、証跡manifestは `--artifacts`、状態スナップショットは `--status`、状態ブロックは `--export` / `--export-file` / `--sync-pr` のみ。
 
 1. 専用worktreeで `node scripts/check-task-worktree.mjs --require-clean`。
 2. spec JSONをリポジトリ外に作り、`node scripts/loop-runner.mjs --init <spec.json> --task <id> --runtime codex|devin|claude-code --implementer <session>`。
-3. REFINE: `--assessment <file>` → `--event ready`（Profile確定）。
+3. REFINE: `--assessment <file>` → `--event ready`（thorough検証はTierと評価軸から機械判定）。
 4. EXECUTE: 実装・commit → `--verify-required`（unitは差分関連のaffected）→ `--event ready`。単独kindは `--verify <kind> [--scope affected]`。
 5. REVIEW: 初回進入時はdraft PRを作り、`node scripts/collect-pr-findings.mjs --pr <番号>` の外部指摘を `--review-packet <dir> --external-findings <file>` でpacketへ含めて独立Reviewerへ渡す。full unit完了後に `--review <file>` → `--event clean | findings`（再レビューは条件を満たせば自動で増分）。
 6. AFTERCARE: `--sync-pr <番号>` → `gh pr ready <番号>` → `--aftercare <番号> --watch-aftercare` → `--event ready`（DONE=merge_ready）→ `--publish-metrics <番号>`（metrics要約をPRのマーカー付きコメントへ保存。状態を更新しない）。状態や本文を更新しない観測は `--check-pr <番号>`。状態ブロックは `--export-file <path>` でファイルへ書き、`gh pr create --body-file` 等で本文へ結合する（Agentは状態ブロックをstdoutで読まない。`--export` は人が確認する用途）。
@@ -18,7 +18,7 @@ runnerの通常出力は `state`・`workflow`（現在Stateのworkflow）・`mis
 JSONの必須キー（schemaは `.agent/schema/` 配下）:
 
 - spec: `spec.schema.json`。`predictedRisk` 必須、Human Requestは改変しない
-- assessment: 形式の正本は `scripts/review-depth.mjs` の検証。`risk_assessment`（4軸）・`tier_rationale`・`applied_tier`・`verification_load: {level: routine|complex, rationale}`
+- assessment: 形式の正本は `scripts/review-depth.mjs` の検証。`risk_assessment`（4軸）・`tier_rationale`・`applied_tier`
 - review: `head`・`baseHead`・`reviewer`・`assessment`・`evidence`・`acceptanceCriteria`（全ACの `{id, evidence}`）・`findings`（`{id, status: open|fixed|dismissed, severity?, evidence}`）。独立レビューは `independent: true`・`context: "fresh"`、増分は `deltaFrom`
 - exit（decision_required / findings / incident）: `reason` 必須。Human Gate解除には `approval: {"source":"user","reference":"..."}`
 

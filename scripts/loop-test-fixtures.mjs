@@ -1,5 +1,5 @@
-import { resolveAgentProfile } from "./resolve-agent-profile.mjs";
 import { computeAssessment } from "./loop-policy.mjs";
+import { resolveRuntime } from "./loop-runner.mjs";
 export const agentAssessment = {
   risk_assessment: {
     blast_radius: "local",
@@ -32,8 +32,12 @@ export function taskFixture(root = process.cwd(), overrides = {}) {
       verificationStrategy: ["Run process tests"],
       predictedRisk: "T1",
     },
+    // Legacy profile fields (selection/profileSource/profile) are kept on
+    // purpose: old state blocks still carry them and must keep validating.
     configuration: {
-      ...resolveAgentProfile({ runtime: "codex", root }),
+      runtime: resolveRuntime({ runtime: "codex", root }),
+      profileSource: "standard.yaml",
+      profile: { name: "standard", autonomy: "high", verification: "proportional" },
       selection: {
         selected: "standard",
         source: "auto",

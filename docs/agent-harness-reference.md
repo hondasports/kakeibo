@@ -1,8 +1,8 @@
 # Agent Harness詳細仕様
 
-このCLIはタスクごとの仕様・Profile・評価・検証・レビュー・停止条件を接続する。AGENTS.mdを入口としてAgentが起動する。Codex/Devin自体を自動起動したり、実行中のモデルの推論設定を変更する機能はない。autonomy/delegation/contextはAgentが遵守する方針、verification=thoroughは追加のlocal検証として機械適用する。
+このCLIはタスクごとの仕様・評価・検証・レビュー・停止条件を接続する。AGENTS.mdを入口としてAgentが起動する。Codex/Devin自体を自動起動したり、実行中のモデルの推論設定を変更する機能はない。
 
-ProfileはREFINE終了時に、Agentが記録した評価（`blast_radius`・`uncertainty`・検証負荷）から規則で自動判定される。`--profile` の明示指定は常に優先される。実装中に評価入力が変わった場合だけ再判定し、自動選択は上位へしか移動しない。下位への変更にはユーザー指定または根拠記録が必要である。選択値・選択元・参照した評価・根拠・規則バージョンは状態に記録され、PR gateでも照合される。
+タスク強度はTier（T1〜T3）に一本化され、Profile機構は廃止した。thorough検証（lint/unit/build必須）はTierと評価軸から機械判定される：final tierがT3、またはagent/reviewer評価のuncertaintyがknown_pattern以外、またはblast_radiusがshared_or_system_wideの場合。`--profile` は後方互換のため受理されるが無視され、警告を1行出す。旧形式の状態ブロック（profile/selection記録あり）はそのまま読み込める。
 
 本書は現行CLIの詳細仕様を記載する。起動に必要な操作手順は [Agent Harness操作手順](agent-harness.md)（起動用クイックリファレンス）を参照する。軽量化の設計正本は [Agent Harness設計](agent-harness-design.md) を参照する。出力・検証・証跡管理のさらなる変更は未実装であり、現在は本書の仕様が正本である。
 
@@ -12,7 +12,7 @@ ProfileはREFINE終了時に、Agentが記録した評価（`blast_radius`・`un
 
 1. 専用worktreeでclean baselineを確認する。
 2. 作業仕様JSONをリポジトリ外（例: `/tmp/spec.json`）に作る。必須フィールドは `.agent/schema/spec.schema.json` を参照。`predictedRisk` も必須。Human Requestを改変せずGoal/AC/Non-goals/Assumptions/Verification Strategyを整理する。
-3. 次を実行し、現在のworkflowを読む。開始時のProfileは仮のdefaultであり、REFINE終了時に自動判定で確定される。Profileを明示する場合は `--profile <name>` を付ける（指定値は常に優先される）。
+3. 次を実行し、現在のworkflowを読む。
 
 ```bash
 node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --runtime codex --implementer session-123
@@ -20,7 +20,7 @@ node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --runtime co
 
 Devinでは `--runtime devin`、Claude Codeでは `--runtime claude-code` を指定する。旧来のモデル指定オプションは互換のため受理されるが、何も記録・参照しない。
 
-4. REFINEの評価を記録し、EXECUTEへ進む。`--assessment` のJSONには `risk_assessment`・`tier_rationale`・`applied_tier` に加えて、Profile判定の入力となる `verification_load: {level: routine|complex, rationale}` を含める。これらの入力が欠ける場合、`ready` はREFINEの不足条件として拒否される。
+4. REFINEの評価を記録し、EXECUTEへ進む。`--assessment` のJSONには `risk_assessment`・`tier_rationale`・`applied_tier` を含める。
 
 ```bash
 node scripts/loop-runner.mjs --assessment /tmp/assessment.json
@@ -29,7 +29,7 @@ node scripts/loop-runner.mjs --event ready
 
 base既定値は `origin/preview`。別baseは開始時に `--base` で指定する。作業状態はworktree固有のGitメタデータに保存する。通常の再開は引数なしで実行する。`--state` は保存済み状態との一致確認専用であり、状態を飛ばす指定ではない。
 
-通常出力は要約だけを返す。taskId・state・workflow（現在Stateのworkflowパス）・head/base・risk・profile・missing・verification・openFindings・aftercare・next を含み、spec・history・configuration・評価本文・ログ本文は含まない。不足要件の根拠が必要な場合だけ `--explain`、検証証跡のmanifestだけ `--artifacts`、状態スナップショットは `--status` で確認する。状態ブロック全体は `--export` / `--export-file <path>` / `--sync-pr` でのみ出力する。Runtime hooks向けの読み取り専用 `--hook-state` は `{state, next}` だけを返し（未initは `state: null`）、taskを更新しない。
+通常出力は要約だけを返す。taskId・state・workflow（現在Stateのworkflowパス）・head/base・risk・missing・verification・openFindings・aftercare・next を含み、spec・history・configuration・評価本文・ログ本文は含まない。不足要件の根拠が必要な場合だけ `--explain`、検証証跡のmanifestだけ `--artifacts`、状態スナップショットは `--status` で確認する。状態ブロック全体は `--export` / `--export-file <path>` / `--sync-pr` でのみ出力する。Runtime hooks向けの読み取り専用 `--hook-state` は `{state, next}` だけを返し（未initは `state: null`）、taskを更新しない。
 
 仕様の修正はREFINEで `--spec /tmp/spec.json`。未決事項があれば `--event decision_required --exit /tmp/exit.json` で停止する。exitにはreasonを記録する。Human Gateの解除には `approval: {"source":"user","reference":"対象と操作を承認したユーザー指示の参照"}` が必要。承認記録はAgentの責任であり、このJSONだけで人間の本人性を証明するものではない。
 
@@ -41,7 +41,7 @@ base既定値は `origin/preview`。別baseは開始時に `--base` で指定す
 node scripts/loop-runner.mjs --assessment /tmp/assessment.json --skills workspace-preflight,security-review
 ```
 
-assessmentは `scripts/review-depth.mjs` のrisk_assessment・tier_rationale・applied_tier形式に `verification_load` を加えた形。EXECUTE/REVIEWで再提出した評価が影響範囲・不確実性・検証計画の変化を示す場合だけProfileを再判定する（自動選択は上位へのみ）。通常の修正・テスト実行・CI待ち・コミットでは再判定しない。
+assessmentは `scripts/review-depth.mjs` のrisk_assessment・tier_rationale・applied_tier形式。再提出は影響範囲・不確実性・検証計画の変化を示す場合だけ行う。通常の修正・テスト実行・CI待ち・コミットでは再提出しない。
 
 HEAD/baseが変わると評価は原則失効するが、新revisionのMachine分類（machine floor・floor trigger・required skills・runtimeRelevant・必須検証kind）が直前の評価時と同一なら、Agent評価とskills記録を引き継ぎ、historyとmetricsに `assessmentCarried: true` を残す。分類が1つでも変わった場合は従来どおり `--assessment` の再提出を求める。引き継ぎは機械分類の不変性だけを根拠とするため、Agentが変更の性質や影響範囲の変化を認識した場合は分類が同じでも再提出する。REFINEへ戻ったタスクには引き継がない。runnerはGitの実差分を取得し、Spec予測・Machine・Agent・Reviewer・過去の最高Riskを統合する。診断CLIの `--paths` はrunner/CIの評価を差し替えられない。Machine Floorはパスルールに加えてhunkの中身（追加・削除行）でも判定する。`convex/**`・`src/**` の非テスト `.ts`/`.tsx` で、認証・認可（`getUserIdentity`/`ctx.auth`/`assert*Member|Owner|Admin`/`role === "owner|member"` 等）、削除・retention（`ctx.db.delete`、convex内の `.delete(`、`scheduler.run(After|At)`+delete）、schema/migration（`defineTable`/`defineSchema`/`.index(`）、外部write/webhook（convex内の `fetch(`、`httpAction`、`Resend`、`api.line.me`）を含む変更行は対応するtriggerを `source: "content"` で発火する。コメント・文字列リテラルの変更でも発火する（過検知許容）。hunkの読み取りはcontent rule対象のpathを含む変更でのみ行い、その取得に失敗した場合はfail-closedでT3（`diff_read_failed`。非コードのみの変更では読み取り自体を行わない）。`suggest-skills.mjs` も同じcontent判定で `security-review` を推奨する（`diff_read_failed` 単体では推奨しない）。`machine-risk.mjs` のCLI既定出力は `{triggerCount, floorTriggers, minimumTier}` で、`--detail` で `floorTriggerDetails` を含むfull結果を返す。`assess-change.mjs` に `--paths` だけ渡した場合はhunkを読まずcontent ruleを評価しない（warningを出力する。gateに使う場合は `--base` を指定する）。
 
