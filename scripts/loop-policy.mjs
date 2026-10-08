@@ -411,12 +411,16 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
   // #948: the conditional exit keys a submission must carry are defined once,
   // in requiredKeys() — --draft exit emits exactly this set, and the presence
   // checks below key off the same list instead of restating the conditions.
-  const requiredExitKeys = requiredKeys("exit", {
-    event,
-    state: task.state,
-    counters: task.counters,
-    limits,
-  });
+  const requiredExitKeys = requiredKeys(
+    "exit",
+    {
+      event,
+      state: task.state,
+      counters: task.counters,
+      limits,
+    },
+    root,
+  );
   if (["decision_required", "repeated_failure"].includes(event))
     requireValue(text(exit.reason), "Stop reason is required");
   if (requiredExitKeys.includes("approval"))

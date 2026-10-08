@@ -202,6 +202,21 @@ describe("--draft", () => {
     expect(draft.predictedRisk).toBe("T3");
     expect(issuePredictedRisk("no paths here")).toBe("T1");
   });
+  it("reads paths out of GitHub blob/tree URLs (f2)", () => {
+    // The bare pattern cannot see a path embedded in a URL; the URL pattern
+    // extracts the tail after <owner>/<repo>/<blob|tree|edit|raw>/<ref>/.
+    expect(
+      issuePredictedRisk(
+        "fix https://github.com/hondasports/kakeibo/blob/preview/scripts/loop-runner.mjs now",
+      ),
+    ).toBe("T3");
+    expect(
+      issuePredictedRisk(
+        "https://github.com/hondasports/kakeibo/tree/main/scripts/loop-policy.mjs",
+      ),
+    ).toBe("T3");
+    expect(issuePredictedRisk("https://github.com/hondasports/kakeibo")).toBe("T1");
+  });
   it("AC5: review draft AC ids equal the spec AC ids", () => {
     const { dir, task } = repository();
     task.spec.acceptanceCriteria = [

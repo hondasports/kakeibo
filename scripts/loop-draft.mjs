@@ -65,12 +65,19 @@ export function issueGoalSection(body = "") {
 }
 
 const ISSUE_PATH_PATTERN = /(?:^|[\s'"`(（])([a-zA-Z0-9_.-]+\/[a-zA-Z0-9_./-]+\.[a-zA-Z0-9]+)/g;
+// GitHub blob/tree/edit URLs embed the path after the ref segment; capture
+// only that tail so `github.com/o/r/blob/main/scripts/x.ts` counts as
+// `scripts/x.ts` (the bare pattern misses it entirely).
+const ISSUE_URL_PATH_PATTERN =
+  /github\.com\/[^\s'"`(（/]+\/[^\s'"`(（/]+\/(?:blob|tree|edit|raw)\/[^\s'"`(（/]+\/([a-zA-Z0-9_./-]+\.[a-zA-Z0-9]+)/g;
 
 /** Issue本文で言及されたパスにMachine Floorを適用した tier を返す。 */
 export function issuePredictedRisk(body = "") {
-  const paths = [...body.matchAll(ISSUE_PATH_PATTERN)]
-    .map((match) => match[1])
-    .filter((candidate) => /\.(ts|tsx|mts|js|jsx|mjs|cjs|json|ya?ml|md|css|sh)$/.test(candidate));
+  const paths = [
+    ...[...body.matchAll(ISSUE_PATH_PATTERN), ...body.matchAll(ISSUE_URL_PATH_PATTERN)].map(
+      (match) => match[1],
+    ),
+  ].filter((candidate) => /\.(ts|tsx|mts|js|jsx|mjs|cjs|json|ya?ml|md|css|sh)$/.test(candidate));
   return machineRiskForPaths(paths).minimumTier;
 }
 
