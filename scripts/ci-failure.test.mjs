@@ -5,6 +5,7 @@ import {
   extractCiFailures,
   failedCheckNames,
   flakyFromJsonReport,
+  normalizeTestTitle,
   parseFailedTests,
   parseFlakyTests,
   parseJobUrl,
@@ -22,7 +23,7 @@ describe("checkKind / failedCheckNames", () => {
     expect(checkKind("Lint / lint")).toBe("lint");
     expect(checkKind("Build / build")).toBe("build");
     expect(checkKind("Test / test")).toBe("unit");
-    expect(checkKind("Agent harness")).toBe("other");
+    expect(checkKind("Agent harness")).toBe("process");
   });
   it("keeps only failed status checks", () => {
     const rollup = [
@@ -57,15 +58,34 @@ describe("parseFailedTests / parseFlakyTests", () => {
       "  2) [public] › e2e/line.spec.ts:20:3 › also broken",
       "  ✘ [authenticated] › e2e/extra.spec.ts:1:1 › xmark",
       "  FAIL  src/a.test.ts > vitest fail",
-      "  × src/b.test.mjs > vitest xfail",
+      "  × fails 6ms",
     ].join("\n");
     expect(parseFailedTests(log)).toEqual([
       { file: "e2e/receipt.spec.ts", title: "fails hard" },
       { file: "e2e/line.spec.ts", title: "also broken" },
       { file: "e2e/extra.spec.ts", title: "xmark" },
       { file: "src/a.test.ts", title: "vitest fail" },
-      { file: "src/b.test.mjs", title: "vitest xfail" },
     ]);
+  });
+  it("strips gh api ISO timestamp prefixes on every log line", () => {
+    const log = [
+      "2026-10-07T23:06:34.7123456Z   ✘  2 [chromium] › e2e/receipt.spec.ts:10:5 › fails hard (5.2s)",
+      "2026-10-07T23:06:35.0000000Z   1) [public] › e2e/line.spec.ts:20:3 › also broken ────────",
+    ].join("\n");
+    expect(parseFailedTests(log)).toEqual([
+      { file: "e2e/receipt.spec.ts", title: "fails hard" },
+      { file: "e2e/line.spec.ts", title: "also broken" },
+    ]);
+  });
+  it("normalizes titles for playwright --grep (durations, padding, describe separators)", () => {
+    expect(normalizeTestTitle("公開・異常系ページ › 未ログインでトップが開ける ────────")).toBe(
+      "公開・異常系ページ 未ログインでトップが開ける",
+    );
+    expect(normalizeTestTitle("my suite › does x (12.3s)")).toBe("my suite does x");
+    // describeの ` › ` は titlePath.join(' ') に合わせて空白へ
+    expect(
+      parseFailedTests("  1) [public] › e2e/foo.spec.ts:3:1 › suite › my title ───────────"),
+    ).toEqual([{ file: "e2e/foo.spec.ts", title: "suite my title" }]);
   });
   it("extracts playwright flaky section entries", () => {
     const log = [
@@ -79,6 +99,21 @@ describe("parseFailedTests / parseFlakyTests", () => {
       { file: "e2e/b.spec.ts", title: "t2" },
     ]);
     expect(parseFlakyTests("no flaky section")).toEqual([]);
+  });
+  it("ignores in-run lines outside the flaky summary section (list reporter emits no ⚠)", () => {
+    const log = [
+      "  ✘ [public] › e2e/a.spec.ts:1:1 › not flaky, still failing (1.2s)",
+      "  1 passed",
+    ].join("\n");
+    expect(parseFlakyTests(log)).toEqual([]);
+  });
+  it("strips timestamps in the flaky section too", () => {
+    const log = [
+      "2026-10-07T23:06:40.0Z   1 flaky",
+      "2026-10-07T23:06:40.0Z     [public] › e2e/home.spec.ts:3:1 › wobble ──────",
+      "2026-10-07T23:06:40.0Z   3 passed",
+    ].join("\n");
+    expect(parseFlakyTests(log)).toEqual([{ file: "e2e/home.spec.ts", title: "wobble" }]);
   });
 });
 
@@ -104,8 +139,12 @@ describe("reproduceCommand", () => {
     expect(reproduceCommand({ checkName: "Build / build", failedTests: [] })).toBe(
       "pnpm run build",
     );
-    expect(reproduceCommand({ checkName: "Test / unit", failedTests: [] })).toBe("pnpm run test");
-    expect(reproduceCommand({ checkName: "Agent harness", failedTests: [] })).toBeNull();
+    expect(reproduceCommand({ checkName: "Test / unit", failedTests: [] })).toBe(
+      "pnpm run test:coverage",
+    );
+    expect(reproduceCommand({ checkName: "Agent harness", failedTests: [] })).toBe(
+      "pnpm run test:process",
+    );
   });
   it("builds vitest per-test commands for unit checks", () => {
     expect(

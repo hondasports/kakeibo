@@ -158,7 +158,7 @@ node scripts/loop-runner.mjs --event ready --handled /tmp/handled.txt
 node scripts/loop-runner.mjs --sync-pr 123
 ```
 
-状態や本文を更新せず現在のPRを確認する場合は `--check-pr` を使う。AFTERCARE/DONEで利用でき、PR CIと共通のlocal検証・レビューcheckpointを照合した後、GitHubを再取得してHEAD/base・最新CI・approval・mergeability・findingを確認する。成功時は `ready: true` と要約を返し、条件を満たさなければ失敗する。古いDONE記録だけを成功根拠にしない。
+状態や本文を更新せず現在のPRを確認する場合は `--check-pr` を使う。AFTERCARE/DONEで利用でき、PR CIと共通のlocal検証・レビューcheckpointを照合した後、GitHubを再取得してHEAD/base・最新CI・approval・mergeability・findingを確認する。成功時は `ready: true` と要約を返す。gate条件（check失敗・未処理finding・approval欠落等）を満たさない場合は `ready: false` と `gateError`（失敗理由）を返す。HEAD/baseの変化やローカル改変などの整合性エラーは従来どおり失敗する。古いDONE記録だけを成功根拠にしない。
 
 ```bash
 node scripts/loop-runner.mjs --check-pr 123 --handled /tmp/handled.txt
@@ -179,7 +179,7 @@ CI失敗時は `--ci-failures <番号>` で失敗checkを機械抽出する（re
 node scripts/loop-runner.mjs --ci-failures 123
 ```
 
-`ci_failure` でEXECUTEへ戻ったtaskは、未解決のciFailureレコードがある限り `ready` をブロックされる。修正をpushしたら `--resolve-ci-failures` を実行する。runner自身がpush前検証を実行する（E2E/unitの失敗は失敗spec/testファイルを対象化、lint/build等のジョブ単位失敗は全量実行）。exit 0 の記録だけが `resolvedAt`/`resolvedHead` を刻む。成功マーカーや自己申告の残存だけでは解決にならない。
+`ci_failure` でEXECUTEへ戻ったtaskは、未解決のciFailureレコードがある限り `ready` をブロックされる（複数checkの同時失敗は `ciFailure` を配列で1遷移にまとめて記録する）。修正をpushしたら `--resolve-ci-failures` を実行する（executeまたはaftercareでのみ有効）。runner自身がpush前検証を実行する（E2E/unitの失敗は失敗spec/testファイルを対象化、lint/build等のジョブ単位失敗は全量実行）。exit 0 の記録だけが `resolvedAt`/`resolvedHead` を刻む。成功マーカーや自己申告の残存だけでは解決にならない。
 
 ```bash
 node scripts/loop-runner.mjs --resolve-ci-failures

@@ -477,15 +477,22 @@ export function transitionTask(task, event, exit, root) {
   if (event === "findings") task.counters.review += 1;
   if (event === "ci_failure") {
     task.counters.ci += 1;
-    // #958: 失敗checkレコードを未解決として保持し、execute readyがブロックする
+    // #958: 失敗checkレコードを未解決として保持し、execute readyがブロックする。
+    // 複数check同時失敗は配列で一括記録。同checkの未解決レコードは
+    // 最新の抽出で置き換える（同じcheckが何度も失敗しても重複しない）。
+    const records = Array.isArray(exit.ciFailure) ? exit.ciFailure : [exit.ciFailure];
     task.ciFailures = task.ciFailures ?? [];
-    task.ciFailures.push({
-      ...exit.ciFailure,
-      reproduction: exit.reproduction,
-      recordedAt: new Date().toISOString(),
-      resolvedAt: null,
-      resolvedHead: null,
-    });
+    for (const record of records) {
+      const stale = task.ciFailures.findIndex((f) => f.check === record.check && !f.resolvedAt);
+      if (stale >= 0) task.ciFailures.splice(stale, 1);
+      task.ciFailures.push({
+        ...record,
+        reproduction: exit.reproduction,
+        recordedAt: new Date().toISOString(),
+        resolvedAt: null,
+        resolvedHead: null,
+      });
+    }
   }
   // Evidence is not wiped here: nothing has changed yet. Invalidation happens
   // only on real revision change in refreshTask, so a dismissed finding or a
@@ -1018,7 +1025,8 @@ export function resolveCiFailures(task, root, services = {}) {
     const files = ["e2e", "unit"].includes(checkKind(failure.check))
       ? [...new Set((failure.failedTests ?? []).map((t) => t.file).filter(Boolean))]
       : [];
-    const argv = ["scripts/verify-prepush.mjs", ...(files.length ? ["--include", ...files] : [])];
+    // verify-prepush.mjs の --include は1引数に1パス — 複数ファイルは繰り返す
+    const argv = ["scripts/verify-prepush.mjs", ...files.flatMap((file) => ["--include", file])];
     const out = runVerify(argv, root);
     const status = out.status ?? 1;
     if (status === 0) {
@@ -1089,6 +1097,7 @@ export function aftercareFetchers(pr, handled, root, services = {}) {
     return repoSlug;
   };
   return {
+    slug,
     fetchPr: () => JSON.parse(gh(["pr", "view", String(pr), "--json", AFTERCARE_PR_FIELDS], root)),
     fetchFindings: () => {
       const raw = (services.exec ?? execFileSync)(
@@ -1886,33 +1895,52 @@ export function run(args, root = process.cwd(), services = {}) {
         ...(result.reason ? { reason: result.reason } : {}),
       };
     }
-    const { evidence, snapshot, prFields } = inspectPullRequest(
-      task,
-      args["check-pr"],
-      args.handled,
-      root,
-      services,
-    );
-    // #958: flaky(passed-on-retry)を観測面に出す。取得失敗は情報欠落のみで止めない
+    // #958: flaky(passed-on-retry)を観測面に出す。PRが赤でも診断が見えるよう
+    // gate判定より先にPR状態を取り、flaky抽出を済ませる。取得失敗は情報欠落のみ。
+    const fetchers = aftercareFetchers(args["check-pr"], args.handled, root, services);
+    const before = services.before ?? (services.fetchPr ?? fetchers.fetchPr)();
+    const findings = services.findings ?? (services.fetchFindings ?? fetchers.fetchFindings)();
     let flakyTests = [];
     try {
       flakyTests = ciFlakyDiagnostics({
-        rollup: prFields.statusCheckRollup ?? [],
-        head: prFields.headRefOid,
-        slug: services.resolveRepo ? services.resolveRepo() : resolveRepositorySlug(root, services),
+        rollup: before.statusCheckRollup ?? [],
+        head: before.headRefOid,
+        slug: fetchers.slug(),
         root,
         gh: services.gh ?? ((a, r) => gh(a, r)),
       });
     } catch {
       flakyTests = [];
     }
-    return {
-      taskId: task.taskId,
-      state: task.state,
-      ...snapshot,
-      flakyTests,
-      checkedAt: evidence.checkedAt,
-    };
+    try {
+      const { evidence, snapshot } = inspectPullRequest(
+        task,
+        args["check-pr"],
+        args.handled,
+        root,
+        { ...services, before, findings },
+      );
+      return {
+        taskId: task.taskId,
+        state: task.state,
+        ...snapshot,
+        flakyTests,
+        checkedAt: evidence.checkedAt,
+      };
+    } catch (error) {
+      // checkAftercareのgate失敗（check赤・未処理finding等）でもflaky診断を
+      // 返す（観測面としてready:falseで応答）。HEAD/base変更やローカル改変
+      // などの整合性エラーはgate失敗ではないので従来どおり投げる。
+      const snapshot = aftercareSnapshot(before, task, findings, args["check-pr"]);
+      if (snapshot.ready) throw error;
+      return {
+        taskId: task.taskId,
+        state: task.state,
+        ...snapshot,
+        flakyTests,
+        gateError: error.message,
+      };
+    }
   }
   if (args["publish-metrics"]) {
     const task = loadTask(root);
@@ -1945,6 +1973,11 @@ export function run(args, root = process.cwd(), services = {}) {
   if (args["resolve-ci-failures"]) {
     // #958 AC5: 未解決ciFailureをrunner自身がverify:prepushで解決する。
     // exit 0のみresolvedAt/resolvedHeadを記録（markerのみでは不十分）。
+    // ci_failure遷移先(execute)かaftercareのみで実行する。
+    requireValue(
+      ["execute", "aftercare"].includes(task.state),
+      "--resolve-ci-failures requires execute or aftercare state",
+    );
     const results = resolveCiFailures(task, root, services);
     saveTask(task, root);
     return { taskId: task.taskId, state: task.state, ciFailureResolutions: results };

@@ -16,10 +16,23 @@ const keywords = new Set([
   "minimum",
   "enum",
   "const",
+  "anyOf",
 ]);
 export function validateSchema(schema, value, location = "$") {
   for (const key of Object.keys(schema)) {
     if (!keywords.has(key)) throw new Error(`Unsupported schema keyword: ${key}`);
+  }
+  if (schema.anyOf) {
+    const errors = [];
+    for (const sub of schema.anyOf) {
+      try {
+        validateSchema(sub, value, location);
+        return;
+      } catch (error) {
+        errors.push(error.message);
+      }
+    }
+    throw new Error(`${location}: no anyOf match (${errors.join("; ")})`);
   }
   const fail = (message) => {
     throw new Error(`${location}: ${message}`);

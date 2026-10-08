@@ -340,22 +340,24 @@ describe("persistent task gates", () => {
     { pagesComplete: false, unhandledCount: 0, unresolvedThreadCount: 0 },
     { ...completeFindings, unhandledCount: 1 },
     { ...completeFindings, unresolvedThreadCount: 1 },
-  ])("refuses incomplete or open findings without changing DONE", (findings) => {
+  ])("reports unhandled findings as a gate failure without changing DONE", (findings) => {
     const { dir, task } = repository();
     task.state = "done";
     task.review = reviewFixture(task);
     saveTask(task, dir);
     const original = readFileSync(taskPath(dir), "utf8");
-    expect(() =>
-      run({ "check-pr": "7" }, dir, {
-        fetchPr: () => delivery(task),
-        fetchFindings: () => findings,
-      }),
-    ).toThrow("Unhandled or incompletely collected");
+    const result = run({ "check-pr": "7" }, dir, {
+      fetchPr: () => delivery(task),
+      fetchFindings: () => findings,
+    });
+    // #958 F9: gate失敗はready:false+gateErrorで返る（flaky診断を返せるように）
+    expect(result.ready).toBe(false);
+    expect(result.gateError).toMatch(/Unhandled|collected/i);
+    expect(result.flakyTests).toEqual([]);
     expect(readFileSync(taskPath(dir), "utf8")).toBe(original);
   });
 
-  it("refuses changed HEAD/base, pending checks and revoked approval during observation", () => {
+  it("reports gate failures (HEAD/base/review/pending) and still surfaces flakyTests", () => {
     const { dir, task } = repository();
     task.state = "done";
     task.review = reviewFixture(task);
@@ -365,13 +367,16 @@ describe("persistent task gates", () => {
       { baseRefOid: "e".repeat(40) },
       { reviewDecision: "CHANGES_REQUESTED" },
       { statusCheckRollup: [{ name: "Agent harness", status: "IN_PROGRESS" }] },
-    ])
-      expect(() =>
-        run({ "check-pr": "7" }, dir, {
-          fetchPr: () => delivery(task, overrides),
-          fetchFindings: () => completeFindings,
-        }),
-      ).toThrow();
+    ]) {
+      const result = run({ "check-pr": "7" }, dir, {
+        fetchPr: () => delivery(task, overrides),
+        fetchFindings: () => completeFindings,
+      });
+      expect(result.ready).toBe(false);
+      expect(result.gateError).toBeTruthy();
+      expect(result.flakyTests).toEqual([]);
+    }
+    // 整合性エラー（TOCTOUでのHEAD/base変化）はgate失敗ではないので投げる
     let reads = 0;
     expect(() =>
       run({ "check-pr": "7" }, dir, {
@@ -379,6 +384,50 @@ describe("persistent task gates", () => {
         fetchFindings: () => completeFindings,
       }),
     ).toThrow("PR HEAD/base changed");
+  });
+
+  it("surfaces flakyTests even when a different check failed (red PR)", () => {
+    const { dir, task } = repository();
+    task.state = "done";
+    task.review = reviewFixture(task);
+    saveTask(task, dir);
+    const pr = delivery(task, {
+      statusCheckRollup: [
+        { name: "Agent harness", status: "COMPLETED", conclusion: "FAILURE" },
+        {
+          name: "E2E (Playwright / Chromium / public)",
+          status: "COMPLETED",
+          conclusion: "SUCCESS",
+        },
+      ],
+    });
+    const gh = (args) => {
+      const joined = args.join(" ");
+      if (joined.includes("check-runs"))
+        return JSON.stringify({
+          check_runs: [
+            {
+              name: "E2E (Playwright / Chromium / public)",
+              conclusion: "success",
+              html_url: "https://github.com/o/r/actions/runs/5/job/11",
+            },
+          ],
+        });
+      if (joined.includes("jobs/11/logs"))
+        return "2026-10-07T00:00:00.0Z   1 flaky\n2026-10-07T00:00:00.0Z     [public] › e2e/home.spec.ts:3:1 › wobble ──────\n2026-10-07T00:00:00.0Z   3 passed\n";
+      throw new Error(`unmocked: ${joined}`);
+    };
+    const result = run({ "check-pr": "7" }, dir, {
+      fetchPr: () => pr,
+      fetchFindings: () => completeFindings,
+      resolveRepo: () => "o/r",
+      gh,
+    });
+    expect(result.ready).toBe(false);
+    expect(result.gateError).toBeTruthy();
+    expect(result.flakyTests).toEqual([
+      { check: "E2E (Playwright / Chromium / public)", file: "e2e/home.spec.ts", title: "wobble" },
+    ]);
   });
 
   it("watches DONE without recording readiness into the task or repeating unchanged events", () => {
@@ -735,7 +784,11 @@ describe("persistent task gates", () => {
     expect(JSON.parse(cli("--sync-pr", "7")).synced).toBe(false);
     pr.findings = { ...completeFindings, unhandledCount: 1 };
     writeFileSync(fixture, JSON.stringify(pr));
-    expect(() => cli("--check-pr", "7")).toThrow(/Unhandled or incompletely collected/);
+    // #958 F9: gate失敗はready:false+gateErrorで返る（診断を返せるようにthrowしない）
+    const unhandled = JSON.parse(cli("--check-pr", "7"));
+    expect(unhandled.ready).toBe(false);
+    expect(unhandled.gateError).toMatch(/Unhandled|incompletely collected/);
+    expect(unhandled.flakyTests).toEqual([]);
     expect(readFileSync(taskPath(dir), "utf8")).toBe(before);
   });
   it("restores an old PR snapshot by invalidating evidence while keeping risk/findings/counters", () => {
@@ -1027,6 +1080,67 @@ describe("persistent task gates", () => {
     // 解決済みは ready をブロックしない（他要件の欠落はこの検証対象外）
     expect(() => resolveLoopStep({ task, event: "ready", root: dir })).not.toThrow(
       /Unresolved ciFailure records remain/,
+    );
+  });
+  it("records multiple ciFailure records in one transition and resolves each", () => {
+    const { dir, task } = repository();
+    task.state = "aftercare";
+    const multi = ciFailureExit({
+      ciFailure: [
+        { check: "Lint / lint", head: "a".repeat(40), reproduce: "pnpm run lint" },
+        {
+          check: "E2E (Playwright / Chromium / authenticated)",
+          head: "a".repeat(40),
+          failedTests: [
+            { file: "e2e/a.spec.ts", title: "one" },
+            { file: "e2e/b.spec.ts", title: "two" },
+          ],
+          reproduce: "pnpm run e2e:isolated -- e2e/a.spec.ts",
+        },
+      ],
+    });
+    transitionTask(task, "ci_failure", multi, dir);
+    expect(task.state).toBe("execute");
+    expect(task.ciFailures.map((f) => f.check)).toEqual([
+      "Lint / lint",
+      "E2E (Playwright / Chromium / authenticated)",
+    ]);
+    task.assessment = { ...task.assessment, verification: {}, requiredSkills: [] };
+    expect(() => resolveLoopStep({ task, event: "ready", root: dir })).toThrow(
+      /Unresolved ciFailure records remain/,
+    );
+    // e2e失敗は --include をファイルごとに繰り返す（verify-prepushは1引数1パス）
+    const argvSeen = [];
+    resolveCiFailures(task, dir, {
+      verifyPrepush: (argv) => {
+        argvSeen.push(argv);
+        return { status: 0 };
+      },
+    });
+    const e2eArgv = argvSeen.find((argv) => argv.includes("--include"));
+    expect(e2eArgv).toEqual([
+      "scripts/verify-prepush.mjs",
+      "--include",
+      "e2e/a.spec.ts",
+      "--include",
+      "e2e/b.spec.ts",
+    ]);
+    expect(task.ciFailures.every((f) => f.resolvedAt)).toBe(true);
+    // 同checkが再度失敗したら未解決レコードを差し替える（重複しない）
+    task.state = "aftercare";
+    transitionTask(task, "ci_failure", ciFailureExit(), dir);
+    const same = task.ciFailures.filter(
+      (f) => f.check === "E2E (Playwright / Chromium / authenticated)",
+    );
+    // 解決済みは履歴として残し、未解決は最新抽出で差し替え（1件のみ）
+    expect(same.filter((f) => !f.resolvedAt)).toHaveLength(1);
+  });
+  it("gates --resolve-ci-failures to execute/aftercare states", () => {
+    const { dir, task } = repository();
+    task.state = "refine";
+    saveTask(task, dir);
+    expect(() => run({ "resolve-ci-failures": true }, dir)).toThrow(
+      /requires execute or aftercare/,
     );
   });
   it("routes not_reproduced CI failures to incident", () => {

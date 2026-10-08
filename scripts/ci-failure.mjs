@@ -7,15 +7,38 @@ import { execFileSync } from "node:child_process";
 
 const MAX_LOG_BYTES = 4 * 1024 * 1024;
 
-/* check名 → E2E種別/Lint/Build/Unit/Process 分類 */
+/* check名 → E2E種別/Lint/Build/Unit/Process 分類（このrepoの実check名に合わせる） */
 const CHECK_KIND = [
   [/^e2e\s*\((public|authenticated)\)/i, "e2e"],
   [/^e2e/i, "e2e"],
   [/^lint/i, "lint"],
   [/^build/i, "build"],
   [/^(test|unit|vitest)/i, "unit"],
-  [/^(process|test:process)/i, "process"],
+  [/^(agent harness|process|test:process)/i, "process"],
 ];
+
+/* `gh api repos/{}/actions/jobs/{id}/logs` は全行頭にISO timestampを付ける。
+ * パース前に剥がす（行は `2026-10-07T23:06:34.7123456Z   <content>` 形）。 */
+const GH_LOG_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+/;
+function stripLogPrefix(line) {
+  return line.replace(GH_LOG_TS, "");
+}
+
+/* list reporterのtitle正規化:
+ * - 実行中 `✘` 行は末尾に ` (5.2s)` 等のdurationが付く
+ * - summary `N)` / flaky列挙は `────` paddingで右端まで埋まる
+ * - error-mode headerは末尾に ` › <deepest failing step>` が付くことがある
+ * - describe階層の ` › ` は playwright --grep が照合する titlePath.join(' ') と
+ *   一致しないので空白へ変換する（再現コマンドが何も選択しない誤 not_reproduced 防止）
+ */
+export function normalizeTestTitle(title = "") {
+  return title
+    .replace(/\s*─+\s*$/, "")
+    .replace(/\s*\(\d+(?:\.\d+)?s\)\s*$/, "")
+    .replace(/\s*›\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 export function checkKind(checkName = "") {
   for (const [re, kind] of CHECK_KIND) if (re.test(checkName)) return kind;
@@ -50,33 +73,34 @@ export function parseFailedTests(log = "") {
     seen.add(key);
     tests.push({ file, title });
   };
-  for (const line of log.split("\n")) {
+  for (const raw of log.split("\n")) {
+    const line = stripLogPrefix(raw);
     let m =
       /^\s*(?:\d+\)|✘\s+\d+|✘)\s*\[[^\]]+\]\s*›\s*(\S+\.spec\.ts):\d+:\d+\s*›\s*(.+?)\s*$/.exec(
         line,
       );
     if (m) {
-      add(m[1], m[2]);
+      add(m[1], normalizeTestTitle(m[2]));
       continue;
     }
     m = /^\s*FAIL\s+(\S+\.test\.(?:ts|tsx|mjs|mts))\s*>\s*(.+?)\s*$/.exec(line);
     if (m) {
-      add(m[1], m[2]);
+      add(m[1], normalizeTestTitle(m[2]));
       continue;
     }
-    m = /^\s*×\s+(\S+\.test\.(?:ts|tsx|mjs|mts))\s*>\s*(.+?)\s*$/.exec(line);
-    if (m) add(m[1], m[2]);
   }
   return tests;
 }
 
 /* Playwright list reporter の flaky(=リトライで通過)抽出。実運用の正本は
- * playwright JSON report だが、ログにも「⚠」や「flaky」行が残るので best-effort。 */
+ * playwright JSON report。ログからは最終summaryの `N flaky` セクション
+ * だけを読む（1.63系のlist reporterは実行中に⚠行を出さない）。 */
 export function parseFlakyTests(log = "") {
   const tests = [];
   const seen = new Set();
   let inFlakySection = false;
-  for (const line of log.split("\n")) {
+  for (const raw of log.split("\n")) {
+    const line = stripLogPrefix(raw);
     // playwright最終summary: `  N flaky` の後に対象テストが列挙される
     if (/^\s*\d+\s+flaky/i.test(line)) {
       inFlakySection = true;
@@ -86,15 +110,15 @@ export function parseFlakyTests(log = "") {
       inFlakySection = false;
       continue;
     }
-    // セクション内の `[<project>] › file › title`（番号なし）と実行中の `⚠` 行
-    const m = inFlakySection
-      ? /^\s*\[[^\]]+\]\s*›\s*(\S+\.spec\.ts):\d+:\d+\s*›\s*(.+?)\s*$/.exec(line)
-      : /^\s*⚠\s*\d*\s*\[[^\]]+\]\s*›\s*(\S+\.spec\.ts):\d+:\d+\s*›\s*(.+?)\s*$/.exec(line);
+    if (!inFlakySection) continue;
+    // セクション内の `[<project>] › file › title`（番号なし）
+    const m = /^\s*\[[^\]]+\]\s*›\s*(\S+\.spec\.ts):\d+:\d+\s*›\s*(.+?)\s*$/.exec(line);
     if (!m) continue;
-    const key = `${m[1]}${m[2]}`;
+    const title = normalizeTestTitle(m[2]);
+    const key = `${m[1]}${title}`;
     if (!seen.has(key)) {
       seen.add(key);
-      tests.push({ file: m[1], title: m[2] });
+      tests.push({ file: m[1], title });
     }
   }
   return tests;
@@ -121,7 +145,8 @@ export function reproduceCommand({ checkName, failedTests = [] }) {
     case "process":
       return "pnpm run test:process";
     case "unit":
-      return "pnpm run test";
+      // CIの Test ジョブが実行するのは test:coverage
+      return "pnpm run test:coverage";
     case "e2e":
       return "pnpm run e2e:isolated";
     default:

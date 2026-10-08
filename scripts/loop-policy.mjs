@@ -416,11 +416,16 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
       validateReproduction(exit.reproduction).length === 0,
       "ci_failure exit requires reproduction {command,result:reproduced|not_reproduced,note}",
     );
-    // 失敗checkの機械抽出レコード（--ci-failures で生成）
-    requireValue(
-      typeof exit.ciFailure === "object" && exit.ciFailure != null && text(exit.ciFailure.check),
-      "ci_failure exit requires ciFailure record (run --ci-failures <pr>)",
-    );
+    // 失敗checkの機械抽出レコード（--ci-failures で生成）。
+    // 複数check同時失敗は配列で1遷移にまとめて記録する（counters.ciの浪費防止）。
+    {
+      const records = Array.isArray(exit.ciFailure) ? exit.ciFailure : [exit.ciFailure];
+      requireValue(
+        records.length > 0 &&
+          records.every((r) => typeof r === "object" && r != null && text(r.check)),
+        "ci_failure exit requires ciFailure record(s) (run --ci-failures <pr>)",
+      );
+    }
     requireValue(
       task.counters.ci < limits.ci_fix_max_rounds,
       "CI repair limit reached; enter incident",

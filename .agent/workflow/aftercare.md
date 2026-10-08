@@ -5,7 +5,7 @@ PR作成後のlatest HEADに対してCI・レビュー指摘・承認・競合�
 - REVIEWでdraft PRを作っている場合は、`--sync-pr <番号>` で状態ブロックを入れてから `gh pr ready <番号>` でready化する。`ready_for_review` で `Agent harness` とE2Eが実行される。draftのままではready扱いにならない。draft PRがなければここでPRを作る。
 
 - `node scripts/collect-pr-findings.mjs --pr <番号>` で外部findingを収集し、仕様と照合して修正または根拠付きで棄却する。
-- CI失敗は `--ci-failures <番号>` で機械抽出する（`{check,head,runUrl,artifactUrl,failedTests,reproduce}`）。`reproduce` コマンドでローカル再現を試し、結果を `ci_failure` の exit へ `{reason, ciFailure:<抽出レコード>, reproduction:{command,result,note}}` として必ず記録して EXECUTE へ戻す。`result` は `reproduced` または `not_reproduced`。`not_reproduced`（ローカルで再現しない）は修復を推測せず INCIDENT へ遷移する。
+- CI失敗は `--ci-failures <番号>` で機械抽出する（`{check,head,runUrl,artifactUrl,failedTests,reproduce}`）。`reproduce` コマンドでローカル再現を試し、結果を `ci_failure` の exit へ `{reason, ciFailure:<抽出レコード>, reproduction:{command,result,note}}` として必ず記録して EXECUTE へ戻す（複数check同時失敗は `ciFailure` を配列で1遷移にまとめる。`note` は任意だが再現状況の根拠を書くことを推奨）。`result` は `reproduced` または `not_reproduced`。`not_reproduced`（ローカルで再現しない）は修復を推測せず INCIDENT へ遷移する。
 - `ci_failure` で戻ったEXECUTEは未解決レコードがある限り `ready` で止まる。修正を push したら `--resolve-ci-failures` を実行する。runner自身がpush前検証（E2E/unitは失敗spec/testファイルを対象化、lint/build等のジョブ失敗は全量）を走らせ、exit 0 のときだけ解決扱いになる（成功マーカーだけでは解決にならない）。
 - E2Eのリトライは local/CI とも 1 回に統一。リトライで通った flaky テストは CI の job summary と `--check-pr` の `flakyTests` に出る。flaky を観測したら follow-up Issue を起票する。
 - 新規findingは `findings` でEXECUTEへ戻す。
