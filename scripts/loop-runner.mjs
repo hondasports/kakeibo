@@ -711,6 +711,7 @@ export function compactTaskForExport(task) {
 export function hydrateExportedTask(task) {
   // #953: legacy blocks may carry the removed reuse/lane fields — ignore them.
   delete task.lane;
+  if (task.assessment && typeof task.assessment === "object") delete task.assessment.lane;
   for (const evidence of Object.values(task.verification ?? {})) delete evidence?.reuse;
   const review = task.review;
   if (review && task.findings === undefined && Array.isArray(review.findings))

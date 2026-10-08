@@ -2325,6 +2325,7 @@ describe("revision invalidation and loop ergonomics", () => {
     // loader ignores them instead of erroring, and they never come back out.
     const legacy = compactTaskForExport(taskFixture());
     legacy.lane = "lite";
+    legacy.assessment = { ...structuredClone(taskFixture().assessment), lane: "lite" };
     legacy.verification.process.reuse = {
       basis: "legacy_reuse_basis",
       from: { head: "0".repeat(40), baseHead: "9".repeat(40) },
@@ -2334,6 +2335,7 @@ describe("revision invalidation and loop ergonomics", () => {
       `${STATE_START}\n\`\`\`json\n${JSON.stringify(legacy)}\n\`\`\`\n${STATE_END}`,
     );
     expect(hydrated.lane).toBeUndefined();
+    expect(hydrated.assessment).not.toHaveProperty("lane");
     expect(hydrated.verification.process.reuse).toBeUndefined();
     expect(() => validateTask(hydrated)).not.toThrow();
     expect(compactTaskForExport(hydrated).verification.process.reuse).toBeUndefined();

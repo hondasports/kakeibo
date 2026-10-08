@@ -156,7 +156,7 @@ export function parseArguments(args) {
 /**
  * Emit the per-task summary as one JSONL record (`--format summary-json`),
  * identical in shape to a record collected by collect-harness-metrics.mjs.
- * Task-state fields (tier/profile/lane/ciFixRounds) come from the worktree's
+ * Task-state fields (tier/profile/ciFixRounds) come from the worktree's
  * agent-task.json when present; otherwise they are omitted/inferred. With
  * --out the record is appended to that file instead of replacing it.
  */
