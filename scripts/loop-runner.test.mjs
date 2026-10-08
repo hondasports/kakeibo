@@ -3092,7 +3092,16 @@ describe("--next auto-advance (#950)", () => {
     (argv) => {
       calls.push(argv.join(" "));
       if (argv[0] === "pr" && argv[1] === "list") return "[]";
-      if (argv[0] === "pr" && argv[1] === "create") return JSON.stringify({ number: 7 });
+      if (argv[0] === "pr" && argv[1] === "create") {
+        // 実ghはURLだけを返す（--json非対応）。body-fileも読んで検証する。
+        const bodyFile = argv[argv.indexOf("--body-file") + 1];
+        const body = readFileSync(bodyFile, "utf8");
+        expect(body).toContain("publish: false");
+        // CIのupdate-spec validatorはreasonをYAML parseする — コロン入り文は
+        // クオート必須（実際に #977 で「Nested mappings」エラーが出た）。
+        expect(body).toMatch(/reason: "/);
+        return "https://github.com/o/r/pull/7";
+      }
       if (argv[0] === "pr" && argv[1] === "view")
         return JSON.stringify({ body: "PR body", headRefOid: null, baseRefOid: null });
       if (argv[0] === "api" && argv[1].includes("comments")) return "[]";

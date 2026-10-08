@@ -2106,7 +2106,8 @@ export function draftPrBody(task, root = process.cwd()) {
     "<!-- suzumemo-update:start -->",
     "```yaml",
     "publish: false",
-    "reason: ハーネス生成の下書き（掲載が必要なら publish: true と category/description を記入）",
+    // コロンを含む日本語文はクオート必須（update-spec validatorが YAML parse する）
+    'reason: "ハーネス生成の下書き（掲載する場合は publish を true にして category と description を記入する）"',
     "```",
     "<!-- suzumemo-update:end -->",
   ].join("\n");
