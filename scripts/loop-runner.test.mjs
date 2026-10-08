@@ -2226,9 +2226,7 @@ describe("increment reuse and loop ergonomics", () => {
     const followUp = "https://github.com/hondasports/kakeibo/issues/999";
     const deferred = (extra) =>
       reviewFixture(task, {
-        findings: [
-          { id: "F1", status: "deferred", evidence: "postpone", followUp, ...extra },
-        ],
+        findings: [{ id: "F1", status: "deferred", evidence: "postpone", followUp, ...extra }],
       });
     // AC2: major (or blocker) cannot be deferred.
     for (const severity of ["major", "blocker"])
@@ -2272,7 +2270,7 @@ describe("increment reuse and loop ergonomics", () => {
     expect(deferredBlock(taskFixture())).toBe("");
     // Round-trip keeps the list; a legacy block without the key hydrates fine.
     expect(parseStateBlock(stateBlock(task)).deferredFindings).toEqual(exported.deferredFindings);
-    const { deferredFindings, ...legacy } = exported;
+    const { deferredFindings: _dropped, ...legacy } = exported;
     expect(legacy.deferredFindings).toBeUndefined();
     expect(() => hydrateExportedTask(structuredClone(legacy))).not.toThrow();
     expect(() => validateTask(hydrateExportedTask(structuredClone(legacy)))).not.toThrow();
