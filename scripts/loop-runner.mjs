@@ -1979,6 +1979,12 @@ export function run(args, root = process.cwd(), services = {}) {
         )
       : `${pr.body}\n\n${block}`;
     const deferred = deferredBlock(task);
+    // A dangling START marker without END (manual corruption only — the
+    // tool never emits one) would satisfy includes(START) while the
+    // replace below needs END, silently dropping the fresh deferred
+    // list. Strip it first so the block is re-appended cleanly.
+    if (body.includes(DEFERRED_START) && !body.includes(DEFERRED_END))
+      body = body.replace(/[^\n]*<!-- suzumemo-agent-deferred:start -->/g, "");
     if (body.includes(DEFERRED_START))
       body = body.replace(
         /\n*<!-- suzumemo-agent-deferred:start -->[\s\S]*?<!-- suzumemo-agent-deferred:end -->/,
