@@ -333,11 +333,7 @@ export function computeAssessment(task, paths, root = process.cwd()) {
  * what it covers, why it is required, and where its evidence lands.
  */
 function verificationPlan(result, task, root) {
-  const acs = (
-    task.spec?.acceptanceCriteria ??
-    task.spec?.acIds?.map((id) => ({ id })) ??
-    []
-  )
+  const acs = (task.spec?.acceptanceCriteria ?? task.spec?.acIds?.map((id) => ({ id })) ?? [])
     .map((ac) => ac.id)
     .filter(Boolean);
   return Object.entries(result.verification).map(([kind, required]) => {

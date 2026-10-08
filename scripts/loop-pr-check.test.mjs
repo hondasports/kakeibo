@@ -60,9 +60,7 @@ describe("GitHub delivery gates", () => {
   it("satisfies every checkpoint item from v2 state-block fields alone (#954 AC3)", () => {
     const parsed = (mutate) => {
       const task = readyTask();
-      const block = JSON.parse(
-        stateBlock(task).match(/```json\s*([\s\S]*?)```/)[1],
-      );
+      const block = JSON.parse(stateBlock(task).match(/```json\s*([\s\S]*?)```/)[1]);
       mutate?.(block);
       const body = `x\n<!-- suzumemo-agent-state:start -->\n\`\`\`json\n${JSON.stringify(
         block,
@@ -74,21 +72,30 @@ describe("GitHub delivery gates", () => {
     const intact = parsed();
     expect(() => validateCheckpoint(intact, context(intact))).not.toThrow();
     // Per-item negatives — each gate item still fires on v2 data.
-    expect(() => validateCheckpoint(parsed((b) => (b.state = "execute")), context(intact))).toThrow(
-      "completed review",
-    );
-    expect(() => validateCheckpoint(parsed((b) => (b.head = "c".repeat(40))), context(intact))).toThrow(
-      "HEAD/base",
-    );
+    expect(() =>
+      validateCheckpoint(
+        parsed((b) => (b.state = "execute")),
+        context(intact),
+      ),
+    ).toThrow("completed review");
+    expect(() =>
+      validateCheckpoint(
+        parsed((b) => (b.head = "c".repeat(40))),
+        context(intact),
+      ),
+    ).toThrow("HEAD/base");
     expect(() =>
       validateCheckpoint(parsed(), {
         ...context(intact),
         paths: ["scripts/loop/state.mjs"],
       }),
     ).toThrow("risk");
-    expect(() => validateCheckpoint(parsed((b) => delete b.review), context(intact))).toThrow(
-      "Review",
-    );
+    expect(() =>
+      validateCheckpoint(
+        parsed((b) => delete b.review),
+        context(intact),
+      ),
+    ).toThrow("Review");
     expect(() =>
       validateCheckpoint(
         parsed((b) => {
@@ -115,11 +122,17 @@ describe("GitHub delivery gates", () => {
         context(intact),
       ),
     ).toThrow("finding");
-    expect(() => validateCheckpoint(parsed((b) => (b.verification = {})), context(intact))).toThrow(
-      "verification: process",
-    );
     expect(() =>
-      validateCheckpoint(parsed((b) => (b.agentAssessment = null)), context(intact)),
+      validateCheckpoint(
+        parsed((b) => (b.verification = {})),
+        context(intact),
+      ),
+    ).toThrow("verification: process");
+    expect(() =>
+      validateCheckpoint(
+        parsed((b) => (b.agentAssessment = null)),
+        context(intact),
+      ),
     ).toThrow();
     // T3 additionally needs the CI review evidence carried on the wire.
     const t3 = parsed((b) => {

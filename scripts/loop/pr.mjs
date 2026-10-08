@@ -45,8 +45,7 @@ export function parseStateBlock(body, root = process.cwd()) {
     .match(/^```json\s*([\s\S]*?)\s*```$/);
   requireValue(match, "Invalid Agent state JSON block");
   const parsed = JSON.parse(match[1]);
-  if (parsed?.schema === STATE_BLOCK_SCHEMA_V2)
-    validateDocument("state-block", parsed, root);
+  if (parsed?.schema === STATE_BLOCK_SCHEMA_V2) validateDocument("state-block", parsed, root);
   return hydrateExportedTask(parsed);
 }
 export const gh = (args, root) =>

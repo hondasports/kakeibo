@@ -131,9 +131,7 @@ export function requiredKeys(kind, context = {}, root = process.cwd()) {
   // first branch is the canonical submitted form (e.g. a full spec — the
   // state-block v2 reference shape is never a draftable submission).
   const schemaRequired = SCHEMA_BACKED_KINDS.has(kind)
-    ? (schemaDocument(kind, root).required ??
-      schemaDocument(kind, root).anyOf?.[0]?.required ??
-      [])
+    ? (schemaDocument(kind, root).required ?? schemaDocument(kind, root).anyOf?.[0]?.required ?? [])
     : [];
   return [
     ...new Set([
