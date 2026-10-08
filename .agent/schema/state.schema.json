@@ -151,6 +151,12 @@
         "type": "object"
       }
     },
+    "deferredFindings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
     "frictionNote": {
       "type": "string"
     },

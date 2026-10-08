@@ -48,6 +48,6 @@ states:
 
 limits:
   same_failure_max: 3
-  review_reassess_every: 3
-  review_max_rounds: 9
+  review_reassess_every: 2
+  review_max_rounds: 5
   ci_fix_max_rounds: 3

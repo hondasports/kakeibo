@@ -284,8 +284,38 @@ export function requireLocalVerification(task, { fullUnit = true } = {}) {
       );
   }
 }
-/** Optional finding severity; every finding still has to be fixed or dismissed before clean. */
+/**
+ * Finding severities. clean only requires every blocker/major finding to be
+ * fixed or dismissed with grounds; minor/nit may instead be recorded as
+ * `deferred` with a follow-up issue URL. A finding without severity counts
+ * as major, so it can never be deferred.
+ */
 export const FINDING_SEVERITIES = ["blocker", "major", "minor", "nit"];
+export const DEFERRABLE_SEVERITIES = ["minor", "nit"];
+export const FINDING_FOLLOWUP_PATTERN = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/\d+$/;
+export function validateFinding(finding, ids = new Set()) {
+  requireValue(
+    text(finding.id) &&
+      !ids.has(finding.id) &&
+      ["open", "fixed", "dismissed", "deferred"].includes(finding.status) &&
+      text(finding.evidence),
+    "Invalid finding record (unique id, status open|fixed|dismissed|deferred, non-empty evidence required)",
+  );
+  requireValue(
+    finding.severity === undefined || FINDING_SEVERITIES.includes(finding.severity),
+    `Invalid finding severity: ${finding.severity} (${FINDING_SEVERITIES.join("|")})`,
+  );
+  if (finding.status === "deferred") {
+    requireValue(
+      DEFERRABLE_SEVERITIES.includes(finding.severity),
+      "Only minor/nit findings can be deferred (missing severity counts as major)",
+    );
+    requireValue(
+      FINDING_FOLLOWUP_PATTERN.test(finding.followUp ?? ""),
+      "A deferred finding needs a followUp issue URL (https://github.com/<owner>/<repo>/issues/<n>)",
+    );
+  }
+}
 export function validateReview(task, report) {
   requireValue(currentEvidence(report, task), "Review must match current HEAD and base");
   requireValue(
@@ -298,17 +328,7 @@ export function validateReview(task, report) {
   requireValue(Array.isArray(report.findings), "Review findings are required");
   const ids = new Set();
   for (const finding of report.findings) {
-    requireValue(
-      text(finding.id) &&
-        !ids.has(finding.id) &&
-        ["open", "fixed", "dismissed"].includes(finding.status) &&
-        text(finding.evidence),
-      "Invalid finding record (unique id, status open|fixed|dismissed, non-empty evidence required)",
-    );
-    requireValue(
-      finding.severity === undefined || FINDING_SEVERITIES.includes(finding.severity),
-      `Invalid finding severity: ${finding.severity} (${FINDING_SEVERITIES.join("|")})`,
-    );
+    validateFinding(finding, ids);
     ids.add(finding.id);
   }
   for (const previous of task.findings ?? []) {

@@ -14,7 +14,9 @@ REVIEW clean以降のゲートはcurrent HEADのfull unit証跡を要求する�
 
 ## Review loop
 
-findingはid・状態・根拠を持ち、任意で重要度（`severity`: blocker | major | minor | nit）を持つ。Reviewerは各ラウンドで対象範囲を網羅し、見つけた指摘を重要度にかかわらず一度に出す。後のラウンドへ小出しにしない。重要度はcleanの条件を変えない。全findingの修正または根拠付き却下が必要である。修正後は変更hunk・影響項目・open findingを再確認する。共有契約や前提が変わった場合だけ範囲を広げる。
+findingはid・状態・根拠・重要度（`severity`）を持つ。severityの基準：blocker=ACを満たさない／セキュリティやデータの破壊／本番障害、major=誤った挙動・テスト欠落による回帰リスク・契約違反、minor=可読性・保守性・軽微な不整合、nit=書式・命名の好み。severityの記入は必須で、未記入はmajor扱いである。Reviewerは各ラウンドで対象範囲を網羅し、見つけた指摘を重要度にかかわらず一度に出す。後のラウンドへ小出しにしない。修正後は変更hunk・影響項目・open findingを再確認する。共有契約や前提が変わった場合だけ範囲を広げる。
+
+cleanの条件は「blocker / majorのopen findingが0件」である。major以上は修正または根拠付き却下が必要で、deferredにはできない。minor / nitは修正・却下に加えて `status: deferred` と `followUp: <follow-up Issue URL>`（`gh issue create` でAgentが作る）を付けることで後回しにできる。deferredは機械的に検証され、URLが不正・severityがmajor以上・severity未指定なら拒否される。deferredした指摘は状態ブロックとPR本文に一覧として残る（追跡を消さない）。
 
 draft PRがある場合は、packet生成前に `node scripts/collect-pr-findings.mjs --pr <番号>` で外部レビュー（CodeRabbit等）の未処理指摘をファイルへ保存し、`--review-packet <dir> --external-findings <file>` で独立Reviewerへ渡す（未信頼データとして包まれ、prompt-injection-guardが同梱される）。外部指摘の採否はReviewerが仕様と照合して判断し、同じラウンドのfindingsへ外部指摘を辿れるidで記録する。実装担当はReviewerの報告を編集しない。内部・外部の指摘をEXECUTEで一度に修正し、clean後に外部指摘で全ループをやり直さないためである。外部レビューの完了を待つためにREVIEWで待機はしない。packet生成後に届いた外部指摘は次のラウンドかAFTERCAREの収集で扱う。
 
@@ -28,4 +30,4 @@ draft PRがある場合は、packet生成前に `node scripts/collect-pr-finding
 
 Reviewerは増分・影響caller・open findingから確認し、影響のないACの証跡は過去レビューを参照する。全ACの `{id, evidence}` 記録は変わらず必須である。共有契約や前提が変わった場合は全差分へ広げる。報告全文はファイルに保存し、実装担当への返却は結論・指摘件数・対象HEAD・報告参照先を中心にする。
 
-open findingが0件でfull unitを含む必須検証が揃っていれば `clean`。findingが残れば `findings`。3ラウンドごとに方針を再評価し、上限到達は未完了として扱う。
+open findingが0件でfull unitを含む必須検証が揃っていれば `clean`。findingが残れば `findings`。2ラウンドごとに方針を再評価し、上限（5ラウンド）到達は未完了としてINCIDENTで扱う。
