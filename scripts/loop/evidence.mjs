@@ -222,6 +222,7 @@ export function runRequiredVerification(task, root, run) {
   requireValue(unchanged(), "Revision changed during required verification");
   return task;
 }
+/** Evidence manifest per verification kind — paths/hashes/summaries, never raw logs. */
 export function artifactManifest(task, root = process.cwd()) {
   const manifest = {};
   for (const [kind, evidence] of Object.entries(task.verification ?? {})) {

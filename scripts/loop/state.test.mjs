@@ -511,7 +511,12 @@ describe("revision invalidation and loop ergonomics", () => {
     expect(unitFullCommand(parent)).toEqual([["pnpm", "exec", "vitest", "run"]]);
     expect(processSuiteExcludes(parent)).toEqual([]);
     // The repository's own process suite is excluded from local unit runs.
-    expect(processSuiteFiles(root)).toContain("scripts/loop/state.test.mjs");
+    for (const file of [
+      "scripts/loop/gates.test.mjs",
+      "scripts/loop/state.test.mjs",
+      "scripts/loop/next.test.mjs",
+    ])
+      expect(processSuiteFiles(root), file).toContain(file);
   });
   it("defaults re-review packets to the increment since the latest qualifying review", () => {
     const { dir, git, task } = repository();

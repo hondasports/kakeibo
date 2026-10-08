@@ -43,11 +43,6 @@ export function parseStateBlock(body) {
 }
 export const gh = (args, root) =>
   execFileSync("gh", args, { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
-/**
- * #958: ciFailure解決の実行体。verify-prepush.mjsは#957で導入されるため
- * 静的importせずspawnで呼ぶ（未マージ環境ではENOENTの明示エラー）。
- * hook経由起動を考慮してGIT_*を除去したenvで実行する。
- */
 export const AFTERCARE_PR_FIELDS =
   "number,state,isDraft,headRefOid,baseRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup";
 /** owner/name slug parsed from a git remote URL (ssh or https); null when it does not match. */

@@ -77,7 +77,6 @@ export function summarizeTask(task, root) {
     next: nextActions(task, root),
   };
 }
-/** Evidence manifest per verification kind — paths/hashes/summaries, never raw logs. */
 export function explainTask(task, root) {
   return {
     ...summarizeTask(task, root),
@@ -91,6 +90,11 @@ export function explainTask(task, root) {
     verificationDetail: artifactManifest(task, root),
   };
 }
+/**
+ * #958: ciFailure解決の実行体。verify-prepush.mjsは#957で導入されるため
+ * 静的importせずspawnで呼ぶ（未マージ環境ではENOENTの明示エラー）。
+ * hook経由起動を考慮してGIT_*を除去したenvで実行する。
+ */
 export function defaultVerifyPrepush(argv, root) {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];

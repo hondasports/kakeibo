@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   aggregateMetrics,
+  harnessVersion,
   metricsLogPath,
   parseArguments,
   readMetricsEntries,
@@ -218,5 +220,26 @@ describe("agent metrics aggregation", () => {
     expect(metricsLogPath(process.cwd(), { AGENT_METRICS_FILE: "/x/metrics.jsonl" })).toBe(
       "/x/metrics.jsonl",
     );
+  });
+});
+
+describe("harnessVersion (#953 split coverage)", () => {
+  it("fingerprints loop-runner plus every scripts/loop/*.mjs", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "loop-metrics-version-"));
+    dirs.push(dir);
+    const git = (args) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+    git(["init", "-b", "main"]);
+    mkdirSync(path.join(dir, ".agent"), { recursive: true });
+    writeFileSync(path.join(dir, ".agent", "process.yaml"), "version: 9\n");
+    mkdirSync(path.join(dir, "scripts", "loop"), { recursive: true });
+    writeFileSync(path.join(dir, "scripts", "loop-runner.mjs"), "export {}\n");
+    writeFileSync(path.join(dir, "scripts", "loop", "state.mjs"), "export const a = 1;\n");
+
+    const before = harnessVersion(dir);
+    expect(before).toMatch(/^9\+[0-9a-f]{12}$/);
+    // An edit inside scripts/loop/ must move the fingerprint even when
+    // loop-runner.mjs itself is unchanged (F2).
+    writeFileSync(path.join(dir, "scripts", "loop", "state.mjs"), "export const a = 2;\n");
+    expect(harnessVersion(dir)).not.toBe(before);
   });
 });

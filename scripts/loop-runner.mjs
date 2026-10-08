@@ -5,7 +5,7 @@ import { loadTask } from "./loop/state.mjs";
 import { recordMetric } from "./loop/metrics.mjs";
 import { cliCommandName, run, summarizeTask } from "./loop/next.mjs";
 
-export function option(args, index) {
+function option(args, index) {
   requireValue(
     args[index + 1] && !args[index + 1].startsWith("--"),
     `${args[index]} requires a value`,
@@ -71,7 +71,7 @@ export function parseArguments(args) {
   }
   return out;
 }
-export const recordCliOutput = (root, command, output, exit) => {
+const recordCliOutput = (root, command, output, exit) => {
   let task = null;
   try {
     task = loadTask(root);
@@ -115,12 +115,69 @@ export function cliMain(
     return 1;
   }
 }
-export * from "./loop/state.mjs";
-export * from "./loop/evidence.mjs";
-export * from "./loop/review.mjs";
-export * from "./loop/pr.mjs";
-export * from "./loop/metrics.mjs";
-export * from "./loop/next.mjs";
+export {
+  artifactManifest,
+  reviewerVerificationManifest,
+  runRequiredVerification,
+  runVerification,
+} from "./loop/evidence.mjs";
+export { metricsPath, publishTaskMetrics, recordMetric } from "./loop/metrics.mjs";
+export {
+  cliCommandName,
+  defaultVerifyPrepush,
+  resolveCiFailures,
+  run,
+  runNext,
+  summarizeTask,
+} from "./loop/next.mjs";
+export {
+  aftercareFetchers,
+  aftercareSnapshot,
+  collectFindingsArgs,
+  derivePrTitle,
+  discoverPrNumber,
+  draftPrBody,
+  ensureTaskPr,
+  githubAftercare,
+  inspectPullRequest,
+  parseStateBlock,
+  repositorySlugFromRemoteUrl,
+  resolveRepositorySlug,
+  restoreTask,
+  snapshotEvent,
+  syncPrStateBlock,
+  watchAftercare,
+} from "./loop/pr.mjs";
+export {
+  autoDeltaFrom,
+  buildReviewPacket,
+  collectReviewCiEvidence,
+  waitForReviewCi,
+} from "./loop/review.mjs";
+export {
+  CHECK_COMMANDS,
+  DEFERRED_END,
+  DEFERRED_START,
+  STATE_BLOCK_RECENT_HISTORY,
+  STATE_END,
+  STATE_START,
+  STATE_WORKFLOWS,
+  acceptanceCriteriaHash,
+  compactTaskForExport,
+  deferredBlock,
+  hydrateExportedTask,
+  loadTask,
+  readChangedPathsRevisioned,
+  recordFailure,
+  refreshTask,
+  resolveLoopStep,
+  resolveRuntime,
+  saveTask,
+  startTask,
+  stateBlock,
+  taskPath,
+  transitionTask,
+} from "./loop/state.mjs";
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   process.exitCode = cliMain(process.argv.slice(2));
