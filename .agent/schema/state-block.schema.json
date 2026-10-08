@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent state block (state-block/v2)",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "taskId",
+    "implementer",
+    "branch",
+    "state",
+    "head",
+    "baseRef",
+    "baseHead",
+    "risk",
+    "attempt",
+    "skills",
+    "spec",
+    "agentAssessment",
+    "verification",
+    "counters"
+  ],
+  "properties": {
+    "schema": {
+      "const": "state-block/v2"
+    },
+    "version": {
+      "const": 2
+    },
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime": {
+      "type": ["string", "null"]
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": ["refine", "execute", "review", "aftercare", "incident", "human_gate", "done"]
+    },
+    "head": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseHead": {
+      "type": "string",
+      "minLength": 1
+    },
+    "risk": {
+      "enum": ["T1", "T2", "T3"]
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "spec": {
+      "type": "object"
+    },
+    "specInline": {
+      "type": "object"
+    },
+    "agentAssessment": {
+      "type": ["object", "null"]
+    },
+    "review": {
+      "type": "object"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "deferredFindings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "ciFailures": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "reviewCi": {
+      "type": "object"
+    },
+    "aftercare": {
+      "type": "object"
+    },
+    "verification": {
+      "type": "object"
+    },
+    "counters": {
+      "type": "object",
+      "required": ["review", "ci", "sameFailure"],
+      "properties": {
+        "review": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ci": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sameFailure": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "historyOmitted": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

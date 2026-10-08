@@ -11,9 +11,12 @@ import {
 } from "../loop-policy.mjs";
 import { recordMetric } from "./metrics.mjs";
 import { summarizeTask } from "./next.mjs";
+import { validateDocument } from "../loop-schema.mjs";
 import {
   DEFERRED_END,
   DEFERRED_START,
+  ISSUE_TASK_PATTERN,
+  STATE_BLOCK_SCHEMA_V2,
   STATE_END,
   STATE_START,
   deferredBlock,
@@ -23,12 +26,14 @@ import {
   readChangedPathsRevisioned,
   refreshTask,
   requireClean,
+  resolveRuntime,
   safeChangedPaths,
   saveTask,
+  specSectionFingerprint,
   stateBlock,
 } from "./state.mjs";
 
-export function parseStateBlock(body) {
+export function parseStateBlock(body, root = process.cwd()) {
   requireValue(
     body.split(STATE_START).length === 2 && body.split(STATE_END).length === 2,
     "Exactly one Agent state block is required",
@@ -39,10 +44,29 @@ export function parseStateBlock(body) {
     .trim()
     .match(/^```json\s*([\s\S]*?)\s*```$/);
   requireValue(match, "Invalid Agent state JSON block");
-  return hydrateExportedTask(JSON.parse(match[1]));
+  const parsed = JSON.parse(match[1]);
+  if (parsed?.schema === STATE_BLOCK_SCHEMA_V2)
+    validateDocument("state-block", parsed, root);
+  return hydrateExportedTask(parsed);
 }
 export const gh = (args, root) =>
   execFileSync("gh", args, { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
+/**
+ * #954: fingerprint of an issue's Agent Spec section (best-effort). Returns
+ * null when the issue is unreadable or has no Agent Spec section — callers
+ * fall back to shipping the spec inline rather than anchoring to nothing.
+ * `services.issueBody` lets tests inject the body without gh.
+ */
+export function issueSpecFingerprint(issueNumber, root, services = {}) {
+  try {
+    const body =
+      services.issueBody?.(issueNumber) ??
+      JSON.parse(gh(["issue", "view", String(issueNumber), "--json", "body"], root))?.body;
+    return specSectionFingerprint(body);
+  } catch {
+    return null;
+  }
+}
 export const AFTERCARE_PR_FIELDS =
   "number,state,isDraft,headRefOid,baseRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup";
 /** owner/name slug parsed from a git remote URL (ssh or https); null when it does not match. */
@@ -365,8 +389,16 @@ export function discoverPrNumber(task, root, ghRunner) {
     return null;
   }
 }
-export function restoreTask(pr, root) {
-  const task = parseStateBlock(pr.body);
+/**
+ * #954: restore from a state-block/v2. When the spec is anchored to an issue
+ * (`spec.ref === "issue#<n>"`), the issue's Agent Spec section is refetched
+ * and its fingerprint compared to the recorded one: a match keeps the
+ * reference form (the issue stays canonical); a mismatch forces the task
+ * back to refine, where the v2 spec cannot satisfy the spec gates until the
+ * agent resubmits one via --spec. Inline specs restore verbatim.
+ */
+export function restoreTask(pr, root, services = {}) {
+  const task = parseStateBlock(pr.body, root);
   requireValue(task.branch === pr.headRefName, "PR state belongs to a different branch");
   requireValue(
     [pr.baseRefName, `origin/${pr.baseRefName}`].includes(task.baseRef),
@@ -380,6 +412,17 @@ export function restoreTask(pr, root) {
     pr.baseRefOid === git(["rev-parse", task.baseRef], root),
     "Fetch the current PR base before restoring",
   );
+  const runtimeName = task.configuration?.runtime?.name;
+  if (runtimeName) task.configuration = { runtime: resolveRuntime({ runtime: runtimeName, root }) };
+  const specRef = task.spec?.ref;
+  if (typeof specRef === "string" && /^issue#\d+$/.test(specRef)) {
+    // A fingerprint mismatch (issue edited, or section unreadable) means the
+    // spec the task was reviewed against may be stale: force refine. The
+    // v2-form spec fails the refine spec gates, so the agent must resubmit
+    // a full spec via --spec before the task can move on.
+    const fingerprint = issueSpecFingerprint(specRef.slice(6), root, services);
+    if (!(fingerprint && fingerprint === task.spec.fingerprint)) task.state = "refine";
+  }
   refreshTask(task, root);
   saveTask(task, root);
   return task;
@@ -389,7 +432,6 @@ export const tailLines = (out) =>
     .split("\n")
     .slice(-20)
     .join("\n");
-export const ISSUE_TASK_PATTERN = /^i(\d+)$/;
 /**
  * Draft PR body: the repo template with the mechanical placeholders filled —
  * a task-scoped summary, the closing issue reference, the risk tier, and a

@@ -78,6 +78,18 @@ export function requireValue(condition, message) {
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 export function validateSpec(spec, root) {
   validateDocument("spec", spec, root);
+  // #954: a v2 state-block spec is a reference ({ref, fingerprint, acIds});
+  // the issue's Agent Spec is canonical. It validates against the same
+  // invariants — no open decisions, unique AC ids — on its own fields.
+  if (typeof spec.ref === "string") {
+    requireValue(spec.openDecisions === 0, "Spec has open material decisions");
+    const ids = spec.acIds;
+    requireValue(
+      ids.every(text) && new Set(ids).size === ids.length,
+      "Acceptance criteria need unique IDs",
+    );
+    return;
+  }
   requireValue(spec.openMaterialDecisions.length === 0, "Spec has open material decisions");
   const ids = spec.acceptanceCriteria.map((ac) => ac.id);
   requireValue(
@@ -321,7 +333,13 @@ export function computeAssessment(task, paths, root = process.cwd()) {
  * what it covers, why it is required, and where its evidence lands.
  */
 function verificationPlan(result, task, root) {
-  const acs = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id).filter(Boolean);
+  const acs = (
+    task.spec?.acceptanceCriteria ??
+    task.spec?.acIds?.map((id) => ({ id })) ??
+    []
+  )
+    .map((ac) => ac.id)
+    .filter(Boolean);
   return Object.entries(result.verification).map(([kind, required]) => {
     const meta = VERIFICATION_SCOPES[kind] ?? { execution: "local", scope: "unknown" };
     const reason =
@@ -432,7 +450,8 @@ export function validateReview(task, report) {
     );
   }
   requireValue(Array.isArray(report.acceptanceCriteria), "Review must cover acceptance criteria");
-  for (const ac of task.spec.acceptanceCriteria) {
+  // A v2 reference spec carries the AC ids it was reviewed against (acIds).
+  for (const ac of task.spec.acceptanceCriteria ?? task.spec.acIds?.map((id) => ({ id })) ?? []) {
     requireValue(
       report.acceptanceCriteria.some((entry) => entry.id === ac.id && text(entry.evidence)),
       `Missing AC evidence: ${ac.id}`,

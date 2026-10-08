@@ -166,6 +166,10 @@
     },
     "reviewCi": {
       "type": ["object", "null"]
+    },
+    "specFingerprint": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "additionalProperties": false

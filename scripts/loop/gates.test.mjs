@@ -37,8 +37,10 @@ import {
   runRequiredVerification,
   runVerification,
   saveTask,
+  specSectionFingerprint,
   stateBlock,
   summarizeTask,
+  STATE_BLOCK_SCHEMA_V2,
   taskPath,
   transitionTask,
   watchAftercare,
@@ -53,6 +55,7 @@ import {
   computeAssessment,
   currentEvidence,
   requiredVerificationKinds,
+  validateTask,
   verificationSummary,
 } from "../loop-policy.mjs";
 import path from "node:path";
@@ -827,6 +830,128 @@ describe("persistent task gates", () => {
     expect(restored.risk).toBe("T3");
     expect(restored.findings).toEqual(task.findings);
     expect(restored.counters.review).toBe(2);
+  });
+
+  it("re-anchors a v2 issue spec on restore and forces refine on a fingerprint mismatch (#954 AC4)", () => {
+    const { dir, git, task } = repository();
+    task.taskId = "i954";
+    task.state = "aftercare";
+    task.review = reviewFixture(task);
+    task.findings = [];
+    const issueBody = "# Issue\n\n## Agent Spec\n\ngoal text\n\n## Other\ntail\n";
+    task.specFingerprint = specSectionFingerprint(issueBody);
+    const body = stateBlock(task);
+    // The wire block is a reference only — no spec prose travels.
+    const parsed = JSON.parse(body.match(/```json\s*([\s\S]*?)```/)[1]);
+    expect(parsed.schema).toBe(STATE_BLOCK_SCHEMA_V2);
+    expect(parsed.spec.ref).toBe("issue#954");
+    expect(parsed).not.toHaveProperty("specInline");
+    const pr = () => ({
+      body,
+      headRefName: task.branch,
+      baseRefName: "preview",
+      headRefOid: git("rev-parse", "HEAD"),
+      baseRefOid: git("rev-parse", "preview"),
+    });
+    // A matching fingerprint keeps the restored state.
+    restoreTask(pr(), dir, { issueBody: () => issueBody });
+    expect(loadTask(dir).state).toBe("aftercare");
+    // Whitespace-only edits still match.
+    restoreTask(pr(), dir, {
+      issueBody: () => issueBody.replace("goal text", "goal text   \n\n"),
+    });
+    expect(loadTask(dir).state).toBe("aftercare");
+    // A real edit forces the task back to refine, and the refine gate then
+    // demands a resubmitted spec (the reference form cannot satisfy it).
+    restoreTask(pr(), dir, { issueBody: () => issueBody.replace("goal", "edited goal") });
+    const restored = loadTask(dir);
+    expect(restored.state).toBe("refine");
+    expect(summarizeTask(restored, dir).missing).toContain("spec:acceptanceCriteria");
+    // An issue that lost its Agent Spec section behaves like an edit.
+    restoreTask(pr(), dir, { issueBody: () => "# Issue\n(no spec)\n" });
+    expect(loadTask(dir).state).toBe("refine");
+  });
+
+  it("carries unresolved ciFailure records through the v2 block into the execute gate (#954 AC6)", () => {
+    const { dir, git, task } = repository();
+    task.state = "execute";
+    task.ciFailures = [
+      {
+        check: "Test",
+        reproduction: "pnpm test:unit --include foo.test.ts",
+        recordedAt: "2026-01-01T00:00:00.000Z",
+        resolvedAt: null,
+        resolvedHead: null,
+        failedTests: [{ file: "foo.test.ts" }],
+      },
+      {
+        check: "Build",
+        reproduction: "pnpm build",
+        recordedAt: "2026-01-01T00:00:00.000Z",
+        resolvedAt: "2026-01-01T01:00:00.000Z",
+        resolvedHead: task.head,
+      },
+    ];
+    const body = stateBlock(task);
+    const parsed = JSON.parse(body.match(/```json\s*([\s\S]*?)```/)[1]);
+    // Only unresolved failures travel on the wire.
+    expect(parsed.ciFailures).toHaveLength(1);
+    expect(parsed.ciFailures[0].check).toBe("Test");
+    restoreTask(
+      {
+        body,
+        headRefName: task.branch,
+        baseRefName: "preview",
+        headRefOid: git("rev-parse", "HEAD"),
+        baseRefOid: git("rev-parse", "preview"),
+      },
+      dir,
+    );
+    const restored = loadTask(dir);
+    expect(restored.state).toBe("execute");
+    expect(restored.ciFailures).toHaveLength(1);
+    // The unresolved record keeps the execute→ready gate closed until
+    // --resolve-ci-failures re-runs the targeted verification.
+    expect(() => transitionTask(restored, "ready", {}, dir)).toThrow(
+      "Unresolved ciFailure records remain",
+    );
+  });
+
+  it("restores deferred findings consistently with review.findings (#954 AC7)", () => {
+    const { dir, git, task } = repository();
+    task.state = "aftercare";
+    task.review = reviewFixture(task, {
+      findings: [
+        {
+          id: "F1",
+          status: "deferred",
+          severity: "nit",
+          followUp: "https://github.com/o/r/issues/978",
+          evidence: "cosmetic",
+        },
+      ],
+    });
+    task.findings = structuredClone(task.review.findings);
+    const body = stateBlock(task);
+    const parsed = JSON.parse(body.match(/```json\s*([\s\S]*?)```/)[1]);
+    expect(parsed.deferredFindings).toEqual([
+      { id: "F1", severity: "nit", followUp: "https://github.com/o/r/issues/978" },
+    ]);
+    restoreTask(
+      {
+        body,
+        headRefName: task.branch,
+        baseRefName: "preview",
+        headRefOid: git("rev-parse", "HEAD"),
+        baseRefOid: git("rev-parse", "preview"),
+      },
+      dir,
+    );
+    const restored = loadTask(dir);
+    // findings stay a re-hydrated reference to review.findings.
+    expect(restored.findings).toEqual(restored.review.findings);
+    expect(restored.deferredFindings).toHaveLength(1);
+    expect(() => validateTask(restored, dir)).not.toThrow();
   });
 
   it(

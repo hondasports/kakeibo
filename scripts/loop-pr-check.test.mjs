@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { checkPullRequest, validateCheckpoint } from "./loop-pr-check.mjs";
 import { checkAftercare, computeAssessment, selectChecks } from "./loop-policy.mjs";
-import { stateBlock } from "./loop-runner.mjs";
+import { parseStateBlock, stateBlock } from "./loop-runner.mjs";
 import { taskFixture, reviewFixture } from "./loop-test-fixtures.mjs";
 function readyTask() {
   const task = taskFixture(process.cwd(), { state: "aftercare" });
@@ -56,6 +56,90 @@ describe("GitHub delivery gates", () => {
       "skill",
     );
     expect(() => validateCheckpoint(task, { ...context, head: "changed" })).toThrow("HEAD/base");
+  });
+  it("satisfies every checkpoint item from v2 state-block fields alone (#954 AC3)", () => {
+    const parsed = (mutate) => {
+      const task = readyTask();
+      const block = JSON.parse(
+        stateBlock(task).match(/```json\s*([\s\S]*?)```/)[1],
+      );
+      mutate?.(block);
+      const body = `x\n<!-- suzumemo-agent-state:start -->\n\`\`\`json\n${JSON.stringify(
+        block,
+      )}\n\`\`\`\n<!-- suzumemo-agent-state:end -->\n`;
+      return parseStateBlock(body);
+    };
+    const context = (task) => ({ head: task.head, baseHead: task.baseHead, paths: ["README.md"] });
+    // The intact v2 block passes the gate with only its own fields.
+    const intact = parsed();
+    expect(() => validateCheckpoint(intact, context(intact))).not.toThrow();
+    // Per-item negatives — each gate item still fires on v2 data.
+    expect(() => validateCheckpoint(parsed((b) => (b.state = "execute")), context(intact))).toThrow(
+      "completed review",
+    );
+    expect(() => validateCheckpoint(parsed((b) => (b.head = "c".repeat(40))), context(intact))).toThrow(
+      "HEAD/base",
+    );
+    expect(() =>
+      validateCheckpoint(parsed(), {
+        ...context(intact),
+        paths: ["scripts/loop/state.mjs"],
+      }),
+    ).toThrow("risk");
+    expect(() => validateCheckpoint(parsed((b) => delete b.review), context(intact))).toThrow(
+      "Review",
+    );
+    expect(() =>
+      validateCheckpoint(
+        parsed((b) => {
+          b.risk = "T3";
+          b.reviewCi = { ok: true, head: b.head, baseHead: b.baseHead };
+          b.review = { ...b.review, independent: false };
+        }),
+        context(intact),
+      ),
+    ).toThrow("Independent");
+    expect(() =>
+      validateCheckpoint(
+        parsed((b) => {
+          b.risk = "T3";
+          b.reviewCi = { ok: true, head: b.head, baseHead: b.baseHead };
+          b.review = { ...b.review, reviewer: b.implementer };
+        }),
+        context(intact),
+      ),
+    ).toThrow();
+    expect(() =>
+      validateCheckpoint(
+        parsed((b) => (b.findings = [{ id: "F1", status: "open", evidence: "x" }])),
+        context(intact),
+      ),
+    ).toThrow("finding");
+    expect(() => validateCheckpoint(parsed((b) => (b.verification = {})), context(intact))).toThrow(
+      "verification: process",
+    );
+    expect(() =>
+      validateCheckpoint(parsed((b) => (b.agentAssessment = null)), context(intact)),
+    ).toThrow();
+    // T3 additionally needs the CI review evidence carried on the wire.
+    const t3 = parsed((b) => {
+      b.risk = "T3";
+      b.skills = [];
+      delete b.reviewCi;
+    });
+    expect(() => validateCheckpoint(t3, context(t3))).toThrow("CI review evidence");
+    const t3WithCi = parsed((b) => {
+      b.risk = "T3";
+      b.reviewCi = { ok: true, head: b.head, baseHead: b.baseHead };
+    });
+    expect(() => validateCheckpoint(t3WithCi, context(t3WithCi))).not.toThrow();
+    // AC2: a v1 block (full task document, no schema marker) parses and
+    // passes the same gate.
+    const v1 = readyTask();
+    const v1Body = `x\n<!-- suzumemo-agent-state:start -->\n\`\`\`json\n${JSON.stringify(
+      v1,
+    )}\n\`\`\`\n<!-- suzumemo-agent-state:end -->\n`;
+    expect(() => validateCheckpoint(parseStateBlock(v1Body), context(v1))).not.toThrow();
   });
   it("accepts state blocks with or without legacy profile fields", () => {
     const task = readyTask();

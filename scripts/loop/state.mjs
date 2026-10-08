@@ -370,79 +370,140 @@ export function recordFailure(task, signature, root) {
 }
 export const STATE_START = "<!-- suzumemo-agent-state:start -->";
 export const STATE_END = "<!-- suzumemo-agent-state:end -->";
-/** Recent history entries kept in the published state block. */
-export const STATE_BLOCK_RECENT_HISTORY = 12;
+/** Wire schema marker distinguishing v2 blocks inside the same markers. */
+export const STATE_BLOCK_SCHEMA_V2 = "state-block/v2";
+/** `i<issue>` task ids anchor their spec to the GitHub issue's Agent Spec. */
+export const ISSUE_TASK_PATTERN = /^i(\d+)$/;
+/** Canonical spec anchor: issue-linked tasks reference the issue, others carry the spec inline. */
+export const specRefForTask = (task) => {
+  const issue = ISSUE_TASK_PATTERN.exec(task?.taskId ?? "")?.[1];
+  return issue ? `issue#${issue}` : "inline";
+};
 /**
- * The PR state block is what restore and the PR gate need, not the full local
- * record: the assessment is recomputed from the real diff on both paths,
- * verification log tails live in local artifacts, and history keeps the
- * recent entries plus every review_recorded entry a delta review or the gate
- * can reference (the latest one and review.deltaFrom). Omitted entries are
- * counted; the complete history stays in the worktree's Git metadata.
- *
- * Exact duplicates of `task.review` are replaced by references that
- * parseStateBlock re-hydrates: `findings` (always the last report's findings)
- * and the latest review_recorded entry's findings/AC evidence. Older kept
- * review entries keep their AC evidence (a delta packet's previous review)
- * but not their findings, which every later review carries forward by id.
+ * The section of an issue body that is the spec's canonical source: the text
+ * between `## Agent Spec` and the next `## ` heading (or end of body).
  */
-export const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-export function compactTaskForExport(task) {
-  const history = task.history ?? [];
-  const keep = new Set(history.map((_, index) => index).slice(-STATE_BLOCK_RECENT_HISTORY));
-  const reviewIndexes = history
-    .map((entry, index) => (entry.event === "review_recorded" ? index : -1))
-    .filter((index) => index >= 0);
-  const latestReview = reviewIndexes.at(-1);
-  if (latestReview !== undefined) keep.add(latestReview);
-  const deltaFrom = task.review?.deltaFrom;
-  if (deltaFrom)
-    for (const index of reviewIndexes) if (history[index].head === deltaFrom) keep.add(index);
-  const review = task.review;
-  const kept = [];
-  history.forEach((entry, index) => {
-    if (!keep.has(index)) return;
-    if (entry.event !== "review_recorded") return kept.push(entry);
-    const { findings, acceptanceCriteria, ...rest } = entry;
-    if (
-      index === latestReview &&
-      review &&
-      entry.head === review.head &&
-      sameJson(findings, review.findings) &&
-      sameJson(acceptanceCriteria, review.acceptanceCriteria)
+export function extractAgentSpecSection(issueBody) {
+  const match = /^## Agent Spec\s*$/m.exec(issueBody ?? "");
+  if (!match) return null;
+  const rest = issueBody.slice(match.index + match[0].length).replace(/^\r?\n/, "");
+  const end = /^## /m.exec(rest);
+  return end ? rest.slice(0, end.index) : rest;
+}
+/** Whitespace-insensitive normalization so the fingerprint survives refetch/formatting. */
+export const normalizeSpecSection = (section) =>
+  String(section ?? "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+/** Fingerprint of the issue's Agent Spec section: detects edits between restore attempts. */
+export function specSectionFingerprint(issueBody) {
+  const section = extractAgentSpecSection(issueBody);
+  if (section === null) return null;
+  return createHash("sha256").update(normalizeSpecSection(section)).digest("hex");
+}
+/**
+ * Canonical hash over the issue-mirrored spec fields — the fingerprint used
+ * for inline specs (self-contained in the block) and for the local record.
+ */
+export const specFingerprint = (spec) =>
+  createHash("sha256")
+    .update(
+      JSON.stringify({
+        goal: spec?.goal ?? null,
+        acceptanceCriteria: (spec?.acceptanceCriteria ?? []).map((ac) => [ac.id, ac.text]),
+        nonGoals: spec?.nonGoals ?? [],
+        verificationStrategy: spec?.verificationStrategy ?? [],
+        predictedRisk: spec?.predictedRisk ?? null,
+      }),
     )
-      return kept.push({ ...rest, sameAsReview: true });
-    kept.push(index === latestReview ? entry : { ...rest, acceptanceCriteria });
-  });
-  const verification = {};
-  for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
-    const { summary, ...rest } = evidence ?? {};
-    verification[kind] =
-      summary && typeof summary === "object"
-        ? { ...rest, summary: { exitCode: summary.exitCode } }
-        : { ...rest };
-  }
-  const omitted = history.length - kept.length;
-  const { findings, ...rest } = task;
+    .digest("hex");
+export const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * state-block/v2 (#954): only what restore and the PR gate need — no history,
+ * no configuration blob, no per-run verification details, no spec prose for
+ * issue-linked tasks (the issue's Agent Spec is canonical; the fingerprint
+ * pins the version the task was worked against). `spec.fingerprint` anchors
+ * the issue's Agent Spec section hash at init/--spec time; when it is missing
+ * (fetch degraded) the spec is shipped inline instead, keeping the block
+ * self-sufficient rather than unverifiable.
+ */
+export function compactTaskForExport(task) {
+  const ref = specRefForTask(task);
+  const spec = task.spec ?? {};
+  // The anchor hash lives on the task for full specs (stamped at init/--spec)
+  // and inside the reference itself for v2-restored tasks.
+  const issueFingerprint =
+    task.specFingerprint ?? (typeof spec.fingerprint === "string" ? spec.fingerprint : null);
+  const anchored = ref !== "inline" && typeof issueFingerprint === "string";
+  const review = task.review ? { ...task.review } : null;
+  // A recorded delta review's findings/AC evidence already cover the whole
+  // head — the deltaFrom pointer only validates against local history, which
+  // the block no longer carries, so it cannot be re-verified and is dropped.
+  if (review) delete review.deltaFrom;
+  const findings = task.findings;
   const deferred = (findings ?? [])
     .filter((finding) => finding.status === "deferred")
     .map(({ id, severity, followUp }) => ({ id, severity, followUp }));
+  const verification = {};
+  for (const [kind, evidence] of Object.entries(task.verification ?? {})) {
+    const appliesTo = evidence?.appliesTo ?? evidence;
+    verification[kind] = {
+      head: appliesTo?.head ?? null,
+      baseHead: appliesTo?.baseHead ?? null,
+      exitCode: evidence?.summary?.exitCode ?? (evidence?.success === true ? 0 : 1),
+    };
+  }
+  const unresolvedCi = (task.ciFailures ?? []).filter((failure) => !failure?.resolvedAt);
+  const omitted = (task.history?.length ?? 0) + (task.historyOmitted ?? 0);
   return {
-    ...rest,
+    schema: STATE_BLOCK_SCHEMA_V2,
+    version: task.version ?? 2,
+    taskId: task.taskId,
+    implementer: task.implementer,
+    runtime: task.configuration?.runtime?.name ?? null,
+    branch: task.branch,
+    state: task.state,
+    head: task.head,
+    baseRef: task.baseRef,
+    baseHead: task.baseHead,
+    risk: task.risk,
+    attempt: task.attempt ?? 0,
+    skills: task.skills ?? [],
+    spec: {
+      fingerprint: anchored ? issueFingerprint : specFingerprint(spec),
+      ref: anchored ? ref : "inline",
+      predictedRisk: spec.predictedRisk ?? null,
+      acIds: (spec.acceptanceCriteria ?? spec.acIds?.map((id) => ({ id })) ?? []).map(
+        (ac) => ac.id,
+      ),
+      openDecisions: spec.openMaterialDecisions?.length ?? spec.openDecisions ?? 0,
+    },
+    ...(anchored ? {} : { specInline: spec }),
+    agentAssessment: task.agentAssessment ?? null,
+    ...(review ? { review } : {}),
     ...(findings === undefined || (review && sameJson(findings, review.findings))
       ? {}
       : { findings }),
     ...(deferred.length ? { deferredFindings: deferred } : {}),
-    assessment: null,
+    ...(unresolvedCi.length ? { ciFailures: unresolvedCi } : {}),
+    ...(task.reviewCi ? { reviewCi: task.reviewCi } : {}),
+    ...(task.aftercare ? { aftercare: task.aftercare } : {}),
     verification,
-    history: kept,
-    ...(omitted + (task.historyOmitted ?? 0) > 0
-      ? { historyOmitted: omitted + (task.historyOmitted ?? 0) }
-      : {}),
+    counters: {
+      review: task.counters?.review ?? 0,
+      ci: task.counters?.ci ?? 0,
+      sameFailure: task.counters?.sameFailure ?? 0,
+    },
+    ...(omitted > 0 ? { historyOmitted: omitted } : {}),
   };
 }
-/** Inverse of the reference compaction above; plain (legacy) blocks pass through unchanged. */
+/** Inverse of the v1 reference compaction; plain (legacy) blocks pass through unchanged. */
 export function hydrateExportedTask(task) {
+  if (task?.schema === STATE_BLOCK_SCHEMA_V2) return hydrateStateBlockV2(task);
   // #953: legacy blocks may carry the removed reuse/lane fields — ignore them.
   delete task.lane;
   if (task.assessment && typeof task.assessment === "object") delete task.assessment.lane;
@@ -457,6 +518,56 @@ export function hydrateExportedTask(task) {
     entry.findings = structuredClone(review.findings);
     entry.acceptanceCriteria = structuredClone(review.acceptanceCriteria);
   }
+  return task;
+}
+/**
+ * v2 → task: rebuilds the schema-required local fields the block omits.
+ * history starts empty (the omitted count is preserved), configuration is
+ * reduced to the runtime name (restore re-resolves the full adapter config),
+ * and minimal verification evidence is re-derived so `currentEvidence` and
+ * `success` checks behave exactly as on the emitting task.
+ */
+export function hydrateStateBlockV2(block) {
+  const task = {
+    version: 2,
+    taskId: block.taskId,
+    implementer: block.implementer,
+    state: block.state,
+    head: block.head,
+    baseRef: block.baseRef,
+    baseHead: block.baseHead,
+    branch: block.branch,
+    risk: block.risk,
+    attempt: block.attempt ?? 0,
+    spec: block.spec?.ref === "inline" ? (block.specInline ?? block.spec) : block.spec,
+    configuration: { runtime: { name: block.runtime } },
+    skills: block.skills ?? [],
+    verification: {},
+    counters: {
+      review: block.counters?.review ?? 0,
+      ci: block.counters?.ci ?? 0,
+      sameFailure: block.counters?.sameFailure ?? 0,
+    },
+    history: [],
+    ...(block.historyOmitted ? { historyOmitted: block.historyOmitted } : {}),
+    agentAssessment: block.agentAssessment ?? null,
+  };
+  for (const [kind, evidence] of Object.entries(block.verification ?? {})) {
+    task.verification[kind] = {
+      head: evidence?.head,
+      baseHead: evidence?.baseHead,
+      success: evidence?.exitCode === 0,
+      summary: { exitCode: evidence?.exitCode },
+    };
+  }
+  if (block.review) task.review = block.review;
+  if (task.review && block.findings === undefined && Array.isArray(task.review.findings))
+    task.findings = structuredClone(task.review.findings);
+  else if (block.findings !== undefined) task.findings = block.findings;
+  if (block.deferredFindings) task.deferredFindings = block.deferredFindings;
+  if (block.ciFailures) task.ciFailures = block.ciFailures;
+  if (block.reviewCi) task.reviewCi = block.reviewCi;
+  if (block.aftercare) task.aftercare = block.aftercare;
   return task;
 }
 export const DEFERRED_START = "<!-- suzumemo-agent-deferred:start -->";
