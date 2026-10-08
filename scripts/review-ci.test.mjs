@@ -17,7 +17,13 @@ import {
   requireReviewCiEvidence,
   requiresReviewCi,
 } from "./loop-policy.mjs";
-import { loadTask, runNext, saveTask, transitionTask } from "./loop-runner.mjs";
+import {
+  collectReviewCiEvidence,
+  loadTask,
+  runNext,
+  saveTask,
+  transitionTask,
+} from "./loop-runner.mjs";
 import { taskFixture, reviewFixture, agentAssessment } from "./loop-test-fixtures.mjs";
 
 const t3Task = () => {
@@ -321,6 +327,23 @@ describe("runNext --review CI wiring", () => {
     );
     expect(result.needs).toBe("ci_pending");
     expect(loadTask(dir).reviewCi ?? null).toBeNull();
+  });
+  it("F8: flaky diagnostics failure degrades flaky only — ciChecks survive", () => {
+    const { dir, task } = wiringRepo();
+    const prFields = pr(task, rollup({}, FULL_CHECKS));
+    const ci = collectReviewCiEvidence(task, 7, dir, {
+      fetchPr: () => prFields,
+      resolveRepo: () => "o/r",
+      gh: () => {
+        throw new Error("gh check-runs unreachable");
+      },
+    });
+    // flaky収集だけが失敗し required/observed は残る（F8: 同一tryで落とさない）
+    expect(ci).toBeDefined();
+    expect(ci.verdict).toBe("ok");
+    expect(ci.observed.length).toBe(FULL_CHECKS.length - 1);
+    expect(ci.flaky.tests).toEqual([]);
+    expect(ci.flaky.errors.length).toBeGreaterThan(0);
   });
   it("F3: review → --event ci_failure keeps the #958 contract (execute, counter, dedup)", () => {
     const { dir, task } = wiringRepo();

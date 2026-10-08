@@ -1547,13 +1547,19 @@ export function collectReviewCiEvidence(task, pr, root, options = {}) {
     const fetchers = aftercareFetchers(pr, handled, root, { fetchPr });
     const prFields = (fetchPr ?? fetchers.fetchPr)();
     const ci = evaluateReviewCi(prFields, task, safeChangedPaths(root, task));
-    ci.flaky = ciFlakyDiagnostics({
-      rollup: prFields?.statusCheckRollup ?? [],
-      head: task.head,
-      slug: resolveRepo ? resolveRepo() : fetchers.slug(),
-      root,
-      gh: ghFn ?? ((a, r) => gh(a, r)),
-    });
+    // flaky収集だけは独立して失敗させる — check-runs/log取得が重いため、
+    // そこでの失敗がciChecks全体を消さないようにする（F8）
+    try {
+      ci.flaky = ciFlakyDiagnostics({
+        rollup: prFields?.statusCheckRollup ?? [],
+        head: task.head,
+        slug: resolveRepo ? resolveRepo() : fetchers.slug(),
+        root,
+        gh: ghFn ?? ((a, r) => gh(a, r)),
+      });
+    } catch (error) {
+      ci.flaky = { tests: [], errors: [String(error?.message ?? error)] };
+    }
     return ci;
   } catch {
     return undefined;
