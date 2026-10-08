@@ -44,3 +44,4 @@ playwright/.clerk/
 
 # Convex anonymous/local deployment の state（e2e:isolated 等）
 .convex/
+e2e-results

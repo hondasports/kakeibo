@@ -194,3 +194,10 @@ jobs:
             test-results/
           # 1日で削除（認証情報が含まれる可能性があるため最短期間）
           retention-days: 1
+
+      # #958: flaky(passed-on-retry)をjob summaryへ可視化。失敗しても
+      # ジョブ結果には影響させない（continue-on-error）
+      - name: Report flaky tests
+        if: always()
+        continue-on-error: true
+        run: node scripts/report-flaky-e2e.mjs >> "$GITHUB_STEP_SUMMARY"
