@@ -39,6 +39,7 @@ import {
   readChangedPathsRevisioned,
   aftercareFetchers,
   collectFindingsArgs,
+  ensureTaskPr,
   repositorySlugFromRemoteUrl,
   resolveRepositorySlug,
   compactTaskForExport,
@@ -3480,6 +3481,23 @@ describe("--next auto-advance (#950)", () => {
     expect(result.pr).toBe(11);
     // packet still built — the missing PR does not block review packaging.
     expect(result.packet.dir).toContain("agent-review");
+  });
+  it("gh pr create strips a remote prefix from stored baseRef (F3)", () => {
+    const { dir, git: fxGit, task } = repository();
+    fxGit("remote", "add", "origin", "https://example.invalid/o/r.git");
+    task.baseRef = "origin/preview";
+    const seen = [];
+    const gh = (argv) => {
+      seen.push(argv.join(" "));
+      if (argv[0] === "pr" && argv[1] === "list") return "[]";
+      if (argv[0] === "pr" && argv[1] === "create") return "https://github.com/o/r/pull/3";
+      return "{}";
+    };
+    const n = ensureTaskPr(task, dir, { gh, push: () => {} });
+    expect(n).toBe(3);
+    const create = seen.find((line) => line.startsWith("pr create"));
+    expect(create).toMatch(/--base preview(\s|$)/);
+    expect(create).not.toContain("origin/preview");
   });
   it("a dirty tree in review state stops as commit instead of crashing (F1)", () => {
     const { dir, task } = repository();

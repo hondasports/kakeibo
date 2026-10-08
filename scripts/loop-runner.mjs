@@ -2225,6 +2225,16 @@ export function ensureTaskPr(task, root = process.cwd(), services = {}) {
   try {
     const file = path.join(temp, "body.md");
     writeFileSync(file, draftPrBody(task, root), { mode: 0o600 });
+    // F3: baseRef は `origin/preview` のようなremote追跡refで保持され得るが、
+    // `gh pr create --base` はブランチ名しか受け付けない（remote/branch 404）。
+    // 実在するremote名の接頭辞だけ剥がし、素のブランチ名（feature/foo）は触らない。
+    const remoteNames = new Set(
+      (services.git ?? ((a, r) => git(a, r)))(["remote"], root).split("\n").filter(Boolean),
+    );
+    const rawBase = task.baseRef ?? "preview";
+    const slash = rawBase.indexOf("/");
+    const baseName =
+      slash > 0 && remoteNames.has(rawBase.slice(0, slash)) ? rawBase.slice(slash + 1) : rawBase;
     // `gh pr create` has no --json: stdout is the PR URL. Tolerate JSON output
     // too (test doubles), then fall back to re-listing the branch's open PR.
     const out = ghRunner(
@@ -2237,7 +2247,7 @@ export function ensureTaskPr(task, root = process.cwd(), services = {}) {
         "--body-file",
         file,
         "--base",
-        task.baseRef ?? "preview",
+        baseName,
         "--head",
         task.branch,
       ],
