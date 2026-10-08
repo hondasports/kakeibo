@@ -9,7 +9,7 @@
 3. 不明点を「調査で解決」「既存patternから安全に決定」「material decision」の3種に分ける。
 4. Product / UX / Security / Data semanticsをmaterially変える未確定事項だけHUMAN_GATEへ送る。
 5. SpecからPredicted Riskを評価する。Machine Floorを下げる目的で仕様を狭めない。
-6. `--assessment` で評価を記録する。JSONには `risk_assessment`（4軸）・`tier_rationale`・`applied_tier` を含める。検証の強度はこの評価とTierから機械判定される（Profile機構は廃止）。
+6. `--draft assessment` の下書きに残りの項目を記入し、`--assessment` で評価を記録する。Machine由来の初期値より低い値は拒否される。検証の強度はこの評価とTierから機械判定される（Profile機構は廃止）。
 
 ## Exit
 
