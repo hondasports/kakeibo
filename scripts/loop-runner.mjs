@@ -2068,22 +2068,27 @@ export function runNext(args, root = process.cwd(), services = {}) {
   if (task.state === "aftercare") {
     const pr = discoverPr();
     if (!pr) return stop("pr");
-    let failed = stepOr("sync-pr", "pr", () => {
-      syncPrStateBlock(task, pr, root, services);
-    });
-    if (failed) return failed;
     const fetchers = aftercareFetchers(pr, args.handled, root, services);
     let prFields;
-    failed = stepOr("fetch-pr", "pr", () => {
+    let failed = stepOr("fetch-pr", "pr", () => {
       prFields = (services.fetchPr ?? fetchers.fetchPr)();
     });
     if (failed) return failed;
+    // ready化をsync-prより先に行う。draft中のsync-prが発火させる `edited`
+    // イベントは Agent harness を SKIPPED にし、そのcheck runが ready_for_review
+    // の成功runより started_at で新しくなるとselectChecksの「最新が正本」判定で
+    // required SUCCESSが永遠に観測されない（draft payloadでskip評価されるため）。
+    // ready後の edited は draft=false で本実行され、skipped run自体が生まれない。
     if (prFields.isDraft === true) {
       failed = stepOr("pr_ready", "pr", () => {
         ghRunner(["pr", "ready", String(pr)], root);
       });
       if (failed) return failed;
     }
+    failed = stepOr("sync-pr", "pr", () => {
+      syncPrStateBlock(task, pr, root, services);
+    });
+    if (failed) return failed;
     const interval = args["interval-seconds"];
     requireIntervalSeconds(interval);
     let result;

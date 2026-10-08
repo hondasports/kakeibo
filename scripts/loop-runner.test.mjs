@@ -3382,6 +3382,12 @@ describe("--next auto-advance (#950)", () => {
     expect(loadTask(dir).state).toBe("done");
     expect(ghCalls.some((call) => call.startsWith("pr edit"))).toBe(true);
     expect(ghCalls.some((call) => call.startsWith("pr ready"))).toBe(true);
+    // draft中のsync-pr(edited)が Agent harness を SKIPPED にし、そのrunが
+    // ready_for_reviewの成功runより新しくselectChecksの正本になるのを防ぐため、
+    // ready化はsync-prより先に行う。
+    expect(ghCalls.findIndex((call) => call.startsWith("pr ready"))).toBeLessThan(
+      ghCalls.findIndex((call) => call.startsWith("pr edit")),
+    );
     expect(ghCalls.some((call) => call.startsWith("api repos/o/r/issues/7/comments"))).toBe(true);
   });
   it("AC7: an aftercare CI failure stops with ci_reproduce and the reproduce command", () => {
