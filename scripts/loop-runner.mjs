@@ -2026,13 +2026,9 @@ export function runNext(args, root = process.cwd(), services = {}) {
     note("aftercare", result.ready);
     if (!result.ready) {
       const last = result.last;
-      const failed = (last?.failed ?? []).filter(
-        (name) => !(last?.pending ?? []).includes(name),
-      );
+      const failed = (last?.failed ?? []).filter((name) => !(last?.pending ?? []).includes(name));
       if (failed.length) {
-        const slug = services.resolveRepo
-          ? services.resolveRepo()
-          : fetchers.slug();
+        const slug = services.resolveRepo ? services.resolveRepo() : fetchers.slug();
         const ciFailures = extractCiFailures({
           rollup: (services.fetchPr ?? fetchers.fetchPr)().statusCheckRollup ?? [],
           head: task.head,
@@ -2110,7 +2106,8 @@ export function draftPrBody(task, root = process.cwd()) {
   let body = readFileSync(templatePath, "utf8");
   body = body.replace("## 概要", `## 概要\n\n${summary}`);
   body = body.replace("## 変更内容", `## 変更内容\n\n- ${summary}`);
-  if (issue) body = body.replaceAll("Closes #", `Closes #${issue} `).replace(`#${issue} `, `#${issue}`);
+  if (issue)
+    body = body.replaceAll("Closes #", `Closes #${issue} `).replace(`#${issue} `, `#${issue}`);
   body = body.replace("Risk: ", `Risk: ${risk}`);
   body = body.replace("結果:", "結果: 成功（`--next` 実行: process/lint/unit/build、E2EはCI）");
   body = body.replace(
@@ -2134,10 +2131,7 @@ export function ensureTaskPr(task, root = process.cwd(), services = {}) {
   const ghRunner = services.gh ?? ((a, r) => gh(a, r));
   (services.push ?? ((branch, r) => git(["push", "-u", "origin", branch], r)))(task.branch, root);
   const listed = JSON.parse(
-    ghRunner(
-      ["pr", "list", "--head", task.branch, "--state", "open", "--json", "number"],
-      root,
-    ),
+    ghRunner(["pr", "list", "--head", task.branch, "--state", "open", "--json", "number"], root),
   );
   if (listed?.[0]?.number) return listed[0].number;
   const temp = mkdtempSync(path.join(tmpdir(), "agent-pr-"));
@@ -2608,8 +2602,7 @@ export function syncPrStateBlock(task, pr, root = process.cwd(), services = {}) 
       () => (deferred ? `\n\n${deferred}` : ""),
     );
   else if (deferred) body = `${body}\n\n${deferred}`;
-  if (body === prInfo.body)
-    return { ...summarizeTask(task, root), pr: String(pr), synced: false };
+  if (body === prInfo.body) return { ...summarizeTask(task, root), pr: String(pr), synced: false };
   const temp = mkdtempSync(path.join(tmpdir(), "agent-state-"));
   try {
     const file = path.join(temp, "body.md");

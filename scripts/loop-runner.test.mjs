@@ -3087,15 +3087,17 @@ describe("--next auto-advance (#950)", () => {
     mkdirSync(path.dirname(marker), { recursive: true });
     writeFileSync(marker, "ok\n");
   };
-  const ghMock = (calls = []) => (argv) => {
-    calls.push(argv.join(" "));
-    if (argv[0] === "pr" && argv[1] === "list") return "[]";
-    if (argv[0] === "pr" && argv[1] === "create") return JSON.stringify({ number: 7 });
-    if (argv[0] === "pr" && argv[1] === "view")
-      return JSON.stringify({ body: "PR body", headRefOid: null, baseRefOid: null });
-    if (argv[0] === "api" && argv[1].includes("comments")) return "[]";
-    return "{}";
-  };
+  const ghMock =
+    (calls = []) =>
+    (argv) => {
+      calls.push(argv.join(" "));
+      if (argv[0] === "pr" && argv[1] === "list") return "[]";
+      if (argv[0] === "pr" && argv[1] === "create") return JSON.stringify({ number: 7 });
+      if (argv[0] === "pr" && argv[1] === "view")
+        return JSON.stringify({ body: "PR body", headRefOid: null, baseRefOid: null });
+      if (argv[0] === "api" && argv[1].includes("comments")) return "[]";
+      return "{}";
+    };
   it("refine stops on a missing assessment and on an invalid spec without transitioning", () => {
     const { dir, task } = repository();
     task.state = "refine";
@@ -3470,8 +3472,8 @@ describe("--next auto-advance (#950)", () => {
     expect(parseArguments(["--next"]).next).toBe(true);
     expect(cliCommandName(parseArguments(["--next"]))).toBe("next");
     expect(cliCommandName(parseArguments(["--next", "--review", "r.json"]))).toBe("next");
-    expect(() =>
-      run(parseArguments(["--next", "--verify-required"]), process.cwd(), {}),
-    ).toThrow("one task action");
+    expect(() => run(parseArguments(["--next", "--verify-required"]), process.cwd(), {})).toThrow(
+      "one task action",
+    );
   });
 });
