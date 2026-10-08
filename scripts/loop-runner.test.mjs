@@ -240,7 +240,9 @@ describe("persistent task gates", () => {
     git("-c", "core.hooksPath=/dev/null", "commit", "-m", "runtime change");
     task.head = git("rev-parse", "HEAD");
     task.state = state;
-    const actual = computeAssessment(task, ["src/app.ts"]);
+    // root省略だとcwd(=実行repo)の `preview` ブランチ有無でfail-closed T3/T1が
+    // 環境依存になる（CIのcheckoutにはlocal previewが無い）。fixture repoを渡す。
+    const actual = computeAssessment(task, ["src/app.ts"], dir);
     expect(actual.runtimeRelevant).toBe(true);
     expect(actual.verification.e2e).toBe(true);
     task.risk = actual.risk.final;
