@@ -199,7 +199,7 @@ Agent taskで残す価値があるもの:
 
 ## 5. Agent Harness
 
-`AGENTS.md` はRuntime共通契約、`.agent/process.yaml` はState Transitionの正本とする。基本Stateは `REFINE / EXECUTE / REVIEW / AFTERCARE`、例外Stateは `INCIDENT / HUMAN_GATE`。Workflow本体をCodex・Devin・Claude Codeの個別設定へ複製しない。
+`AGENTS.md` はRuntime共通契約、`.agent/process.yaml` はState Transitionの正本とする。Workflow本体をCodex・Devin・Claude Codeの個別設定へ複製しない。
 
 具体的な開始・再開・状態保存は [Agent Harness操作手順](agent-harness.md) を参照する（State・遷移・上限値の正本一覧は [Agent Harness State仕様](agent-harness-states.md)）。
 

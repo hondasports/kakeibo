@@ -12,6 +12,7 @@ import {
   checkPathReferences,
   checkSectionNumbering,
   extractSkillReferences,
+  limitKeyPattern,
   parseFrontmatter,
 } from "./check-loop-docs.mjs";
 import { checkHarnessStatesDoc, generateHarnessStatesDoc } from "./generate-harness-docs.mjs";
@@ -395,6 +396,55 @@ describe("link anchor validation", () => {
     );
     expect(errors).toEqual([]);
   });
+
+  it("resolves a bare #fragment against the same document", () => {
+    const repo = makeRepo();
+    const content = "# S\n\n## 実装と検証\n\n[x](#実装と検証)\n";
+    write(repo, "docs/source.md", content);
+    const errors = checkPathReferences(repo, "docs/source.md", content);
+    expect(errors).toEqual([]);
+  });
+
+  it("reports (does not crash on) a bare #fragment missing in the same document", () => {
+    const repo = makeRepo();
+    const content = "# S\n\n[x](#missing)";
+    write(repo, "docs/source.md", content);
+    const errors = checkPathReferences(repo, "docs/source.md", content);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("セクション");
+  });
+
+  it("reports (does not crash on) an anchor on a directory target", () => {
+    const repo = makeRepo();
+    write(repo, ".agent/workflow/refine.md", "# refine\n");
+    const errors = checkPathReferences(repo, "docs/source.md", "[x](../.agent/#sec)");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("セクション");
+  });
+
+  it("reports (does not crash on) malformed percent-encoding in a fragment", () => {
+    const repo = makeRepo();
+    write(repo, "docs/target.md", "# T\n");
+    const errors = checkPathReferences(repo, "docs/source.md", "[x](target.md#100%)");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("percent-encoding");
+  });
+
+  it("does not treat '# ' lines inside fenced code as headings", () => {
+    const repo = makeRepo();
+    write(repo, "docs/target.md", "# T\n\n```bash\n# comment-like line\n```\n");
+    const errors = checkPathReferences(repo, "docs/source.md", "[x](target.md#comment-like-line)");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("セクション");
+  });
+
+  it("matches fragments case-sensitively like GitHub", () => {
+    const repo = makeRepo();
+    write(repo, "docs/target.md", "## Section\n");
+    const errors = checkPathReferences(repo, "docs/source.md", "[x](target.md#Section)");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("セクション");
+  });
 });
 
 describe("limit key mentions", () => {
@@ -423,6 +473,24 @@ describe("limit key mentions", () => {
 
   it("does not flag unrelated words", () => {
     expect(checkLimitKeyMentions("docs/x.md", "round数の上限")).toEqual([]);
+  });
+
+  it("derives the banned keys from process.yaml so new keys stay banned", () => {
+    const repo = makeRepo();
+    write(
+      repo,
+      ".agent/process.yaml",
+      "initial: refine\nlimits:\n  same_failure_max: 3\n  brand_new_limit: 2\n",
+    );
+    const pattern = limitKeyPattern(repo);
+    expect(checkLimitKeyMentions("docs/x.md", "値 brand_new_limit", pattern)).toHaveLength(1);
+    expect(checkLimitKeyMentions("docs/x.md", "値 same_failure_max", pattern)).toHaveLength(1);
+  });
+
+  it("falls back to the known keys when process.yaml is absent", () => {
+    const repo = makeRepo();
+    const pattern = limitKeyPattern(repo);
+    expect(checkLimitKeyMentions("docs/x.md", "値 review_max_rounds", pattern)).toHaveLength(1);
   });
 });
 

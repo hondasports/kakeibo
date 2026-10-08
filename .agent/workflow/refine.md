@@ -11,4 +11,4 @@
 
 ## Exit
 
-`node scripts/loop-runner.mjs --next` を実行する。不足は `needs` で止まる。遷移・上限の正本一覧は `docs/agent-harness-states.md`、提出フォーマットの詳細は `docs/agent-harness.md` を参照する。
+`node scripts/loop-runner.mjs --next` を実行する。ready条件（Goal存在・AC≥1・open decision 0・各ACの検証方針）が揃わなければ `needs` で止まる。遷移・上限の正本一覧は `docs/agent-harness-states.md`、提出フォーマットの詳細は `docs/agent-harness.md` を参照する。

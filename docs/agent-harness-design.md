@@ -9,7 +9,7 @@
 - Agentが読む情報、機械情報を記入する手間、検証・レビューの重複を減らし、作業時間と総トークン消費を抑える。
 - Agentは仕様・実差分・検証結果の意味を判断し、CLIは状態・最低条件・証跡を管理する。
 - Riskの4軸、Machine Floor、必須Skill、必須検証、独立レビュー、Human Gateを維持する。
-- Stateは `REFINE / EXECUTE / REVIEW / AFTERCARE / INCIDENT / HUMAN_GATE / DONE` を使う。強度判定や個々のテストのためにStateやAgentのターンを増やさない。
+- Stateは [State仕様](agent-harness-states.md) の正本を使う。強度判定や個々のテストのためにStateやAgentのターンを増やさない。
 - 実行契約・workflowをRuntimeごとに複製せず、必要な専門Skillだけを必要時に読む。
 
 ## 2. 全体の流れ

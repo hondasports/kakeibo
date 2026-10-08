@@ -2,6 +2,8 @@ import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import YAML from "yaml";
+
 import { checkHarnessStatesDoc, STATES_DOC_PATH } from "./generate-harness-docs.mjs";
 
 const DOC_SCAN_GLOBS = [
@@ -50,8 +52,30 @@ const SECTION_HEADING_PATTERN = /^## (\d+)\. /gm;
 const HEADING_PATTERN = /^#{1,6} +(.*)$/gm;
 
 /** Stateの上限値キー名は process.yaml が正本で、文書では agent-harness-states.md（生成物）だけに書く。 */
-const LIMIT_KEY_PATTERN =
-  /\b(?:same_failure_max|review_reassess_every|review_max_rounds|ci_fix_max_rounds)\b/;
+const FALLBACK_LIMIT_KEYS = [
+  "same_failure_max",
+  "review_reassess_every",
+  "review_max_rounds",
+  "ci_fix_max_rounds",
+];
+
+function limitKeyRegExp(keys) {
+  const escaped = keys.map((key) => key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(`\\b(?:${escaped.join("|")})\\b`);
+}
+
+const LIMIT_KEY_PATTERN = limitKeyRegExp(FALLBACK_LIMIT_KEYS);
+
+/** process.yaml の limits キーから禁止パターンを作る。読めない場合だけ既定キーへフォールバックする。 */
+export function limitKeyPattern(repoRoot) {
+  try {
+    const parsed = YAML.parse(readFileSync(path.join(repoRoot, ".agent/process.yaml"), "utf8"));
+    const keys = Object.keys(parsed?.limits ?? {});
+    return keys.length > 0 ? limitKeyRegExp(keys) : LIMIT_KEY_PATTERN;
+  } catch {
+    return LIMIT_KEY_PATTERN;
+  }
+}
 
 /** GitHubが見出しに付けるアンカーのslugに近い変換（小文字化・空白を-へ・句読点除去）。 */
 export function anchorSlug(heading) {
@@ -62,10 +86,29 @@ export function anchorSlug(heading) {
     .replace(/ /g, "-");
 }
 
+/** フェンスコードブロック（``` / ~~~）を除去する。中の `# ` 行は見出しではないのでアンカーにしない。 */
+function stripFencedBlocks(text) {
+  const kept = [];
+  let fence = null;
+  for (const line of String(text).split("\n")) {
+    const match = line.match(/^(`{3,}|~{3,})/);
+    if (fence === null) {
+      if (match) {
+        fence = match[1][0];
+        continue;
+      }
+      kept.push(line);
+    } else if (match && match[1][0] === fence) {
+      fence = null;
+    }
+  }
+  return kept.join("\n");
+}
+
 function collectAnchors(content) {
   const anchors = new Set();
   const seen = new Map();
-  for (const match of String(content).matchAll(HEADING_PATTERN)) {
+  for (const match of stripFencedBlocks(content).matchAll(HEADING_PATTERN)) {
     const base = anchorSlug(match[1]);
     const count = seen.get(base) ?? 0;
     seen.set(base, count + 1);
@@ -234,19 +277,38 @@ export function checkPathReferences(repoRoot, docPath, content) {
     const target = match[1];
     if (/^(?:https?:|mailto:)/.test(target)) continue;
     // A `#fragment` suffix names a section anchor: check both the file and the heading.
-    const [filePart, anchor] = target.split("#");
-    // Markdown links are resolved relative to the document (GitHub semantics).
-    const { relativePath, exists } = resolveCandidate(repoRoot, docDir, filePart);
+    const hashIndex = target.indexOf("#");
+    const filePart = hashIndex === -1 ? target : target.slice(0, hashIndex);
+    const anchor = hashIndex === -1 ? null : target.slice(hashIndex + 1);
+    // A bare `#anchor` refers to a heading in the same document.
+    const { relativePath, exists } =
+      filePart === ""
+        ? resolveCandidate(repoRoot, "", docPath)
+        : resolveCandidate(repoRoot, docDir, filePart);
     if (!exists) {
       errors.push(`${docPath}: リンク先 ${target} (${relativePath}) が存在しません`);
       continue;
     }
     if (anchor) {
+      const targetAbsPath = path.join(repoRoot, relativePath);
+      if (!statSync(targetAbsPath).isFile()) {
+        errors.push(
+          `${docPath}: リンク先 ${target} はファイルではないためセクション ${anchor} を解決できません`,
+        );
+        continue;
+      }
+      // GitHub anchors are case-sensitive: the fragment must match the slug exactly.
+      let anchorName;
+      try {
+        anchorName = decodeURIComponent(anchor);
+      } catch {
+        errors.push(
+          `${docPath}: リンク先 ${target} のセクション ${anchor} はpercent-encodingが不正です`,
+        );
+        continue;
+      }
       const targetContent =
-        relativePath === docPath
-          ? content
-          : readFileSync(path.join(repoRoot, relativePath), "utf8");
-      const anchorName = decodeURIComponent(anchor).toLowerCase();
+        relativePath === docPath ? content : readFileSync(targetAbsPath, "utf8");
       if (!collectAnchors(targetContent).has(anchorName)) {
         errors.push(`${docPath}: リンク先 ${target} のセクション ${anchor} が存在しません`);
       }
@@ -328,10 +390,10 @@ export function checkBannedVocabulary(docPath, content) {
 }
 
 /** State上限値のキー名は生成物の agent-harness-states.md だけに出す（正本は process.yaml）。 */
-export function checkLimitKeyMentions(docPath, content) {
+export function checkLimitKeyMentions(docPath, content, pattern = LIMIT_KEY_PATTERN) {
   const errors = [];
   if (docPath === STATES_DOC_PATH) return errors;
-  const match = String(content).match(LIMIT_KEY_PATTERN);
+  const match = String(content).match(pattern);
   if (match) {
     errors.push(
       `${docPath}: 上限値キー "${match[0]}" は ${STATES_DOC_PATH}（process.yamlから自動生成）だけに書く`,
@@ -371,12 +433,13 @@ export function checkLoopDocs(repoRoot) {
   if (generatedDrift) errors.push(generatedDrift);
 
   const packageScripts = loadPackageScripts(repoRoot);
+  const limitPattern = limitKeyPattern(repoRoot);
   for (const docPath of docFiles) {
     const content = readFileSync(path.join(repoRoot, docPath), "utf8");
     errors.push(...checkPathReferences(repoRoot, docPath, content));
     errors.push(...checkCommandReferences(repoRoot, docPath, content, packageScripts));
     errors.push(...checkBannedVocabulary(docPath, content));
-    errors.push(...checkLimitKeyMentions(docPath, content));
+    errors.push(...checkLimitKeyMentions(docPath, content, limitPattern));
     if (SKILL_NAME_PATTERN.test(docPath)) {
       errors.push(...checkSkillFrontmatter(repoRoot, docPath));
     }
