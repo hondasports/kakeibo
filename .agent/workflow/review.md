@@ -32,7 +32,7 @@ Reviewerは増分・影響caller・open findingから確認し、影響のない
 
 ## Exit
 
-`node scripts/loop-runner.mjs --next` を実行する。PRがあれば外部レビュー指摘を収集し、`--review-packet` 相当のpacketを生成して `needs:"review"` で止まる（独立レビュー要否も返す）。Reviewerの報告ファイルを受け取ったら `node scripts/loop-runner.mjs --next --review <file>` を実行する: REVIEW cleanに必要な残り検証（全Tierともローカルはprocessのみ）を先に実行し、レビューを記録して、open findingが0件なら、T2/T3はdraft PRの現在HEADのCI check評価を経て `clean` でAFTERCAREへ（CI待ちは `needs:"ci_pending"`、失敗は `ci_reproduce`、意図しないSKIPPEDは `ci_unexpected_skip`）、残れば `findings` でEXECUTEへ遷移する（reasonはfinding id一覧が自動で入る）。2ラウンドごとの方針再評価が必要な回では `needs:"reassessment"` で止まるので、`--event findings --exit <file>` で根拠を記録する。
+`node scripts/loop-runner.mjs --next` を実行する。PRがあれば外部レビュー指摘を収集し、`--review-packet` 相当のpacketを生成して `needs:"review"` で止まる（独立レビュー要否も返す）。Reviewerの報告ファイルを受け取ったら `node scripts/loop-runner.mjs --next --review <file>` を実行する: REVIEW cleanに必要な残り検証（全Tierともローカルはprocessのみ）を先に実行し、レビューを記録して、open findingが0件なら、T2/T3はdraft PRの現在HEADのCI check評価を経て `clean` でAFTERCAREへ（CI待ちは `needs:"ci_pending"`、失敗は `ci_reproduce`、意図しないSKIPPEDは `ci_unexpected_skip`）、残れば `findings` でEXECUTEへ遷移する（reasonはfinding id一覧が自動で入る）。`ci_reproduce` で止まった場合の正規exitは `node scripts/loop-runner.mjs --event ci_failure --exit <file>`：aftercareのCI失敗と同じreproduction契約（`ciFailure`レコード＋`reproduction {command, result, note}` 必須）でEXECUTEへ戻り、未解決recordは `ready` を塞ぐ。`not_reproduced` または3ラウンド到達はINCIDENT。2ラウンドごとの方針再評価が必要な回では `needs:"reassessment"` で止まるので、`--event findings --exit <file>` で根拠を記録する。
 
 cleanの条件は「blocker / majorのopen findingが0件」に加えて、T2/T3は現在HEADのCI check評価（`reviewCi`証跡）が揃うこと（T1はローカルprocess証跡のみ）。上限（5ラウンド）到達は未完了としてINCIDENTで扱う。
 

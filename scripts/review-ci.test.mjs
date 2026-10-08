@@ -6,13 +6,18 @@
 // AC7: .md-only T3がSKIPPED合格でclean
 // AC8: .md以外でのSKIPPED→ci_unexpected_skip相当
 import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { cpSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import {
+  computeAssessment,
   evaluateReviewCi,
   expectedReviewCiChecks,
   requireReviewCiEvidence,
   requiresReviewCi,
 } from "./loop-policy.mjs";
-import { transitionTask } from "./loop-runner.mjs";
+import { loadTask, runNext, saveTask, transitionTask } from "./loop-runner.mjs";
 import { taskFixture, reviewFixture, agentAssessment } from "./loop-test-fixtures.mjs";
 
 const t3Task = () => {
@@ -170,5 +175,193 @@ describe("REVIEW clean gate", () => {
     const task = taskFixture();
     gate(task)();
     expect(task.state).toBe("aftercare");
+  });
+});
+
+// F6: --next --review のCI配線（poll→verdict→証跡記録/停止語）の結合テスト。
+// evaluate/gate単体では配線バグ（ok以外での証跡記録、停止語の誤配線、
+// pollの非終了）を捕まえられないため、runNextをstub servicesで駆動する。
+const FULL_CHECKS = [
+  "Agent harness",
+  "CI scope",
+  "Lint",
+  "Build",
+  "Test",
+  "E2E (Playwright / Chromium / public)",
+  "E2E (Playwright / Chromium / authenticated)",
+];
+const wiringRepo = () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "review-ci-wiring-"));
+  // resolveRuntime（taskFixture）とprocessConfig（transition）が .agent を要求する
+  cpSync(path.join(process.cwd(), ".agent"), path.join(dir, ".agent"), { recursive: true });
+  const git = (args) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+  git(["init", "-b", "preview"]);
+  git(["config", "user.email", "test@example.invalid"]);
+  git(["config", "user.name", "Test"]);
+  mkdirSync(path.join(dir, "src"), { recursive: true });
+  writeFileSync(path.join(dir, "src/app.ts"), "export const app = true;\n");
+  git(["add", "."]);
+  git(["-c", "core.hooksPath=/dev/null", "commit", "-m", "base"]);
+  const baseHead = git(["rev-parse", "HEAD"]).trim();
+  git(["switch", "-c", "task/x"]);
+  writeFileSync(path.join(dir, "src/feature.ts"), "export const feature = true;\n");
+  git(["add", "."]);
+  git(["-c", "core.hooksPath=/dev/null", "commit", "-m", "change"]);
+  const head = git(["rev-parse", "HEAD"]).trim();
+  const task = taskFixture(dir, { head, baseHead, baseRef: "preview", branch: "task/x" });
+  task.state = "review";
+  task.risk = "T3";
+  task.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: "T3" };
+  task.assessment = computeAssessment(task, ["src/feature.ts"], dir);
+  task.aftercare = { pr: 7 };
+  saveTask(task, dir);
+  return { dir, git, task };
+};
+const reviewFileFor = (task) => {
+  const file = path.join(mkdtempSync(path.join(os.tmpdir(), "review-file-")), "review.json");
+  writeFileSync(file, JSON.stringify(reviewFixture(task)), { mode: 0o600 });
+  return file;
+};
+const wiringServices = (fetchPr, extra = {}) => ({
+  runVerification: (task) => task,
+  fetchPr,
+  sleep: () => {},
+  ...extra,
+});
+
+describe("runNext --review CI wiring", () => {
+  it("ok verdict → reviewCi recorded on this head → clean → aftercare", () => {
+    const { dir, task } = wiringRepo();
+    const result = runNext(
+      { review: reviewFileFor(task) },
+      dir,
+      wiringServices(() => pr(task, rollup({}, FULL_CHECKS))),
+    );
+    expect(result.needs).toBe("aftercare");
+    const saved = loadTask(dir);
+    expect(saved.state).toBe("aftercare");
+    expect(saved.reviewCi?.ok).toBe(true);
+    expect(saved.reviewCi.head).toBe(task.head);
+    expect(saved.reviewCi.baseHead).toBe(task.baseHead);
+  });
+  it("failure verdict → ci_reproduce, unresolved record deduped on retry, reviewCi untouched", () => {
+    const { dir, task } = wiringRepo();
+    const failing = pr(task, rollup({ Test: "FAILURE" }, FULL_CHECKS));
+    const services = wiringServices(() => failing, {
+      gh: (argv) =>
+        argv.join(" ").includes("/logs")
+          ? "log line"
+          : JSON.stringify({
+              check_runs: [
+                {
+                  name: "Test",
+                  conclusion: "FAILURE",
+                  html_url: "https://github.com/o/r/actions/runs/1/job/2",
+                },
+              ],
+            }),
+      resolveRepo: () => "o/r",
+    });
+    const result = runNext({ review: reviewFileFor(task) }, dir, services);
+    expect(result.needs).toBe("ci_reproduce");
+    expect(result.command).toContain("--event ci_failure");
+    let saved = loadTask(dir);
+    expect(saved.state).toBe("review");
+    expect(saved.reviewCi ?? null).toBeNull();
+    expect(saved.ciFailures.filter((f) => f.check === "Test" && !f.resolvedAt)).toHaveLength(1);
+    // Same check failing again must not grow the unresolved list.
+    const again = runNext({ review: reviewFileFor(task) }, dir, services);
+    expect(again.needs).toBe("ci_reproduce");
+    saved = loadTask(dir);
+    expect(saved.ciFailures.filter((f) => f.check === "Test" && !f.resolvedAt)).toHaveLength(1);
+  });
+  it("unexpected_skip verdict → ci_unexpected_skip, no reviewCi", () => {
+    const { dir, task } = wiringRepo();
+    const result = runNext(
+      { review: reviewFileFor(task) },
+      dir,
+      wiringServices(() => pr(task, rollup({ Lint: "SKIPPED" }, FULL_CHECKS))),
+    );
+    expect(result.needs).toBe("ci_unexpected_skip");
+    expect(loadTask(dir).reviewCi ?? null).toBeNull();
+  });
+  it("pending → polls until ok → reviewCi recorded (poll terminates)", () => {
+    const { dir, task } = wiringRepo();
+    let calls = 0;
+    let now = 0;
+    const fetchPr = () => {
+      calls += 1;
+      const checks = rollup({}, FULL_CHECKS);
+      if (calls === 1) {
+        const test = checks.find((c) => c.name === "Test");
+        test.status = "IN_PROGRESS";
+        test.conclusion = null;
+      }
+      return pr(task, checks);
+    };
+    const result = runNext(
+      { review: reviewFileFor(task) },
+      dir,
+      wiringServices(fetchPr, { tick: () => (now += 1000), maxSeconds: 3600 }),
+    );
+    expect(calls).toBe(2);
+    expect(result.needs).toBe("aftercare");
+    expect(loadTask(dir).reviewCi?.ok).toBe(true);
+  });
+  it("permanent pending → ci_pending after the poll budget", () => {
+    const { dir, task } = wiringRepo();
+    const checks = rollup({}, FULL_CHECKS);
+    checks.find((c) => c.name === "Test").status = "IN_PROGRESS";
+    checks.find((c) => c.name === "Test").conclusion = null;
+    let now = 0;
+    const result = runNext(
+      { review: reviewFileFor(task) },
+      dir,
+      wiringServices(() => pr(task, checks), { tick: () => (now += 1000), maxSeconds: 60 }),
+    );
+    expect(result.needs).toBe("ci_pending");
+    expect(loadTask(dir).reviewCi ?? null).toBeNull();
+  });
+  it("F3: review → --event ci_failure keeps the #958 contract (execute, counter, dedup)", () => {
+    const { dir, task } = wiringRepo();
+    const exit = {
+      reason: "CI failed",
+      ciFailure: {
+        check: "Test",
+        head: task.head,
+        runUrl: "https://github.com/o/r/actions/runs/1",
+        artifactUrl: "https://github.com/o/r/actions/runs/1/artifacts/2",
+        failedTests: [{ file: "e2e/x.spec.ts", title: "fails" }],
+        reproduce: "pnpm run e2e:isolated -- e2e/x.spec.ts",
+      },
+      reproduction: {
+        command: "pnpm run e2e:isolated -- e2e/x.spec.ts",
+        result: "reproduced",
+        note: "same failure",
+      },
+    };
+    const moved = transitionTask(task, "ci_failure", exit, dir);
+    expect(moved.state).toBe("execute");
+    expect(moved.counters.ci).toBe(1);
+    expect(moved.ciFailures).toHaveLength(1);
+    expect(moved.ciFailures[0].reproduction?.result).toBe("reproduced");
+    // Contract enforcement: no reproduction → rejected
+    expect(() =>
+      transitionTask(
+        wiringRepo().task,
+        "ci_failure",
+        { reason: "x", ciFailure: exit.ciFailure },
+        dir,
+      ),
+    ).toThrow(/reproduction/);
+    // not_reproduced → incident (no repair guessing)
+    const second = wiringRepo().task;
+    const incident = transitionTask(
+      second,
+      "ci_failure",
+      { ...exit, reproduction: { command: "c", result: "not_reproduced", note: "env-only" } },
+      dir,
+    );
+    expect(incident.state).toBe("incident");
   });
 });

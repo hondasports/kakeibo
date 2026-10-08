@@ -20,6 +20,9 @@ states:
     on:
       clean: aftercare
       findings: execute
+      # #952: draft PRのCI失敗はaftercareと同じreproduction契約でexecuteへ戻す
+      # （exit.ciFailure + exit.reproduction 必須、未解決ciFailureはreadyを塞ぐ）。
+      ci_failure: execute
       repeated_failure: incident
       decision_required: human_gate
 
