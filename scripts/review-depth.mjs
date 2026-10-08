@@ -19,8 +19,6 @@ export const REVIEW_FLOOR_TRIGGERS = [
   "destructive_or_irreversible_operation",
 ];
 export const REVIEW_TIERS = ["T1", "T2", "T3"];
-/** Verification-load vocabulary (legacy; profiles removed — accepted but ignored). */
-export const VERIFICATION_LOADS = ["routine", "complex"];
 /** Cumulative review obligations, disclosed only for the selected tier. */
 export const REVIEW_REQUIREMENTS = {
   T1: ["差分のスポットチェック", "変更に対応する検証の成功"],

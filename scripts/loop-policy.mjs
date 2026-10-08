@@ -156,6 +156,8 @@ export function missingRequirements(task) {
   // EXECUTE→REVIEW accepts affected-scope unit evidence; every later gate needs the full suite.
   const localVerificationMissing = ({ fullUnit = true } = {}) => {
     if (!task.assessment || !task.agentAssessment) missing.push("assessment");
+    else if (validateAssessment(task.agentAssessment).length > 0)
+      missing.push("assessment(invalid)");
     for (const skill of task.assessment?.requiredSkills ?? [])
       if (!task.skills.includes(skill)) missing.push(`skill:${skill}`);
     for (const kind of requiredVerificationKinds(task)) {
@@ -175,6 +177,8 @@ export function missingRequirements(task) {
   };
   if (task.state === "refine") {
     if (!task.agentAssessment) missing.push("assessment");
+    else if (validateAssessment(task.agentAssessment).length > 0)
+      missing.push("assessment(invalid)");
     if ((task.spec?.openMaterialDecisions ?? []).length > 0) missing.push("openMaterialDecisions");
     const ids = (task.spec?.acceptanceCriteria ?? []).map((ac) => ac.id);
     if (!ids.length || !ids.every(text) || new Set(ids).size !== ids.length)
@@ -233,9 +237,9 @@ function verificationPlan(result, task, root) {
           ? "not required"
           : result.runtimeRelevant
             ? "runtime-relevant paths changed"
-            : result.thorough
-              ? "tier/uncertainty requires thorough verification"
-              : "required";
+            : // a required non-process kind with no runtime relevance is only
+              // reachable via thorough (required === runtimeRelevant || thorough)
+              "tier/uncertainty requires thorough verification";
     return {
       kind,
       required,
@@ -348,6 +352,12 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
     // The recorded assessment feeds thorough verification derivation; leaving
     // REFINE without it stays blocked (as with the removed profile decision).
     requireValue(task.agentAssessment, "Assessment is required to leave REFINE");
+    // Presence alone is not enough: an invalid assessment (hand-edited state or
+    // crafted state block) must fail at this gate, not one gate later.
+    requireValue(
+      validateAssessment(task.agentAssessment).length === 0,
+      "Invalid agent assessment",
+    );
   }
   if (task.state === "execute" && event === "ready")
     requireLocalVerification(task, { fullUnit: false });
