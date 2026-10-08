@@ -163,6 +163,9 @@
     "historyOmitted": {
       "type": "integer",
       "minimum": 0
+    },
+    "reviewCi": {
+      "type": ["object", "null"]
     }
   },
   "additionalProperties": false

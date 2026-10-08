@@ -83,30 +83,25 @@ const delivery = (task, checks) => ({
 const findings = { pagesComplete: true, unhandledCount: 0, unresolvedThreadCount: 0 };
 
 describe("isLiteLane", () => {
-  it("is true for plain T1 and false for floor triggers / independent review / higher tiers", () => {
+  it("#952: always true — the CI-is-verdict lane now applies to every tier", () => {
     expect(isLiteLane(taskFixture())).toBe(true);
-    // AC3a: a machine floor trigger keeps the task off the lite lane even
-    // when the computed final tier would otherwise read T1.
     const trigger = taskFixture();
     trigger.assessment.risk.machineFloorTriggers = [
       "complex_state_transition_or_orchestration_port",
     ];
-    expect(isLiteLane(trigger)).toBe(false);
-    // And a real floor-triggering path forces the tier up (never lite).
+    expect(isLiteLane(trigger)).toBe(true);
     const floored = taskFixture();
     floored.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: "T3" };
     floored.assessment = computeAssessment(floored, ["convex/schema.ts"]);
-    expect(isLiteLane(floored)).toBe(false);
-    // AC3b: an independent-review requirement keeps the task on the standard lane.
+    expect(isLiteLane(floored)).toBe(true);
     const reviewed = taskFixture();
     reviewed.assessment = { ...reviewed.assessment, review: { independent: true } };
-    expect(isLiteLane(reviewed)).toBe(false);
-    // AC4: T2/T3 are never lite.
+    expect(isLiteLane(reviewed)).toBe(true);
     for (const tier of ["T2", "T3"]) {
       const task = taskFixture();
       task.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: tier };
       task.assessment = computeAssessment(task, ["README.md"]);
-      expect(isLiteLane(task)).toBe(false);
+      expect(isLiteLane(task)).toBe(true);
     }
   });
 });
@@ -182,7 +177,7 @@ describe("checkAftercare on the lite lane", () => {
     expect(summary.build).toBe("ci");
     expect(summary.e2e).toBe("github");
     expect(summary.process).toBe("missing");
-    // Standard lane keeps reporting them as missing.
+    // #952: the lane is global — non-required kinds show as ci for every tier.
     const standard = taskFixture();
     standard.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: "T2" };
     standard.assessment = {
@@ -190,7 +185,7 @@ describe("checkAftercare on the lite lane", () => {
       risk: { ...standard.assessment.risk, final: "T2" },
       verification: { process: true, lint: true, unit: true, build: true, e2e: true },
     };
-    expect(verificationSummary(standard).lint).toBe("missing");
+    expect(verificationSummary(standard).lint).toBe("ci");
   });
 });
 
@@ -221,15 +216,24 @@ describe("verify:prepush marker (AC6)", () => {
     transitionTask(task, "ready", {}, dir);
     expect(task.state).toBe("review");
   });
-  it("standard lane tasks do not need the marker", () => {
-    const { dir, task } = repository();
+  it("#952: T2/T3 also require the marker (prepush is the local gate for every tier)", () => {
+    const { dir, git, task } = repository();
     task.state = "execute";
+    task.risk = "T2";
     task.agentAssessment = { ...structuredClone(agentAssessment), applied_tier: "T2" };
     task.assessment = computeAssessment(task, ["README.md"], dir);
     task.skills = [...task.assessment.requiredSkills];
     for (const kind of requiredVerificationKinds(task))
       task.verification[kind] = { head: task.head, baseHead: task.baseHead, success: true };
-    expect(isLiteLane(task)).toBe(false);
-    expect(() => transitionTask(task, "ready", {}, dir)).not.toThrow(/verify:prepush/);
+    expect(isLiteLane(task)).toBe(true);
+    expect(() => transitionTask(task, "ready", {}, dir)).toThrow(/verify:prepush/);
+    const marker = path.resolve(
+      dir,
+      git("rev-parse", "--git-path", `agent-prepush/${task.head}.ok`),
+    );
+    mkdirSync(path.dirname(marker), { recursive: true });
+    writeFileSync(marker, "ok\n");
+    transitionTask(task, "ready", {}, dir);
+    expect(task.state).toBe("review");
   });
 });

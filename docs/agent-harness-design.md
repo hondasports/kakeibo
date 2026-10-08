@@ -24,8 +24,8 @@
 | 検証の往復 |  | 必須kindの個別実行に加え、`--verify-required` による直列一括実行・成功済み証跡の保持を実装済み |
 | 再レビュー資料 |  | `--delta-from` で増分・前回AC証跡・全体参照を提供し、条件を満たす記録があれば自動で増分を選ぶ（`--full-review` で全差分）。templateは過去findingを事前記入し、severityを記録できる（実装済み）。全AC記録とfresh独立レビューを維持 |
 | PR同期と観測 |  | 同一本文はwrite省略。`--check-pr` は状態を更新せずAFTERCARE/DONEを確認（実装済み）。観測を本文同期から分離 |
-| 修正ループの回数 |  | 初回REVIEW進入時のdraft PRで外部レビューを前倒しし、内部・外部指摘を同じラウンドへ集約する。draftでは `Agent harness`・E2Eをスキップし、ready化で実行する（実装済み） |
-| unitの重複と待ち時間 |  | local unitはprocess suiteを除外。EXECUTE→REVIEWはaffected unitで可、REVIEW clean以降はfull unit必須で、Reviewerと並行実行できる（実装済み） |
+| 修正ループの回数 |  | 初回REVIEW進入時のdraft PRで外部レビューを前倒しし、内部・外部指摘を同じラウンドへ集約する。draftでは `Agent harness` をスキップし、ci.yml・e2e.ymlはレビューと並行実行、ready化でAgent harnessを実行する（実装済み） |
+| unitの重複と待ち時間 |  | ローカルの必須検証は全Tierともprocessのみ。lint/unit/buildの合否はCIのcheckを正本とし、T2/T3のREVIEW cleanは現在HEADのCI check評価を必須とする（#952、実装済み） |
 | 評価の再提出 | ~~revision変更で一律失効~~ | Machine分類が不変なら引き継ぎ、変化時のみ再提出（実装済み） |
 | PR状態ブロック | ~~task全体（history・assessment・ログ末尾を含む）~~ | 復元とPR gateに必要な範囲へ圧縮（直近history＋参照されるreview記録、assessmentは再計算）（実装済み） |
 | 計測 |  | テストは実ログへ書かない（`AGENT_METRICS_FILE`）。transcriptからtoken usageをrole別に記録・集計し、friction本文も残す（実装済み） |
