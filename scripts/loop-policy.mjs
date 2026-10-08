@@ -374,10 +374,7 @@ export function validateTransition({ task, event, exit = {}, limits, root }) {
     requireValue(task.agentAssessment, "Assessment is required to leave REFINE");
     // Presence alone is not enough: an invalid assessment (hand-edited state or
     // crafted state block) must fail at this gate, not one gate later.
-    requireValue(
-      validateAssessment(task.agentAssessment).length === 0,
-      "Invalid agent assessment",
-    );
+    requireValue(validateAssessment(task.agentAssessment).length === 0, "Invalid agent assessment");
   }
   if (task.state === "execute" && event === "ready")
     requireLocalVerification(task, { fullUnit: false });

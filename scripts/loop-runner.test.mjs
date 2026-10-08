@@ -1154,9 +1154,7 @@ describe("persistent task gates", () => {
     expect(summarizeTask(task).missing).toEqual([]);
     task.agentAssessment.risk_assessment.blast_radius = "bogus";
     expect(summarizeTask(task).missing).toContain("assessment(invalid)");
-    expect(() => transitionTask(task, "ready", {}, root)).toThrow(
-      "Invalid agent assessment",
-    );
+    expect(() => transitionTask(task, "ready", {}, root)).toThrow("Invalid agent assessment");
   });
   it("exposes --status/--explain/--artifacts through run() without changing the task", () => {
     const { dir, task } = repository();
