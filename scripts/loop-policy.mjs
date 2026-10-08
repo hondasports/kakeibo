@@ -224,10 +224,7 @@ export function verificationSummary(task) {
         ? "stale"
         : result.success !== true
           ? "failed"
-          : [
-              "pass",
-              ...(isFullScopeEvidence(result) ? [] : ["affected"]),
-            ]
+          : ["pass", ...(isFullScopeEvidence(result) ? [] : ["affected"])]
               .join(",")
               .replace(/^pass,(.+)$/, "pass($1)");
   }
