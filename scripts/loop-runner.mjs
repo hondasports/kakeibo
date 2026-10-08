@@ -1905,13 +1905,33 @@ export function runNext(args, root = process.cwd(), services = {}) {
     note("ready");
     // AC3: spec.prAllowed=falseはpush・PR作成を行わない許可ゲート。
     if (task.spec?.prAllowed !== true) return stop("pr_permission");
-    ensureTaskPr(task, root, services);
+    try {
+      ensureTaskPr(task, root, services);
+    } catch (error) {
+      note("pr", false);
+      return stop("pr", {
+        error: tailLines({ stdout: String(error?.message ?? error) }),
+      });
+    }
     note("pr");
     // task.state === "review" here — fall through to the review stage.
   }
   if (task.state === "review") {
     if (!args.review) {
-      const pr = discoverPr();
+      // A prior --next may have transitioned to review before PR creation
+      // failed — retry it here so the draft PR exists before packet review.
+      let pr = discoverPr();
+      if (!pr && task.spec?.prAllowed === true) {
+        try {
+          ensureTaskPr(task, root, services);
+        } catch (error) {
+          note("pr", false);
+          return stop("pr", {
+            error: tailLines({ stdout: String(error?.message ?? error) }),
+          });
+        }
+        pr = discoverPr();
+      }
       const dir = gitPath(root, [
         "rev-parse",
         "--path-format=absolute",
@@ -2138,23 +2158,24 @@ export function ensureTaskPr(task, root = process.cwd(), services = {}) {
   try {
     const file = path.join(temp, "body.md");
     writeFileSync(file, draftPrBody(task, root), { mode: 0o600 });
-    const created = JSON.parse(
-      ghRunner(
-        [
-          "pr",
-          "create",
-          "--draft",
-          "--title",
-          derivePrTitle(task),
-          "--body-file",
-          file,
-          "--json",
-          "number",
-        ],
-        root,
-      ),
+    // `gh pr create` has no --json: stdout is the PR URL. Tolerate JSON output
+    // too (test doubles), then fall back to re-listing the branch's open PR.
+    const out = ghRunner(
+      ["pr", "create", "--draft", "--title", derivePrTitle(task), "--body-file", file],
+      root,
     );
-    return created.number;
+    let number;
+    try {
+      number = JSON.parse(out)?.number;
+    } catch {
+      number = /\/pull\/(\d+)/.exec(out)?.[1];
+    }
+    if (number) return Number(number);
+    const relisted = JSON.parse(
+      ghRunner(["pr", "list", "--head", task.branch, "--state", "open", "--json", "number"], root),
+    );
+    requireValue(relisted?.[0]?.number, "draft PR was created but its number could not be read");
+    return relisted[0].number;
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }
