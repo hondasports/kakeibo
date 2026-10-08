@@ -10,7 +10,7 @@ T1はセルフレビュー可。T2で `uncertainty=some_unknowns`、またはT3�
 
 ## 検証との並行
 
-REVIEW clean以降のゲートはcurrent HEADのfull unit証跡を要求する（Lite lane除く：ローカル証跡はprocessのみで、判定はCIのcheckが正本）。packetを渡したら、Reviewerの作業と並行して `node scripts/loop-runner.mjs --verify-required` で残りのfull unitを完了させる。並行するのはrunnerとReviewerだけで、`--review` の記録は `--verify-required` の終了を待ってから行う（状態を更新するrunnerは同時に1つ。別runnerが先に保存していると保存は拒否される）。失敗した場合はfindingとして扱い、`findings` でEXECUTEへ戻す。
+REVIEW clean以降のゲートはcurrent HEADのfull unit証跡を要求する（Lite lane除く：ローカル証跡はprocessのみで、判定はCIのcheckが正本）。`--next --review <file>` はレビュー記録の前に残りの必須検証を先に実行する。手動でReviewerと並行させる場合は `--verify-required` で残りのfull unitを先に完了させ、`--review` の記録はその終了を待ってから行う（状態を更新するrunnerは同時に1つ。別runnerが先に保存していると保存は拒否される）。失敗した場合はfindingとして扱い、`findings` でEXECUTEへ戻す。
 
 ## Review loop
 
@@ -30,6 +30,10 @@ draft PRがある場合は、packet生成前に `node scripts/collect-pr-finding
 
 Reviewerは増分・影響caller・open findingから確認し、影響のないACの証跡は過去レビューを参照する。全ACの `{id, evidence}` 記録は変わらず必須である。共有契約や前提が変わった場合は全差分へ広げる。報告全文はファイルに保存し、実装担当への返却は結論・指摘件数・対象HEAD・報告参照先を中心にする。
 
-open findingが0件でfull unitを含む必須検証が揃っていれば `clean`（Lite laneは `lane: "lite"` のタスクでfull unit証跡を要求しない）。findingが残れば `findings`。2ラウンドごとに方針を再評価し、上限（5ラウンド）到達は未完了としてINCIDENTで扱う。
+## Exit
 
-レビュー記録のJSONは `--draft review`（下書きの必須キーと過去findingの事前記入を含む）にReviewerの結果を記入して `--review` で提出する。`TODO` のまま残った項目は拒否される。
+`node scripts/loop-runner.mjs --next` を実行する。PRがあれば外部レビュー指摘を収集し、`--review-packet` 相当のpacketを生成して `needs:"review"` で止まる（独立レビュー要否も返す）。Reviewerの報告ファイルを受け取ったら `node scripts/loop-runner.mjs --next --review <file>` を実行する: REVIEW cleanに必要な残り検証（Lite laneはprocess、それ以外はfull unit）を先に実行し、レビューを記録して、open findingが0件なら `clean` でAFTERCAREへ、残れば `findings` でEXECUTEへ遷移する（reasonはfinding id一覧が自動で入る）。2ラウンドごとの方針再評価が必要な回では `needs:"reassessment"` で止まるので、`--event findings --exit <file>` で根拠を記録する。
+
+cleanの条件は「blocker / majorのopen findingが0件」でfull unitを含む必須検証が揃うこと（Lite laneは `lane: "lite"` のタスクでfull unit証跡を要求しない）。上限（5ラウンド）到達は未完了としてINCIDENTで扱う。
+
+レビュー記録のJSONは `--draft review`（下書きの必須キーと過去findingの事前記入を含む）にReviewerの結果を記入する。`TODO` のまま残った項目は拒否される。

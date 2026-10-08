@@ -64,6 +64,9 @@
     },
     "predictedRisk": {
       "enum": ["T1", "T2", "T3"]
+    },
+    "prAllowed": {
+      "type": "boolean"
     }
   },
   "additionalProperties": false

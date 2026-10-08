@@ -13,4 +13,4 @@
 
 ## Exit
 
-`ready` は Goalがあり、Acceptance Criteriaが1件以上あり、material open decisionが0件で、各ACの検証方針を説明できる場合のみ返す。thorough検証（lint/unit/build必須）はTierと評価軸から機械判定される：final tierがT3、またはuncertaintyがknown_pattern以外、またはblast_radiusがshared_or_system_wideの場合。
+`node scripts/loop-runner.mjs --next` を実行する。spec・assessment・material open decisionを機械検証し、要件を満たせば `ready` でEXECUTEへ進み、不足は `needs` で止まる。`ready` の条件は、Goalがあり、Acceptance Criteriaが1件以上あり、material open decisionが0件で、各ACの検証方針を説明できること。thorough検証（lint/unit/build必須）はTierと評価軸から機械判定される：final tierがT3、またはuncertaintyがknown_pattern以外、またはblast_radiusがshared_or_system_wideの場合。
