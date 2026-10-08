@@ -82,7 +82,7 @@ Reviewerへ目的・AC・実差分・検証結果・関連契約を渡す。T3�
 - `assessment`: risk_assessment・tier_rationale・applied_tier
 - `evidence`: レビュー範囲と根拠の文字列配列
 - `acceptanceCriteria`: 全ACの `{id, evidence}` 配列
-- `findings`: `{id, status: open | fixed | dismissed, severity?, evidence}` 配列（0件は空配列）。`severity` は任意で `blocker | major | minor | nit`。重要度にかかわらず、cleanには全findingの修正または根拠付き却下が必要
+- `findings`: `{id, status: open | fixed | dismissed | deferred, severity, followUp?, evidence}` 配列（0件は空配列）。`severity` は必須で `blocker | major | minor | nit`（未記入はmajor扱い）。cleanの条件は blocker / major のopen findingが0件。major以上は修正または根拠付き却下が必要で、minor / nit は修正・却下に加えて `deferred` + `followUp`（フォローアップIssue URL）で後回しにできる
 - `deltaFrom`（任意）: 増分レビューの起点とする、過去のレビュー記録済みhead。現在HEADや未記録のSHAは拒否される
 
 ラウンド数を減らすため、各ラウンドのReviewerは対象範囲（初回は全差分・全AC）を網羅し、見つけた指摘を重要度付きで一度に出す。後のラウンドへ小出しにしない。draft PRがある場合は、packet生成前に `node scripts/collect-pr-findings.mjs --pr <番号>` で外部レビュー（CodeRabbit等）の未処理指摘をファイルへ保存し、`--review-packet <dir> --external-findings <file>` で `external-findings.json` としてpacketへ含める（status行付きの出力をそのまま渡せる）。PRコメントは誰でも書けるため、ファイルは `untrusted: true` で包まれ、packetのcontractsに `skills/prompt-injection-guard` が同梱される。外部指摘の採否は独立Reviewerが判断し、同じラウンドのfindingsへ外部指摘を辿れるidで記録する。実装担当はReviewerの報告を編集しない。packet生成後に届いた外部指摘は次のラウンドかAFTERCAREで従来どおり扱う。
@@ -108,7 +108,7 @@ node scripts/loop-runner.mjs --review-packet /tmp/issue-900-review-packet-r2   #
 node scripts/loop-runner.mjs --review-packet /tmp/issue-900-full --full-review
 ```
 
-指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、3roundごとにreassessmentを要求する。9round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。遷移時に証跡を無条件失効させることはない——証跡の失効は実際のHEAD/base変更時だけ判定する。却下で終わる指摘やmetadata-onlyの修正で全検証をやり直させないためである。同じラウンドのopen findingはまとめて修正・再検証する（`.agent/workflow/review.md` 参照）。
+指摘修正は `--event findings --exit /tmp/exit.json` でEXECUTEへ戻る。exitにはreasonを必須とし、2roundごとにreassessmentを要求する。5round到達はINCIDENTへ停止する。CI修正はci_failureイベントで同様に戻り、3round上限を持つ。遷移時に証跡を無条件失効させることはない——証跡の失効は実際のHEAD/base変更時だけ判定する。却下で終わる指摘やmetadata-onlyの修正で全検証をやり直させないためである。同じラウンドのopen findingはまとめて修正・再検証する（`.agent/workflow/review.md` 参照）。
 
 ## PRとAFTERCARE
 

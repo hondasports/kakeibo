@@ -19,7 +19,7 @@ JSONの必須キー（schemaは `.agent/schema/` 配下）:
 
 - spec: `spec.schema.json`。`predictedRisk` 必須、Human Requestは改変しない
 - assessment: 形式の正本は `scripts/review-depth.mjs` の検証。`risk_assessment`（4軸）・`tier_rationale`・`applied_tier`・`verification_load: {level: routine|complex, rationale}`
-- review: `head`・`baseHead`・`reviewer`・`assessment`・`evidence`・`acceptanceCriteria`（全ACの `{id, evidence}`）・`findings`（`{id, status: open|fixed|dismissed, severity?, evidence}`）。独立レビューは `independent: true`・`context: "fresh"`、増分は `deltaFrom`
+- review: `head`・`baseHead`・`reviewer`・`assessment`・`evidence`・`acceptanceCriteria`（全ACの `{id, evidence}`）・`findings`（`{id, status: open|fixed|dismissed|deferred, severity, followUp?, evidence}`、`severity` は `blocker|major|minor|nit` で必須・未記入はmajor扱い。`deferred` は minor|nit のみで `followUp` にフォローアップIssue URL必須）。独立レビューは `independent: true`・`context: "fresh"`、増分は `deltaFrom`
 - exit（decision_required / findings / incident）: `reason` 必須。Human Gate解除には `approval: {"source":"user","reference":"..."}`
 
 詳細は対応節だけ読む: [開始と再開](agent-harness-reference.md#開始と再開) / [実装と検証](agent-harness-reference.md#実装と検証) / [レビュー](agent-harness-reference.md#レビュー) / [PRとAFTERCARE](agent-harness-reference.md#prとaftercare)。
