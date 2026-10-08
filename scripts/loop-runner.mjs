@@ -56,6 +56,8 @@ import {
   taskSummaryContext,
 } from "./loop-metrics.mjs";
 import { buildDraft, reviewDraft, todoPointers, DRAFT_TODO } from "./loop-draft.mjs";
+import { requiredKeys } from "./loop-schema.mjs";
+import { hasPrepushMarker } from "./verify-prepush.mjs";
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
 /** Submitted JSON may not carry an unfilled draft placeholder (#948). */
@@ -1694,6 +1696,7 @@ export function parseArguments(args) {
     "--full-review",
     "--hook-state",
     "--resolve-ci-failures",
+    "--next",
   ]);
   const options = new Set([
     "--init",
@@ -1783,19 +1786,392 @@ const CLI_ACTION_KEYS = [
   "ci-failures",
   "resolve-ci-failures",
   "draft",
+  "next",
 ];
+/** Action keys that carry a second key as pure input, not as another action. */
+const actionKeyUsed = (args, key) =>
+  args[key] &&
+  !(args.draft && key === "event") &&
+  // `--next --review <file>` feeds the review report into the auto-advance
+  // pipeline; without `--next`, --review stays its own action.
+  !(args.next && key === "review");
 /**
  * Name reported in `cli_output` metrics. Watch runs are tagged separately so
  * their larger output can be compared against non-watch commands.
  */
 export function cliCommandName(args) {
-  const action = CLI_ACTION_KEYS.find((key) => args[key] && !(args.draft && key === "event"));
+  const action = CLI_ACTION_KEYS.find((key) => actionKeyUsed(args, key));
   if (!action) return "none";
   return args["watch-aftercare"] ? `${action}+watch-aftercare` : action;
 }
+/**
+ * #950: `--next` — run the current state's mechanical steps and stop at the
+ * first point that needs an agent decision. Each invocation handles one state
+ * (plus the mechanical entry work of the state it transitions into), records
+ * every step as {action:"next"} metrics, and resumes idempotently because
+ * every mutating helper already persists. Never fires decision-required,
+ * resolved, human-gate-release, or ci_failure events — judgment stays with
+ * the agent.
+ */
+export function runNext(args, root = process.cwd(), services = {}) {
+  let task = refreshTask(loadTask(root), root);
+  saveTask(task, root);
+  const steps = [];
+  const note = (step, ok = true) => {
+    steps.push(step);
+    recordMetric(task, root, { action: "next", step, ok });
+  };
+  const stop = (needs, extra = {}) => ({
+    taskId: task.taskId,
+    state: task.state,
+    needs,
+    steps,
+    next: nextActions(task, root),
+    ...extra,
+  });
+  const ghRunner = services.gh ?? ((a, r) => gh(a, r));
+  const discoverPr = () => {
+    if (task.aftercare?.pr) return task.aftercare.pr;
+    try {
+      const listed = JSON.parse(
+        ghRunner(
+          ["pr", "list", "--head", task.branch, "--state", "open", "--json", "number"],
+          root,
+        ),
+      );
+      return listed?.[0]?.number ?? null;
+    } catch {
+      return null;
+    }
+  };
+  if (task.state === "refine") {
+    const missing = missingRequirements(task, root);
+    if (missing.length) {
+      const head = missing[0];
+      const needs = head.startsWith("assessment")
+        ? "assessment"
+        : head.startsWith("skill:")
+          ? "skills"
+          : head === "openMaterialDecisions"
+            ? "decisions"
+            : "spec";
+      return stop(needs, { missing });
+    }
+    task = transitionTask(task, "ready", {}, root);
+    saveTask(task, root);
+    note("ready");
+    return stop("implementation");
+  }
+  if (task.state === "execute") {
+    try {
+      requireClean(root);
+    } catch {
+      return stop("commit");
+    }
+    note("clean");
+    const unresolved = () => (task.ciFailures ?? []).filter((f) => !f.resolvedAt);
+    if (unresolved().length) {
+      resolveCiFailures(task, root, services);
+      saveTask(task, root);
+      const remaining = unresolved();
+      note("ci_recheck", remaining.length === 0);
+      if (remaining.length) return stop("ci_reproduce", { ciFailures: remaining });
+    }
+    if (!hasPrepushMarker(root, task.head)) {
+      const out = (services.verifyPrepush ?? defaultVerifyPrepush)(
+        ["scripts/verify-prepush.mjs"],
+        root,
+      );
+      const ok = out.status === 0;
+      note("verify:prepush", ok);
+      if (!ok)
+        return stop("verify:prepush", {
+          command: "pnpm verify:prepush",
+          outputTail: tailLines(out),
+        });
+    } else note("prepush_marker");
+    try {
+      task = runRequiredVerification(task, root, services.runVerification);
+    } catch (error) {
+      note("verify", false);
+      return stop("verify", {
+        error: tailLines({ stdout: String(error?.message ?? error) }),
+      });
+    }
+    saveTask(task, root);
+    note("verify");
+    task = transitionTask(task, "ready", {}, root);
+    saveTask(task, root);
+    note("ready");
+    // AC3: spec.prAllowed=falseはpush・PR作成を行わない許可ゲート。
+    if (task.spec?.prAllowed !== true) return stop("pr_permission");
+    ensureTaskPr(task, root, services);
+    note("pr");
+    // task.state === "review" here — fall through to the review stage.
+  }
+  if (task.state === "review") {
+    if (!args.review) {
+      const pr = discoverPr();
+      const dir = gitPath(root, [
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        `agent-review/${task.head.slice(0, 12)}`,
+      ]);
+      let externalFindings;
+      if (pr) {
+        // Best effort: findings collection needs gh and may legitimately be
+        // absent (e.g. token without scope). The packet still carries the
+        // diff and contracts without it.
+        try {
+          const { slug } = aftercareFetchers(pr, args.handled, root, services);
+          const raw = (services.exec ?? execFileSync)(
+            process.execPath,
+            collectFindingsArgs(pr, args.handled, slug()),
+            { cwd: root, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
+          );
+          mkdirSync(dir, { recursive: true });
+          externalFindings = path.join(dir, "collected-findings.json");
+          writeFileSync(externalFindings, raw, { mode: 0o600 });
+        } catch {
+          externalFindings = undefined;
+        }
+      }
+      const packet = buildReviewPacket(task, dir, root, { externalFindings });
+      note("packet");
+      return stop("review", {
+        packet,
+        pr: pr ?? null,
+        independent: task.assessment?.review?.independent === true,
+      });
+    }
+    // --next --review <file>: verify the remaining REVIEW-clean requirements
+    // (requiredVerificationKinds — lite tasks run process only, everything
+    // else runs full unit), then record the report and transition.
+    try {
+      task = runRequiredVerification(task, root, services.runVerification);
+    } catch (error) {
+      note("verify", false);
+      return stop("verify", {
+        error: tailLines({ stdout: String(error?.message ?? error) }),
+      });
+    }
+    saveTask(task, root);
+    note("verify");
+    const report = readSubmission(args.review, "review");
+    validateReview(task, report);
+    task.review = report;
+    task.findings = report.findings;
+    history(task, "review_recorded", {
+      reviewer: report.reviewer,
+      findings: report.findings,
+      baseHead: task.baseHead,
+      acceptanceCriteria: report.acceptanceCriteria,
+      independent: report.independent === true && report.context === "fresh",
+      risk: highestTier(task.risk, task.assessment?.risk?.final),
+      acHash: acceptanceCriteriaHash(task.spec),
+    });
+    refreshTask(task, root);
+    saveTask(task, root);
+    note("review");
+    const open = (task.findings ?? []).filter((f) => f.status === "open");
+    if (open.length) {
+      const ids = open.map((f) => f.id);
+      const requiredExit = requiredKeys(
+        "exit",
+        {
+          event: "findings",
+          state: task.state,
+          counters: task.counters,
+          limits: processConfig(root).limits,
+        },
+        root,
+      );
+      // The reassessment is a judgment call — --next cannot invent it.
+      if (requiredExit.includes("reassessment"))
+        return stop("reassessment", {
+          findings: ids,
+          command: "node scripts/loop-runner.mjs --event findings --exit <file>",
+        });
+      task = transitionTask(task, "findings", { reason: ids.join(",") }, root);
+      saveTask(task, root);
+      note("findings");
+      return stop("fix", { findings: ids });
+    }
+    task = transitionTask(task, "clean", {}, root);
+    saveTask(task, root);
+    note("clean");
+    return stop("aftercare");
+  }
+  if (task.state === "aftercare") {
+    const pr = discoverPr();
+    if (!pr) return stop("pr");
+    syncPrStateBlock(task, pr, root, services);
+    note("sync-pr");
+    const fetchers = aftercareFetchers(pr, args.handled, root, services);
+    const prFields = (services.fetchPr ?? fetchers.fetchPr)();
+    if (prFields.isDraft === true) {
+      ghRunner(["pr", "ready", String(pr)], root);
+      note("pr_ready");
+    }
+    const interval = args["interval-seconds"];
+    requireIntervalSeconds(interval);
+    const result = watchAftercare(task, pr, root, {
+      ...services,
+      handled: args.handled,
+      intervalSeconds: interval === undefined ? undefined : Number(interval),
+    });
+    task = result.task;
+    saveTask(task, root);
+    note("aftercare", result.ready);
+    if (!result.ready) {
+      const last = result.last;
+      const failed = (last?.failed ?? []).filter(
+        (name) => !(last?.pending ?? []).includes(name),
+      );
+      if (failed.length) {
+        const slug = services.resolveRepo
+          ? services.resolveRepo()
+          : fetchers.slug();
+        const ciFailures = extractCiFailures({
+          rollup: (services.fetchPr ?? fetchers.fetchPr)().statusCheckRollup ?? [],
+          head: task.head,
+          slug,
+          root,
+          gh: (a, r) => ghRunner(a, r),
+        });
+        // AC2/AC7: report the reproduce target; the ci_failure event itself is
+        // the agent's call (`--event ci_failure --exit <file>`), never auto-fired.
+        return stop("ci_reproduce", { ciFailures, watch: last });
+      }
+      // action_required: a human/agent must act before aftercare can pass —
+      // unhandled findings, unresolved threads, review requests, or a PR head
+      // that drifted from the local task.
+      const actionRequired =
+        last?.unhandledFindings > 0 ||
+        last?.unresolvedThreads > 0 ||
+        ["CHANGES_REQUESTED", "REVIEW_REQUIRED"].includes(last?.reviewDecision) ||
+        (last?.head && last.head !== task.head) ||
+        (last?.baseHead && last.baseHead !== task.baseHead);
+      if (actionRequired) return stop("action_required", { watch: last });
+      return stop("ci_pending", { watch: last });
+    }
+    requireClean(root);
+    task = transitionTask(task, "ready", {}, root);
+    saveTask(task, root);
+    note("ready");
+    publishTaskMetrics(task, pr, root, services);
+    note("publish-metrics");
+    return { taskId: task.taskId, state: task.state, needs: null, steps, done: true };
+  }
+  if (task.state === "incident") return stop("resolution");
+  if (task.state === "human_gate") return stop("approval");
+  // done
+  return { taskId: task.taskId, state: task.state, needs: null, steps, done: true };
+}
+const tailLines = (out) =>
+  String(out?.stdout ?? out?.stderr ?? "")
+    .split("\n")
+    .slice(-20)
+    .join("\n");
+const ISSUE_TASK_PATTERN = /^i(\d+)$/;
+/**
+ * Draft PR body: the repo template with the mechanical placeholders filled —
+ * a task-scoped summary, the closing issue reference, the risk tier, and a
+ * non-publishable update spec (agents default to not publishing; a human can
+ * flip it when the change is product-facing).
+ */
+export function draftPrBody(task, root = process.cwd()) {
+  const templatePath = path.join(root, ".github", "pull_request_template.md");
+  const issue = ISSUE_TASK_PATTERN.exec(task.taskId)?.[1];
+  const summary = (task.spec?.goal ?? "").split("\n")[0].trim() || task.taskId;
+  const risk = { T1: "Low", T2: "Medium", T3: "High" }[task.risk] ?? "Medium";
+  const updateYaml = [
+    "<!-- suzumemo-update:start -->",
+    "```yaml",
+    "publish: false",
+    "reason: ハーネス生成の下書き（掲載が必要なら publish: true と category/description を記入）",
+    "```",
+    "<!-- suzumemo-update:end -->",
+  ].join("\n");
+  if (!existsSync(templatePath))
+    return [
+      "## 概要",
+      "",
+      summary,
+      "",
+      "## 関連Issue",
+      "",
+      issue ? `Closes #${issue}` : "—",
+      "",
+      updateYaml,
+      "",
+    ].join("\n");
+  let body = readFileSync(templatePath, "utf8");
+  body = body.replace("## 概要", `## 概要\n\n${summary}`);
+  body = body.replace("## 変更内容", `## 変更内容\n\n- ${summary}`);
+  if (issue) body = body.replaceAll("Closes #", `Closes #${issue} `).replace(`#${issue} `, `#${issue}`);
+  body = body.replace("Risk: ", `Risk: ${risk}`);
+  body = body.replace("結果:", "結果: 成功（`--next` 実行: process/lint/unit/build、E2EはCI）");
+  body = body.replace(
+    /<!-- suzumemo-update:start -->[\s\S]*?<!-- suzumemo-update:end -->/,
+    () => updateYaml,
+  );
+  return body;
+}
+export function derivePrTitle(task) {
+  const first = (task.spec?.goal ?? task.taskId).split("\n")[0].trim() || task.taskId;
+  const issue = ISSUE_TASK_PATTERN.exec(task.taskId)?.[1];
+  const suffix = issue ? ` (#${issue})` : "";
+  const max = 100 - suffix.length;
+  return `${first.length > max ? `${first.slice(0, max - 1)}…` : first}${suffix}`;
+}
+/**
+ * Push the task branch and create the draft PR when none exists; returns the
+ * PR number. Only called when spec.prAllowed === true.
+ */
+export function ensureTaskPr(task, root = process.cwd(), services = {}) {
+  const ghRunner = services.gh ?? ((a, r) => gh(a, r));
+  (services.push ?? ((branch, r) => git(["push", "-u", "origin", branch], r)))(task.branch, root);
+  const listed = JSON.parse(
+    ghRunner(
+      ["pr", "list", "--head", task.branch, "--state", "open", "--json", "number"],
+      root,
+    ),
+  );
+  if (listed?.[0]?.number) return listed[0].number;
+  const temp = mkdtempSync(path.join(tmpdir(), "agent-pr-"));
+  try {
+    const file = path.join(temp, "body.md");
+    writeFileSync(file, draftPrBody(task, root), { mode: 0o600 });
+    const created = JSON.parse(
+      ghRunner(
+        [
+          "pr",
+          "create",
+          "--draft",
+          "--title",
+          derivePrTitle(task),
+          "--body-file",
+          file,
+          "--json",
+          "number",
+        ],
+        root,
+      ),
+    );
+    return created.number;
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+}
 export function run(args, root = process.cwd(), services = {}) {
-  const actions = CLI_ACTION_KEYS.filter((key) => args[key] && !(args.draft && key === "event"));
+  const actions = CLI_ACTION_KEYS.filter((key) => actionKeyUsed(args, key));
   requireValue(actions.length <= 1, "Run one task action at a time");
+  // #950: `--next` drives one state forward on its own and bypasses the normal
+  // dispatch — it composes the same handlers below rather than duplicating
+  // them, and stops at the first point that needs a judgment call.
+  if (args.next) return runNext(args, root, services);
   requireValue(
     !args["watch-aftercare"] || args.aftercare || args["check-pr"],
     "--watch-aftercare requires --aftercare or --check-pr",
@@ -2194,48 +2570,55 @@ export function run(args, root = process.cwd(), services = {}) {
       writeFileSync(args["export-file"], `${block}\n`, { mode: 0o600 });
       return { taskId: task.taskId, state: task.state, written: args["export-file"] };
     }
-    const pr = JSON.parse(
-      (services.gh ?? gh)(
-        ["pr", "view", args["sync-pr"], "--json", "body,headRefOid,baseRefOid"],
-        root,
-      ),
-    );
-    requireValue(
-      pr.headRefOid === task.head && pr.baseRefOid === task.baseHead,
-      "PR revision differs from local task",
-    );
-    let body = pr.body.includes(STATE_START)
-      ? pr.body.replace(
-          /<!-- suzumemo-agent-state:start -->[\s\S]*?<!-- suzumemo-agent-state:end -->/,
-          () => block,
-        )
-      : `${pr.body}\n\n${block}`;
-    const deferred = deferredBlock(task);
-    // A dangling START marker without END (manual corruption only — the
-    // tool never emits one) would satisfy includes(START) while the
-    // replace below needs END, silently dropping the fresh deferred
-    // list. Strip it first so the block is re-appended cleanly.
-    if (body.includes(DEFERRED_START) && !body.includes(DEFERRED_END))
-      body = body.replace(/[^\n]*<!-- suzumemo-agent-deferred:start -->/g, "");
-    if (body.includes(DEFERRED_START))
-      body = body.replace(
-        /\n*<!-- suzumemo-agent-deferred:start -->[\s\S]*?<!-- suzumemo-agent-deferred:end -->/,
-        () => (deferred ? `\n\n${deferred}` : ""),
-      );
-    else if (deferred) body = `${body}\n\n${deferred}`;
-    if (body === pr.body)
-      return { ...summarizeTask(task, root), pr: args["sync-pr"], synced: false };
-    const temp = mkdtempSync(path.join(tmpdir(), "agent-state-"));
-    try {
-      const file = path.join(temp, "body.md");
-      writeFileSync(file, body, { mode: 0o600 });
-      (services.gh ?? gh)(["pr", "edit", args["sync-pr"], "--body-file", file], root);
-    } finally {
-      rmSync(temp, { recursive: true, force: true });
-    }
-    return { ...summarizeTask(task, root), pr: args["sync-pr"], synced: true };
+    return syncPrStateBlock(task, args["sync-pr"], root, services);
   }
   return task;
+}
+/**
+ * Merge the fresh state block (and deferred-findings block) into the PR body
+ * via `gh pr edit`. Shared by the `--sync-pr` action and `--next`'s aftercare
+ * stage. Read-only against the task — sync never mutates state.
+ */
+export function syncPrStateBlock(task, pr, root = process.cwd(), services = {}) {
+  const block = stateBlock(task);
+  const ghRunner = services.gh ?? gh;
+  const prInfo = JSON.parse(
+    ghRunner(["pr", "view", String(pr), "--json", "body,headRefOid,baseRefOid"], root),
+  );
+  requireValue(
+    prInfo.headRefOid === task.head && prInfo.baseRefOid === task.baseHead,
+    "PR revision differs from local task",
+  );
+  let body = prInfo.body.includes(STATE_START)
+    ? prInfo.body.replace(
+        /<!-- suzumemo-agent-state:start -->[\s\S]*?<!-- suzumemo-agent-state:end -->/,
+        () => block,
+      )
+    : `${prInfo.body}\n\n${block}`;
+  const deferred = deferredBlock(task);
+  // A dangling START marker without END (manual corruption only — the
+  // tool never emits one) would satisfy includes(START) while the
+  // replace below needs END, silently dropping the fresh deferred
+  // list. Strip it first so the block is re-appended cleanly.
+  if (body.includes(DEFERRED_START) && !body.includes(DEFERRED_END))
+    body = body.replace(/[^\n]*<!-- suzumemo-agent-deferred:start -->/g, "");
+  if (body.includes(DEFERRED_START))
+    body = body.replace(
+      /\n*<!-- suzumemo-agent-deferred:start -->[\s\S]*?<!-- suzumemo-agent-deferred:end -->/,
+      () => (deferred ? `\n\n${deferred}` : ""),
+    );
+  else if (deferred) body = `${body}\n\n${deferred}`;
+  if (body === prInfo.body)
+    return { ...summarizeTask(task, root), pr: String(pr), synced: false };
+  const temp = mkdtempSync(path.join(tmpdir(), "agent-state-"));
+  try {
+    const file = path.join(temp, "body.md");
+    writeFileSync(file, body, { mode: 0o600 });
+    ghRunner(["pr", "edit", String(pr), "--body-file", file], root);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+  return { ...summarizeTask(task, root), pr: String(pr), synced: true };
 }
 /**
  * Record the byte size of what a CLI run emitted so the effect of

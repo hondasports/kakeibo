@@ -2,10 +2,10 @@
 
 PR作成後のlatest HEADに対してCI・レビュー指摘・承認・競合・mergeabilityを確認し、merge_readyまで進める。
 
-- REVIEWでdraft PRを作っている場合は、`--sync-pr <番号>` で状態ブロックを入れてから `gh pr ready <番号>` でready化する。`ready_for_review` で `Agent harness` とE2Eが実行される。draftのままではready扱いにならない。draft PRがなければここでPRを作る。
+`node scripts/loop-runner.mjs --next` を実行する。`--sync-pr`（状態ブロックをPR本文へ。draftのままではready扱いにならない）→ `gh pr ready`（draftのとき。`ready_for_review` で `Agent harness` とE2Eが実行される）→ watch待機 → `ready` 遷移 → `--publish-metrics` まで機械実行する。止まるのは `action_required`（未処理指摘・未解決thread・承認待ち・revision変更）とCI失敗（`needs:"ci_reproduce"`、`{failedTests, traceUrl, reproduce}` を返す）とCI pending（`needs:"ci_pending"`）である。draft PRがなければ先にPRを作る（EXECUTEで `prAllowed===true` のとき `--next` が自動作成済みのはず）。
 
 - `node scripts/collect-pr-findings.mjs --pr <番号>` で外部findingを収集し、仕様と照合して修正または根拠付きで棄却する。
-- CI失敗は `--ci-failures <番号>` で機械抽出する（`{check,head,runUrl,artifactUrl,failedTests,reproduce}`）。`reproduce` コマンドでローカル再現を試し、結果を `ci_failure` の exit へ `--draft exit --event ci_failure` の下書きに抽出レコードとreproduction結果を記入して必ず記録し、EXECUTE へ戻す（複数check同時失敗は `ciFailure` を配列で1遷移にまとめる。`note` は任意だが再現状況の根拠を書くことを推奨）。`result` は `reproduced` または `not_reproduced`。`not_reproduced`（ローカルで再現しない）は修復を推測せず INCIDENT へ遷移する。
+- CI失敗の再現（`needs:"ci_reproduce"`）: `--ci-failures <番号>` で機械抽出する（`{check,head,runUrl,artifactUrl,failedTests,reproduce}`）。`reproduce` コマンドでローカル再現を試し、結果を `ci_failure` の exit へ `--draft exit --event ci_failure` の下書きに抽出レコードとreproduction結果を記入して必ず記録し、EXECUTE へ戻す（複数check同時失敗は `ciFailure` を配列で1遷移にまとめる。`note` は任意だが再現状況の根拠を書くことを推奨）。`result` は `reproduced` または `not_reproduced`。`not_reproduced`（ローカルで再現しない）は修復を推測せず INCIDENT へ遷移する。`--next` はこのイベントを発火しない — Agentが再現を試してから記録する。
 - `ci_failure` で戻ったEXECUTEは未解決レコードがある限り `ready` で止まる。修正を push したら `--resolve-ci-failures` を実行する。runner自身がpush前検証（E2E/unitは失敗spec/testファイルを対象化、lint/build等のジョブ失敗は全量）を走らせ、exit 0 のときだけ解決扱いになる（成功マーカーだけでは解決にならない）。
 - E2Eのリトライは local/CI とも 1 回に統一。リトライで通った flaky テストは CI の job summary と `--check-pr` の `flakyTests` に出る。flaky を観測したら follow-up Issue を起票する。
 - 新規findingは `findings` でEXECUTEへ戻す。
@@ -17,4 +17,4 @@ PR作成後のlatest HEADに対してCI・レビュー指摘・承認・競合�
 - `--sync-pr` はPR作成後・修正HEADのレビュー完了・状態遷移など復元用checkpointが変わる節目で行う。同一本文ならwriteを省略する。bot確認日時や待機snapshotの更新だけを人間向け本文へ書き戻さない。handled記録は別ファイルで管理し、別Sessionでは最新コメントを再取得・再確認して作り直す。
 - DONE本文の同期でcheckやbotコメントが更新された場合は、`--check-pr` で現在の結果を確認する。観測結果をまた本文へ書く連鎖を作らない。新規の実指摘は通常どおりfindingsとして対応する。
 
-必要条件を満たしHEAD不変を再確認できたら `ready`。`ready`（DONE）直後に `node scripts/loop-runner.mjs --publish-metrics <番号>` を実行し、タスクのmetrics要約をPRのマーカー付きコメント（`<!-- agent-metrics:v1 task=<taskId> -->`）へ保存する。同じマーカーのコメントは更新されるため再実行しても1件のまま。コメントは状態ブロックとは別物で、PR本文・CIとは連鎖しない。
+必要条件を満たしHEAD不変を再確認できたら `ready`。`ready`（DONE）直後にmetrics要約をPRのマーカー付きコメント（`<!-- agent-metrics:v1 task=<taskId> -->`）へ保存する（`--next` ではこの工程の最後に自動実行される）。同じマーカーのコメントは更新されるため再実行しても1件のまま。コメントは状態ブロックとは別物で、PR本文・CIとは連鎖しない。

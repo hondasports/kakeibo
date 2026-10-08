@@ -34,6 +34,26 @@ base既定値は `origin/preview`。別baseは開始時に `--base` で指定す
 
 仕様の修正はREFINEで `--spec /tmp/spec.json`。未決事項があれば `--event decision_required --exit /tmp/exit.json` で停止する。exit JSONは `--draft exit --event <event>` の下書きが必要キー（reason・approval・resolution・reassessment・reproduction・ciFailureの該当分）だけを出力するので、TODOを埋めて提出する。Human Gateの解除には `approval: {"source":"user","reference":"対象と操作を承認したユーザー指示の参照"}` が必要。承認記録はAgentの責任であり、このJSONだけで人間の本人性を証明するものではない。提出JSONの必須キーは `requiredKeys(kind, context)`（`scripts/loop-schema.mjs`）が schema.required と validator の条件キーから一元生成する正本であり、`--draft`・`readSubmission` のTODO検査・`validateTransition` のexit存在確認のすべてがこれを使う。
 
+## `--next`（自動前進）
+
+`node scripts/loop-runner.mjs --next [--review <file>]` は「現在StateのAgent作業は終わった」前提で、そのStateの機械的な残りstepと遷移をまとめて実行し、最初の判断必要箇所で止まる。出力は1個のJSON `{taskId, state, needs, steps, next}`。`steps` は成功した機械step名だけ（ログ本文は含めない）。途中失敗しても保存済みの成功stepは保持されるので、原因を直して `--next` を再実行すれば途中から再開する。`--next` が `decision_required`・`resolved`・human-gate-release・`ci_failure` を発火することはない。
+
+各Stateで実行するstepと停止条件:
+
+| State | 実行する機械step | 止まる `needs` |
+|---|---|---|
+| refine | spec・assessment（#948のTODO検出を含む）の検証 → `ready` | spec不足:`spec` / assessment不足:`assessment` / 必須skill未読:`skills` / material decision:`decisions` → 通過後 `implementation` |
+| execute | clean tree確認 → `verify:prepush`（現在HEADの成功マーカーがなければ）→ 未解決ciFailureの再確認（`--resolve-ci-failures`相当、`--include`対象化付き）→ 残り必須検証 → `ready` → `spec.prAllowed===true` なら push＋draft PR作成 → REVIEWでpacket生成 | dirty tree:`commit` / prepush失敗:`verify:prepush`（失敗check名と再実行コマンドを返す）/ CI失敗未解決:`ci_reproduce` / 検証失敗:`verify` / prAllowed false:`pr_permission` / 同一原因3回失敗はrecordFailure経由でINCIDENT |
+| review（--reviewなし） | PRがあれば外部指摘を収集 → `--review-packet`（増分条件は既存ロジック） | 常に `needs:"review"`（packetパスと独立レビュー要否を返す） |
+| review（--review file） | REVIEW cleanに必要な残り検証（Lite laneはprocessのみ、それ以外はfull unit。`--next` 自体にlane分岐はなく `requiredVerificationKinds` に従う）→ レビュー記録 → open finding 0なら `clean`、あれば `findings`（reasonはfinding id一覧） | 検証失敗:`verify` / 再評価必須回:`reassessment` / findings後:`fix` / clean後:`aftercare` |
+| aftercare | `--sync-pr` → draftなら `gh pr ready` → `--aftercare --watch-aftercare` → `ready` → `--publish-metrics` | `action_required`（未処理指摘・thread・承認待ち・revision変更）/ CI失敗:`ci_reproduce`（`ciFailure{failedTests,traceUrl,reproduce}`）/ pending:`ci_pending` / PR無し:`pr` |
+| incident / human_gate | 何もしない | `resolution` / `approval` |
+| done | 何もしない | `needs:null`（`done:true`） |
+
+`spec.prAllowed`（boolean、省略時false）はEXECUTE末尾のpush・draft PR作成の許可ゲート。falseなら遷移後に `needs:"pr_permission"` で止まり、リモートへの書き込みは一切行わない。
+
+`--next --review <file>` でレビュー提出を兼ねるとき、`--review` は単独アクションとしては数えない（`--next` への入力）。`--handled <file>`（外部指摘の処理済み記録）と `--interval-seconds`（watch間隔）はそのまま渡せる。
+
 ## 実装と検証
 
 変更後に実差分を評価し、必要Skillを読んで記録する。
