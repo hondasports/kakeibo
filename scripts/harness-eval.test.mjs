@@ -7,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -142,6 +143,36 @@ describe("expandHarnessPattern / harnessFiles", () => {
   });
 });
 
+describe("harnessFiles: spec-map specs (#984)", () => {
+  test("includes e2e specs named explicitly by the ref's spec-map, not globs or non-e2e files", async () => {
+    const { repo } = makeFixtureRepo();
+    const g = (args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+    g(["checkout", "harness-new"]);
+    mkdirSync(path.join(repo, "e2e"), { recursive: true });
+    writeFileSync(
+      path.join(repo, "e2e", "spec-map.json"),
+      JSON.stringify({
+        $comment: "x",
+        "src/a/**": ["e2e/a.spec.ts", "e2e/*.spec.ts", "src/secret.test.ts", "e2e/missing.spec.ts"],
+      }),
+    );
+    writeFileSync(path.join(repo, "e2e", "a.spec.ts"), "// a\n");
+    writeFileSync(path.join(repo, "e2e", "unlisted.spec.ts"), "// unlisted\n");
+    mkdirSync(path.join(repo, "src"), { recursive: true });
+    writeFileSync(path.join(repo, "src", "secret.test.ts"), "// oracle-like\n");
+    g(["add", "-A"]);
+    g(["commit", "-m", "ref with spec-map"]);
+    const ref = g(["rev-parse", "HEAD"]);
+    g(["checkout", "main"]);
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    const files = mod.harnessFiles(repo, ref);
+    expect(files).toContain("e2e/a.spec.ts");
+    expect(files).not.toContain("e2e/unlisted.spec.ts"); // globs are not expanded
+    expect(files).not.toContain("e2e/missing.spec.ts");
+    expect(files).not.toContain("src/secret.test.ts"); // only e2e specs, never src/convex
+  });
+});
+
 describe("harnessPathsDoc", () => {
   test("reads the paths list from <ref> so newer harnesses self-describe", async () => {
     const { repo, harnessRef } = makeFixtureRepo();
@@ -240,6 +271,47 @@ describe("overlayHarness: removedPaths (#984)", () => {
     expect(readFileSync(path.join(work, "AGENTS.md"), "utf8")).toBe("# new contract\n");
   });
 
+  test("rejects a removedPaths entry whose parent is a symlink out of the worktree", async () => {
+    const { repo, ref, work } = setupRemoval([".agent/profiles/fast.yaml"]);
+    const outside = tmp();
+    writeFileSync(path.join(outside, "fast.yaml"), "outside\n");
+    rmSync(path.join(work, ".agent", "profiles"), { recursive: true, force: true });
+    symlinkSync(outside, path.join(work, ".agent", "profiles"));
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    expect(() => mod.overlayHarness(repo, work, ref)).toThrow(/outside the worktree/);
+    expect(readFileSync(path.join(outside, "fast.yaml"), "utf8")).toBe("outside\n");
+  });
+
+  test("removes retired npm scripts but keeps ones the ref still defines", async () => {
+    const { repo } = makeFixtureRepo();
+    const g = (args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+    g(["checkout", "harness-new"]);
+    mkdirSync(path.join(repo, "eval", "harness"), { recursive: true });
+    writeFileSync(
+      path.join(repo, "eval", "harness", "harness-paths.json"),
+      JSON.stringify({
+        paths: ["AGENTS.md"],
+        npmScripts: [],
+        removedNpmScripts: ["loop:profile", "e2e:isolated"],
+      }),
+    );
+    g(["add", "-A"]);
+    g(["commit", "-m", "ref paths doc with removedNpmScripts"]);
+    const ref = g(["rev-parse", "HEAD"]);
+    g(["checkout", "main"]);
+    const work = tmp();
+    writeFileSync(
+      path.join(work, "package.json"),
+      JSON.stringify({ scripts: { test: "old", "loop:profile": "node gone.mjs", "e2e:isolated": "old" } }),
+    );
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    mod.overlayHarness(repo, work, ref);
+    const pkg = JSON.parse(readFileSync(path.join(work, "package.json"), "utf8"));
+    expect(pkg.scripts["loop:profile"]).toBeUndefined();
+    expect(pkg.scripts["e2e:isolated"]).toBe("old"); // ref still defines it -> not removed
+    expect(pkg.scripts.test).toBe("old");
+  });
+
   test("rejects entries that escape the worktree", async () => {
     const { repo, ref, work } = setupRemoval(["../outside"]);
     const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
@@ -290,6 +362,12 @@ describe("harness-paths.json drift (#984)", () => {
     );
     expect(alive).toEqual([]);
     expect(paths.paths.filter((entry) => (paths.removedPaths ?? []).includes(entry))).toEqual([]);
+  });
+
+  test("removedNpmScripts are not defined in this repo's package.json", () => {
+    expect((paths.removedNpmScripts ?? []).filter((key) => pkg.scripts[key] !== undefined)).toEqual(
+      [],
+    );
   });
 });
 
