@@ -175,10 +175,9 @@ pnpm run dev
 
 `.agents/` 配下は外部インストールSkill等の環境依存生成物のため、丸ごとGit管理外にする。
 
-このリポジトリで手作りしたSkillと工程定義は、`.agents/` ではなく次のGit管理ディレクトリに置く。
+このリポジトリで手作りしたSkillは、`.agents/` ではなく次のGit管理ディレクトリに置く。
 
 - Capability Skill: `skills/<name>/SKILL.md`（一覧は `AGENTS.md` のCapability skillsが正本）
-- 工程（[State仕様](agent-harness-states.md)の各State）: `.agent/workflow/`（Skillではなく工程定義）
 
 **Git管理しないSkill（外部インストール、`.agents/` 配下）:**
 - `clerk` / `clerk-*` 系 — Clerk公式 Skills（`npx skills add clerk/agent-skills`）

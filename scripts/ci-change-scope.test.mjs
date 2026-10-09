@@ -12,7 +12,7 @@ describe("ciCodeChanged", () => {
     [["README.md"], false],
     [[".github/ISSUE_TEMPLATE/bug.yml"], true],
     [[".github/workflows/ci.yml"], true],
-    [["docs/design.md", ".agent/process.yaml"], true],
+    [["docs/design.md", "scripts/verify-prepush.mjs"], true],
     [["CHANGELOG.md", "AGENTS.md"], false],
   ])("paths %j -> %s", (paths, expected) => {
     expect(ciCodeChanged(paths)).toBe(expected);

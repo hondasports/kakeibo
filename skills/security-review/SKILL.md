@@ -15,7 +15,7 @@ license: Apache-2.0
 - ユーザー入力、ユーザー制御のHTML・URL・redirect・file / path・MIME
 - webhookの署名・送信元等の検証、外部write境界
 
-該当する変更はfloor trigger語彙の `authentication_or_authorization` / `external_service_write_or_webhook` / `destructive_or_irreversible_operation` 相当として扱い、Machine Floor T3（独立Reviewer必須）の根拠になる。path ruleで捕捉されない境界変更はAgentがassessmentへ宣言する。
+該当する変更は高リスク変更として扱い、新しいコンテキストの独立Reviewerによるレビューを推奨する。
 
 ## 判断と出力
 

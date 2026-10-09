@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,8 +6,6 @@ import { afterEach, describe, expect, test } from "vitest";
 import {
   classifyIncludes,
   e2ePreflight,
-  markerDir,
-  needsProcessSuite,
   portBusy,
   runPrepush,
   sanitizeHookEnv,
@@ -31,24 +29,15 @@ afterEach(() => {
 const HEAD = "a".repeat(40);
 const BASE = "b".repeat(40);
 
-function gitOpsFor(root, { dirty = false } = {}) {
+function gitOpsFor() {
   return {
     head: () => HEAD,
     base: () => BASE,
     changedFiles: () => [],
-    dirty: () => dirty,
-    // markerDir() calls git rev-parse — stub via marker dir layout inside root/.git
   };
 }
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-
-/** runPrepushのmarker出力先をテスト用tmpdirへ差し替えるdeps。 */
-function markerDeps() {
-  const dir = mkdtempSync(path.join(tmpdir(), "prepush-markers-"));
-  dirs.push(dir);
-  return { markerBaseDir: () => dir, markerDir: dir };
-}
 
 function collectOut() {
   const lines = [];
@@ -81,13 +70,13 @@ describe("classifyIncludes (AC9)", () => {
   });
 });
 
-describe("unitRelatedTargets / needsProcessSuite", () => {
-  test("scripts/.agent/.md/.json/e2eはrelated対象外", () => {
+describe("unitRelatedTargets", () => {
+  test("メタデータ・.md・.json・e2eはrelated対象外", () => {
     const exists = () => true;
     const targets = unitRelatedTargets(
       [
         "scripts/x.mjs",
-        ".agent/process.yaml",
+        ".husky/pre-push",
         "docs/a.md",
         "package.json",
         "e2e/a.spec.ts",
@@ -96,14 +85,7 @@ describe("unitRelatedTargets / needsProcessSuite", () => {
       ],
       { exists },
     );
-    expect(targets).toEqual(["src/app.ts", "convex/schema.ts"]);
-  });
-  test("scripts/.agent/docs-agent-harnessの変更でprocess起動", () => {
-    expect(needsProcessSuite(["src/a.ts"])).toBe(false);
-    expect(needsProcessSuite(["scripts/x.mjs"])).toBe(true);
-    expect(needsProcessSuite([".agent/process.yaml"])).toBe(true);
-    expect(needsProcessSuite(["docs/agent-harness.md"])).toBe(true);
-    expect(needsProcessSuite(["docs/development-process.md"])).toBe(false);
+    expect(targets).toEqual(["scripts/x.mjs", "src/app.ts", "convex/schema.ts"]);
   });
 });
 
@@ -120,8 +102,7 @@ describe("runPrepush", () => {
         writeFileSync(log, "x");
         return 0;
       },
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir: markerDeps().markerBaseDir,
+      gitOps: gitOpsFor(),
       out,
     });
     expect(code).toBe(0);
@@ -143,9 +124,7 @@ describe("runPrepush", () => {
         return 0;
       },
       preflight: async () => [],
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir: markerDeps().markerBaseDir,
-      markerBaseDir: markerDeps().markerBaseDir,
+      gitOps: gitOpsFor(),
       out,
     });
     expect(code).toBe(0);
@@ -168,9 +147,7 @@ describe("runPrepush", () => {
         return 0;
       },
       preflight: async () => [],
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir: markerDeps().markerBaseDir,
-      markerBaseDir: markerDeps().markerBaseDir,
+      gitOps: gitOpsFor(),
       out,
     });
     const e2eCall = calls.find((c) => c.includes("e2e:isolated"));
@@ -192,9 +169,7 @@ describe("runPrepush", () => {
         return n === 4 ? 1 : 0; // unit-relatedで失敗
       },
       preflight: async () => [],
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir: markerDeps().markerBaseDir,
-      markerBaseDir: markerDeps().markerBaseDir,
+      gitOps: gitOpsFor(),
       out,
     });
     expect(code).toBe(1);
@@ -218,8 +193,7 @@ describe("runPrepush", () => {
         return 0;
       },
       preflight: async () => ["ポート 5173 が使用中", "Chromium未インストール"],
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir: markerDeps().markerBaseDir,
+      gitOps: gitOpsFor(),
       out,
     });
     expect(code).toBe(1);
@@ -227,111 +201,6 @@ describe("runPrepush", () => {
     const tail = lines.at(-1);
     expect(tail).toContain("ポート 5173 が使用中");
     expect(tail).toContain("Chromium未インストール");
-  });
-
-  test("AC7/AC8: 全成功でHEAD.ok作成、dirtyなら作らない、失敗で削除", async () => {
-    const { markerBaseDir, markerDir } = markerDeps();
-    const head = HEAD;
-    expect(existsSync(path.join(markerDir, `${head}.ok`))).toBe(false);
-    // 成功 → marker作成
-    const ok = await runPrepush({
-      argv: [],
-      cwd: repoRoot,
-      changedFilesOverride: ["docs/a.md"],
-      runStep: (cmd, args, cwd, log) => {
-        writeFileSync(log, "x");
-        return 0;
-      },
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir,
-      out: () => {},
-    });
-    expect(ok).toBe(0);
-    expect(existsSync(path.join(markerDir, `${head}.ok`))).toBe(true);
-    // 別HEADではtrueにならない (AC8)
-    expect(existsSync(path.join(markerDir, `${"c".repeat(40)}.ok`))).toBe(false);
-    // 失敗 → marker削除
-    const fail = await runPrepush({
-      argv: [],
-      cwd: repoRoot,
-      changedFilesOverride: ["docs/a.md"],
-      runStep: (cmd, args, cwd, log) => {
-        writeFileSync(log, "x");
-        return args.includes("lint") ? 1 : 0;
-      },
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir,
-      out: () => {},
-    });
-    expect(fail).toBe(1);
-    expect(existsSync(path.join(markerDir, `${head}.ok`))).toBe(false);
-    // dirty → marker作らない
-    const dirty = await runPrepush({
-      argv: [],
-      cwd: repoRoot,
-      changedFilesOverride: ["docs/a.md"],
-      runStep: (cmd, args, cwd, log) => {
-        writeFileSync(log, "x");
-        return 0;
-      },
-      gitOps: gitOpsFor(repoRoot, { dirty: true }),
-      markerBaseDir,
-      out: () => {},
-    });
-    expect(dirty).toBe(0);
-    expect(existsSync(path.join(markerDir, `${head}.ok`))).toBe(false);
-    // marker prune: 20件を超えると古いものから消える
-    for (let i = 0; i < 25; i++) {
-      writeFileSync(path.join(markerDir, `${String(i).padStart(40, "0")}.ok`), "");
-    }
-    await runPrepush({
-      argv: [],
-      cwd: repoRoot,
-      changedFilesOverride: ["docs/a.md"],
-      runStep: (cmd, args, cwd, log) => {
-        writeFileSync(log, "x");
-        return 0;
-      },
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir,
-      out: () => {},
-    });
-    expect(readdirSync(markerDir).filter((f) => f.endsWith(".ok")).length).toBeLessThanOrEqual(20);
-  });
-
-  test("dirty成功や早期失敗でも同HEADの古いマーカーを落とす（対称性）", async () => {
-    const { markerBaseDir, markerDir } = markerDeps();
-    const marker = path.join(markerDir, `${HEAD}.ok`);
-    mkdirSync(markerDir, { recursive: true });
-    writeFileSync(marker, "");
-    // dirty成功 → 既存marker削除
-    const dirty = await runPrepush({
-      argv: [],
-      cwd: repoRoot,
-      changedFilesOverride: ["docs/a.md"],
-      runStep: (cmd, args, cwd, log) => {
-        writeFileSync(log, "x");
-        return 0;
-      },
-      gitOps: gitOpsFor(repoRoot, { dirty: true }),
-      markerBaseDir,
-      out: () => {},
-    });
-    expect(dirty).toBe(0);
-    expect(existsSync(marker)).toBe(false);
-    // --include不存在（早期失敗）→ 既存marker削除
-    writeFileSync(marker, "");
-    const bad = await runPrepush({
-      argv: ["--include", "e2e/ghost.spec.ts"],
-      cwd: repoRoot,
-      changedFilesOverride: [],
-      runStep: () => 0,
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir,
-      out: () => {},
-    });
-    expect(bad).toBe(1);
-    expect(existsSync(marker)).toBe(false);
   });
 
   test("unmapped注意はstep失敗より先に出る", async () => {
@@ -342,8 +211,7 @@ describe("runPrepush", () => {
       changedFilesOverride: ["vite.config.ts"], // spec-map未収載 → unmapped
       runStep: () => 1, // 最初のstepで失敗
       preflight: async () => [],
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir: markerDeps().markerBaseDir,
+      gitOps: gitOpsFor(),
       out,
     });
     expect(code).toBe(1);
@@ -364,8 +232,7 @@ describe("runPrepush", () => {
         return 0;
       },
       preflight: async () => [],
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir: markerDeps().markerBaseDir,
+      gitOps: gitOpsFor(),
       out: () => {},
     });
     expect(code).toBe(0);
@@ -375,7 +242,6 @@ describe("runPrepush", () => {
     const unitCalls = [];
     const dir = tmpdirFixture();
     writeFileSync(path.join(dir, "x.test.ts"), "// test");
-    const { markerBaseDir: mbd2 } = markerDeps();
     const code2 = await runPrepush({
       argv: ["--include", "x.test.ts"],
       cwd: dir,
@@ -386,8 +252,7 @@ describe("runPrepush", () => {
         return 0;
       },
       preflight: async () => [],
-      gitOps: gitOpsFor(dir),
-      markerBaseDir: mbd2,
+      gitOps: gitOpsFor(),
       out: () => {},
     });
     expect(code2).toBe(0);
@@ -399,8 +264,7 @@ describe("runPrepush", () => {
       cwd: repoRoot,
       changedFilesOverride: ["docs/a.md"],
       runStep: () => 0,
-      gitOps: gitOpsFor(repoRoot),
-      markerBaseDir: markerDeps().markerBaseDir,
+      gitOps: gitOpsFor(),
       out: () => {},
     });
     expect(code3).toBe(1);
@@ -426,18 +290,6 @@ describe("hook env sanitization (pre-push経由のGIT_*汚染対策)", () => {
     expect(clean.GIT_PREFIX).toBeUndefined();
     expect(clean.PATH).toBe("/bin");
     expect(clean.FOO).toBe("bar");
-  });
-
-  test("markerDir works even when GIT_DIR is poisoned (hook env leak regression)", () => {
-    const prev = process.env.GIT_DIR;
-    process.env.GIT_DIR = "/nonexistent-hack-dir";
-    try {
-      const dir = markerDir(repoRoot);
-      expect(dir).toContain("agent-prepush");
-    } finally {
-      if (prev === undefined) delete process.env.GIT_DIR;
-      else process.env.GIT_DIR = prev;
-    }
   });
 });
 

@@ -92,7 +92,7 @@ describe("selectSpecs (AC1-AC3)", () => {
       changedFiles: [
         "src/features/expense-search/a.ts",
         "docs/guide.md",
-        "scripts/loop-runner.mjs",
+        "scripts/check-task-worktree.mjs",
       ],
     });
     expect(result.unmapped).toEqual([]);

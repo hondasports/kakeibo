@@ -32,23 +32,10 @@ describe("E2E relevance path classification", () => {
       "docs/development-process.md",
       "skills/workspace-preflight/SKILL.md",
       ".husky/pre-commit",
-      "plugin.json",
-      "scripts/review-depth.mjs",
-      "scripts/review-depth.test.mjs",
       "scripts/check-task-worktree.mjs",
-      "scripts/check-loop-docs.mjs",
-      "scripts/check-loop-docs.test.mjs",
+      "scripts/check-task-worktree.test.mjs",
       "scripts/collect-pr-findings.mjs",
       "scripts/collect-pr-findings.test.mjs",
-      "scripts/suggest-skills.mjs",
-      "scripts/suggest-skills.test.mjs",
-      "scripts/loop/state.mjs",
-      "scripts/loop/next.test.mjs",
-      "scripts/loop/gates.test.mjs",
-      "scripts/generate-harness-docs.mjs",
-      "eval/harness/harness-paths.json",
-      "eval/harness/golden-set.json",
-      "eval/harness/baseline/g1-docs.jsonl",
     ];
 
     for (const filePath of processOnlyPaths) {
@@ -56,7 +43,7 @@ describe("E2E relevance path classification", () => {
     }
   });
 
-  it("keeps runtime, workflow, harness, and environment paths E2E relevant", () => {
+  it("keeps runtime, workflow, and environment paths E2E relevant", () => {
     const runtimePaths = [
       "src/App.tsx",
       "convex/groups.ts",
