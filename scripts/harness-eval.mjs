@@ -53,6 +53,25 @@ const HARNESS_PATHS_PATH = path.join(REPO_ROOT, "eval/harness/harness-paths.json
 const GOLDEN_SET = JSON.parse(readFileSync(GOLDEN_SET_PATH, "utf8"));
 const HARNESS_PATHS = JSON.parse(readFileSync(HARNESS_PATHS_PATH, "utf8"));
 
+/**
+ * The overlay file list is self-describing: read it from <ref> so a harness
+ * newer than the caller's checkout can introduce files the local list does
+ * not know yet (e.g. scripts the new loop imports). Falls back to the
+ * caller's own copy when the ref lacks the file or the ref cannot be read.
+ */
+export function harnessPathsDoc(repoRoot, ref, record) {
+  try {
+    return JSON.parse(
+      git(repoRoot, ["show", `${ref}:eval/harness/harness-paths.json`], {
+        record,
+        quiet: true,
+      }),
+    );
+  } catch {
+    return HARNESS_PATHS;
+  }
+}
+
 export const SUMMARY_KEYS = [
   "oracle",
   "tokens",
@@ -153,7 +172,7 @@ export function expandHarnessPattern(repoRoot, ref, pattern, record) {
 /** All files the overlay should copy from <ref>. Missing paths are ignored. */
 export function harnessFiles(repoRoot, ref, record) {
   const files = new Set();
-  for (const pattern of HARNESS_PATHS.paths) {
+  for (const pattern of harnessPathsDoc(repoRoot, ref, record).paths ?? []) {
     for (const file of expandHarnessPattern(repoRoot, ref, pattern, record)) files.add(file);
   }
   return [...files].sort();
@@ -171,6 +190,7 @@ function extractFile(repoRoot, ref, file, record) {
 
 /** Copy harnessFiles from <ref> into dir and merge the npmScripts keys of package.json. */
 export function overlayHarness(repoRoot, dir, ref, { record } = {}) {
+  const harnessPaths = harnessPathsDoc(repoRoot, ref, record);
   const files = harnessFiles(repoRoot, ref, record);
   for (const file of files) {
     const target = path.join(dir, file);
@@ -180,7 +200,7 @@ export function overlayHarness(repoRoot, dir, ref, { record } = {}) {
   const refPkg = JSON.parse(git(repoRoot, ["show", `${ref}:package.json`], { record }));
   const dirPkgPath = path.join(dir, "package.json");
   const dirPkg = JSON.parse(readFileSync(dirPkgPath, "utf8"));
-  for (const key of HARNESS_PATHS.npmScripts) {
+  for (const key of harnessPaths.npmScripts ?? []) {
     if (refPkg.scripts?.[key] !== undefined) {
       dirPkg.scripts = dirPkg.scripts ?? {};
       dirPkg.scripts[key] = refPkg.scripts[key];

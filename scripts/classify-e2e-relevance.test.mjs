@@ -45,6 +45,10 @@ describe("E2E relevance path classification", () => {
       "scripts/loop/state.mjs",
       "scripts/loop/next.test.mjs",
       "scripts/loop/gates.test.mjs",
+      "scripts/generate-harness-docs.mjs",
+      "eval/harness/harness-paths.json",
+      "eval/harness/golden-set.json",
+      "eval/harness/baseline/g1-docs.jsonl",
     ];
 
     for (const filePath of processOnlyPaths) {

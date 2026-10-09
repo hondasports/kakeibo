@@ -1,39 +1,15 @@
 # REVIEW
 
-実差分・Acceptance Criteria・検証結果を独立に確認し、Risk Floorを含むレビュー深度を満たす。
+実差分・Acceptance Criteria・検証結果を独立に確認し、Risk Floorを含むレビュー深度を満たす。`Final Risk = max(Predicted Risk Floor, Machine Diff Floor, Agent Assessment, Reviewer Assessment)` で、Machine Floorは引き下げ不可。
 
-## Risk
+## 判断
 
-`Final Risk = max(Predicted Risk Floor, Machine Diff Floor, Agent Assessment, Reviewer Assessment)` とする。Machine Floorは引き下げ不可。
-
-T1はセルフレビュー可。T2で `uncertainty=some_unknowns`、またはT3は独立Reviewer必須。独立Reviewerには実装担当の結論を先に見せず、目的・AC・差分・検証・関連caller/契約を渡して独立評価させる。材料は `node scripts/loop-runner.mjs --review-packet <dir>` で生成し、packet全体をfresh contextへ渡す。
-
-## 検証との並行
-
-REVIEW cleanにローカルで要求される検証は全Tierともprocessのみである（#952）。lint/unit/buildの合否はCIのcheckが正本で、push前は `verify:prepush` の成功マーカーがEXECUTE→REVIEWをゲートする。draftのPRではci.yml・e2e.ymlがレビューと並行して実行される（Agent harnessのみdraft中skip）。T2/T3のcleanはdraft PRの現在HEADのCI checkが全て合格条件を満たすことが前提で、`--next --review <file>` はレビュー記録後にCIの結果をpollで評価してから `clean` する（T1は従来どおりAFTERCAREで評価）。Reviewerにはpacketの `verification-manifest.json` にCI check結果とaccept/reasonを載せて渡す。手動経路でも同じ評価は `--next --review` の1ステップで行われる。
-
-## Review loop
-
-findingはid・状態・根拠・重要度（`severity`）を持つ。severityの基準：blocker=ACを満たさない／セキュリティやデータの破壊／本番障害、major=誤った挙動・テスト欠落による回帰リスク・契約違反、minor=可読性・保守性・軽微な不整合、nit=書式・命名の好み。severityの記入は必須で、未記入はmajor扱いである。Reviewerは各ラウンドで対象範囲を網羅し、見つけた指摘を重要度にかかわらず一度に出す。後のラウンドへ小出しにしない。修正後は変更hunk・影響項目・open findingを再確認する。共有契約や前提が変わった場合だけ範囲を広げる。
-
-cleanの条件は「blocker / majorのopen findingが0件」である。major以上は修正または根拠付き却下が必要で、deferredにはできない。minor / nitは修正・却下に加えて `status: deferred` と `followUp: <follow-up Issue URL>`（`gh issue create` でAgentが作る）を付けることで後回しにできる。deferredは機械的に検証され、URLが不正・severityがmajor以上・severity未指定なら拒否される。deferredした指摘は状態ブロックとPR本文に一覧として残る（追跡を消さない）。
-
-draft PRがある場合は、packet生成前に `node scripts/collect-pr-findings.mjs --pr <番号>` で外部レビュー（CodeRabbit等）の未処理指摘をファイルへ保存し、`--review-packet <dir> --external-findings <file>` で独立Reviewerへ渡す（未信頼データとして包まれ、prompt-injection-guardが同梱される）。外部指摘の採否はReviewerが仕様と照合して判断し、同じラウンドのfindingsへ外部指摘を辿れるidで記録する。実装担当はReviewerの報告を編集しない。内部・外部の指摘をEXECUTEで一度に修正し、clean後に外部指摘で全ループをやり直さないためである。外部レビューの完了を待つためにREVIEWで待機はしない。packet生成後に届いた外部指摘は次のラウンドかAFTERCAREの収集で扱う。
-
-同じラウンドのopen findingはEXECUTEでまとめて修正し、まとめて再検証する。1件ごとの修正→検証→再レビュー往復をしない。
-
-レビュー記録は修正commitの前に行う。`--review` はclean treeを要求するため、finding修正を先にcommitすると記録対象のheadが失効する。記録→findings遷移→修正commitの順を守る。
-
-## 再レビュー
-
-`--review-packet <dir>` は、増分条件（同一base・全ACの証跡あり・現在HEADのancestor・同じspecのfingerprint・現在のrisk以上のtier・独立レビューが必要なら起点も独立レビュー）を満たす最新のレビュー記録があれば、自動でそこからの増分資料を作る。満たさなければ全差分packetになる。起点の明示は `--delta-from <reviewed-head>`、全差分の強制は `--full-review` で行う。`diff.patch` は増分、`previous-review.json` は同じbaseの過去AC・finding記録、`full-diff.patch` は範囲拡張時の参照先となる。全AC・全変更path・過去finding・必須契約は引き続き提供する。review-template.jsonには過去findingのid・status・severityが事前記入されるが、evidenceはReviewerが再確認して書く。増分で影響を受けなかった閉じたfindingは、直前レビューの参照を根拠にしてよい。
-
-Reviewerは増分・影響caller・open findingから確認し、影響のないACの証跡は過去レビューを参照する。全ACの `{id, evidence}` 記録は変わらず必須である。共有契約や前提が変わった場合は全差分へ広げる。報告全文はファイルに保存し、実装担当への返却は結論・指摘件数・対象HEAD・報告参照先を中心にする。
+- T1はセルフレビュー可。T2で `uncertainty=some_unknowns`、またはT3はfresh contextの独立Reviewer必須。実装担当の結論を先に見せず、目的・AC・差分・検証・関連caller/契約を渡して独立評価させる。
+- severityの基準：blocker=AC未達・セキュリティやデータ破壊・本番障害、major=誤った挙動・回帰リスクのあるテスト欠落・契約違反、minor=可読性・保守性・軽微な不整合、nit=書式・命名の好み。severity記入は必須（未記入はmajor扱い）。
+- cleanの条件は blocker / major のopen findingが0件。major以上は修正または根拠付き却下のみ。minor / nit は `status: deferred` + `followUp: <follow-up Issue URL>` で後回しできる（deferredは状態ブロックとPR本文に残る）。
+- 各ラウンドで対象範囲を網羅し、見つけた指摘を一度に出す。後のラウンドへ小出しにしない。外部レビュー（CodeRabbit等）指摘の採否はReviewerが仕様と照合して判断し、findingsへ外部指摘を辿れるidで記録する。実装担当はReviewerの報告を編集しない。
+- 共有契約や前提が変わった場合だけ増分レビューから全差分へ範囲を広げる。レビュー記録は修正commitの前に行う（記録→findings遷移→修正commitの順）。
 
 ## Exit
 
-`node scripts/loop-runner.mjs --next` を実行する。PRがあれば外部レビュー指摘を収集し、`--review-packet` 相当のpacketを生成して `needs:"review"` で止まる（独立レビュー要否も返す）。Reviewerの報告ファイルを受け取ったら `node scripts/loop-runner.mjs --next --review <file>` を実行する: REVIEW cleanに必要な残り検証（全Tierともローカルはprocessのみ）を先に実行し、レビューを記録して、open findingが0件なら、T2/T3はdraft PRの現在HEADのCI check評価を経て `clean` でAFTERCAREへ（CI待ちは `needs:"ci_pending"`、失敗は `ci_reproduce`、意図しないSKIPPEDは `ci_unexpected_skip`）、残れば `findings` でEXECUTEへ遷移する（reasonはfinding id一覧が自動で入る）。`ci_reproduce` で止まった場合の正規exitは `node scripts/loop-runner.mjs --event ci_failure --exit <file>`：aftercareのCI失敗と同じreproduction契約（`ciFailure`レコード＋`reproduction {command, result, note}` 必須）でEXECUTEへ戻り、未解決recordは `ready` を塞ぐ。`not_reproduced` または3ラウンド到達はINCIDENT。2ラウンドごとの方針再評価が必要な回では `needs:"reassessment"` で止まるので、`--event findings --exit <file>` で根拠を記録する。
-
-cleanの条件は「blocker / majorのopen findingが0件」に加えて、T2/T3は現在HEADのCI check評価（`reviewCi`証跡）が揃うこと（T1はローカルprocess証跡のみ）。上限（5ラウンド）到達は未完了としてINCIDENTで扱う。
-
-レビュー記録のJSONは `--draft review`（下書きの必須キーと過去findingの事前記入を含む）にReviewerの結果を記入する。`TODO` のまま残った項目は拒否される。
+`node scripts/loop-runner.mjs --next` で外部指摘収集とpacket生成を行い `needs:"review"` で止まる。Reviewerの報告ファイルを受け取ったら `node scripts/loop-runner.mjs --next --review <file>` で残り検証・レビュー記録・clean判定（T2/T3は現在HEADのCI check評価を含む）を機械実行する。CI失敗の正規exitは `--event ci_failure --exit <file>`（aftercareと同じreproduction契約）。詳細は `docs/agent-harness.md#レビュー`、遷移・上限は `docs/agent-harness-states.md`。

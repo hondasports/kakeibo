@@ -133,6 +133,32 @@ describe("expandHarnessPattern / harnessFiles", () => {
   });
 });
 
+describe("harnessPathsDoc", () => {
+  test("reads the paths list from <ref> so newer harnesses self-describe", async () => {
+    const { repo, harnessRef } = makeFixtureRepo();
+    const g = (args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+    // Commit a ref-local paths doc that lists only AGENTS.md + a custom script.
+    g(["checkout", "harness-new"]);
+    mkdirSync(path.join(repo, "eval", "harness"), { recursive: true });
+    writeFileSync(
+      path.join(repo, "eval", "harness", "harness-paths.json"),
+      JSON.stringify({ paths: ["AGENTS.md"], npmScripts: ["custom:script"] }),
+    );
+    g(["add", "-A"]);
+    g(["commit", "-m", "ref paths doc"]);
+    const refWithDoc = g(["rev-parse", "HEAD"]);
+    g(["checkout", "main"]);
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    // ref doc wins over the caller-side fixture doc (which lists agent-hooks etc.)
+    const files = mod.harnessFiles(repo, refWithDoc);
+    expect(files).toEqual(["AGENTS.md"]);
+    expect(mod.harnessPathsDoc(repo, refWithDoc).npmScripts).toEqual(["custom:script"]);
+    // Ref without the file falls back to the caller's own list.
+    const fallbackFiles = mod.harnessFiles(repo, harnessRef);
+    expect(fallbackFiles).toContain("scripts/loop-runner.mjs");
+  });
+});
+
 describe("overlayHarness", () => {
   test("copies ref files and merges only the listed npmScripts", async () => {
     const { repo, harnessRef } = makeFixtureRepo();

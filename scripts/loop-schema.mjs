@@ -93,7 +93,7 @@ export function validateDocument(name, value, root = process.cwd()) {
  * function so `--draft` output and submission validation can never diverge;
  * later issues add keys by extending the schema/validator entries here (e.g.
  * #950 prAllowed, #951 finding severity, #958 reproduction — see
- * docs/agent-harness-reference.md).
+ * docs/agent-harness.md).
  *
  * Top-level keys only; nested required keys live in the shared draft templates.
  */

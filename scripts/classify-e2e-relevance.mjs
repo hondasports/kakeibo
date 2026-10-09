@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const PROCESS_ONLY_SCRIPT_PATTERN =
-  /^scripts\/(?:review-depth|check-task-worktree|check-loop-docs|collect-pr-findings|suggest-skills|machine-risk|assess-change|loop-(?:runner|policy|schema|pr-check|test-fixtures|metrics)|loop\/[\w-]+)(?:\.test)?\.mjs$/;
+  /^scripts\/(?:review-depth|check-task-worktree|check-loop-docs|collect-pr-findings|suggest-skills|machine-risk|assess-change|generate-harness-docs|loop-(?:runner|policy|schema|pr-check|test-fixtures|metrics)|loop\/[\w-]+)(?:\.test)?\.mjs$/;
 
 /** Normalize a Git path to a stable repository-relative form. */
 export function normalizeChangedPath(filePath) {
@@ -30,6 +30,8 @@ export function isProcessOnlyPath(filePath) {
     normalized === "AGENTS.md" ||
     normalized === "plugin.json" ||
     normalized.startsWith(".agent/") ||
+    // Harness eval fixtures/config are process artifacts with no app surface.
+    normalized.startsWith("eval/") ||
     normalized.startsWith(".github/ISSUE_TEMPLATE/") ||
     normalized.startsWith("skills/") ||
     normalized.startsWith(".husky/")

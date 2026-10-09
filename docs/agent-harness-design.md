@@ -1,36 +1,18 @@
 # Agent Harness軽量化
 
-**状態: §5・§6のProfile機構は廃止（Tier一本化）。§2以降の出力・検証・証跡管理は段階的に実装中であり、実装済みの振る舞いは [Agent Harness詳細仕様](agent-harness-reference.md) を正本とする。**
+この文書を、Harnessの軽量化の設計正本とする。現行の操作手順と仕様は [Agent Harness操作手順](agent-harness.md)、State・遷移・上限値の正本は [Agent Harness State仕様](agent-harness-states.md)（`.agent/process.yaml` から自動生成）、現在の実行契約は [AGENTS.md](../AGENTS.md) と `.agent/process.yaml` を参照する。設計を記載しただけで、現在のゲートやCLIの挙動を変更したものとして扱わない。
 
-この文書を、Harnessの軽量化の設計正本とする。現行の操作手順は [Agent Harness操作手順](agent-harness.md)（詳細は [Agent Harness詳細仕様](agent-harness-reference.md)）、現在の実行契約は [AGENTS.md](../AGENTS.md) と `.agent/process.yaml` を参照する。設計を記載しただけで、現在のゲートやCLIの挙動を変更したものとして扱わない。
+なお、実装済みの機能差分（Profile廃止・出力縮小・証跡管理など）は [Agent Harness操作手順](agent-harness.md) が正本であり、この文書には実装状況の一覧表を持たない。
 
 ## 1. 目的と維持する条件
 
 - Agentが読む情報、機械情報を記入する手間、検証・レビューの重複を減らし、作業時間と総トークン消費を抑える。
 - Agentは仕様・実差分・検証結果の意味を判断し、CLIは状態・最低条件・証跡を管理する。
 - Riskの4軸、Machine Floor、必須Skill、必須検証、独立レビュー、Human Gateを維持する。
-- Stateは `REFINE / EXECUTE / REVIEW / AFTERCARE / INCIDENT / HUMAN_GATE / DONE` を使う。強度判定や個々のテストのためにStateやAgentのターンを増やさない。
+- Stateは [State仕様](agent-harness-states.md) の正本を使う。強度判定や個々のテストのためにStateやAgentのターンを増やさない。
 - 実行契約・workflowをRuntimeごとに複製せず、必要な専門Skillだけを必要時に読む。
 
-## 2. 現行実装との差分
-
-| 項目 | 従来のCLI | 設計・実装状況 |
-|---|---|---|
-| Profile選択 | ~~REFINE終了時にタスク内容から自動判定~~ | 廃止（Tier一本化。thorough検証はTierと評価軸から判定） |
-| モデル・effort機構 | ~~models/でモデル推奨Profile・effort対応値を管理~~ | 機構ごと撤去（実装済み） |
-| 通常出力 | ~~毎回configurationとassessmentを含むJSONを返す~~ | 現在State・不足条件・次の操作を中心に返す（実装済み） |
-| 検証 | ~~必要な検証を固定コマンドで実行し、結果を返す~~ | 必須条件を満たす検証計画とartifact-firstの証跡を使う（実装済み） |
-| 証跡の失効 | ~~証跡再利用機構（feature patch + tree fingerprint・metadata-only増分の延長）~~ | 撤去。HEADまたはbaseの更新でverification証跡は全て失効する（#953） |
-| 検証の往復 |  | 必須kindの個別実行に加え、`--verify-required` による直列一括実行・成功済み証跡の保持を実装済み |
-| 再レビュー資料 |  | `--delta-from` で増分・前回AC証跡・全体参照を提供し、条件を満たす記録があれば自動で増分を選ぶ（`--full-review` で全差分）。templateは過去findingを事前記入し、severityを記録できる（実装済み）。全AC記録とfresh独立レビューを維持 |
-| PR同期と観測 |  | 同一本文はwrite省略。`--check-pr` は状態を更新せずAFTERCARE/DONEを確認（実装済み）。観測を本文同期から分離 |
-| 修正ループの回数 |  | 初回REVIEW進入時のdraft PRで外部レビューを前倒しし、内部・外部指摘を同じラウンドへ集約する。draftでは `Agent harness` をスキップし、ci.yml・e2e.ymlはレビューと並行実行、ready化でAgent harnessを実行する（実装済み） |
-| unitの重複と待ち時間 |  | ローカルの必須検証は全Tierともprocessのみ。lint/unit/buildの合否はCIのcheckを正本とし、T2/T3のREVIEW cleanは現在HEADのCI check評価を必須とする（#952、実装済み） |
-| 評価の再提出 | ~~revision変更で一律失効~~ | Machine分類が不変なら引き継ぎ、変化時のみ再提出（実装済み） |
-| PR状態ブロック | ~~task全体（history・assessment・ログ末尾を含む）~~ | 復元とPR gateに必要な範囲へ圧縮（直近history＋参照されるreview記録、assessmentは再計算）（実装済み） |
-| 計測 |  | テストは実ログへ書かない（`AGENT_METRICS_FILE`）。transcriptからtoken usageをrole別に記録・集計し、friction本文も残す（実装済み） |
-
-## 3. 全体の流れ
+## 2. 全体の流れ
 
 ```mermaid
 flowchart TD
@@ -45,7 +27,7 @@ flowchart TD
 
 未決の重要な仕様判断や承認待ちはHUMAN_GATE、反復失敗や切り分けが必要な問題はINCIDENTへ進める。停止理由、復旧・承認の証跡、回数制限は現在の契約を維持する。DONEはmerge_readyを表し、マージや本番操作の許可を与えない。
 
-## 4. 責任の分担
+## 3. 責任の分担
 
 | 担当 | 責任 |
 |---|---|
@@ -56,15 +38,7 @@ flowchart TD
 
 CLIの形式検査は、Agentの判断内容やReviewerの本人性を証明しない。CLIが差分の意味を全面的に理解したものとして扱わない。
 
-## 5. Profileの自動判定
-
-**廃止済み**: Profile機構は撤去し、タスク強度はTier（T1〜T3）に一本化した。thorough検証（lint/unit/build必須）はTierと評価軸（T3、uncertainty != known_pattern、blast_radius=shared_or_system_wide）から機械判定する。
-
-## 6. Profileの適用先
-
-**廃止済み**: §5同様に撤去。委譲は分割して進める利点がある場合に使う。T3、および未解決の挙動前提があるT2の独立レビューはTierとassessmentの条件により必須とする。
-
-## 7. 出力と記録
+## 4. 出力と記録
 
 - 通常の成功出力は現在State・不足条件・次の操作を中心にする。
 - 設定一式、全履歴、過去の成功結果、生ログは通常出力に含めず、必要時に取得できるようにする。
@@ -74,7 +48,7 @@ CLIの形式検査は、Agentの判断内容やReviewerの本人性を証明し�
 - Human Request、Agent Spec、機械状態、証跡は分離する。Issue / PRを再開時の正本とし、ローカルGitメタデータは作業キャッシュとする。
 - 新しいSessionや独立Reviewerには、その作業に必要な目的・AC・実差分・契約・証跡を渡す。詳細を省くことで必要な判断材料を欠落させない。
 
-## 8. 検証の計画とログ
+## 5. 検証の計画とログ
 
 ローカルではACと直接影響する部分、browser層のACがある場合の対象E2Eを優先する。CIは広い回帰確認を担当する。検証計画は、各必須確認について実行先・対象・期待結果・証跡を持ち、Machine Floorを満たすことをCLIが検査する。
 
@@ -82,7 +56,7 @@ targeted / proportional / thoroughは確認範囲を決める方針とする。t
 
 成功時は結果の要約とログの参照先を返す。失敗時は該当箇所・失敗した確認・ログの参照先を返し、必要な詳細を追加で読めるようにする。完了時には、latest HEADに対する全必須確認を満たす。CIへ委ねた確認がpending・未観測・失敗ならDONEへ進めない。
 
-## 9. 修正と証跡の有効性
+## 6. 修正と証跡の有効性
 
 findingの修正では、変更箇所・影響するAC・残ったfindingを再確認する。共有契約や前提が変わった場合は範囲を広げる。検証失敗やfindingを理由なく閉じない。
 
@@ -90,13 +64,13 @@ findingの修正では、変更箇所・影響するAC・残ったfindingを再�
 
 レビュー証跡はlatest HEADの実差分へ結び付ける。過去のレビューを参照しても、必要な独立レビュー・最新差分の確認・全ACの照合を省略しない。
 
-## 10. AFTERCARE
+## 7. AFTERCARE
 
 CI待ちと再取得はCLIへ集約し、状態変化やAgentの判断が必要な場合に結果を返す。latest HEAD/base、必須チェック、承認、競合、mergeability、findingの取得完了・未対応0件を照合する。
 
 API取得失敗、pending、required check未観測、HEAD/base更新はreadyにしない。PR本文の同期でCIが再実行された場合も完了を確認する。外部writeと本番・不可逆操作の承認条件は維持する。
 
-## 11. 実装の受入条件
+## 8. 実装の受入条件
 
 - 判定のための追加State・Agent呼び出しを作らない。
 - 同じ評価入力から同じ検証強度を導けることを検証できる。
@@ -107,7 +81,13 @@ API取得失敗、pending、required check未観測、HEAD/base更新はreadyに
 - 対象・依存・設定・環境・検証契約の変化で証跡を失効し、不変性を証明できない証跡を再利用しない。
 - 再開、HEAD/base更新、CI再実行、反復失敗、承認待ちでも現在の完了条件を維持する。
 
-## 12. 効果の確認
+## 9. CIと検証の分担に関する決定
+
+- **判定はCI、検出はpush前のローカル。** 合否の正本はCIのcheck（`reviewCi` / aftercareの必須check評価）とし、ローカルは `verify:prepush`（pre-push hook）でCIと同等の失敗を早期に検出するだけに留める。ローカル証跡を合否の根拠にしない（#952・#957）。
+- **CIのworkflowはパスで起動を止めず、ジョブ単位でskip（#959）。** `paths-ignore` でworkflow自体を止めるとrequired checkが未観測のまま滞留するため、workflowは常に起動し、CI scopeジョブのdiff分類で後続ジョブをskipする。SKIPPEDを合格扱いにするのはハーネス自身が `.md` のみの差分を確認できた場合に限る。
+- **E2Eはジョブ専用のlocal deploymentで実行（#956）。** 共有のcloud dev deploymentは使わず、CI jobごとにanonymousのlocal backendを立てる。PR HEADのconvex関数が確実に反映され、複数PRのE2Eが相互に直列化されない。
+
+## 10. 効果の確認
 
 代表的な文書変更、通常のコード修正、認証・データ境界を含む高リスク変更で、同じ目的・AC・環境を使って現行と比較する。
 
