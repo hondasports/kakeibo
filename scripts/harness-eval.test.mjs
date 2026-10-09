@@ -265,6 +265,27 @@ describe("report: unmeasured usage (#985)", () => {
     expect(g1.modelCalls).toEqual({ baseline: "未計測", candidate: 3 });
   });
 
+  test("no delta when the measured role sets differ (partial vs full)", async () => {
+    const dir = tmp();
+    const base = path.join(dir, "b.jsonl");
+    const cand = path.join(dir, "c.jsonl");
+    const usage = (reviewer) =>
+      JSON.stringify({
+        taskId: "g1",
+        tokens: {
+          implementer: { input: 100, output: 0, cachedInput: 0 },
+          reviewer,
+        },
+        modelCalls: { implementer: 2, reviewer: reviewer ? 1 : null },
+      });
+    writeFileSync(base, `${usage(null)}\n`);
+    writeFileSync(cand, `${usage({ input: 50, output: 0, cachedInput: 0 })}\n`);
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    const g1 = mod.report({ baseline: base, candidate: cand }).rows.find((r) => r.id === "g1");
+    expect(g1.tokens).toEqual({ baseline: 100, candidate: 150 });
+    expect(g1.modelCalls).toEqual({ baseline: 2, candidate: 3 });
+  });
+
   test("the committed baseline has no zero-filled tokens (AC4)", () => {
     const file = path.join(path.dirname(SCRIPT), "..", "eval", "harness", "baseline");
     for (const name of readdirSync(file)) {
