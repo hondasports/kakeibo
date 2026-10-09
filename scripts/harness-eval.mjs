@@ -435,6 +435,13 @@ function sumMeasured(summary, field, keys = null) {
   return measured ? total : UNMEASURED;
 }
 
+/** Roles that carry a measurement; deltas are only comparable between equal sets. */
+function measuredRoles(summary, field) {
+  return ["implementer", "reviewer"]
+    .filter((role) => pick(summary, `${field}.${role}`) != null)
+    .join(",");
+}
+
 export function report({ baseline, candidate }) {
   const base = loadJsonl(baseline);
   const cand = loadJsonl(candidate);
@@ -444,8 +451,8 @@ export function report({ baseline, candidate }) {
       "oracle",
       (s) => (s?.oracle?.pass === true ? "pass" : s?.oracle?.pass === false ? "fail" : "-"),
     ],
-    ["tokens", (s) => sumMeasured(s, "tokens", ["input", "output", "cachedInput"])],
-    ["modelCalls", (s) => sumMeasured(s, "modelCalls")],
+    ["tokens", (s) => sumMeasured(s, "tokens", ["input", "output", "cachedInput"]), "tokens"],
+    ["modelCalls", (s) => sumMeasured(s, "modelCalls"), "modelCalls"],
     ["runnerCommands", (s) => s?.runnerCommands ?? "-"],
     ["wallTimeMs", (s) => s?.wallTimeMs ?? s?.durationMs ?? "-"],
     ["reviewRounds", (s) => s?.reviewRounds ?? "-"],
@@ -454,11 +461,16 @@ export function report({ baseline, candidate }) {
     const row = { id };
     if (!base.has(id)) row.baseline = "欠損";
     if (!cand.has(id)) row.candidate = "欠損";
-    for (const [name, get] of metrics) {
+    for (const [name, get, usageField] of metrics) {
       const b = base.has(id) ? get(base.get(id)) : null;
       const c = cand.has(id) ? get(cand.get(id)) : null;
       row[name] = { baseline: b ?? "欠損", candidate: c ?? "欠損" };
-      if (typeof b === "number" && typeof c === "number") {
+      if (
+        typeof b === "number" &&
+        typeof c === "number" &&
+        (!usageField ||
+          measuredRoles(base.get(id), usageField) === measuredRoles(cand.get(id), usageField))
+      ) {
         row[name].delta = c - b;
       }
     }
