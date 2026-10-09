@@ -1,5 +1,0 @@
-name: codex
-instruction_entry: AGENTS.md
-supports_fresh_reviewer_context: true
-notes:
-  - Core Harnessを正本とし、Runtime固有指示は最小限にする

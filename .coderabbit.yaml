@@ -5,9 +5,6 @@ language: ja
 
 reviews:
   profile: chill
-  auto_review:
-    # Agent Harnessは初回REVIEW進入時にdraft PRを作り、内部レビューと並行して外部レビューを受ける
-    drafts: true
   path_filters:
     # 自動生成コード・ロックファイルはレビュー対象外
     - "!pnpm-lock.yaml"

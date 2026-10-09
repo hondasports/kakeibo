@@ -114,9 +114,6 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 | 用途                           | 参照先                          |
 | ------------------------------ | ------------------------------- |
 | エージェントの常時適用ルール   | `AGENTS.md`                     |
-| Agent State Machine            | `.agent/process.yaml`           |
-| 変更Risk・必須検証の統合判定   | `scripts/assess-change.mjs`     |
-| Runtime差分                     | `.agent/runtime/`               |
 | Capability Skill                | `skills/*/SKILL.md`             |
 | 開発プロセス、PR、CI            | `docs/development-process.md`   |
 | 認証ガード設計                 | `docs/auth-guard.md`            |
@@ -125,21 +122,12 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 
 ## エージェント作業
 
-SuzumemoはVendor-neutralなAgent Harnessをrepository側に持ちます。`AGENTS.md` は共通契約、`.agent/process.yaml` はState Machine、`.agent/runtime/` はCodex / Devin等のRuntime差分を定義します。タスク強度はTier（T1〜T3）に一本化されています。
-
-基本Stateは `REFINE → EXECUTE → REVIEW → AFTERCARE → DONE` です。Issueは詳細仕様を必須とせず、REFINEでrepositoryを調査してAcceptance Criteriaを補完します。Machine Risk Floor・必須検証・Required SkillsはAgent判断で引き下げられません。
-
-検証の強度はTierと評価軸から機械判定されます。旧Profile機構は廃止し、`--profile` は後方互換のため受理されますが無視されます。Core HarnessのRisk FloorやState Transitionは変更しません。
-
-開始・再開・検証・PRへの状態保存は [Agent Harness操作手順](docs/agent-harness.md) に従います。タスクの入口は `loop:state` です。
-
-軽量化の設計正本は [Agent Harness設計](docs/agent-harness-design.md) を参照してください。出力・検証・証跡管理のさらなる変更のみ設計段階です。
+`AGENTS.md` がCodex / Devin / Claude Code等で共通の契約です。repositoryを編集する前に専用worktreeで次を実行し、clean baselineを確認します。
 
 ```bash
-node scripts/loop-runner.mjs --init /tmp/spec.json --task issue-123 --runtime codex --implementer session-id
-node scripts/loop-runner.mjs
-node scripts/assess-change.mjs --base origin/preview
+node scripts/check-task-worktree.mjs --require-clean
 ```
+
 ## ローカル状態とsecret
 
 主要なローカルsecretとサービス状態はGit管理外です。

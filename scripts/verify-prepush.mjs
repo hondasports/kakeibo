@@ -9,42 +9,25 @@
  *   1. 型: tsc -b
  *   2. lint / format: pnpm run lint / pnpm run format:check
  *   3. unit: vitest related --run <変更ファイル> と --include のunitテスト
- *   4. process: pnpm run test:process（scripts/.agent/docs/agent-harness*変更時のみ）
- *   5. E2E: pnpm run e2e:isolated -- <select-e2e-specsの選定spec + --include>
+ *   4. E2E: pnpm run e2e:isolated -- <select-e2e-specsの選定spec + --include>
  *
- * 全部成功した場合だけ `git rev-parse --git-path agent-prepush` 配下に
- * `<HEAD>.ok` の0バイトマーカーを書く（#949がready条件に使う）。
- * worktreeがdirtyの場合は検証を回すがマーカーは書かない。
- * 失敗した場合は同じHEADの既存マーカーを消す。
- *
- * これはマージ判定材料ではない（判定はCIのcheckが正本）。証跡・状態ブロック・
- * PR記載には使わない。
+ * これはマージ判定材料ではない（判定はCIのcheckが正本）。
  */
 
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync, execFileSync } from "node:child_process";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
-import { isProcessOnlyPath, normalizeChangedPath } from "./classify-e2e-relevance.mjs";
+import { isMetadataOnlyPath, normalizeChangedPath } from "./classify-e2e-relevance.mjs";
 import { parseEnvFile } from "./sync-e2e-env.mjs";
 import { selectSpecs } from "./select-e2e-specs.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const MARKER_KEEP = 20;
 const E2E_SPEC_PATTERN = /^e2e\/[^/]+\.spec\.ts$/;
 const UNIT_TEST_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
-const PROCESS_TRIGGER = /^(?:scripts\/|\.agent\/|docs\/agent-harness|e2e\/spec-map\.json)/;
 // start-ci-convex.mjs が必須とするe2e env。E2E_CLERK_USER_ID は --probe 以外で必須。
 const E2E_ENV_VARS = [
   "VITE_CLERK_PUBLISHABLE_KEY",
@@ -66,35 +49,6 @@ function git(root, args) {
     encoding: "utf8",
     env: sanitizeHookEnv(),
   }).trim();
-}
-
-export function markerDir(root = repoRoot) {
-  return git(root, ["rev-parse", "--path-format=absolute", "--git-path", "agent-prepush"]);
-}
-
-export function prepushMarkerPath(root, head) {
-  return path.join(markerDir(root), `${head}.ok`);
-}
-
-export function hasPrepushMarker(root, head) {
-  return existsSync(prepushMarkerPath(root, head));
-}
-
-function writeMarker(dir, head) {
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(path.join(dir, `${head}.ok`), "");
-  // prune: keep newest MARKER_KEEP markers by mtime
-  readdirSync(dir)
-    .filter((name) => name.endsWith(".ok"))
-    .map((name) => ({ name, mtimeMs: statSync(path.join(dir, name)).mtimeMs }))
-    .sort((a, b) => b.mtimeMs - a.mtimeMs)
-    .slice(MARKER_KEEP)
-    .forEach((m) => rmSync(path.join(dir, m.name), { force: true }));
-}
-
-function dropMarker(dir, head) {
-  const file = path.join(dir, `${head}.ok`);
-  if (existsSync(file)) rmSync(file, { force: true });
 }
 
 /* ------------------------------------------------------------- planning */
@@ -143,7 +97,7 @@ export function classifyIncludes(
   return { e2eSpecs, unitTests, missing };
 }
 
-/** unitのrelated対象: process suiteが面倒を見るパスと非コードを除いた変更ファイル。 */
+/** unitのrelated対象: メタデータ・非コード・E2Eを除いた変更ファイル。 */
 export function unitRelatedTargets(
   changedFiles,
   { exists = (p) => existsSync(path.join(repoRoot, p)) } = {},
@@ -152,17 +106,12 @@ export function unitRelatedTargets(
     .map(normalizeChangedPath)
     .filter(
       (file) =>
-        !isProcessOnlyPath(file) &&
-        !file.startsWith("scripts/") &&
+        !isMetadataOnlyPath(file) &&
         !file.startsWith("e2e/") &&
         !file.endsWith(".md") &&
         !file.endsWith(".json") &&
         exists(file),
     );
-}
-
-export function needsProcessSuite(changedFiles) {
-  return changedFiles.map(normalizeChangedPath).some((file) => PROCESS_TRIGGER.test(file));
 }
 
 /* -------------------------------------------------------------- preflight */
@@ -316,10 +265,6 @@ function defaultRunStep(command, args, cwd, logFile) {
   return out.status ?? 1;
 }
 
-function gitStatusDirty(root) {
-  return git(root, ["status", "--porcelain"]).length > 0;
-}
-
 function buildSteps({ changedFiles, selection, includes }) {
   const steps = [
     {
@@ -361,15 +306,6 @@ function buildSteps({ changedFiles, selection, includes }) {
       command: "pnpm",
       args: ["exec", "vitest", "run", "--passWithNoTests", ...includes.unitTests],
       rerun: `pnpm exec vitest run --passWithNoTests ${includes.unitTests.join(" ")}`,
-    });
-  }
-  if (needsProcessSuite(changedFiles)) {
-    steps.push({
-      id: "process",
-      label: "process (pnpm run test:process)",
-      command: "pnpm",
-      args: ["run", "test:process"],
-      rerun: "pnpm run test:process",
     });
   }
   if (selection.specs.length > 0) {
@@ -430,11 +366,9 @@ export async function runPrepush({
         .split("\n")
         .filter(Boolean);
     },
-    dirty: gitStatusDirty,
   },
   changedFilesOverride = null,
   preflight = e2ePreflight,
-  markerBaseDir = (root) => markerDir(root),
   out = console.log,
 } = {}) {
   const args = parseArguments(argv);
@@ -450,7 +384,6 @@ export async function runPrepush({
     exists: (p) => existsSync(path.join(cwd, p)),
   });
   if (includes.missing.length > 0) {
-    dropMarker(markerBaseDir(cwd), head);
     out(
       `verify:prepush FAILED\n--include のファイルが見つかりません:\n  ${includes.missing.join("\n  ")}`,
     );
@@ -471,14 +404,12 @@ export async function runPrepush({
   if (selection.specs.length > 0) {
     const failures = await preflight({ cwd });
     if (failures.length > 0) {
-      dropMarker(markerBaseDir(cwd), head);
       out(
         `verify:prepush FAILED\nE2E事前条件を満たしていません:\n${failures.map((f) => `  - ${f}`).join("\n")}\n迂回が必要な場合は git push --no-verify を使い、PR本文に記載してください。`,
       );
       return 1;
     }
   }
-  const dirty = gitOps.dirty(cwd);
   mkdirSync(LOG_DIR, { recursive: true });
   let passed = 0;
   for (const step of steps) {
@@ -487,7 +418,6 @@ export async function runPrepush({
     const status = runStep(step.command, step.args, cwd, logFile);
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
     if (status !== 0) {
-      dropMarker(markerBaseDir(cwd), head);
       out(
         `✗ ${step.label} (${seconds}s)\nverify:prepush FAILED\nstep: ${step.id}\n再実行: ${step.rerun}\nlog: ${logFile}`,
       );
@@ -495,14 +425,6 @@ export async function runPrepush({
     }
     passed += 1;
     out(`✓ ${step.label} (${seconds}s)`);
-  }
-  if (dirty) {
-    // dirty下での成功はHEADと検証対象が一致しないので、同じHEADの古い
-    // マーカーも信用できない → 書かないだけでなく落とす（失敗と同じ扱い）
-    dropMarker(markerBaseDir(cwd), head);
-    out("worktreeがdirtyのため成功マーカーは書きません（HEADとマーカー内容を一致させるため）");
-  } else {
-    writeMarker(markerBaseDir(cwd), head);
   }
   out(`verify:prepush PASS (${passed} steps)`);
   return 0;

@@ -25,13 +25,13 @@ license: Apache-2.0
 4. Expected effect
 5. Rollback / recovery
 6. Secret involved
-7. Human Gate
+7. ユーザー承認の要否
 
 target environmentが不明ならwriteしない。
 
-外部write・webhook・不可逆操作を伴う変更はfloor trigger語彙の `external_service_write_or_webhook` / `destructive_or_irreversible_operation` 相当として扱い、Machine Floor T3の根拠になる。path ruleで捕捉されないものはAgentがassessmentへ宣言する。
+外部write・webhook・不可逆操作を伴う変更は高リスク変更として扱う。
 
-## Human Gate required
+## ユーザー承認が必要な操作
 
 ユーザー明示許可なしに次をwriteしない。
 
@@ -56,13 +56,13 @@ target environmentが不明ならwriteしない。
 ## Convex
 
 - target deployment（local / dev / preview / production）を明示
-- production data operationはHuman Gate
+- production data operationはユーザー承認必須
 - 反映・同期コマンドとschema/migration判断は `skills/convex-local-ops` に従う
 
 ## Clerk / Auth
 
 - publishable / secret keyを混同しない
-- production user/settings操作はHuman Gate
+- production user/settings操作はユーザー承認必須
 
 ## GitHub
 
@@ -77,4 +77,4 @@ target environmentが不明ならwriteしない。
 
 ## Verification
 
-credential/env不足を理由にrequired Verificationを省略しない。復旧できなければBLOCKED / Incident。
+credential/env不足を理由にrequired Verificationを省略しない。復旧できなければblockerとして報告する。

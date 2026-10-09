@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        何が起きているかを優先して書いてください。期待動作・影響範囲・完了条件はAgentのREFINE工程でrepositoryと証拠を調査して補完します。
+        何が起きているかを優先して書いてください。期待動作・影響範囲・完了条件はAgentがrepositoryと証拠を調査して補完します。
 
   - type: textarea
     id: problem

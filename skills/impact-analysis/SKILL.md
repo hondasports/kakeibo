@@ -14,8 +14,8 @@ direct caller/testだけでは影響を把握できない時に使う。
 
 shared caller、認可、永続データ、外部操作、復旧範囲を調べ、具体的な要求と確認条件を報告・Issueへ残す。Risk点数ではなく必要な確認と理由を残す。
 
-- 調査結果はREFINEのassessment（`blast_radius`・`uncertainty`・`floor_triggers`）とVerification Strategyへ反映する
-- shared caller・domain跨ぎの変更はfloor trigger語彙の `cross_domain_shared_caller_change` 相当として扱う（`scripts/machine-risk.mjs` のpath ruleにはなく、Agentがassessmentへ宣言する）
+- 調査結果は影響範囲・不確実性とVerification Strategyへ反映する
+- shared caller・domain跨ぎの変更は高リスク変更として扱い、caller側の確認を検証計画に含める
 
 ## indexion による調査（導入環境では優先）
 

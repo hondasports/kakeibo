@@ -4,7 +4,7 @@
  * （summary出力は観測でありゲートではない）。
  */
 import { existsSync, readFileSync } from "node:fs";
-import { flakyFromJsonReport } from "./ci-failure.mjs";
+import { flakyFromJsonReport } from "./flaky-e2e.mjs";
 
 const REPORT = "e2e-results/results.json";
 
