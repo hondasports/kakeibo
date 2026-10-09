@@ -33,7 +33,7 @@ reviews:
         - secretsの受け渡しとpermissionsの最小化、previewとproductionの環境分離を確認する
     - path: "skills/**"
       instructions: |
-        - skills/ と AGENTS.md はagentループの制御文書。既存ルールや AGENTS.md との重複・矛盾があれば指摘する
+        - skills/ と AGENTS.md はAgent向けの制御文書。既存ルールや AGENTS.md との重複・矛盾があれば指摘する
     - path: "AGENTS.md"
       instructions: |
         - 変更が入口の追加・整理に限定されているか、skills/ 配下の各SKILL.mdと矛盾しないかを確認する

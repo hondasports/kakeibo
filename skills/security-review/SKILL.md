@@ -15,7 +15,7 @@ license: Apache-2.0
 - ユーザー入力、ユーザー制御のHTML・URL・redirect・file / path・MIME
 - webhookの署名・送信元等の検証、外部write境界
 
-該当する変更は高リスク変更として扱い、新しいコンテキストの独立Reviewerによるレビューを推奨する。
+該当する変更は高リスク変更として扱い、セルフレビューに加えて新しいコンテキストの独立Reviewerによるレビューを必須とする（`docs/development-process.md` の「Review / branch protection」と同じ条件）。
 
 ## 判断と出力
 
