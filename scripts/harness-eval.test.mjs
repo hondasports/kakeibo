@@ -254,7 +254,8 @@ describe("harness-paths.json drift (#984)", () => {
   const pkg = JSON.parse(readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"));
 
   test("every file listed in test:process is covered by paths (AC3)", async () => {
-    const mod = await import("./harness-eval.mjs");
+    // 実module importはgolden-set.jsonを読む（eval repoには無い）ため、fixture経由で純関数だけ使う
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
     const testFiles = pkg.scripts["test:process"]
       .split(/\s+/)
       .filter((token) => /\.test\.(mjs|ts)$/.test(token));
