@@ -474,10 +474,15 @@ describe("report: unmeasured usage (#985)", () => {
     expect(g1.modelCalls).toEqual({ baseline: 2, candidate: 3 });
   });
 
-  test("committed baselines contain no zero-filled usage placeholders (AC4)", () => {
+  // eval repo（prepareで作る過去コミットのworktree）には baseline/ を置かない（#984）。
+  // ディレクトリがある環境（本repo・CI）では従来どおり全件検査する。
+  const baselineDir = path.join(path.dirname(SCRIPT), "..", "eval", "harness", "baseline");
+  test.skipIf(!existsSync(baselineDir))(
+    "committed baselines contain no zero-filled usage placeholders (AC4)",
+    () => {
     // Measured baselines (recorded via --record-usage) are fine; only the legacy
     // all-zero representation of "never measured" is rejected.
-    const dir = path.join(path.dirname(SCRIPT), "..", "eval", "harness", "baseline");
+    const dir = baselineDir;
     const isZeroFilled = (tokens) =>
       tokens != null && ["input", "cachedInput", "output"].every((key) => tokens[key] === 0);
     for (const name of readdirSync(dir)) {
@@ -491,7 +496,8 @@ describe("report: unmeasured usage (#985)", () => {
         }
       }
     }
-  });
+    },
+  );
 });
 
 describe("git guard (AC8)", () => {
