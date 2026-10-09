@@ -87,7 +87,5 @@
     "verify:prepush",
     "e2e:isolated"
   ],
-  "removedNpmScripts": [
-    "loop:profile"
-  ]
+  "removedNpmScripts": ["loop:profile"]
 }
