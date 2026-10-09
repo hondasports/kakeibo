@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import {
-  STATE_BLOCK_RECENT_HISTORY,
+  STATE_BLOCK_SCHEMA_V2,
   STATE_END,
   STATE_START,
   STATE_WORKFLOWS,
@@ -20,6 +20,7 @@ import {
   buildReviewPacket,
   compactTaskForExport,
   deferredBlock,
+  extractAgentSpecSection,
   hydrateExportedTask,
   loadTask,
   parseStateBlock,
@@ -30,6 +31,8 @@ import {
   runRequiredVerification,
   runVerification,
   saveTask,
+  specFingerprint,
+  specSectionFingerprint,
   stateBlock,
   summarizeTask,
   taskPath,
@@ -365,9 +368,11 @@ describe("revision invalidation and loop ergonomics", () => {
     expect(() => validateTask(hydrateExportedTask(structuredClone(legacy)))).not.toThrow();
   });
   it("restores legacy state blocks carrying removed reuse/lane fields (#953 AC5)", () => {
-    // Pre-#953 blocks may carry verification.<kind>.reuse and `lane` — the
-    // loader ignores them instead of erroring, and they never come back out.
-    const legacy = compactTaskForExport(taskFixture());
+    // Pre-#954 blocks have no `schema` marker and carry the full task
+    // document (configuration blob, history, verification details): the v1
+    // hydrate path ignores verification.<kind>.reuse and `lane` instead of
+    // erroring, and they never come back out.
+    const legacy = structuredClone(taskFixture());
     legacy.lane = "lite";
     legacy.assessment = { ...structuredClone(taskFixture().assessment), lane: "lite" };
     legacy.verification.process.reuse = {
@@ -391,7 +396,9 @@ describe("revision invalidation and loop ergonomics", () => {
     expect(result.frictionNote).toBe("per-kind verify reruns felt heavy");
     const saved = loadTask(dir);
     expect(saved.history.at(-1)).toMatchObject({ event: "friction_note" });
-    expect(stateBlock(saved)).toContain("per-kind verify");
+    // The v2 state block is minimal — the note itself lands in the metrics
+    // log at record time, not on the wire.
+    expect(stateBlock(saved)).not.toContain("per-kind verify");
     expect(() => run({ "friction-note": "   " }, dir)).toThrow("requires non-empty");
   });
   it("records the friction note text (bounded) in the metric line", () => {
@@ -587,7 +594,7 @@ describe("revision invalidation and loop ergonomics", () => {
       ),
     ).toThrow("Invalid finding severity");
   });
-  it("compacts the published state block while keeping restore and gate references", () => {
+  it("emits state-block/v2 — minimal fields, no history, and restore keeps the gate checks", () => {
     const task = taskFixture(root, { state: "aftercare" });
     const reviewHead = (n) => n.toString(16).padStart(40, "0");
     task.history = Array.from({ length: 30 }, (_, index) => ({
@@ -596,65 +603,117 @@ describe("revision invalidation and loop ergonomics", () => {
       head: reviewHead(index + 1),
       at: "2026-01-01T00:00:00.000Z",
     }));
-    const priorFindings = [{ id: "F1", status: "open", evidence: "Needs a fix" }];
-    task.history[3] = {
-      ...task.history[3],
-      event: "review_recorded",
-      acceptanceCriteria: [{ id: "AC1", evidence: "Earlier review" }],
-      findings: priorFindings,
-    };
     task.review = reviewFixture(task, {
       deltaFrom: reviewHead(4),
       findings: [{ id: "F1", status: "fixed", evidence: "Fixed in the increment" }],
     });
     task.findings = structuredClone(task.review.findings);
-    task.history[20] = {
-      ...task.history[20],
-      event: "review_recorded",
-      head: task.head,
-      acceptanceCriteria: structuredClone(task.review.acceptanceCriteria),
-      findings: structuredClone(task.review.findings),
-    };
     task.verification.unit = verificationManifestFixture(task, "unit");
     const compact = compactTaskForExport(task);
-    expect(compact.assessment).toBeNull();
-    expect(compact.verification.unit.summary).toEqual({ exitCode: 0 });
-    expect(compact.verification.unit.artifact).toEqual(task.verification.unit.artifact);
-    expect(compact.history).toHaveLength(STATE_BLOCK_RECENT_HISTORY + 1);
-    // The delta base keeps AC evidence only; the latest review becomes a reference.
-    expect(compact.history[0]).toEqual({
-      ...task.history[3],
-      findings: undefined,
+    // v2 marker and minimal shape: no history, no lane/configuration blob,
+    // no per-run verification detail (AC5).
+    expect(compact.schema).toBe(STATE_BLOCK_SCHEMA_V2);
+    for (const key of ["history", "lane", "configuration", "assessment", "profile"])
+      expect(compact).not.toHaveProperty(key);
+    expect(compact.historyOmitted).toBe(30);
+    expect(compact.verification.unit).toEqual({
+      head: task.head,
+      baseHead: task.baseHead,
+      exitCode: 0,
     });
-    expect(compact.history[0]).not.toHaveProperty("findings");
-    const latest = compact.history.find((entry) => entry.sameAsReview);
-    expect(latest).toMatchObject({ event: "review_recorded", head: task.head });
-    expect(latest).not.toHaveProperty("findings");
+    // A delta review's deltaFrom only validates against local history, which
+    // is not on the wire — the pointer is dropped.
+    expect(compact.review).not.toHaveProperty("deltaFrom");
+    // Findings identical to review.findings stay a reference.
     expect(compact).not.toHaveProperty("findings");
-    expect(compact.historyOmitted).toBe(30 - STATE_BLOCK_RECENT_HISTORY - 1);
-    // Parsing re-hydrates the references exactly.
+    // AC1: the v2 block is smaller than the v1 full-task serialization.
+    const v1Size = Buffer.byteLength(JSON.stringify(task));
+    const v2Size = Buffer.byteLength(JSON.stringify(compact));
+    expect(v2Size).toBeLessThan(v1Size);
+    expect(stateBlock(task).length).toBeLessThan(JSON.stringify(task, null, 2).length / 2);
+    // Round-trip: hydrate rebuilds schema-required locals and the gate
+    // validators still pass on v2 fields alone.
     const restored = parseStateBlock(stateBlock(task));
     expect(restored.findings).toEqual(task.findings);
-    expect(restored.review).toEqual(task.review);
-    expect(restored.history.find((entry) => entry.head === task.head)).toEqual(task.history[20]);
-    expect(restored.history[0].acceptanceCriteria).toEqual(task.history[3].acceptanceCriteria);
+    const { deltaFrom, ...reviewNoDelta } = task.review;
+    expect(restored.review).toEqual(reviewNoDelta);
+    expect(restored.history).toEqual([]);
+    expect(restored.configuration).toEqual({ runtime: { name: "codex" } });
     expect(() => validateTask(restored, root)).not.toThrow();
     expect(() => validateReview(restored, restored.review)).not.toThrow();
     // Re-publishing a restored snapshot keeps the omitted count cumulative.
     expect(compactTaskForExport(restored).historyOmitted).toBe(compact.historyOmitted);
-    expect(task.history).toHaveLength(30);
-    expect(stateBlock(task).length).toBeLessThan(JSON.stringify(task, null, 2).length / 2);
-    // Findings that differ from the review are kept; a broken reference fails closed.
+    // Findings that differ from the review are kept verbatim.
+    const priorFindings = [{ id: "F1", status: "open", evidence: "Needs a fix" }];
     expect(compactTaskForExport({ ...task, findings: priorFindings }).findings).toEqual(
       priorFindings,
     );
     const block = (value) =>
       `${STATE_START}\n\`\`\`json\n${JSON.stringify(value)}\n\`\`\`\n${STATE_END}`;
-    const broken = compactTaskForExport(task);
-    broken.history.find((entry) => entry.sameAsReview).head = "e".repeat(40);
+    // A v1 block with a broken sameAsReview reference still fails closed.
+    const broken = structuredClone(task);
+    broken.history.push({
+      event: "review_recorded",
+      head: "e".repeat(40),
+      sameAsReview: true,
+    });
     expect(() => parseStateBlock(block(broken))).toThrow("review reference");
     // Legacy (uncompacted) blocks pass through unchanged.
     expect(parseStateBlock(block(task))).toEqual(task);
+    // A malformed v2 block is rejected by the wire schema.
+    const malformed = compactTaskForExport(task);
+    delete malformed.head;
+    expect(() => parseStateBlock(block(malformed))).toThrow("missing head");
+  });
+  it("anchors issue-task specs to the issue and falls back to specInline", () => {
+    // Non-issue tasks ship the full spec inline (ref: inline).
+    const inline = compactTaskForExport(taskFixture());
+    expect(inline.spec.ref).toBe("inline");
+    expect(inline.specInline).toMatchObject({ goal: "Complete a test task" });
+    expect(inline.spec.fingerprint).toBe(specFingerprint(taskFixture().spec));
+    // Issue tasks with a recorded fingerprint ship only the reference.
+    const issued = taskFixture(root, { state: "aftercare", taskId: "i954" });
+    issued.specFingerprint = "f".repeat(64);
+    const anchored = compactTaskForExport(issued);
+    expect(anchored.spec).toMatchObject({
+      ref: "issue#954",
+      fingerprint: "f".repeat(64),
+      predictedRisk: "T1",
+      acIds: ["AC1"],
+      openDecisions: 0,
+    });
+    expect(anchored).not.toHaveProperty("specInline");
+    // No recorded fingerprint (issue unreadable at init) → inline fallback.
+    const degraded = compactTaskForExport(taskFixture(root, { taskId: "i954" }));
+    expect(degraded.spec.ref).toBe("inline");
+    expect(degraded.specInline).toMatchObject({ goal: "Complete a test task" });
+    // The reference form round-trips through hydration unchanged.
+    const restored = parseStateBlock(stateBlock(issued));
+    expect(restored.spec).toEqual(anchored.spec);
+    expect(() => validateTask(restored, root)).not.toThrow();
+  });
+  it("extracts and fingerprints the issue Agent Spec section", () => {
+    const body = [
+      "# Title",
+      "prose",
+      "## Agent Spec",
+      "goal text  ",
+      "",
+      "",
+      "more  ",
+      "## Acceptance criteria",
+      "tail",
+    ].join("\n");
+    expect(extractAgentSpecSection(body)).toBe("goal text  \n\n\nmore  \n");
+    expect(extractAgentSpecSection("# no section\n")).toBeNull();
+    // Normalization makes the fingerprint whitespace-insensitive.
+    const spaced = body.replace("goal text  ", "goal text");
+    expect(specSectionFingerprint(spaced)).toBe(specSectionFingerprint(body));
+    expect(specSectionFingerprint(body + "tail2")).toBe(specSectionFingerprint(body));
+    expect(specSectionFingerprint(body.replace("goal text", "edited"))).not.toBe(
+      specSectionFingerprint(body),
+    );
+    expect(specSectionFingerprint("no section")).toBeNull();
   });
   it("reports the current state's workflow in the compact summary", () => {
     const task = taskFixture(root);
