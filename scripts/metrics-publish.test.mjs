@@ -346,6 +346,26 @@ describe("collect-harness-metrics", () => {
     expect(renderTable(rows)).toContain("harnessVersion");
   });
 
+  it("treats legacy zero-filled usage as unmeasured when aggregating (#985)", () => {
+    const zero = { input: 0, cachedInput: 0, output: 0 };
+    const legacy = {
+      ...summaryFor("legacy"),
+      tokens: { implementer: zero, reviewer: zero },
+      modelCalls: { implementer: 0, reviewer: 0 },
+    };
+    const measured = {
+      ...summaryFor("measured"),
+      tokens: { implementer: { input: 500, cachedInput: 0, output: 10 }, reviewer: null },
+      modelCalls: { implementer: 3, reviewer: null },
+    };
+    const [row] = aggregateTable([legacy, measured]);
+    expect(row["tokens.implementer.input p50"]).toBe(500);
+    expect(row["tokens.reviewer.input p50"]).toBeNull();
+    const onlyLegacy = aggregateTable([legacy])[0];
+    expect(onlyLegacy["tokens.implementer.input p50"]).toBeNull();
+    expect(renderTable([onlyLegacy])).toContain("未計測");
+  });
+
   it("--format table groups by harnessVersion and tier", () => {
     const a = summaryFor("a");
     const b = { ...summaryFor("b"), transitions: 10, ciFailures: 1 };

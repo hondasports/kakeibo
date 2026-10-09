@@ -196,7 +196,7 @@ gh pr create --draft --title "..." --body-file /tmp/pr-body-full.md
 
 トークン量はセッションtranscriptから記録する。Claude Codeは `~/.claude/projects/<project>/<session>.jsonl`、Codexは `~/.codex/sessions/**/rollout-*.jsonl` を渡す。Claude Codeはresponse idで重複を除き、Codexは最後の累積値を使う。input（uncached）・cache read・cache write・output・reasoning（outputの内数）・呼び出し数を記録する。taskもPR本文も変更しない観測専用の操作である。独立Reviewerのtranscriptは `--usage-role reviewer` で記録する。
 
-`--record-usage` の記録が1件もないroleは、`tokens.<role>` と `modelCalls.<role>` が0ではなく `null`（未計測）になる。PRコメントとevalのreportは「未計測」と表示し、差分には含めない。片方のroleだけ記録した場合の合計は、そのroleだけの値で、両roleを記録した実行とは比較できないため、evalのreportは計測済みroleの集合が違う項目に差分を出さない。DevinはtranscriptもトークンAPIも使えず未計測になるため、トークン・モデル呼び出し数を比べるevalはClaude CodeかCodexで実行する（`eval/harness/README.md`）。
+`--record-usage` の記録が1件もないroleは、`tokens.<role>` と `modelCalls.<role>` が0ではなく `null`（未計測）になる。PRコメントとevalのreportは「未計測」と表示し、差分には含めない。片方のroleだけ記録した場合の合計は、そのroleだけの値で、両roleを記録した実行とは比較できないため、evalのreportは計測済みroleの集合が違う項目に差分を出さない。PR横断集計（`collect-harness-metrics.mjs`）は、#985以前に投稿された旧0埋めの記録（tokensが全て0かつmodelCallsが0）も未計測として扱い、percentileから除外する。DevinはtranscriptもトークンAPIも使えず未計測になるため、トークン・モデル呼び出し数を比べるevalはClaude CodeかCodexで実行する（`eval/harness/README.md`）。
 
 ```bash
 node scripts/loop-runner.mjs --record-usage ~/.claude/projects/<project>/<session>.jsonl

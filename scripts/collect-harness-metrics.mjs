@@ -111,10 +111,27 @@ const percentile = (sorted, p) => {
 const median = (sorted) => percentile(sorted, 50);
 const p90 = (sorted) => percentile(sorted, 90);
 
+/**
+ * Input tokens for a role, or undefined when it was never measured. Records
+ * published before Issue #985 encode "never measured" as a zero-filled token
+ * object with 0 model calls (same schema id), so that shape is treated as
+ * unmeasured instead of as a measured 0.
+ */
+function measuredInput(record, role) {
+  const tokens = record.tokens?.[role];
+  if (tokens == null) return undefined;
+  const legacyPlaceholder =
+    tokens.input === 0 &&
+    tokens.cachedInput === 0 &&
+    tokens.output === 0 &&
+    record.modelCalls?.[role] === 0;
+  return legacyPlaceholder ? undefined : tokens.input;
+}
+
 /** Metrics compared across harness versions/tiers in the table format. */
 const TABLE_FIELDS = [
-  ["tokens.implementer.input", (record) => record.tokens?.implementer?.input],
-  ["tokens.reviewer.input", (record) => record.tokens?.reviewer?.input],
+  ["tokens.implementer.input", (record) => measuredInput(record, "implementer")],
+  ["tokens.reviewer.input", (record) => measuredInput(record, "reviewer")],
   ["transitions", (record) => record.transitions],
   ["reviewRounds", (record) => record.reviewRounds],
   ["ciFailures", (record) => record.ciFailures],
