@@ -75,6 +75,13 @@ export function harnessPathsDoc(repoRoot, ref, record) {
   }
 }
 
+/**
+ * Written at the worktree root by overlayHarness. Repo-wide consistency tests that
+ * compare the overlaid harness with files of the historical base (e.g. spec-map's
+ * e2e specs) skip when it exists; the base commit predates those files.
+ */
+export const OVERLAY_MARKER = ".harness-eval-overlay";
+
 export const SUMMARY_KEYS = [
   "oracle",
   "tokens",
@@ -172,38 +179,12 @@ export function expandHarnessPattern(repoRoot, ref, pattern, record) {
   return [];
 }
 
-/**
- * e2e specs that <ref>'s e2e/spec-map.json names explicitly (globs excluded).
- * The overlay replaces the map, so the specs it points at must come along or
- * scripts/spec-map.test.mjs fails in every historical worktree. Only e2e/*.spec.*
- * is taken: oracle tests live under src/ and convex/, so isolation is unaffected.
- */
-function specMapSpecs(repoRoot, ref, record) {
-  let map;
-  try {
-    map = JSON.parse(git(repoRoot, ["show", `${ref}:e2e/spec-map.json`], { record, quiet: true }));
-  } catch {
-    return [];
-  }
-  const specs = new Set();
-  for (const [key, value] of Object.entries(map)) {
-    if (key.startsWith("$") || !Array.isArray(value)) continue;
-    for (const spec of value) {
-      if (typeof spec !== "string" || /[*?]/.test(spec)) continue;
-      if (!/^e2e\/[^/]+\.spec\.[cm]?[jt]s$/.test(spec)) continue;
-      for (const file of expandHarnessPattern(repoRoot, ref, spec, record)) specs.add(file);
-    }
-  }
-  return [...specs];
-}
-
 /** All files the overlay should copy from <ref>. Missing paths are ignored. */
 export function harnessFiles(repoRoot, ref, record) {
   const files = new Set();
   for (const pattern of harnessPathsDoc(repoRoot, ref, record).paths ?? []) {
     for (const file of expandHarnessPattern(repoRoot, ref, pattern, record)) files.add(file);
   }
-  for (const file of specMapSpecs(repoRoot, ref, record)) files.add(file);
   return [...files].sort();
 }
 
@@ -234,8 +215,9 @@ export function removeStaleHarnessFiles(repoRoot, dir, ref, removedPaths, { reco
     // lstat: a dangling symlink still counts as present and gets unlinked.
     try {
       lstatSync(target);
-    } catch {
-      continue;
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
     }
     // An ancestor symlinked outside dir would let rmSync delete outside the worktree.
     const root = realpathSync(dir);
@@ -254,6 +236,7 @@ export function removeStaleHarnessFiles(repoRoot, dir, ref, removedPaths, { reco
  * merge the npmScripts keys of package.json.
  */
 export function overlayHarness(repoRoot, dir, ref, { record } = {}) {
+  writeFileSync(path.join(dir, OVERLAY_MARKER), `${ref}\n`);
   const harnessPaths = harnessPathsDoc(repoRoot, ref, record);
   const files = harnessFiles(repoRoot, ref, record);
   for (const file of files) {

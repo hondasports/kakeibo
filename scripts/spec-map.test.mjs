@@ -11,22 +11,28 @@ describe("e2e/spec-map.json", () => {
   const specFiles = listSpecFiles();
   const patterns = Object.keys(map).filter((key) => !key.startsWith("$"));
 
-  test("mapに書かれたspecはすべてe2e/直下に実在する（globは1件以上に展開される）", () => {
-    const problems = [];
-    for (const pattern of patterns) {
-      for (const specPattern of map[pattern]) {
-        if (specPattern.includes("*") || specPattern.includes("?")) {
-          const re = globToRegExp(specPattern);
-          if (!specFiles.some((spec) => re.test(spec))) {
-            problems.push(`${pattern} -> ${specPattern} (globが0件)`);
+  // eval worktree（過去コミット＋ハーネスoverlay、#984）ではmapだけ新しく、指すspecはbaseに無い。
+  // 目印はscripts/harness-eval.mjsのOVERLAY_MARKER。本repoとCIでは従来どおり検査する。
+  const inEvalOverlay = existsSync(path.join(repoRoot, ".harness-eval-overlay"));
+  test.skipIf(inEvalOverlay)(
+    "mapに書かれたspecはすべてe2e/直下に実在する（globは1件以上に展開される）",
+    () => {
+      const problems = [];
+      for (const pattern of patterns) {
+        for (const specPattern of map[pattern]) {
+          if (specPattern.includes("*") || specPattern.includes("?")) {
+            const re = globToRegExp(specPattern);
+            if (!specFiles.some((spec) => re.test(spec))) {
+              problems.push(`${pattern} -> ${specPattern} (globが0件)`);
+            }
+          } else if (!existsSync(path.join(repoRoot, specPattern))) {
+            problems.push(`${pattern} -> ${specPattern} (ファイルなし)`);
           }
-        } else if (!existsSync(path.join(repoRoot, specPattern))) {
-          problems.push(`${pattern} -> ${specPattern} (ファイルなし)`);
         }
       }
-    }
-    expect(problems).toEqual([]);
-  });
+      expect(problems).toEqual([]);
+    },
+  );
 
   test("src/features/* の全ディレクトリがmapのどこかに含まれる", () => {
     const featuresDir = path.join(repoRoot, "src", "features");

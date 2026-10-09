@@ -143,36 +143,6 @@ describe("expandHarnessPattern / harnessFiles", () => {
   });
 });
 
-describe("harnessFiles: spec-map specs (#984)", () => {
-  test("includes e2e specs named explicitly by the ref's spec-map, not globs or non-e2e files", async () => {
-    const { repo } = makeFixtureRepo();
-    const g = (args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
-    g(["checkout", "harness-new"]);
-    mkdirSync(path.join(repo, "e2e"), { recursive: true });
-    writeFileSync(
-      path.join(repo, "e2e", "spec-map.json"),
-      JSON.stringify({
-        $comment: "x",
-        "src/a/**": ["e2e/a.spec.ts", "e2e/*.spec.ts", "src/secret.test.ts", "e2e/missing.spec.ts"],
-      }),
-    );
-    writeFileSync(path.join(repo, "e2e", "a.spec.ts"), "// a\n");
-    writeFileSync(path.join(repo, "e2e", "unlisted.spec.ts"), "// unlisted\n");
-    mkdirSync(path.join(repo, "src"), { recursive: true });
-    writeFileSync(path.join(repo, "src", "secret.test.ts"), "// oracle-like\n");
-    g(["add", "-A"]);
-    g(["commit", "-m", "ref with spec-map"]);
-    const ref = g(["rev-parse", "HEAD"]);
-    g(["checkout", "main"]);
-    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
-    const files = mod.harnessFiles(repo, ref);
-    expect(files).toContain("e2e/a.spec.ts");
-    expect(files).not.toContain("e2e/unlisted.spec.ts"); // globs are not expanded
-    expect(files).not.toContain("e2e/missing.spec.ts");
-    expect(files).not.toContain("src/secret.test.ts"); // only e2e specs, never src/convex
-  });
-});
-
 describe("harnessPathsDoc", () => {
   test("reads the paths list from <ref> so newer harnesses self-describe", async () => {
     const { repo, harnessRef } = makeFixtureRepo();
@@ -312,6 +282,22 @@ describe("overlayHarness: removedPaths (#984)", () => {
     expect(pkg.scripts["loop:profile"]).toBeUndefined();
     expect(pkg.scripts["e2e:isolated"]).toBe("old"); // ref still defines it -> not removed
     expect(pkg.scripts.test).toBe("old");
+  });
+
+  test("writes the overlay marker so base-sensitive tests can skip (#984)", async () => {
+    const { repo, ref, work } = setupRemoval([]);
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    mod.overlayHarness(repo, work, ref);
+    expect(readFileSync(path.join(work, mod.OVERLAY_MARKER), "utf8").trim()).toBe(ref);
+  });
+
+  test("rethrows lstat errors other than ENOENT instead of leaving stale files", async () => {
+    const { repo, ref, work } = setupRemoval(["docs/agent-harness-reference.md"]);
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    // a regular file where a directory is expected makes lstat fail with ENOTDIR, not ENOENT
+    rmSync(path.join(work, "docs"), { recursive: true, force: true });
+    writeFileSync(path.join(work, "docs"), "not a dir\n");
+    expect(() => mod.overlayHarness(repo, work, ref)).toThrow(/ENOTDIR/);
   });
 
   test("rejects entries that escape the worktree", async () => {
