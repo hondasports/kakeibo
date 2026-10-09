@@ -4,7 +4,8 @@
  *
  *   prepare <id> --dir <path> [--harness <git ref>] [--spec-out <path>]
  *     Materialize an eval worktree at golden[id].baseCommit, overlay the harness
- *     files listed in eval/harness/harness-paths.json from <ref> (default: HEAD),
+ *     files listed in eval/harness/harness-paths.json from <ref> (default: HEAD)
+ *     and delete the files it lists under `removedPaths`,
  *     commit the overlay locally (never pushed), and print the single
  *     `loop-runner.mjs --init` command the agent should run.
  *
@@ -188,7 +189,31 @@ function extractFile(repoRoot, ref, file, record) {
   });
 }
 
-/** Copy harnessFiles from <ref> into dir and merge the npmScripts keys of package.json. */
+/**
+ * Delete the harness files <ref> removed (harness-paths.json `removedPaths`)
+ * from dir. Entries are repo-relative files or directories. A path that still
+ * exists at <ref>, or that escapes dir, is never deleted. Returns what was removed.
+ */
+export function removeStaleHarnessFiles(repoRoot, dir, ref, removedPaths, { record } = {}) {
+  const removed = [];
+  for (const entry of removedPaths) {
+    const clean = path.posix.normalize(entry).replace(/\/+$/, "");
+    if (!clean || clean === "." || clean.startsWith("..") || path.isAbsolute(clean)) {
+      fail(`removedPaths entry is not a repo-relative path: ${entry}`);
+    }
+    if (expandHarnessPattern(repoRoot, ref, clean, record).length > 0) continue;
+    const target = path.join(dir, clean);
+    if (!existsSync(target)) continue;
+    rmSync(target, { recursive: true, force: true });
+    removed.push(clean);
+  }
+  return removed;
+}
+
+/**
+ * Copy harnessFiles from <ref> into dir, delete the files <ref> removed, and
+ * merge the npmScripts keys of package.json.
+ */
 export function overlayHarness(repoRoot, dir, ref, { record } = {}) {
   const harnessPaths = harnessPathsDoc(repoRoot, ref, record);
   const files = harnessFiles(repoRoot, ref, record);
@@ -197,6 +222,13 @@ export function overlayHarness(repoRoot, dir, ref, { record } = {}) {
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, extractFile(repoRoot, ref, file, record));
   }
+  const removedFiles = removeStaleHarnessFiles(
+    repoRoot,
+    dir,
+    ref,
+    harnessPaths.removedPaths ?? [],
+    { record },
+  );
   const refPkg = JSON.parse(git(repoRoot, ["show", `${ref}:package.json`], { record }));
   const dirPkgPath = path.join(dir, "package.json");
   const dirPkg = JSON.parse(readFileSync(dirPkgPath, "utf8"));
@@ -209,6 +241,7 @@ export function overlayHarness(repoRoot, dir, ref, { record } = {}) {
   writeFileSync(dirPkgPath, `${JSON.stringify(dirPkg, null, 2)}\n`);
   return {
     files,
+    removedFiles,
     mergedScripts: HARNESS_PATHS.npmScripts.filter((k) => refPkg.scripts?.[k] !== undefined),
   };
 }
@@ -315,6 +348,7 @@ export function prepare(id, { dir, harness = "HEAD", specOut, record } = {}) {
     baseCommit: entry.baseCommit,
     harnessRef: harness,
     overlaidFiles: overlayResult.files.length,
+    removedFiles: overlayResult.removedFiles,
     mergedScripts: overlayResult.mergedScripts,
     overlayCommit: overlayHead,
     spec: specPath,

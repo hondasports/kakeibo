@@ -1,5 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  globSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -180,6 +189,106 @@ describe("overlayHarness", () => {
     expect(pkg.scripts.test).toBe("old"); // unlisted keys stay at base version
     expect(pkg.scripts["missing:script"]).toBeUndefined();
     expect(mergedScripts).toEqual(["test:process", "e2e:isolated"]);
+  });
+});
+
+describe("overlayHarness: removedPaths (#984)", () => {
+  /** harness ref whose paths doc lists removedPaths; base-side stale files live in `work`. */
+  function setupRemoval(removedPaths) {
+    const { repo } = makeFixtureRepo();
+    const g = (args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+    g(["checkout", "harness-new"]);
+    mkdirSync(path.join(repo, "eval", "harness"), { recursive: true });
+    writeFileSync(
+      path.join(repo, "eval", "harness", "harness-paths.json"),
+      JSON.stringify({ paths: ["AGENTS.md"], npmScripts: [], removedPaths }),
+    );
+    g(["add", "-A"]);
+    g(["commit", "-m", "ref paths doc with removedPaths"]);
+    const ref = g(["rev-parse", "HEAD"]);
+    g(["checkout", "main"]);
+    const work = tmp();
+    mkdirSync(path.join(work, ".agent", "profiles"), { recursive: true });
+    mkdirSync(path.join(work, "docs"), { recursive: true });
+    mkdirSync(path.join(work, "src"), { recursive: true });
+    writeFileSync(path.join(work, ".agent", "profiles", "fast.yaml"), "stale\n");
+    writeFileSync(path.join(work, "docs", "agent-harness-reference.md"), "stale\n");
+    writeFileSync(path.join(work, "src", "app.ts"), "keep\n");
+    writeFileSync(path.join(work, "package.json"), JSON.stringify({ scripts: {} }));
+    return { repo, ref, work };
+  }
+
+  test("deletes listed files and directories left over from the base commit (AC2)", async () => {
+    const { repo, ref, work } = setupRemoval([
+      ".agent/profiles",
+      "docs/agent-harness-reference.md",
+      "not/there.md",
+    ]);
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    const { removedFiles } = mod.overlayHarness(repo, work, ref);
+    expect(removedFiles.sort()).toEqual([".agent/profiles", "docs/agent-harness-reference.md"]);
+    expect(existsSync(path.join(work, ".agent", "profiles"))).toBe(false);
+    expect(existsSync(path.join(work, "docs", "agent-harness-reference.md"))).toBe(false);
+    expect(readFileSync(path.join(work, "src", "app.ts"), "utf8")).toBe("keep\n"); // app code untouched
+  });
+
+  test("never deletes a path that still exists at the harness ref", async () => {
+    const { repo, ref, work } = setupRemoval(["AGENTS.md", "docs/agent-harness-reference.md"]);
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    const { removedFiles } = mod.overlayHarness(repo, work, ref);
+    expect(removedFiles).toEqual(["docs/agent-harness-reference.md"]);
+    expect(readFileSync(path.join(work, "AGENTS.md"), "utf8")).toBe("# new contract\n");
+  });
+
+  test("rejects entries that escape the worktree", async () => {
+    const { repo, ref, work } = setupRemoval(["../outside"]);
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    expect(() => mod.overlayHarness(repo, work, ref)).toThrow(/repo-relative/);
+  });
+});
+
+describe("harness-paths.json drift (#984)", () => {
+  const paths = JSON.parse(
+    readFileSync(path.join(REPO_ROOT, "eval/harness/harness-paths.json"), "utf8"),
+  );
+  const pkg = JSON.parse(readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"));
+
+  test("every file listed in test:process is covered by paths (AC3)", async () => {
+    const mod = await import("./harness-eval.mjs");
+    const testFiles = pkg.scripts["test:process"]
+      .split(/\s+/)
+      .filter((token) => /\.test\.(mjs|ts)$/.test(token));
+    expect(testFiles.length).toBeGreaterThan(0);
+    const covered = (file) =>
+      paths.paths.some((entry) => {
+        const clean = entry.replace(/\/+$/, "");
+        return (
+          clean === file ||
+          file.startsWith(`${clean}/`) ||
+          ((clean.includes("*") || clean.includes("?")) && mod.globToRegExp(clean).test(file))
+        );
+      });
+    expect(testFiles.filter((file) => !covered(file))).toEqual([]);
+  });
+
+  test("paths and npmScripts point only at what exists in this repo (AC4)", () => {
+    const missing = paths.paths.filter((entry) => {
+      const clean = entry.replace(/\/+$/, "");
+      if (clean.includes("*") || clean.includes("?")) {
+        return globSync(clean, { cwd: REPO_ROOT }).length === 0;
+      }
+      return !existsSync(path.join(REPO_ROOT, clean));
+    });
+    expect(missing).toEqual([]);
+    expect(paths.npmScripts.filter((key) => pkg.scripts[key] === undefined)).toEqual([]);
+  });
+
+  test("removedPaths do not exist in this repo and are not also overlaid", () => {
+    const alive = (paths.removedPaths ?? []).filter((entry) =>
+      existsSync(path.join(REPO_ROOT, entry)),
+    );
+    expect(alive).toEqual([]);
+    expect(paths.paths.filter((entry) => (paths.removedPaths ?? []).includes(entry))).toEqual([]);
   });
 });
 

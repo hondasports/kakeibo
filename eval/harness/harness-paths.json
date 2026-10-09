@@ -1,6 +1,6 @@
 {
   "$schema": "harness-overlay-paths/v1",
-  "comment": "eval/harness で過去コミットのworktreeへ上書きするハーネス一式。存在しないパスは無視される。ハーネスのファイルを追加・移動したIssueは、この一覧も更新する。test:process が参照するハーネスのテストと、そのテストがimportするスクリプトも対象に含める（overlay後のunit verifyが新旧混在で壊れないため）。",
+  "comment": "eval/harness で過去コミットのworktreeへ上書きするハーネス一式。存在しないパスは無視される。ハーネスのファイルを追加・移動したIssueは、この一覧も更新する。test:process が参照するハーネスのテストと、そのテストがimportするスクリプトも対象に含める（overlay後のunit verifyが新旧混在で壊れないため）。 ref側で削除したハーネスのファイルは removedPaths に列挙する（overlayは追加・上書きだけで削除を反映しないため。ref側に存在するパスは消されない）。",
   "paths": [
     "AGENTS.md",
     ".agent",
@@ -39,8 +39,6 @@
     "scripts/run-compact-tests.test.mjs",
     "scripts/agent-usage.mjs",
     "scripts/agent-usage.test.mjs",
-    "scripts/resolve-agent-profile.mjs",
-    "scripts/resolve-agent-profile.test.mjs",
     "scripts/ci-change-scope.mjs",
     "scripts/ci-change-scope.test.mjs",
     "scripts/ci-failure.mjs",
@@ -60,7 +58,21 @@
     "scripts/harness-eval.test.mjs",
     "scripts/generate-harness-docs.mjs",
     "scripts/verify-prepush.mjs",
-    "scripts/select-e2e-specs.mjs"
+    "scripts/select-e2e-specs.mjs",
+    "scripts/select-e2e-specs.test.mjs",
+    "scripts/verify-prepush.test.mjs",
+    "scripts/spec-map.test.mjs",
+    "scripts/draft.test.mjs",
+    "scripts/lite-lane.test.mjs",
+    "scripts/review-ci.test.mjs",
+    "scripts/report-flaky-e2e.mjs"
+  ],
+  "removedPaths": [
+    "docs/agent-harness-reference.md",
+    ".agent/profiles",
+    "scripts/resolve-agent-profile.mjs",
+    "scripts/resolve-agent-profile.test.mjs",
+    "scripts/loop-runner.test.mjs"
   ],
   "npmScripts": [
     "test:process",
@@ -68,7 +80,6 @@
     "loop:pr-findings",
     "loop:suggest-skills",
     "loop:assess",
-    "loop:profile",
     "loop:state",
     "loop:metrics",
     "verify:prepush",
