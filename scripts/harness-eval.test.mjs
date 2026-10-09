@@ -286,15 +286,21 @@ describe("report: unmeasured usage (#985)", () => {
     expect(g1.modelCalls).toEqual({ baseline: 2, candidate: 3 });
   });
 
-  test("the committed baseline has no zero-filled tokens (AC4)", () => {
-    const file = path.join(path.dirname(SCRIPT), "..", "eval", "harness", "baseline");
-    for (const name of readdirSync(file)) {
-      for (const line of readFileSync(path.join(file, name), "utf8").split("\n")) {
+  test("committed baselines contain no zero-filled usage placeholders (AC4)", () => {
+    // Measured baselines (recorded via --record-usage) are fine; only the legacy
+    // all-zero representation of "never measured" is rejected.
+    const dir = path.join(path.dirname(SCRIPT), "..", "eval", "harness", "baseline");
+    const isZeroFilled = (tokens) =>
+      tokens != null && ["input", "cachedInput", "output"].every((key) => tokens[key] === 0);
+    for (const name of readdirSync(dir)) {
+      for (const line of readFileSync(path.join(dir, name), "utf8").split("\n")) {
         if (!line.trim()) continue;
         const record = JSON.parse(line);
         if (!record.tokens) continue;
-        expect(record.tokens).toEqual({ implementer: null, reviewer: null });
-        expect(record.modelCalls).toEqual({ implementer: null, reviewer: null });
+        for (const role of ["implementer", "reviewer"]) {
+          expect(isZeroFilled(record.tokens[role]), `${name} tokens.${role}`).toBe(false);
+          expect(record.modelCalls?.[role], `${name} modelCalls.${role}`).not.toBe(0);
+        }
       }
     }
   });
