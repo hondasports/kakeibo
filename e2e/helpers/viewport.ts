@@ -51,9 +51,15 @@ export async function expectLocatorInsideContainer(locator: Locator, container: 
 }
 
 export async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
-  const hasHorizontalOverflow = await page.evaluate(() => {
-    const root = document.documentElement;
-    return root.scrollWidth > root.clientWidth + 1;
-  });
-  expect(hasHorizontalOverflow).toBe(false);
+  // viewport切替直後はPageTransitionのslideが残り一瞬はみ出すため、収束するまで待つ。
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const root = document.documentElement;
+          return root.scrollWidth > root.clientWidth + 1;
+        }),
+      { timeout: 5000 },
+    )
+    .toBe(false);
 }
