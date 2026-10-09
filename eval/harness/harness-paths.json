@@ -74,7 +74,9 @@
     ".agent/profiles",
     "scripts/resolve-agent-profile.mjs",
     "scripts/resolve-agent-profile.test.mjs",
-    "scripts/loop-runner.test.mjs"
+    "scripts/loop-runner.test.mjs",
+    ".agent/models",
+    "skills/requirements"
   ],
   "npmScripts": [
     "test:process",

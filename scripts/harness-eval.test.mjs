@@ -359,6 +359,56 @@ describe("harness-paths.json drift (#984)", () => {
   });
 });
 
+describe("golden bases: no stale harness file survives the overlay (#984)", () => {
+  const goldenPath = path.join(REPO_ROOT, "eval/harness/golden-set.json");
+  // golden-set.json is absent in eval worktrees (oracle isolation); base commits can be
+  // absent in shallow clones. Each base is checked when its objects are available.
+  const tasks = existsSync(goldenPath) ? JSON.parse(readFileSync(goldenPath, "utf8")).tasks : [];
+  const lines = (...args) =>
+    execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
+      .split("\n")
+      .filter(Boolean);
+  const hasCommit = (sha) => {
+    try {
+      execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], {
+        cwd: REPO_ROOT,
+        stdio: "ignore",
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  for (const task of tasks) {
+    test.skipIf(!hasCommit(task.baseCommit))(
+      `${task.id}: harness-owned files removed from HEAD are listed in removedPaths`,
+      async () => {
+        const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+        const doc = JSON.parse(
+          readFileSync(path.join(REPO_ROOT, "eval/harness/harness-paths.json"), "utf8"),
+        );
+        const owns = (file) =>
+          doc.paths.some((entry) => {
+            const clean = entry.replace(/\/+$/, "");
+            return (
+              clean === file ||
+              file.startsWith(`${clean}/`) ||
+              ((clean.includes("*") || clean.includes("?")) && mod.globToRegExp(clean).test(file))
+            );
+          });
+        const removed = (file) =>
+          (doc.removedPaths ?? []).some((entry) => file === entry || file.startsWith(`${entry}/`));
+        const head = new Set(lines("ls-tree", "-r", "--name-only", "HEAD"));
+        const stale = lines("ls-tree", "-r", "--name-only", task.baseCommit).filter(
+          (file) => !head.has(file) && owns(file) && !removed(file),
+        );
+        expect(stale).toEqual([]);
+      },
+    );
+  }
+});
+
 describe("buildAgentSpec", () => {
   test("excludes oracle content and marks prAllowed false (AC1)", async () => {
     const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
