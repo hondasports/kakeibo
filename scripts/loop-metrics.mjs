@@ -208,14 +208,21 @@ const sumBy = (list, pick) => list.reduce((total, item) => total + number(pick(i
 export function summarizeTask(entries, taskId, context = {}) {
   const filtered = taskId ? entries.filter((entry) => entry?.taskId === taskId) : entries;
   const usage = aggregateUsage(filtered);
+  // A role with no recorded usage is unmeasured (null), never 0: 0 would read
+  // as "used nothing" and mislead before/after comparisons (Issue #985).
   const roleTokens = (role) => {
     const bucket = usage?.byRole?.[role];
+    if (!bucket) return null;
     return {
       // cache writes are billed as input; reasoning rides on output tokens.
       input: number(bucket?.inputUncached) + number(bucket?.cacheWrite),
       cachedInput: number(bucket?.cacheRead),
       output: number(bucket?.output) + number(bucket?.reasoning),
     };
+  };
+  const roleCalls = (role) => {
+    const bucket = usage?.byRole?.[role];
+    return bucket ? number(bucket.calls) : null;
   };
   const transitions = filtered.filter((entry) => entry?.action === "transition");
   const transitionCount = (event) => transitions.filter((entry) => entry.event === event).length;
@@ -233,8 +240,8 @@ export function summarizeTask(entries, taskId, context = {}) {
       reviewer: roleTokens("reviewer"),
     },
     modelCalls: {
-      implementer: number(usage?.byRole?.implementer?.calls),
-      reviewer: number(usage?.byRole?.reviewer?.calls),
+      implementer: roleCalls("implementer"),
+      reviewer: roleCalls("reviewer"),
     },
     runnerCommands: filtered.filter((entry) => entry?.action === "cli_output").length,
     transitions: transitions.length,
@@ -313,8 +320,11 @@ export function taskSummaryContext(task, root = process.cwd()) {
 
 /** Human table + folded JSON for the PR comment body (marker line first). */
 export function renderMetricsComment(summary) {
+  const UNMEASURED = "未計測";
   const fmtTokens = (tokens) =>
-    `in ${number(tokens.input)} / cached ${number(tokens.cachedInput)} / out ${number(tokens.output)}`;
+    !tokens
+      ? UNMEASURED
+      : `in ${number(tokens.input)} / cached ${number(tokens.cachedInput)} / out ${number(tokens.output)}`;
   const secs = (ms) => `${Math.round(number(ms) / 1000)}s`;
   const rows = [
     ["Task", `\`${summary.taskId}\``],
@@ -325,7 +335,7 @@ export function renderMetricsComment(summary) {
     ["Tokens (reviewer)", fmtTokens(summary.tokens?.reviewer)],
     [
       "Model calls",
-      `implementer ${number(summary.modelCalls?.implementer)} / reviewer ${number(summary.modelCalls?.reviewer)}`,
+      `implementer ${summary.modelCalls?.implementer ?? UNMEASURED} / reviewer ${summary.modelCalls?.reviewer ?? UNMEASURED}`,
     ],
     ["Runner commands", number(summary.runnerCommands)],
     ["Transitions", number(summary.transitions)],

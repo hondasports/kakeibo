@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -235,6 +235,47 @@ describe("report", () => {
     expect(g2.candidate).toBe("欠損");
     const g3 = rows.find((r) => r.id === "g3");
     expect(g3.baseline).toBe("欠損");
+  });
+});
+
+describe("report: unmeasured usage (#985)", () => {
+  test("null tokens/modelCalls are shown as 未計測 and produce no delta", async () => {
+    const dir = tmp();
+    const base = path.join(dir, "b.jsonl");
+    const cand = path.join(dir, "c.jsonl");
+    const unmeasured = JSON.stringify({
+      taskId: "g1",
+      tokens: { implementer: null, reviewer: null },
+      modelCalls: { implementer: null, reviewer: null },
+    });
+    const measured = JSON.stringify({
+      taskId: "g1",
+      tokens: {
+        implementer: { input: 80, output: 0, cachedInput: 0 },
+        reviewer: null,
+      },
+      modelCalls: { implementer: 3, reviewer: null },
+    });
+    writeFileSync(base, `${unmeasured}\n`);
+    writeFileSync(cand, `${measured}\n`);
+    const mod = await loadModuleWithFixtureEval(fixtureEvalDir());
+    const { rows } = mod.report({ baseline: base, candidate: cand });
+    const g1 = rows.find((r) => r.id === "g1");
+    expect(g1.tokens).toEqual({ baseline: "未計測", candidate: 80 });
+    expect(g1.modelCalls).toEqual({ baseline: "未計測", candidate: 3 });
+  });
+
+  test("the committed baseline has no zero-filled tokens (AC4)", () => {
+    const file = path.join(path.dirname(SCRIPT), "..", "eval", "harness", "baseline");
+    for (const name of readdirSync(file)) {
+      for (const line of readFileSync(path.join(file, name), "utf8").split("\n")) {
+        if (!line.trim()) continue;
+        const record = JSON.parse(line);
+        if (!record.tokens) continue;
+        expect(record.tokens).toEqual({ implementer: null, reviewer: null });
+        expect(record.modelCalls).toEqual({ implementer: null, reviewer: null });
+      }
+    }
   });
 });
 

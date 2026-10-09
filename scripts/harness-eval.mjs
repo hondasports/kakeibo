@@ -416,6 +416,25 @@ function loadJsonl(file) {
 const pick = (summary, pathSpec) =>
   pathSpec.split(".").reduce((acc, key) => (acc == null ? acc : acc[key]), summary);
 
+const UNMEASURED = "未計測";
+
+/**
+ * Sum the measured roles of a summary field. A role recorded as null was never
+ * measured (Issue #985); when no role was measured the whole field is
+ * UNMEASURED rather than 0, so it never yields a delta.
+ */
+function sumMeasured(summary, field, keys = null) {
+  let total = 0;
+  let measured = false;
+  for (const role of ["implementer", "reviewer"]) {
+    const value = pick(summary, `${field}.${role}`);
+    if (value == null) continue;
+    measured = true;
+    total += keys ? keys.reduce((sum, key) => sum + (value[key] ?? 0), 0) : value;
+  }
+  return measured ? total : UNMEASURED;
+}
+
 export function report({ baseline, candidate }) {
   const base = loadJsonl(baseline);
   const cand = loadJsonl(candidate);
@@ -425,20 +444,8 @@ export function report({ baseline, candidate }) {
       "oracle",
       (s) => (s?.oracle?.pass === true ? "pass" : s?.oracle?.pass === false ? "fail" : "-"),
     ],
-    [
-      "tokens",
-      (s) =>
-        (pick(s, "tokens.implementer.input") ?? 0) +
-        (pick(s, "tokens.implementer.output") ?? 0) +
-        (pick(s, "tokens.implementer.cachedInput") ?? 0) +
-        (pick(s, "tokens.reviewer.input") ?? 0) +
-        (pick(s, "tokens.reviewer.output") ?? 0) +
-        (pick(s, "tokens.reviewer.cachedInput") ?? 0),
-    ],
-    [
-      "modelCalls",
-      (s) => (pick(s, "modelCalls.implementer") ?? 0) + (pick(s, "modelCalls.reviewer") ?? 0),
-    ],
+    ["tokens", (s) => sumMeasured(s, "tokens", ["input", "output", "cachedInput"])],
+    ["modelCalls", (s) => sumMeasured(s, "modelCalls")],
     ["runnerCommands", (s) => s?.runnerCommands ?? "-"],
     ["wallTimeMs", (s) => s?.wallTimeMs ?? s?.durationMs ?? "-"],
     ["reviewRounds", (s) => s?.reviewRounds ?? "-"],

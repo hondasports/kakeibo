@@ -121,6 +121,27 @@ describe("summarizeTask", () => {
     expect(summary.frictionNotes).toBe(1);
   });
 
+  it("reports tokens/modelCalls as null (unmeasured) when no usage was recorded (#985)", () => {
+    const noUsage = fixtureEntries.filter((entry) => entry.action !== "usage");
+    const summary = summarizeTask(noUsage, "t1", context());
+    expect(summary.tokens).toEqual({ implementer: null, reviewer: null });
+    expect(summary.modelCalls).toEqual({ implementer: null, reviewer: null });
+    const body = renderMetricsComment(summary);
+    expect(body).toContain("| Tokens (implementer) | 未計測 |");
+    expect(body).toContain("| Model calls | implementer 未計測 / reviewer 未計測 |");
+    expect(body).not.toContain("in 0 / cached 0 / out 0");
+  });
+
+  it("treats only the role without a usage record as unmeasured", () => {
+    const implementerOnly = fixtureEntries.filter(
+      (entry) => entry.action !== "usage" || entry.role === "implementer",
+    );
+    const summary = summarizeTask(implementerOnly, "t1", context());
+    expect(summary.tokens.implementer).not.toBeNull();
+    expect(summary.tokens.reviewer).toBeNull();
+    expect(summary.modelCalls.reviewer).toBeNull();
+  });
+
   it("omits profile/lane keys when the task state has none (AC6)", () => {
     const summary = summarizeTask(fixtureEntries, "t1", {
       tier: "T1",
@@ -140,7 +161,7 @@ describe("summarizeTask", () => {
     const summary = summarizeTask(fixtureEntries, "nope", context());
     expect(summary.transitions).toBe(0);
     expect(summary.runnerCommands).toBe(0);
-    expect(summary.tokens.implementer).toEqual({ input: 0, cachedInput: 0, output: 0 });
+    expect(summary.tokens.implementer).toBeNull();
   });
 });
 
