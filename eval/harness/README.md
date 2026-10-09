@@ -16,6 +16,13 @@ evalは実際のPRを作らない。Agentは **REVIEW clean** に到達した時
 AFTERCAREとCIの指標（`ciFailures`、CIの待ち時間、「CIの失敗 → 再push」の回数）は
 evalの範囲外であり、#942の `collect-harness-metrics.mjs` による実PRの集計で比較する。
 
+## トークン・モデル呼び出し数の計測
+
+`--record-usage` の記録が無いroleの `tokens` / `modelCalls` は0ではなく `null`（未計測）になり、
+`report` では「未計測」と表示して差分（delta）を出さない。DevinはtranscriptもトークンAPIも使えず未計測になるため、
+トークン・モデル呼び出し数を比較するevalは **Claude CodeまたはCodex** で実行し、
+実行後に `--record-usage <transcript.jsonl>` で記録する。
+
 ## 実行手順
 
 eval実行は手動で起動する（CIで常時実行しない）。`git push`・PR作成は一切行わない。

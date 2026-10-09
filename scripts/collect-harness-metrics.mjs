@@ -166,7 +166,10 @@ export function renderTable(rows) {
   const lines = [
     `| ${headers.join(" | ")} |`,
     `|${headers.map(() => "---").join("|")}|`,
-    ...rows.map((row) => `| ${headers.map((h) => row[h] ?? "—").join(" | ")} |`),
+    ...rows.map(
+      (row) =>
+        `| ${headers.map((h) => row[h] ?? (h.startsWith("tokens") ? "未計測" : "—")).join(" | ")} |`,
+    ),
   ];
   return lines.join("\n");
 }

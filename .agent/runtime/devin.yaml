@@ -3,3 +3,4 @@ instruction_entry: AGENTS.md
 supports_fresh_reviewer_context: true
 notes:
   - Repository Setupでは依存導入と標準test/lintだけを定義し、Workflow本体を複製しない
+  - usageは未計測: Devinにはagent-usage.mjsが読めるtranscriptがなく、公式APIのセッション別consumptionはACUのみ（ManageBilling権限のサービスユーザーが必要でトークン・モデル呼び出し数は取れない）。metricsではtokens/modelCallsを0ではなく「未計測」(null)と表示する（#985）
