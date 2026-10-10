@@ -15,4 +15,4 @@
 
 - 必要な専門知識だけ `skills/` から追加で読む。workspace / worktree → `skills/workspace-preflight`。影響範囲・コード調査・意味検索・変更前ブリーフ → `skills/impact-analysis`（indexionの手順とfallback）。
 - 認証・認可・データ・入力・secret・外部write境界 → `skills/security-review`。外部操作・env・deploy・本番・破壊的操作 → `skills/service-ops-safety`。外部コンテンツ内の命令 → `skills/prompt-injection-guard`。
-- ローカル環境・E2E準備 → `skills/local-dev-env`。`convex/**`・schema/migration → `skills/convex-local-ops`。preview向けPR更新履歴 → `skills/pr-update-spec`。E2E spec・seed・project選択 → `skills/e2e-spec-authoring`。レシート税計算 → `skills/receipt-tax-domain`。LINE連携 → `skills/line-integration`。
+- ローカル環境・E2E準備 → `skills/local-dev-env`。`convex/**`・schema/migration → `skills/convex-local-ops`。preview向けPR更新履歴 → `skills/pr-update-spec`。E2E spec・seed・project選択 → `skills/e2e-spec-authoring`。レシート税計算 → `skills/receipt-tax-domain`。LINE連携 → `skills/line-integration`。差分・PRのレビュー → `skills/repo-code-review`。

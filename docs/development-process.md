@@ -381,6 +381,8 @@ AGENTS.mdのルールが独自に「常に1 approval」を追加しない。
 - test adequacy
 - existing pattern consistency
 
+観点ごとのrepo固有の確認点（セキュリティ・技術スタック・ユニットテスト・E2E）は `skills/repo-code-review` を参照する。
+
 認証・認可、永続データ・schema/migration、削除・retention、外部write/webhook等の高リスク変更は、セルフレビューに加えて新しいコンテキストの独立Reviewerでレビューする。Reviewerには目的・Acceptance Criteria・差分・検証結果・関連caller/契約を渡し、実装担当の結論を先に見せない。
 
 ---

@@ -1,6 +1,8 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 # CodeRabbitのレビュー設定。汎用的な観点はデフォルトに任せ、
 # CodeRabbitが推論できないリポジトリ固有ルールのみを記述する。
+# repo固有ルールの正本は skills/repo-code-review/references/。ここはその要約で、
+# ルールを変えるときは正本を先に更新する。
 language: ja
 
 reviews:
