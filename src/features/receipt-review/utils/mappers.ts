@@ -11,6 +11,10 @@ import type {
   ReviewItemValues,
 } from "../types/types";
 import type { AiExpenseQueueItem, AiExpenseQueueStatus } from "../../../types/aiExpenseQueue";
+import { buildReviewChecks } from "./reviewChecks";
+import { dropResolvedAmountTaxReasons } from "./reviewFeedback";
+import { getReviewGuidance } from "./reviewGuidance";
+import { buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 
 export const emptyReviewForm: ReviewFormValues = {
   documentType: "receipt",
@@ -20,6 +24,48 @@ export const emptyReviewForm: ReviewFormValues = {
   categoryId: "",
   registrationMode: "detailed",
 };
+
+/** 税内訳・未配分・税率確認に関する案内のid。 */
+function isTaxGuidanceId(id: string): boolean {
+  return (
+    id.startsWith("summary-") ||
+    id.startsWith("tax-") ||
+    id.startsWith("discount") ||
+    id === "allocation"
+  );
+}
+
+/**
+ * 下書き確認ダイアログと同じ再解釈・照合で、金額と税内訳が解決済みか判定する。
+ * 明細が無い、または照合できない場合は解決済みとみなさない。
+ */
+export function isAmountAndTaxResolved(draft: AiExpenseDraft): boolean {
+  const paidTotalYen = draft.amountYen;
+  if (!draft.items || draft.items.length === 0 || paidTotalYen === undefined) return false;
+  const form = mapDraftToReviewForm(draft);
+  const sourceItems = mapDraftItemsToReviewItems(draft.items);
+  const preview = buildReviewTaxPreview(sourceItems, {
+    paidTotalYen,
+    taxSummaries: draft.taxSummaries,
+    markerDefinitions: draft.markerDefinitions,
+    priceTaxTreatment: form.priceTaxTreatment,
+    taxRateComposition: form.taxRateComposition,
+  });
+  const items = draft.taxSummaries?.length ? preview.items : sourceItems;
+  const effectiveDraft = { ...draft, taxSummaries: preview.taxSummaries };
+  const checks = buildReviewChecks({
+    items,
+    paidTotalYen,
+    taxSummaries: effectiveDraft.taxSummaries,
+    rawObservation: draft.rawObservation,
+  });
+  if (checks.amount.status !== "matched" || checks.taxRate.status !== "matched") return false;
+  const guidance = getReviewGuidance(form, items, effectiveDraft, {
+    summarySourceIndexes: preview.summarySourceIndexes,
+    sourceTaxSummaries: draft.taxSummaries,
+  });
+  return !guidance.some((issue) => isTaxGuidanceId(issue.id));
+}
 
 export function mapDraftToQueueItem(
   draft: AiExpenseDraft,
@@ -44,7 +90,7 @@ export function mapDraftToQueueItem(
     amountYen: draft.amountYen,
     date: draft.date,
     categoryName,
-    reviewReasons: draft.reviewReasons,
+    reviewReasons: dropResolvedAmountTaxReasons(draft.reviewReasons, isAmountAndTaxResolved(draft)),
     itemTotalYen: draft.itemSummary?.itemTotalYen,
     itemDifferenceYen: draft.itemSummary?.itemDifferenceYen,
     hasUncategorizedItems: draft.itemSummary?.hasUncategorizedItems,

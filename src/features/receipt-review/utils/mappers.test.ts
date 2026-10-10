@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  isAmountAndTaxResolved,
   mapConvexDraftToAiExpenseDraft,
   mapDraftItemsToReviewItems,
   mapDraftToQueueItem,
   mapDraftToReviewForm,
 } from "./mappers";
 import type { AiExpenseDraft } from "../types/types";
+import { mixedTaxReviewFixture } from "./reviewTaxPreviewTestHelpers";
 import { RECEIPT_TAX_CHOICE_FIELDS } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 
 describe("mapDraftToReviewForm: 税設定の補正元を保持する", () => {
@@ -306,5 +308,73 @@ describe("mapDraftItemsToReviewItems", () => {
     ]);
 
     expect(item.amountYen).toBe("99");
+  });
+});
+
+describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
+  function summary892Draft(overrides: Partial<AiExpenseDraft> = {}) {
+    const { draft, items } = mixedTaxReviewFixture();
+    return {
+      ...draft,
+      status: "needs_review" as const,
+      amountYen: 1782,
+      categoryId: "food",
+      reviewReasons: ["user_confirmation_required", "amount_mismatch"],
+      items: items.map((item) => ({
+        _id: item.id,
+        itemName: item.itemName,
+        amountYen: Number(item.amountYen),
+        printedAmountYen: item.printedAmountYen,
+        amountBasis: item.amountBasis,
+        taxRatePercent: item.taxRatePercent,
+        taxResolutionStatus: item.taxResolutionStatus,
+        taxResolutionSource: item.taxResolutionSource,
+        categoryId: "food",
+      })),
+      ...overrides,
+    } as AiExpenseDraft;
+  }
+
+  it("ダイアログで解決済みの金額・税内訳は、一覧に古い理由を残さない（#997）", () => {
+    const draft = summary892Draft();
+    expect(isAmountAndTaxResolved(draft)).toBe(true);
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual(["user_confirmation_required"]);
+  });
+
+  it("税率衝突など真の不一致は一覧に残す", () => {
+    const draft = summary892Draft();
+    draft.taxSummaries = draft.taxSummaries?.map((summary) =>
+      summary.taxRatePercent === 10
+        ? { ...summary, taxableAmountBasis: "tax_excluded", status: "contradictory" }
+        : summary,
+    );
+    expect(isAmountAndTaxResolved(draft)).toBe(false);
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
+      "user_confirmation_required",
+      "amount_mismatch",
+    ]);
+  });
+
+  it("支払合計と明細が合わない場合は理由を残す", () => {
+    const draft = summary892Draft({ amountYen: 1800 });
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toContain("amount_mismatch");
+  });
+
+  it("明細を持たない下書きは解決済みとみなさず、保存済みの理由を保つ", () => {
+    const draft = summary892Draft({ items: undefined });
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
+      "user_confirmation_required",
+      "amount_mismatch",
+    ]);
+  });
+
+  it("税以外の独立した理由は解決済みでも隠さない", () => {
+    const draft = summary892Draft({
+      reviewReasons: ["amount_mismatch", "low_confidence", "ambiguous_category"],
+    });
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
+      "low_confidence",
+      "ambiguous_category",
+    ]);
   });
 });

@@ -28,8 +28,9 @@ export async function listByStatusHandler(ctx: QueryCtx, args: ListByStatusArgs)
     createAiExpenseDraftQueryDeps(ctx),
     args,
   );
-  return entries.map(({ id, creationTime, ...entry }) => ({
+  return entries.map(({ id, creationTime, items, ...entry }) => ({
     ...entry,
+    ...(items === undefined ? {} : { items: items.map(draftItemFieldsToDoc) }),
     _id: id,
     _creationTime: creationTime,
   }));
