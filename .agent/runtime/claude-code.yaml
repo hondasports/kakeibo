@@ -1,7 +1,0 @@
-name: claude-code
-instruction_entry: AGENTS.md
-supports_fresh_reviewer_context: true
-notes:
-  - CLAUDE.mdやsettingsへWorkflow本体を複製せず、AGENTS.mdとCore Harnessを正本とする
-  - 独立ReviewerはAgent toolのfresh context subagentへreview packetを渡して実行する
-  - "--record-usage には ~/.claude/projects/<project>/<session>.jsonl を渡す。ReviewerのsubagentはそのtranscriptのJSONLを --usage-role reviewer で記録する"

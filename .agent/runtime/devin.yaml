@@ -1,5 +1,0 @@
-name: devin
-instruction_entry: AGENTS.md
-supports_fresh_reviewer_context: true
-notes:
-  - Repository Setupでは依存導入と標準test/lintだけを定義し、Workflow本体を複製しない

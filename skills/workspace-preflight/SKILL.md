@@ -26,9 +26,7 @@ node scripts/check-task-worktree.mjs --require-clean
 - canonical worktreeとは別の登録済みworktree
 - clean baseline
 
-`task identity == branch` や「差分が他task由来ではない」ことは、このscript単体では判定しない。task↔branchの紐付けと差分範囲の整合は、Agent SpecとPR本文の状態ブロック・引き渡し確認で担保し、scriptのPASS証跡として水増ししない。
-
-preflight後、差分候補が見える段階で `node scripts/suggest-skills.mjs` を実行し、条件スキルの読み漏れを機械的に確認する。
+`task identity == branch` や「差分が他task由来ではない」ことは、このscript単体では判定しない。task↔branchの紐付けと差分範囲の整合はIssue・PR本文で確認し、scriptのPASS証跡として水増ししない。
 
 ## FAIL
 

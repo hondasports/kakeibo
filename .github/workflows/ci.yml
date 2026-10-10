@@ -5,20 +5,59 @@ on:
     # main は PR 経由のみ更新される。merge commit のツリーは PR の CI で検証済みのため、
     # main への push では再実行しない。
     branches: [preview]
-    paths-ignore:
-      - "**/*.md"
   pull_request:
     branches: [main, preview]
-    paths-ignore:
-      - "**/*.md"
   # main への push では自動実行しないが、チェック未実行のまま取り込まれた変更の
   # 再検証用に手動実行を残す。
   workflow_dispatch:
 
+# workflow 単位の paths-ignore は使わない。.md だけの変更でも workflow を起動し、
+# 先頭の CI scope ジョブで「.md 以外の変更があるか」を判定して各ジョブを skip する
+# （e2e.yml の classify と同じ考え方。required checks では skip されたジョブは合格扱い）。
+# 判定が失敗・できない場合は安全側に倒して Lint / Build / Test をすべて実行する。
+
 jobs:
+  scope:
+    name: CI scope
+    runs-on: ubuntu-latest
+    outputs:
+      code_changed: ${{ steps.scope.outputs.code_changed || steps.scope_dispatch.outputs.code_changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+
+      - name: Classify change scope (pull_request / push)
+        id: scope
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+          node scripts/ci-change-scope.mjs --base "$BASE" --head "$HEAD" --github-output "$GITHUB_OUTPUT"
+
+      - name: Classify change scope (workflow_dispatch)
+        id: scope_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "code_changed=true" >> "$GITHUB_OUTPUT"
+          echo "reason=workflow_dispatch" >> "$GITHUB_OUTPUT"
+          echo "changed_count=0" >> "$GITHUB_OUTPUT"
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    # scope が失敗・キャンセルされた場合は安全側で必ず実行する（skip=合格扱いにしない）。
+    # workflow 自体がキャンセルされたときは実行しない。
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code_changed == 'true') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -48,6 +87,8 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code_changed == 'true') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -75,6 +116,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code_changed == 'true') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

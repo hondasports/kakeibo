@@ -1,4 +1,2 @@
 node scripts/check-task-worktree.mjs --staged
-node scripts/loop-runner.mjs --assert-started
 pnpm exec lint-staged
-node scripts/check-loop-docs.mjs

@@ -1,13 +1,12 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 # CodeRabbitのレビュー設定。汎用的な観点はデフォルトに任せ、
 # CodeRabbitが推論できないリポジトリ固有ルールのみを記述する。
+# repo固有ルールの正本は skills/repo-code-review/references/。ここはその要約で、
+# ルールを変えるときは正本を先に更新する。
 language: ja
 
 reviews:
   profile: chill
-  auto_review:
-    # Agent Harnessは初回REVIEW進入時にdraft PRを作り、内部レビューと並行して外部レビューを受ける
-    drafts: true
   path_filters:
     # 自動生成コード・ロックファイルはレビュー対象外
     - "!pnpm-lock.yaml"
@@ -36,7 +35,7 @@ reviews:
         - secretsの受け渡しとpermissionsの最小化、previewとproductionの環境分離を確認する
     - path: "skills/**"
       instructions: |
-        - skills/ と AGENTS.md はagentループの制御文書。既存ルールや AGENTS.md との重複・矛盾があれば指摘する
+        - skills/ と AGENTS.md はAgent向けの制御文書。既存ルールや AGENTS.md との重複・矛盾があれば指摘する
     - path: "AGENTS.md"
       instructions: |
         - 変更が入口の追加・整理に限定されているか、skills/ 配下の各SKILL.mdと矛盾しないかを確認する

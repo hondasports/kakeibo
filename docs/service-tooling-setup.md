@@ -65,8 +65,8 @@ pnpm install
 ```bash
 # Codex CLI の場合
 codex mcp add vercel --url https://mcp.vercel.com
-codex mcp add convex -- npx -y convex@latest mcp start
-codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest
+codex mcp add convex -- npx -y convex@1.44.0 mcp start
+codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@1.10.1
 ```
 
 1. Clerk CLIにログインし、`kakeibo` applicationを作成またはリンクする。
@@ -175,10 +175,9 @@ pnpm run dev
 
 `.agents/` 配下は外部インストールSkill等の環境依存生成物のため、丸ごとGit管理外にする。
 
-このリポジトリで手作りしたSkillと工程定義は、`.agents/` ではなく次のGit管理ディレクトリに置く。
+このリポジトリで手作りしたSkillは、`.agents/` ではなく次のGit管理ディレクトリに置く。
 
 - Capability Skill: `skills/<name>/SKILL.md`（一覧は `AGENTS.md` のCapability skillsが正本）
-- 工程（REFINE / EXECUTE / REVIEW / AFTERCARE / INCIDENT）: `.agent/workflow/`（Skillではなく工程定義）
 
 **Git管理しないSkill（外部インストール、`.agents/` 配下）:**
 - `clerk` / `clerk-*` 系 — Clerk公式 Skills（`npx skills add clerk/agent-skills`）
@@ -203,7 +202,7 @@ Node.jsはリポジトリ直下の `mise.toml` を正本とし、現在は `24.1
 
 CLIツールは、端末全体の環境を汚さないため、原則としてグローバルインストールしない。Clerk CLIやConvex CLIはプロジェクトの `devDependencies` に追加し、`pnpm exec` で実行する。
 
-MCP server設定は例外扱いとする。Codex MCP serverでは公式手順との互換性を優先し、`npx ...@latest` やHTTP MCPを許容する。
+MCP server設定もバージョンを固定する。`.devin/mcp_config.json`・`.devin/config.json`・`mcp.json` の `npx` 起動パッケージは `@latest` や範囲指定を使わず固定版を書く（`convex` は `pnpm-lock.yaml` の解決済みバージョン、それ以外はnpmの安定版）。これらのnpmパッケージはpackage.jsonに含めないためDependabotでは追跡できず、更新は四半期ごとに手動で `npm view <pkg> version` を確認して行う。HTTP MCPはURL指定のため対象外とする。
 
 例外:
 

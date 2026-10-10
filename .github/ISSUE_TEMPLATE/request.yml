@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        やりたいことを分かる範囲で書いてください。詳細な仕様・影響範囲・完了条件はAgentのREFINE工程でrepositoryを調査して整理します。
+        やりたいことを分かる範囲で書いてください。詳細な仕様・影響範囲・完了条件はAgentがrepositoryを調査して整理します。
 
   - type: textarea
     id: request

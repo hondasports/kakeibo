@@ -1,15 +1,20 @@
 import type { AiExpenseDraftStatus } from "../../domain/aiExpenseDrafts/constants";
 import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftRepository";
+import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftItemReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftItemRepository";
 import { summarizeItems, type ItemSummary } from "../../domain/aiExpenseDrafts/reviewItems";
 import type { UsecaseGroupContext } from "../context";
 
 const LIST_LIMIT = 100;
 
-export type AiExpenseDraftListEntry = AiExpenseDraftFields & { itemSummary?: ItemSummary };
+export type AiExpenseDraftListEntry = AiExpenseDraftFields & {
+  itemSummary?: ItemSummary;
+  /** 一覧の確認理由を下書き確認と同じ判定で導出するための明細。ready/needs_review のみ。 */
+  items?: AiExpenseDraftItemFields[];
+};
 
-/** ステータスで下書き一覧を取得する。ready/needs_review には明細サマリを付与する。 */
+/** ステータスで下書き一覧を取得する。ready/needs_review には明細サマリと明細を付与する。 */
 export async function listAiExpenseDraftsByStatus(
   ctx: Pick<UsecaseGroupContext, "groupId">,
   deps: {
@@ -28,6 +33,7 @@ export async function listAiExpenseDraftsByStatus(
       return {
         ...draft,
         itemSummary: summarizeItems(draft, items),
+        items: items.length > 0 ? items : undefined,
       };
     }),
   );

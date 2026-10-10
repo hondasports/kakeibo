@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const PROCESS_ONLY_SCRIPT_PATTERN =
-  /^scripts\/(?:review-depth|check-task-worktree|check-loop-docs|collect-pr-findings|suggest-skills|machine-risk|assess-change|resolve-agent-profile|loop-(?:runner|policy|schema|pr-check|test-fixtures|metrics))(?:\.test)?\.mjs$/;
+  /^scripts\/(?:check-task-worktree|collect-pr-findings)(?:\.test)?\.mjs$/;
 
 /** Normalize a Git path to a stable repository-relative form. */
 export function normalizeChangedPath(filePath) {
@@ -28,8 +28,6 @@ export function isProcessOnlyPath(filePath) {
 
   if (
     normalized === "AGENTS.md" ||
-    normalized === "plugin.json" ||
-    normalized.startsWith(".agent/") ||
     normalized.startsWith(".github/ISSUE_TEMPLATE/") ||
     normalized.startsWith("skills/") ||
     normalized.startsWith(".husky/")
@@ -45,9 +43,9 @@ const TEST_FILE_BASENAME = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 
 /**
  * Paths whose content cannot change lint/unit/build outcomes: Markdown prose,
- * issue templates, and local git hooks. Process verification still covers
- * docs/script integrity, so `process` evidence is never extended through
- * these paths — this predicate is stricter than isProcessOnlyPath on purpose.
+ * issue templates, and local git hooks. Used to scope `--verify unit --scope
+ * affected` to paths unit can actually observe (isUnitRelatedPath). This
+ * predicate is stricter than isProcessOnlyPath on purpose.
  * A test-pattern basename inside a metadata dir is NOT metadata-only: vitest
  * would still pick it up and change `vitest run` output.
  */

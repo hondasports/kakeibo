@@ -55,6 +55,27 @@ export function deriveVisibleReviewReasons(
   return reasons;
 }
 
+/** 金額・税内訳の判定に由来する理由。解決済みなら一覧から外す。 */
+const AMOUNT_TAX_REVIEW_REASONS = new Set([
+  "amount_mismatch",
+  "normalized_amount_mismatch",
+  "unresolved_tax_rate",
+  "unresolved_amount_basis",
+  "cannot_reconcile_item_amounts",
+]);
+
+/**
+ * 保存時の金額・税内訳の理由を、現在の判定で解決済みなら外す。
+ * `user_confirmation_required` など確認待ちの状態や、税以外の理由は残す。
+ */
+export function dropResolvedAmountTaxReasons(
+  reasons: string[],
+  amountAndTaxResolved: boolean,
+): string[] {
+  if (!amountAndTaxResolved) return reasons;
+  return reasons.filter((reason) => !AMOUNT_TAX_REVIEW_REASONS.has(reason));
+}
+
 export function formatReviewSaveMessage(args: {
   status: "ready" | "needs_review" | "failed" | "registered";
   reviewReasons: string[];

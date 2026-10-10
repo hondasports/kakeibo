@@ -1,0 +1,88 @@
+{
+  "$comment": "変更パスのglob → 対応するE2E spec（glob可）の対応表。verify:prepush（scripts/select-e2e-specs.mjs）が変更ファイルをこのmapで引き、@smokeの最低ラインに合流させる。どのglobにも一致しない変更は安全側で @smoke+@public 全件になるため、新しいsrc/features/*やconvex/*配下を追加したらここへ対応specを追記すること。spec名のglobはe2e/直下の実ファイルへ展開される。",
+  "src/features/account-deletion/**": ["e2e/account-deletion.spec.ts"],
+  "src/features/ai-expense-queue/**": [
+    "e2e/ai-expense-queue.spec.ts",
+    "e2e/ai-expense-queue.basis-regression.spec.ts",
+    "e2e/ai-expense-queue.tax-regression.spec.ts",
+    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
+    "e2e/ai-expense-tax-allocation.spec.ts"
+  ],
+  "src/features/app-shell/**": [
+    "e2e/navigation.spec.ts",
+    "e2e/responsive.spec.ts",
+    "e2e/auth.spec.ts"
+  ],
+  "src/features/auth/**": ["e2e/auth.spec.ts"],
+  "src/features/dashboard/**": ["e2e/dashboard-home.spec.ts"],
+  "src/features/expense-entry/**": ["e2e/receipt-form.spec.ts"],
+  "src/features/expense-search/**": ["e2e/expense-search.spec.ts"],
+  "src/features/group-admin/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
+  "src/features/monthly-summary/**": ["e2e/monthly-summary.spec.ts"],
+  "src/features/receipt/**": ["e2e/receipt-form.spec.ts", "e2e/receipt-image-extraction.spec.ts"],
+  "src/features/receipt-review/**": [
+    "e2e/ai-expense-queue.spec.ts",
+    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
+    "e2e/ai-expense-tax-allocation.spec.ts"
+  ],
+  "src/features/settings/**": [
+    "e2e/settings.spec.ts",
+    "e2e/notifications.spec.ts",
+    "e2e/account-deletion.spec.ts"
+  ],
+  "src/features/summary-shared/**": [
+    "e2e/monthly-summary.spec.ts",
+    "e2e/yearly-summary.spec.ts",
+    "e2e/weekly-summary-bulk-ops.spec.ts"
+  ],
+  "src/features/system-admin/**": [
+    "e2e/system-admin-membership.spec.ts",
+    "e2e/system-admin-route.spec.ts",
+    "e2e/system-admin-search.spec.ts"
+  ],
+  "src/features/ui/**": ["e2e/responsive.spec.ts", "e2e/navigation.spec.ts"],
+  "src/features/week/**": ["e2e/weekly-summary-bulk-ops.spec.ts"],
+  "src/features/weekly-summary/**": ["e2e/weekly-summary-bulk-ops.spec.ts"],
+  "src/features/yearly-summary/**": ["e2e/yearly-summary.spec.ts"],
+  "src/router.tsx": ["e2e/navigation.spec.ts", "e2e/auth.spec.ts"],
+  "convex/aiExpenseDrafts/**": [
+    "e2e/ai-expense-queue.spec.ts",
+    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
+    "e2e/ai-expense-tax-allocation.spec.ts"
+  ],
+  "lib/usecase/aiExpenseDrafts/**": [
+    "e2e/ai-expense-queue.spec.ts",
+    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
+    "e2e/ai-expense-tax-allocation.spec.ts"
+  ],
+  "convex/categories/**": ["e2e/settings.spec.ts", "e2e/receipt-form.spec.ts"],
+  "convex/e2eHttp/**": ["e2e/*.spec.ts"],
+  "convex/lib/**": ["e2e/*.spec.ts"],
+  "convex/crons.ts": [
+    "e2e/monthly-summary.spec.ts",
+    "e2e/yearly-summary.spec.ts",
+    "e2e/weekly-summary-bulk-ops.spec.ts",
+    "e2e/notifications.spec.ts"
+  ],
+  "convex/email/**": ["e2e/notifications.spec.ts"],
+  "convex/expenseEntries/**": [
+    "e2e/receipt-form.spec.ts",
+    "e2e/expense-search.spec.ts",
+    "e2e/monthly-summary.spec.ts"
+  ],
+  "convex/groups/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
+  "convex/lineLink/**": ["e2e/settings.spec.ts"],
+  "convex/lineWebhook/**": ["e2e/settings.spec.ts"],
+  "convex/notifications/**": ["e2e/notifications.spec.ts"],
+  "convex/notificationSettings.ts": ["e2e/notifications.spec.ts"],
+  "convex/receiptAnalysisJobs/**": [
+    "e2e/ai-expense-queue.spec.ts",
+    "e2e/receipt-image-extraction.spec.ts"
+  ],
+  "convex/receiptImageExtraction/**": ["e2e/receipt-image-extraction.spec.ts"],
+  "convex/receipts/**": ["e2e/receipt-form.spec.ts", "e2e/ai-expense-queue*.spec.ts"],
+  "convex/users/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
+  "convex/weekSessions/**": ["e2e/weekly-summary-bulk-ops.spec.ts"],
+  "convex/auth.config.ts": ["e2e/auth.spec.ts"],
+  "convex/http.ts": ["e2e/navigation.spec.ts", "e2e/auth.spec.ts"]
+}

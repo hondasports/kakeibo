@@ -1,6 +1,0 @@
-name: standard
-autonomy: high
-delegation: adaptive
-verification: proportional
-context:
-  strategy: on_demand

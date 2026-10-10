@@ -36,6 +36,14 @@ for (const width of [1280, 320]) {
         await seedTaxReviewDraftByUser(userId, receiptCase);
         await page.reload();
         const item = queue.locator(".ai-expense-queue-item").filter({ hasText: "E2E税内訳補完店" });
+        // 一覧の確認理由は、下書き確認と同じ判定に揃える（#997）。
+        // 解決済みなら古い金額・税内訳の理由を出さず、未解決なら隠さない。
+        if (receiptCase === "summary892") {
+          await expect(item).not.toContainText("金額・税内訳の確認が必要");
+          await expect(item).toContainText("内容確認が必要");
+        } else {
+          await expect(item).toContainText("金額・税内訳の確認が必要");
+        }
         await item.getByRole("button", { name: "確認する", exact: true }).click();
         const dialog = page.getByRole("dialog", { name: "下書き確認" });
         const banner = dialog.getByRole("region", { name: "全体の確認状態" });

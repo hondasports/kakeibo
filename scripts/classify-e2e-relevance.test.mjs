@@ -32,16 +32,10 @@ describe("E2E relevance path classification", () => {
       "docs/development-process.md",
       "skills/workspace-preflight/SKILL.md",
       ".husky/pre-commit",
-      "plugin.json",
-      "scripts/review-depth.mjs",
-      "scripts/review-depth.test.mjs",
       "scripts/check-task-worktree.mjs",
-      "scripts/check-loop-docs.mjs",
-      "scripts/check-loop-docs.test.mjs",
+      "scripts/check-task-worktree.test.mjs",
       "scripts/collect-pr-findings.mjs",
       "scripts/collect-pr-findings.test.mjs",
-      "scripts/suggest-skills.mjs",
-      "scripts/suggest-skills.test.mjs",
     ];
 
     for (const filePath of processOnlyPaths) {
@@ -49,7 +43,7 @@ describe("E2E relevance path classification", () => {
     }
   });
 
-  it("keeps runtime, workflow, harness, and environment paths E2E relevant", () => {
+  it("keeps runtime, workflow, and environment paths E2E relevant", () => {
     const runtimePaths = [
       "src/App.tsx",
       "convex/groups.ts",
@@ -134,7 +128,13 @@ describe("E2E workflow classification contract", () => {
     expect(workflow).toContain("fetch-depth: 0");
     expect(workflow).toContain("needs: classify");
     expect(workflow).toContain("needs.classify.outputs.runtime_relevant == 'true'");
-    expect(workflow).toContain("shared-dev");
+    // backend はジョブ専用の使い捨て（#956）。共有dev直列化も draft gate も残さない。
+    expect(workflow).toContain("e2e-${{ matrix.name }}-${{ github.event.pull_request.number }}");
+    expect(workflow).toContain("cancel-in-progress: true");
+    expect(workflow).toContain("start-ci-convex.mjs");
+    expect(workflow).not.toContain("shared-dev");
+    expect(workflow).not.toContain("github.event.pull_request.draft");
+    expect(workflow).not.toContain("DEV_");
     expect(workflow).toContain("name: authenticated");
     expect(workflow).toContain("printf '%s\\n' \"- runtime_relevant: \\`$RUNTIME_RELEVANT\\`\"");
     expect(workflow).toContain("printf '%s\\n' \"- reason: \\`$REASON\\`\"");

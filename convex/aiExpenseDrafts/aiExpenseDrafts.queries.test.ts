@@ -156,6 +156,9 @@ describe("aiExpenseDrafts (queries)", () => {
             { categoryId: "cat-medical", amountYen: 980 },
           ],
         },
+        items: expect.arrayContaining([
+          expect.objectContaining({ _id: "draft-item-uncategorized", itemName: "未分類品" }),
+        ]),
       }),
     ]);
   });
