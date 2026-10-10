@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isAmountAndTaxResolved,
+  isUnrelatedToAmountTaxGuidanceId,
   mapConvexDraftToAiExpenseDraft,
   mapDraftItemsToReviewItems,
   mapDraftToQueueItem,
@@ -376,5 +377,56 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
       "low_confidence",
       "ambiguous_category",
     ]);
+  });
+
+  it("割引対象を推論してから照合する（ダイアログと同じ初期化）", () => {
+    const draft = summary892Draft();
+    draft.items = [
+      ...(draft.items ?? []),
+      {
+        _id: "item-extra",
+        itemName: "追加商品",
+        amountYen: 30,
+        printedAmountYen: 30,
+        amountBasis: "tax_excluded",
+        taxRatePercent: 8,
+        taxResolutionStatus: "resolved",
+        taxResolutionSource: "item_explicit",
+        categoryId: "food",
+      },
+      {
+        _id: "item-discount",
+        itemName: "割引",
+        lineType: "discount",
+        amountYen: -30,
+        printedAmountYen: -30,
+        amountBasis: "tax_excluded",
+        taxRatePercent: 8,
+        taxResolutionStatus: "resolved",
+        taxResolutionSource: "item_explicit",
+        categoryId: "food",
+      },
+    ];
+    expect(isAmountAndTaxResolved(draft)).toBe(true);
+  });
+
+  it("税以外の明細不備（金額0円）が残る間は金額の理由を外さない", () => {
+    const draft = summary892Draft();
+    draft.items = [
+      ...(draft.items ?? []),
+      { _id: "item-zero", itemName: "無料品", amountYen: 0, categoryId: "food" },
+    ];
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toContain("amount_mismatch");
+  });
+});
+
+describe("isUnrelatedToAmountTaxGuidanceId", () => {
+  it("金額・税内訳に関係しない案内だけを除外対象にする", () => {
+    for (const id of ["document", "shopName", "date", "category", "category-1", "reading"]) {
+      expect(isUnrelatedToAmountTaxGuidanceId(id)).toBe(true);
+    }
+    for (const id of ["summary-0", "allocation", "amount-1", "aggregate", "name-1", "tax-1"]) {
+      expect(isUnrelatedToAmountTaxGuidanceId(id)).toBe(false);
+    }
   });
 });
