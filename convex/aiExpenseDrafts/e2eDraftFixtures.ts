@@ -315,7 +315,8 @@ async function createE2eSummaryReviewDraft(
       ],
     },
     warnings: [],
-    reviewReasons: [],
+    // 読み取り時に保存される理由。一覧は現在の判定と食い違わないこと（#997）。
+    reviewReasons: ["user_confirmation_required", "amount_mismatch"],
     createdAt: now,
     updatedAt: now,
   });

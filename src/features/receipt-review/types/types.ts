@@ -43,6 +43,8 @@ export type AiExpenseDraft = {
   registrationMode?: AiExpenseRegistrationMode;
   derivedRegistration?: DerivedRegistrationSnapshot;
   markerDefinitions?: Array<{ marker: string; description: string }>;
+  /** 一覧用に付与される明細（ready / needs_review のみ）。確認理由の導出に使う。 */
+  items?: AiExpenseDraftItem[];
   itemSummary?: {
     itemTotalYen: number;
     itemDifferenceYen?: number;

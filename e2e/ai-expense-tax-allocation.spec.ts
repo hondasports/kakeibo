@@ -17,10 +17,15 @@ test("#748 未配分の13明細を確認して税込合計・税額を保存後�
     await row.getByRole("button", { name: "確認する" }).click();
     const dialog = page.getByRole("dialog", { name: "下書き確認" });
     const checks = dialog.getByRole("region", { name: "確認結果", exact: true });
-    // 金額は印字どおり一致しているため金額確認カードは出さず、税率別集計カードだけが残る。
+    // 金額・税率別集計は現在の税情報で一致しているため検算カードは出さず、
+    // 未配分の税額は全体の確認状態の案内に残る（#891 / #911）。
     // 割引対象は最寄りの商品へ自動推論される。
-    await expect(checks.getByText("税率別集計")).toBeVisible();
-    await expect(checks.getByText("金額確認")).toHaveCount(0);
+    await expect(checks).toHaveCount(0);
+    await expect(
+      dialog
+        .getByRole("region", { name: "全体の確認状態" })
+        .getByText("8%の税内訳：税額を商品に配分できていません"),
+    ).toBeVisible();
     // Choose the actual discount targets without changing their tax rates.
     for (const [name, target] of [
       ["割引4", "商品3"],
@@ -42,17 +47,14 @@ test("#748 未配分の13明細を確認して税込合計・税額を保存後�
     await expect(dialog.getByRole("region", { name: "商品一覧" })).toContainText(
       "割引の対象税率が対象商品（8%）と異なります",
     );
-    // Fix each summary using the existing editor; the first editor becomes read-only after save.
+    // 税内訳の編集欄は確認が要る8%だけが出る。対象額種別は税抜印字のまま、
+    // 未配分の税額は割引の対象税率を選ぶと解消する（#911）。
     await dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true }).click();
-    for (let i = 0; i < 2; i++) {
-      const section = dialog.getByRole("region", { name: "税内訳を確認", exact: true });
-      await section.getByRole("combobox", { name: "対象額種別", exact: true }).first().click();
-      await page.getByRole("option", { name: "税抜印字", exact: true }).click();
-      await section.getByRole("button", { name: "保存", exact: true }).first().click();
-      await expect(section.getByRole("combobox", { name: "対象額種別", exact: true })).toHaveCount(
-        1 - i,
-      );
-    }
+    const section = dialog.getByRole("region", { name: "税内訳を確認", exact: true });
+    await expect(section.getByRole("combobox", { name: "対象額種別", exact: true })).toHaveCount(1);
+    await expect(section.getByRole("combobox", { name: "対象額種別", exact: true })).toHaveText(
+      "税抜印字",
+    );
     for (const name of ["割引8", "割引9"]) {
       const item = dialog.locator("details").filter({ hasText: name }).first();
       if ((await item.getAttribute("open")) === null) await item.locator("summary").click();
