@@ -8,6 +8,7 @@ import {
   mapDraftToReviewForm,
 } from "./mappers";
 import type { AiExpenseDraft } from "../types/types";
+import { getReviewPriority } from "../../../../lib/domain/aiExpenseDrafts/queue";
 import { mixedTaxReviewFixture } from "./reviewTaxPreviewTestHelpers";
 import { RECEIPT_TAX_CHOICE_FIELDS } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 
@@ -340,6 +341,29 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
     const draft = summary892Draft();
     expect(isAmountAndTaxResolved(draft)).toBe(true);
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual(["user_confirmation_required"]);
+  });
+
+  it("解決済みなら保存時の明細差額を残さず、確認の優先度を上げない", () => {
+    const itemSummary = {
+      itemTotalYen: 1729,
+      itemDifferenceYen: 53,
+      hasUncategorizedItems: false,
+      hasLowConfidenceItems: false,
+      categoryAggregates: [],
+    };
+    const resolved = mapDraftToQueueItem(summary892Draft({ itemSummary }), {});
+    expect(resolved.itemDifferenceYen).toBe(0);
+    expect(getReviewPriority(resolved)).not.toBe(0);
+
+    const conflict = summary892Draft({ itemSummary });
+    conflict.taxSummaries = conflict.taxSummaries?.map((summary) =>
+      summary.taxRatePercent === 10
+        ? { ...summary, taxableAmountBasis: "tax_excluded", status: "contradictory" }
+        : summary,
+    );
+    const unresolved = mapDraftToQueueItem(conflict, {});
+    expect(unresolved.itemDifferenceYen).toBe(53);
+    expect(getReviewPriority(unresolved)).toBe(0);
   });
 
   it("税率衝突など真の不一致は一覧に残す", () => {

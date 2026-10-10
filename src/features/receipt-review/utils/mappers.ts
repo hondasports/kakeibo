@@ -87,6 +87,7 @@ export function mapDraftToQueueItem(
   categories?: Array<{ _id: Id<"categories"> | string; name: string }>,
   previewImageDataUrl?: string,
 ): AiExpenseQueueItem {
+  const amountAndTaxResolved = isAmountAndTaxResolved(draft);
   const categoryName = categories?.find((c) => c._id === draft.categoryId)?.name;
   const categoryAggregates = draft.itemSummary?.categoryAggregates.map((aggregate) => ({
     ...aggregate,
@@ -104,9 +105,13 @@ export function mapDraftToQueueItem(
     amountYen: draft.amountYen,
     date: draft.date,
     categoryName,
-    reviewReasons: dropResolvedAmountTaxReasons(draft.reviewReasons, isAmountAndTaxResolved(draft)),
+    reviewReasons: dropResolvedAmountTaxReasons(draft.reviewReasons, amountAndTaxResolved),
     itemTotalYen: draft.itemSummary?.itemTotalYen,
-    itemDifferenceYen: draft.itemSummary?.itemDifferenceYen,
+    // 解決済みなら保存時の合計との差は残さない（確認の優先度を不要に上げない）。
+    itemDifferenceYen:
+      amountAndTaxResolved && draft.itemSummary?.itemDifferenceYen !== undefined
+        ? 0
+        : draft.itemSummary?.itemDifferenceYen,
     hasUncategorizedItems: draft.itemSummary?.hasUncategorizedItems,
     hasLowConfidenceItems: draft.itemSummary?.hasLowConfidenceItems,
     categoryAggregates,
