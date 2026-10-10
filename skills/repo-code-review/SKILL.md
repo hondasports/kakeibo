@@ -10,7 +10,7 @@ license: Apache-2.0
 
 差分またはPRをレビューするとき（セルフレビューを含む）に使う。入力は対象diff（`git diff origin/preview...HEAD` 等）、Issueの目的とAcceptance Criteria、実行済みの検証結果。
 
-レビュー観点の正本は `docs/development-process.md` の「Review / branch protection」。このskillはrepo固有の確認点だけを持つ。汎用的な指摘はCodeRabbit等に任せる。
+レビュー観点の正本は `docs/development-process.md` の「Review / branch protection」。このskillはrepo固有の確認点だけを持つが、レビューの範囲はそれに限らない。正本の観点（correctness・user impact等）に沿った汎用的な不具合も、見つけたら所見に含める。CodeRabbit等の自動レビューは補助であり、代わりにはならない。
 
 ## 読み分け
 
@@ -39,6 +39,6 @@ license: Apache-2.0
 末尾に必ず次の2つを付ける。
 
 - 変更とテストの対応表（`references/unit-test.md` の形式）
-- 独立Reviewerの要否と理由。認証・認可、永続データ・schema/migration、削除・retention、外部write/webhookに該当すれば必須
+- 独立Reviewerの要否と理由。判定条件は `docs/development-process.md` の「Review / branch protection」と `skills/security-review` の「入力・起動」に従い、ここで条件を絞らない
 
 このskillによる確認はセルフレビューであり、独立レビューと呼ばない。
