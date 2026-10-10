@@ -50,6 +50,7 @@
   ],
   "lib/usecase/aiExpenseDrafts/**": [
     "e2e/ai-expense-queue.spec.ts",
+    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
     "e2e/ai-expense-tax-allocation.spec.ts"
   ],
   "convex/categories/**": ["e2e/settings.spec.ts", "e2e/receipt-form.spec.ts"],

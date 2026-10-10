@@ -14,7 +14,8 @@ import type { AiExpenseQueueItem, AiExpenseQueueStatus } from "../../../types/ai
 import { buildReviewChecks } from "./reviewChecks";
 import { dropResolvedAmountTaxReasons } from "./reviewFeedback";
 import { getReviewGuidance } from "./reviewGuidance";
-import { buildReviewTaxPreview } from "./reviewItemsTaxPreview";
+import { initializeReviewCategoryState } from "./reviewItemCategories";
+import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 
 export const emptyReviewForm: ReviewFormValues = {
   documentType: "receipt",
@@ -25,32 +26,45 @@ export const emptyReviewForm: ReviewFormValues = {
   registrationMode: "detailed",
 };
 
-/** 税内訳・未配分・税率確認に関する案内のid。 */
-function isTaxGuidanceId(id: string): boolean {
+/**
+ * 金額・税内訳の解決に関係しない案内のid（店名・日付・カテゴリ・読み取り確認）。
+ * これ以外の案内（税内訳、未配分、割引、明細の金額不備、カテゴリ別合計など）は
+ * 金額・税内訳の理由を残す根拠にする。
+ */
+export function isUnrelatedToAmountTaxGuidanceId(id: string): boolean {
   return (
-    id.startsWith("summary-") ||
-    id.startsWith("tax-") ||
-    id.startsWith("discount") ||
-    id === "allocation"
+    id === "document" ||
+    id === "shopName" ||
+    id === "date" ||
+    id === "category" ||
+    id === "reading" ||
+    id.startsWith("category-")
   );
 }
 
 /**
- * 下書き確認ダイアログと同じ再解釈・照合で、金額と税内訳が解決済みか判定する。
+ * 下書き確認ダイアログと同じ初期化・再解釈・照合で、金額と税内訳が解決済みか判定する。
  * 明細が無い、または照合できない場合は解決済みとみなさない。
  */
 export function isAmountAndTaxResolved(draft: AiExpenseDraft): boolean {
   const paidTotalYen = draft.amountYen;
   if (!draft.items || draft.items.length === 0 || paidTotalYen === undefined) return false;
-  const form = mapDraftToReviewForm(draft);
-  const sourceItems = mapDraftItemsToReviewItems(draft.items);
-  const preview = buildReviewTaxPreview(sourceItems, {
+  const mappedForm = mapDraftToReviewForm(draft);
+  // ダイアログの useReviewFormState と同じ順序で、割引対象の推論とカテゴリ初期化を先に行う。
+  const categoryState = initializeReviewCategoryState(
+    mapDraftItemsToReviewItems(draft.items),
+    mappedForm.categoryId,
+  );
+  const form = { ...mappedForm, categoryId: categoryState.receiptCategoryId };
+  const previewArgs = {
     paidTotalYen,
     taxSummaries: draft.taxSummaries,
     markerDefinitions: draft.markerDefinitions,
     priceTaxTreatment: form.priceTaxTreatment,
     taxRateComposition: form.taxRateComposition,
-  });
+  };
+  const sourceItems = applyReviewItemsTaxPreview(categoryState.items, previewArgs);
+  const preview = buildReviewTaxPreview(sourceItems, previewArgs);
   const items = draft.taxSummaries?.length ? preview.items : sourceItems;
   const effectiveDraft = { ...draft, taxSummaries: preview.taxSummaries };
   const checks = buildReviewChecks({
@@ -64,7 +78,7 @@ export function isAmountAndTaxResolved(draft: AiExpenseDraft): boolean {
     summarySourceIndexes: preview.summarySourceIndexes,
     sourceTaxSummaries: draft.taxSummaries,
   });
-  return !guidance.some((issue) => isTaxGuidanceId(issue.id));
+  return guidance.every((issue) => isUnrelatedToAmountTaxGuidanceId(issue.id));
 }
 
 export function mapDraftToQueueItem(
