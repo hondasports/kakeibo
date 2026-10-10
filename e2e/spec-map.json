@@ -22,6 +22,7 @@
   "src/features/receipt/**": ["e2e/receipt-form.spec.ts", "e2e/receipt-image-extraction.spec.ts"],
   "src/features/receipt-review/**": [
     "e2e/ai-expense-queue.spec.ts",
+    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
     "e2e/ai-expense-tax-allocation.spec.ts"
   ],
   "src/features/settings/**": [
@@ -46,6 +47,7 @@
   "src/router.tsx": ["e2e/navigation.spec.ts", "e2e/auth.spec.ts"],
   "convex/aiExpenseDrafts/**": [
     "e2e/ai-expense-queue.spec.ts",
+    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
     "e2e/ai-expense-tax-allocation.spec.ts"
   ],
   "lib/usecase/aiExpenseDrafts/**": [
