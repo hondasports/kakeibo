@@ -262,19 +262,20 @@ describe("groups (management) (グループ作成上限)", () => {
         },
       ],
       groupMembers: [
-        ...Array.from({ length: ownedCount }, (_, index) => ({
-          _id: `owned-${index}` as Id<"groupMembers">,
-          groupId: `group-owned-${index}` as Id<"groups">,
-          userId,
-          role: "owner" as const,
-          createdAt: 1000,
-          updatedAt: 1000,
-        })),
+        // member 行を先に並べ、先頭 100 件が member でも owner を数え漏らさないことを確認する。
         ...Array.from({ length: memberCount }, (_, index) => ({
           _id: `joined-${index}` as Id<"groupMembers">,
           groupId: `group-joined-${index}` as Id<"groups">,
           userId,
           role: "member" as const,
+          createdAt: 1000,
+          updatedAt: 1000,
+        })),
+        ...Array.from({ length: ownedCount }, (_, index) => ({
+          _id: `owned-${index}` as Id<"groupMembers">,
+          groupId: `group-owned-${index}` as Id<"groups">,
+          userId,
+          role: "owner" as const,
           createdAt: 1000,
           updatedAt: 1000,
         })),
@@ -301,6 +302,21 @@ describe("groups (management) (グループ作成上限)", () => {
 
   it("member として参加しているだけのグループは上限に数えない", async () => {
     const ctx = createCtxWithMemberships(MAX_OWNED_GROUPS_PER_USER - 1, 30);
+    await expect(createGroupHandler(ctx, { name: "新しい家" })).resolves.toEqual(
+      expect.any(String),
+    );
+  });
+
+  it("先に 120 件の member 行があっても、後から付いた owner が上限なら拒否する", async () => {
+    const ctx = createCtxWithMemberships(MAX_OWNED_GROUPS_PER_USER, 120);
+    await expect(createGroupHandler(ctx, { name: "新しい家" })).rejects.toThrow(
+      "作成できるグループは",
+    );
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+  });
+
+  it("先に 120 件の member 行があっても、owner が上限未満なら作成できる", async () => {
+    const ctx = createCtxWithMemberships(MAX_OWNED_GROUPS_PER_USER - 1, 120);
     await expect(createGroupHandler(ctx, { name: "新しい家" })).resolves.toEqual(
       expect.any(String),
     );

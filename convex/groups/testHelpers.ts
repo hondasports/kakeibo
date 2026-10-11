@@ -149,6 +149,7 @@ export function createMockDb(state: {
         if (tableName === "groupMembers") {
           return (
             indexName === "by_user_id" ||
+            indexName === "by_user_id_and_role" ||
             indexName === "by_group_id" ||
             indexName === "by_group_id_and_role" ||
             indexName === "by_group_id_and_user_id"
@@ -212,6 +213,9 @@ export function createMockDb(state: {
           }
           if (indexName === "by_user_id" && "userId" in doc) {
             return doc.userId === filters.userId;
+          }
+          if (indexName === "by_user_id_and_role" && "userId" in doc && "role" in doc) {
+            return doc.userId === filters.userId && doc.role === filters.role;
           }
           if (indexName === "by_token" && "token" in doc) {
             return doc.token === filters.token;

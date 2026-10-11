@@ -8,7 +8,11 @@ const ownerId = "https://issuer.example|owner";
 const targetUserId = "https://issuer.example|target";
 
 /** group-001 の owner(actor) と member(target)。target は他グループの owner を otherOwnedCount 個持つ。 */
-function createCtx(otherOwnedCount: number, targetRoleInGroup: "member" | "owner" = "member") {
+function createCtx(
+  otherOwnedCount: number,
+  targetRoleInGroup: "member" | "owner" = "member",
+  otherMemberCount = 0,
+) {
   const ctx = createMockDb({
     users: [
       {
@@ -46,6 +50,15 @@ function createCtx(otherOwnedCount: number, targetRoleInGroup: "member" | "owner
         createdAt: 1000,
         updatedAt: 1000,
       },
+      // member 行を owner 行より先に並べ、先頭 100 件が member でも数え漏らさないことを確認する。
+      ...Array.from({ length: otherMemberCount }, (_, index) => ({
+        _id: `target-joined-${index}` as Id<"groupMembers">,
+        groupId: `group-joined-${index}` as Id<"groups">,
+        userId: targetUserId,
+        role: "member" as const,
+        createdAt: 1000,
+        updatedAt: 1000,
+      })),
       ...Array.from({ length: otherOwnedCount }, (_, index) => ({
         _id: `target-owned-${index}` as Id<"groupMembers">,
         groupId: `group-other-${index}` as Id<"groups">,
@@ -112,5 +125,28 @@ describe("groups (management) (オーナー付与時の保持上限)", () => {
     expect(ctx.db.patch).not.toHaveBeenCalled();
     expect(ctx.db.insert).not.toHaveBeenCalled();
     expect(ctx.scheduler.runAfter).not.toHaveBeenCalled();
+  });
+
+  it("changeMemberRole: 先に 120 件の member 行があっても、owner が上限なら昇格を拒否する", async () => {
+    const ctx = createCtx(MAX_OWNED_GROUPS_PER_USER, "member", 120);
+    await expect(changeMemberRoleHandler(ctx, { targetUserId, newRole: "owner" })).rejects.toThrow(
+      LIMIT_MESSAGE,
+    );
+    expect(ctx.db.patch).not.toHaveBeenCalled();
+  });
+
+  it("changeMemberRole: 先に 120 件の member 行があっても、owner が上限未満なら昇格できる", async () => {
+    const ctx = createCtx(MAX_OWNED_GROUPS_PER_USER - 1, "member", 120);
+    await expect(
+      changeMemberRoleHandler(ctx, { targetUserId, newRole: "owner" }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("transferGroupOwnership: 先に 120 件の member 行があっても、owner が上限なら譲渡を拒否する", async () => {
+    const ctx = createCtx(MAX_OWNED_GROUPS_PER_USER, "member", 120);
+    await expect(transferGroupOwnershipHandler(ctx, { targetUserId })).rejects.toThrow(
+      LIMIT_MESSAGE,
+    );
+    expect(ctx.db.patch).not.toHaveBeenCalled();
   });
 });

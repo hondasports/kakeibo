@@ -189,9 +189,11 @@ group admin から他ユーザーの Clerk アカウントを削除する機能�
 | 項目 | 上限 | 定数 | 備考 |
 | --- | --- | --- | --- |
 | 1 グループの pending 招待 | 20 件 | `MAX_PENDING_GROUP_INVITATIONS` | 同一メールへの再招待は旧 pending を `revoked` にしてから数えるため、上限到達時も可能。取り消し・承諾で枠が空く |
-| 1 ユーザーが owner のグループ数 | 10 個 | `MAX_OWNED_GROUPS_PER_USER` | `member` として参加しているだけのグループは数えない。`createGroup` で判定 |
+| 1 ユーザーが owner のグループ数 | 10 個 | `MAX_OWNED_GROUPS_PER_USER` | `member` として参加しているだけのグループは数えない。`assertOwnedGroupLimit` が `groupMembers` の `by_user_id_and_role` インデックスで owner 行だけを上限件数まで読んで判定する。`createGroup`・owner への昇格（`changeMemberRole`）・グループ owner によるオーナー譲渡に適用 |
 | 招待メールアドレス長 | 254 文字 | `MAX_EMAIL_LENGTH` | ローカル部は 64 文字まで |
 | 招待メールアドレス形式 | `@` が 1 つ、空白なし、ドメインは 2 ラベル以上 | `validateInvitationEmail` | `inviteMember` は DB 予約・Clerk 呼び出しより前に検証。`addMemberByEmail` も同じ検証を使う |
+
+**owner 数上限の適用範囲**: 上限はグループ作成、グループ owner による owner への昇格（`changeMemberRole`）、グループ owner によるオーナー譲渡（`transferGroupOwnership`）にだけ適用する。システム管理者のロール操作（`change_role` / `transfer_owner`、`lib/usecase/systemAdmin/roleOperation.ts`）とオーナー不在グループの復旧（`lib/usecase/systemAdmin/ownerlessRecovery.ts`）は、監査ログを残す特権操作であるため意図的に対象外とする。
 
 日次の送信回数など時間窓の上限は専用テーブルが必要なため未実装。Clerk 側のレート制限・Restricted sign-up 設定はオーナーが Clerk ダッシュボードで確認する。
 

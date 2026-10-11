@@ -5,23 +5,30 @@ import {
   assertOwnedGroupLimit,
   OWNED_GROUP_LIMIT_SELF_MESSAGE,
   OWNED_GROUP_LIMIT_TARGET_MESSAGE,
-  OWNED_GROUPS_SCAN_LIMIT,
 } from "./assertOwnedGroupLimit";
 
-function depsWith(ownedCount: number, memberCount = 0) {
-  const records = [
-    ...Array.from({ length: ownedCount }, (_, i) => ({ role: "owner" as const, id: `o${i}` })),
-    ...Array.from({ length: memberCount }, (_, i) => ({ role: "member" as const, id: `m${i}` })),
-  ];
-  const listByUser = vi.fn(async () => records as never);
-  return { memberships: { listByUser } };
+/** listByUserAndRole の bounded read（limit まで）を模す。 */
+function depsWith(ownedCount: number) {
+  const records = Array.from({ length: ownedCount }, (_, i) => ({
+    role: "owner" as const,
+    id: `o${i}`,
+  }));
+  const listByUserAndRole = vi.fn(
+    async (_u: string, _r: string, limit?: number) =>
+      (limit === undefined ? records : records.slice(0, limit)) as never,
+  );
+  return { memberships: { listByUserAndRole } };
 }
 
 describe("assertOwnedGroupLimit", () => {
-  it("上限未満なら通り、bounded read で走査する", async () => {
-    const deps = depsWith(MAX_OWNED_GROUPS_PER_USER - 1, 30);
+  it("上限未満なら通り、owner 行だけを上限件数までの bounded read で読む", async () => {
+    const deps = depsWith(MAX_OWNED_GROUPS_PER_USER - 1);
     await expect(assertOwnedGroupLimit(deps, "u", { subject: "target" })).resolves.toBeUndefined();
-    expect(deps.memberships.listByUser).toHaveBeenCalledWith("u", OWNED_GROUPS_SCAN_LIMIT);
+    expect(deps.memberships.listByUserAndRole).toHaveBeenCalledWith(
+      "u",
+      "owner",
+      MAX_OWNED_GROUPS_PER_USER,
+    );
   });
 
   it("上限ちょうどで subject=target なら対象向けメッセージで拒否する", async () => {
