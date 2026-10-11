@@ -3,6 +3,15 @@ import { reinterpretDraftTax } from "./reinterpretDraftTax";
 import { observationLine, unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";
 
 describe("出所不明の対象額の再計算", () => {
+  it.each(["税抜合計", "税別合計"])("税率なし%sの印字を全体設定で捨てない", (label) => {
+    const input = unprovenTargetReceipt();
+    input.rawObservationLines = [
+      { ...observationLine(`${label} 4,373円`, 4373, 0), lineRoleCandidates: ["total"] },
+    ];
+    input.decisionOverride = { priceTaxTreatment: "included", taxRateComposition: "rate10" };
+    expect(reinterpretDraftTax(input).interpretation.taxSummaries[0].taxableAmountYen).toBe(4373);
+  });
+
   it("英語SUBTOTALを支払合計の裏付けにしない", () => {
     const input = unprovenTargetReceipt();
     input.rawObservationLines![0].rawText = "SUBTOTAL 4,810円";

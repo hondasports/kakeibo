@@ -34,7 +34,7 @@ function explicitSummaryLineKind(rawText: string): "target" | "tax" | undefined 
   const explicitTarget = /対象|タイショウ|課税売上/.test(text) && !/対象(?:消費)?税/.test(text);
   if (explicitTarget) return "target";
   if (/税額|消費税|内税|外税|\(内\)税|税計|税合計|tax/i.test(text)) return "tax";
-  if (/小計/.test(text)) return "target";
+  if (/小計|^(?:税抜|税別)(?:合計|総計)|^(?:合計|総計)\(?(?:税抜|税別)/.test(text)) return "target";
   return undefined;
 }
 
