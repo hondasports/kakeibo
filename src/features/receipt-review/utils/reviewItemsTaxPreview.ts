@@ -1,3 +1,4 @@
+import type { ReceiptLineClassification } from "../../../../lib/domain/receipt/observations";
 import { reinterpretDraftTax } from "../../../../lib/receiptTax/reinterpretDraftTax";
 import type { DraftItemTaxFields } from "../../../../lib/receiptTax/draftTaxMapping";
 import type {
@@ -45,6 +46,7 @@ function reviewItemToDraftFields(item: ReviewItemValues): DraftItemTaxFields {
 }
 
 type ReviewTaxPreviewArgs = {
+  receiptLineClassifications?: ReceiptLineClassification[];
   rawObservation?: AiExpenseDraft["rawObservation"];
   receiptUserOverride?: AiExpenseDraft["receiptUserOverride"];
   paidTotalYen?: number;
@@ -87,6 +89,7 @@ export function buildReviewTaxPreview(
     items: items.map(reviewItemToDraftFields),
     taxSummaries: sourceSummaries,
     markerDefinitions: args.markerDefinitions,
+    receiptLineClassifications: args.receiptLineClassifications,
     rawObservationLines:
       args.rawObservation?.source === "ai_ocr" ? args.rawObservation.lines : undefined,
     decisionOverride: {

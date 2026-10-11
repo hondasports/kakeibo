@@ -44,6 +44,25 @@ describe("buildTaxRateCheck", () => {
       expect(check.rows[0].reason).toBeUndefined();
     });
 
+    it("tax/paymentが曖昧な対象額ラベルを直接印字として扱わない", () => {
+      const check = buildTaxRateCheck({
+        items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],
+        taxSummaries: [summary()],
+        rawObservation: rawObservation([{ rawText: "8%対象 100", amountYen: 100 }]),
+        receiptLineClassifications: [
+          {
+            sourceLineIndex: 0,
+            status: "ambiguous",
+            candidates: [
+              { role: "tax", score: 0.5, evidence: [] },
+              { role: "paymentMethodAmount", score: 0.5, evidence: [] },
+            ],
+          },
+        ],
+      });
+      expect(check.rows[0]).toMatchObject({ status: "matched", matchKind: "approx" });
+    });
+
     it("直接印字の証拠がある対象額は±1円でも不一致", () => {
       const check = buildTaxRateCheck({
         items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],

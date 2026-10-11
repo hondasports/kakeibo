@@ -23,6 +23,7 @@ export type DraftRegistrationItem = {
 export type DraftForRegistration = Pick<
   AiExpenseDraftFields,
   | "rawObservation"
+  | "receiptInterpretation"
   | "receiptUserOverride"
   | "registrationMode"
   | "receiptTotalResolution"
@@ -84,6 +85,7 @@ export function buildDraftRegistrationItems(
   if (draft.taxSummaries?.length || items.some((item) => item.taxRatePercent != null)) {
     const { itemFields, interpretation } = reinterpretDraftTax({
       amountYen: draft.amountYen!,
+      receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
       taxSummariesUserConfirmed: draft.receiptUserOverride?.fields.includes("taxSummaries"),
       items: items.map(mapDraftItemToTaxFields),
       rawObservationLines:

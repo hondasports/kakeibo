@@ -90,6 +90,8 @@ export function ReviewDialog(props: ReviewDialogProps) {
         taxSummaries: sourceDraft?.taxSummaries,
         markerDefinitions: sourceDraft?.markerDefinitions,
         rawObservation: sourceDraft?.rawObservation,
+        receiptLineClassifications:
+          sourceDraft?.receiptInterpretation?.values.receiptLineClassifications,
         receiptUserOverride: sourceDraft?.receiptUserOverride,
         priceTaxTreatment: form.priceTaxTreatment,
         taxRateComposition: form.taxRateComposition,
@@ -100,6 +102,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
       sourceDraft?.taxSummaries,
       sourceDraft?.markerDefinitions,
       sourceDraft?.rawObservation,
+      sourceDraft?.receiptInterpretation,
       sourceDraft?.receiptUserOverride,
       form.priceTaxTreatment,
       form.taxRateComposition,
@@ -157,6 +160,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
     paidTotalYen,
     taxSummaries: draft?.taxSummaries,
     rawObservation: draft?.rawObservation,
+    receiptLineClassifications: draft?.receiptInterpretation?.values.receiptLineClassifications,
   });
   const unresolvedTaxItemCount = items.filter(
     (item) => buildTaxContextFromReviewItem(item).status === "unresolved",

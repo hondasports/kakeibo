@@ -1,5 +1,8 @@
 import { taxSummaryEvidenceLines } from "../../../../lib/domain/receipt/tax/summaryEvidence";
-import type { ReceiptRawObservation } from "../../../../lib/domain/receipt/observations";
+import type {
+  ReceiptLineClassification,
+  ReceiptRawObservation,
+} from "../../../../lib/domain/receipt/observations";
 import type { AmountBasis, TaxMode, TaxRatePercent } from "../../../../lib/receiptTax/types";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
@@ -45,11 +48,13 @@ function hasDirectPrintEvidence(
   summary: TaxSummary,
   rawObservation: ReceiptRawObservation | undefined,
   singleSummary: boolean,
+  classifications?: ReceiptLineClassification[],
 ): boolean {
   return (
     rawObservation?.source === "ai_ocr" &&
     taxSummaryEvidenceLines(rawObservation.lines, summary.taxRatePercent, "target", {
       singleSummary,
+      classifications,
     }).some((line) => line.amountYen === summary.taxableAmountYen)
   );
 }
@@ -58,6 +63,7 @@ export function buildTaxRateCheck(args: {
   items: ReviewItemValues[];
   taxSummaries?: AiExpenseDraft["taxSummaries"];
   rawObservation?: ReceiptRawObservation;
+  receiptLineClassifications?: ReceiptLineClassification[];
 }): ReviewTaxRateCheck {
   const summaries = args.taxSummaries ?? [];
   const items = args.items;
@@ -113,7 +119,12 @@ export function buildTaxRateCheck(args: {
           ? "ユーザー修正"
           : summary.valueOrigin?.source === "items"
             ? "商品から計算"
-            : hasDirectPrintEvidence(summary, args.rawObservation, summaries.length === 1)
+            : hasDirectPrintEvidence(
+                  summary,
+                  args.rawObservation,
+                  summaries.length === 1,
+                  args.receiptLineClassifications,
+                )
               ? "OCR原文"
               : "出所未確認の対象額",
     };
@@ -177,6 +188,7 @@ export function buildTaxRateCheck(args: {
       summary,
       args.rawObservation,
       summaries.length === 1,
+      args.receiptLineClassifications,
     );
     if (approxAllowed && Math.abs(differenceYen) === 1)
       return { ...base, currentYen, differenceYen, status: "matched", matchKind: "approx" };

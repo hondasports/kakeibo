@@ -31,6 +31,20 @@ function draft(
 }
 
 describe("ReceiptTaxSummarySection", () => {
+  it("決済行の税額ラベルを根拠として表示しない", () => {
+    render(
+      <ReceiptTaxSummarySection
+        draft={{
+          ...draft({ status: "coherent" }),
+          rawObservation: rawObservation([
+            { rawText: "カード決済 消費税額96円", amountYen: 96, lineRoleCandidates: ["payment"] },
+          ]),
+        }}
+      />,
+    );
+    expect(screen.queryByText(/原文 1行目/)).not.toBeInTheDocument();
+  });
+
   it("coherent サマリは読み取り専用で表示する", () => {
     render(<ReceiptTaxSummarySection draft={draft({ status: "coherent" })} />);
 

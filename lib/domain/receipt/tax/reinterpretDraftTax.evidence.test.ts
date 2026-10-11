@@ -3,6 +3,36 @@ import { reinterpretDraftTax } from "./reinterpretDraftTax";
 import { observationLine, unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";
 
 describe("出所不明の対象額の再計算", () => {
+  it.each(["payment", "change", "ambiguous", "classified"] as const)(
+    "%s の税額らしい金額を対象額の補正に使わない",
+    (kind) => {
+      const input = unprovenTargetReceipt();
+      input.rawObservationLines![1].rawText = "カード決済 消費税額437円";
+      if (kind === "payment" || kind === "change") {
+        input.rawObservationLines![1].lineRoleCandidates = [kind];
+      } else {
+        input.receiptLineClassifications = [
+          {
+            sourceLineIndex: 1,
+            status: kind === "ambiguous" ? "ambiguous" : "classified",
+            candidates:
+              kind === "ambiguous"
+                ? [
+                    { role: "tax", score: 0.5, evidence: [] },
+                    { role: "paymentMethodAmount", score: 0.5, evidence: [] },
+                  ]
+                : [{ role: "paymentMethodAmount", score: 1, evidence: [] }],
+          },
+        ];
+      }
+      const result = reinterpretDraftTax(input);
+      expect(result.interpretation.taxSummaries[0].taxableAmountYen).toBe(4373);
+      expect(result.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(
+        true,
+      );
+    },
+  );
+
   it.each([
     "税込10% 消費税額",
     "消費税合計10%",
