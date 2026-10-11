@@ -198,6 +198,8 @@ export const createE2eTaxReviewDraftForUser = internalMutation({
     secondaryCategoryId: v.optional(v.id("categories")),
     receiptCase: v.optional(
       v.union(
+        v.literal("unproven1003"),
+        v.literal("printed1003"),
         v.literal("basis890"),
         v.literal("basis890_264"),
         v.literal("summary892"),

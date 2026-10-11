@@ -46,14 +46,11 @@ export function groupAuditQueryType(queryType: GroupSearchType): SearchAuditQuer
 
 export type SystemAdminEnvironment = "development" | "preview" | "production";
 
-/** APP_ENV を systemAdmin 検索の environment 表示値へ解決する。未設定は development。 */
+/** APP_ENV を systemAdmin 検索の environment 表示値へ解決する。未設定・未知値は失敗（fail-closed）。 */
 export function resolveSystemAdminSearchEnvironment(
   env: string | undefined,
 ): { success: true; environment: SystemAdminEnvironment } | { success: false } {
-  if (env === undefined || env === "development") {
-    return { success: true, environment: "development" };
-  }
-  if (env === "preview" || env === "production") {
+  if (env === "development" || env === "preview" || env === "production") {
     return { success: true, environment: env };
   }
   return { success: false };

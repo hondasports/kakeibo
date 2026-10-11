@@ -51,4 +51,18 @@ describe("real モードのガード", () => {
       ).rejects.toThrow(ConvexError);
     });
   });
+
+  it.each([undefined, "prod", "Production"])(
+    "APP_ENV=%s では mode 未設定・mock でも mock 抽出に落とさず拒否する",
+    async (appEnv) => {
+      for (const mode of [undefined, "mock"]) {
+        await withEnv({ RECEIPT_IMAGE_EXTRACTOR_MODE: mode, APP_ENV: appEnv }, async () => {
+          const ctx = createActionCtx(createIdentity());
+          await expect(
+            extractReceiptFieldsHandler(ctx, { imageDataUrl: VALID_IMAGE_DATA_URL }),
+          ).rejects.toThrow("APP_ENV");
+        });
+      }
+    },
+  );
 });

@@ -770,7 +770,7 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
 
     const basisSelect = dialog.getByRole("combobox", { name: "対象額種別" });
     await basisSelect.click();
-    await page.getByRole("option", { name: "税込印字" }).click();
+    await page.getByRole("option", { name: "税込" }).click();
 
     const taxIncludedAmountInput = dialog.getByRole("spinbutton", { name: "税込合計" });
     await taxIncludedAmountInput.fill("1060");
@@ -784,7 +784,7 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
       dialog.getByText("内税として読み取りましたが、対象額は税抜として読み取られています"),
     ).toHaveCount(0);
     await expect(dialog.getByText("税込額と支払合計が一致しません")).toHaveCount(0);
-    await expect(dialog.getByLabel("税率別集計", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByLabel("税率別集計", { exact: true })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "税内訳を修正" })).toHaveCount(0);
 
     await dialog.getByRole("button", { name: "この内容で保存" }).click();
@@ -800,6 +800,6 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
     await readyItem.getByRole("button", { name: "修正する" }).click();
     await expect(dialog).toBeVisible();
     await dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true }).click();
-    await expect(dialog.getByLabel("税率別集計", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByLabel("税率別集計", { exact: true })).toBeVisible();
   });
 });

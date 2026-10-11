@@ -147,12 +147,14 @@ export function planDraftTaxInterpretation(
 ): TaxInterpretationPlan {
   const { interpretation, itemFields } = reinterpretDraftTax({
     amountYen: draft.amountYen,
+    taxSummariesUserConfirmed: draft.receiptUserOverride?.fields.includes("taxSummaries"),
     receiptTotalSource: args.receiptTotalSource ?? resolveReceiptTotalSource(draft),
     receiptTotalConfidence: draft.confidence.amountYen,
     receiptTotalSupportingCandidates: resolveReceiptTotalSupportingCandidates(draft),
     taxSummaries: draft.taxSummaries ?? [],
     markerDefinitions: draft.markerDefinitions,
-    rawObservationLines: draft.rawObservation?.lines,
+    rawObservationLines:
+      draft.rawObservation?.source === "ai_ocr" ? draft.rawObservation.lines : undefined,
     receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
     items: items.map(mapDraftItemToTaxFields),
     override: args.override,

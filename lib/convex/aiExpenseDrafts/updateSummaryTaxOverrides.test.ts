@@ -127,6 +127,23 @@ describe("updateSummaryTaxOverridesHandler", () => {
     expect(result.items[0].taxResolutionStatus).toBe("resolved");
   });
 
+  it("税額だけの編集は対象額の不明な出所と個別編集情報を保存後も維持する", async () => {
+    const { ctx } = createCtx();
+    for (const taxYen of [97, 98]) {
+      const result = await updateSummaryTaxOverridesHandler(
+        ctx,
+        { draftId: DRAFT_ID, summaryIndex: 0, taxYen },
+        GROUP_ID,
+      );
+      expect(result.draft.taxSummaries![0]).toMatchObject({
+        taxableAmountYen: 960,
+        taxYen,
+        valueOrigin: { source: "unknown" },
+        userEditedFields: ["taxYen"],
+      });
+    }
+  });
+
   it("少なくとも1つの override フィールドが必要", async () => {
     const { ctx } = createCtx();
     await expect(

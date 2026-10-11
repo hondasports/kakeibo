@@ -21,10 +21,10 @@ describe("assertValidImageDataUrl", () => {
 });
 
 describe("resolveExtractionPlan", () => {
-  it("mode 未設定・非production は mock", () => {
+  it("mode 未設定・development は mock", () => {
     expect(
       resolveExtractionPlan({
-        appEnv: undefined,
+        appEnv: "development",
         extractorMode: undefined,
         openAiApiKey: undefined,
       }),
@@ -43,14 +43,22 @@ describe("resolveExtractionPlan", () => {
     ).toThrow("RECEIPT_IMAGE_EXTRACTOR_MODE は mock または real のどちらかを指定してください");
   });
 
-  it("real × 非production はガード文言（APP_ENV 既定 development を含む）", () => {
+  it("real × development はガード文言", () => {
     expect(() =>
-      resolveExtractionPlan({ appEnv: undefined, extractorMode: "real", openAiApiKey: "k" }),
+      resolveExtractionPlan({ appEnv: "development", extractorMode: "real", openAiApiKey: "k" }),
     ).toThrow("real モードは APP_ENV=production のときのみ利用できます（現在: development）");
-    expect(() =>
-      resolveExtractionPlan({ appEnv: "preview", extractorMode: "real", openAiApiKey: "k" }),
-    ).toThrow("（現在: preview）");
   });
+
+  it.each([undefined, "", "prod", "Production", "preview", "staging"])(
+    "APP_ENV が未設定・不正（%s）なら mode に関わらず fail-closed で拒否する",
+    (appEnv) => {
+      for (const extractorMode of [undefined, "mock", "real"]) {
+        expect(() => resolveExtractionPlan({ appEnv, extractorMode, openAiApiKey: "k" })).toThrow(
+          /APP_ENV.*development.*production/,
+        );
+      }
+    },
+  );
 
   it("real × production × キー未設定は APIキー文言", () => {
     expect(() =>

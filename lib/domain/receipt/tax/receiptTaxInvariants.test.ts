@@ -226,3 +226,11 @@ describe("receiptTax invariants", () => {
     expect(a).toEqual(b);
   });
 });
+
+it("再計算した対象額でも税額配分と登録合計を保存する", async () => {
+  const { reinterpretDraftTax } = await import("./reinterpretDraftTax");
+  const { unprovenTargetReceipt } = await import("./fixtures/unprovenTargetReceipt");
+  const result = reinterpretDraftTax(unprovenTargetReceipt());
+  expect(result.itemFields.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(437);
+  expect(result.itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0)).toBe(4810);
+});

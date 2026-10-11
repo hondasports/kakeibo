@@ -44,3 +44,21 @@ describe("getResolveExtractorModeErrorMessage", () => {
     expect(getResolveExtractorModeErrorMessage(error)).toBe(expected);
   });
 });
+
+describe("resolveExtractorMode の APP_ENV allow-list", () => {
+  it.each([undefined, "", "prod", "Production", "preview"])(
+    "APP_ENV=%s は mode 未設定でも mock に落とさず拒否する",
+    (appEnv) => {
+      expect(resolveExtractorMode({ appEnv, mode: undefined })).toEqual({
+        error: "invalid_app_env",
+      });
+      expect(resolveExtractorMode({ appEnv, mode: "mock" })).toEqual({
+        error: "invalid_app_env",
+      });
+    },
+  );
+
+  it("invalid_app_env の文言は APP_ENV を名指しする", () => {
+    expect(getResolveExtractorModeErrorMessage("invalid_app_env")).toMatch(/APP_ENV/);
+  });
+});

@@ -22,6 +22,9 @@ export type DraftRegistrationItem = {
 /** 登録可否判定に必要な下書きの形状。 */
 export type DraftForRegistration = Pick<
   AiExpenseDraftFields,
+  | "rawObservation"
+  | "receiptInterpretation"
+  | "receiptUserOverride"
   | "registrationMode"
   | "receiptTotalResolution"
   | "amountYen"
@@ -82,7 +85,11 @@ export function buildDraftRegistrationItems(
   if (draft.taxSummaries?.length || items.some((item) => item.taxRatePercent != null)) {
     const { itemFields, interpretation } = reinterpretDraftTax({
       amountYen: draft.amountYen!,
+      receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
+      taxSummariesUserConfirmed: draft.receiptUserOverride?.fields.includes("taxSummaries"),
       items: items.map(mapDraftItemToTaxFields),
+      rawObservationLines:
+        draft.rawObservation?.source === "ai_ocr" ? draft.rawObservation.lines : undefined,
       taxSummaries: (draft.taxSummaries ?? []) as ExtractedTaxSummary[],
       markerDefinitions: draft.markerDefinitions as ReceiptMarkerDefinition[] | undefined,
     });

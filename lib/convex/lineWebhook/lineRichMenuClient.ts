@@ -2,6 +2,7 @@
  * LINE リッチメニュー適用クライアント（infrastructure adapter）。
  * scripts/apply-line-rich-menu.ts から直接利用される運用ツール。
  */
+import { APP_ENV_INVALID_MESSAGE, parseKnownAppEnv } from "../../domain/common/appEnv";
 import { getLineIntegrationMode } from "../lineLink/lineIntegrationConfig";
 import {
   LINE_RICH_MENU_NAME,
@@ -54,7 +55,10 @@ function readAccessToken(): string {
 
 function assertApplyAllowed(dryRun: boolean): void {
   if (dryRun) return;
-  if (process.env.APP_ENV === "production") {
+  // 実 apply は development と明示された環境のみ許可する（deny-list にしない）
+  const appEnv = parseKnownAppEnv(process.env.APP_ENV);
+  if (appEnv === undefined) throw new Error(APP_ENV_INVALID_MESSAGE);
+  if (appEnv === "production") {
     throw new Error("LINE rich menu apply is not available in production");
   }
 }
