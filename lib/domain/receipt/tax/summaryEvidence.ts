@@ -69,6 +69,15 @@ export function hasPrintedTaxSummaryEvidence(
   classifications?: ReceiptLineClassification[],
 ): boolean {
   return independentSummaryLines(lines, classifications).some((line) => {
+    // 金額のない明確な税率宣言だけを除き、読めない内税・外税は保護する。
+    if (
+      line.amountYen === null &&
+      !line.amountText?.trim() &&
+      /^(?:※)?(?:(?:消費|適用)?税率|taxrate)[:：]?\(?\d+(?:\.\d+)?%\)?$/i.test(
+        normalizedText(line.rawText),
+      )
+    )
+      return false;
     if (taxSummaryLineKind(line.rawText) !== undefined) return true;
     // 読み取れない税内訳や税率付き金額も独立した証拠として残す。
     return (

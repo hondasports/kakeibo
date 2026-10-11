@@ -583,3 +583,72 @@ it("即時保存の処理中と失敗を区別し、失敗時も税内訳の再�
     screen.getByRole("region", { name: "8%の税内訳を修正" }).querySelector("summary"),
   ).toBeVisible();
 });
+
+it("未保存の全体設定から作った税内訳も表示し、保存後は編集できる", async () => {
+  const user = userEvent.setup();
+  const onTaxSummaryChange = vi.fn();
+  const baseDraft = { ...props.selectedReviewDraft!, amountYen: 100, taxSummaries: [] };
+  const form = {
+    ...props.reviewForm,
+    amountYen: "100",
+    priceTaxTreatment: "included" as const,
+    taxRateComposition: "rate10" as const,
+  };
+  const reviewItems = [
+    {
+      id: "item",
+      itemName: "商品",
+      amountYen: "100",
+      printedAmountYen: 100,
+      amountBasis: "tax_included" as const,
+      taxRatePercent: 10 as const,
+      taxResolutionStatus: "resolved" as const,
+      categoryId: "food",
+    },
+  ];
+  const { rerender } = render(
+    <ReviewDialog
+      {...props}
+      selectedReviewDraft={baseDraft}
+      reviewForm={form}
+      reviewItems={reviewItems}
+      onTaxSummaryChange={onTaxSummaryChange}
+    />,
+  );
+  expect(screen.getByRole("region", { name: "10%の税内訳を確認" })).toBeInTheDocument();
+  expect(
+    screen.getByText(/全体税設定を保存すると、税内訳を個別に修正できます/),
+  ).toBeInTheDocument();
+  expect(onTaxSummaryChange).not.toHaveBeenCalled();
+  rerender(
+    <ReviewDialog
+      {...props}
+      selectedReviewDraft={{
+        ...baseDraft,
+        taxSummaries: [
+          {
+            taxRatePercent: 10,
+            taxMode: "included",
+            taxableAmountYen: 100,
+            taxableAmountBasis: "tax_included",
+            taxYen: 9,
+            taxIncludedAmountYen: 100,
+            roundingMethod: "round",
+            warnings: [],
+            valueOrigin: { source: "items" },
+          },
+        ],
+      }}
+      reviewForm={form}
+      reviewItems={reviewItems}
+      onTaxSummaryChange={onTaxSummaryChange}
+    />,
+  );
+  const editor = screen.getByRole("region", { name: "10%の税内訳を修正" });
+  await user.click(editor.querySelector("summary")!);
+  const target = within(editor).getByRole("spinbutton", { name: "対象額" });
+  await user.clear(target);
+  await user.type(target, "99");
+  await user.click(within(editor).getByRole("button", { name: "保存" }));
+  expect(onTaxSummaryChange).toHaveBeenCalledWith(0, { taxableAmountYen: 99 });
+});

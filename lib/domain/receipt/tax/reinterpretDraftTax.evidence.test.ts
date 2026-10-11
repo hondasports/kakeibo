@@ -12,6 +12,37 @@ describe("出所不明の対象額の再計算", () => {
     expect(reinterpretDraftTax(input).interpretation.taxSummaries[0].taxableAmountYen).toBe(4373);
   });
 
+  it.each([
+    "10%対象 読取不能",
+    "消費税額10% 読取不能",
+    "内税10% 判読不能",
+    "外税10% 判読不能",
+    "消費税10% 999",
+  ])("読めない金額のラベル%sは捨てない", (rawText) => {
+    const input = unprovenTargetReceipt();
+    input.taxSummaries = [];
+    input.rawObservationLines = [
+      { ...observationLine(rawText, 0, 0), amountYen: null, amountText: null },
+    ];
+    input.decisionOverride = { priceTaxTreatment: "included", taxRateComposition: "rate10" };
+    expect(reinterpretDraftTax(input).interpretation.taxSummaries).toEqual([]);
+  });
+
+  it("金額のない税率宣言は全体税設定からの内訳作成を止めない", () => {
+    const input = unprovenTargetReceipt();
+    input.taxSummaries = [];
+    input.rawObservationLines = [
+      { ...observationLine("消費税率10%", 0, 0), amountYen: null, amountText: null },
+    ];
+    input.decisionOverride = { priceTaxTreatment: "included", taxRateComposition: "rate10" };
+    const result = reinterpretDraftTax(input);
+    expect(result.interpretation.taxSummaries[0]).toMatchObject({
+      taxableAmountYen: 4810,
+      status: "verified",
+    });
+    expect(result.itemFields.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+  });
+
   it("英語SUBTOTALを支払合計の裏付けにしない", () => {
     const input = unprovenTargetReceipt();
     input.rawObservationLines![0].rawText = "SUBTOTAL 4,810円";
