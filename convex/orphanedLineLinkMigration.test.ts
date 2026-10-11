@@ -306,6 +306,43 @@ describe("orphaned LINE link migration", () => {
     expect(await tableCounts(t, "issuer|O1")).toEqual(full);
   });
 
+  it("退会リクエストが読み取り上限を超えるときは、進行中が上限の外にあっても安全側で削除しない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    await seedLineData(t, "issuer|O1");
+    // 完了済み(終端)の退会リクエストを CHILD_LIMIT(50) 件より多く作り、進行中の1件を最後(読み取り上限の外)に置く。
+    // 先頭 51 件しか読まない判定だと、進行中を見落として孤立と誤判定し、不可逆に削除してしまう。
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 60; i += 1) {
+        await ctx.db.insert("accountDeletionRequests", {
+          userId: "issuer|O1",
+          clerkUserId: `clerk-o1-${i}`,
+          status: "completed",
+          leftGroupCount: 0,
+          deletedGroupCount: 0,
+          attemptCount: 0,
+          maxAttempts: 6,
+          createdAt: i,
+          updatedAt: i,
+        });
+      }
+      await ctx.db.insert("accountDeletionRequests", {
+        userId: "issuer|O1",
+        clerkUserId: "clerk-o1-in-progress",
+        status: "identity_deleted",
+        leftGroupCount: 0,
+        deletedGroupCount: 0,
+        attemptCount: 0,
+        maxAttempts: 6,
+        createdAt: 1000,
+        updatedAt: 1000,
+      });
+    });
+
+    const results = await runAll(t);
+    expect(results.reduce((n, r) => n + r.deletedLinks + r.sweptRows, 0)).toBe(0);
+    expect(await tableCounts(t, "issuer|O1")).toEqual(full);
+  });
+
   it("完了済みの退会リクエストを持つ孤立ユーザーは削除対象になる", async () => {
     const t = convexTest(schema, convexTestModules);
     await seedLineData(t, "issuer|O1");

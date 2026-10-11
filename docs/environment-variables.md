@@ -100,7 +100,10 @@ Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email
 > `real` mode は `APP_ENV=production` のときのみ許可する。
 >
 > **`APP_ENV` は全デプロイで必須**。許可値は `development` / `production` の完全一致のみ（`prod` や `Production` は不正）。
-> mock / 開発専用の挙動は `APP_ENV=development` と明示された場合だけ許可する allow-list 方式で、未設定・不正値は production とも development とも見なさず fail-closed にする。
+> 未設定・不正値は production とも development とも見なさず fail-closed にする（黙って mock や開発専用の挙動に落ちない）。許可の条件は対象ごとに異なる:
+>
+> - **LINE 連携の mock mode と、リッチメニューの実 apply**: `APP_ENV=development` と明示された場合だけ許可する（allow-list）。`production` は拒否する。
+> - **レシート画像抽出**: `APP_ENV` が `development` / `production` のどちらかに確定していることが前提で、その上で `RECEIPT_IMAGE_EXTRACTOR_MODE` に従う。`real` は `production` のみ。`mock` は、`RECEIPT_IMAGE_EXTRACTOR_MODE=mock` と**明示**されていれば `production` でも動く（既存の挙動）。この PR が除いたのは、`APP_ENV` や mode が未設定のときの「黙った mock フォールバック」であり、明示的な mock 指定の禁止ではない。
 >
 > | 対象 | `APP_ENV` 未設定・不正値のとき |
 > | --- | --- |

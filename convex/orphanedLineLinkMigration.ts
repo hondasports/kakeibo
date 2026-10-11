@@ -130,7 +130,10 @@ async function classifyUser(ctx: ReadCtx, userId: string): Promise<UserState> {
     .withIndex("by_user_id", (q) => q.eq("userId", userId))
     .take(CHILD_LIMIT + 1);
   const inProgress = requests.some((request) => !TERMINAL_DELETION_STATUSES.has(request.status));
-  return inProgress ? "in_progress_deletion" : "orphan";
+  // 読み取り上限(CHILD_LIMIT + 1)に達した場合、残りに進行中のリクエストがあるかを判断できない。
+  // 削除は不可逆なので、判断できないときは孤立とみなさず安全側(削除しない)に倒す。
+  const truncated = requests.length > CHILD_LIMIT;
+  return inProgress || truncated ? "in_progress_deletion" : "orphan";
 }
 
 async function takeChildren(ctx: ReadCtx, table: ChildTable, userId: string) {
