@@ -1,4 +1,5 @@
-import type { ReceiptRawObservationLine } from "../observations";
+import { isNonTaxEvidenceLine } from "./interpretTaxEvidence";
+import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
 import type { ExtractedReceiptItem, ExtractedTaxSummary } from "./types";
 
 function normalizedText(rawText: string): string {
@@ -48,21 +49,32 @@ function taxSummaryLineKind(rawText: string): "target" | "tax" | undefined {
   return undefined;
 }
 
+function independentSummaryLines(
+  lines: ReceiptRawObservationLine[] | undefined,
+  classifications: ReceiptLineClassification[] | undefined,
+): ReceiptRawObservationLine[] {
+  const byIndex = new Map(classifications?.map((entry) => [entry.sourceLineIndex, entry]));
+  return (lines ?? []).filter(
+    (line) =>
+      line.explicitlyPrinted &&
+      !isItemOrDiscountOnly(line) &&
+      !isNonTaxEvidenceLine(line, byIndex.get(line.sourceLineIndex)),
+  );
+}
+
 /** 独立した印字税内訳がある場合だけ、全体選択によるサマリの置換を止める。 */
 export function hasPrintedTaxSummaryEvidence(
   lines: ReceiptRawObservationLine[] | undefined,
+  classifications?: ReceiptLineClassification[],
 ): boolean {
-  return (
-    lines?.some((line) => {
-      if (!line.explicitlyPrinted || isItemOrDiscountOnly(line)) return false;
-      if (taxSummaryLineKind(line.rawText) !== undefined) return true;
-      // 読み取れない税内訳や税率付き金額も独立した証拠として残す。
-      return (
-        line.lineRoleCandidates.some((role) => role === "tax" || role === "subtotal") ||
-        (line.amountYen !== null && /%/.test(normalizedText(line.rawText)))
-      );
-    }) ?? false
-  );
+  return independentSummaryLines(lines, classifications).some((line) => {
+    if (taxSummaryLineKind(line.rawText) !== undefined) return true;
+    // 読み取れない税内訳や税率付き金額も独立した証拠として残す。
+    return (
+      line.lineRoleCandidates.some((role) => role === "tax" || role === "subtotal") ||
+      (line.amountYen !== null && /%/.test(normalizedText(line.rawText)))
+    );
+  });
 }
 
 /** 原文の役割と税率を照合する。単一内訳に帰属できる対象額・税額だけ税率省略を許す。 */
@@ -70,11 +82,9 @@ export function taxSummaryEvidenceLines(
   lines: ReceiptRawObservationLine[] | undefined,
   rate: number,
   kind: "target" | "tax",
-  options: { singleSummary?: boolean } = {},
+  options: { singleSummary?: boolean; classifications?: ReceiptLineClassification[] } = {},
 ): ReceiptRawObservationLine[] {
-  const independentLines = (lines ?? []).filter(
-    (line) => line.explicitlyPrinted && !isItemOrDiscountOnly(line),
-  );
+  const independentLines = independentSummaryLines(lines, options.classifications);
   const canAssignRateLessLine =
     options.singleSummary === true &&
     !independentLines.some((line) => hasConflictingRate(line.rawText, rate));
@@ -97,9 +107,10 @@ export function recalculateUnprovenSummary(args: {
   items: ExtractedReceiptItem[];
   summaries: ExtractedTaxSummary[];
   lines?: ReceiptRawObservationLine[];
+  classifications?: ReceiptLineClassification[];
 }): ExtractedTaxSummary[] {
   const { items, summaries, amountYen } = args;
-  const lines = args.lines?.filter((line) => !isItemOrDiscountOnly(line));
+  const lines = independentSummaryLines(args.lines, args.classifications);
   if (summaries.length !== 1 || items.length === 0 || !lines?.length) return summaries;
   const summary = summaries[0];
   if (summary.valueOrigin?.source === "user") return summaries;

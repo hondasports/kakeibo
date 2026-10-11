@@ -61,6 +61,7 @@ export function isAmountAndTaxResolved(draft: AiExpenseDraft): boolean {
     taxSummaries: draft.taxSummaries,
     markerDefinitions: draft.markerDefinitions,
     rawObservation: draft.rawObservation,
+    receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
     receiptUserOverride: draft.receiptUserOverride,
     priceTaxTreatment: form.priceTaxTreatment,
     taxRateComposition: form.taxRateComposition,
@@ -74,6 +75,7 @@ export function isAmountAndTaxResolved(draft: AiExpenseDraft): boolean {
     paidTotalYen,
     taxSummaries: effectiveDraft.taxSummaries,
     rawObservation: draft.rawObservation,
+    receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
   });
   if (checks.amount.status !== "matched" || checks.taxRate.status !== "matched") return false;
   const guidance = getReviewGuidance(form, items, effectiveDraft, {

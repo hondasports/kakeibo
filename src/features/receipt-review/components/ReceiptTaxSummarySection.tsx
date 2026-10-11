@@ -49,7 +49,10 @@ export function ReceiptTaxSummarySection({
           draft?.rawObservation?.source === "ai_ocr" ? draft.rawObservation.lines : undefined,
           summary.taxRatePercent,
           "target",
-          { singleSummary: summaries.length === 1 },
+          {
+            singleSummary: summaries.length === 1,
+            classifications: draft?.receiptInterpretation?.values.receiptLineClassifications,
+          },
         );
         const sourceLabel =
           summary.valueOrigin?.source === "user"
@@ -104,7 +107,11 @@ export function ReceiptTaxSummarySection({
                     draft.rawObservation.lines,
                     summary.taxRatePercent,
                     "tax",
-                    { singleSummary: summaries.length === 1 },
+                    {
+                      singleSummary: summaries.length === 1,
+                      classifications:
+                        draft?.receiptInterpretation?.values.receiptLineClassifications,
+                    },
                   ),
                 ].map((line) => (
                   <Typography variant="body2" key={line.sourceLineIndex}>

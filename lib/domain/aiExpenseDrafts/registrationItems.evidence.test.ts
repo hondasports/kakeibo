@@ -111,3 +111,40 @@ it.each(["target", "tax-mode", "subtotal", "missing-raw"])(
     );
   },
 );
+
+it.each(["classified", "ambiguous"] as const)(
+  "%s な決済行では保存・登録時にも税額を確定しない",
+  (status) => {
+    const { draft, items } = fixture();
+    draft.rawObservation!.lines[1].rawText = "カード決済 消費税額437円";
+    draft.receiptInterpretation = {
+      source: "ai",
+      interpretedAt: 0,
+      values: {
+        status: draft.status,
+        documentType: draft.documentType,
+        confidence: draft.confidence,
+        warnings: [],
+        reviewReasons: [],
+        items: [],
+        receiptLineClassifications: [
+          {
+            sourceLineIndex: 1,
+            status,
+            candidates:
+              status === "ambiguous"
+                ? [
+                    { role: "tax", score: 0.5, evidence: [] },
+                    { role: "paymentMethodAmount", score: 0.5, evidence: [] },
+                  ]
+                : [{ role: "paymentMethodAmount", score: 1, evidence: [] }],
+          },
+        ],
+      },
+    };
+    const plan = planDraftTaxInterpretation(draft, items, {}, 1);
+    expect(plan.draftPatch.status).toBe("needs_review");
+    expect(plan.draftPatch.taxSummaries![0].taxableAmountYen).toBe(4373);
+    expect(() => buildDraftRegistrationItems(draft, items)).toThrow(/税額または税込登録額が未確定/);
+  },
+);

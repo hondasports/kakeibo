@@ -72,6 +72,7 @@ export function getReviewGuidance(
       items,
       taxSummaries: draft?.taxSummaries,
       rawObservation: draft?.rawObservation,
+      receiptLineClassifications: draft?.receiptInterpretation?.values.receiptLineClassifications,
     });
     draft?.taxSummaries?.forEach((summary, index) => {
       const sourceIndex = taxSummaryContext?.summarySourceIndexes?.[index] ?? index;

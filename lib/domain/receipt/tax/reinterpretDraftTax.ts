@@ -193,7 +193,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
   const canSynthesizeDecision =
     selectedRate !== undefined &&
     selectedBasis !== undefined &&
-    !hasPrintedTaxSummaryEvidence(input.rawObservationLines) &&
+    !hasPrintedTaxSummaryEvidence(input.rawObservationLines, input.receiptLineClassifications) &&
     !sourceTaxSummaries.some(
       (summary) =>
         summary.valueOrigin?.source === "user" || (summary.userEditedFields?.length ?? 0) > 0,
@@ -230,6 +230,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
         items,
         summaries: sourceTaxSummaries,
         lines: input.rawObservationLines,
+        classifications: input.receiptLineClassifications,
       });
 
   const userItemPriceWasEdited =

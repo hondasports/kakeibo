@@ -65,6 +65,8 @@ export function useReviewTaxSummaryOverrides({
             taxSummaries: result.draft.taxSummaries,
             markerDefinitions: result.draft.markerDefinitions,
             rawObservation: result.draft.rawObservation,
+            receiptLineClassifications:
+              result.draft.receiptInterpretation?.values.receiptLineClassifications,
             receiptUserOverride: result.draft.receiptUserOverride,
           }),
         ),
