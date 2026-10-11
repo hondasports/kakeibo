@@ -29,17 +29,32 @@ export function hasPrintedTaxSummaryEvidence(
   );
 }
 
-/** 原文の役割と税率を照合する。数値の一致だけでは印字証拠にしない。 */
+/** 原文の役割と税率を照合する。単一内訳に帰属できる対象額だけ税率省略を許す。 */
 export function taxSummaryEvidenceLines(
   lines: ReceiptRawObservationLine[] | undefined,
   rate: number,
   kind: "target" | "tax",
+  options: { singleSummary?: boolean } = {},
 ): ReceiptRawObservationLine[] {
+  const canAssignRateLessTarget =
+    kind === "target" &&
+    options.singleSummary === true &&
+    !(lines ?? []).some((line) => {
+      if (!line.explicitlyPrinted) return false;
+      const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
+      const rates = [...text.matchAll(/(\d+(?:\.\d+)?)%/g)];
+      return (
+        rates.length !== (text.match(/%/g)?.length ?? 0) ||
+        rates.some((match) => Number(match[1]) !== rate)
+      );
+    });
   return (lines ?? []).filter((line) => {
     if (!line.explicitlyPrinted || !Number.isSafeInteger(line.amountYen)) return false;
     const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
     const rateMatch = /(?<!\d)(0|8|10)%/.exec(text);
-    if (!rateMatch || Number(rateMatch[1]) !== rate) return false;
+    if (rateMatch) {
+      if (Number(rateMatch[1]) !== rate) return false;
+    } else if (!canAssignRateLessTarget || text.includes("%")) return false;
     return taxSummaryLineKind(line.rawText) === kind;
   });
 }
