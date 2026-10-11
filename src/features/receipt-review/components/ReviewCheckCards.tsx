@@ -168,7 +168,7 @@ function TaxRateCheckBody({ check }: { check: ReviewTaxRateCheck }) {
                 color: row.status === "mismatch" ? "error.main" : undefined,
               }}
             >
-              現在 {yen(row.currentYen)} ／ 印字 {yen(row.printedYen)}
+              現在 {yen(row.currentYen)} ／ {row.sourceLabel ?? "対象額"} {yen(row.printedYen)}
             </Typography>
           </Stack>
           {row.status === "mismatch" && row.differenceYen !== undefined && (

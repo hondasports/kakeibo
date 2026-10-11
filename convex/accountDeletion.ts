@@ -37,6 +37,7 @@ import {
   markIdentityDeleted as markIdentityDeletedUsecase,
   scheduleAccountDeletionRetry,
 } from "../lib/usecase/accountDeletion/requestMutations";
+import { recoverStrandedAccountDeletions as recoverStrandedAccountDeletionsUsecase } from "../lib/usecase/accountDeletion/recoverStrandedAccountDeletions";
 import { finalizeAccountDeletion as finalizeAccountDeletionUsecase } from "../lib/usecase/accountDeletion/finalizeAccountDeletion";
 
 /** テスト・他ドメインからの直接 import 互換シム。 */
@@ -207,5 +208,13 @@ export const cleanupCompletedRequests = internalMutation({
   args: {},
   handler: async (ctx) => {
     await cleanupCompletedAccountDeletionRequests(createAccountDeletionMutationDeps(ctx));
+  },
+});
+
+/** Clerk 削除済みで failed になった退会リクエストを cron から自動復旧する（本人は再試行できないため）。 */
+export const recoverStrandedRequests = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    await recoverStrandedAccountDeletionsUsecase(createAccountDeletionMutationDeps(ctx));
   },
 });

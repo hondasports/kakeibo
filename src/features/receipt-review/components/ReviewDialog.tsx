@@ -89,6 +89,10 @@ export function ReviewDialog(props: ReviewDialogProps) {
         paidTotalYen,
         taxSummaries: sourceDraft?.taxSummaries,
         markerDefinitions: sourceDraft?.markerDefinitions,
+        rawObservation: sourceDraft?.rawObservation,
+        receiptLineClassifications:
+          sourceDraft?.receiptInterpretation?.values.receiptLineClassifications,
+        receiptUserOverride: sourceDraft?.receiptUserOverride,
         priceTaxTreatment: form.priceTaxTreatment,
         taxRateComposition: form.taxRateComposition,
       }),
@@ -97,6 +101,9 @@ export function ReviewDialog(props: ReviewDialogProps) {
       paidTotalYen,
       sourceDraft?.taxSummaries,
       sourceDraft?.markerDefinitions,
+      sourceDraft?.rawObservation,
+      sourceDraft?.receiptInterpretation,
+      sourceDraft?.receiptUserOverride,
       form.priceTaxTreatment,
       form.taxRateComposition,
     ],
@@ -123,13 +130,11 @@ export function ReviewDialog(props: ReviewDialogProps) {
     summarySourceIndexes: preview.summarySourceIndexes,
     sourceTaxSummaries: sourceDraft?.taxSummaries,
   });
-  const editableSummaries = guidance.flatMap((issue) => {
-    if (issue.taxSummaryIndex === undefined) return [];
-    const sourceIndex = preview.summarySourceIndexes[issue.taxSummaryIndex];
-    return sourceIndex !== undefined && sourceIndex >= 0
-      ? [{ summaryIndex: issue.taxSummaryIndex, sourceIndex, message: issue.message }]
-      : [];
-  });
+  const editableSummaries = preview.summarySourceIndexes.map((sourceIndex, summaryIndex) => ({
+    summaryIndex,
+    sourceIndex,
+    message: guidance.find((issue) => issue.taxSummaryIndex === summaryIndex)?.message,
+  }));
   const required = guidance.filter((issue) => issue.required);
   const recommendations = guidance.filter((issue) => !issue.required && issue.scope !== "receipt");
   const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");
@@ -149,6 +154,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
     paidTotalYen,
     taxSummaries: draft?.taxSummaries,
     rawObservation: draft?.rawObservation,
+    receiptLineClassifications: draft?.receiptInterpretation?.values.receiptLineClassifications,
   });
   const unresolvedTaxItemCount = items.filter(
     (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
@@ -190,7 +196,6 @@ export function ReviewDialog(props: ReviewDialogProps) {
     setExpanded((current) => ({
       ...current,
       [target]: true,
-      ...(target.startsWith("tax-summary-") ? { reference: true } : {}),
     }));
     pendingJump.current = target;
   };
@@ -203,6 +208,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
     if (target === null) return;
     pendingJump.current = null;
     const section = sections.current.get(target);
+    if (section?.tagName === "DETAILS") section.setAttribute("open", "");
     section?.scrollIntoView?.({ block: "start", behavior: "instant" });
     const invalid = section?.querySelector<HTMLElement>(
       '[role="combobox"][aria-invalid="true"],input[aria-invalid="true"]:not([aria-hidden="true"])',
@@ -336,6 +342,18 @@ export function ReviewDialog(props: ReviewDialogProps) {
                     />
                   </Box>
                 )}
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  aria-label="保存状態"
+                  aria-live="polite"
+                >
+                  {busy
+                    ? "変更を保存しています…"
+                    : reviewError
+                      ? "変更を保存できませんでした。内容を確認して再試行してください。"
+                      : "商品の税率・税込／税抜は変更ごとに下書きへ保存されます。金額・名前・カテゴリは最後の「この内容で保存」で保存します。支出への登録は一覧から行います。"}
+                </Typography>
                 <ReviewDialogBasicsSection
                   form={form}
                   categories={categories}

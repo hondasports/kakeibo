@@ -1,3 +1,4 @@
+import type { ReceiptLineClassification } from "../../../../lib/domain/receipt/observations";
 import { reinterpretDraftTax } from "../../../../lib/receiptTax/reinterpretDraftTax";
 import type { DraftItemTaxFields } from "../../../../lib/receiptTax/draftTaxMapping";
 import type {
@@ -45,6 +46,9 @@ function reviewItemToDraftFields(item: ReviewItemValues): DraftItemTaxFields {
 }
 
 type ReviewTaxPreviewArgs = {
+  receiptLineClassifications?: ReceiptLineClassification[];
+  rawObservation?: AiExpenseDraft["rawObservation"];
+  receiptUserOverride?: AiExpenseDraft["receiptUserOverride"];
   paidTotalYen?: number;
   taxSummaries?: AiExpenseDraft["taxSummaries"];
   markerDefinitions?: AiExpenseDraft["markerDefinitions"];
@@ -81,9 +85,13 @@ export function buildReviewTaxPreview(
   const sourceSummaries = toExtractedTaxSummaries(args.taxSummaries ?? []);
   const { itemFields, interpretation } = reinterpretDraftTax({
     amountYen: paidTotalYen,
+    taxSummariesUserConfirmed: args.receiptUserOverride?.fields.includes("taxSummaries"),
     items: items.map(reviewItemToDraftFields),
     taxSummaries: sourceSummaries,
     markerDefinitions: args.markerDefinitions,
+    receiptLineClassifications: args.receiptLineClassifications,
+    rawObservationLines:
+      args.rawObservation?.source === "ai_ocr" ? args.rawObservation.lines : undefined,
     decisionOverride: {
       priceTaxTreatment: args.priceTaxTreatment,
       taxRateComposition: args.taxRateComposition,
@@ -112,9 +120,24 @@ export function buildReviewTaxPreview(
 
   // 再解釈は同一サマリの重複を除く。保持されるconfidenceの参照で保存先を追跡する。
   // ユーザーの全体選択から合成されたサマリには元の編集フォームがない。
-  const summarySourceIndexes = interpretation.taxSummaries.map((summary) =>
-    sourceSummaries.findIndex((source) => source.confidence === summary.confidence),
-  );
+  const summarySourceIndexes = interpretation.taxSummaries.map((summary) => {
+    const originalIndex = sourceSummaries.findIndex(
+      (source) => source.confidence === summary.confidence,
+    );
+    if (originalIndex >= 0) return originalIndex;
+    // 保存済みの合成結果は値が同じ場合だけ元の編集先へ戻す。
+    const fields = [
+      "taxRatePercent",
+      "taxMode",
+      "taxableAmountYen",
+      "taxableAmountBasis",
+      "taxYen",
+      "taxIncludedAmountYen",
+    ] as const;
+    return sourceSummaries.findIndex((source) =>
+      fields.every((field) => source[field] === summary[field]),
+    );
+  });
   const taxSummaries = interpretation.taxSummaries.map((summary, index) => {
     const source = sourceSummaries[summarySourceIndexes[index]];
     if (

@@ -24,6 +24,14 @@ crons.interval(
   {},
 );
 
+// Clerk 削除済みで failed の退会リクエストを再駆動（identityDeletedAt から 14 日まで・1 回 10 件）。
+crons.interval(
+  "recover stranded account deletion requests",
+  { hours: 6 },
+  internal.accountDeletion.recoverStrandedRequests,
+  {},
+);
+
 crons.interval(
   "recover stale LINE notification jobs",
   { minutes: 1 },

@@ -3,6 +3,7 @@
  * グループとオーナーメンバーシップを作成し、作成者の activeGroupId を設定する。
  */
 import type { UsecaseGroupContext } from "../context";
+import { assertOwnedGroupLimit } from "./assertOwnedGroupLimit";
 import type { GroupMutationDeps } from "./deps";
 import { normalizeGroupNameOrThrow } from "./validation";
 
@@ -13,6 +14,9 @@ export async function createGroup(
 ): Promise<string> {
   await deps.accountDeletion.assertNotInProgress(ctx.userId);
   const name = normalizeGroupNameOrThrow(args.name);
+
+  // owner として保持するグループ数を制限する（無制限のグループ作成→大量招待の踏み台を防ぐ）。
+  await assertOwnedGroupLimit(deps, ctx.userId, { subject: "self" });
 
   const now = Date.now();
   const groupId = await deps.groups.insert({

@@ -754,7 +754,7 @@ LINE Login channel secret、Messaging API channel secret、Messaging API channel
 pnpm run line:rich-menu
 ```
 
-3. 問題なければ apply する。`APP_ENV=production` では拒否される。
+3. 問題なければ apply する。`APP_ENV=development` 以外（`production`・未設定・不正値）では拒否される。
 
 ```bash
 APP_ENV=development LINE_INTEGRATION_MODE=real pnpm run line:rich-menu -- --apply

@@ -186,6 +186,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user_id", ["userId"])
+    // オーナー保持数の上限判定（ユーザーの owner 行だけを bounded read する）用。
+    .index("by_user_id_and_role", ["userId", "role"])
     .index("by_group_id", ["groupId"])
     .index("by_group_id_and_role", ["groupId", "role"])
     .index("by_group_id_and_user_id", ["groupId", "userId"]),
@@ -775,6 +777,7 @@ export default defineSchema({
   })
     .index("by_user_id", ["userId"])
     .index("by_status_and_updated_at", ["status", "updatedAt"])
+    .index("by_status_and_identity_deleted_at", ["status", "identityDeletedAt"])
     .index("by_next_retry_at", ["nextRetryAt"]),
 
   accountDeletionGroupPurges: defineTable({

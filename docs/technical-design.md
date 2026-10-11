@@ -449,6 +449,25 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   ctx.db/ctx.scheduler の直接アクセスはゼロ。`convex/accountDeletionActions.ts` は
   `"use node"` の Clerk 連携 action として骨格を維持し、エラー分類のみ
   ドメイン関数へ置き換えた。
+- **failed の自動復旧**: Clerk ユーザー削除後（`identityDeletedAt` あり）に finalize が
+  上限回数まで失敗して `failed` になると、本人は認証できず `retryAccountDeletion` を呼べない。
+  そのため cron（6 時間毎、`recoverStrandedRequests`）が `failed` かつ `identityDeletedAt` ありの
+  リクエストを `retryAccountDeletion` と同じ再開遷移（`resumeFailedAccountDeletion`）で
+  再駆動する。対象は index `by_status_and_identity_deleted_at`（`status`, `identityDeletedAt`）で
+  `failed` かつ `identityDeletedAt` が 14 日以内の行だけを直接読む（再試行可能な `failed` が大量にあっても対象が押し出されない）。
+  読む候補は最大 200 件（`STRANDED_RECOVERY_CANDIDATE_CAP`）で、`updatedAt` 昇順（最後に触った時刻が古い順）に
+  並べ替えて先頭 10 件を再駆動する。再駆動して再び `failed` に戻った行は `updatedAt` が新しくなり後ろへ回るため、
+  失敗し続ける行が先頭を占有して他の行が 14 日の期限まで試行されない事態を防ぐ（新規 field なしのローテーション）。
+  候補が 200 件を超えたら `console.error("Account deletion recovery saturated", ...)` で運用者に警告する。
+  14 日を超えたものは別クエリで最大 20 件だけ `console.error("Account deletion recovery abandoned", ...)` で
+  運用者に通知し（`expiredLogged` / `expiredTruncated` 付き）、再駆動はしない。`failed` のまま残るため
+  運用者が対応するまで毎回再ログされる。`identityDeletedAt` 未設定の `failed` は本人の手動再試行対象で、読まず触らない。
+  併せて `markDeletingIdentity` は Clerk 削除前の状態からのみ遷移し、
+  古い scheduled run が `failed` を巻き戻して Clerk 削除を再実行しないようにした。一方 `markIdentityDeleted` は
+  Clerk 削除の成功という取り消せない事実を記録するため、並行する古い action が `failed` / `retry_wait` 等へ進めていても
+  `completed` と記録済み状態（`identity_deleted` / `finalization_retry_wait`）以外なら受け付け、`identityDeletedAt` を
+  設定して `identity_deleted` へ進める（拒否すると本人は認証不能・自動復旧対象外で孤立するため）。
+  `finalizeAccountDeletion` は finalize 可能な状態かつ全 purge が `completed` の場合のみユーザー行を削除する。
 - **状態遷移・エラー文言・メール payload/dedupe キー・子ジョブ生成の冪等性は
   不変**。internal endpoint 名と戻り値も維持する。
 

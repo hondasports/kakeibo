@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TaxSummaryConsistencyReason } from "../../../../lib/receiptTax/types";
+import { rawObservation } from "../utils/reviewChecksTestHelpers";
 import { ReceiptTaxSummarySection } from "./ReceiptTaxSummarySection";
 
 function draft(
@@ -30,13 +31,82 @@ function draft(
 }
 
 describe("ReceiptTaxSummarySection", () => {
+  it.each(["税抜合計", "税別合計"])("単一内訳の税率なし%sも対象額の原文として表示する", (label) => {
+    render(
+      <ReceiptTaxSummarySection
+        draft={{
+          ...draft({ status: "coherent" }),
+          rawObservation: rawObservation([
+            { rawText: `${label} 1,060円`, amountYen: 1060, lineRoleCandidates: ["total"] },
+          ]),
+        }}
+      />,
+    );
+    expect(screen.getByText(/OCR原文の対象額/)).toBeInTheDocument();
+    expect(screen.getByText(`原文 1行目：${label} 1,060円`)).toBeInTheDocument();
+  });
+
+  it("決済行の税額ラベルを根拠として表示しない", () => {
+    render(
+      <ReceiptTaxSummarySection
+        draft={{
+          ...draft({ status: "coherent" }),
+          rawObservation: rawObservation([
+            { rawText: "カード決済 消費税額96円", amountYen: 96, lineRoleCandidates: ["payment"] },
+          ]),
+        }}
+      />,
+    );
+    expect(screen.queryByText(/原文 1行目/)).not.toBeInTheDocument();
+  });
+
   it("coherent サマリは読み取り専用で表示する", () => {
     render(<ReceiptTaxSummarySection draft={draft({ status: "coherent" })} />);
 
     expect(screen.getByLabelText("税率別集計")).toBeInTheDocument();
-    expect(screen.getByText("10% 内税")).toBeInTheDocument();
+    expect(screen.getAllByText("10% 内税").length).toBeGreaterThan(0);
     expect(screen.getByText("対象額 1,060円（税込）")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+  });
+
+  it.each(["対象額", "小計"])("単一内訳では税率なし%sの印字を出所と根拠に表示する", (label) => {
+    render(
+      <ReceiptTaxSummarySection
+        draft={{
+          ...draft({ status: "coherent" }),
+          rawObservation: rawObservation([{ rawText: `${label} 1,060円`, amountYen: 1060 }]),
+        }}
+      />,
+    );
+    expect(screen.getByText(/OCR原文の対象額/)).toBeInTheDocument();
+    expect(screen.getByText(`原文 1行目：${label} 1,060円`)).toBeInTheDocument();
+  });
+
+  it("複数内訳では税率なし対象額をどの税率にも流用しない", () => {
+    const input = draft({ status: "coherent" });
+    render(
+      <ReceiptTaxSummarySection
+        draft={{
+          ...input,
+          taxSummaries: [input.taxSummaries[0], { ...input.taxSummaries[0], taxRatePercent: 8 }],
+          rawObservation: rawObservation([{ rawText: "対象額 1,060円", amountYen: 1060 }]),
+        }}
+      />,
+    );
+    expect(screen.queryByText(/OCR原文の対象額/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/原文 1行目/)).not.toBeInTheDocument();
+  });
+
+  it("単一内訳の税率なし税額も原文の根拠に表示する", () => {
+    render(
+      <ReceiptTaxSummarySection
+        draft={{
+          ...draft({ status: "coherent" }),
+          rawObservation: rawObservation([{ rawText: "消費税額 96円", amountYen: 96 }]),
+        }}
+      />,
+    );
+    expect(screen.getByText("原文 1行目：消費税額 96円")).toBeInTheDocument();
   });
 
   it("conflicting サマリは編集可能な表示になる", () => {
@@ -48,7 +118,7 @@ describe("ReceiptTaxSummarySection", () => {
     );
 
     expect(screen.getByLabelText("税率別集計")).toBeInTheDocument();
-    expect(screen.getByText("10% 内税")).toBeInTheDocument();
+    expect(screen.getAllByText("10% 内税").length).toBeGreaterThan(0);
     expect(
       screen.getByText("税率別対象額・税額・支払合計の金額が一致しません"),
     ).toBeInTheDocument();
@@ -83,6 +153,7 @@ describe("ReceiptTaxSummarySection", () => {
     render(
       <ReceiptTaxSummarySection
         draft={draft({ status: "coherent" })}
+        onSummaryChange={vi.fn()}
         editableSummaries={[
           {
             summaryIndex: 0,

@@ -20,6 +20,11 @@ function line(
 }
 
 describe("classifyReceiptLines", () => {
+  it("SUBTOTALの文字列だけから支払合計候補を作らない", () => {
+    const [result] = classifyReceiptLines([line("SUBTOTAL 4,810円", 4810, 0)]);
+    expect(result.candidates.some((candidate) => candidate.role === "totalCandidate")).toBe(false);
+  });
+
   it("OCRで税額が誤読されても内税ラベルをtaxとして扱う", () => {
     const [result] = classifyReceiptLines([line("内税 58円", 56, 8, ["item", "unknown"])], {
       taxAmountsYen: [58],

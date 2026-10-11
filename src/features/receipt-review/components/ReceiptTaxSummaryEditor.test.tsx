@@ -88,7 +88,7 @@ describe("ReceiptTaxSummaryEditor", () => {
 
     const basisSelect = screen.getByRole("combobox", { name: "対象額種別" });
     await user.click(basisSelect);
-    await user.click(screen.getByRole("option", { name: "税込印字" }));
+    await user.click(screen.getByRole("option", { name: "税込" }));
 
     await user.click(screen.getByRole("button", { name: "保存" }));
 
