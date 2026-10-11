@@ -49,6 +49,7 @@ export function ReceiptTaxSummarySection({
           draft?.rawObservation?.source === "ai_ocr" ? draft.rawObservation.lines : undefined,
           summary.taxRatePercent,
           "target",
+          { singleSummary: summaries.length === 1 },
         );
         const sourceLabel =
           summary.valueOrigin?.source === "user"

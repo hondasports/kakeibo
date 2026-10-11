@@ -56,6 +56,38 @@ describe("buildTaxRateCheck", () => {
       expect(check.rows[0].differenceYen).toBe(1);
     });
 
+    it.each(["対象額", "小計"])("単一内訳の税率なし%sも直接印字として±1円を許容しない", (label) => {
+      const check = buildTaxRateCheck({
+        items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],
+        taxSummaries: [summary()],
+        rawObservation: rawObservation([{ rawText: `${label} 100`, amountYen: 100 }]),
+      });
+      expect(check.rows[0]).toMatchObject({
+        status: "mismatch",
+        sourceLabel: "OCR原文",
+        differenceYen: 1,
+      });
+    });
+
+    it.each(["10%対象 200", "税率 ?% 200"])(
+      "別税率や不明税率の原文%sがあれば税率なし対象額を帰属させない",
+      (rawText) => {
+        const check = buildTaxRateCheck({
+          items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],
+          taxSummaries: [summary()],
+          rawObservation: rawObservation([
+            { rawText: "対象額 100", amountYen: 100 },
+            { rawText, amountYen: 200 },
+          ]),
+        });
+        expect(check.rows[0]).toMatchObject({
+          status: "matched",
+          matchKind: "approx",
+          sourceLabel: "出所未確認の対象額",
+        });
+      },
+    );
+
     it("直接印字の証拠がない対象額は±1円を近似一致として扱う", () => {
       const check = buildTaxRateCheck({
         items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],

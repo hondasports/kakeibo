@@ -44,12 +44,13 @@ export type ReviewTaxRateCheck = {
 function hasDirectPrintEvidence(
   summary: TaxSummary,
   rawObservation: ReceiptRawObservation | undefined,
+  singleSummary: boolean,
 ): boolean {
   return (
     rawObservation?.source === "ai_ocr" &&
-    taxSummaryEvidenceLines(rawObservation.lines, summary.taxRatePercent, "target").some(
-      (line) => line.amountYen === summary.taxableAmountYen,
-    )
+    taxSummaryEvidenceLines(rawObservation.lines, summary.taxRatePercent, "target", {
+      singleSummary,
+    }).some((line) => line.amountYen === summary.taxableAmountYen)
   );
 }
 
@@ -112,7 +113,7 @@ export function buildTaxRateCheck(args: {
           ? "ユーザー修正"
           : summary.valueOrigin?.source === "items"
             ? "商品から計算"
-            : hasDirectPrintEvidence(summary, args.rawObservation)
+            : hasDirectPrintEvidence(summary, args.rawObservation, summaries.length === 1)
               ? "OCR原文"
               : "出所未確認の対象額",
     };
@@ -172,7 +173,11 @@ export function buildTaxRateCheck(args: {
     const differenceYen = currentYen - summary.taxableAmountYen;
     if (differenceYen === 0)
       return { ...base, currentYen, differenceYen, status: "matched", matchKind: "exact" };
-    const approxAllowed = !hasDirectPrintEvidence(summary, args.rawObservation);
+    const approxAllowed = !hasDirectPrintEvidence(
+      summary,
+      args.rawObservation,
+      summaries.length === 1,
+    );
     if (approxAllowed && Math.abs(differenceYen) === 1)
       return { ...base, currentYen, differenceYen, status: "matched", matchKind: "approx" };
     return { ...base, currentYen, differenceYen, status: "mismatch" };
