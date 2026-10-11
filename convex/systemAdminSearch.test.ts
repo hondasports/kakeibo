@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
@@ -78,6 +78,30 @@ async function seed(t: ReturnType<typeof convexTest>) {
 }
 
 describe("system admin search and detail API", () => {
+  // APP_ENV 未設定は fail-closed のため、環境ラベルを明示して検証する
+  beforeEach(() => {
+    vi.stubEnv("APP_ENV", "development");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("APP_ENVが未設定・不正なら検索を拒否する（developmentへフォールバックしない）", async () => {
+    const t = convexTest(schema, convexTestModules);
+    await seed(t);
+    const admin = t.withIdentity(identity("admin"));
+    for (const appEnv of ["", "prod", "Production"]) {
+      vi.stubEnv("APP_ENV", appEnv);
+      await expect(
+        admin.action(api.systemAdminSearch.searchUsers, {
+          queryType: "email",
+          query: "   ",
+          paginationOpts: { numItems: 1, cursor: null },
+        }),
+      ).rejects.toThrow("APP_ENVが正しく設定されていません");
+    }
+  });
+
   it("空白だけのユーザー検索を条件なし一覧として実行する", async () => {
     const t = convexTest(schema, convexTestModules);
     await seed(t);

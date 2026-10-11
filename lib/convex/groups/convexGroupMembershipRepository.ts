@@ -31,6 +31,13 @@ function createMembershipRead(ctx: Pick<QueryCtx, "db">): GroupMembershipReadRep
       const docs = limit === undefined ? await readQueryDocs(query) : await query.take(limit);
       return docs.map(memberDocToFields);
     },
+    async listByUserAndRole(userId, role, limit) {
+      const query = ctx.db
+        .query("groupMembers")
+        .withIndex("by_user_id_and_role", (q) => q.eq("userId", userId).eq("role", role));
+      const docs = limit === undefined ? await readQueryDocs(query) : await query.take(limit);
+      return docs.map(memberDocToFields);
+    },
     async paginateByUser(userId, cursor, limit) {
       const page = await ctx.db
         .query("groupMembers")

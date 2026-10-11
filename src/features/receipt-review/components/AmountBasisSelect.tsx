@@ -22,8 +22,8 @@ export function AmountBasisSelect({
       size="small"
       value={value ?? "unknown"}
     >
-      <MenuItem value="tax_included">税込印字</MenuItem>
-      <MenuItem value="tax_excluded">税抜印字</MenuItem>
+      <MenuItem value="tax_included">税込</MenuItem>
+      <MenuItem value="tax_excluded">税抜</MenuItem>
       <MenuItem value="unknown">不明</MenuItem>
     </TextField>
   );

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { WebhookEventPayload } from "resend";
 import type { ActionCtx } from "../../_generated/server";
-import { createResendWebhookHandler } from "./resendWebhook";
+import { MAX_RESEND_WEBHOOK_BODY_BYTES, createResendWebhookHandler } from "./resendWebhook";
 
 // PublicHttpAction は callable として型付けされていないため、テストでは any として呼び出す
 const asAny = (value: unknown): any => value as any;
@@ -35,11 +35,19 @@ function createActionCtx(): ActionCtx {
 
 function createRequest({ body, headers }: { body: string; headers: Record<string, string> }): {
   text: () => Promise<string>;
+  body: ReadableStream<Uint8Array>;
   headers: { get: (name: string) => string | null };
 } {
   const headersMap = new Map(Object.entries(headers));
   return {
     text: () => Promise.resolve(body),
+    // ハンドラーは署名検証前に body をサイズ上限付きでストリーム読み込みする
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(body));
+        controller.close();
+      },
+    }),
     headers: {
       get: (name: string) => (headersMap.get(name) ?? null) as string | null,
     },
@@ -181,5 +189,51 @@ describe("createResendWebhookHandler", () => {
 
     expect(response.status).toBe(200);
     expect(ctx.runMutation).not.toHaveBeenCalled();
+  });
+
+  it("returns 413 for oversize bodies before verification or processing", async () => {
+    const verifier = vi.fn();
+    const handler = createResendWebhookHandler(verifier);
+    const ctx = createActionCtx();
+    const req = createRequest({
+      body: "x".repeat(MAX_RESEND_WEBHOOK_BODY_BYTES + 1),
+      headers: { "svix-id": "id-1", "svix-timestamp": "1000", "svix-signature": "sig" },
+    });
+
+    const response = (await asAny(handler)(ctx, req as any)) as MockResponse;
+
+    expect(response.status).toBe(413);
+    expect(verifier).not.toHaveBeenCalled();
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+  });
+
+  it("returns 413 for oversize bodies even when the secret is missing", async () => {
+    delete process.env.RESEND_WEBHOOK_SECRET;
+    const handler = createResendWebhookHandler(vi.fn());
+    const req = createRequest({
+      body: "x".repeat(MAX_RESEND_WEBHOOK_BODY_BYTES + 1),
+      headers: {},
+    });
+
+    const response = (await asAny(handler)(createActionCtx(), req as any)) as MockResponse;
+
+    expect(response.status).toBe(413);
+  });
+
+  it("verifies the exact raw body for payloads at the size limit", async () => {
+    const body = "x".repeat(MAX_RESEND_WEBHOOK_BODY_BYTES);
+    const verifier = vi.fn(
+      () => asAny({ type: "email.delivered", data: {} }) as WebhookEventPayload,
+    );
+    const handler = createResendWebhookHandler(verifier);
+    const req = createRequest({
+      body,
+      headers: { "svix-id": "id-1", "svix-timestamp": "1000", "svix-signature": "sig" },
+    });
+
+    const response = (await asAny(handler)(createActionCtx(), req as any)) as MockResponse;
+
+    expect(response.status).toBe(200);
+    expect(verifier).toHaveBeenCalledWith(expect.objectContaining({ payload: body }));
   });
 });

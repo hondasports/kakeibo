@@ -186,6 +186,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user_id", ["userId"])
+    // オーナー保持数の上限判定（ユーザーの owner 行だけを bounded read する）用。
+    .index("by_user_id_and_role", ["userId", "role"])
     .index("by_group_id", ["groupId"])
     .index("by_group_id_and_role", ["groupId", "role"])
     .index("by_group_id_and_user_id", ["groupId", "userId"]),

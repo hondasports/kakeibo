@@ -6,6 +6,7 @@ import { ConvexError } from "convex/values";
 import { getGroupAdminErrorMessage, validateNotSelfOperator } from "../../domain/groups/admin";
 import { formatGroupRoleLabel, type GroupRole } from "../../domain/groups/role";
 import type { UsecaseGroupContext } from "../context";
+import { assertOwnedGroupLimit } from "./assertOwnedGroupLimit";
 import type { GroupMutationDeps } from "./deps";
 
 export async function changeMemberRole(
@@ -42,6 +43,11 @@ export async function changeMemberRole(
 
   if (currentRole === "owner" && args.newRole === "member") {
     await deps.ownerTransition.assertAnotherOwnerRemains(ctx.groupId, targetMembership.id);
+  }
+
+  // 新たに owner を増やす昇格のみ、対象ユーザーの owner 保持数上限を確認する。
+  if (args.newRole === "owner" && currentRole !== "owner") {
+    await assertOwnedGroupLimit(deps, args.targetUserId, { subject: "target" });
   }
 
   const now = Date.now();
