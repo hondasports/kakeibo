@@ -23,4 +23,15 @@ describe("resolveLineIntegrationMode", () => {
   it("productionのmockを拒否する", () => {
     expect(() => resolveLineIntegrationMode("mock", "production")).toThrow();
   });
+
+  it.each([undefined, "", "prod", "Production", "preview"])(
+    "APP_ENV=%sのmockは拒否する（fail-closed）",
+    (appEnv) => {
+      expect(() => resolveLineIntegrationMode("mock", appEnv)).toThrow(/APP_ENV/);
+    },
+  );
+
+  it("realはAPP_ENVが未設定でも従来どおり許可する", () => {
+    expect(resolveLineIntegrationMode("real", undefined)).toBe("real");
+  });
 });

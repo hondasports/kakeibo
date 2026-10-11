@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -51,6 +51,14 @@ async function addAdmin(
 }
 
 describe("system admin authorization lifecycle", () => {
+  // APP_ENV 未設定は fail-closed のため、環境ラベルを明示して検証する
+  beforeEach(() => {
+    vi.stubEnv("APP_ENV", "development");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("未認証・未登録・revokedはcontextを返し、管理APIは拒否する", async () => {
     const t = convexTest(schema, convexTestModules);
     const users = await seedUsers(t, ["revoked"]);
