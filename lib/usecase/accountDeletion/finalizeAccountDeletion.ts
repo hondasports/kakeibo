@@ -24,6 +24,9 @@ export async function finalizeAccountDeletion(
 
   const purgeRelations = await deps.purges.takeByRequest(args.requestId, GROUP_BATCH_SIZE);
   if (purgeRelations.length > 0) {
+    // identity_deleted へ進んだ時点で全 purge は completed のはず。未完了が残るなら中途半端な削除を避ける。
+    if (purgeRelations.some((relation) => relation.status !== "completed"))
+      throw new ConvexError("Account deletion purge is not completed");
     for (const relation of purgeRelations) {
       await deps.purges.delete(relation.id);
     }

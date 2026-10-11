@@ -31,7 +31,9 @@ export const processAccountDeletion = internalAction({
       );
       if (purgeState !== "ready") return;
     }
-    await ctx.runMutation(internal.accountDeletion.markDeletingIdentity, args);
+    // 状態遷移が許可されない（failed など）場合は Clerk 削除を再実行しない。
+    const marked = await ctx.runMutation(internal.accountDeletion.markDeletingIdentity, args);
+    if (!marked) return;
     try {
       if (process.env.APP_ENV === "production") {
         const secretKey = process.env.CLERK_SECRET_KEY;
@@ -50,7 +52,11 @@ export const processAccountDeletion = internalAction({
         return;
       }
     }
-    await ctx.runMutation(internal.accountDeletion.markIdentityDeleted, args);
+    const identityDeleted = await ctx.runMutation(
+      internal.accountDeletion.markIdentityDeleted,
+      args,
+    );
+    if (!identityDeleted) return;
     try {
       await ctx.runMutation(internal.accountDeletion.finalizeAccountDeletion, args);
     } catch {
