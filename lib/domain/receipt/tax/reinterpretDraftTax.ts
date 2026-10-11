@@ -16,7 +16,7 @@ import type {
   TaxRatePercent,
 } from "./types";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
-import { recalculateUnprovenSummary } from "./summaryEvidence";
+import { hasPrintedTaxSummaryEvidence, recalculateUnprovenSummary } from "./summaryEvidence";
 import { allocateTax } from "./normalizeAmounts";
 
 export type { DraftSummaryOverride } from "./types";
@@ -182,7 +182,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
   const canSynthesizeDecision =
     selectedRate !== undefined &&
     selectedBasis !== undefined &&
-    !input.rawObservationLines?.some((line) => line.explicitlyPrinted) &&
+    !hasPrintedTaxSummaryEvidence(input.rawObservationLines) &&
     !sourceTaxSummaries.some((summary) => summary.valueOrigin?.source === "user");
   const taxSummaries = canSynthesizeDecision
     ? (() => {

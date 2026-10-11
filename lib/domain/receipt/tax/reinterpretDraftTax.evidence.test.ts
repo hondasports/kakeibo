@@ -3,6 +3,88 @@ import { reinterpretDraftTax } from "./reinterpretDraftTax";
 import { observationLine, unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";
 
 describe("出所不明の対象額の再計算", () => {
+  it.each(["税込10% 消費税額", "消費税合計10%", "10%対象消費税"])(
+    "税額の明示 %s を税込・合計の対象額と取り違えない",
+    (label) => {
+      const input = unprovenTargetReceipt();
+      input.rawObservationLines![1].rawText = `${label} 437円`;
+      const result = reinterpretDraftTax(input);
+      expect(result.interpretation.taxSummaries[0]).toMatchObject({
+        taxableAmountYen: 4810,
+        taxYen: 437,
+        status: "verified",
+        valueOrigin: { source: "items", previousTaxableAmountYen: 4373 },
+      });
+      expect(result.itemFields.every((item) => item.taxAllocationStatus === "allocated")).toBe(
+        true,
+      );
+    },
+  );
+
+  it.each(["missing", "stale"])(
+    "商品・合計の原文だけなら全体選択から%sサマリを再計算できる",
+    (kind) => {
+      const input = unprovenTargetReceipt();
+      input.rawObservationLines = [
+        { ...observationLine("商品1 990円", 990, 0), lineRoleCandidates: ["item"] },
+        { ...observationLine("税込合計 4,810円", 4810, 1), lineRoleCandidates: ["total"] },
+      ];
+      if (kind === "missing") input.taxSummaries = [];
+      else input.taxSummaries[0].taxRatePercent = 8;
+      input.decisionOverride = { priceTaxTreatment: "included", taxRateComposition: "rate10" };
+      const result = reinterpretDraftTax(input);
+      expect(result.interpretation.taxSummaries[0]).toMatchObject({
+        taxableAmountYen: 4810,
+        taxRatePercent: 10,
+        taxYen: 437,
+        valueOrigin: { source: "items" },
+      });
+      expect(result.itemFields.every((item) => item.taxAllocationStatus === "allocated")).toBe(
+        true,
+      );
+      expect(result.itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0)).toBe(4810);
+    },
+  );
+
+  it.each(["消費税 999円", "10%対象 4,373円", "対象額 4,373円", "小計 4,373円"])(
+    "独立した税内訳 %s がある場合は全体選択でも合成しない",
+    (rawText) => {
+      const input = unprovenTargetReceipt();
+      input.rawObservationLines = [
+        observationLine(rawText, rawText.includes("999") ? 999 : 4373, 0),
+      ];
+      input.decisionOverride = { priceTaxTreatment: "included", taxRateComposition: "rate10" };
+      const result = reinterpretDraftTax(input);
+      expect(result.interpretation.taxSummaries[0].taxableAmountYen).toBe(4373);
+      expect(result.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(
+        true,
+      );
+    },
+  );
+
+  it.each([
+    ["TAX10% 999円", "unknown"],
+    ["税計 999円", "unknown"],
+    ["10% 4,373円", "unknown"],
+    ["税込 ?% 4,373円", "unknown"],
+    ["対象税率10% 4,373円", "tax"],
+    ["判読不能 999円", "tax"],
+    ["判読不能 4,373円", "subtotal"],
+  ] as const)("曖昧な税内訳 %s (%s) を全体選択で捨てない", (rawText, role) => {
+    const input = unprovenTargetReceipt();
+    input.rawObservationLines = [
+      { ...observationLine("合計 4,810円", 4810, 0), lineRoleCandidates: ["total"] },
+      {
+        ...observationLine(rawText, rawText.includes("999") ? 999 : 4373, 1),
+        lineRoleCandidates: [role],
+      },
+    ];
+    input.decisionOverride = { priceTaxTreatment: "included", taxRateComposition: "rate10" };
+    const result = reinterpretDraftTax(input);
+    expect(result.interpretation.taxSummaries[0].taxableAmountYen).toBe(4373);
+    expect(result.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+  });
+
   it("商品確認だけで4,810円と437円を整合させ、元の対象額と原文を保持する", () => {
     const input = unprovenTargetReceipt();
     input.items[0].warnings = ["amount_mismatch", "unresolved_tax_rate", "unresolved_amount_basis"];
@@ -67,7 +149,7 @@ describe("出所不明の対象額の再計算", () => {
     expect(result.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
   });
 
-  it.each(["10%税込", "10%合計", "10%課税売上", "10%対象"])(
+  it.each(["10%税込", "10%合計", "10%課税売上", "10%対象", "10%課税対象額（消費税）"])(
     "別形式の印字対象額 %s も上書きしない",
     (label) => {
       const input = unprovenTargetReceipt();

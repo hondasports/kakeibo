@@ -63,6 +63,36 @@ it("プレビュー・保存計画・再表示・登録で同じ対象額と税�
   );
 });
 
+it.each(["missing", "stale"])(
+  "税内訳の原文がない%sサマリは全体税設定で保存・再表示・登録できる",
+  (kind) => {
+    const { draft, items } = fixture();
+    draft.rawObservation!.lines = [
+      { ...observationLine("商品1 990円", 990, 0), lineRoleCandidates: ["item"] },
+      { ...observationLine("合計 4,810円", 4810, 1), lineRoleCandidates: ["total"] },
+    ];
+    if (kind === "missing") draft.taxSummaries = [];
+    else draft.taxSummaries![0].taxRatePercent = 8;
+    const plan = planDraftTaxInterpretation(
+      draft,
+      items,
+      {
+        decisionOverride: { priceTaxTreatment: "included", taxRateComposition: "rate10" },
+      },
+      1,
+    );
+    expect(plan.draftPatch.status).toBe("ready");
+    const savedItems = items.map((item, index) => ({ ...item, ...plan.itemPatches[index].patch }));
+    const savedDraft = { ...draft, ...plan.draftPatch };
+    expect(buildDraftRegistrationItems(savedDraft, savedItems)).toEqual([
+      { itemName: "商品1、商品2、商品3、商品4、商品5", amountYen: 4810, categoryId: "category" },
+    ]);
+    expect(
+      planDraftTaxInterpretation(savedDraft, savedItems, {}, 2).draftPatch.taxSummaries,
+    ).toEqual(plan.draftPatch.taxSummaries);
+  },
+);
+
 it.each(["target", "tax-mode", "subtotal", "missing-raw"])(
   "印字矛盾・根拠不足 %s は登録ガードを通らない",
   (kind) => {
