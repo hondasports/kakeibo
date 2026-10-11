@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "./_generated/api";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
@@ -213,6 +213,12 @@ const full = { links: 2, jobs: 1, events: 1, requests: 1, audits: 1 };
 const empty = { links: 0, jobs: 0, events: 0, requests: 0, audits: 0 };
 
 describe("orphaned LINE link migration", () => {
+  // executeBatch は ctx.scheduler.runAfter(0, …) で自分自身を再スケジュールし console.log も出す。
+  // 実タイマーのままだと edge-runtime の teardown 後に走り、EnvironmentTeardownError で vitest が失敗する。
+  // （convex/accountDeletion.test.ts の group purge orchestration と同じ対処）
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
   it("dryRun は孤立データの件数だけを返し、何も削除しない", async () => {
     const t = convexTest(schema, convexTestModules);
     await seedUser(t, "issuer|U1");
