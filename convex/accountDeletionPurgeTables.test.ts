@@ -30,6 +30,20 @@ function tablesWithUserIdString(): string[] {
 }
 
 describe("退会 purge 対象テーブルのドリフト防止", () => {
+  it("optional な userId(string) のテーブルも検出対象に含まれる（Convex は optional でも kind=string）", () => {
+    const tables = schema.tables as unknown as Record<
+      string,
+      { validator: { fields: Record<string, { kind: string; isOptional: string }> } }
+    >;
+    const optionalUserIdPurgeTables = ACCOUNT_DELETION_USER_PURGE_TABLES.filter(
+      (name) => tables[name].validator.fields.userId?.isOptional === "optional",
+    );
+    // lineWebhookEvents.userId は v.optional(v.string())。ガードが検出できなくなったらここで気付く。
+    expect(optionalUserIdPurgeTables).toContain("lineWebhookEvents");
+    const detected = new Set(tablesWithUserIdString());
+    for (const name of optionalUserIdPurgeTables) expect(detected.has(name)).toBe(true);
+  });
+
   it("schema の userId(string) 付きテーブルは purge 対象か、理由付き allowlist のどちらかに属する", () => {
     const purged = new Set<string>(ACCOUNT_DELETION_USER_PURGE_TABLES);
     const handled = new Set(Object.keys(USER_ID_TABLES_HANDLED_ELSEWHERE));

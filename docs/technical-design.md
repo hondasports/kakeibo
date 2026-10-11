@@ -271,6 +271,7 @@ convex/
   systemAdminOwnerlessGroupRecovery.ts
   systemAdminGroupDeletion.ts
   legacyGroupDeletionAuditMigration.ts
+  orphanedLineLinkMigration.ts   # 退会済みユーザーに残った LINE 連携データの一回限り内部 migration（§16.4）
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
@@ -1524,6 +1525,16 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 - 既存PRODデータが読めなくならないか
 - 必須項目追加で既存データが壊れないか
 - query/mutationの認可条件が維持されているか
+
+#### 退会済みユーザーの LINE 連携データ掃除（一回限りの内部 migration）
+
+finalize の purge に `lineAccountLinks` 等を加える前に完了した退会では、active な連携が取り残され、LINE webhook の解決と再連携（`LINE_LINK_CONFLICT`）を妨げる。`convex/orphanedLineLinkMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`users` に行が無い userId の `lineAccountLinks` と、その userId の通知 job / event・連携リクエスト・監査ログを削除する。存在するユーザーと、終端でない `accountDeletionRequests` を持つ userId には触れない。通知 job はリンクより先に削除する。
+
+運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。
+
+1. `pnpm exec convex run orphanedLineLinkMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"..."}'` で繰り返し、`orphanLinks` と `wouldDelete` を確認。件数のみで userId / lineUserId は返らない）
+2. `pnpm exec convex run orphanedLineLinkMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。冪等なので再実行可）
+3. `pnpm exec convex run orphanedLineLinkMigration:verify '{}'`（全 page で `remainingOrphanLinks` が 0 であること）
 
 ## 17. テスト方針
 
