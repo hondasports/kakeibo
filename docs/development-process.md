@@ -252,6 +252,8 @@ Node.jsとpnpmはリポジトリの `mise.toml` と `package.json` から選択�
 mise install
 ```
 
+indexionの `.indexion/` はworktreeごとに空から始まる。コード調査の直前にdigestを構築する手順は `skills/impact-analysis` を参照する。
+
 ターミナル1:
 
 ```bash

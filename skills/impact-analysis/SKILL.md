@@ -22,7 +22,7 @@ shared caller、認可、永続データ、外部操作、復旧範囲を調べ�
 indexion が使える環境では、ファイル読み回しの前に次を使い、調査対象を絞る。
 
 ```bash
-indexion digest build .                  # 初回のみ。関数インデックスを .indexion/digest に構築
+indexion digest build .                  # worktreeごとに初回のみ。関数インデックスを .indexion/digest に構築
 indexion digest query "<目的>"           # 例: "レシート税計算" → 関数を意味で検索
 indexion search "<クエリ>" [paths...]    # コード/ドキュメントの意味検索
 indexion agent orient --task="<内容>" .  # 変更前ブリーフ（影響元・消費側・危険箇所）
@@ -31,6 +31,7 @@ indexion grep "<pattern>" [paths...]     # トークン構造検索（例: doc�
 
 - MCP経由でも同じツールが使える（`.devin/mcp_config.json` / `.codex/config.toml` に `indexion` サーバを登録済み）
 - 解析対象は `.indexionignore` で絞る。生成物のローカル状態は `.indexion/` 配下に作られ、git管理対象外
+- `.indexion/` はworktreeごとに独立しており、新しいtask worktreeでは空になる。調査の直前に `.indexion/digest` が無ければ `indexion digest build .` を実行する（調査しないtaskでは実行しない）
 
 ## indexion が使えない環境でのフォールバック
 
