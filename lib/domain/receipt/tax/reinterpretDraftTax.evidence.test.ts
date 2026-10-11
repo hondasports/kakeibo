@@ -3,6 +3,43 @@ import { reinterpretDraftTax } from "./reinterpretDraftTax";
 import { observationLine, unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";
 
 describe("出所不明の対象額の再計算", () => {
+  it("英語SUBTOTALを支払合計の裏付けにしない", () => {
+    const input = unprovenTargetReceipt();
+    input.rawObservationLines![0].rawText = "SUBTOTAL 4,810円";
+    input.rawObservationLines![0].lineRoleCandidates = ["unknown"];
+    input.receiptTotalSource = "ai_estimate";
+    expect(reinterpretDraftTax(input).interpretation.taxSummaries[0].taxableAmountYen).toBe(4373);
+  });
+
+  it.each(["税込合計", "ご請求額", "お買上", "TOTAL", "総計", "今回支払額"])(
+    "%s の合計印字でも一致する対象額を補正する",
+    (label) => {
+      const input = unprovenTargetReceipt();
+      input.rawObservationLines![0].rawText = `${label} 4,810円`;
+      input.rawObservationLines![0].lineRoleCandidates = ["total"];
+      expect(reinterpretDraftTax(input).interpretation.taxSummaries[0]).toMatchObject({
+        taxableAmountYen: 4810,
+        valueOrigin: { source: "items" },
+      });
+    },
+  );
+
+  it("複数内訳の一部を編集して再表示しても未編集の出所をユーザーにしない", () => {
+    const input = unprovenTargetReceipt();
+    input.taxSummaries.push({ ...input.taxSummaries[0], taxRatePercent: 8 });
+    input.summaryOverride = { index: 0, summary: { taxableAmountYen: 4800 } };
+    const saved = reinterpretDraftTax(input);
+    const reopened = reinterpretDraftTax({
+      ...input,
+      summaryOverride: undefined,
+      taxSummariesUserConfirmed: true,
+      taxSummaries: saved.interpretation.taxSummaries,
+    });
+    expect(reopened.interpretation.taxSummaries[0].valueOrigin?.source).toBe("user");
+    expect(reopened.interpretation.taxSummaries[1].valueOrigin?.source).not.toBe("user");
+    expect(reopened.interpretation.taxSummaries[1].userEditedFields).toBeUndefined();
+  });
+
   it.each(["payment", "change", "ambiguous", "classified"] as const)(
     "%s の税額らしい金額を対象額の補正に使わない",
     (kind) => {

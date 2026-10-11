@@ -1,3 +1,4 @@
+import { isReceiptTotalLabel } from "../lineClassification";
 import { isNonTaxEvidenceLine } from "./interpretTaxEvidence";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
 import type { ExtractedReceiptItem, ExtractedTaxSummary } from "./types";
@@ -159,9 +160,9 @@ export function recalculateUnprovenSummary(args: {
   const totals = lines.filter(
     (line) =>
       line.explicitlyPrinted &&
-      /^(?:合計|総合計|お?支払(?:い)?(?:合計|金額)?)/.test(
-        line.rawText.normalize("NFKC").replace(/\s+/g, ""),
-      ),
+      taxSummaryLineKind(line.rawText) !== "tax" &&
+      (isReceiptTotalLabel(line.rawText) ||
+        /^(?:合計|総合計|お?支払(?:い)?(?:合計|金額)?)/.test(normalizedText(line.rawText))),
   );
   if (totals.length === 0 || totals.some((line) => line.amountYen !== amountYen)) return summaries;
   const target = items.reduce((sum, item) => sum + item.printedAmountYen, 0);
