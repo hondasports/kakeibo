@@ -85,6 +85,80 @@ describe("出所不明の対象額の再計算", () => {
     expect(result.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
   });
 
+  it.each(["item", "discount"] as const)("%付きの%s行は全体選択による合成を妨げない", (role) => {
+    const input = unprovenTargetReceipt();
+    input.taxSummaries = [];
+    input.rawObservationLines = [
+      { ...observationLine("10%引 180円", 180, 0), lineRoleCandidates: [role] },
+    ];
+    input.decisionOverride = { priceTaxTreatment: "included", taxRateComposition: "rate10" };
+    const result = reinterpretDraftTax(input);
+    expect(result.interpretation.taxSummaries[0]).toMatchObject({
+      taxableAmountYen: 4810,
+      valueOrigin: { source: "items" },
+    });
+    expect(result.itemFields.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+  });
+
+  it("税額だけの編集は対象額をユーザー由来にせず、保存後の商品確認から再計算できる", () => {
+    const input = unprovenTargetReceipt();
+    input.rawObservationLines = undefined;
+    input.summaryOverride = { index: 0, summary: { taxYen: 437 } };
+    const saved = reinterpretDraftTax(input);
+    expect(saved.interpretation.taxSummaries[0]).toMatchObject({
+      taxableAmountYen: 4373,
+      valueOrigin: { source: "unknown" },
+    });
+    expect(
+      saved.interpretation.taxSummaries[0].valueOrigin?.previousTaxableAmountYen,
+    ).toBeUndefined();
+    const reopened = reinterpretDraftTax({
+      ...unprovenTargetReceipt(),
+      taxSummaries: saved.interpretation.taxSummaries,
+      taxSummariesUserConfirmed: true,
+    });
+    expect(reopened.interpretation.taxSummaries[0]).toMatchObject({
+      taxableAmountYen: 4810,
+      valueOrigin: { source: "items", previousTaxableAmountYen: 4373 },
+    });
+  });
+
+  it.each(["items", "user"] as const)(
+    "税額だけの編集でも既存の対象額の出所%sを保持する",
+    (source) => {
+      const input = unprovenTargetReceipt();
+      input.rawObservationLines = undefined;
+      input.taxSummaries[0].valueOrigin = { source, previousTaxableAmountYen: 4000 };
+      input.summaryOverride = { index: 0, summary: { taxYen: 999 } };
+      expect(reinterpretDraftTax(input).interpretation.taxSummaries[0].valueOrigin).toEqual(
+        input.taxSummaries[0].valueOrigin,
+      );
+    },
+  );
+
+  it.each([
+    { taxMode: "external" as const },
+    { taxableAmountBasis: "tax_excluded" as const },
+    { taxIncludedAmountYen: 9999 },
+  ])("対象額以外の手修正%sも保存・再表示で自動上書きしない", (override) => {
+    const input = unprovenTargetReceipt();
+    input.summaryOverride = { index: 0, summary: override };
+    const saved = reinterpretDraftTax(input);
+    expect(saved.interpretation.taxSummaries[0]).toMatchObject({
+      ...override,
+      valueOrigin: { source: "unknown" },
+    });
+    const reopened = reinterpretDraftTax({
+      ...unprovenTargetReceipt(),
+      taxSummaries: saved.interpretation.taxSummaries,
+      taxSummariesUserConfirmed: true,
+    });
+    expect(reopened.interpretation.taxSummaries[0]).toMatchObject(override);
+    expect(reopened.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(
+      true,
+    );
+  });
+
   it("商品確認だけで4,810円と437円を整合させ、元の対象額と原文を保持する", () => {
     const input = unprovenTargetReceipt();
     input.items[0].warnings = ["amount_mismatch", "unresolved_tax_rate", "unresolved_amount_basis"];

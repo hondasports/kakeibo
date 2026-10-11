@@ -23,7 +23,9 @@ export function hasPrintedTaxSummaryEvidence(
       // 読み取れない税内訳や税率付き金額も独立した証拠として残す。
       return (
         line.lineRoleCandidates.some((role) => role === "tax" || role === "subtotal") ||
-        (line.amountYen !== null && /%/.test(line.rawText.normalize("NFKC")))
+        (line.amountYen !== null &&
+          !line.lineRoleCandidates.some((role) => role === "item" || role === "discount") &&
+          /%/.test(line.rawText.normalize("NFKC")))
       );
     }) ?? false
   );
@@ -41,6 +43,12 @@ export function taxSummaryEvidenceLines(
     options.singleSummary === true &&
     !(lines ?? []).some((line) => {
       if (!line.explicitlyPrinted) return false;
+      if (
+        taxSummaryLineKind(line.rawText) === undefined &&
+        !line.lineRoleCandidates.some((role) => role === "tax" || role === "subtotal") &&
+        line.lineRoleCandidates.some((role) => role === "item" || role === "discount")
+      )
+        return false;
       const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
       const rates = [...text.matchAll(/(\d+(?:\.\d+)?)%/g)];
       return (
@@ -142,6 +150,21 @@ export function recalculateUnprovenSummary(args: {
       ? [Math.floor(exactTax), Math.ceil(exactTax)].includes(summary.taxYen)
       : Math[summary.roundingMethod](exactTax) === summary.taxYen;
   if (!Number.isSafeInteger(target) || included !== amountYen || !taxFits) return summaries;
+  const recalculated = {
+    taxableAmountYen: target,
+    taxableAmountBasis: basis,
+    taxMode: basis === "tax_included" ? "included" : "external",
+    taxIncludedAmountYen: included,
+  };
+  // 対象額の出所と独立して、他フィールドの手修正も保存後まで保護する。
+  if (
+    summary.userEditedFields?.some(
+      (field) =>
+        field in recalculated &&
+        summary[field] !== recalculated[field as keyof typeof recalculated],
+    )
+  )
+    return summaries;
   if (
     summary.taxableAmountYen === target &&
     summary.taxableAmountBasis === basis &&
