@@ -1,3 +1,4 @@
+import { taxSummaryEvidenceLines } from "../../../../lib/domain/receipt/tax/summaryEvidence";
 import type { ReceiptRawObservation } from "../../../../lib/domain/receipt/observations";
 import type { AmountBasis, TaxMode, TaxRatePercent } from "../../../../lib/receiptTax/types";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
@@ -17,6 +18,7 @@ export type ReviewTaxRateRow = {
   taxableAmountBasis?: AmountBasis;
   /** 印字された税率別対象額。サマリが無い税率では undefined */
   printedYen?: number;
+  sourceLabel?: string;
   /** 同じ税込／税抜基準で集計した明細側の印字額合計 */
   currentYen?: number;
   status: ReviewCheckStatus;
@@ -39,45 +41,16 @@ export type ReviewTaxRateCheck = {
   focusTarget?: string;
 };
 
-const DIRECT_PRINT_PATTERN = /(?:対象|小計|%)/;
-const TAX_AMOUNT_LINE_ROLES = new Set(["tax", "subtotal", "total"]);
-
-/**
- * 観測行テキストから税率を読み取る。印字に税率を含まない行は undefined。
- * 「8%対象」「10% 対象額」などを拾う。
- */
-function parsePrintedTaxRatePercent(rawText: string): number | undefined {
-  const m = /(\d{1,2}(?:\.\d+)?)\s*%/.exec(rawText.replace(/\s+/g, ""));
-  if (!m) return undefined;
-  const rate = Number(m[1]);
-  return Number.isFinite(rate) && rate >= 0 && rate <= 100 ? rate : undefined;
-}
-
 function hasDirectPrintEvidence(
   summary: TaxSummary,
   rawObservation: ReceiptRawObservation | undefined,
-  summaries: TaxSummary[],
 ): boolean {
-  if (!rawObservation) return false;
-  const sameAmountCount = summaries.filter(
-    (candidate) => candidate.taxableAmountYen === summary.taxableAmountYen,
-  ).length;
-  return rawObservation.lines.some((line) => {
-    if (
-      !line.explicitlyPrinted ||
-      line.amountYen !== summary.taxableAmountYen ||
-      !(
-        line.lineRoleCandidates.some((role) => TAX_AMOUNT_LINE_ROLES.has(role)) ||
-        DIRECT_PRINT_PATTERN.test(line.rawText)
-      )
+  return (
+    rawObservation?.source === "ai_ocr" &&
+    taxSummaryEvidenceLines(rawObservation.lines, summary.taxRatePercent, "target").some(
+      (line) => line.amountYen === summary.taxableAmountYen,
     )
-      return false;
-    const lineRate = parsePrintedTaxRatePercent(line.rawText);
-    // 税率表記がある行は、その税率の内訳だけの証拠とする
-    if (lineRate !== undefined) return lineRate === summary.taxRatePercent;
-    // 税率表記がない行は、同一対象額の内訳が複数あると帰属を特定できない
-    return sameAmountCount === 1;
-  });
+  );
 }
 
 export function buildTaxRateCheck(args: {
@@ -134,6 +107,14 @@ export function buildTaxRateCheck(args: {
       taxMode: summary.taxMode,
       taxableAmountBasis: basis,
       printedYen: summary.taxableAmountYen,
+      sourceLabel:
+        summary.valueOrigin?.source === "user"
+          ? "ユーザー修正"
+          : summary.valueOrigin?.source === "items"
+            ? "商品から計算"
+            : hasDirectPrintEvidence(summary, args.rawObservation)
+              ? "OCR原文"
+              : "出所未確認の対象額",
     };
     if (globalReason)
       return {
@@ -191,7 +172,7 @@ export function buildTaxRateCheck(args: {
     const differenceYen = currentYen - summary.taxableAmountYen;
     if (differenceYen === 0)
       return { ...base, currentYen, differenceYen, status: "matched", matchKind: "exact" };
-    const approxAllowed = !hasDirectPrintEvidence(summary, args.rawObservation, summaries);
+    const approxAllowed = !hasDirectPrintEvidence(summary, args.rawObservation);
     if (approxAllowed && Math.abs(differenceYen) === 1)
       return { ...base, currentYen, differenceYen, status: "matched", matchKind: "approx" };
     return { ...base, currentYen, differenceYen, status: "mismatch" };

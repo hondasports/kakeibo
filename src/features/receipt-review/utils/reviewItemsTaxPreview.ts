@@ -45,6 +45,8 @@ function reviewItemToDraftFields(item: ReviewItemValues): DraftItemTaxFields {
 }
 
 type ReviewTaxPreviewArgs = {
+  rawObservation?: AiExpenseDraft["rawObservation"];
+  receiptUserOverride?: AiExpenseDraft["receiptUserOverride"];
   paidTotalYen?: number;
   taxSummaries?: AiExpenseDraft["taxSummaries"];
   markerDefinitions?: AiExpenseDraft["markerDefinitions"];
@@ -81,9 +83,12 @@ export function buildReviewTaxPreview(
   const sourceSummaries = toExtractedTaxSummaries(args.taxSummaries ?? []);
   const { itemFields, interpretation } = reinterpretDraftTax({
     amountYen: paidTotalYen,
+    taxSummariesUserConfirmed: args.receiptUserOverride?.fields.includes("taxSummaries"),
     items: items.map(reviewItemToDraftFields),
     taxSummaries: sourceSummaries,
     markerDefinitions: args.markerDefinitions,
+    rawObservationLines:
+      args.rawObservation?.source === "ai_ocr" ? args.rawObservation.lines : undefined,
     decisionOverride: {
       priceTaxTreatment: args.priceTaxTreatment,
       taxRateComposition: args.taxRateComposition,

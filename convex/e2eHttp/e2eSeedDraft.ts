@@ -140,6 +140,8 @@ export const e2eSeedTaxReviewDraftHandler = httpAction(async (ctx, req) => {
   const body = bodyResult;
   if (
     body.receiptCase !== undefined &&
+    body.receiptCase !== "unproven1003" &&
+    body.receiptCase !== "printed1003" &&
     body.receiptCase !== "basis890" &&
     body.receiptCase !== "basis890_264" &&
     body.receiptCase !== "summary892" &&

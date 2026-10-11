@@ -34,7 +34,7 @@ describe("ReceiptTaxSummarySection", () => {
     render(<ReceiptTaxSummarySection draft={draft({ status: "coherent" })} />);
 
     expect(screen.getByLabelText("税率別集計")).toBeInTheDocument();
-    expect(screen.getByText("10% 内税")).toBeInTheDocument();
+    expect(screen.getAllByText("10% 内税").length).toBeGreaterThan(0);
     expect(screen.getByText("対象額 1,060円（税込）")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
   });
@@ -48,7 +48,7 @@ describe("ReceiptTaxSummarySection", () => {
     );
 
     expect(screen.getByLabelText("税率別集計")).toBeInTheDocument();
-    expect(screen.getByText("10% 内税")).toBeInTheDocument();
+    expect(screen.getAllByText("10% 内税").length).toBeGreaterThan(0);
     expect(
       screen.getByText("税率別対象額・税額・支払合計の金額が一致しません"),
     ).toBeInTheDocument();
@@ -83,6 +83,7 @@ describe("ReceiptTaxSummarySection", () => {
     render(
       <ReceiptTaxSummarySection
         draft={draft({ status: "coherent" })}
+        onSummaryChange={vi.fn()}
         editableSummaries={[
           {
             summaryIndex: 0,

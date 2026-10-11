@@ -60,6 +60,8 @@ export function isAmountAndTaxResolved(draft: AiExpenseDraft): boolean {
     paidTotalYen,
     taxSummaries: draft.taxSummaries,
     markerDefinitions: draft.markerDefinitions,
+    rawObservation: draft.rawObservation,
+    receiptUserOverride: draft.receiptUserOverride,
     priceTaxTreatment: form.priceTaxTreatment,
     taxRateComposition: form.taxRateComposition,
   };

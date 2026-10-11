@@ -47,13 +47,13 @@ test("#748 未配分の13明細を確認して税込合計・税額を保存後�
     await expect(dialog.getByRole("region", { name: "商品一覧" })).toContainText(
       "割引の対象税率が対象商品（8%）と異なります",
     );
-    // 税内訳の編集欄は確認が要る8%だけが出る。対象額種別は税抜印字のまま、
+    // 税内訳の編集欄は確認が要る8%だけが出る。対象額種別は税抜のまま、
     // 未配分の税額は割引の対象税率を選ぶと解消する（#911）。
     await dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true }).click();
     const section = dialog.getByRole("region", { name: "税内訳を確認", exact: true });
     await expect(section.getByRole("combobox", { name: "対象額種別", exact: true })).toHaveCount(1);
     await expect(section.getByRole("combobox", { name: "対象額種別", exact: true })).toHaveText(
-      "税抜印字",
+      "税抜",
     );
     for (const name of ["割引8", "割引9"]) {
       const item = dialog.locator("details").filter({ hasText: name }).first();

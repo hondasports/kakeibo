@@ -74,6 +74,8 @@ export type ExtractedReceiptItem = {
 };
 
 export type ExtractedTaxSummary = {
+  /** 未設定の旧データは出所不明として扱う。原文は別に保持する。 */
+  valueOrigin?: { source: "items" | "user"; previousTaxableAmountYen?: number };
   taxRatePercent: TaxRatePercent;
   taxMode: TaxMode;
   taxableAmountYen: number;

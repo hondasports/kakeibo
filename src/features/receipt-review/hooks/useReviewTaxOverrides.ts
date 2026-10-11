@@ -61,6 +61,8 @@ export function useReviewTaxOverrides({
             paidTotalYen: result.draft.amountYen,
             taxSummaries: result.draft.taxSummaries,
             markerDefinitions: result.draft.markerDefinitions,
+            rawObservation: result.draft.rawObservation,
+            receiptUserOverride: result.draft.receiptUserOverride,
           }),
         ),
       );
@@ -99,6 +101,8 @@ export function useReviewTaxOverrides({
             paidTotalYen: result.draft.amountYen,
             taxSummaries: result.draft.taxSummaries,
             markerDefinitions: result.draft.markerDefinitions,
+            rawObservation: result.draft.rawObservation,
+            receiptUserOverride: result.draft.receiptUserOverride,
           }),
         ),
       );
