@@ -6,9 +6,10 @@ import {
   getInvitationRedirectErrorMessage,
   INVITATION_ACCEPT_PATH,
   isAllowedRedirectOrigin,
-  KAKEIBO_PRODUCTION_HOSTNAME,
   parseAllowedRedirectOrigins,
 } from "./clerkInvitations";
+
+const PRODUCTION_ORIGIN = "https://app.example.com";
 
 describe("isAllowedRedirectOrigin", () => {
   it("設定済み origin は許可", () => {
@@ -69,22 +70,23 @@ describe("isAllowedRedirectOrigin", () => {
     ).toBe(true);
   });
 
-  it("本番 origin は許可", () => {
-    const url = new URL(`https://${KAKEIBO_PRODUCTION_HOSTNAME}` + INVITATION_ACCEPT_PATH);
-    expect(isAllowedRedirectOrigin(url, [])).toBe(true);
+  it("kakeibo.vercel.app は設定に含まれていなければ拒否（コードに埋め込まない）", () => {
+    const url = new URL("https://kakeibo.vercel.app" + INVITATION_ACCEPT_PATH);
+    expect(isAllowedRedirectOrigin(url, [])).toBe(false);
+    expect(isAllowedRedirectOrigin(url, [PRODUCTION_ORIGIN])).toBe(false);
   });
 
-  it("本番ホスト名でも http や別ポートは拒否", () => {
+  it("設定済みホスト名でも http や別ポートは拒否", () => {
     expect(
       isAllowedRedirectOrigin(
-        new URL(`http://${KAKEIBO_PRODUCTION_HOSTNAME}` + INVITATION_ACCEPT_PATH),
-        [],
+        new URL("http://app.example.com" + INVITATION_ACCEPT_PATH),
+        [PRODUCTION_ORIGIN],
       ),
     ).toBe(false);
     expect(
       isAllowedRedirectOrigin(
-        new URL(`https://${KAKEIBO_PRODUCTION_HOSTNAME}:8443` + INVITATION_ACCEPT_PATH),
-        [],
+        new URL("https://app.example.com:8443" + INVITATION_ACCEPT_PATH),
+        [PRODUCTION_ORIGIN],
       ),
     ).toBe(false);
   });
@@ -116,13 +118,13 @@ describe("isAllowedRedirectOrigin", () => {
 describe("buildInvitationRedirectUrl", () => {
   it("許可 origin に token を付与", () => {
     const result = buildInvitationRedirectUrl(
-      `https://${KAKEIBO_PRODUCTION_HOSTNAME}${INVITATION_ACCEPT_PATH}`,
+      `${PRODUCTION_ORIGIN}${INVITATION_ACCEPT_PATH}`,
       "token-123",
-      [],
+      [PRODUCTION_ORIGIN],
     );
     expect(result).toEqual({
       success: true,
-      redirectUrl: `https://${KAKEIBO_PRODUCTION_HOSTNAME}${INVITATION_ACCEPT_PATH}?token=token-123`,
+      redirectUrl: `${PRODUCTION_ORIGIN}${INVITATION_ACCEPT_PATH}?token=token-123`,
     });
   });
 
@@ -142,9 +144,9 @@ describe("buildInvitationRedirectUrl", () => {
 
   it("パスが異なると invalid_path", () => {
     const result = buildInvitationRedirectUrl(
-      `https://${KAKEIBO_PRODUCTION_HOSTNAME}/other`,
+      `${PRODUCTION_ORIGIN}/other`,
       "token",
-      [],
+      [PRODUCTION_ORIGIN],
     );
     expect(result).toEqual({ success: false, error: "invalid_path" });
   });
@@ -173,16 +175,16 @@ describe("buildInvitationRedirectUrl", () => {
   it("userinfo と hash は origin が許可されていても invalid_path", () => {
     expect(
       buildInvitationRedirectUrl(
-        `https://user:pass@${KAKEIBO_PRODUCTION_HOSTNAME}${INVITATION_ACCEPT_PATH}`,
+        `https://user:pass@app.example.com${INVITATION_ACCEPT_PATH}`,
         "token",
-        [],
+        [PRODUCTION_ORIGIN],
       ),
     ).toEqual({ success: false, error: "invalid_path" });
     expect(
       buildInvitationRedirectUrl(
-        `https://${KAKEIBO_PRODUCTION_HOSTNAME}${INVITATION_ACCEPT_PATH}#x`,
+        `${PRODUCTION_ORIGIN}${INVITATION_ACCEPT_PATH}#x`,
         "token",
-        [],
+        [PRODUCTION_ORIGIN],
       ),
     ).toEqual({ success: false, error: "invalid_path" });
   });

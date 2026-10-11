@@ -12,13 +12,18 @@ import {
 } from "./clerkInvitations";
 
 describe("buildInvitationRedirectUrl", () => {
-  it("本番ドメインの招待受け入れURLを許可する", () => {
-    expect(
-      buildInvitationRedirectUrl(
-        "https://kakeibo.vercel.app/group/invitations/accept",
-        "token-123",
-      ),
-    ).toBe("https://kakeibo.vercel.app/group/invitations/accept?token=token-123");
+  it("INVITATION_REDIRECT_ORIGINS が未設定ならどの origin も許可しない", () => {
+    vi.stubEnv("INVITATION_REDIRECT_ORIGINS", "");
+    try {
+      expect(() =>
+        buildInvitationRedirectUrl(
+          "https://kakeibo.vercel.app/group/invitations/accept",
+          "token-123",
+        ),
+      ).toThrowError(ConvexError);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("攻撃者が登録した kakeibo-*.vercel.app は拒否する", () => {
@@ -112,13 +117,13 @@ describe("buildClerkInvitationParams", () => {
     expect(
       buildClerkInvitationParams(
         "invitee@example.com",
-        "https://kakeibo.vercel.app/group/invitations/accept?token=token-123",
+        "https://app.example.com/group/invitations/accept?token=token-123",
         "group-001" as Id<"groups">,
         "token-123",
       ),
     ).toEqual({
       emailAddress: "invitee@example.com",
-      redirectUrl: "https://kakeibo.vercel.app/group/invitations/accept?token=token-123",
+      redirectUrl: "https://app.example.com/group/invitations/accept?token=token-123",
       ignoreExisting: true,
       publicMetadata: {
         groupId: "group-001",
