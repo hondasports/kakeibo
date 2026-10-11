@@ -337,7 +337,10 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
         status: "ready",
         receiptTaxDecision: choice,
       });
-      expect(env.getDraft().taxSummaries).toEqual(printedSummary);
+      // 旧保存形式は値を保持し、確認済みの出所だけを補完する。
+      expect(env.getDraft().taxSummaries).toEqual(
+        printedSummary.map((summary) => ({ ...summary, valueOrigin: { source: "user" } })),
+      );
       expect(registrationItems(env)).toEqual([
         expect.objectContaining({ amountYen: testCase.paidYen }),
       ]);
