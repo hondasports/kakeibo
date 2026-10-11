@@ -51,6 +51,8 @@ export interface AccountDeletionRequestStore extends AccountDeletionRequestReade
   patch(requestId: string, fields: Partial<AccountDeletionRequestFields>): Promise<void>;
   /** completed かつ updatedAt が cutoff より古いリクエストを最大 limit 件取得する。 */
   listCompletedBefore(cutoff: number, limit: number): Promise<AccountDeletionRequestRecord[]>;
+  /** failed のリクエストを updatedAt の新しい順に最大 limit 件取得する。 */
+  listFailed(limit: number): Promise<AccountDeletionRequestRecord[]>;
   /** リクエストを物理削除する。 */
   delete(requestId: string): Promise<void>;
 }

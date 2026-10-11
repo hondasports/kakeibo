@@ -419,3 +419,133 @@ describe("getMyAccountDeletionStatus", () => {
     ).resolves.toMatchObject({ status: "purging_groups" });
   });
 });
+
+describe("recoverStrandedRequests（Clerk削除済みfailedの自動復旧）", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  // scheduleProcess が登録する Node 専用 action を teardown 後に実行しない。
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  async function insertFailed(
+    t: ReturnType<typeof convexTest>,
+    overrides: Partial<{
+      status: "failed" | "completed" | "identity_deleted";
+      identityDeletedAt: number | undefined;
+    }> = {},
+  ) {
+    return await t.run(async (ctx) =>
+      ctx.db.insert("accountDeletionRequests", {
+        userId: `user-${Math.random()}`,
+        clerkUserId: "clerk-x",
+        status: overrides.status ?? "failed",
+        leftGroupCount: 0,
+        deletedGroupCount: 0,
+        attemptCount: 6,
+        maxAttempts: 6,
+        lastErrorCode: "finalization_failed",
+        lastErrorMessage: "退会処理の完了に失敗しました。",
+        createdAt: 1,
+        updatedAt: Date.now() - 1000,
+        preparationCompletedAt: 1,
+        ...("identityDeletedAt" in overrides
+          ? { identityDeletedAt: overrides.identityDeletedAt }
+          : { identityDeletedAt: Date.now() - 1000 }),
+      }),
+    );
+  }
+
+  const scheduledCount = (t: ReturnType<typeof convexTest>) =>
+    t.run(async (ctx) => (await ctx.db.system.query("_scheduled_functions").collect()).length);
+
+  it("failed かつ identityDeletedAt ありの直近リクエストを identity_deleted へ戻して再スケジュールする", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const id = await insertFailed(t);
+    await t.mutation(internal.accountDeletion.recoverStrandedRequests, {});
+    const request = await t.run((ctx) => ctx.db.get(id));
+    expect(request).toMatchObject({ status: "identity_deleted", attemptCount: 0 });
+    expect(request?.lastErrorCode).toBeUndefined();
+    expect(await scheduledCount(t)).toBe(1);
+  });
+
+  it("identityDeletedAt が無い failed は本人が再試行できるため触らない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const id = await insertFailed(t, { identityDeletedAt: undefined });
+    await t.mutation(internal.accountDeletion.recoverStrandedRequests, {});
+    expect((await t.run((ctx) => ctx.db.get(id)))?.status).toBe("failed");
+    expect(await scheduledCount(t)).toBe(0);
+  });
+
+  it("identityDeletedAt から14日を超えた failed は触らず console.error で通知する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const id = await insertFailed(t, { identityDeletedAt: Date.now() - 15 * DAY });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await t.mutation(internal.accountDeletion.recoverStrandedRequests, {});
+    expect((await t.run((ctx) => ctx.db.get(id)))?.status).toBe("failed");
+    expect(await scheduledCount(t)).toBe(0);
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Account deletion recovery abandoned",
+      expect.objectContaining({ requestId: id }),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("completed など failed 以外は触らない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const completed = await insertFailed(t, { status: "completed" });
+    const finalizing = await insertFailed(t, { status: "identity_deleted" });
+    await t.mutation(internal.accountDeletion.recoverStrandedRequests, {});
+    expect((await t.run((ctx) => ctx.db.get(completed)))?.status).toBe("completed");
+    expect((await t.run((ctx) => ctx.db.get(finalizing)))?.attemptCount).toBe(6);
+    expect(await scheduledCount(t)).toBe(0);
+  });
+
+  it("1回の実行で再駆動する件数は10件までで、再実行すると残りを処理する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    for (let i = 0; i < 12; i += 1) await insertFailed(t);
+    await t.mutation(internal.accountDeletion.recoverStrandedRequests, {});
+    const failedAfterFirst = await t.run(
+      async (ctx) =>
+        (await ctx.db.query("accountDeletionRequests").take(20)).filter(
+          (request) => request.status === "failed",
+        ).length,
+    );
+    expect(failedAfterFirst).toBe(2);
+    await t.mutation(internal.accountDeletion.recoverStrandedRequests, {});
+    expect(await scheduledCount(t)).toBe(12);
+  });
+
+  it("failed に戻った後に届いた古い markDeletingIdentity / markIdentityDeleted は状態を変えない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const id = await insertFailed(t, { identityDeletedAt: undefined });
+    expect(await t.mutation(internal.accountDeletion.markDeletingIdentity, { requestId: id })).toBe(
+      null,
+    );
+    expect(await t.mutation(internal.accountDeletion.markIdentityDeleted, { requestId: id })).toBe(
+      null,
+    );
+    expect((await t.run((ctx) => ctx.db.get(id)))?.status).toBe("failed");
+  });
+
+  it("正常フロー（requested→deleting_identity→identity_deleted）の遷移は許可される", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const id = await t.run((ctx) =>
+      ctx.db.insert("accountDeletionRequests", {
+        userId: "user-normal",
+        clerkUserId: "clerk-normal",
+        status: "requested",
+        leftGroupCount: 0,
+        deletedGroupCount: 0,
+        attemptCount: 0,
+        maxAttempts: 6,
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+    await t.mutation(internal.accountDeletion.markDeletingIdentity, { requestId: id });
+    expect((await t.run((ctx) => ctx.db.get(id)))?.status).toBe("deleting_identity");
+    await t.mutation(internal.accountDeletion.markIdentityDeleted, { requestId: id });
+    const request = await t.run((ctx) => ctx.db.get(id));
+    expect(request?.status).toBe("identity_deleted");
+    expect(request?.identityDeletedAt).toBeDefined();
+  });
+});

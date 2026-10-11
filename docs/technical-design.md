@@ -448,6 +448,16 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   ctx.db/ctx.scheduler の直接アクセスはゼロ。`convex/accountDeletionActions.ts` は
   `"use node"` の Clerk 連携 action として骨格を維持し、エラー分類のみ
   ドメイン関数へ置き換えた。
+- **failed の自動復旧**: Clerk ユーザー削除後（`identityDeletedAt` あり）に finalize が
+  上限回数まで失敗して `failed` になると、本人は認証できず `retryAccountDeletion` を呼べない。
+  そのため cron（6 時間毎、`recoverStrandedRequests`）が `failed` かつ `identityDeletedAt` ありの
+  リクエストを `retryAccountDeletion` と同じ再開遷移（`resumeFailedAccountDeletion`）で
+  再駆動する。1 回 10 件まで、`identityDeletedAt` から 14 日を超えたものは再駆動せず
+  `console.error("Account deletion recovery abandoned", ...)` で運用者に通知する
+  （`failed` のまま残る）。`identityDeletedAt` 未設定の `failed` は本人の手動再試行対象で触らない。
+  併せて `markDeletingIdentity` / `markIdentityDeleted` は許可状態からのみ遷移し、
+  古い scheduled run が `failed` を巻き戻して Clerk 削除を再実行しないようにした。
+  `finalizeAccountDeletion` は finalize 可能な状態かつ全 purge が `completed` の場合のみユーザー行を削除する。
 - **状態遷移・エラー文言・メール payload/dedupe キー・子ジョブ生成の冪等性は
   不変**。internal endpoint 名と戻り値も維持する。
 

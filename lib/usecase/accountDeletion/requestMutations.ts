@@ -3,6 +3,10 @@
  * mark 系・scheduleRetry・cleanupCompletedRequests の移植。
  */
 import { getAccountDeletionRetryDelay } from "../../domain/accountDeletion/retry";
+import {
+  canMarkDeletingIdentityFrom,
+  canMarkIdentityDeletedFrom,
+} from "../../domain/accountDeletion/status";
 import type { AccountDeletionRequestRecord } from "../../domain/accountDeletion/request";
 import type { AccountDeletionMutationDeps } from "./deps";
 
@@ -11,7 +15,8 @@ export async function markDeletingIdentity(
   args: { requestId: string },
 ): Promise<AccountDeletionRequestRecord | null> {
   const request = await deps.requests.get(args.requestId);
-  if (!request || request.status === "completed") return null;
+  // 古い scheduled run が failed 等を deleting_identity へ戻し Clerk 削除を再実行しないよう弾く。
+  if (!request || !canMarkDeletingIdentityFrom(request.status)) return null;
   await deps.requests.patch(args.requestId, {
     status: "deleting_identity",
     updatedAt: Date.now(),
@@ -24,7 +29,7 @@ export async function markIdentityDeleted(
   args: { requestId: string },
 ): Promise<AccountDeletionRequestRecord | null> {
   const request = await deps.requests.get(args.requestId);
-  if (!request || request.status === "completed") return null;
+  if (!request || !canMarkIdentityDeletedFrom(request.status)) return null;
   await deps.requests.patch(args.requestId, {
     status: "identity_deleted",
     identityDeletedAt: Date.now(),

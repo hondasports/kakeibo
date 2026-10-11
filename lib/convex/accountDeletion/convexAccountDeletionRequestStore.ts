@@ -80,6 +80,14 @@ export function createAccountDeletionRequestStore(
         .take(limit);
       return docs.map(requestDocToRecord);
     },
+    async listFailed(limit) {
+      const docs = await ctx.db
+        .query("accountDeletionRequests")
+        .withIndex("by_status_and_updated_at", (q) => q.eq("status", "failed"))
+        .order("desc")
+        .take(limit);
+      return docs.map(requestDocToRecord);
+    },
     async delete(requestId) {
       await ctx.db.delete(requestId as Id<"accountDeletionRequests">);
     },
