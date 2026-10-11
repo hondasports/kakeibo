@@ -74,6 +74,12 @@ export const receiptMarkerDefinitionValidator = v.object({
 });
 export const markerDefinitionsValidator = v.array(receiptMarkerDefinitionValidator);
 export const taxSummaryValidator = v.object({
+  valueOrigin: v.optional(
+    v.object({
+      source: v.union(v.literal("items"), v.literal("user")),
+      previousTaxableAmountYen: v.optional(v.number()),
+    }),
+  ),
   taxRatePercent: taxSummaryTaxRatePercentValidator,
   taxMode: taxModeValidator,
   taxableAmountYen: v.number(),

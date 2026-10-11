@@ -162,7 +162,7 @@ describe("下書きの修正導線", () => {
     await user.click(screen.getByRole("button", { name: "修正が必要な項目へ" }));
     expect(screen.getByRole("textbox", { name: "レシートの金額" })).toHaveFocus();
   });
-  it("税内訳の矛盾から折りたたみ内の修正欄へ移動できる", async () => {
+  it("税内訳の矛盾から原文を開かず修正欄へ移動できる", async () => {
     const user = userEvent.setup();
     render(
       <ReviewDialog
@@ -195,7 +195,7 @@ describe("下書きの修正導線", () => {
         name: "税率を確認する",
       }),
     );
-    expect(reference).toHaveAttribute("open");
+    expect(reference).not.toHaveAttribute("open");
     expect(screen.getByRole("spinbutton", { name: "対象額" })).toBeInTheDocument();
   });
   it("編集した商品は問題が解消しても閉じず、再編集できる", async () => {
@@ -282,7 +282,7 @@ describe("下書きの修正導線", () => {
 });
 
 describe("Issue #892 現在の税内訳に揃えた表示", () => {
-  it("支払合計がずれた補完済み8%だけを修正し、税額保存後にフォームを隠す", async () => {
+  it("支払合計がずれた8%を修正し、税額保存後も再編集の入口を残す", async () => {
     const user = userEvent.setup();
     const fixture = mixedTaxReviewFixture();
     const onSummaryChange = vi.fn();
@@ -307,8 +307,8 @@ describe("Issue #892 現在の税内訳に揃えた表示", () => {
     await user.click(within(banner).getByRole("button", { name: "税内訳を修正" }));
     const editor = screen.getByRole("region", { name: "8%の税内訳を修正" });
     expect(within(editor).getByRole("combobox", { name: "税率" })).toHaveFocus();
-    expect(screen.queryByRole("region", { name: "10%の税内訳を修正" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "保存" })).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "10%の税内訳を修正" })).not.toHaveAttribute("open");
+    expect(within(editor).getAllByRole("button", { name: "保存" })).toHaveLength(1);
     const tax = within(editor).getByRole("spinbutton", { name: "税額" });
     expect(tax).toHaveValue(52);
     await user.clear(tax);
@@ -325,12 +325,14 @@ describe("Issue #892 現在の税内訳に揃えた表示", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: "税内訳を修正" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "税内訳を確認" })).not.toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "OCR原文" })).toHaveTextContent("合計 1,782円");
+    expect(screen.getByRole("region", { name: "税内訳を確認" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "OCR原文", hidden: true })).toHaveTextContent(
+      "合計 1,782円",
+    );
     expect(screen.getByRole("region", { name: "確認件数" })).toHaveTextContent("確認推奨 0件");
   });
 
-  it("1782円の混在税は確認0件で、参考欄に税内訳フォームや余白を残さない", async () => {
+  it("1782円の混在税は確認0件で、通常表示に再編集の入口を残す", async () => {
     const user = userEvent.setup();
     const fixture = mixedTaxReviewFixture();
     render(
@@ -346,12 +348,12 @@ describe("Issue #892 現在の税内訳に揃えた表示", () => {
     ).toBeVisible();
     await user.click(screen.getByText("読み取り原文・詳しい税情報（参考）"));
     expect(screen.getByRole("list", { name: "OCR原文" })).toHaveTextContent("合計 1,782円");
-    expect(screen.queryByLabelText("税率別集計", { exact: true })).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "税内訳を確認" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("税率別集計", { exact: true })).toBeVisible();
+    expect(screen.getByRole("region", { name: "税内訳を確認" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "税内訳を修正" })).not.toBeInTheDocument();
   });
 
-  it("未解決の10%だけ表示し、元番号のフォームへフォーカスして保存できる", async () => {
+  it("未解決の10%へフォーカスし、元番号で保存できる", async () => {
     const user = userEvent.setup();
     const fixture = mixedTaxReviewFixture();
     const onSummaryChange = vi.fn();
@@ -380,8 +382,8 @@ describe("Issue #892 現在の税内訳に揃えた表示", () => {
     await user.click(within(banner).getByRole("button", { name: "税内訳を修正" }));
     const editor = screen.getByRole("region", { name: "10%の税内訳を修正" });
     expect(editor).toContainElement(document.activeElement as HTMLElement);
-    expect(screen.queryByRole("region", { name: "8%の税内訳を修正" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "保存" })).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "8%の税内訳を修正" })).not.toHaveAttribute("open");
+    expect(within(editor).getAllByRole("button", { name: "保存" })).toHaveLength(1);
     const target = within(editor).getByRole("spinbutton", { name: "対象額" });
     await user.clear(target);
     await user.type(target, "1061");
@@ -411,7 +413,7 @@ describe("Issue #892 現在の税内訳に揃えた表示", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: "税内訳を修正" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("税率別集計", { exact: true })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("税率別集計", { exact: true })).toBeVisible();
     expect(
       within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 0件"),
     ).toBeVisible();
@@ -551,4 +553,33 @@ it("個別修正した税込登録額を再描画で上書きしない", async (
     await user.click(item.querySelector("summary")!);
   }
   expect(within(item as HTMLElement).getByText("登録額: 110円（税込）")).toBeInTheDocument();
+});
+
+it("即時保存の処理中と失敗を区別し、失敗時も税内訳の再試行入口を残す", () => {
+  const fixture = mixedTaxReviewFixture();
+  const { rerender } = render(
+    <ReviewDialog
+      {...props}
+      selectedReviewDraft={fixture.draft}
+      reviewForm={fixture.form}
+      reviewItems={fixture.items}
+      onTaxSummaryChange={vi.fn()}
+      taxSummaryUpdatingIndex={0}
+    />,
+  );
+  expect(screen.getByLabelText("保存状態")).toHaveTextContent("変更を保存しています");
+  rerender(
+    <ReviewDialog
+      {...props}
+      selectedReviewDraft={fixture.draft}
+      reviewForm={fixture.form}
+      reviewItems={fixture.items}
+      onTaxSummaryChange={vi.fn()}
+      reviewError="保存に失敗しました"
+    />,
+  );
+  expect(screen.getByLabelText("保存状態")).toHaveTextContent("変更を保存できませんでした");
+  expect(
+    screen.getByRole("region", { name: "8%の税内訳を修正" }).querySelector("summary"),
+  ).toBeVisible();
 });

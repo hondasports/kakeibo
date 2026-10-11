@@ -272,3 +272,16 @@ describe("Issue #672 receipt tax golden case ledger", () => {
     }
   });
 });
+
+it("Issue #1003 の匿名化した旧対象額を商品確認から解消する", async () => {
+  const { reinterpretDraftTax } = await import("./reinterpretDraftTax");
+  const { unprovenTargetReceipt } = await import("./fixtures/unprovenTargetReceipt");
+  const result = reinterpretDraftTax(unprovenTargetReceipt());
+  expect(result.interpretation.taxSummaries[0]).toMatchObject({
+    taxableAmountYen: 4810,
+    status: "verified",
+  });
+  expect(result.itemFields.map((item) => item.normalizedAmountYen)).toEqual([
+    990, 1500, 1500, 790, 30,
+  ]);
+});

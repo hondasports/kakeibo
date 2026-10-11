@@ -16,6 +16,7 @@ import type {
   TaxRatePercent,
 } from "./types";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
+import { recalculateUnprovenSummary } from "./summaryEvidence";
 import { allocateTax } from "./normalizeAmounts";
 
 export type { DraftSummaryOverride } from "./types";
@@ -33,6 +34,7 @@ export type BulkUnresolvedTaxOverride = {
 
 export type ReinterpretDraftTaxInput = {
   amountYen: number;
+  taxSummariesUserConfirmed?: boolean;
   receiptTotalSource?: "explicit_label" | "user_confirmed" | "ai_estimate";
   receiptTotalConfidence?: number;
   receiptTotalSupportingCandidates?: ReceiptTaxInput["receiptTotalSupportingCandidates"];
@@ -101,14 +103,28 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
   const sourceTaxSummaries = input.taxSummaries
     .map((summary, index) => {
       if (input.summaryOverride?.index === index) {
-        return { ...summary, ...input.summaryOverride.summary };
+        return {
+          ...summary,
+          ...input.summaryOverride.summary,
+          valueOrigin: {
+            source: "user" as const,
+            previousTaxableAmountYen:
+              summary.valueOrigin?.previousTaxableAmountYen ?? summary.taxableAmountYen,
+          },
+        };
       }
-      return summary;
+      return input.taxSummariesUserConfirmed && !summary.valueOrigin
+        ? { ...summary, valueOrigin: { source: "user" as const } }
+        : summary;
     })
     .map(completeSummaryModeBasis);
 
   const items = input.items.map((item, index) => {
     const extracted = draftItemToExtractedReceiptItem(item);
+    // 前回の判定理由は再計算する。OCR由来の一般的な注意は保持する。
+    extracted.warnings = extracted.warnings.filter(
+      (warning) => warning !== "unresolved_tax_rate" && warning !== "unresolved_amount_basis",
+    );
     const decisionAmountBasis =
       input.decisionOverride?.priceTaxTreatment === "included"
         ? "tax_included"
@@ -162,34 +178,45 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
       : input.decisionOverride?.priceTaxTreatment === "excluded"
         ? "tax_excluded"
         : undefined;
-  const taxSummaries =
-    selectedRate !== undefined && selectedBasis !== undefined
-      ? (() => {
-          const printedTotalYen = items.reduce((sum, item) => sum + item.printedAmountYen, 0);
-          const taxYen = Math.round(
-            selectedBasis === "tax_excluded"
-              ? (printedTotalYen * selectedRate) / 100
-              : (printedTotalYen * selectedRate) / (100 + selectedRate),
-          );
-          return [
-            {
-              taxRatePercent: selectedRate,
-              taxMode:
-                selectedBasis === "tax_excluded" ? ("external" as const) : ("included" as const),
-              taxableAmountYen: printedTotalYen,
-              taxableAmountBasis: selectedBasis,
-              taxYen,
-              taxIncludedAmountYen:
-                selectedBasis === "tax_excluded" ? printedTotalYen + taxYen : printedTotalYen,
-              roundingMethod: "round" as const,
-              confidence: {},
-              warnings: [],
-              status: "verified" as const,
-              reasons: [],
-            },
-          ];
-        })()
-      : sourceTaxSummaries;
+  // 独立した印字証拠がある場合、全体選択でも原文の内訳を捨てない。
+  const canSynthesizeDecision =
+    selectedRate !== undefined &&
+    selectedBasis !== undefined &&
+    !input.rawObservationLines?.some((line) => line.explicitlyPrinted) &&
+    !sourceTaxSummaries.some((summary) => summary.valueOrigin?.source === "user");
+  const taxSummaries = canSynthesizeDecision
+    ? (() => {
+        const printedTotalYen = items.reduce((sum, item) => sum + item.printedAmountYen, 0);
+        const taxYen = Math.round(
+          selectedBasis === "tax_excluded"
+            ? (printedTotalYen * selectedRate) / 100
+            : (printedTotalYen * selectedRate) / (100 + selectedRate),
+        );
+        return [
+          {
+            taxRatePercent: selectedRate,
+            taxMode:
+              selectedBasis === "tax_excluded" ? ("external" as const) : ("included" as const),
+            taxableAmountYen: printedTotalYen,
+            taxableAmountBasis: selectedBasis,
+            taxYen,
+            taxIncludedAmountYen:
+              selectedBasis === "tax_excluded" ? printedTotalYen + taxYen : printedTotalYen,
+            roundingMethod: "round" as const,
+            valueOrigin: { source: "items" as const },
+            confidence: {},
+            warnings: [],
+            status: "verified" as const,
+            reasons: [],
+          },
+        ];
+      })()
+    : recalculateUnprovenSummary({
+        amountYen: input.amountYen,
+        items,
+        summaries: sourceTaxSummaries,
+        lines: input.rawObservationLines,
+      });
 
   const userItemPriceWasEdited =
     input.override?.amountBasis !== undefined ||
@@ -261,46 +288,56 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
           }
         : undefined,
   });
-  const interpretedItems =
-    selectedRate !== undefined && selectedBasis !== undefined
-      ? (() => {
-          const summaryTaxYen = taxSummaries[0]?.taxYen ?? 0;
-          const printedTotalYen = interpretation.items.reduce(
-            (sum, item) => sum + item.printedAmountYen,
-            0,
-          );
-          const allocations = allocateTax(
-            summaryTaxYen,
-            printedTotalYen,
-            interpretation.items.map((item) => item.printedAmountYen),
-          );
-          return interpretation.items.map((item, index) => {
-            const allocatedTaxYen = allocations[index] ?? 0;
-            return {
-              ...item,
-              amountBasis: selectedBasis,
+  const interpretedItems = canSynthesizeDecision
+    ? (() => {
+        const summaryTaxYen = taxSummaries[0]?.taxYen ?? 0;
+        const printedTotalYen = interpretation.items.reduce(
+          (sum, item) => sum + item.printedAmountYen,
+          0,
+        );
+        const allocations = allocateTax(
+          summaryTaxYen,
+          printedTotalYen,
+          interpretation.items.map((item) => item.printedAmountYen),
+        );
+        return interpretation.items.map((item, index) => {
+          const allocatedTaxYen = allocations[index] ?? 0;
+          return {
+            ...item,
+            amountBasis: selectedBasis,
+            taxRatePercent: selectedRate,
+            allocatedTaxYen,
+            taxAllocationStatus: "allocated" as const,
+            normalizedAmountYen:
+              selectedBasis === "tax_excluded"
+                ? item.printedAmountYen + allocatedTaxYen
+                : item.printedAmountYen,
+            taxContext: {
+              status: "resolved" as const,
               taxRatePercent: selectedRate,
-              allocatedTaxYen,
-              taxAllocationStatus: "allocated" as const,
-              normalizedAmountYen:
-                selectedBasis === "tax_excluded"
-                  ? item.printedAmountYen + allocatedTaxYen
-                  : item.printedAmountYen,
-              taxContext: {
-                status: "resolved" as const,
-                taxRatePercent: selectedRate,
-                amountBasis: selectedBasis,
-                source: "item_explicit" as const,
-              },
-            };
-          });
-        })()
-      : interpretation.items;
-  const resolvedInterpretation = { ...interpretation, items: interpretedItems };
+              amountBasis: selectedBasis,
+              source: "item_explicit" as const,
+            },
+          };
+        });
+      })()
+    : interpretation.items;
+  const amountsResolved =
+    interpretation.taxSummaries.length > 0 &&
+    interpretation.taxSummaries.every((summary) => summary.status === "verified") &&
+    interpretedItems.every((item) => item.taxAllocationStatus === "allocated") &&
+    interpretedItems.reduce((sum, item) => sum + item.normalizedAmountYen, 0) === input.amountYen;
+  const effectiveItems = amountsResolved
+    ? interpretedItems.map((item) => ({
+        ...item,
+        warnings: item.warnings.filter((warning) => warning !== "amount_mismatch"),
+      }))
+    : interpretedItems;
+  const resolvedInterpretation = { ...interpretation, items: effectiveItems };
 
   return {
     interpretation: resolvedInterpretation,
-    itemFields: interpretedItems.map(interpretedItemToDraftFields),
+    itemFields: effectiveItems.map(interpretedItemToDraftFields),
   };
 }
 
