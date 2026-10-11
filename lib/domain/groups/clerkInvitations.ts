@@ -1,5 +1,4 @@
 export const INVITATION_ACCEPT_PATH = "/group/invitations/accept";
-export const KAKEIBO_PRODUCTION_HOSTNAME = "kakeibo.vercel.app";
 
 export type InvitationRedirectError =
   | "invalid_url"
@@ -19,7 +18,7 @@ export type InvitationRedirectOptions = {
 /**
  * 招待リンクの戻り先 origin を判定する。
  * 第三者が登録できるホスト名（kakeibo-*.vercel.app 等）は許可しないため、
- * 設定済み origin・本番 origin との完全一致、または開発時の localhost だけを通す。
+ * 設定済み origin との完全一致、または開発時の localhost だけを通す（コードに許可 origin を埋め込まない）。
  */
 export function isAllowedRedirectOrigin(
   url: URL,
@@ -34,11 +33,7 @@ export function isAllowedRedirectOrigin(
     );
   }
 
-  if (configuredOrigins.includes(url.origin)) {
-    return true;
-  }
-
-  return url.origin === `https://${KAKEIBO_PRODUCTION_HOSTNAME}`;
+  return configuredOrigins.includes(url.origin);
 }
 
 export function buildInvitationRedirectUrl(

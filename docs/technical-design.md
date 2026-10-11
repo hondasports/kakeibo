@@ -1483,7 +1483,7 @@ DEV / PREVIEW / PROD の3環境を分けて構築する。
 | 領域           | DEV                                              | PREVIEW                                          | PROD                                              |
 | -------------- | ------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------- |
 | フロントエンド | Vercel Preview URL、またはlocalhost              | `preview` branch の Vercel Preview              | Vercel Production URL                             |
-| URL            | `https://kakeibo-*.vercel.app` などのPreview URL | `https://kakeibo-*.vercel.app` などのPreview URL | `https://kakeibo.vercel.app` などのProduction URL |
+| URL            | `https://kakeibo-*.vercel.app` などのPreview URL | `https://kakeibo-*.vercel.app` などのPreview URL | `https://www.suzumemo.jp` などのProduction URL    |
 | Clerk          | Development instance                             | Development instance                             | Production instance                               |
 | Clerk認証方式  | Google OAuth                                     | Google OAuth                                     | Google OAuth                                      |
 | Convex         | dev deployment                                   | fixed staging deployment                         | production deployment                             |

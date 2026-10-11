@@ -67,9 +67,9 @@ Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email
 | `INVITATION_REDIRECT_ORIGINS`  | 招待メールのリンク先として許可する origin（カンマ区切り・完全一致） | 任意  | ✅             | ✅         | ✅   | ❌         | Convex Dashboard |
 
 - 招待メールのリンク先（`redirectUrl`）は、この変数に列挙した origin と完全一致する場合だけ許可する。ワイルドカードやサブドメイン一致は使わない。
-- `https://kakeibo.vercel.app` のみ変数未設定でも許可される。それ以外の本番ドメイン・Preview ドメインは設定が必須（未設定だと招待が「戻り先URLが許可されていません」で失敗する）。
+- 既定で許可される origin は無い。本番ドメイン・Preview ドメインとも設定が必須（未設定だと招待が「戻り先URLが許可されていません」で失敗する）。
 - `localhost` / `127.0.0.1` は `APP_ENV=development` の deployment でのみ許可する。`APP_ENV` が `production` や未設定の場合は拒否する。
-- 値は `https://preview.suzumemo.jp,https://kakeibo.vercel.app` のように scheme と host（必要ならport）だけを書く。パスは含めない。
+- 値は `https://preview.suzumemo.jp,https://www.suzumemo.jp` のように scheme と host（必要ならport）だけを書く。パスは含めない。
 - fixed Preview の `https://preview.suzumemo.jp` は `preview-deploy.yml` と `production-release.yml`（RC）が staging Convex に設定する。PROD は手動で設定する。
 
 ### OpenAI / レシート画像抽出関連
@@ -378,7 +378,7 @@ pnpm exec convex env set E2E_CLEANUP_SECRET '...'
 # production deployment（real mode）
 pnpm exec convex env set RECEIPT_IMAGE_EXTRACTOR_MODE real
 pnpm exec convex env set APP_ENV production
-pnpm exec convex env set INVITATION_REDIRECT_ORIGINS https://kakeibo.vercel.app
+pnpm exec convex env set INVITATION_REDIRECT_ORIGINS https://www.suzumemo.jp
 pnpm exec convex env set OPENAI_API_KEY sk-...
 # production には E2E_CLERK_USER_ID / E2E_CLEANUP_SECRET を設定しない
 ```
