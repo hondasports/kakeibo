@@ -130,17 +130,11 @@ export function ReviewDialog(props: ReviewDialogProps) {
     summarySourceIndexes: preview.summarySourceIndexes,
     sourceTaxSummaries: sourceDraft?.taxSummaries,
   });
-  const editableSummaries = preview.summarySourceIndexes.flatMap((sourceIndex, summaryIndex) =>
-    sourceIndex >= 0
-      ? [
-          {
-            summaryIndex,
-            sourceIndex,
-            message: guidance.find((issue) => issue.taxSummaryIndex === summaryIndex)?.message,
-          },
-        ]
-      : [],
-  );
+  const editableSummaries = preview.summarySourceIndexes.map((sourceIndex, summaryIndex) => ({
+    summaryIndex,
+    sourceIndex,
+    message: guidance.find((issue) => issue.taxSummaryIndex === summaryIndex)?.message,
+  }));
   const required = guidance.filter((issue) => issue.required);
   const recommendations = guidance.filter((issue) => !issue.required && issue.scope !== "receipt");
   const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");

@@ -39,11 +39,12 @@ export function ReceiptTaxSummarySection({
         const summary = summaries[index];
         if (!summary) return null;
         const isEditable =
-          editableSummaries !== undefined ||
-          summary.status === "ambiguous" ||
-          summary.status === "contradictory" ||
-          summary.status === "reconcilable" ||
-          summary.status === "conflicting";
+          sourceIndex >= 0 &&
+          (editableSummaries !== undefined ||
+            summary.status === "ambiguous" ||
+            summary.status === "contradictory" ||
+            summary.status === "reconcilable" ||
+            summary.status === "conflicting");
         const key = `${sourceIndex}-${index}`;
         const evidence = taxSummaryEvidenceLines(
           draft?.rawObservation?.source === "ai_ocr" ? draft.rawObservation.lines : undefined,
@@ -122,6 +123,11 @@ export function ReceiptTaxSummarySection({
                   OCR原文は画像の正確性を保証しません。相違があればレシート画像と照合してください。
                 </Typography>
               </Box>
+            )}
+            {sourceIndex < 0 && (
+              <Typography variant="body2">
+                全体税設定を保存すると、税内訳を個別に修正できます。
+              </Typography>
             )}
             {isEditable && (
               <ReceiptTaxSummaryEditor
