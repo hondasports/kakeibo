@@ -62,6 +62,15 @@ function hasAmount(line: ReceiptRawObservationLine) {
   return line.amountYen !== null;
 }
 
+/** 構造分類と税内訳の照合で共通の支払合計ラベルを使う。 */
+export function isReceiptTotalLabel(rawText: string): boolean {
+  const text = normalizeText(rawText);
+  return (
+    /(?:合計|総計|お買上|ご請求額|お支払(?:額|合計)|今回支払額|total)/i.test(text) &&
+    !/(?:小計|値引|割引|subtotal)/i.test(text)
+  );
+}
+
 function addLabelCandidates(
   line: ReceiptRawObservationLine,
   candidates: Map<ReceiptStructuralLineRole, MutableCandidate>,
@@ -101,10 +110,7 @@ function addLabelCandidates(
   ) {
     addCandidate(candidates, "tax", 0.8, "partial_label:tax");
   }
-  if (
-    /(?:合計|総計|お買上|ご請求額|お支払(?:額|合計)|今回支払額|total)/i.test(text) &&
-    !/(?:小計|値引|割引)/.test(text)
-  ) {
+  if (isReceiptTotalLabel(line.rawText)) {
     addCandidate(candidates, "totalCandidate", 0.94, "explicit_label:total");
   }
   if (/(?:クーポン|coupon)/i.test(text)) {

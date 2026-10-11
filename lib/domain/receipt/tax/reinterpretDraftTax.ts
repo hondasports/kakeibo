@@ -101,11 +101,16 @@ function completeSummaryModeBasis(summary: ExtractedTaxSummary): ExtractedTaxSum
 }
 
 export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): ReinterpretDraftTaxResult {
+  // 旧形式は集合全体に編集metadataがない場合だけ保守的に保護する。
+  const legacyUserConfirmed =
+    input.taxSummariesUserConfirmed &&
+    input.taxSummaries.every(
+      (summary) => summary.valueOrigin === undefined && summary.userEditedFields === undefined,
+    );
   const sourceTaxSummaries = input.taxSummaries
     .map((summary, index) => {
       const existingOrigin =
-        summary.valueOrigin ??
-        (input.taxSummariesUserConfirmed ? { source: "user" as const } : undefined);
+        summary.valueOrigin ?? (legacyUserConfirmed ? { source: "user" as const } : undefined);
       if (input.summaryOverride?.index === index) {
         const targetEdited = input.summaryOverride.summary.taxableAmountYen !== undefined;
         return {
