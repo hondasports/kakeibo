@@ -100,6 +100,30 @@ describe("buildTaxRateCheck", () => {
       expect(check.rows[0]).toMatchObject({ status: "mismatch", sourceLabel: "OCR原文" });
     });
 
+    it.each(["8.0%対象額", "８.００％対象額"])("小数の税率表記%sも直接印字として扱う", (label) => {
+      const check = buildTaxRateCheck({
+        items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],
+        taxSummaries: [summary()],
+        rawObservation: rawObservation([{ rawText: `${label} 100`, amountYen: 100 }]),
+      });
+      expect(check.rows[0]).toMatchObject({ status: "mismatch", sourceLabel: "OCR原文" });
+    });
+
+    it("商品名の税込表記を同額の対象額証拠に流用しない", () => {
+      const check = buildTaxRateCheck({
+        items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],
+        taxSummaries: [summary()],
+        rawObservation: rawObservation([
+          { rawText: "商品A 税込8% 100", amountYen: 100, lineRoleCandidates: ["item"] },
+        ]),
+      });
+      expect(check.rows[0]).toMatchObject({
+        status: "matched",
+        matchKind: "approx",
+        sourceLabel: "出所未確認の対象額",
+      });
+    });
+
     it("直接印字の証拠がない対象額は±1円を近似一致として扱う", () => {
       const check = buildTaxRateCheck({
         items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],
