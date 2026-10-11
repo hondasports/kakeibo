@@ -108,6 +108,7 @@ import type * as notifications_lineActions from "../notifications/lineActions.js
 import type * as notifications_model from "../notifications/model.js";
 import type * as notifications_mutations from "../notifications/mutations.js";
 import type * as notifications_queries from "../notifications/queries.js";
+import type * as orphanedLineLinkMigration from "../orphanedLineLinkMigration.js";
 import type * as receiptAnalysisJobs_actions from "../receiptAnalysisJobs/actions.js";
 import type * as receiptAnalysisJobs_internal from "../receiptAnalysisJobs/internal.js";
 import type * as receiptAnalysisJobs_mutations from "../receiptAnalysisJobs/mutations.js";
@@ -246,6 +247,7 @@ declare const fullApi: ApiFromModules<{
   "notifications/model": typeof notifications_model;
   "notifications/mutations": typeof notifications_mutations;
   "notifications/queries": typeof notifications_queries;
+  orphanedLineLinkMigration: typeof orphanedLineLinkMigration;
   "receiptAnalysisJobs/actions": typeof receiptAnalysisJobs_actions;
   "receiptAnalysisJobs/internal": typeof receiptAnalysisJobs_internal;
   "receiptAnalysisJobs/mutations": typeof receiptAnalysisJobs_mutations;
