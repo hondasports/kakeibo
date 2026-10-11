@@ -1,14 +1,50 @@
 import type { ReceiptRawObservationLine } from "../observations";
 import type { ExtractedReceiptItem, ExtractedTaxSummary } from "./types";
 
-/** 明示的な対象額・税額の語を優先し、税率のない合計行は税内訳にしない。 */
-function taxSummaryLineKind(rawText: string): "target" | "tax" | undefined {
-  const text = rawText.normalize("NFKC").replace(/\s+/g, "");
-  const explicitTarget =
-    /対象|タイショウ|小計|課税売上/.test(text) && !/対象(?:消費)?税/.test(text);
+function normalizedText(rawText: string): string {
+  return rawText.normalize("NFKC").replace(/\s+/g, "");
+}
+
+function printedRates(rawText: string): number[] {
+  return [...normalizedText(rawText).matchAll(/(?<![\d.])(\d+(?:\.\d+)?)%/g)].map((match) =>
+    Number(match[1]),
+  );
+}
+
+function hasConflictingRate(rawText: string, rate: number): boolean {
+  const text = normalizedText(rawText);
+  const rates = printedRates(text);
+  return rates.length !== (text.match(/%/g)?.length ?? 0) || rates.some((value) => value !== rate);
+}
+
+/** 商品・割引だけの役割なら、名称中の税表記を独立した税内訳にしない。 */
+function isItemOrDiscountOnly(line: ReceiptRawObservationLine): boolean {
+  return (
+    explicitSummaryLineKind(line.rawText) === undefined &&
+    !line.lineRoleCandidates.some((role) => role === "tax" || role === "subtotal") &&
+    line.lineRoleCandidates.some((role) => role === "item" || role === "discount")
+  );
+}
+
+/** 明示的な対象額を優先し、税額の小計・合計は税額として扱う。 */
+function explicitSummaryLineKind(rawText: string): "target" | "tax" | undefined {
+  const text = normalizedText(rawText);
+  const explicitTarget = /対象|タイショウ|課税売上/.test(text) && !/対象(?:消費)?税/.test(text);
   if (explicitTarget) return "target";
   if (/税額|消費税|内税|外税|\(内\)税|税計|税合計|tax/i.test(text)) return "tax";
-  if (/(?<!\d)(0|8|10)%/.test(text) && /税込|税抜|税別|合計/.test(text)) return "target";
+  if (/小計/.test(text)) return "target";
+  return undefined;
+}
+
+function taxSummaryLineKind(rawText: string): "target" | "tax" | undefined {
+  const text = normalizedText(rawText);
+  const explicitKind = explicitSummaryLineKind(text);
+  if (explicitKind) return explicitKind;
+  if (
+    printedRates(text).some((rate) => [0, 8, 10].includes(rate)) &&
+    /税込|税抜|税別|合計/.test(text)
+  )
+    return "target";
   return undefined;
 }
 
@@ -18,14 +54,12 @@ export function hasPrintedTaxSummaryEvidence(
 ): boolean {
   return (
     lines?.some((line) => {
-      if (!line.explicitlyPrinted) return false;
+      if (!line.explicitlyPrinted || isItemOrDiscountOnly(line)) return false;
       if (taxSummaryLineKind(line.rawText) !== undefined) return true;
       // 読み取れない税内訳や税率付き金額も独立した証拠として残す。
       return (
         line.lineRoleCandidates.some((role) => role === "tax" || role === "subtotal") ||
-        (line.amountYen !== null &&
-          !line.lineRoleCandidates.some((role) => role === "item" || role === "discount") &&
-          /%/.test(line.rawText.normalize("NFKC")))
+        (line.amountYen !== null && /%/.test(normalizedText(line.rawText)))
       );
     }) ?? false
   );
@@ -38,32 +72,20 @@ export function taxSummaryEvidenceLines(
   kind: "target" | "tax",
   options: { singleSummary?: boolean } = {},
 ): ReceiptRawObservationLine[] {
+  const independentLines = (lines ?? []).filter(
+    (line) => line.explicitlyPrinted && !isItemOrDiscountOnly(line),
+  );
   const canAssignRateLessTarget =
     kind === "target" &&
     options.singleSummary === true &&
-    !(lines ?? []).some((line) => {
-      if (!line.explicitlyPrinted) return false;
-      if (
-        taxSummaryLineKind(line.rawText) === undefined &&
-        !line.lineRoleCandidates.some((role) => role === "tax" || role === "subtotal") &&
-        line.lineRoleCandidates.some((role) => role === "item" || role === "discount")
-      )
-        return false;
-      const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
-      const rates = [...text.matchAll(/(\d+(?:\.\d+)?)%/g)];
-      return (
-        rates.length !== (text.match(/%/g)?.length ?? 0) ||
-        rates.some((match) => Number(match[1]) !== rate)
-      );
-    });
-  return (lines ?? []).filter((line) => {
-    if (!line.explicitlyPrinted || !Number.isSafeInteger(line.amountYen)) return false;
-    const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
-    const rateMatch = /(?<!\d)(0|8|10)%/.exec(text);
-    if (rateMatch) {
-      if (Number(rateMatch[1]) !== rate) return false;
-    } else if (!canAssignRateLessTarget || text.includes("%")) return false;
-    return taxSummaryLineKind(line.rawText) === kind;
+    !independentLines.some((line) => hasConflictingRate(line.rawText, rate));
+  return independentLines.filter((line) => {
+    if (!Number.isSafeInteger(line.amountYen)) return false;
+    const text = normalizedText(line.rawText);
+    if (text.includes("%")) {
+      if (hasConflictingRate(text, rate)) return false;
+    } else if (!canAssignRateLessTarget) return false;
+    return taxSummaryLineKind(text) === kind;
   });
 }
 
@@ -77,7 +99,8 @@ export function recalculateUnprovenSummary(args: {
   summaries: ExtractedTaxSummary[];
   lines?: ReceiptRawObservationLine[];
 }): ExtractedTaxSummary[] {
-  const { items, summaries, lines, amountYen } = args;
+  const { items, summaries, amountYen } = args;
+  const lines = args.lines?.filter((line) => !isItemOrDiscountOnly(line));
   if (summaries.length !== 1 || items.length === 0 || !lines?.length) return summaries;
   const summary = summaries[0];
   if (summary.valueOrigin?.source === "user") return summaries;
@@ -111,24 +134,15 @@ export function recalculateUnprovenSummary(args: {
     })
   )
     return summaries;
-  // 税率付きの金額行を税額と確認できない場合、別の対象額証拠を落とさない。
+  // 分類できない税率付き金額や、他税率・不明税率の印字を落とさない。
   if (
     lines.some(
       (line) =>
         line.explicitlyPrinted &&
-        line.amountYen !== null &&
-        /(?<!\d)(?:0|8|10)\s*%/.test(line.rawText.normalize("NFKC")) &&
-        !taxLines.includes(line),
-    )
-  )
-    return summaries;
-  // 他税率の印字を落とした単一内訳では自動確定しない。
-  if (
-    lines.some(
-      (line) =>
-        line.explicitlyPrinted &&
-        /(?<!\d)(0|8|10)\s*%/.test(line.rawText.normalize("NFKC")) &&
-        !new RegExp(`(?<!\\d)${rate}\\s*%`).test(line.rawText.normalize("NFKC")),
+        ((line.amountYen !== null &&
+          normalizedText(line.rawText).includes("%") &&
+          !taxLines.includes(line)) ||
+          hasConflictingRate(line.rawText, rate)),
     )
   )
     return summaries;
