@@ -1,7 +1,7 @@
 /**
  * 招待レコード作成ユースケース（internalMutation）。
- * 同一トークンの既存レコードは pending に戻して再利用し、
- * なければ stale 掃除＋招待可否チェックの後に新規作成する。
+ * 同一トークンの既存レコード（予約行）は pending のままなら clerkInvitationId を追記し、
+ * 後続予約に revoke 済みなら復活させず拒否する。なければ stale 掃除＋招待可否チェックの後に新規作成する。
  */
 import type { GroupInvitationRepository } from "../../domain/groups/groupInvitationRepository";
 import type { GroupInvitationCleanupService } from "../../domain/groups/groupServices";
@@ -31,8 +31,17 @@ export async function createGroupInvitationRecord(
   const existing = await deps.invitations.findByToken(args.token);
 
   if (existing) {
+    // 2 段階目（Clerk 招待後の clerkInvitationId 追記）。予約行が今も pending のときだけ追記する。
+    // 同一メールの後続予約が revokeForEmail でこの行を revoke 済み（または取消済み）なら、
+    // pending に戻すと「同一メール pending 1 件」「上限」の不変条件を壊すため復活させない。
+    // 予約行が pending のままなら、後続予約は存在せず（存在すれば revoke されている）、
+    // 件数にも予約時点で数えられているため、再判定せず clerkInvitationId だけを追記すれば足りる。
+    if (existing.status !== "pending") {
+      throw new ConvexError(
+        "同じメールアドレスへの別の招待操作により、この招待は無効になりました。招待一覧を確認してから再度お試しください",
+      );
+    }
     await deps.invitations.patch(existing.id, {
-      status: "pending",
       updatedAt: now,
       ...(args.clerkInvitationId ? { clerkInvitationId: args.clerkInvitationId } : {}),
     });

@@ -77,6 +77,23 @@ describe("inviteMember", () => {
     });
   });
 
+  it("2段階目が superseded で拒否されたらエラーを伝播し、Clerk招待を再送せず補償削除もしない", async () => {
+    const createInvitation = vi.fn(async () => ({ id: "clerk-invite-001" }));
+    const store = createStore({
+      createGroupInvitationRecord: vi
+        .fn()
+        .mockResolvedValueOnce("invite-001")
+        .mockRejectedValueOnce(new Error("この招待は無効になりました")),
+    });
+    const services = createServices({
+      getClerk: vi.fn(() => ({ invitations: { createInvitation } })),
+    });
+
+    await expect(inviteMember(store, services, args)).rejects.toThrow("無効になりました");
+    expect(createInvitation).toHaveBeenCalledTimes(1);
+    expect(store.deletePendingGroupInvitationRecordByToken).not.toHaveBeenCalled();
+  });
+
   it("グループ未選択ならドメインエラーで止まり副作用を起こさない", async () => {
     const store = createStore({ getMyGroup: vi.fn(async () => null) });
     const services = createServices();
