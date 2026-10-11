@@ -60,6 +60,18 @@ Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email
 
 通常のローカル開発は `pnpm run dev` でlocal deploymentを自動作成・選択し、Convex watcherとViteを起動する。Convexだけを起動する場合は `pnpm run convex:dev` を使う。クラウドのdev deploymentを使う必要がある場合だけ `pnpm run convex:dev:cloud` と `pnpm run e2e:env-sync:cloud` を明示的に実行する。
 
+### グループ招待リンク関連
+
+| 変数名                         | 用途                                                                  | Local | DEV/PR Preview | PREVIEW RC | PROD | Secret扱い | 設定場所         |
+| ------------------------------ | --------------------------------------------------------------------- | ----- | -------------- | ---------- | ---- | ---------- | ---------------- |
+| `INVITATION_REDIRECT_ORIGINS`  | 招待メールのリンク先として許可する origin（カンマ区切り・完全一致） | 任意  | ✅             | ✅         | ✅   | ❌         | Convex Dashboard |
+
+- 招待メールのリンク先（`redirectUrl`）は、この変数に列挙した origin と完全一致する場合だけ許可する。ワイルドカードやサブドメイン一致は使わない。
+- `https://kakeibo.vercel.app` のみ変数未設定でも許可される。それ以外の本番ドメイン・Preview ドメインは設定が必須（未設定だと招待が「戻り先URLが許可されていません」で失敗する）。
+- `localhost` / `127.0.0.1` は `APP_ENV=development` の deployment でのみ許可する。`APP_ENV` が `production` や未設定の場合は拒否する。
+- 値は `https://preview.suzumemo.jp,https://kakeibo.vercel.app` のように scheme と host（必要ならport）だけを書く。パスは含めない。
+- fixed Preview の `https://preview.suzumemo.jp` は `preview-deploy.yml` と `production-release.yml`（RC）が staging Convex に設定する。PROD は手動で設定する。
+
 ### OpenAI / レシート画像抽出関連
 
 | 変数名                         | 用途                                         | Local | DEV/PR Preview | PREVIEW RC | PROD | Secret扱い | 設定場所               |
@@ -344,6 +356,7 @@ Convex Dashboard (Deployment Settings > Environment Variables) に以下を設�
 - `E2E_CLERK_USER_ID` — DEV / PREVIEW でE2E操作を許可する固定テストユーザー。本番には設定しない
 - `RECEIPT_IMAGE_EXTRACTOR_MODE` — `mock`（Local / DEV / PREVIEW）/ `real`（PRODのみ）
 - `APP_ENV` — **必須**。`development`（Local / DEV / PREVIEW）/ `production`（PROD）。未設定・不正値は mock / 開発専用機能が fail-closed で拒否される
+- `INVITATION_REDIRECT_ORIGINS` — 招待メールのリンク先として許可する origin（カンマ区切り・完全一致）。PROD は本番の公開 origin、staging は `https://preview.suzumemo.jp`。localhost / 127.0.0.1 を指定しても `APP_ENV=development` 以外では無視される（拒否される）
 - `OPENAI_API_KEY` — OpenAI API 認証キー（production deployment のみ設定。dev deployment には設定しない）
 
 Convex staging deployment では、`APP_ENV=development`、
@@ -355,12 +368,14 @@ CLI での設定例:
 # ローカル / dev deployment（mock mode）
 pnpm exec convex env set RECEIPT_IMAGE_EXTRACTOR_MODE mock
 pnpm exec convex env set APP_ENV development
+pnpm exec convex env set INVITATION_REDIRECT_ORIGINS https://preview.suzumemo.jp
 pnpm exec convex env set E2E_CLERK_USER_ID 'https://your-clerk-frontend-api-url.clerk.accounts.dev|user_...'
 pnpm exec convex env set E2E_CLEANUP_SECRET '...'
 
 # production deployment（real mode）
 pnpm exec convex env set RECEIPT_IMAGE_EXTRACTOR_MODE real
 pnpm exec convex env set APP_ENV production
+pnpm exec convex env set INVITATION_REDIRECT_ORIGINS https://kakeibo.vercel.app
 pnpm exec convex env set OPENAI_API_KEY sk-...
 # production には E2E_CLERK_USER_ID / E2E_CLEANUP_SECRET を設定しない
 ```
