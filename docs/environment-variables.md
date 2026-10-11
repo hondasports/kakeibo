@@ -66,7 +66,7 @@ Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email
 | ------------------------------ | -------------------------------------------- | ----- | -------------- | ---------- | ---- | ---------- | ---------------------- |
 | `OPENAI_API_KEY`               | OpenAI API 認証キー                          | ❌    | ❌             | ❌         | ✅   | ✅         | Convex Dashboard       |
 | `RECEIPT_IMAGE_EXTRACTOR_MODE` | OpenAI 呼び出しの切り替え（`mock` / `real`） | ✅    | ✅             | ✅         | ✅   | ❌         | Convex Dashboard       |
-| `APP_ENV`                      | real mode の許可判定（`development` / `production`） | ✅ | ✅ | ✅ | ✅ | ❌ | Convex Dashboard |
+| `APP_ENV`                      | **全デプロイで必須**。環境の明示（`development` / `production` の完全一致）。real mode・mock・開発専用操作の許可判定に使う | ✅ | ✅ | ✅ | ✅ | ❌ | Convex Dashboard |
 
 ### トランザクションメール (Resend) 関連
 
@@ -86,6 +86,20 @@ Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email
 > `OPENAI_API_KEY` は Convex Action 内（サーバー側）でのみ使用する。フロントエンドには渡さない。
 > ローカル・PR・Preview・CI では `RECEIPT_IMAGE_EXTRACTOR_MODE=mock` を使い、OpenAI API を呼ばない。
 > `real` mode は `APP_ENV=production` のときのみ許可する。
+>
+> **`APP_ENV` は全デプロイで必須**。許可値は `development` / `production` の完全一致のみ（`prod` や `Production` は不正）。
+> mock / 開発専用の挙動は `APP_ENV=development` と明示された場合だけ許可する allow-list 方式で、未設定・不正値は production とも development とも見なさず fail-closed にする。
+>
+> | 対象 | `APP_ENV` 未設定・不正値のとき |
+> | --- | --- |
+> | レシート画像抽出（`RECEIPT_IMAGE_EXTRACTOR_MODE` 未設定の mock フォールバックを含む） | `APP_ENV が未設定、または不正な値です…` で拒否（mode に関わらず mock / real どちらも動かない） |
+> | LINE 連携 mock mode（`LINE_INTEGRATION_MODE=mock`） | 拒否。`real` mode は従来どおり `APP_ENV` に依存しない |
+> | LINE リッチメニュー実 apply（`pnpm run line:rich-menu -- --apply`） | 拒否（`--apply` は `APP_ENV=development` のときだけ。dry-run は影響なし） |
+> | system admin の検索・グループ削除ジョブ一覧 | `APP_ENVが正しく設定されていません` で拒否（development 表示へフォールバックしない） |
+> | E2E 用 HTTP / purge | 従来どおり `development` 以外は 503 / no-op |
+>
+> 各環境の設定元: Local は `pnpm run e2e:env-sync`（`development`）、CI E2E は `scripts/start-ci-convex.mjs`（`development`）、PREVIEW / PREVIEW RC は `preview-deploy.yml` / `production-release.yml`（`development`）、PROD は `production-release.yml`（`production`）。
+> `convex env set APP_ENV ...` を手動で行う環境（新規 Convex deployment など）は、機能を使う前に必ず設定する。
 
 ### E2E テストクリーンアップ関連
 
@@ -327,7 +341,7 @@ Convex Dashboard (Deployment Settings > Environment Variables) に以下を設�
 - `E2E_CLEANUP_SECRET` — DEV / PREVIEW 専用のE2Eクリーンアップ API 認証シークレット。本番には設定しない
 - `E2E_CLERK_USER_ID` — DEV / PREVIEW でE2E操作を許可する固定テストユーザー。本番には設定しない
 - `RECEIPT_IMAGE_EXTRACTOR_MODE` — `mock`（Local / DEV / PREVIEW）/ `real`（PRODのみ）
-- `APP_ENV` — `development`（Local / DEV / PREVIEW）/ `production`（PROD）
+- `APP_ENV` — **必須**。`development`（Local / DEV / PREVIEW）/ `production`（PROD）。未設定・不正値は mock / 開発専用機能が fail-closed で拒否される
 - `OPENAI_API_KEY` — OpenAI API 認証キー（production deployment のみ設定。dev deployment には設定しない）
 
 Convex staging deployment では、`APP_ENV=development`、
