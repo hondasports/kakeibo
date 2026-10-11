@@ -4,6 +4,7 @@ import {
   LineWebhookPayloadError,
 } from "../../lib/domain/lineWebhook/payload";
 import { verifyLineSignature } from "../../lib/domain/lineWebhook/signature";
+import { readBoundedBody } from "../../lib/convex/http/readBoundedBody";
 import { runClaimEvents } from "../../lib/convex/lineWebhook/webhookIngress";
 
 export const MAX_RAW_BODY_BYTES = 1_000_000;
@@ -14,41 +15,8 @@ export type LineSignatureVerifier = (
   channelSecret: string,
 ) => Promise<boolean>;
 
-async function readRawBody(req: Request): Promise<{ bytes: Uint8Array; tooLarge: boolean }> {
-  if (!req.body) return { bytes: new Uint8Array(), tooLarge: false };
-
-  const reader = req.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-
-      const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
-      totalBytes += chunk.byteLength;
-      if (totalBytes > MAX_RAW_BODY_BYTES) {
-        try {
-          await reader.cancel("LINE webhook payload too large");
-        } catch {
-          // 読み込み停止が既に完了している場合も413を返す。
-        }
-        return { bytes: new Uint8Array(), tooLarge: true };
-      }
-      chunks.push(chunk);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const bytes = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return { bytes, tooLarge: false };
+function readRawBody(req: Request) {
+  return readBoundedBody(req, MAX_RAW_BODY_BYTES);
 }
 
 export function createLineWebhookHandler(
