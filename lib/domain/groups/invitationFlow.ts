@@ -1,4 +1,4 @@
-import { normalizeEmail } from "../users/email";
+import { MAX_EMAIL_LENGTH, validateInvitationEmail } from "./email";
 import { getGroupAdminErrorMessage, validateGroupOwnerRole } from "./admin";
 
 export class ClerkInvitationDomainError extends Error {}
@@ -26,13 +26,24 @@ export function requireInvitationGroup(group: InvitationGroupRecord | null): Inv
   return group;
 }
 
-/** 招待メールアドレスを正規化する。空・空白のみは「メールアドレスを入力してください」を投げる。 */
+/**
+ * 招待メールアドレスを正規化・検証する（Clerk 呼び出しより前に実行する）。
+ * 空・空白のみ、長すぎる、形式不正はそれぞれ日本語メッセージで投げる。
+ */
 export function resolveInvitationEmail(email: string): string {
-  const normalized = normalizeEmail(email);
-  if (normalized === undefined) {
-    throw new ClerkInvitationDomainError("メールアドレスを入力してください");
+  const result = validateInvitationEmail(email);
+  if (!result.success) {
+    if (result.error === "empty") {
+      throw new ClerkInvitationDomainError("メールアドレスを入力してください");
+    }
+    if (result.error === "too_long") {
+      throw new ClerkInvitationDomainError(
+        `メールアドレスは${MAX_EMAIL_LENGTH}文字以内で入力してください`,
+      );
+    }
+    throw new ClerkInvitationDomainError("メールアドレスの形式が正しくありません");
   }
-  return normalized;
+  return result.email;
 }
 
 export type GroupInvitationRecordInput = {

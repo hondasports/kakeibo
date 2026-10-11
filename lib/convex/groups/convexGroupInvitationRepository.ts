@@ -39,14 +39,13 @@ function createInvitationRead(ctx: Pick<QueryCtx, "db">): GroupInvitationReadRep
       const doc = await ctx.db.get(invitationId as Id<"groupInvitations">);
       return doc === null ? null : invitationDocToFields(doc);
     },
-    async listByGroupAndStatus(groupId, status) {
-      const docs = await readQueryDocs(
-        ctx.db
-          .query("groupInvitations")
-          .withIndex("by_group_id_and_status", (q) =>
-            q.eq("groupId", groupId as Id<"groups">).eq("status", status),
-          ),
-      );
+    async listByGroupAndStatus(groupId, status, limit) {
+      const query = ctx.db
+        .query("groupInvitations")
+        .withIndex("by_group_id_and_status", (q) =>
+          q.eq("groupId", groupId as Id<"groups">).eq("status", status),
+        );
+      const docs = limit === undefined ? await readQueryDocs(query) : await query.take(limit);
       return docs.map(invitationDocToFields);
     },
     async listByGroupAndEmail(groupId, email) {

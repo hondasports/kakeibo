@@ -73,3 +73,17 @@ describe("buildGroupInvitationRecordInput", () => {
     expect(record.clerkInvitationId).toBe("ci-1");
   });
 });
+
+describe("resolveInvitationEmail (形式・長さ)", () => {
+  it("形式不正はドメインエラー", () => {
+    expect(() => resolveInvitationEmail("foo")).toThrowError(
+      new ClerkInvitationDomainError("メールアドレスの形式が正しくありません"),
+    );
+  });
+
+  it("254 文字超はドメインエラー", () => {
+    expect(() => resolveInvitationEmail(`${"a".repeat(255)}@example.com`)).toThrowError(
+      new ClerkInvitationDomainError("メールアドレスは254文字以内で入力してください"),
+    );
+  });
+});

@@ -4,6 +4,19 @@
  */
 export type GroupInvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 
+/**
+ * 1 グループが同時に持てる pending 招待の上限。
+ * 家族・世帯向けアプリで一度に未承諾のまま招待する人数としては十分に大きく、
+ * 認証済みユーザーによる Clerk 招待メールの大量送信と groupInvitations の無制限増加を防ぐ。
+ */
+export const MAX_PENDING_GROUP_INVITATIONS = 20;
+
+/**
+ * 1 ユーザーが owner として保持できるグループ数の上限。
+ * 複数グループ所属（家族・実家・共同生活など）は想定するが、無制限のグループ作成は防ぐ。
+ */
+export const MAX_OWNED_GROUPS_PER_USER = 10;
+
 /** groupInvitations ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
 export type GroupInvitationFields = {
   groupId: string;

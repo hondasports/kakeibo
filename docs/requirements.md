@@ -339,7 +339,7 @@ MVPでは、ユーザーが好きなタイミングで軽く支出や収入を�
 | role          | string   |  yes | `owner` / `member`                        |
 | activeGroupId | string   |   no | ユーザーが現在表示対象にしているグループID |
 
-オーナーはClerk invitationを経由して招待メールを送信し、招待を受け入れたユーザーは対象グループの `groupMembers` に追加される。メンバー削除は `groupMembers` からの削除であり、Clerkアカウントや `users` レコードは削除しない。
+オーナーはClerk invitationを経由して招待メールを送信し、招待を受け入れたユーザーは対象グループの `groupMembers` に追加される。メンバー削除は `groupMembers` からの削除であり、Clerkアカウントや `users` レコードは削除しない。濫用防止のため、1グループの未承諾（pending）招待は20件、1ユーザーがオーナーになれるグループは10個、招待メールアドレスは254文字以内かつ形式検証済みのものに制限する（詳細は `docs/group-admin-permissions.md` 7.1.2）。
 
 ### 10.6 AI支出下書き
 
