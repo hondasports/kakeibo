@@ -5,6 +5,7 @@ import {
 } from "./invitations";
 import { addMemberByEmailHandler } from "./members";
 import { describe, expect, it, vi } from "vitest";
+import { MAX_PENDING_GROUP_INVITATIONS } from "../../lib/domain/groups/groupInvitation";
 import { createIdentity, createMockDb } from "./testHelpers";
 
 describe("groups (invitations) (assert and create)", () => {
@@ -382,5 +383,110 @@ describe("groups (invitations) (assert and create)", () => {
       expect.objectContaining({ status: "revoked" }),
     );
     expect(ctx.db.insert).toHaveBeenCalled();
+  });
+});
+
+describe("groups (invitations) (上限と入力検証)", () => {
+  const ownerId = "https://issuer.example|owner";
+
+  function pendingInvitations(count: number) {
+    return Array.from({ length: count }, (_, index) => ({
+      _id: `invite-${index}` as Id<"groupInvitations">,
+      groupId: "group-001" as Id<"groups">,
+      email: `invitee${index}@example.com`,
+      token: `token-${index}`,
+      status: "pending" as const,
+      invitedByUserId: ownerId,
+      createdAt: 1000 + index,
+      updatedAt: 1000 + index,
+    }));
+  }
+
+  it("pending が上限未満(上限-1件)なら新規招待を作成できる", async () => {
+    const ctx = createMockDb({
+      groupInvitations: pendingInvitations(MAX_PENDING_GROUP_INVITATIONS - 1),
+    });
+
+    await expect(
+      createGroupInvitationRecordHandler(ctx, {
+        groupId: "group-001" as Id<"groups">,
+        email: "new@example.com",
+        token: "new-token",
+        invitedByUserId: ownerId,
+      }),
+    ).resolves.toEqual(expect.any(String));
+    expect(ctx.db.insert).toHaveBeenCalledWith(
+      "groupInvitations",
+      expect.objectContaining({ email: "new@example.com", status: "pending" }),
+    );
+  });
+
+  it("pending が上限に達していたら新規招待を拒否し、行を作らない", async () => {
+    const ctx = createMockDb({
+      groupInvitations: pendingInvitations(MAX_PENDING_GROUP_INVITATIONS),
+    });
+
+    await expect(
+      createGroupInvitationRecordHandler(ctx, {
+        groupId: "group-001" as Id<"groups">,
+        email: "new@example.com",
+        token: "new-token",
+        invitedByUserId: ownerId,
+      }),
+    ).rejects.toThrow("未承諾の招待が上限");
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+  });
+
+  it("上限到達時でも pending 済みアドレスへの再招待は許可される", async () => {
+    const ctx = createMockDb({
+      groupInvitations: pendingInvitations(MAX_PENDING_GROUP_INVITATIONS),
+    });
+
+    await expect(
+      createGroupInvitationRecordHandler(ctx, {
+        groupId: "group-001" as Id<"groups">,
+        email: "invitee3@example.com",
+        token: "new-token",
+        invitedByUserId: ownerId,
+      }),
+    ).resolves.toEqual(expect.any(String));
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "invite-3",
+      expect.objectContaining({ status: "revoked" }),
+    );
+    expect(ctx.db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it("他グループの pending は上限に数えない", async () => {
+    const ctx = createMockDb({
+      groupInvitations: pendingInvitations(MAX_PENDING_GROUP_INVITATIONS).map((invitation) => ({
+        ...invitation,
+        groupId: "group-other" as Id<"groups">,
+      })),
+    });
+
+    await expect(
+      createGroupInvitationRecordHandler(ctx, {
+        groupId: "group-001" as Id<"groups">,
+        email: "new@example.com",
+        token: "new-token",
+        invitedByUserId: ownerId,
+      }),
+    ).resolves.toEqual(expect.any(String));
+  });
+
+  it("形式不正のメールアドレスは掃除も insert もせず拒否する", async () => {
+    const ctx = createMockDb({});
+
+    await expect(
+      createGroupInvitationRecordHandler(ctx, {
+        groupId: "group-001" as Id<"groups">,
+        email: "not-an-email",
+        token: "new-token",
+        invitedByUserId: ownerId,
+      }),
+    ).rejects.toThrow("メールアドレスの形式が正しくありません");
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+    expect(ctx.db.patch).not.toHaveBeenCalled();
   });
 });

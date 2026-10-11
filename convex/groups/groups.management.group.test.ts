@@ -2,6 +2,7 @@ import type { Id } from "../_generated/dataModel";
 import { createGroupHandler, updateGroupNameHandler } from "./mutations";
 import { describe, expect, it, vi } from "vitest";
 import { createIdentity, createMockDb } from "./testHelpers";
+import { MAX_OWNED_GROUPS_PER_USER } from "../../lib/domain/groups/groupInvitation";
 
 describe("groups (management) (group lifecycle)", () => {
   it("createGroupHandler は空文字を拒否する", async () => {
@@ -242,6 +243,66 @@ describe("groups (management) (group lifecycle)", () => {
 
     await expect(updateGroupNameHandler(ctx, { name: "新しい名前" })).rejects.toThrow(
       "グループオーナーのみ実行できます",
+    );
+  });
+});
+
+describe("groups (management) (グループ作成上限)", () => {
+  const userId = "https://issuer.example|owner";
+
+  function createCtxWithMemberships(ownedCount: number, memberCount = 0) {
+    const ctx = createMockDb({
+      users: [
+        {
+          _id: "user-owner" as Id<"users">,
+          userId,
+          displayName: "オーナー",
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
+      ],
+      groupMembers: [
+        ...Array.from({ length: ownedCount }, (_, index) => ({
+          _id: `owned-${index}` as Id<"groupMembers">,
+          groupId: `group-owned-${index}` as Id<"groups">,
+          userId,
+          role: "owner" as const,
+          createdAt: 1000,
+          updatedAt: 1000,
+        })),
+        ...Array.from({ length: memberCount }, (_, index) => ({
+          _id: `joined-${index}` as Id<"groupMembers">,
+          groupId: `group-joined-${index}` as Id<"groups">,
+          userId,
+          role: "member" as const,
+          createdAt: 1000,
+          updatedAt: 1000,
+        })),
+      ],
+    });
+    ctx.auth.getUserIdentity = vi.fn().mockResolvedValue(createIdentity(userId));
+    return ctx;
+  }
+
+  it("owner のグループが上限未満なら作成できる", async () => {
+    const ctx = createCtxWithMemberships(MAX_OWNED_GROUPS_PER_USER - 1);
+    await expect(createGroupHandler(ctx, { name: "新しい家" })).resolves.toEqual(
+      expect.any(String),
+    );
+  });
+
+  it("owner のグループが上限に達していたら拒否し、グループを作らない", async () => {
+    const ctx = createCtxWithMemberships(MAX_OWNED_GROUPS_PER_USER);
+    await expect(createGroupHandler(ctx, { name: "新しい家" })).rejects.toThrow(
+      "作成できるグループは",
+    );
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+  });
+
+  it("member として参加しているだけのグループは上限に数えない", async () => {
+    const ctx = createCtxWithMemberships(MAX_OWNED_GROUPS_PER_USER - 1, 30);
+    await expect(createGroupHandler(ctx, { name: "新しい家" })).resolves.toEqual(
+      expect.any(String),
     );
   });
 });

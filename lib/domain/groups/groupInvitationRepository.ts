@@ -14,10 +14,11 @@ export interface GroupInvitationReadRepository {
   findByToken(token: string): Promise<GroupInvitationRecord | null>;
   /** ID で招待を1件取得する。 */
   findById(invitationId: string): Promise<GroupInvitationRecord | null>;
-  /** グループ×ステータスの招待を全件取得する。 */
+  /** グループ×ステータスの招待を取得する。limit 指定時は最大 limit 件の bounded read。 */
   listByGroupAndStatus(
     groupId: string,
     status: GroupInvitationStatus,
+    limit?: number,
   ): Promise<GroupInvitationRecord[]>;
   /** グループ×メールアドレス（正規化済み）の招待を全件取得する。 */
   listByGroupAndEmail(groupId: string, email: string): Promise<GroupInvitationRecord[]>;

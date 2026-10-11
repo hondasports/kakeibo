@@ -163,3 +163,34 @@ describe("cancelPendingGroupInvitation", () => {
     expect(revokeInvitation).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("inviteMember (メールアドレス検証)", () => {
+  it.each([
+    ["形式不正", "not-an-email", "メールアドレスの形式が正しくありません"],
+    ["@ が複数", "a@b@example.com", "メールアドレスの形式が正しくありません"],
+    ["過長", `${"a".repeat(260)}@example.com`, "メールアドレスは254文字以内で入力してください"],
+  ])("%s は DB 予約も Clerk 呼び出しも行わず拒否する", async (_label, email, message) => {
+    const store = createStore();
+    const createInvitation = vi.fn(async () => ({ id: "clerk-invite-001" }));
+    const services = createServices({
+      getClerk: vi.fn(() => ({ invitations: { createInvitation } })),
+    });
+
+    await expect(inviteMember(store, services, { ...args, email })).rejects.toThrowError(
+      new ClerkInvitationDomainError(message),
+    );
+
+    expect(store.createGroupInvitationRecord).not.toHaveBeenCalled();
+    expect(services.getClerk).not.toHaveBeenCalled();
+    expect(createInvitation).not.toHaveBeenCalled();
+  });
+
+  it("正しいアドレスは従来どおり Clerk 招待まで進む", async () => {
+    const store = createStore();
+    const services = createServices();
+    await expect(inviteMember(store, services, args)).resolves.toMatchObject({
+      clerkInvitationId: "clerk-invite-001",
+    });
+    expect(store.createGroupInvitationRecord).toHaveBeenCalledTimes(2);
+  });
+});

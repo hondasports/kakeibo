@@ -5,6 +5,8 @@
  */
 import type { GroupInvitationRepository } from "../../domain/groups/groupInvitationRepository";
 import type { GroupInvitationCleanupService } from "../../domain/groups/groupServices";
+import { ConvexError } from "convex/values";
+import { MAX_PENDING_GROUP_INVITATIONS } from "../../domain/groups/groupInvitation";
 import { normalizeEmailOrThrow } from "./validation";
 import { assertEmailCanBeInvitedToGroup } from "./assertEmailCanBeInvitedToGroup";
 import type { GroupMembershipReadRepository } from "../../domain/groups/groupMembershipRepository";
@@ -37,15 +39,31 @@ export async function createGroupInvitationRecord(
     return existing.id;
   }
 
-  await deps.invitationCleanup.revokeForEmail(args.groupId, args.email);
+  // 形式不正のアドレスは掃除や insert の前に弾く
+  const email = normalizeEmailOrThrow(args.email);
+
+  await deps.invitationCleanup.revokeForEmail(args.groupId, email);
   await assertEmailCanBeInvitedToGroup(deps, {
     groupId: args.groupId,
-    email: args.email,
+    email,
   });
+
+  // 同一メールの旧 pending は上で revoke 済みなので、再招待は上限に含まれない。
+  // 上限判定は上限件数までの bounded read（take）で行い、超過時は Clerk 呼び出しより前に拒否する。
+  const pendingInvitations = await deps.invitations.listByGroupAndStatus(
+    args.groupId,
+    "pending",
+    MAX_PENDING_GROUP_INVITATIONS,
+  );
+  if (pendingInvitations.length >= MAX_PENDING_GROUP_INVITATIONS) {
+    throw new ConvexError(
+      `未承諾の招待が上限(${MAX_PENDING_GROUP_INVITATIONS}件)に達しています。不要な招待を取り消してから再度お試しください`,
+    );
+  }
 
   const invitation = {
     groupId: args.groupId,
-    email: normalizeEmailOrThrow(args.email),
+    email,
     token: args.token,
     status: "pending" as const,
     invitedByUserId: args.invitedByUserId,
