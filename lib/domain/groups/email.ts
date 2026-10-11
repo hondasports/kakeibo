@@ -10,6 +10,37 @@ export function validateEmail(
   return { success: true, email: normalized };
 }
 
+/** メールアドレスの最大長（RFC 5321 の forward-path 上限）。 */
+export const MAX_EMAIL_LENGTH = 254;
+/** ローカル部の最大長（RFC 5321）。 */
+const MAX_EMAIL_LOCAL_PART_LENGTH = 64;
+/** 保守的な形式: @ はちょうど 1 つ、空白なし、ドメインは「.」区切りで 2 ラベル以上。 */
+const EMAIL_FORMAT_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+
+export type ValidateInvitationEmailError = ValidateEmailError | "too_long" | "invalid_format";
+
+/**
+ * 招待・メンバー追加で受け付けるメールアドレスの検証。
+ * ネットワークを使わず、長さと形式だけを検査する（Clerk への送信前に弾くため）。
+ * 既存データ照合用の validateEmail とは分け、Gmail 正規化・照合には影響させない。
+ */
+export function validateInvitationEmail(
+  email: string,
+): { success: true; email: string } | { success: false; error: ValidateInvitationEmailError } {
+  const result = validateEmail(email);
+  if (!result.success) {
+    return result;
+  }
+  if (result.email.length > MAX_EMAIL_LENGTH) {
+    return { success: false, error: "too_long" };
+  }
+  const localPart = result.email.slice(0, result.email.indexOf("@"));
+  if (!EMAIL_FORMAT_PATTERN.test(result.email) || localPart.length > MAX_EMAIL_LOCAL_PART_LENGTH) {
+    return { success: false, error: "invalid_format" };
+  }
+  return result;
+}
+
 export function normalizeGmailAddress(email: string): string | null {
   const [localPart, domain] = email.split("@");
   if (!localPart || !domain) {

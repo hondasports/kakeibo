@@ -13,12 +13,12 @@ describe("resolveAppEnvironment", () => {
     });
   });
 
-  it("未知の env は development にフォールバック", () => {
-    expect(resolveAppEnvironment("staging")).toEqual({
-      success: true,
-      environment: "development",
-    });
-  });
+  it.each([undefined, "", "staging", "prod", "Production"])(
+    "未設定・未知の env（%s）は development にフォールバックせず unknown エラー",
+    (current) => {
+      expect(resolveAppEnvironment(current)).toEqual({ success: false, error: "unknown" });
+    },
+  );
 
   it("expected と一致しない場合は mismatch エラー", () => {
     expect(resolveAppEnvironment("development", "production")).toEqual({

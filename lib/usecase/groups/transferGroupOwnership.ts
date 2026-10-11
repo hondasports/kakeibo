@@ -7,6 +7,7 @@ import { getGroupAdminErrorMessage, validateNotSelfOperator } from "../../domain
 import { formatGroupRoleLabel } from "../../domain/groups/role";
 import { GROUP_ADMIN_ERROR_MESSAGES } from "./groupAdminErrors";
 import type { UsecaseGroupContext } from "../context";
+import { assertOwnedGroupLimit } from "./assertOwnedGroupLimit";
 import type { GroupMutationDeps } from "./deps";
 
 export async function transferGroupOwnership(
@@ -36,6 +37,9 @@ export async function transferGroupOwnership(
   if (targetMembership.role !== "member") {
     throw new ConvexError(GROUP_ADMIN_ERROR_MESSAGES.TRANSFER_TARGET_MUST_BE_MEMBER);
   }
+
+  // 譲渡先は新たにこのグループの owner になるため、保持数上限を確認する。
+  await assertOwnedGroupLimit(deps, args.targetUserId, { subject: "target" });
 
   const actorUser = await deps.users.findByUserId(ctx.userId);
   const targetUser = await deps.users.findByUserId(args.targetUserId);

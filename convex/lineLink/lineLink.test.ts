@@ -54,6 +54,13 @@ describe("LINE 連携の公開フィードバック", () => {
       process.env.LINE_INTEGRATION_MODE = "mock";
       process.env.APP_ENV = "production";
       expect(() => getLineIntegrationMode()).toThrow();
+      // APP_ENV未設定・不正値でもmockに落とさない
+      delete process.env.APP_ENV;
+      expect(() => getLineIntegrationMode()).toThrow(/APP_ENV/);
+      process.env.APP_ENV = "prod";
+      expect(() => getLineIntegrationMode()).toThrow(/APP_ENV/);
+      process.env.APP_ENV = "development";
+      expect(getLineIntegrationMode()).toBe("mock");
     } finally {
       if (originalMode === undefined) delete process.env.LINE_INTEGRATION_MODE;
       else process.env.LINE_INTEGRATION_MODE = originalMode;

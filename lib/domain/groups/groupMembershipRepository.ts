@@ -16,6 +16,8 @@ export type GroupMembershipPage = {
 export interface GroupMembershipReadRepository {
   /** ユーザーのメンバーシップを取得する。limit 指定時は最大 limit 件の bounded read。 */
   listByUser(userId: string, limit?: number): Promise<GroupMemberRecord[]>;
+  /** ユーザーの指定ロールのメンバーシップを取得する。limit 指定時は最大 limit 件の bounded read。 */
+  listByUserAndRole(userId: string, role: GroupRole, limit?: number): Promise<GroupMemberRecord[]>;
   /** ユーザーのメンバーシップをカーソル付きページネーションで取得する。 */
   paginateByUser(
     userId: string,

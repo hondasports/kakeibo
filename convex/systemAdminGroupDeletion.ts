@@ -53,7 +53,8 @@ export const listGroupDeletionJobs = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new ConvexError("システム管理者権限が必要です");
     const envResult = resolveAppEnvironment(process.env.APP_ENV);
-    const environment = envResult.success ? envResult.environment : "development";
+    if (!envResult.success) throw new ConvexError("APP_ENVが正しく設定されていません");
+    const environment = envResult.environment;
     return (await listGroupDeletionJobsUsecase(createSystemAdminQueryDeps(ctx), {
       tokenIdentifier: identity.tokenIdentifier,
       paginationOpts: args.paginationOpts,

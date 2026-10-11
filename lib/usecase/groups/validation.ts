@@ -6,7 +6,7 @@ import { ConvexError } from "convex/values";
 import { MAX_GROUP_NAME_LENGTH, validateGroupName } from "../../domain/groups/groupName";
 import { assertGroupNotDeleted } from "../../domain/groups/lifecycle";
 import type { GroupWithLifecycleStatus } from "../../domain/groups/lifecycle";
-import { validateEmail } from "../../domain/groups/email";
+import { MAX_EMAIL_LENGTH, validateInvitationEmail } from "../../domain/groups/email";
 import { GROUP_ADMIN_ERROR_MESSAGES } from "./groupAdminErrors";
 
 export function normalizeGroupNameOrThrow(name: string): string {
@@ -21,9 +21,15 @@ export function normalizeGroupNameOrThrow(name: string): string {
 }
 
 export function normalizeEmailOrThrow(email: string): string {
-  const result = validateEmail(email);
+  const result = validateInvitationEmail(email);
   if (!result.success) {
-    throw new ConvexError("メールアドレスを入力してください");
+    if (result.error === "empty") {
+      throw new ConvexError("メールアドレスを入力してください");
+    }
+    if (result.error === "too_long") {
+      throw new ConvexError(`メールアドレスは${MAX_EMAIL_LENGTH}文字以内で入力してください`);
+    }
+    throw new ConvexError("メールアドレスの形式が正しくありません");
   }
   return result.email;
 }

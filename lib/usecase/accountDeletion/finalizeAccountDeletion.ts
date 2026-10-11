@@ -1,6 +1,6 @@
 /**
  * 退会完了処理（internalMutation）。
- * purge 関連→ユーザー紐付きデータ（lineWebhookEvents→lineImageJobs）→完了メール→
+ * purge 関連→ユーザー紐付きデータ（ACCOUNT_DELETION_USER_PURGE_TABLES の順。LINE通知→LINE連携の順）→完了メール→
  * ユーザー削除→リクエスト completed 化の順で進め、残存があれば自身を再スケジュールする。
  */
 import { ConvexError } from "convex/values";
@@ -24,6 +24,9 @@ export async function finalizeAccountDeletion(
 
   const purgeRelations = await deps.purges.takeByRequest(args.requestId, GROUP_BATCH_SIZE);
   if (purgeRelations.length > 0) {
+    // identity_deleted へ進んだ時点で全 purge は completed のはず。未完了が残るなら中途半端な削除を避ける。
+    if (purgeRelations.some((relation) => relation.status !== "completed"))
+      throw new ConvexError("Account deletion purge is not completed");
     for (const relation of purgeRelations) {
       await deps.purges.delete(relation.id);
     }

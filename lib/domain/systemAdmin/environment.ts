@@ -23,9 +23,10 @@ export function resolveAppEnvironment(
     APP_ENVIRONMENTS.includes(value as AppEnvironment);
 
   if (!expectedEnv) {
+    // 未設定・未知値を development と表示すると誤設定の本番を開発環境と誤認させるため拒否する
     return isKnownEnv(currentEnv)
       ? { success: true, environment: currentEnv }
-      : { success: true, environment: "development" };
+      : { success: false, error: "unknown" };
   }
 
   if (!isKnownEnv(currentEnv) || currentEnv !== expectedEnv) {
