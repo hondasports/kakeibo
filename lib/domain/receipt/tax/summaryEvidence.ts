@@ -202,7 +202,8 @@ export function recalculateUnprovenSummary(args: {
   if (
     summary.taxableAmountYen === target &&
     summary.taxableAmountBasis === basis &&
-    summary.taxMode === (basis === "tax_included" ? "included" : "external")
+    summary.taxMode === (basis === "tax_included" ? "included" : "external") &&
+    summary.taxIncludedAmountYen === included
   )
     return summaries;
   return [

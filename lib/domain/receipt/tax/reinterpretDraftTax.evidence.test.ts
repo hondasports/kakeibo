@@ -3,6 +3,22 @@ import { reinterpretDraftTax } from "./reinterpretDraftTax";
 import { observationLine, unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";
 
 describe("出所不明の対象額の再計算", () => {
+  it.each([false, true])("対象額が一致しても古い税込合計を補正する（手修正=%s）", (userEdited) => {
+    const input = unprovenTargetReceipt();
+    input.taxSummaries[0].taxableAmountYen = 4810;
+    input.taxSummaries[0].taxIncludedAmountYen = 4373;
+    if (userEdited) input.taxSummaries[0].userEditedFields = ["taxIncludedAmountYen"];
+    const result = reinterpretDraftTax(input);
+    expect(result.interpretation.taxSummaries[0]).toMatchObject({
+      taxableAmountYen: 4810,
+      taxIncludedAmountYen: userEdited ? 4373 : 4810,
+      status: userEdited ? "contradictory" : "verified",
+    });
+    expect(result.itemFields.every((item) => item.taxAllocationStatus === "allocated")).toBe(
+      !userEdited,
+    );
+  });
+
   it.each(["税抜合計", "税別合計"])("税率なし%sの印字を全体設定で捨てない", (label) => {
     const input = unprovenTargetReceipt();
     input.rawObservationLines = [
