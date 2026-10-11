@@ -1528,13 +1528,21 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 
 #### 退会済みユーザーの LINE 連携データ掃除（一回限りの内部 migration）
 
-finalize の purge に `lineAccountLinks` 等を加える前に完了した退会では、active な連携が取り残され、LINE webhook の解決と再連携（`LINE_LINK_CONFLICT`）を妨げる。`convex/orphanedLineLinkMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`users` に行が無い userId の `lineAccountLinks` と、その userId の通知 job / event・連携リクエスト・監査ログを削除する。存在するユーザーと、終端でない `accountDeletionRequests` を持つ userId には触れない。通知 job はリンクより先に削除する。
+finalize の purge に `lineAccountLinks` 等を加える前に完了した退会では、active な連携が取り残され、LINE webhook の解決と再連携（`LINE_LINK_CONFLICT`）を妨げる。また LINE OAuth を開始しただけで連携を完了せず退会したユーザーには `lineAccountLinks` が無く、`lineLinkRequests` / `lineLinkAuditLogs` だけが残る。`convex/orphanedLineLinkMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`users` に行が無い userId の連携データを削除する。存在するユーザーと、終端でない `accountDeletionRequests` を持つ userId には触れない。
+
+走査は 3 つの phase を `links` → `requests` → `auditLogs` の順に、テーブルごとに独立した pagination で行う（1 page 10 件）。
+
+- `links`: `lineAccountLinks` の孤立リンクと、その userId の通知 job / event・連携リクエスト・監査ログを削除する。通知 job はリンクより先に削除する。
+- `requests`: リンクを持たない孤立 userId の `lineLinkRequests` を削除する。
+- `auditLogs`: リンクを持たない孤立 userId の `lineLinkAuditLogs` を削除する。
+
+cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` の先頭。戻り値の `continueCursor` をそのまま次の呼び出しに渡す。最後の phase（`auditLogs`）が終わった時だけ `isDone: true` / `continueCursor: null` になる。戻り値・ログは件数のみで userId / lineUserId は含まない。
 
 運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。
 
-1. `pnpm exec convex run orphanedLineLinkMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"..."}'` で繰り返し、`orphanLinks` と `wouldDelete` を確認。件数のみで userId / lineUserId は返らない）
-2. `pnpm exec convex run orphanedLineLinkMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。冪等なので再実行可）
-3. `pnpm exec convex run orphanedLineLinkMigration:verify '{}'`（全 page で `remainingOrphanLinks` が 0 であること）
+1. `pnpm exec convex run orphanedLineLinkMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`orphanLinks` / `orphanRequests` / `orphanAuditLogs` と `wouldDelete` を確認。`wouldDelete` は phase 間で重複しうる上限見積もり）
+2. `pnpm exec convex run orphanedLineLinkMigration:executeBatch '{}'`（自己再スケジュールで全 phase を最後まで進む。冪等なので再実行可。`isDone: true` を戻り値かログで確認）
+3. `pnpm exec convex run orphanedLineLinkMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remainingOrphanLinks` / `remainingOrphanRequests` / `remainingOrphanAuditLogs` が 0 であること）
 
 ## 17. テスト方針
 
