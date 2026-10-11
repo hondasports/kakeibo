@@ -31,6 +31,21 @@ function draft(
 }
 
 describe("ReceiptTaxSummarySection", () => {
+  it.each(["税抜合計", "税別合計"])("単一内訳の税率なし%sも対象額の原文として表示する", (label) => {
+    render(
+      <ReceiptTaxSummarySection
+        draft={{
+          ...draft({ status: "coherent" }),
+          rawObservation: rawObservation([
+            { rawText: `${label} 1,060円`, amountYen: 1060, lineRoleCandidates: ["total"] },
+          ]),
+        }}
+      />,
+    );
+    expect(screen.getByText(/OCR原文の対象額/)).toBeInTheDocument();
+    expect(screen.getByText(`原文 1行目：${label} 1,060円`)).toBeInTheDocument();
+  });
+
   it("決済行の税額ラベルを根拠として表示しない", () => {
     render(
       <ReceiptTaxSummarySection

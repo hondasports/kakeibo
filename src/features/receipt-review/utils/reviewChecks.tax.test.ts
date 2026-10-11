@@ -4,6 +4,17 @@ import { resolvedItem, summary, rawObservation } from "./reviewChecksTestHelpers
 
 describe("buildTaxRateCheck", () => {
   describe("buildTaxRateCheck", () => {
+    it.each(["税抜合計", "税別合計"])("税率なし%sの対象額を直接印字として厳密照合する", (label) => {
+      const check = buildTaxRateCheck({
+        items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],
+        taxSummaries: [summary()],
+        rawObservation: rawObservation([
+          { rawText: `${label} 100`, amountYen: 100, lineRoleCandidates: ["total"] },
+        ]),
+      });
+      expect(check.rows[0]).toMatchObject({ status: "mismatch", sourceLabel: "OCR原文" });
+    });
+
     it("同一基準の明細合計が印字対象額と一致すれば一致", () => {
       const check = buildTaxRateCheck({
         items: [resolvedItem()],
