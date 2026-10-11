@@ -208,6 +208,34 @@ describe("出所不明の対象額の再計算", () => {
     },
   );
 
+  it.each(["消費税額", "内税"])("単一内訳の税率なし%sも合計・商品と照合して再計算する", (label) => {
+    const input = unprovenTargetReceipt();
+    input.rawObservationLines![1].rawText = `${label} 437円`;
+    const result = reinterpretDraftTax(input);
+    expect(result.interpretation.taxSummaries[0]).toMatchObject({
+      taxableAmountYen: 4810,
+      status: "verified",
+    });
+    expect(result.itemFields.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+  });
+
+  it.each(["消費税額 999円", "外税 437円"])("税率なし税額%sの矛盾は捨てない", (rawText) => {
+    const input = unprovenTargetReceipt();
+    input.rawObservationLines![1] = observationLine(
+      rawText,
+      rawText.includes("999") ? 999 : 437,
+      1,
+    );
+    expect(reinterpretDraftTax(input).interpretation.taxSummaries[0].taxableAmountYen).toBe(4373);
+  });
+
+  it("単一サマリでも別税率の原文があれば税率なし税額を帰属させない", () => {
+    const input = unprovenTargetReceipt();
+    input.rawObservationLines![1].rawText = "消費税額 437円";
+    input.rawObservationLines!.push(observationLine("8% 100円", 100, 2));
+    expect(reinterpretDraftTax(input).interpretation.taxSummaries[0].taxableAmountYen).toBe(4373);
+  });
+
   it("商品確認だけで4,810円と437円を整合させ、元の対象額と原文を保持する", () => {
     const input = unprovenTargetReceipt();
     input.items[0].warnings = ["amount_mismatch", "unresolved_tax_rate", "unresolved_amount_basis"];

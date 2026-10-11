@@ -104,6 +104,7 @@ export function ReceiptTaxSummarySection({
                     draft.rawObservation.lines,
                     summary.taxRatePercent,
                     "tax",
+                    { singleSummary: summaries.length === 1 },
                   ),
                 ].map((line) => (
                   <Typography variant="body2" key={line.sourceLineIndex}>

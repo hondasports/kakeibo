@@ -68,6 +68,18 @@ describe("ReceiptTaxSummarySection", () => {
     expect(screen.queryByText(/原文 1行目/)).not.toBeInTheDocument();
   });
 
+  it("単一内訳の税率なし税額も原文の根拠に表示する", () => {
+    render(
+      <ReceiptTaxSummarySection
+        draft={{
+          ...draft({ status: "coherent" }),
+          rawObservation: rawObservation([{ rawText: "消費税額 96円", amountYen: 96 }]),
+        }}
+      />,
+    );
+    expect(screen.getByText("原文 1行目：消費税額 96円")).toBeInTheDocument();
+  });
+
   it("conflicting サマリは編集可能な表示になる", () => {
     render(
       <ReceiptTaxSummarySection

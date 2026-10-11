@@ -65,7 +65,7 @@ export function hasPrintedTaxSummaryEvidence(
   );
 }
 
-/** 原文の役割と税率を照合する。単一内訳に帰属できる対象額だけ税率省略を許す。 */
+/** 原文の役割と税率を照合する。単一内訳に帰属できる対象額・税額だけ税率省略を許す。 */
 export function taxSummaryEvidenceLines(
   lines: ReceiptRawObservationLine[] | undefined,
   rate: number,
@@ -75,8 +75,7 @@ export function taxSummaryEvidenceLines(
   const independentLines = (lines ?? []).filter(
     (line) => line.explicitlyPrinted && !isItemOrDiscountOnly(line),
   );
-  const canAssignRateLessTarget =
-    kind === "target" &&
+  const canAssignRateLessLine =
     options.singleSummary === true &&
     !independentLines.some((line) => hasConflictingRate(line.rawText, rate));
   return independentLines.filter((line) => {
@@ -84,7 +83,7 @@ export function taxSummaryEvidenceLines(
     const text = normalizedText(line.rawText);
     if (text.includes("%")) {
       if (hasConflictingRate(text, rate)) return false;
-    } else if (!canAssignRateLessTarget) return false;
+    } else if (!canAssignRateLessLine) return false;
     return taxSummaryLineKind(text) === kind;
   });
 }
@@ -121,7 +120,7 @@ export function recalculateUnprovenSummary(args: {
   // 税率が省略された対象額や小計も、帰属を断定せず補正を止める。
   if (lines.some((line) => line.explicitlyPrinted && taxSummaryLineKind(line.rawText) === "target"))
     return summaries;
-  const taxLines = taxSummaryEvidenceLines(lines, rate, "tax");
+  const taxLines = taxSummaryEvidenceLines(lines, rate, "tax", { singleSummary: true });
   if (taxLines.length === 0 || taxLines.some((line) => line.amountYen !== summary.taxYen))
     return summaries;
   if (
