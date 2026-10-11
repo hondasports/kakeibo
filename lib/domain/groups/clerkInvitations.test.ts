@@ -78,16 +78,14 @@ describe("isAllowedRedirectOrigin", () => {
 
   it("設定済みホスト名でも http や別ポートは拒否", () => {
     expect(
-      isAllowedRedirectOrigin(
-        new URL("http://app.example.com" + INVITATION_ACCEPT_PATH),
-        [PRODUCTION_ORIGIN],
-      ),
+      isAllowedRedirectOrigin(new URL("http://app.example.com" + INVITATION_ACCEPT_PATH), [
+        PRODUCTION_ORIGIN,
+      ]),
     ).toBe(false);
     expect(
-      isAllowedRedirectOrigin(
-        new URL("https://app.example.com:8443" + INVITATION_ACCEPT_PATH),
-        [PRODUCTION_ORIGIN],
-      ),
+      isAllowedRedirectOrigin(new URL("https://app.example.com:8443" + INVITATION_ACCEPT_PATH), [
+        PRODUCTION_ORIGIN,
+      ]),
     ).toBe(false);
   });
 
@@ -143,11 +141,9 @@ describe("buildInvitationRedirectUrl", () => {
   });
 
   it("パスが異なると invalid_path", () => {
-    const result = buildInvitationRedirectUrl(
-      `${PRODUCTION_ORIGIN}/other`,
-      "token",
-      [PRODUCTION_ORIGIN],
-    );
+    const result = buildInvitationRedirectUrl(`${PRODUCTION_ORIGIN}/other`, "token", [
+      PRODUCTION_ORIGIN,
+    ]);
     expect(result).toEqual({ success: false, error: "invalid_path" });
   });
 
@@ -181,11 +177,9 @@ describe("buildInvitationRedirectUrl", () => {
       ),
     ).toEqual({ success: false, error: "invalid_path" });
     expect(
-      buildInvitationRedirectUrl(
-        `${PRODUCTION_ORIGIN}${INVITATION_ACCEPT_PATH}#x`,
-        "token",
-        [PRODUCTION_ORIGIN],
-      ),
+      buildInvitationRedirectUrl(`${PRODUCTION_ORIGIN}${INVITATION_ACCEPT_PATH}#x`, "token", [
+        PRODUCTION_ORIGIN,
+      ]),
     ).toEqual({ success: false, error: "invalid_path" });
   });
 
