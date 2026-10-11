@@ -29,12 +29,15 @@ export async function markIdentityDeleted(
   args: { requestId: string },
 ): Promise<AccountDeletionRequestRecord | null> {
   const request = await deps.requests.get(args.requestId);
+  // Clerk 削除の成功は failed 等へ進んだ後でも記録する（identityDeletedAt を失うと孤立する）。completed のみ弾く。
   if (!request || !canMarkIdentityDeletedFrom(request.status)) return null;
   await deps.requests.patch(args.requestId, {
     status: "identity_deleted",
     identityDeletedAt: Date.now(),
     attemptCount: 0,
     nextRetryAt: undefined,
+    lastErrorCode: undefined,
+    lastErrorMessage: undefined,
     updatedAt: Date.now(),
   });
   return request;
