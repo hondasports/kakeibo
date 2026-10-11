@@ -78,18 +78,39 @@ export function createAccountDeletionGroupPurgeStore(
   };
 }
 
-const USER_PURGE_INDEX: Record<AccountDeletionUserPurgeTable, string> = {
+/** index が userId 単独で絞れるテーブル（by_user_id_and_created_at 等の先頭が userId）。 */
+const USER_PURGE_INDEX = {
   lineWebhookEvents: "by_user_id_and_created_at",
   lineImageJobs: "by_user_id_and_created_at",
   lineNotificationJobs: "by_user_id_and_created_at",
   lineNotificationEvents: "by_user_id_and_created_at",
-};
+  lineLinkRequests: "by_user_id_and_expires_at",
+  lineLinkAuditLogs: "by_user_id",
+} as const satisfies Partial<Record<AccountDeletionUserPurgeTable, string>>;
+
+/** lineAccountLinks は by_user_id_and_status しかないので、全 status を順に引く。 */
+const LINE_ACCOUNT_LINK_STATUSES = [
+  "active",
+  "revoked",
+] as const satisfies readonly Doc<"lineAccountLinks">["status"][];
 
 export function createAccountDeletionUserDataPurgeStore(
   ctx: Pick<MutationCtx, "db">,
 ): AccountDeletionUserDataPurgeStore {
   return {
     async takeUserScopedIds(table, userId, limit) {
+      if (table === "lineAccountLinks") {
+        const ids: string[] = [];
+        for (const status of LINE_ACCOUNT_LINK_STATUSES) {
+          if (ids.length >= limit) break;
+          const docs = await ctx.db
+            .query("lineAccountLinks")
+            .withIndex("by_user_id_and_status", (q) => q.eq("userId", userId).eq("status", status))
+            .take(limit - ids.length);
+          ids.push(...docs.map((doc) => doc._id as string));
+        }
+        return ids;
+      }
       const docs = await ctx.db
         .query(table)
         .withIndex(USER_PURGE_INDEX[table] as never, (q) =>

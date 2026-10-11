@@ -1,6 +1,6 @@
 /**
  * 退会完了処理（internalMutation）。
- * purge 関連→ユーザー紐付きデータ（lineWebhookEvents→lineImageJobs）→完了メール→
+ * purge 関連→ユーザー紐付きデータ（ACCOUNT_DELETION_USER_PURGE_TABLES の順。LINE通知→LINE連携の順）→完了メール→
  * ユーザー削除→リクエスト completed 化の順で進め、残存があれば自身を再スケジュールする。
  */
 import { ConvexError } from "convex/values";

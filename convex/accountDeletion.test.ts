@@ -310,7 +310,7 @@ describe("account deletion group purge orchestration", () => {
       return { requestId, userDbId };
     });
 
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 10; i += 1) {
       await t.mutation(internal.accountDeletion.finalizeAccountDeletion, { requestId });
     }
 
@@ -343,6 +343,180 @@ describe("account deletion group purge orchestration", () => {
     expect(state.notificationEvents).toHaveLength(0);
     expect(state.emails).toHaveLength(1);
     expect(state.emails[0].templateType).toBe("account_deletion_completed");
+  });
+
+  it("退会完了でLINE連携データを削除し、他ユーザー分は残してLINE userを再連携できる", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const userId = "https://clerk.example.test|account-delete-line-link";
+    const otherUserId = "https://clerk.example.test|account-delete-line-link-other";
+    const { requestId, userDbId } = await t.run(async (ctx) => {
+      const userDbId = await ctx.db.insert("users", {
+        userId,
+        displayName: "LINE連携退会テスト",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const requestId = await ctx.db.insert("accountDeletionRequests", {
+        userId,
+        clerkUserId: "clerk-account-delete-line-link",
+        status: "identity_deleted",
+        leftGroupCount: 0,
+        deletedGroupCount: 0,
+        attemptCount: 0,
+        maxAttempts: 6,
+        createdAt: 1,
+        updatedAt: 1,
+        identityDeletedAt: 1,
+      });
+      const groupId = await ctx.db.insert("groups", {
+        name: "g",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      for (const owner of [userId, otherUserId]) {
+        const batchId = await ctx.db.insert("receiptAnalysisBatches", {
+          groupId,
+          createdByUserId: owner,
+          totalCount: 1,
+          processedCount: 1,
+          status: "completed",
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        const activeLinkId = await ctx.db.insert("lineAccountLinks", {
+          userId: owner,
+          lineUserId: `line-${owner}-active`,
+          status: "active",
+          linkedAt: 2,
+          createdAt: 2,
+          updatedAt: 2,
+        });
+        await ctx.db.insert("lineAccountLinks", {
+          userId: owner,
+          lineUserId: `line-${owner}-old`,
+          status: "revoked",
+          linkedAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          revokedAt: 2,
+        });
+        await ctx.db.insert("lineLinkRequests", {
+          userId: owner,
+          stateHash: `state-${owner}`,
+          nonceHash: `nonce-${owner}`,
+          codeVerifier: "verifier",
+          status: "completed",
+          expiresAt: 10,
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        await ctx.db.insert("lineLinkAuditLogs", {
+          userId: owner,
+          action: "linked",
+          result: "success",
+          createdAt: 1,
+        });
+        // linkId で lineAccountLinks を参照するため、リンクより先に消える必要がある。
+        await ctx.db.insert("lineNotificationJobs", {
+          userId: owner,
+          batchId,
+          type: "ai_review_required",
+          pendingCount: 1,
+          linkId: activeLinkId,
+          linkedAtSnapshot: 2,
+          lineUserIdSnapshot: `line-${owner}-active`,
+          text: "通知",
+          status: "queued",
+          attemptCount: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        });
+      }
+      return { requestId, userDbId };
+    });
+
+    for (let i = 0; i < 12; i += 1) {
+      await t.mutation(internal.accountDeletion.finalizeAccountDeletion, { requestId });
+    }
+
+    const countFor = (owner: string) =>
+      t.run(async (ctx) => ({
+        links: await ctx.db
+          .query("lineAccountLinks")
+          .withIndex("by_user_id_and_status", (q) => q.eq("userId", owner))
+          .collect(),
+        requests: await ctx.db
+          .query("lineLinkRequests")
+          .withIndex("by_user_id_and_expires_at", (q) => q.eq("userId", owner))
+          .collect(),
+        audits: await ctx.db
+          .query("lineLinkAuditLogs")
+          .withIndex("by_user_id", (q) => q.eq("userId", owner))
+          .collect(),
+        jobs: await ctx.db
+          .query("lineNotificationJobs")
+          .withIndex("by_user_id_and_created_at", (q) => q.eq("userId", owner))
+          .collect(),
+      }));
+    const deleted = await countFor(userId);
+    expect(await t.run(async (ctx) => ctx.db.get(userDbId))).toBeNull();
+    expect(deleted.links).toHaveLength(0);
+    expect(deleted.requests).toHaveLength(0);
+    expect(deleted.audits).toHaveLength(0);
+    expect(deleted.jobs).toHaveLength(0);
+    const other = await countFor(otherUserId);
+    expect(other.links).toHaveLength(2);
+    expect(other.requests).toHaveLength(1);
+    expect(other.audits).toHaveLength(1);
+    expect(other.jobs).toHaveLength(1);
+
+    // 退会済みユーザーの旧LINE userは、もう家計ユーザーへ解決されない。
+    const lineUserId = `line-${userId}-active`;
+    await t.mutation(internal.lineWebhook.internal.claimEvents, {
+      events: [
+        {
+          webhookEventId: "after-delete-event",
+          eventType: "text",
+          lineUserId,
+          messageId: "after-delete-message",
+          messageText: "今週の支出",
+          replyToken: "after-delete-reply-token",
+        },
+      ],
+    });
+    const [afterEvent] = await t.run(async (ctx) =>
+      ctx.db
+        .query("lineWebhookEvents")
+        .withIndex("by_webhook_event_id", (q) => q.eq("webhookEventId", "after-delete-event"))
+        .collect(),
+    );
+    expect(afterEvent?.delivery).toBe("unlinked");
+    expect(afterEvent?.userId).toBeUndefined();
+
+    // 別ユーザーが同じLINE userを連携しても LINE_LINK_CONFLICT にならない。
+    const newUserId = "https://clerk.example.test|account-delete-line-link-new";
+    const stateHash = "state-after-delete";
+    await t.mutation(internal.lineLink.internal.createRequest, {
+      userId: newUserId,
+      stateHash,
+      nonceHash: "nonce-after-delete",
+      codeVerifier: "verifier",
+      expiresAt: Date.now() + 60_000,
+    });
+    const claim = await t.mutation(internal.lineLink.internal.claimRequest, {
+      stateHash,
+      userId: newUserId,
+    });
+    if (!claim.ok) throw new Error("claim should succeed");
+    await expect(
+      t.mutation(internal.lineLink.internal.finalizeRequest, {
+        requestId: claim.requestId,
+        userId: newUserId,
+        lineUserId,
+        nonceHash: claim.nonceHash,
+      }),
+    ).resolves.toEqual({ ok: true });
   });
 
   it("25件を超える共有membershipもページングで取りこぼさず離脱する", async () => {
