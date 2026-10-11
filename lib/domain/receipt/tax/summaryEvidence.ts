@@ -1,6 +1,34 @@
 import type { ReceiptRawObservationLine } from "../observations";
 import type { ExtractedReceiptItem, ExtractedTaxSummary } from "./types";
 
+/** 明示的な対象額・税額の語を優先し、税率のない合計行は税内訳にしない。 */
+function taxSummaryLineKind(rawText: string): "target" | "tax" | undefined {
+  const text = rawText.normalize("NFKC").replace(/\s+/g, "");
+  const explicitTarget =
+    /対象|タイショウ|小計|課税売上/.test(text) && !/対象(?:消費)?税/.test(text);
+  if (explicitTarget) return "target";
+  if (/税額|消費税|内税|外税|\(内\)税|税計|税合計|tax/i.test(text)) return "tax";
+  if (/(?<!\d)(0|8|10)%/.test(text) && /税込|税抜|税別|合計/.test(text)) return "target";
+  return undefined;
+}
+
+/** 独立した印字税内訳がある場合だけ、全体選択によるサマリの置換を止める。 */
+export function hasPrintedTaxSummaryEvidence(
+  lines: ReceiptRawObservationLine[] | undefined,
+): boolean {
+  return (
+    lines?.some((line) => {
+      if (!line.explicitlyPrinted) return false;
+      if (taxSummaryLineKind(line.rawText) !== undefined) return true;
+      // 読み取れない税内訳や税率付き金額も独立した証拠として残す。
+      return (
+        line.lineRoleCandidates.some((role) => role === "tax" || role === "subtotal") ||
+        (line.amountYen !== null && /%/.test(line.rawText.normalize("NFKC")))
+      );
+    }) ?? false
+  );
+}
+
 /** 原文の役割と税率を照合する。数値の一致だけでは印字証拠にしない。 */
 export function taxSummaryEvidenceLines(
   lines: ReceiptRawObservationLine[] | undefined,
@@ -12,9 +40,7 @@ export function taxSummaryEvidenceLines(
     const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
     const rateMatch = /(?<!\d)(0|8|10)%/.exec(text);
     if (!rateMatch || Number(rateMatch[1]) !== rate) return false;
-    const target =
-      /対象|タイショウ|小計|税込|税抜|税別|課税売上|合計/.test(text) && !/対象消費税/.test(text);
-    return kind === "target" ? target : !target && /税額|消費税|内税|外税|\(内\)税/.test(text);
+    return taxSummaryLineKind(line.rawText) === kind;
   });
 }
 
@@ -47,12 +73,7 @@ export function recalculateUnprovenSummary(args: {
   )
     return summaries;
   // 税率が省略された対象額や小計も、帰属を断定せず補正を止める。
-  if (
-    lines.some(
-      (line) =>
-        line.explicitlyPrinted && /対象|タイショウ|小\s*計/.test(line.rawText.normalize("NFKC")),
-    )
-  )
+  if (lines.some((line) => line.explicitlyPrinted && taxSummaryLineKind(line.rawText) === "target"))
     return summaries;
   const taxLines = taxSummaryEvidenceLines(lines, rate, "tax");
   if (taxLines.length === 0 || taxLines.some((line) => line.amountYen !== summary.taxYen))
