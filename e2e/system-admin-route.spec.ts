@@ -6,11 +6,12 @@ test.describe("system admin route", () => {
     await bypassClerkBotDetection(page);
     await page.goto("/admin");
 
-    await expect(page.getByRole("heading", { name: "管理画面を利用できません" })).toBeVisible({
+    // Appの未認証ゲートが管理画面のrouterより先にログイン画面を表示する。
+    await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeVisible({
       timeout: 30_000,
     });
     await expect(page.getByText("システム管理者として操作")).not.toBeVisible();
     await expect(page.getByText("家計データは表示されません")).not.toBeVisible();
-    await expect(page.getByRole("link", { name: "通常の画面へ戻る" })).toHaveAttribute("href", "/");
+    await expect(page.getByAltText("Suzumemo スズメモ")).toBeVisible();
   });
 });
