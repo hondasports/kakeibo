@@ -8,6 +8,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
+import { STRANDED_RECOVERY_EXPIRED_LOG_LIMIT } from "../lib/usecase/accountDeletion/recoverStrandedAccountDeletions";
 import {
   deleteOrphanedGroupMemberships,
   loadAccountDeletionClassification,
@@ -512,6 +513,59 @@ describe("recoverStrandedRequests（Clerk削除済みfailedの自動復旧）", 
     expect(failedAfterFirst).toBe(2);
     await t.mutation(internal.accountDeletion.recoverStrandedRequests, {});
     expect(await scheduledCount(t)).toBe(12);
+  });
+
+  it("identityDeletedAt なしの新しい failed が150件あっても、古い復旧対象を復旧する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const eligible = await insertFailed(t, { identityDeletedAt: Date.now() - 2 * DAY });
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 150; i += 1) {
+        await ctx.db.insert("accountDeletionRequests", {
+          userId: `retryable-${i}`,
+          clerkUserId: "clerk-retryable",
+          status: "failed",
+          leftGroupCount: 0,
+          deletedGroupCount: 0,
+          attemptCount: 6,
+          maxAttempts: 6,
+          createdAt: 1,
+          updatedAt: Date.now() + 1000 + i,
+        });
+      }
+    });
+    await t.mutation(internal.accountDeletion.recoverStrandedRequests, {});
+    expect((await t.run((ctx) => ctx.db.get(eligible)))?.status).toBe("identity_deleted");
+    expect(await scheduledCount(t)).toBe(1);
+    const untouched = await t.run(async (ctx) =>
+      (await ctx.db.query("accountDeletionRequests").take(200)).filter(
+        (request) => request.status === "failed",
+      ),
+    );
+    expect(untouched).toHaveLength(150);
+  });
+
+  it("期限切れの failed が大量にあっても、ログは上限件数までで復旧対象は復旧される", async () => {
+    const t = convexTest(schema, convexTestModules);
+    for (let i = 0; i < 25; i += 1) {
+      await insertFailed(t, { identityDeletedAt: Date.now() - 20 * DAY - i });
+    }
+    const eligible = await insertFailed(t, { identityDeletedAt: Date.now() - DAY });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await t.mutation(internal.accountDeletion.recoverStrandedRequests, {});
+    expect((await t.run((ctx) => ctx.db.get(eligible)))?.status).toBe("identity_deleted");
+    expect(await scheduledCount(t)).toBe(1);
+    expect(errorSpy).toHaveBeenCalledTimes(STRANDED_RECOVERY_EXPIRED_LOG_LIMIT);
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Account deletion recovery abandoned",
+      expect.objectContaining({ expiredLogged: 20, expiredTruncated: true }),
+    );
+    const stillFailed = await t.run(async (ctx) =>
+      (await ctx.db.query("accountDeletionRequests").take(50)).filter(
+        (request) => request.status === "failed",
+      ),
+    );
+    expect(stillFailed).toHaveLength(25);
+    errorSpy.mockRestore();
   });
 
   it("failed に戻った後に届いた古い markDeletingIdentity / markIdentityDeleted は状態を変えない", async () => {

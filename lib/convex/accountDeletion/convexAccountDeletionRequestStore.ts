@@ -80,11 +80,23 @@ export function createAccountDeletionRequestStore(
         .take(limit);
       return docs.map(requestDocToRecord);
     },
-    async listFailed(limit) {
+    async listFailedIdentityDeletedAfter(cutoff, limit) {
+      // identityDeletedAt 未設定は index 上で数値より小さく並ぶため、gt(cutoff) で読み飛ばされる。
       const docs = await ctx.db
         .query("accountDeletionRequests")
-        .withIndex("by_status_and_updated_at", (q) => q.eq("status", "failed"))
-        .order("desc")
+        .withIndex("by_status_and_identity_deleted_at", (q) =>
+          q.eq("status", "failed").gt("identityDeletedAt", cutoff),
+        )
+        .take(limit);
+      return docs.map(requestDocToRecord);
+    },
+    async listFailedIdentityDeletedAtOrBefore(cutoff, limit) {
+      // 下限 0 で identityDeletedAt 未設定（index 上で数値より小さい）を除外する。
+      const docs = await ctx.db
+        .query("accountDeletionRequests")
+        .withIndex("by_status_and_identity_deleted_at", (q) =>
+          q.eq("status", "failed").gte("identityDeletedAt", 0).lte("identityDeletedAt", cutoff),
+        )
         .take(limit);
       return docs.map(requestDocToRecord);
     },

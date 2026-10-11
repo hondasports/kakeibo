@@ -452,9 +452,12 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   上限回数まで失敗して `failed` になると、本人は認証できず `retryAccountDeletion` を呼べない。
   そのため cron（6 時間毎、`recoverStrandedRequests`）が `failed` かつ `identityDeletedAt` ありの
   リクエストを `retryAccountDeletion` と同じ再開遷移（`resumeFailedAccountDeletion`）で
-  再駆動する。1 回 10 件まで、`identityDeletedAt` から 14 日を超えたものは再駆動せず
-  `console.error("Account deletion recovery abandoned", ...)` で運用者に通知する
-  （`failed` のまま残る）。`identityDeletedAt` 未設定の `failed` は本人の手動再試行対象で触らない。
+  再駆動する。対象は index `by_status_and_identity_deleted_at`（`status`, `identityDeletedAt`）で
+  `failed` かつ `identityDeletedAt` が 14 日以内の行だけを古い順に直接読み、1 回 10 件まで再駆動する
+  （固定件数の新しい順走査ではないため、再試行可能な `failed` が大量にあっても対象が押し出されない）。
+  14 日を超えたものは別クエリで最大 20 件だけ `console.error("Account deletion recovery abandoned", ...)` で
+  運用者に通知し（`expiredLogged` / `expiredTruncated` 付き）、再駆動はしない。`failed` のまま残るため
+  運用者が対応するまで毎回再ログされる。`identityDeletedAt` 未設定の `failed` は本人の手動再試行対象で、読まず触らない。
   併せて `markDeletingIdentity` / `markIdentityDeleted` は許可状態からのみ遷移し、
   古い scheduled run が `failed` を巻き戻して Clerk 削除を再実行しないようにした。
   `finalizeAccountDeletion` は finalize 可能な状態かつ全 purge が `completed` の場合のみユーザー行を削除する。

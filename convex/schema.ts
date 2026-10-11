@@ -775,6 +775,7 @@ export default defineSchema({
   })
     .index("by_user_id", ["userId"])
     .index("by_status_and_updated_at", ["status", "updatedAt"])
+    .index("by_status_and_identity_deleted_at", ["status", "identityDeletedAt"])
     .index("by_next_retry_at", ["nextRetryAt"]),
 
   accountDeletionGroupPurges: defineTable({

@@ -51,8 +51,22 @@ export interface AccountDeletionRequestStore extends AccountDeletionRequestReade
   patch(requestId: string, fields: Partial<AccountDeletionRequestFields>): Promise<void>;
   /** completed かつ updatedAt が cutoff より古いリクエストを最大 limit 件取得する。 */
   listCompletedBefore(cutoff: number, limit: number): Promise<AccountDeletionRequestRecord[]>;
-  /** failed のリクエストを updatedAt の新しい順に最大 limit 件取得する。 */
-  listFailed(limit: number): Promise<AccountDeletionRequestRecord[]>;
+  /**
+   * failed かつ identityDeletedAt が cutoff より新しい（含まない）リクエストを、identityDeletedAt の古い順に最大 limit 件取得する。
+   * identityDeletedAt 未設定の failed（本人が再試行できる行）は読まない。
+   */
+  listFailedIdentityDeletedAfter(
+    cutoff: number,
+    limit: number,
+  ): Promise<AccountDeletionRequestRecord[]>;
+  /**
+   * failed かつ identityDeletedAt が cutoff 以前のリクエストを、identityDeletedAt の古い順に最大 limit 件取得する。
+   * identityDeletedAt 未設定の failed は読まない。
+   */
+  listFailedIdentityDeletedAtOrBefore(
+    cutoff: number,
+    limit: number,
+  ): Promise<AccountDeletionRequestRecord[]>;
   /** リクエストを物理削除する。 */
   delete(requestId: string): Promise<void>;
 }
