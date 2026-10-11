@@ -340,7 +340,7 @@ Convex Dashboard (Deployment Settings > Environment Variables) に以下を設�
 - `E2E_CLERK_USER_ID` — DEV / PREVIEW でE2E操作を許可する固定テストユーザー。本番には設定しない
 - `RECEIPT_IMAGE_EXTRACTOR_MODE` — `mock`（Local / DEV / PREVIEW）/ `real`（PRODのみ）
 - `APP_ENV` — `development`（Local / DEV / PREVIEW）/ `production`（PROD）
-- `INVITATION_REDIRECT_ORIGINS` — 招待メールのリンク先として許可する origin（カンマ区切り・完全一致）。PROD は本番の公開 origin、staging は `https://preview.suzumemo.jp`
+- `INVITATION_REDIRECT_ORIGINS` — 招待メールのリンク先として許可する origin（カンマ区切り・完全一致）。PROD は本番の公開 origin、staging は `https://preview.suzumemo.jp`。localhost / 127.0.0.1 を指定しても `APP_ENV=development` 以外では無視される（拒否される）
 - `OPENAI_API_KEY` — OpenAI API 認証キー（production deployment のみ設定。dev deployment には設定しない）
 
 Convex staging deployment では、`APP_ENV=development`、

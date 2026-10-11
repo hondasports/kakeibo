@@ -38,6 +38,37 @@ describe("isAllowedRedirectOrigin", () => {
     );
   });
 
+  it("設定済み origin に localhost があっても allowLocalhost でなければ拒否", () => {
+    const configured = ["http://localhost:5173", "http://127.0.0.1:5173"];
+    const localhostUrl = new URL("http://localhost:5173" + INVITATION_ACCEPT_PATH);
+    const loopbackUrl = new URL("http://127.0.0.1:5173" + INVITATION_ACCEPT_PATH);
+    expect(isAllowedRedirectOrigin(localhostUrl, configured)).toBe(false);
+    expect(isAllowedRedirectOrigin(localhostUrl, configured, { allowLocalhost: false })).toBe(
+      false,
+    );
+    expect(isAllowedRedirectOrigin(loopbackUrl, configured)).toBe(false);
+    expect(isAllowedRedirectOrigin(loopbackUrl, configured, { allowLocalhost: false })).toBe(false);
+  });
+
+  it("設定済み origin に localhost があり allowLocalhost 指定時は許可", () => {
+    const configured = ["http://localhost:5173", "http://127.0.0.1:5173"];
+    const options = { allowLocalhost: true };
+    expect(
+      isAllowedRedirectOrigin(
+        new URL("http://localhost:5173" + INVITATION_ACCEPT_PATH),
+        configured,
+        options,
+      ),
+    ).toBe(true);
+    expect(
+      isAllowedRedirectOrigin(
+        new URL("http://127.0.0.1:5173" + INVITATION_ACCEPT_PATH),
+        configured,
+        options,
+      ),
+    ).toBe(true);
+  });
+
   it("本番 origin は許可", () => {
     const url = new URL(`https://${KAKEIBO_PRODUCTION_HOSTNAME}` + INVITATION_ACCEPT_PATH);
     expect(isAllowedRedirectOrigin(url, [])).toBe(true);

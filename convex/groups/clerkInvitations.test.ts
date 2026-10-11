@@ -75,6 +75,31 @@ describe("buildInvitationRedirectUrl", () => {
     }
   });
 
+  it.each([
+    ["production", false],
+    ["", false],
+    [undefined, false],
+    ["development", true],
+  ])(
+    "INVITATION_REDIRECT_ORIGINS に localhost があっても APP_ENV=%s のとき許可は %s",
+    (appEnv, allowed) => {
+      vi.stubEnv("INVITATION_REDIRECT_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173");
+      vi.stubEnv("APP_ENV", appEnv as unknown as string);
+      try {
+        for (const origin of ["http://localhost:5173", "http://127.0.0.1:5173"]) {
+          const call = () => buildInvitationRedirectUrl(`${origin}/group/invitations/accept`, "t");
+          if (allowed) {
+            expect(call()).toBe(`${origin}/group/invitations/accept?token=t`);
+          } else {
+            expect(call).toThrowError(ConvexError);
+          }
+        }
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
+
   it("許可されていない origin は拒否する", () => {
     expect(() =>
       buildInvitationRedirectUrl("https://example.com/group/invitations/accept", "token-789"),

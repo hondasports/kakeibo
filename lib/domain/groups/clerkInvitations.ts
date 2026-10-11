@@ -26,15 +26,16 @@ export function isAllowedRedirectOrigin(
   configuredOrigins: string[],
   options: InvitationRedirectOptions = {},
 ): boolean {
-  if (configuredOrigins.includes(url.origin)) {
-    return true;
+  // localhost 系は設定済み origin より先に判定し、allowLocalhost でなければ設定値に含まれていても拒否する
+  const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (isLocalhost) {
+    return (
+      Boolean(options.allowLocalhost) && (url.protocol === "http:" || url.protocol === "https:")
+    );
   }
 
-  if (options.allowLocalhost) {
-    const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-    if (isLocalhost && (url.protocol === "http:" || url.protocol === "https:")) {
-      return true;
-    }
+  if (configuredOrigins.includes(url.origin)) {
+    return true;
   }
 
   return url.origin === `https://${KAKEIBO_PRODUCTION_HOSTNAME}`;
