@@ -73,9 +73,19 @@ export type ExtractedReceiptItem = {
   warnings: string[];
 };
 
+export type TaxSummaryUserEditedField =
+  | "taxRatePercent"
+  | "taxMode"
+  | "taxableAmountYen"
+  | "taxableAmountBasis"
+  | "taxYen"
+  | "taxIncludedAmountYen";
+
 export type ExtractedTaxSummary = {
+  /** 対象額の出所とは別に、個別フィールドの手修正を保持する。 */
+  userEditedFields?: TaxSummaryUserEditedField[];
   /** 未設定の旧データは出所不明として扱う。原文は別に保持する。 */
-  valueOrigin?: { source: "items" | "user"; previousTaxableAmountYen?: number };
+  valueOrigin?: { source: "items" | "user" | "unknown"; previousTaxableAmountYen?: number };
   taxRatePercent: TaxRatePercent;
   taxMode: TaxMode;
   taxableAmountYen: number;

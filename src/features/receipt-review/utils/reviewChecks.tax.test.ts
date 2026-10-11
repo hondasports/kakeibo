@@ -88,6 +88,18 @@ describe("buildTaxRateCheck", () => {
       },
     );
 
+    it("商品の割引率は税率なし対象額の帰属を妨げない", () => {
+      const check = buildTaxRateCheck({
+        items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],
+        taxSummaries: [summary()],
+        rawObservation: rawObservation([
+          { rawText: "対象額 100", amountYen: 100 },
+          { rawText: "10%引 180円", amountYen: 180, lineRoleCandidates: ["discount"] },
+        ]),
+      });
+      expect(check.rows[0]).toMatchObject({ status: "mismatch", sourceLabel: "OCR原文" });
+    });
+
     it("直接印字の証拠がない対象額は±1円を近似一致として扱う", () => {
       const check = buildTaxRateCheck({
         items: [resolvedItem({ printedAmountYen: 101, amountYen: "101" })],

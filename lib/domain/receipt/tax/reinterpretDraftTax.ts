@@ -14,6 +14,7 @@ import type {
   PriceTaxTreatment,
   TaxRateComposition,
   TaxRatePercent,
+  TaxSummaryUserEditedField,
 } from "./types";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
 import { hasPrintedTaxSummaryEvidence, recalculateUnprovenSummary } from "./summaryEvidence";
@@ -102,20 +103,30 @@ function completeSummaryModeBasis(summary: ExtractedTaxSummary): ExtractedTaxSum
 export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): ReinterpretDraftTaxResult {
   const sourceTaxSummaries = input.taxSummaries
     .map((summary, index) => {
+      const existingOrigin =
+        summary.valueOrigin ??
+        (input.taxSummariesUserConfirmed ? { source: "user" as const } : undefined);
       if (input.summaryOverride?.index === index) {
+        const targetEdited = input.summaryOverride.summary.taxableAmountYen !== undefined;
         return {
           ...summary,
           ...input.summaryOverride.summary,
-          valueOrigin: {
-            source: "user" as const,
-            previousTaxableAmountYen:
-              summary.valueOrigin?.previousTaxableAmountYen ?? summary.taxableAmountYen,
-          },
+          userEditedFields: [
+            ...new Set([
+              ...(summary.userEditedFields ?? []),
+              ...(Object.keys(input.summaryOverride.summary) as TaxSummaryUserEditedField[]),
+            ]),
+          ],
+          valueOrigin: targetEdited
+            ? {
+                source: "user" as const,
+                previousTaxableAmountYen:
+                  existingOrigin?.previousTaxableAmountYen ?? summary.taxableAmountYen,
+              }
+            : (existingOrigin ?? { source: "unknown" as const }),
         };
       }
-      return input.taxSummariesUserConfirmed && !summary.valueOrigin
-        ? { ...summary, valueOrigin: { source: "user" as const } }
-        : summary;
+      return existingOrigin ? { ...summary, valueOrigin: existingOrigin } : summary;
     })
     .map(completeSummaryModeBasis);
 
@@ -183,7 +194,10 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     selectedRate !== undefined &&
     selectedBasis !== undefined &&
     !hasPrintedTaxSummaryEvidence(input.rawObservationLines) &&
-    !sourceTaxSummaries.some((summary) => summary.valueOrigin?.source === "user");
+    !sourceTaxSummaries.some(
+      (summary) =>
+        summary.valueOrigin?.source === "user" || (summary.userEditedFields?.length ?? 0) > 0,
+    );
   const taxSummaries = canSynthesizeDecision
     ? (() => {
         const printedTotalYen = items.reduce((sum, item) => sum + item.printedAmountYen, 0);
