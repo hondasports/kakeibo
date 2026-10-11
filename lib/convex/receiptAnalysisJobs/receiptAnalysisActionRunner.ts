@@ -37,7 +37,7 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
         expectedDraftId: expectedDraftId as Id<"aiExpenseDrafts"> | null,
       }),
     async waitForMockExtractor() {
-      if (getExtractorMode(process.env.APP_ENV ?? "development") === "mock") {
+      if (getExtractorMode(process.env.APP_ENV) === "mock") {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     },

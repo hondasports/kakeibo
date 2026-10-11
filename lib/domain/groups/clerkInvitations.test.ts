@@ -16,25 +16,95 @@ describe("isAllowedRedirectOrigin", () => {
     expect(isAllowedRedirectOrigin(url, ["https://app.example.com"])).toBe(true);
   });
 
-  it("localhost は http/https 許可", () => {
+  it("allowLocalhost 指定時のみ localhost は http/https 許可", () => {
     expect(
-      isAllowedRedirectOrigin(new URL("http://localhost:5173" + INVITATION_ACCEPT_PATH), []),
+      isAllowedRedirectOrigin(new URL("http://localhost:5173" + INVITATION_ACCEPT_PATH), [], {
+        allowLocalhost: true,
+      }),
     ).toBe(true);
-    expect(isAllowedRedirectOrigin(new URL("https://127.0.0.1" + INVITATION_ACCEPT_PATH), [])).toBe(
-      true,
+    expect(
+      isAllowedRedirectOrigin(new URL("https://127.0.0.1" + INVITATION_ACCEPT_PATH), [], {
+        allowLocalhost: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("allowLocalhost が未指定または false なら localhost は拒否", () => {
+    const url = new URL("http://localhost:5173" + INVITATION_ACCEPT_PATH);
+    expect(isAllowedRedirectOrigin(url, [])).toBe(false);
+    expect(isAllowedRedirectOrigin(url, [], { allowLocalhost: false })).toBe(false);
+    expect(isAllowedRedirectOrigin(new URL("http://127.0.0.1" + INVITATION_ACCEPT_PATH), [])).toBe(
+      false,
     );
   });
 
-  it("本番ドメインは許可", () => {
+  it("設定済み origin に localhost があっても allowLocalhost でなければ拒否", () => {
+    const configured = ["http://localhost:5173", "http://127.0.0.1:5173"];
+    const localhostUrl = new URL("http://localhost:5173" + INVITATION_ACCEPT_PATH);
+    const loopbackUrl = new URL("http://127.0.0.1:5173" + INVITATION_ACCEPT_PATH);
+    expect(isAllowedRedirectOrigin(localhostUrl, configured)).toBe(false);
+    expect(isAllowedRedirectOrigin(localhostUrl, configured, { allowLocalhost: false })).toBe(
+      false,
+    );
+    expect(isAllowedRedirectOrigin(loopbackUrl, configured)).toBe(false);
+    expect(isAllowedRedirectOrigin(loopbackUrl, configured, { allowLocalhost: false })).toBe(false);
+  });
+
+  it("設定済み origin に localhost があり allowLocalhost 指定時は許可", () => {
+    const configured = ["http://localhost:5173", "http://127.0.0.1:5173"];
+    const options = { allowLocalhost: true };
+    expect(
+      isAllowedRedirectOrigin(
+        new URL("http://localhost:5173" + INVITATION_ACCEPT_PATH),
+        configured,
+        options,
+      ),
+    ).toBe(true);
+    expect(
+      isAllowedRedirectOrigin(
+        new URL("http://127.0.0.1:5173" + INVITATION_ACCEPT_PATH),
+        configured,
+        options,
+      ),
+    ).toBe(true);
+  });
+
+  it("本番 origin は許可", () => {
     const url = new URL(`https://${KAKEIBO_PRODUCTION_HOSTNAME}` + INVITATION_ACCEPT_PATH);
     expect(isAllowedRedirectOrigin(url, [])).toBe(true);
   });
 
-  it("Vercel preview ドメインは許可", () => {
-    const url = new URL(
-      "https://kakeibo-git-main-hondasports-projects.vercel.app" + INVITATION_ACCEPT_PATH,
+  it("本番ホスト名でも http や別ポートは拒否", () => {
+    expect(
+      isAllowedRedirectOrigin(
+        new URL(`http://${KAKEIBO_PRODUCTION_HOSTNAME}` + INVITATION_ACCEPT_PATH),
+        [],
+      ),
+    ).toBe(false);
+    expect(
+      isAllowedRedirectOrigin(
+        new URL(`https://${KAKEIBO_PRODUCTION_HOSTNAME}:8443` + INVITATION_ACCEPT_PATH),
+        [],
+      ),
+    ).toBe(false);
+  });
+
+  it("第三者が登録できる kakeibo-*.vercel.app は設定がなければ拒否", () => {
+    const url = new URL("https://kakeibo-attacker.vercel.app" + INVITATION_ACCEPT_PATH);
+    expect(isAllowedRedirectOrigin(url, [])).toBe(false);
+    expect(
+      isAllowedRedirectOrigin(url, ["https://app.example.com"], { allowLocalhost: true }),
+    ).toBe(false);
+  });
+
+  it("設定済み origin と完全一致しないものは拒否", () => {
+    const configured = ["https://preview.example.com"];
+    expect(isAllowedRedirectOrigin(new URL("https://evil.preview.example.com/x"), configured)).toBe(
+      false,
     );
-    expect(isAllowedRedirectOrigin(url, [])).toBe(true);
+    expect(isAllowedRedirectOrigin(new URL("http://preview.example.com/x"), configured)).toBe(
+      false,
+    );
   });
 
   it("無関係な origin は拒否", () => {
@@ -77,6 +147,44 @@ describe("buildInvitationRedirectUrl", () => {
       [],
     );
     expect(result).toEqual({ success: false, error: "invalid_path" });
+  });
+
+  it("攻撃者が登録した kakeibo-*.vercel.app は not_allowed", () => {
+    const result = buildInvitationRedirectUrl(
+      "https://kakeibo-attacker.vercel.app" + INVITATION_ACCEPT_PATH,
+      "token",
+      [],
+    );
+    expect(result).toEqual({ success: false, error: "not_allowed" });
+  });
+
+  it("localhost は allowLocalhost 指定時のみ許可", () => {
+    const raw = "http://localhost:5173" + INVITATION_ACCEPT_PATH;
+    expect(buildInvitationRedirectUrl(raw, "token", [])).toEqual({
+      success: false,
+      error: "not_allowed",
+    });
+    expect(buildInvitationRedirectUrl(raw, "token", [], { allowLocalhost: true })).toEqual({
+      success: true,
+      redirectUrl: `${raw}?token=token`,
+    });
+  });
+
+  it("userinfo と hash は origin が許可されていても invalid_path", () => {
+    expect(
+      buildInvitationRedirectUrl(
+        `https://user:pass@${KAKEIBO_PRODUCTION_HOSTNAME}${INVITATION_ACCEPT_PATH}`,
+        "token",
+        [],
+      ),
+    ).toEqual({ success: false, error: "invalid_path" });
+    expect(
+      buildInvitationRedirectUrl(
+        `https://${KAKEIBO_PRODUCTION_HOSTNAME}${INVITATION_ACCEPT_PATH}#x`,
+        "token",
+        [],
+      ),
+    ).toEqual({ success: false, error: "invalid_path" });
   });
 
   it("許可されていない origin は not_allowed", () => {

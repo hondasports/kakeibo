@@ -30,20 +30,20 @@ export function assertValidImageDataUrl(imageDataUrl: string): void {
 
 /**
  * 環境設定から抽出計画を決める。判定順序は既存 endpoint と同一:
- * mode 解決 → real は production 限定 → mock → OPENAI_API_KEY 必須。
+ * APP_ENV allow-list → mode 解決 → real は production 限定 → mock → OPENAI_API_KEY 必須。
  */
 export function resolveExtractionPlan(env: ExtractionEnvironment): ExtractionPlan {
-  const appEnv = env.appEnv ?? "development";
-  const modeResult = resolveExtractorMode({ appEnv, mode: env.extractorMode });
+  const modeResult = resolveExtractorMode({ appEnv: env.appEnv, mode: env.extractorMode });
   if ("error" in modeResult) {
     throw new ReceiptImageExtractionDomainError(
       getResolveExtractorModeErrorMessage(modeResult.error),
     );
   }
 
-  if (modeResult.mode === "real" && appEnv !== "production") {
+  // resolveExtractorMode が APP_ENV を development / production に限定済み
+  if (modeResult.mode === "real" && env.appEnv !== "production") {
     throw new ReceiptImageExtractionDomainError(
-      `real モードは APP_ENV=production のときのみ利用できます（現在: ${appEnv}）`,
+      `real モードは APP_ENV=production のときのみ利用できます（現在: ${env.appEnv}）`,
     );
   }
 

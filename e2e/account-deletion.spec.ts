@@ -44,9 +44,13 @@ test("@group-access 唯一ownerは退会をブロックされ、owner譲渡後�
     await page.getByRole("textbox", { name: "確認用入力" }).fill("削除");
     await expect(button).toBeEnabled();
   } finally {
-    if (currentUserId) await cleanupGroupMembershipsByUser(currentUserId);
-    if (memberUserId && currentUserId) {
-      await cleanupGroupMembershipsByUser(memberUserId, currentUserId);
+    // seedユーザーの削除認可には本人の所属が必要なため、本人は最後に片付ける。
+    try {
+      if (memberUserId && currentUserId) {
+        await cleanupGroupMembershipsByUser(memberUserId, currentUserId);
+      }
+    } finally {
+      if (currentUserId) await cleanupGroupMembershipsByUser(currentUserId);
     }
   }
 });

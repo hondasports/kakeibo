@@ -111,6 +111,48 @@ describe("LINE rich menu client", () => {
     }
   });
 
+  it.each([undefined, "", "prod", "Production", "preview"])(
+    "APP_ENV=%sではapplyを拒否する（fail-closed）",
+    async (appEnv) => {
+      const restore = setEnvironment({
+        APP_ENV: appEnv,
+        LINE_INTEGRATION_MODE: "real",
+        LINE_MESSAGING_CHANNEL_ACCESS_TOKEN: "access-token-private",
+      });
+      const fetchImpl = vi.fn();
+      try {
+        await expect(
+          applyLineDefaultRichMenu({
+            imageBytes: readMenuImage(),
+            fetchImpl,
+          }),
+        ).rejects.toThrow(/APP_ENV/);
+        expect(fetchImpl).not.toHaveBeenCalled();
+      } finally {
+        restore();
+      }
+    },
+  );
+
+  it("APP_ENV未設定でもdry-runは許可する", async () => {
+    const restore = setEnvironment({
+      APP_ENV: undefined,
+      LINE_INTEGRATION_MODE: "real",
+      LINE_MESSAGING_CHANNEL_ACCESS_TOKEN: "access-token-private",
+    });
+    const fetchImpl = vi.fn();
+    try {
+      const result = await applyLineDefaultRichMenu({
+        imageBytes: readMenuImage(),
+        dryRun: true,
+        fetchImpl,
+      });
+      expect(result.mode).toBe("dry-run");
+    } finally {
+      restore();
+    }
+  });
+
   it("real modeではcreate・画像upload・default設定・旧メニュー削除を順に呼ぶ", async () => {
     const restore = setEnvironment({
       LINE_INTEGRATION_MODE: "real",

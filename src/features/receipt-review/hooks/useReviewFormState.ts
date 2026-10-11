@@ -57,6 +57,10 @@ export function useReviewFormState({
         paidTotalYen: Number(mappedForm.amountYen),
         taxSummaries: selectedReviewDraft.taxSummaries,
         markerDefinitions: selectedReviewDraft.markerDefinitions,
+        rawObservation: selectedReviewDraft.rawObservation,
+        receiptLineClassifications:
+          selectedReviewDraft.receiptInterpretation?.values.receiptLineClassifications,
+        receiptUserOverride: selectedReviewDraft.receiptUserOverride,
         priceTaxTreatment: mappedForm.priceTaxTreatment,
         taxRateComposition: mappedForm.taxRateComposition,
       }),
@@ -91,6 +95,10 @@ export function useReviewFormState({
           paidTotalYen: Number(reviewForm.amountYen),
           taxSummaries: selectedReviewDraft?.taxSummaries,
           markerDefinitions: selectedReviewDraft?.markerDefinitions,
+          rawObservation: selectedReviewDraft?.rawObservation,
+          receiptLineClassifications:
+            selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
+          receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
           priceTaxTreatment: nextPriceTaxTreatment as ReviewFormValues["priceTaxTreatment"],
           taxRateComposition: nextTaxRateComposition as ReviewFormValues["taxRateComposition"],
         }),
@@ -102,6 +110,10 @@ export function useReviewFormState({
           paidTotalYen: Number(value),
           taxSummaries: selectedReviewDraft?.taxSummaries,
           markerDefinitions: selectedReviewDraft?.markerDefinitions,
+          rawObservation: selectedReviewDraft?.rawObservation,
+          receiptLineClassifications:
+            selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
+          receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
           priceTaxTreatment: reviewForm.priceTaxTreatment,
           taxRateComposition: reviewForm.taxRateComposition,
         }),
@@ -217,6 +229,10 @@ export function useReviewFormState({
         paidTotalYen: Number.isFinite(paidTotalYen) ? paidTotalYen : undefined,
         taxSummaries: selectedReviewDraft?.taxSummaries,
         markerDefinitions: selectedReviewDraft?.markerDefinitions,
+        rawObservation: selectedReviewDraft?.rawObservation,
+        receiptLineClassifications:
+          selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
+        receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
         priceTaxTreatment: reviewForm.priceTaxTreatment,
         taxRateComposition: reviewForm.taxRateComposition,
       });
@@ -267,6 +283,10 @@ export function useReviewFormState({
         paidTotalYen: Number(reviewForm.amountYen),
         taxSummaries: selectedReviewDraft?.taxSummaries,
         markerDefinitions: selectedReviewDraft?.markerDefinitions,
+        rawObservation: selectedReviewDraft?.rawObservation,
+        receiptLineClassifications:
+          selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
+        receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
         ...(preserveReceiptChoice
           ? {
               priceTaxTreatment: reviewForm.priceTaxTreatment,

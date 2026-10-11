@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
@@ -15,6 +15,14 @@ const identity = (userId: string) => ({
 });
 
 describe("system admin group deletion operations", () => {
+  // APP_ENV 未設定は fail-closed のため、環境ラベルを明示して検証する
+  beforeEach(() => {
+    vi.stubEnv("APP_ENV", "development");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("一覧は家計内容とactor snapshotを返さず、failed jobを再開して監査する", async () => {
     const t = convexTest(schema, convexTestModules);
     const { jobId } = await t.run(async (ctx) => {
@@ -83,6 +91,21 @@ describe("system admin group deletion operations", () => {
       targetKind: "group",
       reason: "失敗原因を確認し、同じstageから再開",
     });
+  });
+
+  it("APP_ENVが未設定・不正なら一覧を拒否する（developmentへフォールバックしない）", async () => {
+    const t = convexTest(schema, convexTestModules);
+    for (const appEnv of ["", "prod", "Production"]) {
+      vi.stubEnv("APP_ENV", appEnv);
+      await expect(
+        t
+          .withIdentity(identity("admin"))
+          .query(api.systemAdminGroupDeletion.listGroupDeletionJobs, {
+            paginationOpts: { numItems: 10, cursor: null },
+            status: "failed",
+          }),
+      ).rejects.toThrow("APP_ENVが正しく設定されていません");
+    }
   });
 
   it("system admin以外は一覧・再開できない", async () => {

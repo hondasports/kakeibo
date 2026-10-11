@@ -175,7 +175,7 @@ describe("ReviewCheckCards", () => {
     expect(within(region).getAllByText("比較不能")).toHaveLength(2);
     expect(within(region).getByText("支払額が未確定です")).toBeInTheDocument();
     expect(within(region).getByText("対象額の税込／税抜が未確定です")).toBeInTheDocument();
-    expect(within(region).getByText(/現在 未確定 ／ 印字 4,292円/)).toBeInTheDocument();
+    expect(within(region).getByText(/現在 未確定 ／ 対象額 4,292円/)).toBeInTheDocument();
   });
 
   it("サマリに無い税率は印字なし行として末尾に追加する", () => {
@@ -206,6 +206,6 @@ describe("ReviewCheckCards", () => {
     );
     const region = screen.getByRole("region", { name: "確認結果" });
     expect(within(region).getByText(/10%（印字なし）/)).toBeInTheDocument();
-    expect(within(region).getByText(/現在 200円 ／ 印字 未確定/)).toBeInTheDocument();
+    expect(within(region).getByText(/現在 200円 ／ 対象額 未確定/)).toBeInTheDocument();
   });
 });

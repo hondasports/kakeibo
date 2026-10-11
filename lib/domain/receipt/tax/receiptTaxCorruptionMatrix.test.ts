@@ -169,3 +169,33 @@ describe("receiptTax corruption matrix", () => {
     expect(result.reasons).toContain("mixed_tax_mode");
   });
 });
+
+it.each([
+  "tax",
+  "total",
+  "missing",
+  "duplicate",
+  "discount",
+  "mixed",
+  "unknown",
+  "target",
+  "rounding",
+])("対象額再計算は%sの証拠不足・矛盾を隠さない", async (corruption) => {
+  const { reinterpretDraftTax } = await import("./reinterpretDraftTax");
+  const { unprovenTargetReceipt, observationLine } =
+    await import("./fixtures/unprovenTargetReceipt");
+  const input = unprovenTargetReceipt();
+  if (corruption === "tax") input.rawObservationLines![1].amountYen = 400;
+  if (corruption === "total") input.rawObservationLines![0].amountYen = 4800;
+  if (corruption === "missing") input.items.pop();
+  if (corruption === "duplicate") input.items.push(input.items[0]);
+  if (corruption === "discount") input.items[0].printedAmountYen = -990;
+  if (corruption === "mixed") input.items[0].taxRatePercent = 8;
+  if (corruption === "unknown") input.rawObservationLines = undefined;
+  if (corruption === "target")
+    input.rawObservationLines!.push(observationLine("10%対象 4,373円", 4373, 2));
+  if (corruption === "rounding") input.taxSummaries[0].roundingMethod = "ceil";
+  const result = reinterpretDraftTax(input);
+  expect(result.interpretation.taxSummaries[0].taxableAmountYen).toBe(4373);
+  expect(result.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+});

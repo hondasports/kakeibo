@@ -14,14 +14,22 @@ export type AnalyzeReceiptImageCoreArgs = {
   telemetryId?: string;
 };
 
+const GENERIC_FAILURE_WARNING = "画像解析に失敗しました";
+
+/**
+ * 下書きの warnings / ジョブの error として永続化され、グループメンバーに表示される文言を返す。
+ * 利用者向けに意図された ConvexError の文字列だけをそのまま返し、
+ * それ以外（設定値や内部状態を含みうる Error.message）は固定文言に置き換える。
+ * 詳細はサーバーログにのみ残す（画像データ・秘密情報は含めない）。
+ */
 export function getSafeFailureWarning(err: unknown) {
   if (err instanceof ConvexError && typeof err.data === "string") {
     return err.data;
   }
   if (err instanceof Error) {
-    return err.message;
+    console.error("receipt_extraction_unexpected_error", { name: err.name, message: err.message });
   }
-  return "画像解析に失敗しました";
+  return GENERIC_FAILURE_WARNING;
 }
 
 export async function assertReceiptImageConsent(ctx: ActionCtx) {
