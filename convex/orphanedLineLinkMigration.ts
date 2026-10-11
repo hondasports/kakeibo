@@ -21,6 +21,16 @@
  * すべて internal 関数でクライアントから呼べない。cron は追加せず、運用者が手動で実行する。
  * 必ず非本番 deployment で先に実行・検証してから、本番へ同じ手順を適用すること。
  *
+ * 【削除は不可逆。判定の根拠が「users 行の不在」だけである点に注意】
+ * 孤児の判定は「users に行が無く、終端でない accountDeletionRequests も無い」ことだけで、
+ * 「退会が完了した」という積極的な証拠は要求しない（完了済みの退会リクエストは日次 cron で消えるため、
+ * 古い退会は証拠が残らない）。そのため、次の生きたユーザーを孤児と誤判定して連携を消しうる:
+ *   - プロフィール作成（upsertUser）に失敗した認証済みユーザー。UI は使え、LINE 連携も開始できるため、
+ *     users 行が無いまま有効な LINE 連携を持ちうる（src/features/auth/hooks/useInitializeUser.ts は失敗をログのみで継続する）。
+ * したがって運用者は、dryRun の件数（orphanLinks / orphanRequests / orphanAuditLogs）が想定の退会者数と
+ * 妥当に一致することを確認してから executeBatch を実行すること。想定より多い場合は実行せず、
+ * 内訳を調べてから判断する。誤って消した連携は、本人が LINE 連携をやり直せば復旧する（データ損失は連携情報に限られる）。
+ *
  * 実行手順（対象 deployment は Convex CLI の通常の指定方法で選ぶ。最初は非本番）:
  *   1. dry run（カウントのみ。continueCursor が null になるまで、返った値をそのまま cursor に渡して繰り返す）
  *      pnpm exec convex run orphanedLineLinkMigration:dryRun '{}'

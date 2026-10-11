@@ -1538,7 +1538,9 @@ finalize の purge に `lineAccountLinks` 等を加える前に完了した退�
 
 cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` の先頭。戻り値の `continueCursor` をそのまま次の呼び出しに渡す。最後の phase（`auditLogs`）が終わった時だけ `isDone: true` / `continueCursor: null` になる。戻り値・ログは件数のみで userId / lineUserId は含まない。
 
-運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。
+**削除は不可逆で、孤児の判定根拠は「`users` に行が無い」ことだけである。** 完了した退会リクエストは日次 cron で消えるため、「退会が完了した」という積極的な証拠は要求していない。そのため、プロフィール作成（`upsertUser`）に失敗した認証済みユーザー（UI は使え、LINE 連携も開始できるが `users` 行が無い。`useInitializeUser` は失敗をログのみで継続する）の連携を、孤児と誤判定して消す可能性がある。誤って消した連携は、本人が LINE 連携をやり直せば復旧し、失われるのは連携情報に限られる。この判定方針は、プロダクトオーナーが「`users` 行が無ければ削除」で確定したものである。
+
+運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の件数が想定の退会者数と妥当に一致することを確認してから `executeBatch` を実行し、想定より多い場合は実行せず内訳を調べる。**
 
 1. `pnpm exec convex run orphanedLineLinkMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`orphanLinks` / `orphanRequests` / `orphanAuditLogs` と `wouldDelete` を確認。`wouldDelete` は phase 間で重複しうる上限見積もり）
 2. `pnpm exec convex run orphanedLineLinkMigration:executeBatch '{}'`（自己再スケジュールで全 phase を最後まで進む。冪等なので再実行可。`isDone: true` を戻り値かログで確認）
