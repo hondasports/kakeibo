@@ -98,6 +98,8 @@ Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email
 > | system admin の検索・グループ削除ジョブ一覧 | `APP_ENVが正しく設定されていません` で拒否（development 表示へフォールバックしない） |
 > | E2E 用 HTTP / purge | 従来どおり `development` 以外は 503 / no-op |
 >
+> **system admin の `preview` について**: system admin の環境（`systemAdmins.environment` と `expectedEnvironment`）は、`development` / `preview` / `production` の3値で、これは system admin の権限が属する環境を表すデータ上の定義であり（`docs/system-admin-authorization.md`、`lib/domain/systemAdmin/environment.ts`）、mock や実 apply の可否を決める上記の allow-list とは別の問いである。`APP_ENV=preview` はレシート抽出・LINE mock・リッチメニュー apply では不正値として拒否されるが、system admin の検索・ジョブ一覧では環境ラベルとして受け付ける。この3値は既存の管理者行と bootstrap 手順に依存するため、`APP_ENV` の許可値（2値）に揃えて `preview` を外すと管理者の環境モデルを壊す。実際の PREVIEW / RC は `APP_ENV=development` で動いているため、`APP_ENV=preview` を設定する運用は想定しない。
+>
 > 各環境の設定元: Local は `pnpm run e2e:env-sync`（`development`）、CI E2E は `scripts/start-ci-convex.mjs`（`development`）、PREVIEW / PREVIEW RC は `preview-deploy.yml` / `production-release.yml`（`development`）、PROD は `production-release.yml`（`production`）。
 > `convex env set APP_ENV ...` を手動で行う環境（新規 Convex deployment など）は、機能を使う前に必ず設定する。
 
