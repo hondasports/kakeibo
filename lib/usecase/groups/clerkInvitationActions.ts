@@ -55,10 +55,11 @@ export async function inviteMember(
   services: InviteClerkServices,
   args: { email: string; redirectUrl: string },
 ): Promise<InviteMemberResult> {
+  // 形式不正・過長のアドレスは DB アクセスや Clerk 呼び出しより前に弾く
+  const email = resolveInvitationEmail(args.email);
   const group = requireInvitationGroup(await store.getMyGroup());
   const currentUserId = await store.getAuthenticatedUserId();
 
-  const email = resolveInvitationEmail(args.email);
   const token = services.createToken();
   const redirectUrl = services.buildRedirectUrl(args.redirectUrl, token);
 

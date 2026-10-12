@@ -1,3 +1,4 @@
+import { unprovenTargetReceipt } from "../../../../lib/domain/receipt/tax/fixtures/unprovenTargetReceipt";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useReviewFormState } from "./useReviewFormState";
@@ -112,4 +113,60 @@ describe("明細削除後の税条件", () => {
       });
     else expect(result.current.reviewItems[0].taxAllocationStatus).toBe("unallocated");
   });
+});
+
+it("初期化と金額変更で構造分類の決済行を税額へ流用しない", () => {
+  const input = unprovenTargetReceipt();
+  input.rawObservationLines![1].rawText = "カード決済 消費税額437円";
+  const draft: AiExpenseDraft = {
+    _id: "draft",
+    status: "needs_review",
+    documentType: "receipt",
+    amountYen: input.amountYen,
+    categoryId: "cat",
+    reviewReasons: [],
+    taxSummaries: input.taxSummaries,
+    rawObservation: { source: "ai_ocr", observedAt: 0, lines: input.rawObservationLines! },
+    receiptInterpretation: {
+      source: "ai",
+      interpretedAt: 0,
+      values: {
+        status: "needs_review",
+        documentType: "receipt",
+        confidence: {},
+        warnings: [],
+        reviewReasons: [],
+        items: [],
+        receiptLineClassifications: [
+          {
+            sourceLineIndex: 1,
+            status: "ambiguous",
+            candidates: [
+              { role: "tax", score: 0.5, evidence: [] },
+              { role: "paymentMethodAmount", score: 0.5, evidence: [] },
+            ],
+          },
+        ],
+      },
+    },
+  };
+  const { result } = renderHook(() =>
+    useReviewFormState({
+      selectedReviewDraftId: draft._id,
+      selectedReviewDraft: draft,
+      localReviewItems: input.items.map((item) => ({
+        ...item,
+        amountYen: item.printedAmountYen!,
+        categoryId: "cat",
+      })),
+      selectedReviewDraftDetails: null,
+    }),
+  );
+  expect(
+    result.current.reviewItems.some((item) => item.taxAllocationStatus === "unallocated"),
+  ).toBe(true);
+  act(() => result.current.handleReviewFieldChange("amountYen", "4810"));
+  expect(
+    result.current.reviewItems.some((item) => item.taxAllocationStatus === "unallocated"),
+  ).toBe(true);
 });

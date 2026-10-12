@@ -1,5 +1,4 @@
 export const INVITATION_ACCEPT_PATH = "/group/invitations/accept";
-export const KAKEIBO_PRODUCTION_HOSTNAME = "kakeibo.vercel.app";
 
 export type InvitationRedirectError =
   | "invalid_url"
@@ -11,27 +10,37 @@ export type BuildInvitationRedirectUrlResult =
   | { success: true; redirectUrl: string }
   | { success: false; error: InvitationRedirectError };
 
-export function isAllowedRedirectOrigin(url: URL, configuredOrigins: string[]): boolean {
-  if (configuredOrigins.includes(url.origin)) {
-    return true;
-  }
+export type InvitationRedirectOptions = {
+  /** localhost / 127.0.0.1 を許可するか。APP_ENV=development の deployment だけ true にする */
+  allowLocalhost?: boolean;
+};
 
+/**
+ * 招待リンクの戻り先 origin を判定する。
+ * 第三者が登録できるホスト名（kakeibo-*.vercel.app 等）は許可しないため、
+ * 設定済み origin との完全一致、または開発時の localhost だけを通す（コードに許可 origin を埋め込まない）。
+ */
+export function isAllowedRedirectOrigin(
+  url: URL,
+  configuredOrigins: string[],
+  options: InvitationRedirectOptions = {},
+): boolean {
+  // localhost 系は設定済み origin より先に判定し、allowLocalhost でなければ設定値に含まれていても拒否する
   const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-  if (isLocalhost && (url.protocol === "http:" || url.protocol === "https:")) {
-    return true;
+  if (isLocalhost) {
+    return (
+      Boolean(options.allowLocalhost) && (url.protocol === "http:" || url.protocol === "https:")
+    );
   }
 
-  if (url.hostname === KAKEIBO_PRODUCTION_HOSTNAME) {
-    return true;
-  }
-
-  return /^kakeibo-[a-z0-9-]+\.vercel\.app$/i.test(url.hostname);
+  return configuredOrigins.includes(url.origin);
 }
 
 export function buildInvitationRedirectUrl(
   rawRedirectUrl: string,
   token: string,
   configuredOrigins: string[],
+  options: InvitationRedirectOptions = {},
 ): BuildInvitationRedirectUrlResult {
   let url: URL;
   try {
@@ -46,7 +55,7 @@ export function buildInvitationRedirectUrl(
   if (url.username || url.password || url.hash || url.pathname !== INVITATION_ACCEPT_PATH) {
     return { success: false, error: "invalid_path" };
   }
-  if (!isAllowedRedirectOrigin(url, configuredOrigins)) {
+  if (!isAllowedRedirectOrigin(url, configuredOrigins, options)) {
     return { success: false, error: "not_allowed" };
   }
 

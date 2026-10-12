@@ -271,6 +271,7 @@ convex/
   systemAdminOwnerlessGroupRecovery.ts
   systemAdminGroupDeletion.ts
   legacyGroupDeletionAuditMigration.ts
+  orphanedLineLinkMigration.ts   # 退会済みユーザーに残った LINE 連携データの一回限り内部 migration（§16.4）
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
@@ -448,6 +449,25 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   ctx.db/ctx.scheduler の直接アクセスはゼロ。`convex/accountDeletionActions.ts` は
   `"use node"` の Clerk 連携 action として骨格を維持し、エラー分類のみ
   ドメイン関数へ置き換えた。
+- **failed の自動復旧**: Clerk ユーザー削除後（`identityDeletedAt` あり）に finalize が
+  上限回数まで失敗して `failed` になると、本人は認証できず `retryAccountDeletion` を呼べない。
+  そのため cron（6 時間毎、`recoverStrandedRequests`）が `failed` かつ `identityDeletedAt` ありの
+  リクエストを `retryAccountDeletion` と同じ再開遷移（`resumeFailedAccountDeletion`）で
+  再駆動する。対象は index `by_status_and_identity_deleted_at`（`status`, `identityDeletedAt`）で
+  `failed` かつ `identityDeletedAt` が 14 日以内の行だけを直接読む（再試行可能な `failed` が大量にあっても対象が押し出されない）。
+  読む候補は最大 200 件（`STRANDED_RECOVERY_CANDIDATE_CAP`）で、`updatedAt` 昇順（最後に触った時刻が古い順）に
+  並べ替えて先頭 10 件を再駆動する。再駆動して再び `failed` に戻った行は `updatedAt` が新しくなり後ろへ回るため、
+  失敗し続ける行が先頭を占有して他の行が 14 日の期限まで試行されない事態を防ぐ（新規 field なしのローテーション）。
+  候補が 200 件を超えたら `console.error("Account deletion recovery saturated", ...)` で運用者に警告する。
+  14 日を超えたものは別クエリで最大 20 件だけ `console.error("Account deletion recovery abandoned", ...)` で
+  運用者に通知し（`expiredLogged` / `expiredTruncated` 付き）、再駆動はしない。`failed` のまま残るため
+  運用者が対応するまで毎回再ログされる。`identityDeletedAt` 未設定の `failed` は本人の手動再試行対象で、読まず触らない。
+  併せて `markDeletingIdentity` は Clerk 削除前の状態からのみ遷移し、
+  古い scheduled run が `failed` を巻き戻して Clerk 削除を再実行しないようにした。一方 `markIdentityDeleted` は
+  Clerk 削除の成功という取り消せない事実を記録するため、並行する古い action が `failed` / `retry_wait` 等へ進めていても
+  `completed` と記録済み状態（`identity_deleted` / `finalization_retry_wait`）以外なら受け付け、`identityDeletedAt` を
+  設定して `identity_deleted` へ進める（拒否すると本人は認証不能・自動復旧対象外で孤立するため）。
+  `finalizeAccountDeletion` は finalize 可能な状態かつ全 purge が `completed` の場合のみユーザー行を削除する。
 - **状態遷移・エラー文言・メール payload/dedupe キー・子ジョブ生成の冪等性は
   不変**。internal endpoint 名と戻り値も維持する。
 
@@ -1463,7 +1483,7 @@ DEV / PREVIEW / PROD の3環境を分けて構築する。
 | 領域           | DEV                                              | PREVIEW                                          | PROD                                              |
 | -------------- | ------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------- |
 | フロントエンド | Vercel Preview URL、またはlocalhost              | `preview` branch の Vercel Preview              | Vercel Production URL                             |
-| URL            | `https://kakeibo-*.vercel.app` などのPreview URL | `https://kakeibo-*.vercel.app` などのPreview URL | `https://kakeibo.vercel.app` などのProduction URL |
+| URL            | `https://kakeibo-*.vercel.app` などのPreview URL | `https://kakeibo-*.vercel.app` などのPreview URL | `https://www.suzumemo.jp` などのProduction URL    |
 | Clerk          | Development instance                             | Development instance                             | Production instance                               |
 | Clerk認証方式  | Google OAuth                                     | Google OAuth                                     | Google OAuth                                      |
 | Convex         | dev deployment                                   | fixed staging deployment                         | production deployment                             |
@@ -1524,6 +1544,26 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 - 既存PRODデータが読めなくならないか
 - 必須項目追加で既存データが壊れないか
 - query/mutationの認可条件が維持されているか
+
+#### 退会済みユーザーの LINE 連携データ掃除（一回限りの内部 migration）
+
+finalize の purge に `lineAccountLinks` 等を加える前に完了した退会では、active な連携が取り残され、LINE webhook の解決と再連携（`LINE_LINK_CONFLICT`）を妨げる。また LINE OAuth を開始しただけで連携を完了せず退会したユーザーには `lineAccountLinks` が無く、`lineLinkRequests` / `lineLinkAuditLogs` だけが残る。`convex/orphanedLineLinkMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`users` に行が無い userId の連携データを削除する。存在するユーザーと、終端でない `accountDeletionRequests` を持つ userId には触れない。
+
+走査は 3 つの phase を `links` → `requests` → `auditLogs` の順に、テーブルごとに独立した pagination で行う（1 page 10 件）。
+
+- `links`: `lineAccountLinks` の孤立リンクと、その userId の通知 job / event・連携リクエスト・監査ログを削除する。通知 job はリンクより先に削除する。
+- `requests`: リンクを持たない孤立 userId の `lineLinkRequests` を削除する。
+- `auditLogs`: リンクを持たない孤立 userId の `lineLinkAuditLogs` を削除する。
+
+cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` の先頭。戻り値の `continueCursor` をそのまま次の呼び出しに渡す。最後の phase（`auditLogs`）が終わった時だけ `isDone: true` / `continueCursor: null` になる。戻り値・ログは件数のみで userId / lineUserId は含まない。
+
+**削除は不可逆で、孤児の判定根拠は「`users` に行が無い」ことだけである。** 完了した退会リクエストは日次 cron で消えるため、「退会が完了した」という積極的な証拠は要求していない。そのため、プロフィール作成（`upsertUser`）に失敗した認証済みユーザー（UI は使え、LINE 連携も開始できるが `users` 行が無い。`useInitializeUser` は失敗をログのみで継続する）の連携を、孤児と誤判定して消す可能性がある。誤って消した連携は、本人が LINE 連携をやり直せば復旧し、失われるのは連携情報に限られる。この判定方針は、プロダクトオーナーが「`users` 行が無ければ削除」で確定したものである。
+
+運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の件数が想定の退会者数と妥当に一致することを確認してから `executeBatch` を実行し、想定より多い場合は実行せず内訳を調べる。**
+
+1. `pnpm exec convex run orphanedLineLinkMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`orphanLinks` / `orphanRequests` / `orphanAuditLogs` と `wouldDelete` を確認。`wouldDelete` は phase 間で重複しうる上限見積もり）
+2. `pnpm exec convex run orphanedLineLinkMigration:executeBatch '{}'`（自己再スケジュールで全 phase を最後まで進む。冪等なので再実行可。`isDone: true` を戻り値かログで確認）
+3. `pnpm exec convex run orphanedLineLinkMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remainingOrphanLinks` / `remainingOrphanRequests` / `remainingOrphanAuditLogs` が 0 であること）
 
 ## 17. テスト方針
 

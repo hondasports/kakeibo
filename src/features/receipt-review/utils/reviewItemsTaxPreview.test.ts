@@ -1,3 +1,4 @@
+import { unprovenTargetReceipt } from "../../../../lib/domain/receipt/tax/fixtures/unprovenTargetReceipt";
 import { describe, expect, it } from "vitest";
 import type { ReviewItemValues } from "../types/types";
 import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
@@ -279,4 +280,34 @@ describe("共有再解釈後の明細と税内訳", () => {
     expect(preview.summarySourceIndexes).toEqual([0, 2]);
     expect(preview.taxSummaries[1].status).toBe("contradictory");
   });
+});
+
+it("構造分類だけが決済行を示す場合もプレビューで対象額を補正しない", () => {
+  const input = unprovenTargetReceipt();
+  input.rawObservationLines![1].rawText = "カード決済 消費税額437円";
+  const preview = buildReviewTaxPreview(
+    input.items.map((item, index) => ({
+      ...item,
+      id: `item-${index}`,
+      amountYen: String(item.printedAmountYen),
+      categoryId: "category",
+    })),
+    {
+      paidTotalYen: input.amountYen,
+      taxSummaries: input.taxSummaries,
+      rawObservation: { source: "ai_ocr", observedAt: 0, lines: input.rawObservationLines! },
+      receiptLineClassifications: [
+        {
+          sourceLineIndex: 1,
+          status: "ambiguous",
+          candidates: [
+            { role: "tax", score: 0.5, evidence: [] },
+            { role: "paymentMethodAmount", score: 0.5, evidence: [] },
+          ],
+        },
+      ],
+    },
+  );
+  expect(preview.taxSummaries[0].taxableAmountYen).toBe(4373);
+  expect(preview.items.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
 });

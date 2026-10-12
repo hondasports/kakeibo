@@ -4,7 +4,7 @@ import {
   resolveExtractorMode,
 } from "../../../lib/domain/receiptImageExtraction/mode";
 
-export function getExtractorMode(appEnv: string): "mock" | "real" {
+export function getExtractorMode(appEnv: string | undefined): "mock" | "real" {
   const mode = process.env.RECEIPT_IMAGE_EXTRACTOR_MODE;
   const result = resolveExtractorMode({ appEnv, mode });
 

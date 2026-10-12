@@ -6,8 +6,8 @@ import { seedTaxReviewDraftByUser } from "./helpers/seed";
 async function expectResolved(dialog: Locator) {
   await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("確認推奨 0件");
   await expect(dialog.getByRole("button", { name: "税内訳を修正" })).toHaveCount(0);
-  await expect(dialog.getByLabel("税率別集計", { exact: true })).toHaveCount(0);
-  await expect(dialog.getByRole("region", { name: "税内訳を確認" })).toHaveCount(0);
+  await expect(dialog.getByLabel("税率別集計", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("region", { name: "税内訳を確認" })).toBeVisible();
 }
 
 for (const width of [1280, 320]) {
@@ -73,9 +73,13 @@ for (const width of [1280, 320]) {
             expectedForms,
           );
           if (receiptCase === "summary892_conflict10")
-            await expect(dialog.getByRole("region", { name: "8%の税内訳を修正" })).toHaveCount(0);
+            await expect(
+              dialog.getByRole("region", { name: "8%の税内訳を修正" }),
+            ).not.toHaveAttribute("open");
           if (receiptCase === "summary892_unknown" || receiptCase === "summary892_tax52")
-            await expect(dialog.getByRole("region", { name: "10%の税内訳を修正" })).toHaveCount(0);
+            await expect(
+              dialog.getByRole("region", { name: "10%の税内訳を修正" }),
+            ).not.toHaveAttribute("open");
           await dialog.screenshot({ path: testInfo.outputPath("tax-summary-before.png") });
           if (receiptCase === "summary892_tax52") {
             const tax = editor.getByRole("spinbutton", { name: "税額", exact: true });
@@ -99,7 +103,7 @@ for (const width of [1280, 320]) {
               await product.getByRole("textbox", { name: "明細名" }).fill("食品0の名称修正");
               await expect(targetAmount).toHaveValue("669");
               await editor.getByRole("button", { name: "保存", exact: true }).click();
-              await expect(editor).toHaveCount(0);
+              await expect(editor).toBeVisible();
               await expect(banner.getByRole("button", { name: "税内訳を修正" })).toHaveCount(1);
               await banner.getByRole("button", { name: "税内訳を修正" }).click();
             }
@@ -108,7 +112,7 @@ for (const width of [1280, 320]) {
               tenPercentEditor.getByRole("combobox", { name: "税率", exact: true }),
             ).toBeFocused();
             await tenPercentEditor.getByRole("combobox", { name: "対象額種別" }).click();
-            await page.getByRole("option", { name: "税込印字", exact: true }).click();
+            await page.getByRole("option", { name: "税込", exact: true }).click();
             await tenPercentEditor.getByRole("button", { name: "保存", exact: true }).click();
           }
           await expectResolved(dialog);
@@ -116,6 +120,8 @@ for (const width of [1280, 320]) {
           await dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true }).click();
           await expectResolved(dialog);
         }
+        const reference = dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true });
+        if ((await reference.locator("..").getAttribute("open")) === null) await reference.click();
         await expect(dialog.getByRole("list", { name: "OCR原文" })).toContainText("合計 1,782円");
         await dialog.screenshot({ path: testInfo.outputPath("tax-summary-resolved.png") });
         await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();

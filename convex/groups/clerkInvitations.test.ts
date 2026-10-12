@@ -1,5 +1,5 @@
 import { ConvexError } from "convex/values";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import {
   buildClerkInvitationParams,
@@ -12,25 +12,98 @@ import {
 } from "./clerkInvitations";
 
 describe("buildInvitationRedirectUrl", () => {
-  it("本番ドメインの招待受け入れURLを許可する", () => {
-    expect(
-      buildInvitationRedirectUrl(
-        "https://kakeibo.vercel.app/group/invitations/accept",
-        "token-123",
-      ),
-    ).toBe("https://kakeibo.vercel.app/group/invitations/accept?token=token-123");
+  it("INVITATION_REDIRECT_ORIGINS が未設定ならどの origin も許可しない", () => {
+    vi.stubEnv("INVITATION_REDIRECT_ORIGINS", "");
+    try {
+      expect(() =>
+        buildInvitationRedirectUrl(
+          "https://kakeibo.vercel.app/group/invitations/accept",
+          "token-123",
+        ),
+      ).toThrowError(ConvexError);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
-  it("Vercel preview の招待受け入れURLを許可する", () => {
-    expect(
+  it("攻撃者が登録した kakeibo-*.vercel.app は拒否する", () => {
+    expect(() =>
       buildInvitationRedirectUrl(
-        "https://kakeibo-git-main-hondasports-projects.vercel.app/group/invitations/accept",
+        "https://kakeibo-attacker.vercel.app/group/invitations/accept",
         "token-456",
       ),
-    ).toBe(
-      "https://kakeibo-git-main-hondasports-projects.vercel.app/group/invitations/accept?token=token-456",
-    );
+    ).toThrowError(ConvexError);
   });
+
+  it("INVITATION_REDIRECT_ORIGINS に設定した origin を許可する", () => {
+    vi.stubEnv("INVITATION_REDIRECT_ORIGINS", "https://preview.suzumemo.jp");
+    try {
+      expect(
+        buildInvitationRedirectUrl(
+          "https://preview.suzumemo.jp/group/invitations/accept",
+          "token-456",
+        ),
+      ).toBe("https://preview.suzumemo.jp/group/invitations/accept?token=token-456");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it.each([
+    ["development", true],
+    ["production", false],
+    ["preview", false],
+    ["", false],
+  ])("APP_ENV=%s のとき localhost の許可は %s", (appEnv, allowed) => {
+    vi.stubEnv("APP_ENV", appEnv);
+    try {
+      const call = () =>
+        buildInvitationRedirectUrl("http://localhost:5173/group/invitations/accept", "t");
+      if (allowed) {
+        expect(call()).toBe("http://localhost:5173/group/invitations/accept?token=t");
+      } else {
+        expect(call).toThrowError(ConvexError);
+      }
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("APP_ENV 未設定のとき localhost は拒否する", () => {
+    vi.stubEnv("APP_ENV", undefined as unknown as string);
+    try {
+      expect(() =>
+        buildInvitationRedirectUrl("http://localhost:5173/group/invitations/accept", "t"),
+      ).toThrowError(ConvexError);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it.each([
+    ["production", false],
+    ["", false],
+    [undefined, false],
+    ["development", true],
+  ])(
+    "INVITATION_REDIRECT_ORIGINS に localhost があっても APP_ENV=%s のとき許可は %s",
+    (appEnv, allowed) => {
+      vi.stubEnv("INVITATION_REDIRECT_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173");
+      vi.stubEnv("APP_ENV", appEnv as unknown as string);
+      try {
+        for (const origin of ["http://localhost:5173", "http://127.0.0.1:5173"]) {
+          const call = () => buildInvitationRedirectUrl(`${origin}/group/invitations/accept`, "t");
+          if (allowed) {
+            expect(call()).toBe(`${origin}/group/invitations/accept?token=t`);
+          } else {
+            expect(call).toThrowError(ConvexError);
+          }
+        }
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
 
   it("許可されていない origin は拒否する", () => {
     expect(() =>
@@ -44,13 +117,13 @@ describe("buildClerkInvitationParams", () => {
     expect(
       buildClerkInvitationParams(
         "invitee@example.com",
-        "https://kakeibo.vercel.app/group/invitations/accept?token=token-123",
+        "https://app.example.com/group/invitations/accept?token=token-123",
         "group-001" as Id<"groups">,
         "token-123",
       ),
     ).toEqual({
       emailAddress: "invitee@example.com",
-      redirectUrl: "https://kakeibo.vercel.app/group/invitations/accept?token=token-123",
+      redirectUrl: "https://app.example.com/group/invitations/accept?token=token-123",
       ignoreExisting: true,
       publicMetadata: {
         groupId: "group-001",
@@ -130,6 +203,14 @@ describe("getVerifiedClerkEmailAddresses", () => {
 });
 
 describe("inviteMemberHandler", () => {
+  // localhost の戻り先は APP_ENV=development のときだけ許可される
+  beforeEach(() => {
+    vi.stubEnv("APP_ENV", "development");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("ローカル予約の作成に失敗したら Clerk invitation 作成へ進まない", async () => {
     const getClerkClient = vi.fn();
     const createToken = vi.fn(() => "invite-token");

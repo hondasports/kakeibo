@@ -5,6 +5,7 @@
  */
 import { ConvexError } from "convex/values";
 import { getGroupAdminErrorMessage, validateNotSelfOperator } from "../../domain/groups/admin";
+import { isGroupDeleted } from "../../domain/groups/lifecycle";
 import { validateRemovableGroupMemberRole } from "../../domain/groups/admin";
 import type { UsecaseGroupContext } from "../context";
 import type { GroupMutationDeps } from "./deps";
@@ -48,11 +49,26 @@ export async function removeMember(
 
   await deps.memberships.delete(targetMembership.id);
 
-  const remainingMemberships = await deps.memberships.listByUser(args.targetUserId);
   const removedTargetUser = targetUser;
   if (removedTargetUser !== null) {
-    const nextActiveGroupId = remainingMemberships[0]?.groupId ?? undefined;
-    await deps.users.setActiveGroup(removedTargetUser.docId, nextActiveGroupId, Date.now());
+    // 除外元グループが active だった場合のみ付け替える。他グループを active にしている
+    // 対象ユーザーの設定を、別グループのオーナー操作で書き換えさせない。
+    if (removedTargetUser.activeGroupId === ctx.groupId) {
+      const remainingMemberships = await deps.memberships.listByUser(args.targetUserId);
+      let nextActiveGroupId: string | undefined;
+      for (const membership of remainingMemberships) {
+        if (membership.groupId === ctx.groupId) {
+          continue;
+        }
+        const candidate = await deps.groups.get(membership.groupId);
+        // 削除中・削除済みグループは active 候補にしない
+        if (candidate !== null && !isGroupDeleted(candidate)) {
+          nextActiveGroupId = membership.groupId;
+          break;
+        }
+      }
+      await deps.users.setActiveGroup(removedTargetUser.docId, nextActiveGroupId, Date.now());
+    }
     if (removedTargetUser.email) {
       await deps.invitationCleanup.revokeForEmail(ctx.groupId, removedTargetUser.email);
     }

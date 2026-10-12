@@ -1,3 +1,7 @@
+import {
+  unprovenTargetReceipt,
+  observationLine,
+} from "../../lib/domain/receipt/tax/fixtures/unprovenTargetReceipt";
 import { unallocatedTaxReceipt } from "../../lib/domain/receipt/tax/fixtures/unallocatedTaxReceipt";
 import {
   receiptTaxBasisCases,
@@ -7,6 +11,8 @@ import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 
 export type E2eTaxReviewReceiptCase =
+  | "unproven1003"
+  | "printed1003"
   | "basis890"
   | "basis890_264"
   | "summary892"
@@ -171,6 +177,8 @@ export async function createE2eTaxReviewDraftForUserHandler(
   ctx: MutationCtx,
   args: CreateE2eReadyDraftForUserArgs & { receiptCase?: E2eTaxReviewReceiptCase },
 ) {
+  if (args.receiptCase === "unproven1003" || args.receiptCase === "printed1003")
+    return createE2eUnprovenTargetDraft(ctx, args);
   if (
     args.receiptCase === "summary892" ||
     args.receiptCase === "summary892_unknown" ||
@@ -679,5 +687,50 @@ export async function createE2eUnallocatedTaxDraftForUserHandler(
       updatedAt: now,
     });
   }
+  return draftId;
+}
+
+async function createE2eUnprovenTargetDraft(
+  ctx: MutationCtx,
+  args: CreateE2eReadyDraftForUserArgs & { receiptCase?: E2eTaxReviewReceiptCase },
+) {
+  const fixture = unprovenTargetReceipt();
+  const now = Date.now();
+  if (args.receiptCase === "printed1003")
+    fixture.rawObservationLines!.push(observationLine("10%対象 4,373円", 4373, 2));
+  const draftId = await ctx.db.insert("aiExpenseDrafts", {
+    groupId: args.groupId,
+    createdByUserId: args.createdByUserId,
+    sourceType: "image_upload",
+    status: "needs_review",
+    documentType: "receipt",
+    shopName: "E2E対象額レビュー店",
+    date: "2026-10-11",
+    amountYen: fixture.amountYen,
+    categoryId: args.categoryId,
+    confidence: { documentType: 1, shopName: 1, date: 1, amountYen: 1, categoryId: 1 },
+    taxSummaries: fixture.taxSummaries,
+    rawObservation: { source: "ai_ocr", observedAt: now, lines: fixture.rawObservationLines! },
+    warnings: [],
+    reviewReasons: ["amount_mismatch", "user_confirmation_required"],
+    createdAt: now,
+    updatedAt: now,
+  });
+  for (const item of fixture.items)
+    await ctx.db.insert("aiExpenseDraftItems", {
+      groupId: args.groupId,
+      draftId,
+      itemName: item.itemName,
+      amountYen: item.printedAmountYen!,
+      printedAmountYen: item.printedAmountYen!,
+      taxRatePercent: null,
+      amountBasis: "unknown",
+      taxResolutionStatus: "unresolved",
+      categoryId: args.categoryId,
+      confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+      warnings: ["amount_mismatch"],
+      createdAt: now,
+      updatedAt: now,
+    });
   return draftId;
 }

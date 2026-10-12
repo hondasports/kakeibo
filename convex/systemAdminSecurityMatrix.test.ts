@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
@@ -15,6 +15,14 @@ const identity = (userId: string) => ({
 });
 
 describe("system admin security matrix", () => {
+  // APP_ENV 未設定は fail-closed のため、環境ラベルを明示して検証する
+  beforeEach(() => {
+    vi.stubEnv("APP_ENV", "development");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("管理APIのレスポンスと監査allowlistに家計データ・tokenを含めない", async () => {
     const t = convexTest(schema, convexTestModules);
     const ids = await t.run(async (ctx) => {

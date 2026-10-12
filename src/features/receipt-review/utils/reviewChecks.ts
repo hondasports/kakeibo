@@ -1,4 +1,7 @@
-import type { ReceiptRawObservation } from "../../../../lib/domain/receipt/observations";
+import type {
+  ReceiptLineClassification,
+  ReceiptRawObservation,
+} from "../../../../lib/domain/receipt/observations";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
 import type { ReviewAmountCheck } from "./reviewAmountChecks";
 import type { ReviewTaxRateCheck } from "./reviewTaxChecks";
@@ -14,6 +17,7 @@ export function buildReviewChecks(args: {
   paidTotalYen?: number;
   taxSummaries?: AiExpenseDraft["taxSummaries"];
   rawObservation?: ReceiptRawObservation;
+  receiptLineClassifications?: ReceiptLineClassification[];
 }): ReviewChecks {
   return {
     amount: buildAmountCheck(args),
