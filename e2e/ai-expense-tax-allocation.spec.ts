@@ -20,7 +20,7 @@ test("#748 未配分の13明細を確認して税込合計・税額を保存後�
     await expect(
       dialog
         .getByRole("region", { name: "全体の確認状態" })
-        .getByText(/税額を商品に配分できていません/),
+        .getByText(/8%の商品とレシートの照合：.*税額を商品に配分できていません/),
     ).toBeVisible();
     // Choose the actual discount targets without changing their tax rates.
     for (const [name, target] of [
