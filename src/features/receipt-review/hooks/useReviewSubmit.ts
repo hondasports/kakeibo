@@ -57,7 +57,7 @@ export function useReviewSubmit({
         draftId: selectedReviewDraftId as Id<"aiExpenseDrafts">,
       });
       setReviewSaveFeedback({
-        message: "ユーザー補正を解除し、AI判定へ戻しました。",
+        message: "ユーザー補正を解除し、修正前の内容へ戻しました。",
         severity: "success",
       });
       clearSelection();

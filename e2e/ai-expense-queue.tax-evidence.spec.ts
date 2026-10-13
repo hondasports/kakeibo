@@ -100,3 +100,61 @@ test("Issue #1015 印字対象額の矛盾は商品確認後も保持し、内�
     await cleanupAiExpenseQueue();
   }
 });
+
+test("Issue #1015 旧下書きの初回保存前の商品と基本情報へ戻せる", async ({ page }) => {
+  await gotoAuthenticated(page, "/weeks/current/input");
+  await cleanupAiExpenseQueue();
+  try {
+    await seedTaxReviewDraftByUser(await getCurrentClerkTokenIdentifier(page), "summary892");
+    await page.reload();
+    const queue = page.locator(".input-workbench--expense");
+    await queue
+      .locator(".ai-expense-queue-item")
+      .filter({ hasText: "E2E税内訳補完店" })
+      .getByRole("button", { name: "確認する", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "下書き確認" });
+    await dialog.getByLabel("店名・内容", { exact: true }).fill("E2E復元確認店");
+    await dialog.getByLabel("合計金額", { exact: true }).fill("1900");
+    const product = dialog
+      .getByRole("region", { name: "商品一覧" })
+      .locator("details")
+      .filter({ hasText: "食品0" });
+    if ((await product.getAttribute("open")) === null) await product.locator("summary").click();
+    await product.getByRole("textbox", { name: "明細名", exact: true }).fill("変更した商品");
+    await dialog
+      .getByRole("region", { name: "商品一覧" })
+      .locator("details")
+      .filter({ hasText: "変更した商品" })
+      .getByLabel("レシートの金額", { exact: true })
+      .fill("213");
+    await dialog.getByRole("button", { name: "下書きを保存", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await queue
+      .locator(".ai-expense-queue-item")
+      .filter({ hasText: "E2E復元確認店" })
+      .getByRole("button", { name: /確認する|修正する/ })
+      .click();
+    await dialog.getByText("読み取り原文（参考）", { exact: true }).click();
+    await dialog.getByRole("button", { name: "修正前の内容へ戻す", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await queue
+      .locator(".ai-expense-queue-item")
+      .filter({ hasText: "E2E税内訳補完店" })
+      .getByRole("button", { name: /確認する|修正する/ })
+      .click();
+    await expect(dialog.getByLabel("店名・内容", { exact: true })).toHaveValue("E2E税内訳補完店");
+    await expect(dialog.getByLabel("合計金額", { exact: true })).toHaveValue("1782");
+    const restored = dialog
+      .getByRole("region", { name: "商品一覧" })
+      .locator("details")
+      .filter({ hasText: "食品0" });
+    if ((await restored.getAttribute("open")) === null) await restored.locator("summary").click();
+    await expect(restored.getByRole("textbox", { name: "明細名", exact: true })).toHaveValue(
+      "食品0",
+    );
+    await expect(restored.getByLabel("レシートの金額", { exact: true })).toHaveValue("95");
+  } finally {
+    await cleanupAiExpenseQueue();
+  }
+});
