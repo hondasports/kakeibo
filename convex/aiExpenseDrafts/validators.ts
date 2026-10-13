@@ -204,6 +204,7 @@ export const receiptTaxDecisionValidator = v.object({
   reasons: v.array(v.string()),
   candidates: v.array(receiptTaxDecisionCandidateValidator),
   taxAmount: v.object({
+    userConfirmedTaxYen: v.optional(v.number()),
     printedTaxYen: v.optional(v.number()),
     estimatedTaxYen: v.optional(v.number()),
     roundingMethod: v.union(
@@ -212,7 +213,12 @@ export const receiptTaxDecisionValidator = v.object({
       v.literal("ceil"),
       v.literal("unknown"),
     ),
-    source: v.union(v.literal("printed"), v.literal("estimated"), v.literal("unknown")),
+    source: v.union(
+      v.literal("printed"),
+      v.literal("estimated"),
+      v.literal("unknown"),
+      v.literal("user"),
+    ),
   }),
 });
 
@@ -353,12 +359,13 @@ export const receiptDraftValueSnapshotValidator = v.object({
 });
 
 export const receiptInterpretationSnapshotValidator = v.object({
-  source: v.literal("ai"),
+  source: v.union(v.literal("ai"), v.literal("legacy_projection")),
   interpretedAt: v.number(),
   values: receiptDraftValueSnapshotValidator,
 });
 
 export const receiptUserOverrideSnapshotValidator = v.object({
+  taxSummaryCorrections: v.optional(v.array(taxSummaryValidator)),
   source: v.literal("user"),
   updatedAt: v.number(),
   fields: v.array(v.string()),

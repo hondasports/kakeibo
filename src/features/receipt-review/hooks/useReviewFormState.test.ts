@@ -107,9 +107,9 @@ describe("明細削除後の税条件", () => {
     expect(result.current.reviewItems[0].taxRatePercent).toBe(rate);
     if (rate === 8)
       expect(result.current.reviewItems[0]).toMatchObject({
-        normalizedAmountYen: 108,
-        allocatedTaxYen: 8,
-        taxAllocationStatus: "allocated",
+        normalizedAmountYen: 100,
+        allocatedTaxYen: 0,
+        taxAllocationStatus: "unallocated",
       });
     else expect(result.current.reviewItems[0].taxAllocationStatus).toBe("unallocated");
   });

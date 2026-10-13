@@ -60,6 +60,7 @@ export function useReviewTaxOverrides({
           applyReviewItemsTaxPreview(mapDraftItemsToReviewItems(result.items), {
             paidTotalYen: result.draft.amountYen,
             taxSummaries: result.draft.taxSummaries,
+            sourceTaxSummaries: result.draft.receiptInterpretation?.values.taxSummaries,
             markerDefinitions: result.draft.markerDefinitions,
             rawObservation: result.draft.rawObservation,
             receiptLineClassifications:
@@ -102,6 +103,7 @@ export function useReviewTaxOverrides({
           applyReviewItemsTaxPreview(mapDraftItemsToReviewItems(result.items), {
             paidTotalYen: result.draft.amountYen,
             taxSummaries: result.draft.taxSummaries,
+            sourceTaxSummaries: result.draft.receiptInterpretation?.values.taxSummaries,
             markerDefinitions: result.draft.markerDefinitions,
             rawObservation: result.draft.rawObservation,
             receiptLineClassifications:

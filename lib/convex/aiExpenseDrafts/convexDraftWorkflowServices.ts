@@ -30,7 +30,6 @@ export function createDraftTaxInterpretationService(
         preservedNonTaxReasons: request.preservedNonTaxReasons,
         override: request.override,
         bulkUnresolvedOverride: request.bulkUnresolvedOverride,
-        summaryOverride: request.summaryOverride,
         receiptTotalSource: request.receiptTotalSource,
         decisionOverride: request.decisionOverride,
       });

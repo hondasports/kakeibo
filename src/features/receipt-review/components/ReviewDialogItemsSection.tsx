@@ -19,7 +19,6 @@ export type ReviewDialogItemsSectionProps = {
   isCategorySplit: boolean;
   draft: AiExpenseDraft | null;
   totalOnly: boolean;
-  canEditTax: boolean;
   taxUpdatingItemId?: string | null;
   register: (target: string) => (node: HTMLElement | null) => void;
   onToggleItem: (itemId: string) => void;
@@ -51,7 +50,6 @@ export function ReviewDialogItemsSection({
   isCategorySplit,
   draft,
   totalOnly,
-  canEditTax,
   taxUpdatingItemId,
   register,
   onToggleItem,
@@ -205,7 +203,7 @@ export function ReviewDialogItemsSection({
                     onTaxRateChange={onTaxRateChange}
                     onToggleDetail={() => onToggleTaxDetail(item.id)}
                   />
-                  {!canEditTax && buildTaxContextFromReviewItem(item).status === "unresolved" && (
+                  {buildTaxContextFromReviewItem(item).status === "unresolved" && (
                     <Typography variant="body2" color="text.secondary">
                       税内訳を読み取れていません。レシートと照合して税率・税込／税抜を確認してください。
                     </Typography>

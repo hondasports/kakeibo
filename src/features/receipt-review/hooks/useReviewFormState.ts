@@ -56,6 +56,7 @@ export function useReviewFormState({
       applyReviewItemsTaxPreview(categoryState.items, {
         paidTotalYen: Number(mappedForm.amountYen),
         taxSummaries: selectedReviewDraft.taxSummaries,
+        sourceTaxSummaries: selectedReviewDraft.receiptInterpretation?.values.taxSummaries,
         markerDefinitions: selectedReviewDraft.markerDefinitions,
         rawObservation: selectedReviewDraft.rawObservation,
         receiptLineClassifications:
@@ -94,6 +95,7 @@ export function useReviewFormState({
         applyReviewItemsTaxPreview(current, {
           paidTotalYen: Number(reviewForm.amountYen),
           taxSummaries: selectedReviewDraft?.taxSummaries,
+          sourceTaxSummaries: selectedReviewDraft?.receiptInterpretation?.values.taxSummaries,
           markerDefinitions: selectedReviewDraft?.markerDefinitions,
           rawObservation: selectedReviewDraft?.rawObservation,
           receiptLineClassifications:
@@ -109,6 +111,7 @@ export function useReviewFormState({
         applyReviewItemsTaxPreview(current, {
           paidTotalYen: Number(value),
           taxSummaries: selectedReviewDraft?.taxSummaries,
+          sourceTaxSummaries: selectedReviewDraft?.receiptInterpretation?.values.taxSummaries,
           markerDefinitions: selectedReviewDraft?.markerDefinitions,
           rawObservation: selectedReviewDraft?.rawObservation,
           receiptLineClassifications:
@@ -228,6 +231,7 @@ export function useReviewFormState({
       return applyReviewItemsTaxPreview(updated, {
         paidTotalYen: Number.isFinite(paidTotalYen) ? paidTotalYen : undefined,
         taxSummaries: selectedReviewDraft?.taxSummaries,
+        sourceTaxSummaries: selectedReviewDraft?.receiptInterpretation?.values.taxSummaries,
         markerDefinitions: selectedReviewDraft?.markerDefinitions,
         rawObservation: selectedReviewDraft?.rawObservation,
         receiptLineClassifications:
@@ -282,6 +286,7 @@ export function useReviewFormState({
       return applyReviewItemsTaxPreview(remaining, {
         paidTotalYen: Number(reviewForm.amountYen),
         taxSummaries: selectedReviewDraft?.taxSummaries,
+        sourceTaxSummaries: selectedReviewDraft?.receiptInterpretation?.values.taxSummaries,
         markerDefinitions: selectedReviewDraft?.markerDefinitions,
         rawObservation: selectedReviewDraft?.rawObservation,
         receiptLineClassifications:

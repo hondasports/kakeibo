@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { interpretReceiptTax } from "./interpretReceiptTax";
+import { reinterpretDraftTax } from "./reinterpretDraftTax";
+import { unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";
 import { receiptTaxBasisCases, receiptTaxBasisInput } from "./fixtures/receiptTaxBasisCases";
 import {
   RECEIPT_TAX_GOLDEN_FAILURE_CLASSES,
@@ -283,5 +285,22 @@ it("Issue #1003 の匿名化した旧対象額を商品確認から解消する"
   });
   expect(result.itemFields.map((item) => item.normalizedAmountYen)).toEqual([
     990, 1500, 1500, 790, 30,
+  ]);
+});
+
+it("Issue #1015: 小計・支払合計・内消費税の実再現で登録額と按分を固定する", () => {
+  const input = unprovenTargetReceipt();
+  const result = reinterpretDraftTax(input);
+  expect(result.itemFields.map((item) => item.normalizedAmountYen)).toEqual([
+    990, 1500, 1500, 790, 30,
+  ]);
+  expect(result.itemFields.map((item) => item.allocatedTaxYen)).toEqual([90, 136, 136, 72, 3]);
+  expect(result.interpretation.taxSummaries).toEqual([
+    expect.objectContaining({
+      taxableAmountYen: 4810,
+      taxYen: 437,
+      status: "verified",
+      valueOrigin: { source: "items" },
+    }),
   ]);
 });

@@ -6,7 +6,6 @@
  */
 import type {
   BulkUnresolvedTaxOverride,
-  DraftSummaryOverride,
   DraftTaxOverride,
 } from "../receipt/tax/reinterpretDraftTax";
 import type { PriceTaxTreatment, TaxRateComposition } from "../receipt/tax/types";
@@ -22,7 +21,6 @@ export type DraftTaxInterpretationRequest = {
   preservedNonTaxReasons?: AiExpenseDraftReviewReason[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
-  summaryOverride?: DraftSummaryOverride;
   receiptTotalSource?: "explicit_label" | "user_confirmed" | "ai_estimate";
   decisionOverride?: {
     priceTaxTreatment?: PriceTaxTreatment;
