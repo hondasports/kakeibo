@@ -295,7 +295,7 @@ test.describe("Issue #148 確認が必要なAI支出下書きの編集導線", (
     await expect(dialog.getByText("レシート全体の確認")).toBeVisible();
     // 店名は支払先名で補完されるため必須エラーは出ない。代わりに比較不能の案内を確認する。
     await expect(dialog.getByText("金額を比較できません")).toBeVisible();
-    await dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true }).click();
+    await dialog.getByText("読み取り原文（参考）", { exact: true }).click();
     await expect(dialog.getByRole("list", { name: "OCR原文" })).toContainText(
       "大阪市水道局 水道料金",
     );
@@ -715,7 +715,7 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
     const item = queue.locator(".ai-expense-queue-item").filter({ hasText: "E2E混在税レビュー店" });
     await item.getByRole("button", { name: "確認する" }).click();
     const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true }).click();
+    await dialog.getByText("読み取り原文（参考）", { exact: true }).click();
 
     await expect(dialog.getByRole("list", { name: "OCR原文" })).toContainText("牛乳 110円");
     await expectLocatorInsideViewport(dialog);
@@ -735,71 +735,40 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
     await cleanupAiExpenseQueue();
   });
 
-  test("税率別集計の矛盾を編集して保存すると下書きが再描画される", async ({ page }) => {
-    if (!process.env.E2E_CLERK_USER_EMAIL) {
-      test.skip();
-      return;
-    }
-
+  test("旧税内訳の矛盾は商品の税設定を確認して保存・再表示できる", async ({ page }) => {
     await gotoAuthenticated(page, "/");
-    const userId = await getCurrentClerkTokenIdentifier(page);
-    await seedTaxSummaryConflictDraftByUser(userId);
+    await seedTaxSummaryConflictDraftByUser(await getCurrentClerkTokenIdentifier(page));
     await page.goto(INPUT_PATH);
-
     const queue = await waitForReceiptInputQueue(page);
     const reviewSection = queue.getByRole("region", { name: "確認待ち" });
-    await expect(reviewSection.getByText("E2E税率別集計店")).toBeVisible({ timeout: 15_000 });
+    await expect(reviewSection.getByText("E2E税率別集計店")).toBeVisible({ timeout: 15000 });
     await reviewSection.getByRole("button", { name: "確認する" }).click();
-
     const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await expect(dialog).toBeVisible();
-    await dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true }).click();
-
-    const summarySection = dialog.getByLabel("税率別集計", { exact: true });
-    await expect(summarySection).toBeVisible();
+    const product = dialog
+      .getByRole("region", { name: "商品一覧" })
+      .locator("details")
+      .filter({ hasText: "E2E税率別集計商品" });
+    if ((await product.getAttribute("open")) === null) await product.locator("summary").click();
+    await product.getByRole("combobox", { name: "E2E税率別集計商品の税率", exact: true }).click();
+    await page.getByRole("option", { name: "10%", exact: true }).click();
     await expect(
-      summarySection.getByText("内税として読み取りましたが、対象額は税抜として読み取られています"),
-    ).toBeVisible();
-    await expect(
-      summarySection.getByText("税率別対象額・税額・支払合計の金額が一致しません"),
-    ).toBeVisible();
-
-    const taxableAmountInput = dialog.getByRole("spinbutton", { name: "対象額" });
-    await expect(taxableAmountInput).toBeVisible();
-    await taxableAmountInput.fill("1060");
-
-    const basisSelect = dialog.getByRole("combobox", { name: "対象額種別" });
-    await basisSelect.click();
-    await page.getByRole("option", { name: "税込" }).click();
-
-    const taxIncludedAmountInput = dialog.getByRole("spinbutton", { name: "税込合計" });
-    await taxIncludedAmountInput.fill("1060");
-
-    await dialog.getByRole("button", { name: "保存", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "保存中…" })).toHaveCount(0, {
-      timeout: 15_000,
-    });
-
-    await expect(
-      dialog.getByText("内税として読み取りましたが、対象額は税抜として読み取られています"),
-    ).toHaveCount(0);
-    await expect(dialog.getByText("税込額と支払合計が一致しません")).toHaveCount(0);
-    await expect(dialog.getByLabel("税率別集計", { exact: true })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "税内訳を修正" })).toHaveCount(0);
-
-    await dialog.getByRole("button", { name: "この内容で保存" }).click();
+      product.getByRole("combobox", { name: "E2E税率別集計商品の税率", exact: true }),
+    ).toBeEnabled();
+    await product
+      .getByRole("combobox", { name: "E2E税率別集計商品の表示価格", exact: true })
+      .click();
+    await page.getByRole("option", { name: "税込", exact: true }).click();
+    await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+    await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
     await expect(dialog).toBeHidden();
-
-    // サマリ修正で明細の税も解決済みになるため登録できますへ移る
     const readyItem = queue
       .getByRole("region", { name: "登録できます" })
       .locator(".ai-expense-queue-item")
-      .filter({ hasText: "E2E税率別集計店" })
-      .first();
-    await expect(readyItem).toBeVisible({ timeout: 15_000 });
-    await readyItem.getByRole("button", { name: "修正する" }).click();
-    await expect(dialog).toBeVisible();
-    await dialog.getByText("読み取り原文・詳しい税情報（参考）", { exact: true }).click();
-    await expect(dialog.getByLabel("税率別集計", { exact: true })).toBeVisible();
+      .filter({ hasText: "E2E税率別集計店" });
+    await expect(readyItem).toContainText("1,060円");
+    await readyItem.getByRole("button", { name: "修正する", exact: true }).click();
+    await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+    await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
   });
 });

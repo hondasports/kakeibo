@@ -2,7 +2,7 @@ import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { getImageCaptureFailureHint } from "../../../../lib/domain/aiExpenseDrafts/failure";
 import { getDraftTitle } from "../../../../lib/domain/aiExpenseDrafts/title";
 import { resolveReviewItemDisplayAmountYen } from "../../../../lib/domain/aiExpenseDrafts/reviewItemAmounts";
-import { RECEIPT_TAX_CHOICE_FIELDS } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
+import { resolveReceiptTaxChoices } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import type {
   AiExpenseDraft,
   AiExpenseDraftStatus,
@@ -59,6 +59,7 @@ export function isAmountAndTaxResolved(draft: AiExpenseDraft): boolean {
   const previewArgs = {
     paidTotalYen,
     taxSummaries: draft.taxSummaries,
+    sourceTaxSummaries: draft.receiptInterpretation?.values.taxSummaries,
     markerDefinitions: draft.markerDefinitions,
     rawObservation: draft.rawObservation,
     receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
@@ -78,10 +79,7 @@ export function isAmountAndTaxResolved(draft: AiExpenseDraft): boolean {
     receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
   });
   if (checks.amount.status !== "matched" || checks.taxRate.status !== "matched") return false;
-  const guidance = getReviewGuidance(form, items, effectiveDraft, {
-    summarySourceIndexes: preview.summarySourceIndexes,
-    sourceTaxSummaries: draft.taxSummaries,
-  });
+  const guidance = getReviewGuidance(form, items, effectiveDraft);
   return guidance.every((issue) => isUnrelatedToAmountTaxGuidanceId(issue.id));
 }
 
@@ -152,18 +150,7 @@ export function mapConvexDraftToAiExpenseDraft(draft: Doc<"aiExpenseDrafts">): A
 }
 
 export function mapDraftToReviewForm(draft: AiExpenseDraft): ReviewFormValues {
-  // 全体設定で明示した軸だけを復元し、商品・内訳補正の派生値を再送しない。
-  const overrideFields = draft.receiptUserOverride?.fields ?? [];
-  const hasLegacyUnknownChoice =
-    overrideFields.includes("receiptTaxDecision") &&
-    (draft.registrationMode === "totalOnly" ||
-      (!overrideFields.includes("items") && !overrideFields.includes("taxSummaries")));
-  const hasSavedPriceChoice =
-    overrideFields.includes(RECEIPT_TAX_CHOICE_FIELDS.priceTaxTreatment) ||
-    (hasLegacyUnknownChoice && draft.receiptTaxDecision?.priceTaxTreatment === "unknown");
-  const hasSavedRateChoice =
-    overrideFields.includes(RECEIPT_TAX_CHOICE_FIELDS.taxRateComposition) ||
-    (hasLegacyUnknownChoice && draft.receiptTaxDecision?.taxRateComposition === "unknown");
+  const choices = resolveReceiptTaxChoices(draft);
   return {
     documentType: draft.documentType,
     shopName: getDraftTitle(draft, ""),
@@ -171,12 +158,7 @@ export function mapDraftToReviewForm(draft: AiExpenseDraft): ReviewFormValues {
     amountYen: draft.amountYen?.toString() ?? "",
     categoryId: draft.categoryId ?? "",
     registrationMode: draft.registrationMode ?? "detailed",
-    priceTaxTreatment: hasSavedPriceChoice
-      ? draft.receiptTaxDecision?.priceTaxTreatment
-      : undefined,
-    taxRateComposition: hasSavedRateChoice
-      ? draft.receiptTaxDecision?.taxRateComposition
-      : undefined,
+    ...choices,
   };
 }
 

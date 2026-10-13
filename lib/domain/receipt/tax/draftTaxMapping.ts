@@ -1,3 +1,4 @@
+import type { ReceiptItemLineType } from "../discountItems";
 import type { AiExpenseDraftReviewReason } from "../../aiExpenseDrafts/constants";
 import type {
   AmountBasis,
@@ -14,6 +15,7 @@ import type {
 
 export type DraftItemTaxFields = {
   itemName: string;
+  lineType?: ReceiptItemLineType;
   printedAmountYen?: number;
   amountBasis?: AmountBasis;
   taxRatePercent?: TaxRatePercent | null;
@@ -33,6 +35,7 @@ export type DraftItemTaxFields = {
 
 export type DraftItemTaxFieldsSource = {
   itemName: string;
+  lineType?: ReceiptItemLineType;
   printedAmountYen?: number | null;
   amountYen: number;
   amountBasis?: AmountBasis;
@@ -55,6 +58,7 @@ export type DraftItemTaxFieldsSource = {
 export function mapDraftItemToTaxFields(item: DraftItemTaxFieldsSource): DraftItemTaxFields {
   return {
     itemName: item.itemName,
+    lineType: item.lineType,
     printedAmountYen: item.printedAmountYen ?? item.amountYen,
     amountBasis: item.amountBasis,
     taxRatePercent: item.taxRatePercent ?? null,
@@ -153,6 +157,7 @@ export function deriveTaxReviewReasons(
 export function draftItemToExtractedReceiptItem(item: DraftItemTaxFields): ExtractedReceiptItem {
   return {
     itemName: item.itemName,
+    lineType: item.lineType,
     printedAmountYen: item.printedAmountYen ?? 0,
     amountBasis: item.amountBasis ?? "unknown",
     taxRatePercent: item.taxRatePercent ?? null,

@@ -97,7 +97,7 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     await user.click(screen.getByRole("button", { name: "確認する" }));
 
     const dialog = screen.getByRole("dialog", { name: "下書き確認" });
-    await user.click(within(dialog).getByText("読み取り原文・詳しい税情報（参考）"));
+    await user.click(within(dialog).getByText("読み取り原文（参考）"));
     expect(within(dialog).getByRole("list", { name: "OCR原文" })).toHaveTextContent(
       "合計 ￥８０３",
     );

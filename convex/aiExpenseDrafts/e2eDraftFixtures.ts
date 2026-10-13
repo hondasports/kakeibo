@@ -697,7 +697,7 @@ async function createE2eUnprovenTargetDraft(
   const fixture = unprovenTargetReceipt();
   const now = Date.now();
   if (args.receiptCase === "printed1003")
-    fixture.rawObservationLines!.push(observationLine("10%対象 4,373円", 4373, 2));
+    fixture.rawObservationLines!.push(observationLine("10%対象 4,373円", 4373, 3));
   const draftId = await ctx.db.insert("aiExpenseDrafts", {
     groupId: args.groupId,
     createdByUserId: args.createdByUserId,

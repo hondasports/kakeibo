@@ -103,13 +103,6 @@ const corrections = [
     change: (review: ReviewState) => review.handleAmountBasisChange("item", "tax_included"),
   },
   {
-    label: "税内訳",
-    item: { ...initialItem, taxAllocationStatus: "unallocated" as const },
-    summary: { taxableAmountYen: 200, taxYen: 16 },
-    change: (review: ReviewState) =>
-      review.handleTaxSummaryChange(0, { taxableAmountYen: 200, taxYen: 16 }),
-  },
-  {
     label: "全体税の再計算",
     item: initialItem,
     change: (review: ReviewState) => review.handleApplyReceiptTaxSettings(),
@@ -119,7 +112,7 @@ const corrections = [
 describe("税修正応答と全体税設定の同期", () => {
   it.each(corrections)(
     "$label の成功後は古い全体設定を再適用・再送しない",
-    async ({ item, summary, change }) => {
+    async ({ item, change }) => {
       mutation.mockReset();
       const user = userEvent.setup();
       const draft = savedGlobalChoiceDraft();
@@ -156,11 +149,11 @@ describe("税修正応答と全体税設定の同期", () => {
       ];
       const updatedDraft = {
         ...draft,
-        taxSummaries: [{ ...draft.taxSummaries![0], ...summary }],
+        taxSummaries: draft.taxSummaries,
         receiptUserOverride: {
           ...draft.receiptUserOverride!,
           // 商品・内訳の補正後はサーバーが以前の全体choiceを解除する。
-          fields: ["receiptTaxDecision", summary ? "taxSummaries" : "items"],
+          fields: ["receiptTaxDecision", "items"],
           values: { ...draft.receiptUserOverride!.values, items: updatedItems },
         },
       };
@@ -210,7 +203,6 @@ describe("税修正応答と全体税設定の同期", () => {
           onResetToAiInterpretation={review.handleResetToAiInterpretation}
           onTaxRateChange={review.handleTaxRateChange}
           onAmountBasisChange={review.handleAmountBasisChange}
-          onTaxSummaryChange={review.handleTaxSummaryChange}
         />,
       );
       const card = screen.getByText("未保存の商品名").closest("details")!;

@@ -41,6 +41,10 @@ function previewReceipt(input: ReturnType<typeof duplicatedExternalInput>) {
     items: applyReviewItemsTaxPreview(sourceItems, {
       paidTotalYen: input.amountYen,
       taxSummaries: interpretation.taxSummaries,
+      sourceTaxSummaries: input.taxSummaries,
+      rawObservation: input.rawObservationLines
+        ? { source: "ai_ocr", observedAt: 0, lines: input.rawObservationLines }
+        : undefined,
     }),
   };
 }
@@ -66,10 +70,8 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
         printedTaxYen: 32,
         expectedPaidYen: 436,
       });
-      expect(taxSummaries).toHaveLength(2);
-      expect(taxSummaries.map((summary) => summary.taxIncludedAmountYen)).toEqual(
-        input.taxSummaries.map((summary) => summary.taxIncludedAmountYen),
-      );
+      expect(taxSummaries).toHaveLength(1);
+
       expect(input).toEqual(snapshot);
     },
   );
@@ -102,16 +104,50 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
   ])("異なる税額・対象額・矛盾する税込補助額は同値として隠さない（%o）", (changes) => {
     const input = duplicatedExternalInput();
     input.taxSummaries[1] = { ...input.taxSummaries[1], ...changes };
+    input.rawObservationLines = input.taxSummaries.flatMap((summary, index) => [
+      {
+        rawText: "8%税抜対象 " + summary.taxableAmountYen + "円",
+        amountYen: summary.taxableAmountYen,
+        amountText: String(summary.taxableAmountYen),
+        sourceLineIndex: index * 2,
+        explicitlyPrinted: true,
+        lineRoleCandidates: ["tax"],
+        roleConfidence: 1,
+      },
+      {
+        rawText: "外税8% " + summary.taxYen + "円",
+        amountYen: summary.taxYen,
+        amountText: String(summary.taxYen),
+        sourceLineIndex: index * 2 + 1,
+        explicitlyPrinted: true,
+        lineRoleCandidates: ["tax"],
+        roleConfidence: 1,
+      },
+      ...(summary.taxIncludedAmountYen === undefined
+        ? []
+        : [
+            {
+              rawText: "8%税込合計 " + summary.taxIncludedAmountYen + "円",
+              amountYen: summary.taxIncludedAmountYen,
+              amountText: String(summary.taxIncludedAmountYen),
+              sourceLineIndex: index * 2 + 10,
+              explicitlyPrinted: true,
+              lineRoleCandidates: ["tax" as const],
+              roleConfidence: 1,
+            },
+          ]),
+    ]);
     const snapshot = structuredClone(input);
     const { items, taxSummaries } = previewReceipt(input);
 
-    expect(buildReviewChecks({ items, paidTotalYen: 436, taxSummaries }).amount.status).not.toBe(
+    expect(buildReviewChecks({ items, paidTotalYen: 436, taxSummaries }).taxRate.status).not.toBe(
       "matched",
     );
     expect(
       toReceiptTotalsViewModel({ reviewItems: items, paidTotalYen: 436, taxSummaries }).status,
     ).not.toBe("matched");
-    expect(taxSummaries).toHaveLength(2);
+    expect(items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+    expect(taxSummaries).toHaveLength(1);
     expect(input).toEqual(snapshot);
   });
 

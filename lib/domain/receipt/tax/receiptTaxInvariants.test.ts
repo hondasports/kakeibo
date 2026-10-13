@@ -234,3 +234,23 @@ it("再計算した対象額でも税額配分と登録合計を保存する", a
   expect(result.itemFields.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(437);
   expect(result.itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0)).toBe(4810);
 });
+
+it("導出結果の再入力・順序変更でも印字証拠と商品合計を保存する", async () => {
+  const { reinterpretDraftTax } = await import("./reinterpretDraftTax");
+  const { unprovenTargetReceipt } = await import("./fixtures/unprovenTargetReceipt");
+  const input = unprovenTargetReceipt();
+  const original = structuredClone(input);
+  let summaries = input.taxSummaries;
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    const result = reinterpretDraftTax({
+      ...input,
+      taxSummaries: summaries,
+      items: cycle % 2 ? input.items.toReversed() : input.items,
+    });
+    summaries = result.interpretation.taxSummaries;
+    expect(result.itemFields.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+    expect(result.itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0)).toBe(4810);
+    expect(result.itemFields.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(437);
+  }
+  expect(input).toEqual(original);
+});

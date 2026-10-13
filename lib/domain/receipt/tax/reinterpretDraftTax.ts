@@ -6,7 +6,6 @@ import {
 import { interpretReceiptTax } from "./interpretReceiptTax";
 import type {
   AmountBasis,
-  DraftSummaryOverride,
   ExtractedTaxSummary,
   ReceiptMarkerDefinition,
   ReceiptTaxInput,
@@ -14,13 +13,9 @@ import type {
   PriceTaxTreatment,
   TaxRateComposition,
   TaxRatePercent,
-  TaxSummaryUserEditedField,
 } from "./types";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
-import { hasPrintedTaxSummaryEvidence, recalculateUnprovenSummary } from "./summaryEvidence";
-import { allocateTax } from "./normalizeAmounts";
-
-export type { DraftSummaryOverride } from "./types";
+import { deriveReceiptTaxSummaries } from "./deriveReceiptTaxSummaries";
 
 export type DraftTaxOverride = {
   itemIndex: number;
@@ -35,18 +30,18 @@ export type BulkUnresolvedTaxOverride = {
 
 export type ReinterpretDraftTaxInput = {
   amountYen: number;
-  taxSummariesUserConfirmed?: boolean;
   receiptTotalSource?: "explicit_label" | "user_confirmed" | "ai_estimate";
   receiptTotalConfidence?: number;
   receiptTotalSupportingCandidates?: ReceiptTaxInput["receiptTotalSupportingCandidates"];
   items: DraftItemTaxFields[];
   taxSummaries: ExtractedTaxSummary[];
+  sourceTaxSummaries?: ExtractedTaxSummary[];
+  correctedTaxSummaries?: ExtractedTaxSummary[];
   markerDefinitions?: ReceiptMarkerDefinition[];
   rawObservationLines?: ReceiptRawObservationLine[];
   receiptLineClassifications?: ReceiptLineClassification[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
-  summaryOverride?: DraftSummaryOverride;
   decisionOverride?: {
     priceTaxTreatment?: PriceTaxTreatment;
     taxRateComposition?: TaxRateComposition;
@@ -101,38 +96,8 @@ function completeSummaryModeBasis(summary: ExtractedTaxSummary): ExtractedTaxSum
 }
 
 export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): ReinterpretDraftTaxResult {
-  // 旧形式は集合全体に編集metadataがない場合だけ保守的に保護する。
-  const legacyUserConfirmed =
-    input.taxSummariesUserConfirmed &&
-    input.taxSummaries.every(
-      (summary) => summary.valueOrigin === undefined && summary.userEditedFields === undefined,
-    );
-  const sourceTaxSummaries = input.taxSummaries
-    .map((summary, index) => {
-      const existingOrigin =
-        summary.valueOrigin ?? (legacyUserConfirmed ? { source: "user" as const } : undefined);
-      if (input.summaryOverride?.index === index) {
-        const targetEdited = input.summaryOverride.summary.taxableAmountYen !== undefined;
-        return {
-          ...summary,
-          ...input.summaryOverride.summary,
-          userEditedFields: [
-            ...new Set([
-              ...(summary.userEditedFields ?? []),
-              ...(Object.keys(input.summaryOverride.summary) as TaxSummaryUserEditedField[]),
-            ]),
-          ],
-          valueOrigin: targetEdited
-            ? {
-                source: "user" as const,
-                previousTaxableAmountYen:
-                  existingOrigin?.previousTaxableAmountYen ?? summary.taxableAmountYen,
-              }
-            : (existingOrigin ?? { source: "unknown" as const }),
-        };
-      }
-      return existingOrigin ? { ...summary, valueOrigin: existingOrigin } : summary;
-    })
+  const sourceTaxSummaries = (input.sourceTaxSummaries ?? input.taxSummaries)
+    .filter((summary) => summary.valueOrigin?.source !== "items")
     .map(completeSummaryModeBasis);
 
   const items = input.items.map((item, index) => {
@@ -182,76 +147,35 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     return decisionAdjusted;
   });
 
-  const selectedRate: TaxRatePercent | undefined =
-    input.decisionOverride?.taxRateComposition === "rate8"
-      ? 8
-      : input.decisionOverride?.taxRateComposition === "rate10"
-        ? 10
-        : undefined;
-  const selectedBasis: AmountBasis | undefined =
-    input.decisionOverride?.priceTaxTreatment === "included"
-      ? "tax_included"
-      : input.decisionOverride?.priceTaxTreatment === "excluded"
-        ? "tax_excluded"
-        : undefined;
-  // 独立した印字証拠がある場合、全体選択でも原文の内訳を捨てない。
-  const canSynthesizeDecision =
-    selectedRate !== undefined &&
-    selectedBasis !== undefined &&
-    !hasPrintedTaxSummaryEvidence(input.rawObservationLines, input.receiptLineClassifications) &&
-    !sourceTaxSummaries.some(
-      (summary) =>
-        summary.valueOrigin?.source === "user" || (summary.userEditedFields?.length ?? 0) > 0,
-    );
-  const taxSummaries = canSynthesizeDecision
-    ? (() => {
-        const printedTotalYen = items.reduce((sum, item) => sum + item.printedAmountYen, 0);
-        const taxYen = Math.round(
-          selectedBasis === "tax_excluded"
-            ? (printedTotalYen * selectedRate) / 100
-            : (printedTotalYen * selectedRate) / (100 + selectedRate),
-        );
-        return [
-          {
-            taxRatePercent: selectedRate,
-            taxMode:
-              selectedBasis === "tax_excluded" ? ("external" as const) : ("included" as const),
-            taxableAmountYen: printedTotalYen,
-            taxableAmountBasis: selectedBasis,
-            taxYen,
-            taxIncludedAmountYen:
-              selectedBasis === "tax_excluded" ? printedTotalYen + taxYen : printedTotalYen,
-            roundingMethod: "round" as const,
-            valueOrigin: { source: "items" as const },
-            confidence: {},
-            warnings: [],
-            status: "verified" as const,
-            reasons: [],
-          },
-        ];
-      })()
-    : recalculateUnprovenSummary({
-        amountYen: input.amountYen,
-        items,
-        summaries: sourceTaxSummaries,
-        lines: input.rawObservationLines,
-        classifications: input.receiptLineClassifications,
-      });
+  const taxSummaries = deriveReceiptTaxSummaries({
+    amountYen: input.amountYen,
+    items,
+    preferExplicitChoice:
+      (input.decisionOverride?.priceTaxTreatment === "included" ||
+        input.decisionOverride?.priceTaxTreatment === "excluded") &&
+      (input.decisionOverride?.taxRateComposition === "rate8" ||
+        input.decisionOverride?.taxRateComposition === "rate10"),
+    allowEstimates:
+      input.decisionOverride?.priceTaxTreatment === "included" ||
+      input.decisionOverride?.priceTaxTreatment === "excluded" ||
+      input.items.every(
+        (item) =>
+          item.taxResolutionStatus === "resolved" && item.taxResolutionSource === "item_explicit",
+      ),
+    evidenceSummaries: sourceTaxSummaries,
+    correctedSummaries: input.correctedTaxSummaries,
+    lines: input.rawObservationLines,
+    classifications: input.receiptLineClassifications,
+  });
 
   const userItemPriceWasEdited =
     input.override?.amountBasis !== undefined ||
     input.bulkUnresolvedOverride?.amountBasis !== undefined;
-  const userSummaryPriceWasEdited =
-    input.summaryOverride?.summary.taxableAmountBasis !== undefined ||
-    input.summaryOverride?.summary.taxMode !== undefined;
   const userPriceWasEdited =
-    userItemPriceWasEdited ||
-    userSummaryPriceWasEdited ||
-    input.decisionOverride?.priceTaxTreatment !== undefined;
+    userItemPriceWasEdited || input.decisionOverride?.priceTaxTreatment !== undefined;
   const userRateWasEdited =
     input.override?.taxRatePercent !== undefined ||
     input.bulkUnresolvedOverride?.taxRatePercent !== undefined ||
-    input.summaryOverride?.summary.taxRatePercent !== undefined ||
     input.decisionOverride?.taxRateComposition !== undefined;
   const treatmentFromItems = (): PriceTaxTreatment => {
     const bases = new Set(items.map((item) => item.amountBasis));
@@ -308,40 +232,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
           }
         : undefined,
   });
-  const interpretedItems = canSynthesizeDecision
-    ? (() => {
-        const summaryTaxYen = taxSummaries[0]?.taxYen ?? 0;
-        const printedTotalYen = interpretation.items.reduce(
-          (sum, item) => sum + item.printedAmountYen,
-          0,
-        );
-        const allocations = allocateTax(
-          summaryTaxYen,
-          printedTotalYen,
-          interpretation.items.map((item) => item.printedAmountYen),
-        );
-        return interpretation.items.map((item, index) => {
-          const allocatedTaxYen = allocations[index] ?? 0;
-          return {
-            ...item,
-            amountBasis: selectedBasis,
-            taxRatePercent: selectedRate,
-            allocatedTaxYen,
-            taxAllocationStatus: "allocated" as const,
-            normalizedAmountYen:
-              selectedBasis === "tax_excluded"
-                ? item.printedAmountYen + allocatedTaxYen
-                : item.printedAmountYen,
-            taxContext: {
-              status: "resolved" as const,
-              taxRatePercent: selectedRate,
-              amountBasis: selectedBasis,
-              source: "item_explicit" as const,
-            },
-          };
-        });
-      })()
-    : interpretation.items;
+  const interpretedItems = interpretation.items;
   const amountsResolved =
     interpretation.taxSummaries.length > 0 &&
     interpretation.taxSummaries.every((summary) => summary.status === "verified") &&
@@ -353,7 +244,23 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
         warnings: item.warnings.filter((warning) => warning !== "amount_mismatch"),
       }))
     : interpretedItems;
-  const resolvedInterpretation = { ...interpretation, items: effectiveItems };
+  const hasTaxReadingCorrection = taxSummaries.some((summary) =>
+    summary.userEditedFields?.includes("taxYen"),
+  );
+  const resolvedInterpretation = {
+    ...interpretation,
+    items: effectiveItems,
+    decision: hasTaxReadingCorrection
+      ? {
+          ...interpretation.decision,
+          taxAmount: {
+            ...interpretation.decision.taxAmount,
+            userConfirmedTaxYen: taxSummaries.reduce((sum, summary) => sum + summary.taxYen, 0),
+            source: "user" as const,
+          },
+        }
+      : interpretation.decision,
+  };
 
   return {
     interpretation: resolvedInterpretation,

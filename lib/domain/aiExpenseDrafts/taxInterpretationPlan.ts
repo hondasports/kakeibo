@@ -1,3 +1,8 @@
+import {
+  snapshotReceiptDraftValues,
+  resolveReceiptTaxChoices,
+  resolveReceiptTaxCorrections,
+} from "./receiptDataContract";
 /**
  * 税再解釈を下書き・明細へ永続化するための計画を算出する純粋ルール。
  * DB 取得・patch は infra に委ねる。
@@ -15,7 +20,6 @@ import { deriveTaxReviewReasons, mapDraftItemToTaxFields } from "../receipt/tax/
 import {
   reinterpretDraftTax,
   type BulkUnresolvedTaxOverride,
-  type DraftSummaryOverride,
   type DraftTaxOverride,
   type ReinterpretDraftTaxInput,
 } from "../receipt/tax/reinterpretDraftTax";
@@ -45,7 +49,6 @@ export const UPDATED_DRAFT_NOT_FOUND_MESSAGE = "Failed to retrieve updated AI ex
  * 再解釈の適格性を判定する。不在 → 他グループ → 金額/税サマリ欠落の順。
  * 税サマリが無い下書きでも、ユーザーが新しい税情報を供給するオーバーライド
  * （decisionOverride・明細単位 override・未解決一括 override）があれば許可する。
- * summaryOverride は既存サマリの編集なので適格性の根拠にはしない。
  */
 export function validateTaxInterpretationEligibility(
   draft: AiExpenseDraftFields | null,
@@ -100,7 +103,6 @@ export type TaxInterpretationPlanArgs = {
   preservedNonTaxReasons?: AiExpenseDraftReviewReason[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
-  summaryOverride?: DraftSummaryOverride;
   receiptTotalSource?: ReceiptTotalSource;
   decisionOverride?: ReinterpretDraftTaxInput["decisionOverride"];
 };
@@ -122,6 +124,7 @@ export type DraftItemTaxPatch = {
 
 export type DraftTaxInterpretationPatch = {
   status: "ready" | "needs_review";
+  receiptInterpretation: AiExpenseDraftFields["receiptInterpretation"];
   taxSummaries: AiExpenseDraftFields["taxSummaries"];
   receiptTotalResolution: AiExpenseDraftFields["receiptTotalResolution"];
   receiptTaxDecision: AiExpenseDraftFields["receiptTaxDecision"];
@@ -147,11 +150,12 @@ export function planDraftTaxInterpretation(
 ): TaxInterpretationPlan {
   const { interpretation, itemFields } = reinterpretDraftTax({
     amountYen: draft.amountYen,
-    taxSummariesUserConfirmed: draft.receiptUserOverride?.fields.includes("taxSummaries"),
     receiptTotalSource: args.receiptTotalSource ?? resolveReceiptTotalSource(draft),
     receiptTotalConfidence: draft.confidence.amountYen,
     receiptTotalSupportingCandidates: resolveReceiptTotalSupportingCandidates(draft),
     taxSummaries: draft.taxSummaries ?? [],
+    sourceTaxSummaries: draft.receiptInterpretation?.values.taxSummaries,
+    correctedTaxSummaries: resolveReceiptTaxCorrections(draft.receiptUserOverride),
     markerDefinitions: draft.markerDefinitions,
     rawObservationLines:
       draft.rawObservation?.source === "ai_ocr" ? draft.rawObservation.lines : undefined,
@@ -159,8 +163,9 @@ export function planDraftTaxInterpretation(
     items: items.map(mapDraftItemToTaxFields),
     override: args.override,
     bulkUnresolvedOverride: args.bulkUnresolvedOverride,
-    summaryOverride: args.summaryOverride,
-    decisionOverride: args.decisionOverride,
+    decisionOverride:
+      args.decisionOverride ??
+      (args.override || args.bulkUnresolvedOverride ? undefined : resolveReceiptTaxChoices(draft)),
   });
 
   const ignoresTaxDetails = draft.registrationMode === "totalOnly";
@@ -223,6 +228,11 @@ export function planDraftTaxInterpretation(
     itemPatches,
     draftPatch: {
       status,
+      receiptInterpretation: draft.receiptInterpretation ?? {
+        source: "legacy_projection",
+        interpretedAt: now,
+        values: snapshotReceiptDraftValues(draft, items),
+      },
       taxSummaries: interpretation.taxSummaries,
       receiptTotalResolution: interpretation.receiptTotalResolution,
       receiptTaxDecision: interpretation.decision,

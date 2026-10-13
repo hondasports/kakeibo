@@ -7,7 +7,6 @@ import { useReviewDraftSelection } from "./useReviewDraftSelection";
 import { useReviewFormState } from "./useReviewFormState";
 import { useReviewSubmit } from "./useReviewSubmit";
 import { useReviewTaxOverrides } from "./useReviewTaxOverrides";
-import { useReviewTaxSummaryOverrides } from "./useReviewTaxSummaryOverrides";
 import { mapDraftToReviewForm } from "../utils/mappers";
 
 export function useReviewDialog({
@@ -66,13 +65,6 @@ export function useReviewDialog({
     setReviewError: submit.setReviewError,
   });
 
-  const taxSummaryOverrides = useReviewTaxSummaryOverrides({
-    selectedReviewDraftId: draftSelection.selectedReviewDraftId,
-    setReviewDraftOverride: handleTaxDraftUpdate,
-    setReviewItems: formState.setReviewItems,
-    setReviewError: submit.setReviewError,
-  });
-
   const handleOpenReview = (itemId: string) => {
     draftSelection.setReviewDraftOverride(null);
     draftSelection.setSelectedReviewDraftId(itemId);
@@ -124,7 +116,5 @@ export function useReviewDialog({
     handleTaxRateChange: taxOverrides.handleTaxRateChange,
     handleAmountBasisChange: taxOverrides.handleAmountBasisChange,
     handleApplyReceiptTaxSettings: taxOverrides.handleApplyReceiptTaxSettings,
-    taxSummaryUpdatingIndex: taxSummaryOverrides.taxSummaryUpdatingIndex,
-    handleTaxSummaryChange: taxSummaryOverrides.handleTaxSummaryChange,
   };
 }

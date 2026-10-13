@@ -1,3 +1,4 @@
+import { resolveReceiptTaxChoices, resolveReceiptTaxCorrections } from "./receiptDataContract";
 /**
  * 下書き → 支出エントリ/レシート登録用の明細構築に関するドメイン知識。
  * totalOnly 時の合計確認・税解釈の確定状態の検証を行う。
@@ -85,12 +86,14 @@ export function buildDraftRegistrationItems(
   if (draft.taxSummaries?.length || items.some((item) => item.taxRatePercent != null)) {
     const { itemFields, interpretation } = reinterpretDraftTax({
       amountYen: draft.amountYen!,
+      decisionOverride: resolveReceiptTaxChoices(draft),
       receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
-      taxSummariesUserConfirmed: draft.receiptUserOverride?.fields.includes("taxSummaries"),
       items: items.map(mapDraftItemToTaxFields),
       rawObservationLines:
         draft.rawObservation?.source === "ai_ocr" ? draft.rawObservation.lines : undefined,
       taxSummaries: (draft.taxSummaries ?? []) as ExtractedTaxSummary[],
+      sourceTaxSummaries: draft.receiptInterpretation?.values.taxSummaries,
+      correctedTaxSummaries: resolveReceiptTaxCorrections(draft.receiptUserOverride),
       markerDefinitions: draft.markerDefinitions as ReceiptMarkerDefinition[] | undefined,
     });
     if (

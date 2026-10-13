@@ -143,7 +143,7 @@ export function ReviewStatusBanner({
         <Alert severity="warning">
           <Typography variant="subtitle2">商品の税率を確認してください</Typography>
           <Typography variant="body2">
-            商品の税率または税込／税抜設定を、レシートと照合してください。
+            {taxRate.reason ?? "商品の税率または税込／税抜設定を、レシートと照合してください。"}
           </Typography>
           <Box>
             <Button
@@ -177,11 +177,7 @@ export function ReviewStatusBanner({
                 size="small"
                 onClick={() => onJump(issue.target)}
               >
-                {issue.target.startsWith("tax-summary-")
-                  ? "税内訳を修正"
-                  : issue.required
-                    ? "修正箇所へ"
-                    : "確認箇所へ"}
+                {issue.required ? "修正箇所へ" : "確認箇所へ"}
               </Button>
             </Box>
           ))}

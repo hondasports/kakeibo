@@ -47,6 +47,7 @@ export function unprovenTargetReceipt(): ReinterpretDraftTaxInput {
     rawObservationLines: [
       observationLine("合計 4,810円", 4810, 0),
       observationLine("内消費税10% 437円", 437, 1),
+      { ...observationLine("小計 4,810円", 4810, 2), lineRoleCandidates: ["subtotal"] },
     ],
   };
 }

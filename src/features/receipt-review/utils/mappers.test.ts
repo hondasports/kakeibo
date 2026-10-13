@@ -361,6 +361,15 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
         ? { ...summary, taxableAmountBasis: "tax_excluded", status: "contradictory" }
         : summary,
     );
+    conflict.rawObservation!.lines.push({
+      rawText: "10%税抜対象1060円",
+      amountYen: 1060,
+      amountText: "1060",
+      sourceLineIndex: 3,
+      lineRoleCandidates: ["tax"],
+      roleConfidence: 1,
+      explicitlyPrinted: true,
+    });
     const unresolved = mapDraftToQueueItem(conflict, {});
     expect(unresolved.itemDifferenceYen).toBe(53);
     expect(getReviewPriority(unresolved)).toBe(0);
@@ -373,6 +382,15 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
         ? { ...summary, taxableAmountBasis: "tax_excluded", status: "contradictory" }
         : summary,
     );
+    draft.rawObservation!.lines.push({
+      rawText: "10%税抜対象1060円",
+      amountYen: 1060,
+      amountText: "1060",
+      sourceLineIndex: 3,
+      lineRoleCandidates: ["tax"],
+      roleConfidence: 1,
+      explicitlyPrinted: true,
+    });
     expect(isAmountAndTaxResolved(draft)).toBe(false);
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
       "user_confirmation_required",

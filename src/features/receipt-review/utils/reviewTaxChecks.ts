@@ -105,7 +105,7 @@ export function buildTaxRateCheck(args: {
   const focusTarget =
     untargetedDiscount?.id ??
     unresolved[0]?.id ??
-    (items.length === 0 ? "tax-summary" : globalReason ? "items" : undefined);
+    (items.length === 0 ? "reference" : globalReason ? "items" : undefined);
 
   const rows: ReviewTaxRateRow[] = summaries.map((summary) => {
     const basis = summaryAmountBasis(summary);
@@ -136,6 +136,22 @@ export function buildTaxRateCheck(args: {
         blockerCode: globalBlockerCode,
         affectedItemIds: globalAffectedItemIds,
       };
+    if (
+      summary.warnings?.includes("contradictory_receipt_tax_evidence") ||
+      summary.warnings?.includes("unresolved_receipt_tax_evidence")
+    ) {
+      return {
+        ...base,
+        status: "uncomparable" as const,
+        reason: summary.warnings.includes("contradictory_receipt_tax_evidence")
+          ? "商品の金額・税込／税抜・割引が、レシートの印字情報と一致していません"
+          : "税額の根拠が不足しています。商品とレシート画像を確認してください",
+        blockerCode: "unresolved-tax" as const,
+        affectedItemIds: items
+          .filter((item) => effectiveTaxRateOf(item, items) === summary.taxRatePercent)
+          .map((item) => item.id),
+      };
+    }
     if (basis === "unknown")
       return {
         ...base,
