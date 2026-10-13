@@ -130,6 +130,19 @@ export function deriveReceiptTaxSummaries(args: {
         .map((item) => item.taxRatePercent),
     );
     const paidTax = args.amountYen - items.reduce((sum, item) => sum + item.printedAmountYen, 0);
+    const hasReconciledExternalTax =
+      basis === "tax_excluded" &&
+      rates.length === 1 &&
+      [Math.floor(exactTax), Math.ceil(exactTax)].includes(paidTax) &&
+      lines.some(
+        (line) =>
+          isReceiptTotalLabel(line.rawText) &&
+          taxSummaryLineKind(line.rawText) === undefined &&
+          line.amountYen === args.amountYen,
+      ) &&
+      taxSummaryEvidenceLines(lines, rate, "target", options).some(
+        (line) => line.amountYen === target,
+      );
     const estimatedTax =
       basis === "tax_excluded" &&
       externalRates.size === 1 &&
@@ -208,7 +221,8 @@ export function deriveReceiptTaxSummaries(args: {
       (hasPrintedSummaryEvidence || !args.allowEstimates) &&
       taxes.length === 0 &&
       correctedTax === undefined &&
-      validLegacyTaxes.length === 0;
+      validLegacyTaxes.length === 0 &&
+      !hasReconciledExternalTax;
     return {
       taxRatePercent: rate,
       taxMode: basis === "tax_included" ? "included" : "external",
@@ -248,9 +262,17 @@ export function deriveReceiptTaxSummaries(args: {
       !aggregateAmounts.includes(line.amountYen!)
     );
   });
+  const aggregateTaxIsCorrected =
+    derived.some((summary) => summary.userEditedFields?.includes("taxYen")) &&
+    derived.every(
+      (summary) =>
+        summary.userEditedFields?.includes("taxYen") ||
+        (summary.taxRatePercent === 0 && summary.taxYen === 0),
+    );
   const aggregateTaxConflict = lines.some(
     (line) =>
       isAggregateTaxLine(line.rawText) &&
+      !aggregateTaxIsCorrected &&
       line.amountYen !== derived.reduce((sum, summary) => sum + summary.taxYen, 0),
   );
   const estimatedTotalConflict =

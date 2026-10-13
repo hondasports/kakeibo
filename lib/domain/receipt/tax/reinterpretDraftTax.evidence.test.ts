@@ -444,4 +444,98 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
     });
     expect(input.rawObservationLines[1].amountYen).toBe(5);
   });
+  it.each(["小計1005円", "税抜合計1005円", "10%対象1005円"])(
+    "%s と税込合計の差額から独立した税額行なしで税額を確定する",
+    (targetLabel) => {
+      const input = unprovenTargetReceipt();
+      input.amountYen = 1105;
+      input.items = [{ ...input.items[0], printedAmountYen: 1005, amountBasis: "tax_excluded" }];
+      input.rawObservationLines = [
+        observationLine(targetLabel, 1005, 0),
+        observationLine("合計1105円", 1105, 1),
+      ];
+      expect(allocated(input)).toBe(true);
+      const first = reinterpretDraftTax(input);
+      expect(first.interpretation.taxSummaries[0].taxYen).toBe(100);
+      expect(first.itemFields[0].normalizedAmountYen).toBe(1105);
+      expect(
+        reinterpretDraftTax({ ...input, taxSummaries: first.interpretation.taxSummaries })
+          .itemFields,
+      ).toEqual(first.itemFields);
+    },
+  );
+  it.each(["支払合計なし", "対象額不一致", "税額不読", "支払合計不一致"])(
+    "税抜小計の差額推定は%sを解決しない",
+    (problem) => {
+      const input = unprovenTargetReceipt();
+      input.amountYen = 1100;
+      input.items = [{ ...input.items[0], printedAmountYen: 1000, amountBasis: "tax_excluded" }];
+      input.rawObservationLines = [observationLine("10%対象1000円", 1000, 0)];
+      if (problem !== "支払合計なし")
+        input.rawObservationLines.push(observationLine("合計1100円", 1100, 1));
+      if (problem === "対象額不一致") input.rawObservationLines[0].amountYen = 999;
+      if (problem === "支払合計不一致") input.rawObservationLines[1].amountYen = 1101;
+      if (problem === "税額不読")
+        input.rawObservationLines.push({
+          ...observationLine("消費税 読取不能", 0, 2),
+          amountYen: null,
+          amountText: null,
+        });
+      expect(allocated(input)).toBe(false);
+    },
+  );
+  it.each(["消費税計", "消費税合計", "税額合計"])(
+    "%s の明示税額訂正を税率付き税額訂正と同様に扱う",
+    (label) => {
+      const input = unprovenTargetReceipt();
+      input.rawObservationLines![1].rawText = label + "437円";
+      input.correctedTaxSummaries = [
+        { ...input.taxSummaries[0], taxYen: 438, userEditedFields: ["taxYen"] },
+      ];
+      const first = reinterpretDraftTax(input);
+      expect(allocated(input)).toBe(true);
+      expect(first.interpretation.decision.taxAmount).toMatchObject({
+        printedTaxYen: 437,
+        userConfirmedTaxYen: 438,
+        source: "user",
+      });
+      expect(
+        reinterpretDraftTax({ ...input, taxSummaries: first.interpretation.taxSummaries })
+          .itemFields,
+      ).toEqual(first.itemFields);
+      input.correctedTaxSummaries[0].taxYen = 999;
+      expect(allocated(input)).toBe(false);
+    },
+  );
+  it.each([false, true])(
+    "混在税率の税合計は全税率訂正=%sの場合だけ訂正で置換する",
+    (allCorrected) => {
+      const input = unprovenTargetReceipt();
+      input.amountYen = 2181;
+      input.items = [
+        { ...input.items[0], printedAmountYen: 1081, taxRatePercent: 8 },
+        { ...input.items[0], printedAmountYen: 1100, taxRatePercent: 10 },
+      ];
+      input.rawObservationLines = [
+        observationLine("合計2181円", 2181, 0),
+        observationLine("内消費税8%80円", 80, 1),
+        observationLine("内消費税10%100円", 100, 2),
+        observationLine("消費税計180円", 180, 3),
+      ];
+      input.correctedTaxSummaries = [
+        { ...input.taxSummaries[0], taxRatePercent: 8, taxYen: 81, userEditedFields: ["taxYen"] },
+        ...(allCorrected
+          ? [
+              {
+                ...input.taxSummaries[0],
+                taxRatePercent: 10 as const,
+                taxYen: 100,
+                userEditedFields: ["taxYen" as const],
+              },
+            ]
+          : []),
+      ];
+      expect(allocated(input)).toBe(allCorrected);
+    },
+  );
 });
