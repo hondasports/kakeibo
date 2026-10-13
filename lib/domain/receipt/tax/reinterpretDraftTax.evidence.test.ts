@@ -391,4 +391,57 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
       true,
     );
   });
+  it.each([
+    [91, 91],
+    [91, 999],
+    [999, 91],
+  ])("同率の旧税額候補%sを順序で選んで確定しない", (firstTax, secondTax) => {
+    const input = unprovenTargetReceipt();
+    input.amountYen = 1000;
+    input.items = [{ ...input.items[0], printedAmountYen: 1000 }];
+    input.rawObservationLines = [];
+    input.taxSummaries = [firstTax, secondTax].map((taxYen) => ({
+      ...input.taxSummaries[0],
+      taxYen,
+    }));
+    const result = reinterpretDraftTax(input);
+    expect(result.interpretation.taxSummaries[0].status === "verified").toBe(
+      firstTax === secondTax,
+    );
+    expect(result.itemFields[0].taxAllocationStatus === "allocated").toBe(firstTax === secondTax);
+  });
+  it("同率の旧税額候補が矛盾しても明示的な税額訂正を優先する", () => {
+    const input = unprovenTargetReceipt();
+    input.amountYen = 1000;
+    input.items = [{ ...input.items[0], printedAmountYen: 1000 }];
+    input.rawObservationLines = [];
+    input.taxSummaries = [91, 999].map((taxYen) => ({ ...input.taxSummaries[0], taxYen }));
+    input.correctedTaxSummaries = [
+      { ...input.taxSummaries[0], taxYen: 91, userEditedFields: ["taxYen"] },
+    ];
+    expect(allocated(input)).toBe(true);
+    expect(reinterpretDraftTax(input).interpretation.decision.taxAmount.userConfirmedTaxYen).toBe(
+      91,
+    );
+  });
+
+  it.each(["内消費税", "外税額"])("0%の%sは明示訂正した0円を原文5円と分けて扱う", (label) => {
+    const input = unprovenTargetReceipt();
+    input.items = input.items.map((item) => ({ ...item, taxRatePercent: 0 }));
+    input.rawObservationLines = [
+      { ...observationLine("合計4810円", 4810, 0), lineRoleCandidates: ["total"] },
+      observationLine(label + "5円", 5, 1),
+    ];
+    input.correctedTaxSummaries = [
+      { ...input.taxSummaries[0], taxRatePercent: 0, taxYen: 0, userEditedFields: ["taxYen"] },
+    ];
+    const result = reinterpretDraftTax(input);
+    expect(allocated(input)).toBe(true);
+    expect(result.interpretation.decision.taxAmount).toMatchObject({
+      printedTaxYen: 5,
+      userConfirmedTaxYen: 0,
+      source: "user",
+    });
+    expect(input.rawObservationLines[1].amountYen).toBe(5);
+  });
 });
