@@ -156,10 +156,10 @@ export function deriveReceiptTaxSummaries(args: {
     const conflict =
       unidentifiedEvidence ||
       correctedTaxes.length > 1 ||
-      (rate === 0 && taxes.some((amount) => amount !== 0)) ||
+      (rate === 0 && correctedTax === undefined && taxes.some((amount) => amount !== 0)) ||
       totalConflict ||
       (correctedTax === undefined && taxes.length > 1) ||
-      validLegacyTaxes.length > 1 ||
+      (correctedTax === undefined && legacyTaxes.length > 1) ||
       group.some(
         (item) => item.amountBasis !== basis || !Number.isSafeInteger(item.printedAmountYen),
       ) ||
@@ -167,6 +167,7 @@ export function deriveReceiptTaxSummaries(args: {
       target < 0 ||
       ![Math.floor(exactTax), Math.ceil(exactTax)].includes(tax) ||
       taxLines.some((line) => {
+        if (rate === 0) return false;
         const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
         return basis === "tax_included" && /外税|税抜|税別/.test(text);
       }) ||
