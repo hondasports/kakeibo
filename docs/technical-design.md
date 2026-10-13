@@ -1271,13 +1271,16 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `aiExpenseDrafts.mutations.updateForReview(draftId, input)`
 - `aiExpenseDrafts.mutations.deleteDraft(draftId)`
 - `aiExpenseDrafts.mutations.updateDraftItemTaxOverrides(draftId, itemId, taxRatePercent?, amountBasis?)`
-- `aiExpenseDrafts.mutations.updateSummaryTaxOverrides(draftId, summaryIndex, taxRatePercent?, taxMode?, taxableAmountYen?, taxYen?, ...)`
 - `aiExpenseDrafts.mutations.applyReceiptTaxSettings(draftId, taxRatePercent?, amountBasis?)`
 - `aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries(draftIds)`（主導線）
 - `aiExpenseDrafts.mutations.registerReadyDrafts(draftIds)`（レガシー。`receipts` へ登録し `registeredReceiptId` を設定）
 - `aiExpenseDrafts.actions.analyzeReceiptImageToDraft(input)`
 - `aiExpenseDrafts.internal.createFromExtraction(input)`（internal）
 - `aiExpenseDrafts.internal.createFailedDraftFromImageAnalysis(input)`（internal）
+
+税率別の対象額・税配分・登録額は `reinterpretDraftTax` で現在の商品と独立した印字証拠から導出する。プレビュー・保存・再表示・登録ガードは同じ境界を使い、計算済みの `taxSummaries` を次の計算の証拠にはしない。
+
+原文は `rawObservation`、元の抽出値は `receiptInterpretation` に保持する。元のsnapshotがない旧下書きは、初回の再計算時に `source: legacy_projection` として保存する。旧フォームの明示訂正は `receiptUserOverride.taxSummaryCorrections` に履歴として保持し、対象額等を再入力にしない。税額の明示訂正だけを原文税額と区別して照合する。汎用の税内訳フォームと専用公開更新mutationは廃止する。
 
 ### 10.9 receipt analysis jobs
 
