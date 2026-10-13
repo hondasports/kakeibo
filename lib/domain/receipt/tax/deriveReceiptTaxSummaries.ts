@@ -88,13 +88,10 @@ export function deriveReceiptTaxSummaries(args: {
     const group = items.filter((item) => item.taxRatePercent === rate);
     const basis = group[0].amountBasis;
     const target = group.reduce((sum, item) => sum + item.printedAmountYen, 0);
-    const taxLines =
-      rate === 0
-        ? []
-        : taxSummaryEvidenceLines(lines, rate, "tax", {
-            ...options,
-            singleSummary: taxableRates.length === 1,
-          });
+    const taxLines = taxSummaryEvidenceLines(lines, rate, "tax", {
+      ...options,
+      singleSummary: rate === 0 ? rates.length === 1 : taxableRates.length === 1,
+    });
     const taxes = [...new Set(taxLines.map((line) => line.amountYen!))];
     const correctedTaxes = [
       ...new Set(
@@ -141,7 +138,7 @@ export function deriveReceiptTaxSummaries(args: {
         : Math.round(exactTax);
     const tax =
       rate === 0
-        ? 0
+        ? (correctedTax ?? taxes[0] ?? 0)
         : (correctedTax ??
           taxes[0] ??
           (args.allowEstimates ? validLegacyTaxes[0] : legacyTaxes[0]) ??
@@ -159,6 +156,7 @@ export function deriveReceiptTaxSummaries(args: {
     const conflict =
       unidentifiedEvidence ||
       correctedTaxes.length > 1 ||
+      (rate === 0 && taxes.some((amount) => amount !== 0)) ||
       totalConflict ||
       (correctedTax === undefined && taxes.length > 1) ||
       validLegacyTaxes.length > 1 ||

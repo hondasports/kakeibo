@@ -62,13 +62,11 @@ export function independentSummaryLines(
 }
 
 export function isTaxRateDeclarationLine(line: ReceiptRawObservationLine): boolean {
-  return (
-    line.amountYen === null &&
-    !line.amountText?.trim() &&
-    /^(?:※)?(?:(?:消費|適用)?税率|taxrate)[:：]?\(?(?:0|8|10)%\)?$/i.test(
-      normalizedText(line.rawText),
-    )
+  if (line.amountYen !== null || line.amountText?.trim()) return false;
+  const match = /^(?:※)?(?:(?:消費|適用)?税率|taxrate)[:：]?\(?(\d+(?:\.\d+)?)%\)?$/i.exec(
+    normalizedText(line.rawText),
   );
+  return match !== null && [0, 8, 10].includes(Number(match[1]));
 }
 
 /** 独立した印字税内訳がある場合だけ、全体選択によるサマリの置換を止める。 */

@@ -262,12 +262,20 @@ export function resolveReceiptTaxChoices(draft: {
 export function resolveReceiptTaxCorrections(
   override: ReceiptUserOverrideSnapshot | undefined,
 ): ExtractedTaxSummary[] | undefined {
-  return (
-    override?.taxSummaryCorrections ??
-    (override?.fields.includes("taxSummaries")
-      ? override.values.taxSummaries?.filter(
-          (summary) => summary.userEditedFields?.length || summary.valueOrigin?.source === "user",
-        )
-      : undefined)
-  );
+  if (override?.taxSummaryCorrections) return override.taxSummaryCorrections;
+  if (!override?.fields.includes("taxSummaries")) return undefined;
+  const summaries = override.values.taxSummaries ?? [];
+  const legacyConfirmation =
+    summaries.length > 0 &&
+    summaries.every((summary) => !summary.userEditedFields?.length && !summary.valueOrigin);
+  return summaries
+    .filter(
+      (summary) =>
+        legacyConfirmation ||
+        summary.userEditedFields?.length ||
+        summary.valueOrigin?.source === "user",
+    )
+    .map((summary) =>
+      summary.userEditedFields?.length ? summary : { ...summary, userEditedFields: ["taxYen"] },
+    );
 }

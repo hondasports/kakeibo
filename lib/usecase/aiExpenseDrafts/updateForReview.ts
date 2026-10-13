@@ -13,6 +13,7 @@ import {
 } from "../../domain/aiExpenseDrafts/registrationItems";
 import {
   RECEIPT_TAX_CHOICE_FIELDS,
+  snapshotReceiptDraftValues,
   type AiExpenseRegistrationMode,
 } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import {
@@ -100,6 +101,19 @@ export async function updateAiExpenseDraftForReview(
   }
 
   const now = Date.now();
+  const hasTaxDecisionUpdate =
+    args.priceTaxTreatment !== undefined || args.taxRateComposition !== undefined;
+  const shouldReinterpretTax = Boolean(fields.taxSummaries?.length) || hasTaxDecisionUpdate;
+  if (!fields.receiptInterpretation && shouldReinterpretTax) {
+    const originalItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
+    await deps.drafts.patch(args.draftId, {
+      receiptInterpretation: {
+        source: "legacy_projection",
+        interpretedAt: now,
+        values: snapshotReceiptDraftValues(fields, originalItems),
+      },
+    });
+  }
   if (args.items !== undefined) {
     if (registrationMode === "detailed" && !validatePositiveCategoryTotals(args.items)) {
       throw new ConvexError("Draft category total must be greater than zero");
@@ -150,13 +164,7 @@ export async function updateAiExpenseDraftForReview(
     updatedAt: now,
   });
 
-  const hasTaxDecisionUpdate =
-    args.priceTaxTreatment !== undefined || args.taxRateComposition !== undefined;
-  if (
-    (fields.taxSummaries && fields.taxSummaries.length > 0) ||
-    args.priceTaxTreatment !== undefined ||
-    args.taxRateComposition !== undefined
-  ) {
+  if (shouldReinterpretTax) {
     await deps.taxInterpretation.persistInterpretation({
       draftId: args.draftId,
       groupId: ctx.groupId,
