@@ -24,3 +24,13 @@ export function buildReviewChecks(args: {
     taxRate: buildTaxRateCheck(args),
   };
 }
+
+/**
+ * 確認推奨に数える比較不能の件数。
+ * レシートに税内訳が無いだけの比較不能は、ユーザーが直せないため数えない。
+ */
+export function countActionableUncomparable(checks: ReviewChecks): number {
+  return [checks.amount, checks.taxRate].filter(
+    (check) => check.status === "uncomparable" && check.blockerCode !== "missing-tax-summary",
+  ).length;
+}

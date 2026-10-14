@@ -107,6 +107,8 @@ it.each(["合計点数3点", "お買上点数3点", "合計数量3個", "合計3
 it.each([null, 4800])("本物の合計が%sなら矛盾・不読を捨てない", (amount) => {
   const input = unprovenTargetReceipt();
   input.rawObservationLines![0].amountYen = amount;
+  // 不読は数値と原文の両方が読めない状態。原文が金額として読めるなら数値として使う（Issue #1018）。
+  if (amount === null) input.rawObservationLines![0].amountText = null;
   expect(
     reinterpretDraftTax(input).itemFields.some(
       (item) => item.taxAllocationStatus === "unallocated",
