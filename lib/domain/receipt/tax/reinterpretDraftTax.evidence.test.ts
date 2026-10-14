@@ -669,4 +669,74 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
       expect(allocated(input)).toBe(false);
     },
   );
+  it.each([
+    "消費税等",
+    "内消費税等",
+    "消費税",
+    "内消費税",
+    "（内）消費税等",
+    "税額",
+    "内税",
+    "消費税額",
+    "消費税額等",
+    "内税額",
+    "内税計",
+    "内消費税等計",
+  ])("混在税率の率省略%sは税率別税額合計と照合する", (label) => {
+    const input = unprovenTargetReceipt();
+    input.amountYen = 2180;
+    input.items = [
+      { ...input.items[0], printedAmountYen: 1080, taxRatePercent: 8 },
+      { ...input.items[0], printedAmountYen: 1100, taxRatePercent: 10 },
+    ];
+    input.rawObservationLines = [
+      observationLine("合計2180円", 2180, 0),
+      observationLine("内消費税8%80円", 80, 1),
+      observationLine("内消費税10%100円", 100, 2),
+      observationLine(label + "180円", 180, 3),
+    ];
+    const first = reinterpretDraftTax(input);
+    expect(allocated(input)).toBe(true);
+    expect(first.itemFields.map((item) => item.allocatedTaxYen)).toEqual([80, 100]);
+    expect(
+      reinterpretDraftTax({ ...input, taxSummaries: first.interpretation.taxSummaries }).itemFields,
+    ).toEqual(first.itemFields);
+    input.rawObservationLines[3] = observationLine(label + "181円", 181, 3);
+    expect(allocated(input)).toBe(false);
+    input.rawObservationLines[3] = {
+      ...observationLine(label + "読取不能", 0, 3),
+      amountYen: null,
+      amountText: null,
+    };
+    expect(allocated(input)).toBe(false);
+  });
+  it.each(["外税", "外税額", "外消費税等", "（外）消費税等", "外消費税合計"])(
+    "混在税率の率省略%sは商品の税込／税抜と矛盾しない場合だけ確定する",
+    (label) => {
+      const input = unprovenTargetReceipt();
+      input.amountYen = 2180;
+      input.items = [
+        { ...input.items[0], printedAmountYen: 1080, taxRatePercent: 8 },
+        { ...input.items[0], printedAmountYen: 1100, taxRatePercent: 10 },
+      ];
+      input.rawObservationLines = [
+        observationLine("合計2180円", 2180, 0),
+        observationLine("内消費税8%80円", 80, 1),
+        observationLine("内消費税10%100円", 100, 2),
+        observationLine(label + "180円", 180, 3),
+      ];
+      expect(allocated(input)).toBe(false);
+      input.correctedTaxSummaries = [
+        { ...input.taxSummaries[0], taxRatePercent: 8, taxYen: 80, userEditedFields: ["taxYen"] },
+        { ...input.taxSummaries[0], taxRatePercent: 10, taxYen: 100, userEditedFields: ["taxYen"] },
+      ];
+      expect(allocated(input)).toBe(false);
+      input.items = input.items.map((item) => ({
+        ...item,
+        printedAmountYen: 1000,
+        amountBasis: "tax_excluded",
+      }));
+      expect(allocated(input)).toBe(true);
+    },
+  );
 });

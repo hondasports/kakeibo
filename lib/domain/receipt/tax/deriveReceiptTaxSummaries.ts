@@ -15,7 +15,13 @@ export const TAX_EVIDENCE_MISSING = "unresolved_receipt_tax_evidence";
 
 function isAggregateTaxLine(rawText: string): boolean {
   const text = rawText.normalize("NFKC").replace(/\s+/g, "");
-  return !text.includes("%") && /税額?合計|消費税(?:額)?(?:合計|計)|taxtotal/i.test(text);
+  return (
+    !text.includes("%") &&
+    (/税額?合計|消費税(?:額)?(?:合計|計)|taxtotal/i.test(text) ||
+      /^(?:内|外|\(内\)|\(外\))?(?:消費税(?:額)?(?:等)?|税額(?:等)?|内税(?:額)?|外税(?:額)?)(?:合計|計)?[:：]?[¥￥]?[\d,]+(?:円)?$/.test(
+        text,
+      ))
+  );
 }
 
 export function deriveReceiptTaxSummaries(args: {
@@ -270,12 +276,18 @@ export function deriveReceiptTaxSummaries(args: {
         summary.userEditedFields?.includes("taxYen") ||
         (summary.taxRatePercent === 0 && summary.taxYen === 0),
     );
-  const aggregateTaxConflict = lines.some(
-    (line) =>
-      isAggregateTaxLine(line.rawText) &&
-      !aggregateTaxIsCorrected &&
-      line.amountYen !== derived.reduce((sum, summary) => sum + summary.taxYen, 0),
-  );
+  const aggregateTaxConflict = lines.some((line) => {
+    if (!isAggregateTaxLine(line.rawText)) return false;
+    const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
+    const basisConflict =
+      /外(?:消費)?税|\(外\)(?:消費)?税|税抜|税別/.test(text) &&
+      derived.some((summary) => summary.taxRatePercent !== 0 && summary.taxMode === "included");
+    return (
+      basisConflict ||
+      (!aggregateTaxIsCorrected &&
+        line.amountYen !== derived.reduce((sum, summary) => sum + summary.taxYen, 0))
+    );
+  });
   const estimatedTotalConflict =
     derived.reduce((sum, summary) => sum + summary.taxIncludedAmountYen!, 0) !== args.amountYen;
   return derived.map((summary) =>
