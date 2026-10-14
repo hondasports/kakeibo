@@ -129,6 +129,15 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
       },
     );
 
+    it.each(["税率 ?% 4,810円", "税 4,810円"])(
+      "税・税率の語がある行は支払総額と同額でも証拠不足として保持する: %s",
+      (rawText) => {
+        const input = unprovenTargetReceipt();
+        input.rawObservationLines!.push(observationLine(rawText, 4810, 3));
+        expect(allocated(input)).toBe(false);
+      },
+    );
+
     it("支払総額と異なる金額の税系候補行は矛盾として保持する", () => {
       expect(allocated(withPaymentLines("tax", 999))).toBe(false);
     });
