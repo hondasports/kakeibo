@@ -67,16 +67,6 @@ export function buildTaxRateCheck(args: {
 }): ReviewTaxRateCheck {
   const summaries = args.taxSummaries ?? [];
   const items = args.items;
-  if (summaries.length === 0)
-    return {
-      status: "uncomparable",
-      rows: [],
-      reason: "税率別の対象額が読み取れていません",
-      blockerCode: "missing-tax-summary",
-      affectedItemIds: items.map((item) => item.id),
-      focusTarget: "reference",
-    };
-
   const untargetedDiscount = items.find(
     (item) => isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId,
   );
@@ -106,6 +96,26 @@ export function buildTaxRateCheck(args: {
     untargetedDiscount?.id ??
     unresolved[0]?.id ??
     (items.length === 0 ? "reference" : globalReason ? "items" : undefined);
+
+  // 商品の税率が未確定なら集計が無いのは当然で、ユーザーが直す先は商品の入力欄。
+  if (summaries.length === 0)
+    return globalBlockerCode === "unresolved-tax"
+      ? {
+          status: "uncomparable",
+          rows: [],
+          reason: globalReason,
+          blockerCode: globalBlockerCode,
+          affectedItemIds: globalAffectedItemIds,
+          focusTarget,
+        }
+      : {
+          status: "uncomparable",
+          rows: [],
+          reason: "税率別の対象額が読み取れていません",
+          blockerCode: "missing-tax-summary",
+          affectedItemIds: items.map((item) => item.id),
+          focusTarget: "reference",
+        };
 
   const rows: ReviewTaxRateRow[] = summaries.map((summary) => {
     const basis = summaryAmountBasis(summary);
