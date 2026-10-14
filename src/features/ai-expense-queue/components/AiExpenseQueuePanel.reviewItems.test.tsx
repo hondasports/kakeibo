@@ -186,8 +186,9 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     expect(within(dialog).getByLabelText("支出日（レシート記載日）")).toHaveValue("2026-06-21");
     expect(within(dialog).getByLabelText("合計金額")).toHaveValue("1380");
     expect(within(dialog).queryByText(/判定が曖昧なOCR行/)).not.toBeInTheDocument();
+    // 商品の税率が未確定なら、金額と税率の比較不能を1つにまとめて商品の確認へ案内する。
     expect(within(dialog).getByRole("region", { name: "全体の確認状態" })).toHaveTextContent(
-      "金額を比較できません",
+      "税率・税込／税抜が未確定の商品があります",
     );
     const itemInput = within(dialog).getByDisplayValue("パン");
     const detail = itemInput.closest("details")!;
