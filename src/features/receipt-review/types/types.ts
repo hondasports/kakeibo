@@ -108,6 +108,7 @@ export type ReviewFormValues = {
 };
 
 export type ReviewItemValues = AiExpenseItemTaxDetails & {
+  confirmedTaxRatePercent?: 0 | 8 | 10 | null;
   id: string;
   persistedItemId?: string;
   itemName: string;

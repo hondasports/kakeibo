@@ -85,7 +85,7 @@ describe("buildReplacementDraftItemFields", () => {
     expect(result.fields.normalizedAmountYen).toBeUndefined();
   });
 
-  it("previous から税関連フィールドと lineType・warnings を継承する", () => {
+  it("同じ商品の税関連フィールドと lineType・warnings を継承する", () => {
     const previous: AiExpenseDraftItemFields = {
       groupId: "g1",
       draftId: "d1",
@@ -105,7 +105,7 @@ describe("buildReplacementDraftItemFields", () => {
     };
     const result = buildReplacementDraftItemFields({
       ...base,
-      item: { itemId: "x", itemName: "残す商品", amountYen: 200, categoryId: "c1" },
+      item: { itemId: "x", itemName: "旧", amountYen: 200, categoryId: "c1" },
       previous,
     });
     expect(result.success).toBe(true);

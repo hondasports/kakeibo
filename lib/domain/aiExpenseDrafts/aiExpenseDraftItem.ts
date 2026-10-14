@@ -44,6 +44,7 @@ export type AiExpenseDraftItemFields = {
 
 /** レビュー更新で明細を置き換える際の入力。 */
 export type DraftReviewItemInput = {
+  confirmedTaxRatePercent?: TaxRatePercent | null;
   itemId?: string;
   itemName: string;
   lineType?: ReceiptItemLineType;

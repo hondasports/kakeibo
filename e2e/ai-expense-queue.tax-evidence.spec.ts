@@ -226,3 +226,75 @@ for (const reverse of [false, true]) {
     }
   });
 }
+
+for (const saveBeforeRate of [false, true]) {
+  test(`Issue #1015 商品名変更後に税率を再確認して保存・登録できる 途中保存=${saveBeforeRate}`, async ({
+    page,
+  }) => {
+    await gotoAuthenticated(page, "/weeks/current/input");
+    await cleanupAiExpenseQueue();
+    try {
+      await seedTaxReviewDraftByUser(await getCurrentClerkTokenIdentifier(page));
+      await page.reload();
+      const queue = page.locator(".input-workbench--expense");
+      const queued = queue.locator(".ai-expense-queue-item").filter({ hasText: "E2E税レビュー店" });
+      await queued.getByRole("button", { name: "確認する", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "下書き確認" });
+      let product = dialog
+        .getByRole("region", { name: "商品一覧" })
+        .locator("details")
+        .filter({ hasText: "E2E税テスト商品" });
+      if ((await product.getAttribute("open")) === null) await product.locator("summary").click();
+      for (const [label, option] of [
+        ["税率", "8%"],
+        ["表示価格", "税抜"],
+      ]) {
+        const select = product.getByRole("combobox", {
+          name: `E2E税テスト商品の${label}`,
+          exact: true,
+        });
+        await select.click();
+        await page.getByRole("option", { name: option, exact: true }).click();
+        await expect(select).toBeEnabled();
+      }
+      await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+      await product.getByRole("textbox", { name: "明細名", exact: true }).fill("変更後の商品");
+      product = dialog
+        .getByRole("region", { name: "商品一覧" })
+        .locator("details")
+        .filter({ hasText: "変更後の商品" });
+      await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
+        "税率未確定 1件",
+      );
+      if (saveBeforeRate) {
+        await dialog.getByRole("button", { name: "下書きを保存", exact: true }).click();
+        await expect(dialog).toBeHidden();
+        await queued.getByRole("button", { name: "確認する", exact: true }).click();
+        await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
+          "税率未確定 1件",
+        );
+      }
+      if ((await product.getAttribute("open")) === null) await product.locator("summary").click();
+      const rate = product.getByRole("combobox", { name: "変更後の商品の税率", exact: true });
+      await rate.click();
+      await page.getByRole("option", { name: "8%", exact: true }).click();
+      await expect(rate).toBeEnabled();
+      await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+      await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
+      await expect(dialog).toBeHidden();
+      const ready = queue
+        .getByRole("region", { name: "登録できます" })
+        .locator(".ai-expense-queue-item")
+        .filter({ hasText: "E2E税レビュー店" });
+      await ready.getByRole("button", { name: "修正する", exact: true }).click();
+      await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+      await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
+      await expect(dialog).toBeHidden();
+      await ready.getByRole("button", { name: "登録する", exact: true }).click();
+      await expect(queue.getByRole("region", { name: "登録済み" })).toContainText("108円");
+    } finally {
+      await cleanupTestReceipts();
+      await cleanupAiExpenseQueue();
+    }
+  });
+}

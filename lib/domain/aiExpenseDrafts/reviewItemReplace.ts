@@ -1,3 +1,7 @@
+import {
+  confirmItemTaxRate,
+  invalidateItemTaxRateConfirmation,
+} from "../receipt/tax/itemTaxConfirmation";
 import { hasReceiptTaxMetadata } from "../receipt/tax/draftTaxMapping";
 /**
  * レビュー入力で下書き明細を置き換える際の純粋ルール。
@@ -77,6 +81,17 @@ export function buildReplacementDraftItemFields(args: {
   if (!itemName || !isValidSignedLineItemAmount(itemName, item.amountYen, lineType)) {
     return { success: false, error: "name_or_amount_required" };
   }
+  const identityChanged =
+    previous &&
+    (itemName !== previous.itemName.trim() ||
+      (lineType ?? "item") !== (previous.lineType ?? "item"));
+  let taxItem = previous;
+  if (taxItem && identityChanged && hasReceiptTaxMetadata({}, [taxItem])) {
+    taxItem = invalidateItemTaxRateConfirmation(taxItem);
+  }
+  if (taxItem && item.confirmedTaxRatePercent !== undefined) {
+    taxItem = confirmItemTaxRate(taxItem, item.confirmedTaxRatePercent);
+  }
   const amounts = resolveReviewItemAmountsForReplace(item.amountYen, previous);
   return {
     success: true,
@@ -88,21 +103,21 @@ export function buildReplacementDraftItemFields(args: {
       amountYen: amounts.amountYen,
       printedAmountYen: amounts.printedAmountYen,
       categoryId: item.categoryId,
-      amountBasis: previous?.amountBasis,
-      taxRatePercent: previous?.taxRatePercent,
-      markers: previous?.markers,
-      taxMarker: previous?.taxMarker,
-      allocatedTaxYen: previous?.allocatedTaxYen,
+      amountBasis: taxItem?.amountBasis,
+      taxRatePercent: taxItem?.taxRatePercent,
+      markers: taxItem?.markers,
+      taxMarker: taxItem?.taxMarker,
+      allocatedTaxYen: taxItem?.allocatedTaxYen,
       taxAllocationStatus:
         previous && hasReceiptTaxMetadata({}, [previous]) ? "unallocated" : undefined,
       normalizedAmountYen:
         "normalizedAmountYen" in amounts
           ? amounts.normalizedAmountYen
           : previous?.normalizedAmountYen,
-      taxResolutionStatus: previous?.taxResolutionStatus,
-      taxResolutionSource: previous?.taxResolutionSource,
-      taxReviewReasons: previous?.taxReviewReasons,
-      taxConfirmedFields: previous?.taxConfirmedFields,
+      taxResolutionStatus: taxItem?.taxResolutionStatus,
+      taxResolutionSource: taxItem?.taxResolutionSource,
+      taxReviewReasons: taxItem?.taxReviewReasons,
+      taxConfirmedFields: taxItem?.taxConfirmedFields,
       quantity: previous?.quantity,
       unitPriceYen: previous?.unitPriceYen,
       categoryName: previous?.categoryName,

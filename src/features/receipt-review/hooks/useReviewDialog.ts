@@ -59,6 +59,7 @@ export function useReviewDialog({
   };
 
   const taxOverrides = useReviewTaxOverrides({
+    reviewItems: formState.reviewItems,
     selectedReviewDraftId: draftSelection.selectedReviewDraftId,
     setReviewItems: formState.setReviewItems,
     setReviewDraftOverride: handleTaxDraftUpdate,

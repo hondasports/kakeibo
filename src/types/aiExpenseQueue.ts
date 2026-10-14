@@ -70,6 +70,7 @@ export type AiExpenseQueuePanelProps = {
       amountYen: number;
       categoryId: string;
       items?: Array<{
+        confirmedTaxRatePercent?: 0 | 8 | 10 | null;
         itemName: string;
         lineType?: ReceiptItemLineType;
         amountYen: number;
