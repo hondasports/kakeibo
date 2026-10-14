@@ -1,3 +1,8 @@
+import {
+  resolveReceiptTotalSource,
+  resolveReceiptTotalSupportingCandidates,
+} from "../../../../lib/domain/aiExpenseDrafts/receiptTotalEvidence";
+import { hasReceiptTaxMetadata } from "../../../../lib/domain/receipt/tax/draftTaxMapping";
 import { resolveReceiptTaxCorrections } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import type { ReceiptLineClassification } from "../../../../lib/domain/receipt/observations";
 import { reinterpretDraftTax } from "../../../../lib/receiptTax/reinterpretDraftTax";
@@ -48,6 +53,7 @@ type ReviewTaxPreviewArgs = {
   rawObservation?: AiExpenseDraft["rawObservation"];
   receiptUserOverride?: AiExpenseDraft["receiptUserOverride"];
   paidTotalYen?: number;
+  receiptTotalResolution?: AiExpenseDraft["receiptTotalResolution"];
   taxSummaries?: AiExpenseDraft["taxSummaries"];
   sourceTaxSummaries?: AiExpenseDraft["taxSummaries"];
   markerDefinitions?: AiExpenseDraft["markerDefinitions"];
@@ -71,8 +77,7 @@ export function buildReviewTaxPreview(
     return unchanged;
   }
   if (
-    (!args.taxSummaries || args.taxSummaries.length === 0) &&
-    !items.some((item) => item.taxRatePercent != null || item.amountBasis != null) &&
+    !hasReceiptTaxMetadata(args, items) &&
     args.priceTaxTreatment === undefined &&
     args.taxRateComposition === undefined
   ) {
@@ -82,7 +87,15 @@ export function buildReviewTaxPreview(
   const sourceSummaries = toExtractedTaxSummaries(args.taxSummaries ?? []);
   const { itemFields, interpretation } = reinterpretDraftTax({
     amountYen: paidTotalYen,
-    correctedTaxSummaries: resolveReceiptTaxCorrections(args.receiptUserOverride),
+    receiptTotalSource: resolveReceiptTotalSource({
+      amountYen: paidTotalYen,
+      receiptTotalResolution: args.receiptTotalResolution,
+    }),
+    receiptTotalSupportingCandidates: resolveReceiptTotalSupportingCandidates(args),
+    correctedTaxSummaries: resolveReceiptTaxCorrections(
+      args.receiptUserOverride,
+      args.sourceTaxSummaries ? toExtractedTaxSummaries(args.sourceTaxSummaries) : undefined,
+    ),
     items: items.map(reviewItemToDraftFields),
     taxSummaries: sourceSummaries,
     sourceTaxSummaries: args.sourceTaxSummaries

@@ -27,19 +27,18 @@ function isAggregateTaxLine(rawText: string): boolean {
 export function deriveReceiptTaxSummaries(args: {
   amountYen: number;
   items: ExtractedReceiptItem[];
-  evidenceSummaries: ExtractedTaxSummary[];
   lines?: ReceiptRawObservationLine[];
   classifications?: ReceiptLineClassification[];
   correctedSummaries?: ExtractedTaxSummary[];
   allowEstimates?: boolean;
-  preferExplicitChoice?: boolean;
+  paidTotalConfirmed?: boolean;
 }): ExtractedTaxSummary[] {
-  const { items, evidenceSummaries } = args;
+  const { items } = args;
   if (
     items.length === 0 ||
     items.some((item) => item.taxRatePercent === null || item.amountBasis === "unknown")
   ) {
-    return evidenceSummaries.filter((summary) => summary.valueOrigin?.source !== "items");
+    return [];
   }
   const rates = [...new Set(items.map((item) => item.taxRatePercent!))];
   const lines = independentSummaryLines(args.lines, args.classifications).filter((line) => {
@@ -75,6 +74,7 @@ export function deriveReceiptTaxSummaries(args: {
     );
     return (
       declaredRates.length !== (text.match(/%/g)?.length ?? 0) ||
+      (new Set(declaredRates).size > 1 && taxSummaryLineKind(text) !== "target") ||
       declaredRates.some((rate) => !rates.includes(rate as TaxRatePercent)) ||
       (taxableRates.length > 1 &&
         declaredRates.length === 0 &&
@@ -89,8 +89,7 @@ export function deriveReceiptTaxSummaries(args: {
       taxSummaryLineKind(line.rawText) === undefined &&
       line.amountYen !== args.amountYen,
   );
-  const estimatedRates = new Set<TaxRatePercent>();
-  const derived = rates.map((rate) => {
+  const buckets = rates.map((rate) => {
     const group = items.filter((item) => item.taxRatePercent === rate);
     const basis = group[0].amountBasis;
     const target = group.reduce((sum, item) => sum + item.printedAmountYen, 0);
@@ -113,137 +112,169 @@ export function deriveReceiptTaxSummaries(args: {
       ),
     ];
     const correctedTax = correctedTaxes.length === 1 ? correctedTaxes[0] : undefined;
-    // 原文がない旧データでは、元の抽出税額だけを暫定入力とする。対象額と計算済み値は再利用しない。
-    const legacyTaxes =
-      !args.preferExplicitChoice && !hasPrintedSummaryEvidence
-        ? [
-            ...new Set(
-              evidenceSummaries
-                .filter(
-                  (summary) =>
-                    summary.taxRatePercent === rate && summary.valueOrigin?.source !== "items",
-                )
-                .map((summary) => summary.taxYen),
-            ),
-          ]
-        : [];
-    const roundingMethod = "unknown" as const;
     const exactTax =
       basis === "tax_included" ? (target * rate) / (100 + rate) : (target * rate) / 100;
-    const validLegacyTaxes = legacyTaxes.filter((tax) =>
-      [Math.floor(exactTax), Math.ceil(exactTax)].includes(tax),
-    );
-    const externalRates = new Set(
-      items
-        .filter((item) => item.amountBasis === "tax_excluded" && item.taxRatePercent !== 0)
-        .map((item) => item.taxRatePercent),
-    );
-    const paidTax = args.amountYen - items.reduce((sum, item) => sum + item.printedAmountYen, 0);
-    const hasReconciledExternalTax =
-      basis === "tax_excluded" &&
-      taxableRates.length === 1 &&
-      [Math.floor(exactTax), Math.ceil(exactTax)].includes(paidTax) &&
-      lines.some(
-        (line) =>
-          isReceiptTotalLabel(line.rawText) &&
-          taxSummaryLineKind(line.rawText) === undefined &&
-          line.amountYen === args.amountYen,
-      ) &&
-      targetLines.some((line) => line.amountYen === target);
-    const estimatedTax =
-      basis === "tax_excluded" &&
-      externalRates.size === 1 &&
-      [Math.floor(exactTax), Math.ceil(exactTax)].includes(paidTax)
-        ? paidTax
-        : Math.round(exactTax);
-    const tax =
-      rate === 0
-        ? (correctedTax ?? taxes[0] ?? 0)
-        : (correctedTax ??
-          taxes[0] ??
-          (args.allowEstimates ? validLegacyTaxes[0] : legacyTaxes[0]) ??
-          estimatedTax);
-    if (
-      rate !== 0 &&
-      correctedTax === undefined &&
-      taxes.length === 0 &&
-      validLegacyTaxes.length === 0
-    ) {
-      estimatedRates.add(rate);
-    }
-    const included = target + (basis === "tax_excluded" ? tax : 0);
-    const excluded = included - tax;
-    const conflict =
-      unidentifiedEvidence ||
-      correctedTaxes.length > 1 ||
-      (rate === 0 && correctedTax === undefined && taxes.some((amount) => amount !== 0)) ||
-      totalConflict ||
-      (correctedTax === undefined && taxes.length > 1) ||
-      (correctedTax === undefined && legacyTaxes.length > 1) ||
-      group.some(
-        (item) => item.amountBasis !== basis || !Number.isSafeInteger(item.printedAmountYen),
-      ) ||
-      !Number.isSafeInteger(target) ||
-      target < 0 ||
-      ![Math.floor(exactTax), Math.ceil(exactTax)].includes(tax) ||
-      taxLines.some((line) => {
-        if (rate === 0) return false;
-        const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
-        return basis === "tax_included" && /外税|税抜|税別/.test(text);
-      }) ||
-      targetLines.some((line) => {
-        const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
-        if (/税抜|税別/.test(text)) return line.amountYen !== excluded;
-        if (/税込/.test(text)) return line.amountYen !== included;
-        if (/小計|subtotal/i.test(text) && !text.includes("%")) {
-          if (rates.length > 1) return false;
-          return (
-            line.amountYen !== target &&
-            line.amountYen !== excluded &&
-            line.amountYen !== included &&
-            !(
-              group.some((item) => item.printedAmountYen < 0) &&
-              group
-                .filter((item) => item.printedAmountYen < 0)
-                .every((item) => isDiscountLine(item.itemName, item.lineType)) &&
-              line.amountYen ===
-                group
-                  .filter((item) => item.printedAmountYen >= 0)
-                  .reduce((sum, item) => sum + item.printedAmountYen, 0)
-            )
-          );
-        }
-        if (
-          basis === "tax_excluded" &&
-          line.amountYen === included &&
-          taxLines.some((taxLine) =>
-            /内(?:消費)?税|税込|\(内\)税/.test(taxLine.rawText.normalize("NFKC")),
-          )
-        )
-          return false;
-        return line.amountYen !== target;
-      });
-    const missing =
-      rate !== 0 &&
-      (hasPrintedSummaryEvidence || !args.allowEstimates) &&
-      taxes.length === 0 &&
-      correctedTax === undefined &&
-      validLegacyTaxes.length === 0 &&
-      !hasReconciledExternalTax;
     return {
-      taxRatePercent: rate,
-      taxMode: basis === "tax_included" ? "included" : "external",
-      taxableAmountYen: target,
-      taxableAmountBasis: basis,
-      taxYen: tax,
-      taxIncludedAmountYen: included,
-      roundingMethod,
-      ...(correctedTax === undefined ? {} : { userEditedFields: ["taxYen" as const] }),
-      valueOrigin: { source: "items" },
-      confidence: {},
-      warnings: conflict ? [TAX_EVIDENCE_CONFLICT] : missing ? [TAX_EVIDENCE_MISSING] : [],
-    } satisfies ExtractedTaxSummary;
+      rate,
+      group,
+      basis,
+      target,
+      taxLines,
+      targetLines,
+      taxes,
+      correctedTaxes,
+      correctedTax,
+      exactTax,
+    };
   });
+  const estimatedExternal = buckets.filter(
+    (bucket) =>
+      bucket.rate !== 0 &&
+      bucket.basis === "tax_excluded" &&
+      bucket.correctedTax === undefined &&
+      bucket.taxes.length === 0,
+  );
+  const fixedTax = buckets
+    .filter((bucket) => bucket.basis === "tax_excluded" && !estimatedExternal.includes(bucket))
+    .reduce((sum, bucket) => sum + (bucket.correctedTax ?? bucket.taxes[0] ?? 0), 0);
+  const requiredTax =
+    args.amountYen - items.reduce((sum, item) => sum + item.printedAmountYen, 0) - fixedTax;
+  const combinations = estimatedExternal.reduce<number[][]>(
+    (current, bucket) =>
+      current.flatMap((values) =>
+        [...new Set([Math.floor(bucket.exactTax), Math.ceil(bucket.exactTax)])].map((tax) => [
+          ...values,
+          tax,
+        ]),
+      ),
+    [[]],
+  );
+  const matches = combinations.filter(
+    (values) => values.reduce((sum, tax) => sum + tax, 0) === requiredTax,
+  );
+  const resolvedExternal = new Map<TaxRatePercent, number>(
+    matches.length === 1
+      ? estimatedExternal.map((bucket, index) => [bucket.rate, matches[0][index]])
+      : [],
+  );
+  const ambiguousEstimatedTax = matches.length > 1;
+  const estimatedRates = new Set<TaxRatePercent>();
+  const derived = buckets.map(
+    ({
+      rate,
+      group,
+      basis,
+      target,
+      taxLines,
+      targetLines,
+      taxes,
+      correctedTaxes,
+      correctedTax,
+      exactTax,
+    }) => {
+      const roundingMethod = "unknown" as const;
+      const paidTax = args.amountYen - items.reduce((sum, item) => sum + item.printedAmountYen, 0);
+      const hasReconciledExternalTax =
+        basis === "tax_excluded" &&
+        taxableRates.length === 1 &&
+        [Math.floor(exactTax), Math.ceil(exactTax)].includes(paidTax) &&
+        lines.some(
+          (line) =>
+            isReceiptTotalLabel(line.rawText) &&
+            taxSummaryLineKind(line.rawText) === undefined &&
+            line.amountYen === args.amountYen,
+        ) &&
+        targetLines.some((line) => line.amountYen === target);
+      const estimatedTax = resolvedExternal.get(rate) ?? Math.round(exactTax);
+      const tax =
+        rate === 0 ? (correctedTax ?? taxes[0] ?? 0) : (correctedTax ?? taxes[0] ?? estimatedTax);
+      if (rate !== 0 && correctedTax === undefined && taxes.length === 0) {
+        estimatedRates.add(rate);
+      }
+      const included = target + (basis === "tax_excluded" ? tax : 0);
+      const excluded = included - tax;
+      const conflict =
+        unidentifiedEvidence ||
+        correctedTaxes.length > 1 ||
+        (rate === 0 && correctedTax === undefined && taxes.some((amount) => amount !== 0)) ||
+        totalConflict ||
+        (correctedTax === undefined && taxes.length > 1) ||
+        group.some(
+          (item) => item.amountBasis !== basis || !Number.isSafeInteger(item.printedAmountYen),
+        ) ||
+        !Number.isSafeInteger(target) ||
+        target < 0 ||
+        ![Math.floor(exactTax), Math.ceil(exactTax)].includes(tax) ||
+        taxLines.some((line) => {
+          if (rate === 0) return false;
+          const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
+          return basis === "tax_included" && /外税|税抜|税別/.test(text);
+        }) ||
+        targetLines.some((line) => {
+          const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
+          if (/税抜|税別/.test(text)) return line.amountYen !== excluded;
+          if (/税込/.test(text)) return line.amountYen !== included;
+          if (/小計|subtotal/i.test(text) && !text.includes("%")) {
+            if (rates.length > 1) return false;
+            return (
+              line.amountYen !== target &&
+              line.amountYen !== excluded &&
+              line.amountYen !== included &&
+              !(
+                group.some((item) => item.printedAmountYen < 0) &&
+                group
+                  .filter((item) => item.printedAmountYen < 0)
+                  .every((item) => isDiscountLine(item.itemName, item.lineType)) &&
+                line.amountYen ===
+                  group
+                    .filter((item) => item.printedAmountYen >= 0)
+                    .reduce((sum, item) => sum + item.printedAmountYen, 0)
+              )
+            );
+          }
+          if (
+            basis === "tax_excluded" &&
+            line.amountYen === included &&
+            taxLines.some((taxLine) =>
+              /内(?:消費)?税|税込|\(内\)税/.test(taxLine.rawText.normalize("NFKC")),
+            )
+          )
+            return false;
+          return line.amountYen !== target;
+        });
+      const missing =
+        rate !== 0 &&
+        (hasPrintedSummaryEvidence || !args.allowEstimates) &&
+        taxes.length === 0 &&
+        correctedTax === undefined &&
+        !hasReconciledExternalTax &&
+        !(
+          args.allowEstimates &&
+          resolvedExternal.has(rate) &&
+          (!hasPrintedSummaryEvidence ||
+            args.paidTotalConfirmed ||
+            lines.some(
+              (line) =>
+                isReceiptTotalLabel(line.rawText) &&
+                taxSummaryLineKind(line.rawText) === undefined &&
+                line.amountYen === args.amountYen,
+            ))
+        );
+      return {
+        taxRatePercent: rate,
+        taxMode: basis === "tax_included" ? "included" : "external",
+        taxableAmountYen: target,
+        taxableAmountBasis: basis,
+        taxYen: tax,
+        taxIncludedAmountYen: included,
+        roundingMethod,
+        ...(correctedTax === undefined ? {} : { userEditedFields: ["taxYen" as const] }),
+        valueOrigin: { source: "items" },
+        confidence: {},
+        warnings: conflict ? [TAX_EVIDENCE_CONFLICT] : missing ? [TAX_EVIDENCE_MISSING] : [],
+      } satisfies ExtractedTaxSummary;
+    },
+  );
   const aggregateAmounts = [
     items.reduce((sum, item) => sum + item.printedAmountYen, 0),
     derived.reduce((sum, summary) => sum + summary.taxIncludedAmountYen!, 0),
@@ -260,6 +291,20 @@ export function deriveReceiptTaxSummaries(args: {
         .reduce((sum, item) => sum + item.printedAmountYen, 0),
     );
   }
+  const combinedTargetConflict = lines.some((line) => {
+    const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
+    const declaredRates = new Set(
+      [...text.matchAll(/(?<![\d.])(\d+(?:\.\d+)?)%/g)].map((match) => Number(match[1])),
+    );
+    if (declaredRates.size < 2 || taxSummaryLineKind(text) !== "target") return false;
+    const selected = derived.filter((summary) => declaredRates.has(summary.taxRatePercent));
+    const expected = selected.reduce((sum, summary) => {
+      if (/税抜|税別/.test(text)) return sum + summary.taxIncludedAmountYen! - summary.taxYen;
+      if (/税込/.test(text)) return sum + summary.taxIncludedAmountYen!;
+      return sum + summary.taxableAmountYen;
+    }, 0);
+    return selected.length !== declaredRates.size || line.amountYen !== expected;
+  });
   const subtotalConflict = lines.some((line) => {
     const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
     return (
@@ -291,7 +336,9 @@ export function deriveReceiptTaxSummaries(args: {
   const estimatedTotalConflict =
     derived.reduce((sum, summary) => sum + summary.taxIncludedAmountYen!, 0) !== args.amountYen;
   return derived.map((summary) =>
+    combinedTargetConflict ||
     subtotalConflict ||
+    (ambiguousEstimatedTax && estimatedRates.has(summary.taxRatePercent)) ||
     aggregateTaxConflict ||
     (estimatedTotalConflict && estimatedRates.has(summary.taxRatePercent))
       ? { ...summary, warnings: [...new Set([...summary.warnings, TAX_EVIDENCE_CONFLICT])] }

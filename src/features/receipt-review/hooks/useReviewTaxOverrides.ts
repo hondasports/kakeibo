@@ -65,6 +65,7 @@ export function useReviewTaxOverrides({
             rawObservation: result.draft.rawObservation,
             receiptLineClassifications:
               result.draft.receiptInterpretation?.values.receiptLineClassifications,
+            receiptTotalResolution: result.draft.receiptTotalResolution,
             receiptUserOverride: result.draft.receiptUserOverride,
           }),
         ),
@@ -108,6 +109,7 @@ export function useReviewTaxOverrides({
             rawObservation: result.draft.rawObservation,
             receiptLineClassifications:
               result.draft.receiptInterpretation?.values.receiptLineClassifications,
+            receiptTotalResolution: result.draft.receiptTotalResolution,
             receiptUserOverride: result.draft.receiptUserOverride,
           }),
         ),

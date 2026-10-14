@@ -1,3 +1,4 @@
+import { hasReceiptTaxMetadata } from "../receipt/tax/draftTaxMapping";
 /**
  * レビュー入力で下書き明細を置き換える際の純粋ルール。
  * 上限・itemId 検証・置換明細フィールドの構築を担い、永続化は infra に委ねる。
@@ -92,7 +93,8 @@ export function buildReplacementDraftItemFields(args: {
       markers: previous?.markers,
       taxMarker: previous?.taxMarker,
       allocatedTaxYen: previous?.allocatedTaxYen,
-      taxAllocationStatus: "unallocated",
+      taxAllocationStatus:
+        previous && hasReceiptTaxMetadata({}, [previous]) ? "unallocated" : undefined,
       normalizedAmountYen:
         "normalizedAmountYen" in amounts
           ? amounts.normalizedAmountYen

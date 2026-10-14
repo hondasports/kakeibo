@@ -66,40 +66,7 @@ function shouldApplyBulkOverride(
   return extracted.amountBasis === "unknown" && extracted.taxRatePercent === null;
 }
 
-/**
- * 下書き再解釈では、画面表示と同じ規則（表示側の summaryAmountBasis と同じフォールバック）で
- * 税サマリの欠けた側を確定入力として補完する。税モードが宣言済みで基準が未確定なら
- * モードから基準を、基確定でモードが未確定なら基準からモードを埋める。
- * 算術的な矛盾（税込合計・対象額の不一致）は下流の整合性チェックが検出するため、
- * ここで補完しても誤った確定にはならない。
- */
-function completeSummaryModeBasis(summary: ExtractedTaxSummary): ExtractedTaxSummary {
-  if (
-    summary.taxableAmountBasis === "unknown" &&
-    (summary.taxMode === "external" || summary.taxMode === "included")
-  ) {
-    return {
-      ...summary,
-      taxableAmountBasis: summary.taxMode === "external" ? "tax_excluded" : "tax_included",
-    };
-  }
-  if (
-    summary.taxMode === "unknown" &&
-    (summary.taxableAmountBasis === "tax_included" || summary.taxableAmountBasis === "tax_excluded")
-  ) {
-    return {
-      ...summary,
-      taxMode: summary.taxableAmountBasis === "tax_included" ? "included" : "external",
-    };
-  }
-  return summary;
-}
-
 export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): ReinterpretDraftTaxResult {
-  const sourceTaxSummaries = (input.sourceTaxSummaries ?? input.taxSummaries)
-    .filter((summary) => summary.valueOrigin?.source !== "items")
-    .map(completeSummaryModeBasis);
-
   const items = input.items.map((item, index) => {
     const extracted = draftItemToExtractedReceiptItem(item);
     // 前回の判定理由は再計算する。OCR由来の一般的な注意は保持する。
@@ -147,22 +114,41 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     return decisionAdjusted;
   });
 
-  const taxSummaries = deriveReceiptTaxSummaries({
-    amountYen: input.amountYen,
-    items,
-    preferExplicitChoice:
-      (input.decisionOverride?.priceTaxTreatment === "included" ||
-        input.decisionOverride?.priceTaxTreatment === "excluded") &&
-      (input.decisionOverride?.taxRateComposition === "rate8" ||
-        input.decisionOverride?.taxRateComposition === "rate10"),
-    allowEstimates:
+  const itemTaxWasConfirmed = (index: number): boolean => {
+    if (
       input.decisionOverride?.priceTaxTreatment === "included" ||
       input.decisionOverride?.priceTaxTreatment === "excluded" ||
-      input.items.every(
-        (item) =>
-          item.taxResolutionStatus === "resolved" && item.taxResolutionSource === "item_explicit",
-      ),
-    evidenceSummaries: sourceTaxSummaries,
+      input.decisionOverride?.taxRateComposition === "rate8" ||
+      input.decisionOverride?.taxRateComposition === "rate10"
+    )
+      return true;
+    if (
+      input.override?.itemIndex === index &&
+      (input.override.amountBasis !== undefined || input.override.taxRatePercent !== undefined)
+    )
+      return true;
+    const original = input.items[index];
+    if (
+      input.bulkUnresolvedOverride &&
+      shouldApplyBulkOverride(original, draftItemToExtractedReceiptItem(original))
+    )
+      return true;
+    return (
+      original.taxResolutionStatus !== "unresolved" &&
+      (original.taxResolutionSource === undefined ||
+        original.taxResolutionSource === "item_explicit")
+    );
+  };
+  const taxSummaries = deriveReceiptTaxSummaries({
+    paidTotalConfirmed: input.receiptTotalSource === "user_confirmed",
+    amountYen: input.amountYen,
+    items,
+    allowEstimates: items.every(
+      (item, index) =>
+        item.amountBasis !== "unknown" &&
+        item.taxRatePercent !== null &&
+        itemTaxWasConfirmed(index),
+    ),
     correctedSummaries: input.correctedTaxSummaries,
     lines: input.rawObservationLines,
     classifications: input.receiptLineClassifications,
@@ -179,6 +165,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     input.decisionOverride?.taxRateComposition !== undefined;
   const treatmentFromItems = (): PriceTaxTreatment => {
     const bases = new Set(items.map((item) => item.amountBasis));
+    if (bases.has("unknown")) return "unknown";
     if (bases.has("tax_included") && bases.has("tax_excluded")) return "perItem";
     if (bases.has("tax_included")) return "included";
     if (bases.has("tax_excluded")) return "excluded";
@@ -199,6 +186,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     return "unknown";
   };
   const compositionFromItemsAndSummaries = (): TaxRateComposition => {
+    if (items.some((item) => item.taxRatePercent === null)) return "unknown";
     const rates = new Set([
       ...items.map((item) => item.taxRatePercent),
       ...taxSummaries.map((summary) => summary.taxRatePercent),
@@ -264,7 +252,17 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
 
   return {
     interpretation: resolvedInterpretation,
-    itemFields: effectiveItems.map(interpretedItemToDraftFields),
+    itemFields: effectiveItems.map((item, index) => {
+      const fields = interpretedItemToDraftFields(item);
+      if (fields.taxAllocationStatus !== "allocated" && !itemTaxWasConfirmed(index)) {
+        return {
+          ...fields,
+          taxResolutionStatus: input.items[index].taxResolutionStatus ?? "unresolved",
+          taxResolutionSource: input.items[index].taxResolutionSource,
+        };
+      }
+      return fields;
+    }),
   };
 }
 

@@ -623,6 +623,7 @@ describe("aiExpenseDrafts (create)", () => {
       normalizedAmountYen: 1,
       amountBasis: "tax_included",
       taxRatePercent: index === count - 1 ? 8 : 0,
+      taxResolutionStatus: index === count - 1 ? "unresolved" : "resolved",
       taxAllocationStatus: "unallocated",
       categoryId: "cat-food",
       confidence: {},

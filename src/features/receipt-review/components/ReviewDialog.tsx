@@ -90,6 +90,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
         rawObservation: sourceDraft?.rawObservation,
         receiptLineClassifications:
           sourceDraft?.receiptInterpretation?.values.receiptLineClassifications,
+        receiptTotalResolution: sourceDraft?.receiptTotalResolution,
         receiptUserOverride: sourceDraft?.receiptUserOverride,
         priceTaxTreatment: form.priceTaxTreatment,
         taxRateComposition: form.taxRateComposition,
@@ -102,6 +103,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
       sourceDraft?.rawObservation,
       sourceDraft?.receiptInterpretation,
       sourceDraft?.receiptUserOverride,
+      sourceDraft?.receiptTotalResolution,
       form.priceTaxTreatment,
       form.taxRateComposition,
     ],
