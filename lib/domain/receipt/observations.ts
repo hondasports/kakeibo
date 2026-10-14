@@ -55,9 +55,7 @@ export function resolveObservationAmounts(
   lines: ReceiptRawObservationLine[] | undefined,
 ): ReceiptRawObservationLine[] | undefined {
   return lines?.map((line) =>
-    line.amountYen === null
-      ? { ...line, amountYen: parseAmountOnlyText(line.amountText) }
-      : line,
+    line.amountYen === null ? { ...line, amountYen: parseAmountOnlyText(line.amountText) } : line,
   );
 }
 
