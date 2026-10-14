@@ -67,7 +67,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.1",
-    "chrome-devtools-mcp": "^1.9.0",
+    "chrome-devtools-mcp": "^1.10.1",
     "clerk": "^2.2.0",
     "convex-test": "0.0.56",
     "dotenv": "^18.0.5",
