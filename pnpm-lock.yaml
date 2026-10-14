@@ -130,8 +130,8 @@ importers:
         specifier: ^1.9.0
         version: 1.9.0
       clerk:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: ^3.4.1
+        version: 3.4.1
       convex-test:
         specifier: 0.0.56
         version: 0.0.56(convex@1.44.0(@clerk/react@6.15.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8))
@@ -229,6 +229,10 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
+  '@babel/runtime@7.29.10':
+    resolution: {integrity: sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA==}
+    engines: {node: '>=6.9.0'}
+
   '@babel/runtime@7.29.7':
     resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
     engines: {node: '>=6.9.0'}
@@ -278,47 +282,47 @@ packages:
     resolution: {integrity: sha512-YBJtclx3ytvQGNYhf0/pG+WHUk1ams7Aai3D2AB8c96AkSnzUE+i1Q98HyupIulPDr3fUWeQJtex4DYyO9D4fA==}
     engines: {node: '>=20.9.0'}
 
-  '@clerk/cli-darwin-arm64@2.2.0':
-    resolution: {integrity: sha512-K4buQP9/iCuJe0O/YMBVStkVjkikriBR72t2KkZKtc+iYbA5l5slIkrPNodHVNBiuwNG5xzKudl8Va5JgWlONA==}
+  '@clerk/cli-darwin-arm64@3.4.1':
+    resolution: {integrity: sha512-5okFr1Q3X7H7mV8uYmko77sg3IqZGZJ8ME5FbjaEptxz5VtLHDB8OdvG3x9hEp89DmRJzoEawI+qHNms5SLPhQ==}
     cpu: [arm64]
     os: [darwin]
 
-  '@clerk/cli-darwin-x64@2.2.0':
-    resolution: {integrity: sha512-w6FNxdZ/OjmmWKvKdxyWO+2kfC90bYOILeYTxIF/dcvh/snHfO4S2a7WWSpE3CA9JbslWKhtGlqaIQRGqOCIQg==}
+  '@clerk/cli-darwin-x64@3.4.1':
+    resolution: {integrity: sha512-CjjhlkdGI7aSSAvbI+3+OI8wXawI2+h2RubHYzrAg9qUuH1Me+oXmQBU8+NpAC1JiIja6Z7U8bcP06uJyVGfaw==}
     cpu: [x64]
     os: [darwin]
 
-  '@clerk/cli-linux-arm64-musl@2.2.0':
-    resolution: {integrity: sha512-ebLozKzw5Eyk4Nfx55DKkzr73HAEhNO60qoJNTIpBfyfdGzhb6NKCOgWeaUj0Q7+rEyiBpbEq63epIdakU3jRA==}
+  '@clerk/cli-linux-arm64-musl@3.4.1':
+    resolution: {integrity: sha512-0M5vfxiIksGvnrkficO6wpT18EpPJL2IGPJANW6FvXf/Id4OkUcdUpPb07vRzRpHecgsLZlwTyzbUi8nHSD9Yw==}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@clerk/cli-linux-arm64@2.2.0':
-    resolution: {integrity: sha512-s0p27vsn3SxfMP7KpLKd4OkV+1k6lhl4XGodFKhJxtEgZHiD1iLMB8xNmAmRoIaHGsAoLVA7TwaG9zkIGSf+7Q==}
+  '@clerk/cli-linux-arm64@3.4.1':
+    resolution: {integrity: sha512-q/lzt+E5iQcOk2fqYaU8dkbf/GJRdm9cXH9kjfqKJ2DmIrP//mBQfiVS+Sy1WiQTcQ4Sx+qnzFNNV8TMjcyNfg==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@clerk/cli-linux-x64-musl@2.2.0':
-    resolution: {integrity: sha512-2qBI/pmaBUjqLoN0rCZymWR1M5OWUCfrEdMN5tlGPKFn9+/TpxNqa63oRF0ieZysDpyEE+Oxyvvkz0KcT0HJSw==}
+  '@clerk/cli-linux-x64-musl@3.4.1':
+    resolution: {integrity: sha512-MDUmbZGXKutLpSUQXPOxF2DdCvsrA+bt5LR29HuhGVaPusCa04iDZrzgVw0oDwuW493qVqgt9DV5YyKKd86iqA==}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@clerk/cli-linux-x64@2.2.0':
-    resolution: {integrity: sha512-ikIBtoiGUsIgBpQH7prfkHBxCaN9bh0wbkhbZ5UlZg0emCRGcjDDXbkxLV2KFXobyxgpuha9+Z3CH/nwXk5NuQ==}
+  '@clerk/cli-linux-x64@3.4.1':
+    resolution: {integrity: sha512-RHAegbuF1/zPq1b8Zk9oHsQUqh4TlQsY8imkK1U2NfZNn7AHQKYwiDbVYwe74vHU4CfxJxr0lmF26DOV914MXQ==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@clerk/cli-win32-arm64@2.2.0':
-    resolution: {integrity: sha512-/RYucr85YLekpISdBRwAxjDm0Y3PwNYRaMPhNWRnqV8KQqTBsLNGHiEZH2egeruMlHGLH8FGAYvjlqMYqlG1Aw==}
+  '@clerk/cli-win32-arm64@3.4.1':
+    resolution: {integrity: sha512-dVrYfgN8b/XlwtGYoW4pAkQK+ZATVG3XzIPnY8YxUjwrviMzDfTtfTKU6RAJohylL6cUz/hmMQDwKKYEeDnKog==}
     cpu: [arm64]
     os: [win32]
 
-  '@clerk/cli-win32-x64@2.2.0':
-    resolution: {integrity: sha512-UBtJZ7iaVxaYVryvCeJ3mOrsTrLhO9BXnn7QLJQC4u2bgTHyptgF8kFClBhkjn9TNVvZEveMtSO6RjxifUozzw==}
+  '@clerk/cli-win32-x64@3.4.1':
+    resolution: {integrity: sha512-IYmKdf4AAPGTA15pkkdZUDSCvnZIJyT0R6NEk8Z0eBeZJUAZC6g2+uGB4q6W75JlIF7avQ2taehmTBlBPKSdHw==}
     cpu: [x64]
     os: [win32]
 
@@ -2251,8 +2255,8 @@ packages:
   cjs-module-lexer@1.2.3:
     resolution: {integrity: sha512-0TNiGstbQmCFwt4akjjBg5pLRTSyj/PkWQ1ZoO2zntmg9yLqSRxwEa4iCfQLGjqhiqBfOJa7W/E8wfGrTDmlZQ==}
 
-  clerk@2.2.0:
-    resolution: {integrity: sha512-moYF6j37czyN2hCkrsakLTQuhDsV3B+prct3Lz5GYiRA9cc8qVDwEd08pQZMZ+/d2D0wLSIkfrqJN0TOBrMwSw==}
+  clerk@3.4.1:
+    resolution: {integrity: sha512-J/T3FeadGA/XGW/e4DDfjHcQaMw9PXw+JSpsjroWlJ/u3nyXXAZs7VOr3rTzwif+GQ+LbDSAI6Vr0tZTKQkO2w==}
     engines: {node: '>=20.0.0'}
     hasBin: true
 
@@ -4009,6 +4013,8 @@ snapshots:
     dependencies:
       '@babel/types': 7.29.7
 
+  '@babel/runtime@7.29.10': {}
+
   '@babel/runtime@7.29.7': {}
 
   '@babel/template@7.29.7':
@@ -4083,28 +4089,28 @@ snapshots:
       - react
       - react-dom
 
-  '@clerk/cli-darwin-arm64@2.2.0':
+  '@clerk/cli-darwin-arm64@3.4.1':
     optional: true
 
-  '@clerk/cli-darwin-x64@2.2.0':
+  '@clerk/cli-darwin-x64@3.4.1':
     optional: true
 
-  '@clerk/cli-linux-arm64-musl@2.2.0':
+  '@clerk/cli-linux-arm64-musl@3.4.1':
     optional: true
 
-  '@clerk/cli-linux-arm64@2.2.0':
+  '@clerk/cli-linux-arm64@3.4.1':
     optional: true
 
-  '@clerk/cli-linux-x64-musl@2.2.0':
+  '@clerk/cli-linux-x64-musl@3.4.1':
     optional: true
 
-  '@clerk/cli-linux-x64@2.2.0':
+  '@clerk/cli-linux-x64@3.4.1':
     optional: true
 
-  '@clerk/cli-win32-arm64@2.2.0':
+  '@clerk/cli-win32-arm64@3.4.1':
     optional: true
 
-  '@clerk/cli-win32-x64@2.2.0':
+  '@clerk/cli-win32-x64@3.4.1':
     optional: true
 
   '@clerk/react@6.15.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
@@ -5015,7 +5021,7 @@ snapshots:
   '@testing-library/dom@10.4.1':
     dependencies:
       '@babel/code-frame': 7.29.7
-      '@babel/runtime': 7.29.7
+      '@babel/runtime': 7.29.10
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
       dom-accessibility-api: 0.5.16
@@ -5730,16 +5736,16 @@ snapshots:
 
   cjs-module-lexer@1.2.3: {}
 
-  clerk@2.2.0:
+  clerk@3.4.1:
     optionalDependencies:
-      '@clerk/cli-darwin-arm64': 2.2.0
-      '@clerk/cli-darwin-x64': 2.2.0
-      '@clerk/cli-linux-arm64': 2.2.0
-      '@clerk/cli-linux-arm64-musl': 2.2.0
-      '@clerk/cli-linux-x64': 2.2.0
-      '@clerk/cli-linux-x64-musl': 2.2.0
-      '@clerk/cli-win32-arm64': 2.2.0
-      '@clerk/cli-win32-x64': 2.2.0
+      '@clerk/cli-darwin-arm64': 3.4.1
+      '@clerk/cli-darwin-x64': 3.4.1
+      '@clerk/cli-linux-arm64': 3.4.1
+      '@clerk/cli-linux-arm64-musl': 3.4.1
+      '@clerk/cli-linux-x64': 3.4.1
+      '@clerk/cli-linux-x64-musl': 3.4.1
+      '@clerk/cli-win32-arm64': 3.4.1
+      '@clerk/cli-win32-x64': 3.4.1
 
   clsx@2.1.1: {}
 
