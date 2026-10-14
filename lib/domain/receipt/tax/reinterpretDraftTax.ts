@@ -50,7 +50,8 @@ export type ReinterpretDraftTaxInput = {
 
 export type ReinterpretDraftTaxResult = {
   interpretation: ReceiptTaxInterpretation;
-  itemFields: ReturnType<typeof interpretedItemToDraftFields>[];
+  itemFields: (ReturnType<typeof interpretedItemToDraftFields> &
+    Pick<DraftItemTaxFields, "taxConfirmedFields">)[];
 };
 
 function shouldApplyBulkOverride(
@@ -114,31 +115,39 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     return decisionAdjusted;
   });
 
-  const itemTaxWasConfirmed = (index: number): boolean => {
+  const confirmedFields = items.map((item, index) => {
+    const original = input.items[index];
+    const originalConfirmed =
+      original.taxResolutionStatus !== "unresolved" &&
+      (original.taxResolutionSource === undefined ||
+        original.taxResolutionSource === "item_explicit");
+    const confirmed = new Set(
+      original.taxConfirmedFields ??
+        (originalConfirmed ? (["amountBasis", "taxRatePercent"] as const) : []),
+    );
+    const override = input.override?.itemIndex === index ? input.override : undefined;
+    const bulk =
+      input.bulkUnresolvedOverride &&
+      shouldApplyBulkOverride(original, draftItemToExtractedReceiptItem(original));
     if (
+      override?.amountBasis !== undefined ||
+      bulk ||
       input.decisionOverride?.priceTaxTreatment === "included" ||
-      input.decisionOverride?.priceTaxTreatment === "excluded" ||
+      input.decisionOverride?.priceTaxTreatment === "excluded"
+    )
+      confirmed.add("amountBasis");
+    if (
+      override?.taxRatePercent !== undefined ||
+      bulk ||
       input.decisionOverride?.taxRateComposition === "rate8" ||
       input.decisionOverride?.taxRateComposition === "rate10"
     )
-      return true;
-    if (
-      input.override?.itemIndex === index &&
-      (input.override.amountBasis !== undefined || input.override.taxRatePercent !== undefined)
-    )
-      return true;
-    const original = input.items[index];
-    if (
-      input.bulkUnresolvedOverride &&
-      shouldApplyBulkOverride(original, draftItemToExtractedReceiptItem(original))
-    )
-      return true;
-    return (
-      original.taxResolutionStatus !== "unresolved" &&
-      (original.taxResolutionSource === undefined ||
-        original.taxResolutionSource === "item_explicit")
-    );
-  };
+      confirmed.add("taxRatePercent");
+    if (item.amountBasis === "unknown") confirmed.delete("amountBasis");
+    if (item.taxRatePercent === null) confirmed.delete("taxRatePercent");
+    return (["amountBasis", "taxRatePercent"] as const).filter((field) => confirmed.has(field));
+  });
+  const itemTaxWasConfirmed = (index: number): boolean => confirmedFields[index].length === 2;
   const taxSummaries = deriveReceiptTaxSummaries({
     paidTotalConfirmed: input.receiptTotalSource === "user_confirmed",
     amountYen: input.amountYen,
@@ -253,11 +262,14 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
   return {
     interpretation: resolvedInterpretation,
     itemFields: effectiveItems.map((item, index) => {
-      const fields = interpretedItemToDraftFields(item);
+      const fields = {
+        ...interpretedItemToDraftFields(item),
+        taxConfirmedFields: confirmedFields[index],
+      };
       if (fields.taxAllocationStatus !== "allocated" && !itemTaxWasConfirmed(index)) {
         return {
           ...fields,
-          taxResolutionStatus: input.items[index].taxResolutionStatus ?? "unresolved",
+          taxResolutionStatus: "unresolved" as const,
           taxResolutionSource: input.items[index].taxResolutionSource,
         };
       }

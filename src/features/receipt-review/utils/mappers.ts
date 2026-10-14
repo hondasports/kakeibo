@@ -186,6 +186,7 @@ export function mapDraftItemsToReviewItems(
       taxResolutionStatus: item.taxResolutionStatus,
       taxResolutionSource: item.taxResolutionSource,
       taxReviewReasons: item.taxReviewReasons,
+      taxConfirmedFields: item.taxConfirmedFields,
       quantity: item.quantity,
       unitPriceYen: item.unitPriceYen,
       categoryId: item.categoryId ?? "",

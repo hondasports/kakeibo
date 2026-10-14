@@ -217,3 +217,38 @@ describe("ReviewItemCard", () => {
     expect(screen.getByLabelText("おにぎりの税詳細")).toBeVisible();
   });
 });
+
+it("表示済みの税率と価格区分も選び直して明示確認できる", async () => {
+  const user = userEvent.setup();
+  const onTaxRateChange = vi.fn();
+  const onAmountBasisChange = vi.fn();
+  renderCard({
+    item: makeItem({
+      amountBasis: "tax_included",
+      taxRatePercent: 10,
+      taxResolutionStatus: "unresolved",
+    }),
+    enableItemTaxEditing: true,
+    inlineTaxEditing: true,
+    onTaxRateChange,
+    onAmountBasisChange,
+  });
+  await user.click(screen.getByRole("combobox", { name: "おにぎりの税率" }));
+  await user.click(screen.getByRole("option", { name: "10%" }));
+  expect(onTaxRateChange).toHaveBeenCalledExactlyOnceWith("item-1", 10);
+  await user.click(screen.getByRole("combobox", { name: "おにぎりの表示価格" }));
+  await user.click(screen.getByRole("option", { name: "税込" }));
+  expect(onAmountBasisChange).toHaveBeenCalledExactlyOnceWith("item-1", "tax_included");
+});
+
+it("負額の行種別確認で税価格区分を変更しない", async () => {
+  const user = userEvent.setup();
+  const onAmountBasisChange = vi.fn();
+  renderCard({
+    item: makeItem({ amountYen: "-10", lineType: "unknown", amountBasis: "unknown" }),
+    onAmountBasisChange,
+  });
+  await user.click(screen.getByRole("combobox", { name: "この負額行の種類" }));
+  await user.click(screen.getByRole("option", { name: "判定できない（要確認）" }));
+  expect(onAmountBasisChange).not.toHaveBeenCalled();
+});

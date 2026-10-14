@@ -1,3 +1,4 @@
+import type { ReceiptItemTaxConfirmedField } from "../receipt/tax/types";
 /**
  * 抽出結果から AI 下書き（aiExpenseDrafts / aiExpenseDraftItems）の永続化フィールドを構築する純粋ルール。
  * 分類・ユーザー上書き適用・AI解釈スナップショットの構築を担い、DB 読み書きは infra に委ねる。
@@ -46,6 +47,7 @@ export type ExtractedDraftItemInput<TCategoryId extends string = string> = {
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
+  taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
   quantity?: number;
   unitPriceYen?: number;
   categoryName?: string;
@@ -193,6 +195,7 @@ export function buildExtractedDraftItemFields<
     taxResolutionStatus: item.taxResolutionStatus,
     taxResolutionSource: item.taxResolutionSource,
     taxReviewReasons: item.taxReviewReasons,
+    taxConfirmedFields: item.taxConfirmedFields,
     quantity: item.quantity,
     unitPriceYen: item.unitPriceYen,
     categoryName: item.categoryName,

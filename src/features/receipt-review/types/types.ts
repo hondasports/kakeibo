@@ -1,3 +1,4 @@
+import type { ReceiptItemTaxConfirmedField } from "../../../../lib/receiptTax/types";
 import type {
   ExtractedTaxSummary,
   PriceTaxTreatment,
@@ -69,6 +70,7 @@ export type AiExpenseItemTaxDetails = {
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
+  taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
   quantity?: number;
   unitPriceYen?: number;
 };

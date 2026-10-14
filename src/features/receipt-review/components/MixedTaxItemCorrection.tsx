@@ -253,9 +253,33 @@ export function MixedTaxItemCorrection({
                       size="small"
                       value={activeItem.amountBasis ?? "unknown"}
                     >
-                      <MenuItem value="tax_included">税込</MenuItem>
-                      <MenuItem value="tax_excluded">税抜</MenuItem>
-                      <MenuItem value="unknown">不明</MenuItem>
+                      <MenuItem
+                        value="tax_included"
+                        onClick={() => {
+                          if ((activeItem.amountBasis ?? "unknown") === "tax_included")
+                            onAmountBasisChange?.(activeItem.id, "tax_included");
+                        }}
+                      >
+                        税込
+                      </MenuItem>
+                      <MenuItem
+                        value="tax_excluded"
+                        onClick={() => {
+                          if ((activeItem.amountBasis ?? "unknown") === "tax_excluded")
+                            onAmountBasisChange?.(activeItem.id, "tax_excluded");
+                        }}
+                      >
+                        税抜
+                      </MenuItem>
+                      <MenuItem
+                        value="unknown"
+                        onClick={() => {
+                          if ((activeItem.amountBasis ?? "unknown") === "unknown")
+                            onAmountBasisChange?.(activeItem.id, "unknown");
+                        }}
+                      >
+                        不明
+                      </MenuItem>
                     </TextField>
                   ) : null}
                 </Stack>

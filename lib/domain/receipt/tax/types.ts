@@ -1,3 +1,5 @@
+export type ReceiptItemTaxConfirmedField = "amountBasis" | "taxRatePercent";
+
 import type { ReceiptItemLineType } from "../discountItems";
 export type TaxRatePercent = 0 | 8 | 10;
 export type AmountBasis = "tax_included" | "tax_excluded" | "unknown";

@@ -15,6 +15,10 @@ export function TaxRateSelect({
 }) {
   const selectValue = value === 0 || value === 8 || value === 10 ? String(value) : "unset";
 
+  const confirmCurrent = (next: "8" | "10" | "0" | "unset") => {
+    if (next === selectValue) onChange(next === "unset" ? null : (Number(next) as 0 | 8 | 10));
+  };
+
   return (
     <TextField
       aria-label={label}
@@ -34,10 +38,18 @@ export function TaxRateSelect({
       sx={{ flex: 1, minWidth: 176 }}
       value={selectValue}
     >
-      <MenuItem value="8">{discount ? "8%対象の割引" : "8%"}</MenuItem>
-      <MenuItem value="10">{discount ? "10%対象の割引" : "10%"}</MenuItem>
-      <MenuItem value="0">{discount ? "非課税対象の割引" : "非課税"}</MenuItem>
-      <MenuItem value="unset">{discount ? "不明" : "未設定"}</MenuItem>
+      <MenuItem value="8" onClick={() => confirmCurrent("8")}>
+        {discount ? "8%対象の割引" : "8%"}
+      </MenuItem>
+      <MenuItem value="10" onClick={() => confirmCurrent("10")}>
+        {discount ? "10%対象の割引" : "10%"}
+      </MenuItem>
+      <MenuItem value="0" onClick={() => confirmCurrent("0")}>
+        {discount ? "非課税対象の割引" : "非課税"}
+      </MenuItem>
+      <MenuItem value="unset" onClick={() => confirmCurrent("unset")}>
+        {discount ? "不明" : "未設定"}
+      </MenuItem>
     </TextField>
   );
 }

@@ -1,3 +1,4 @@
+import { isReceiptCountLabel } from "../lineClassification";
 import { isNonTaxEvidenceLine } from "./interpretTaxEvidence";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
 
@@ -56,6 +57,7 @@ export function independentSummaryLines(
   return (lines ?? []).filter(
     (line) =>
       line.explicitlyPrinted &&
+      !isReceiptCountLabel(line.rawText) &&
       !isItemOrDiscountOnly(line) &&
       !isNonTaxEvidenceLine(line, byIndex.get(line.sourceLineIndex)),
   );

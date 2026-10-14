@@ -1,3 +1,6 @@
+import type { ReceiptItemTaxConfirmedField } from "./types";
+import { hasPrintedTaxSummaryEvidence } from "./summaryEvidence";
+import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
 import type { ReceiptItemLineType } from "../discountItems";
 import type { AiExpenseDraftReviewReason } from "../../aiExpenseDrafts/constants";
 import type {
@@ -31,6 +34,7 @@ export type DraftItemTaxFields = {
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
+  taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
 };
 
 export type DraftItemTaxFieldsSource = {
@@ -49,6 +53,7 @@ export type DraftItemTaxFieldsSource = {
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource | null;
   taxReviewReasons?: string[];
+  taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
 };
 
 /**
@@ -71,6 +76,7 @@ export function mapDraftItemToTaxFields(item: DraftItemTaxFieldsSource): DraftIt
     taxResolutionStatus: item.taxResolutionStatus,
     taxResolutionSource: item.taxResolutionSource ?? undefined,
     taxReviewReasons: item.taxReviewReasons,
+    taxConfirmedFields: item.taxConfirmedFields,
   };
 }
 
@@ -188,8 +194,13 @@ export function hasReceiptTaxMetadata(
   draft: {
     taxSummaries?: readonly unknown[];
     sourceTaxSummaries?: readonly unknown[];
-    receiptInterpretation?: { values: { taxSummaries?: readonly unknown[] } };
-    rawObservation?: { source: string };
+    receiptInterpretation?: {
+      values: {
+        taxSummaries?: readonly unknown[];
+        receiptLineClassifications?: ReceiptLineClassification[];
+      };
+    };
+    rawObservation?: { source: string; lines?: ReceiptRawObservationLine[] };
     receiptUserOverride?: { fields: readonly string[]; taxSummaryCorrections?: readonly unknown[] };
   },
   items: readonly {
@@ -197,20 +208,27 @@ export function hasReceiptTaxMetadata(
     amountBasis?: string | null;
     taxResolutionStatus?: string;
     taxAllocationStatus?: string;
+    taxConfirmedFields?: readonly ReceiptItemTaxConfirmedField[];
   }[],
 ): boolean {
   return Boolean(
     draft.taxSummaries?.length ||
     draft.sourceTaxSummaries?.length ||
     draft.receiptInterpretation?.values.taxSummaries?.length ||
-    draft.rawObservation?.source === "ai_ocr" ||
+    (draft.rawObservation?.source === "ai_ocr" &&
+      (items.length > 0 ||
+        hasPrintedTaxSummaryEvidence(
+          draft.rawObservation.lines,
+          draft.receiptInterpretation?.values.receiptLineClassifications,
+        ))) ||
     draft.receiptUserOverride?.taxSummaryCorrections?.length ||
     draft.receiptUserOverride?.fields.includes("taxSummaries") ||
     items.some(
       (item) =>
         item.taxRatePercent != null ||
         item.amountBasis != null ||
-        item.taxResolutionStatus !== undefined,
+        item.taxResolutionStatus !== undefined ||
+        Boolean(item.taxConfirmedFields?.length),
     ),
   );
 }

@@ -18,6 +18,7 @@ import {
   receiptTaxDecisionValidator,
   receiptUserOverrideSnapshotValidator,
   taxResolutionSourceValidator,
+  taxConfirmedFieldsValidator,
   taxResolutionStatusValidator,
   taxSummaryValidator,
 } from "./aiExpenseDrafts/model";
@@ -588,6 +589,7 @@ export default defineSchema({
     taxResolutionStatus: v.optional(taxResolutionStatusValidator),
     taxResolutionSource: v.optional(taxResolutionSourceValidator),
     taxReviewReasons: v.optional(v.array(v.string())),
+    taxConfirmedFields: v.optional(taxConfirmedFieldsValidator),
     quantity: v.optional(v.number()),
     unitPriceYen: v.optional(v.number()),
     categoryName: v.optional(v.string()),
