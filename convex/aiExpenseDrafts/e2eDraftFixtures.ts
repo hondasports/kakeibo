@@ -548,7 +548,7 @@ export async function createE2eMixedTaxReviewDraftForUserHandler(
     allocatedTaxYen: 8,
     normalizedAmountYen: 108,
     taxResolutionStatus: "resolved",
-    taxResolutionSource: "marker_reconciled",
+    taxResolutionSource: "item_explicit",
   });
   await ctx.db.insert("aiExpenseDraftItems", {
     ...common,
@@ -560,7 +560,7 @@ export async function createE2eMixedTaxReviewDraftForUserHandler(
     allocatedTaxYen: 10,
     normalizedAmountYen: 110,
     taxResolutionStatus: "resolved",
-    taxResolutionSource: "summary_reconciliation",
+    taxResolutionSource: "item_explicit",
   });
   await ctx.db.insert("aiExpenseDraftItems", {
     ...common,

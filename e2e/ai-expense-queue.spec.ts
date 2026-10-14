@@ -408,8 +408,9 @@ test.describe("Issue #431 レシート税判定UI", () => {
     const dialog = page.getByRole("dialog", { name: "下書き確認" });
     const checkSection = dialog.getByRole("region", { name: "確認結果" });
     await expect(checkSection).toBeVisible();
-    await expect(checkSection.getByText("明細合計")).toBeVisible();
-    await expect(checkSection.getByText("支払額")).toBeVisible();
+    await expect(checkSection.getByText("比較不能", { exact: true })).toHaveCount(2);
+    await expect(checkSection.getByText(/税率・税込／税抜が未確定/)).toBeVisible();
+    await expect(dialog.getByLabel("合計金額", { exact: true })).toHaveValue("9120");
     await expect(checkSection.getByText("税率別の対象額が読み取れていません")).toBeVisible();
 
     await expect(
@@ -449,19 +450,9 @@ test.describe("下書き確認の税状態保存", () => {
       .first();
     if ((await taxItemRow.getAttribute("open")) === null)
       await taxItemRow.locator("summary").click();
-    // 開封時のクライアント側再解釈で明細は 8%・税抜に解決済み（DBには未保存のプレビュー状態）
-    await expect(dialog.getByText(/税率 8%/).first()).toBeVisible({ timeout: 15_000 });
-    // 金額・税率別ともに一致のため検算カードは出さず、成功メッセージだけが残る
-    await expect(
-      dialog
-        .getByRole("region", { name: "全体の確認状態" })
-        .getByText("印字額と明細の金額が一致しています"),
-    ).toBeVisible();
+    await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("税率未確定 1件");
     const checkSection = dialog.getByRole("region", { name: "確認結果" });
-    await expect(checkSection).toHaveCount(0);
-
-    // プレビュー解釈と異なる税率へ修正して永続化する（同値クリックではSelectのonChangeが発火しない）
-    // 非課税は amountBasis も tax_included に揃えて item_explicit 解決になるため、単独の mutation で確定する
+    await expect(checkSection.getByText(/税率・税込／税抜が未確定/)).toBeVisible();
     await taxItemRow.getByRole("combobox", { name: "E2E税テスト商品の税率", exact: true }).click();
     await page.getByRole("option", { name: "非課税", exact: true }).click();
     await expect(dialog.getByText(/税率 0%/).first()).toBeVisible({ timeout: 15_000 });
@@ -672,7 +663,7 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(800);
     await expect(dialog.getByText("パン", { exact: true })).toBeVisible();
 
-    // 要確認の明細行は畳んだまま表示する。牛乳を開いて直すと残りはサーバ側の再解釈で解決される。
+    // 未確認の各商品は、旧税内訳から逆算せず商品ごとに確認する。
     const milkRow = dialog.locator('section[aria-label="商品一覧"] details').filter({
       hasText: "牛乳",
     });
@@ -684,6 +675,15 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
     await milkTaxRate.click();
     await page.getByRole("option", { name: "8%", exact: true }).click();
     await dialog.getByRole("combobox", { name: "牛乳の表示価格", exact: true }).click();
+    await page.getByRole("option", { name: "税込", exact: true }).click();
+    await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("税率未確定 1件");
+    const wrapRow = dialog
+      .locator('section[aria-label="商品一覧"] details')
+      .filter({ hasText: "ラップ" });
+    if ((await wrapRow.getAttribute("open")) === null) await wrapRow.locator("summary").click();
+    await wrapRow.getByRole("combobox", { name: "ラップの税率", exact: true }).click();
+    await page.getByRole("option", { name: "10%", exact: true }).click();
+    await wrapRow.getByRole("combobox", { name: "ラップの表示価格", exact: true }).click();
     await page.getByRole("option", { name: "税込", exact: true }).click();
 
     await expect(

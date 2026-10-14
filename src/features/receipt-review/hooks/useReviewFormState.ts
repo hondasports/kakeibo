@@ -61,6 +61,7 @@ export function useReviewFormState({
         rawObservation: selectedReviewDraft.rawObservation,
         receiptLineClassifications:
           selectedReviewDraft.receiptInterpretation?.values.receiptLineClassifications,
+        receiptTotalResolution: selectedReviewDraft.receiptTotalResolution,
         receiptUserOverride: selectedReviewDraft.receiptUserOverride,
         priceTaxTreatment: mappedForm.priceTaxTreatment,
         taxRateComposition: mappedForm.taxRateComposition,
@@ -100,6 +101,7 @@ export function useReviewFormState({
           rawObservation: selectedReviewDraft?.rawObservation,
           receiptLineClassifications:
             selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
+          receiptTotalResolution: selectedReviewDraft?.receiptTotalResolution,
           receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
           priceTaxTreatment: nextPriceTaxTreatment as ReviewFormValues["priceTaxTreatment"],
           taxRateComposition: nextTaxRateComposition as ReviewFormValues["taxRateComposition"],
@@ -116,6 +118,7 @@ export function useReviewFormState({
           rawObservation: selectedReviewDraft?.rawObservation,
           receiptLineClassifications:
             selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
+          receiptTotalResolution: selectedReviewDraft?.receiptTotalResolution,
           receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
           priceTaxTreatment: reviewForm.priceTaxTreatment,
           taxRateComposition: reviewForm.taxRateComposition,
@@ -236,6 +239,7 @@ export function useReviewFormState({
         rawObservation: selectedReviewDraft?.rawObservation,
         receiptLineClassifications:
           selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
+        receiptTotalResolution: selectedReviewDraft?.receiptTotalResolution,
         receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
         priceTaxTreatment: reviewForm.priceTaxTreatment,
         taxRateComposition: reviewForm.taxRateComposition,
@@ -291,6 +295,7 @@ export function useReviewFormState({
         rawObservation: selectedReviewDraft?.rawObservation,
         receiptLineClassifications:
           selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
+        receiptTotalResolution: selectedReviewDraft?.receiptTotalResolution,
         receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
         ...(preserveReceiptChoice
           ? {

@@ -1,3 +1,4 @@
+import { hasReceiptTaxMetadata } from "../../domain/receipt/tax/draftTaxMapping";
 import { ConvexError } from "convex/values";
 import {
   AiExpenseDraft,
@@ -103,9 +104,9 @@ export async function updateAiExpenseDraftForReview(
   const now = Date.now();
   const hasTaxDecisionUpdate =
     args.priceTaxTreatment !== undefined || args.taxRateComposition !== undefined;
-  const shouldReinterpretTax = Boolean(fields.taxSummaries?.length) || hasTaxDecisionUpdate;
+  const originalItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
+  const shouldReinterpretTax = hasTaxDecisionUpdate || hasReceiptTaxMetadata(fields, originalItems);
   if (!fields.receiptInterpretation && shouldReinterpretTax) {
-    const originalItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
     await deps.drafts.patch(args.draftId, {
       receiptInterpretation: {
         source: "legacy_projection",

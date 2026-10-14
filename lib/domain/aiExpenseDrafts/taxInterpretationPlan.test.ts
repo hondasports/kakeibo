@@ -73,7 +73,7 @@ describe("validateTaxInterpretationEligibility", () => {
     ).toEqual({ success: false, error: "missing_amount_or_summaries" });
     expect(
       validateTaxInterpretationEligibility(makeDraft({ taxSummaries: [] }), "g1", undefined),
-    ).toEqual({ success: false, error: "missing_amount_or_summaries" });
+    ).toMatchObject({ success: true });
   });
   it("decisionOverride があれば税サマリ無しでも許可する", () => {
     const r = validateTaxInterpretationEligibility(makeDraft({ taxSummaries: [] }), "g1", {

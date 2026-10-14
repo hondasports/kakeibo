@@ -183,3 +183,34 @@ export function buildReceiptTaxInput(args: {
     markerDefinitions: args.markerDefinitions,
   };
 }
+
+export function hasReceiptTaxMetadata(
+  draft: {
+    taxSummaries?: readonly unknown[];
+    sourceTaxSummaries?: readonly unknown[];
+    receiptInterpretation?: { values: { taxSummaries?: readonly unknown[] } };
+    rawObservation?: { source: string };
+    receiptUserOverride?: { fields: readonly string[]; taxSummaryCorrections?: readonly unknown[] };
+  },
+  items: readonly {
+    taxRatePercent?: number | null;
+    amountBasis?: string | null;
+    taxResolutionStatus?: string;
+    taxAllocationStatus?: string;
+  }[],
+): boolean {
+  return Boolean(
+    draft.taxSummaries?.length ||
+    draft.sourceTaxSummaries?.length ||
+    draft.receiptInterpretation?.values.taxSummaries?.length ||
+    draft.rawObservation?.source === "ai_ocr" ||
+    draft.receiptUserOverride?.taxSummaryCorrections?.length ||
+    draft.receiptUserOverride?.fields.includes("taxSummaries") ||
+    items.some(
+      (item) =>
+        item.taxRatePercent != null ||
+        item.amountBasis != null ||
+        item.taxResolutionStatus !== undefined,
+    ),
+  );
+}

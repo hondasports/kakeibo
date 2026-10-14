@@ -165,7 +165,7 @@ describe("updateForReviewHandler tax reinterpretation (user overrides)", () => {
           source: "payment_change",
           evidence: "cash_received:10000 - change:2197",
         }),
-        expect.objectContaining({ amountYen: 803, source: "tax_arithmetic" }),
+        expect.objectContaining({ amountYen: 803, source: "explicit_label" }),
       ]),
     });
     expect(getItems()[0]).toMatchObject({
@@ -422,6 +422,7 @@ describe("updateForReviewHandler tax reinterpretation (user overrides)", () => {
       items: [
         {
           itemName: "商品A",
+          itemId: afterBulk!._id as Id<"aiExpenseDraftItems">,
           amountYen: Number(afterBulk!.printedAmountYen),
           categoryId: CAT_ID,
           confidence: { itemName: 1, amountYen: 1, categoryId: 1 },

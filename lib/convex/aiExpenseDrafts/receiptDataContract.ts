@@ -42,7 +42,10 @@ export async function persistReceiptUserOverrideSnapshot(
   const receiptUserOverride: ReceiptUserOverrideSnapshot<Id<"categories">> =
     buildReceiptUserOverride({
       existingFields: draft.receiptUserOverride?.fields,
-      taxSummaryCorrections: resolveReceiptTaxCorrections(draft.receiptUserOverride),
+      taxSummaryCorrections: resolveReceiptTaxCorrections(
+        draft.receiptUserOverride,
+        draft.receiptInterpretation?.values.taxSummaries,
+      ),
       fields: args.fields,
       updatedAt,
       values: snapshotReceiptDraftValues(draft, items),

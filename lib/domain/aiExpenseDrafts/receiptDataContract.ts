@@ -261,21 +261,29 @@ export function resolveReceiptTaxChoices(draft: {
 
 export function resolveReceiptTaxCorrections(
   override: ReceiptUserOverrideSnapshot | undefined,
+  originalSummaries?: ExtractedTaxSummary[],
 ): ExtractedTaxSummary[] | undefined {
   if (override?.taxSummaryCorrections) return override.taxSummaryCorrections;
   if (!override?.fields.includes("taxSummaries")) return undefined;
   const summaries = override.values.taxSummaries ?? [];
-  const legacyConfirmation =
-    summaries.length > 0 &&
-    summaries.every((summary) => !summary.userEditedFields?.length && !summary.valueOrigin);
+  const isolatedLegacyEdit = override.fields.every((field) => field === "taxSummaries");
   return summaries
-    .filter(
-      (summary) =>
-        legacyConfirmation ||
-        summary.userEditedFields?.length ||
-        summary.valueOrigin?.source === "user",
-    )
-    .map((summary) =>
-      summary.userEditedFields?.length ? summary : { ...summary, userEditedFields: ["taxYen"] },
-    );
+    .filter((summary) => summary.valueOrigin?.source !== "items")
+    .map((summary) => {
+      if (summary.userEditedFields?.length || summary.valueOrigin || !isolatedLegacyEdit) {
+        return summary;
+      }
+      const originals = originalSummaries?.filter(
+        (original) => original.taxRatePercent === summary.taxRatePercent,
+      );
+      const matchingEdits = summaries.filter(
+        (edit) => edit.taxRatePercent === summary.taxRatePercent,
+      );
+      return originals?.length === 1 &&
+        originals[0].valueOrigin?.source !== "items" &&
+        matchingEdits.length === 1 &&
+        originals[0].taxYen !== summary.taxYen
+        ? { ...summary, userEditedFields: ["taxYen"] }
+        : summary;
+    });
 }

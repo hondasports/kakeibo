@@ -61,7 +61,7 @@ describe("buildReplacementDraftItemFields", () => {
     ).toEqual({ success: false, error: "name_or_amount_required" });
   });
 
-  it("previous 無しは既定 confidence・unallocated で構築する", () => {
+  it("previous 無しは既定 confidence で構築し税モデルを追加しない", () => {
     const result = buildReplacementDraftItemFields({
       ...base,
       item: { itemName: " 商品 ", amountYen: 300, categoryId: "c1" },
@@ -76,7 +76,7 @@ describe("buildReplacementDraftItemFields", () => {
       amountYen: 300,
       printedAmountYen: 300,
       categoryId: "c1",
-      taxAllocationStatus: "unallocated",
+      taxAllocationStatus: undefined,
       confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
       createdAt: 99,
       updatedAt: 99,

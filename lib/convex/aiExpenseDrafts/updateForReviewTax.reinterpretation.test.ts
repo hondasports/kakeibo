@@ -318,7 +318,18 @@ describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", (
       ],
     });
 
-    expect(result.status).toBe("ready");
+    expect(result.status).toBe("needs_review");
+    const confirmed = await updateForReviewHandler(ctx, {
+      draftId: DRAFT_ID,
+      documentType: "receipt",
+      shopName: "テスト店",
+      date: "2026-07-04",
+      amountYen: 108,
+      categoryId: CAT_ID,
+      priceTaxTreatment: "excluded",
+      taxRateComposition: "rate8",
+    });
+    expect(confirmed.status).toBe("ready");
     const items = getItems();
     expect(items[0]?.printedAmountYen).toBe(100);
     expect(items[0]?.taxResolutionStatus).toBe("resolved");
@@ -374,6 +385,7 @@ describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", (
       items: [
         {
           itemName: "商品A",
+          itemId: afterBulk[0]._id as Id<"aiExpenseDraftItems">,
           amountYen: 100,
           categoryId: CAT_ID,
           confidence: { itemName: 1, amountYen: 1, categoryId: 1 },

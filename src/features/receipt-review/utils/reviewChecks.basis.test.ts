@@ -3,7 +3,7 @@ import {
   receiptTaxBasisCases,
   receiptTaxBasisInput,
 } from "../../../../lib/domain/receipt/tax/fixtures/receiptTaxBasisCases";
-import { applyReviewItemsTaxPreview } from "./reviewItemsTaxPreview";
+import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 import { buildAmountCheck } from "./reviewAmountChecks";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
 import { findBasisConflicts } from "./reviewCheckUtils";
@@ -178,34 +178,33 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
         id: `item-${index}`,
         amountYen: String(item.printedAmountYen),
         taxAllocationStatus: "unallocated",
+        taxResolutionSource: "item_explicit",
         normalizedAmountYen: item.printedAmountYen,
       }),
     );
-    const items = applyReviewItemsTaxPreview(sourceItems, {
+    const { items, taxSummaries } = buildReviewTaxPreview(sourceItems, {
       paidTotalYen: input.amountYen,
       taxSummaries: input.taxSummaries,
     });
     expect(items.map((item) => item.allocatedTaxYen)).toEqual(testCase.allocations);
-    expect(findBasisConflicts(items, input.taxSummaries)).toEqual([]);
-    expect(
-      buildAmountCheck({ items, paidTotalYen: input.amountYen, taxSummaries: input.taxSummaries }),
-    ).toMatchObject({
+    expect(findBasisConflicts(items, taxSummaries)).toEqual([]);
+    expect(buildAmountCheck({ items, paidTotalYen: input.amountYen, taxSummaries })).toMatchObject({
       status: "matched",
       itemsComparableTotalYen: input.amountYen,
     });
     const check = buildTaxRateCheck({
       items,
-      taxSummaries: input.taxSummaries,
+      taxSummaries,
       rawObservation: rawObservation([
-        { rawText: `8%対象額 ${testCase.paidYen}`, amountYen: testCase.paidYen },
+        { rawText: `8%税込対象額 ${testCase.paidYen}`, amountYen: testCase.paidYen },
       ]),
     });
     expect(check).toMatchObject({
       status: "matched",
       rows: [
         {
-          printedYen: testCase.paidYen,
-          currentYen: testCase.paidYen,
+          printedYen: testCase.amounts.reduce((sum, amount) => sum + amount, 0),
+          currentYen: testCase.amounts.reduce((sum, amount) => sum + amount, 0),
           matchKind: "exact",
         },
       ],

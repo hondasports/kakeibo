@@ -187,7 +187,7 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     expect(within(dialog).getByLabelText("合計金額")).toHaveValue("1380");
     expect(within(dialog).queryByText(/判定が曖昧なOCR行/)).not.toBeInTheDocument();
     expect(within(dialog).getByRole("region", { name: "全体の確認状態" })).toHaveTextContent(
-      "差額 250円",
+      "金額を比較できません",
     );
     const itemInput = within(dialog).getByDisplayValue("パン");
     const detail = itemInput.closest("details")!;

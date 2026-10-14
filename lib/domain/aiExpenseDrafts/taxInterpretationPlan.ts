@@ -1,4 +1,12 @@
 import {
+  resolveReceiptTotalSource,
+  resolveReceiptTotalSupportingCandidates,
+} from "./receiptTotalEvidence";
+export {
+  resolveReceiptTotalSource,
+  resolveReceiptTotalSupportingCandidates,
+} from "./receiptTotalEvidence";
+import {
   snapshotReceiptDraftValues,
   resolveReceiptTaxChoices,
   resolveReceiptTaxCorrections,
@@ -46,14 +54,12 @@ export function getTaxInterpretationEligibilityErrorMessage(
 export const UPDATED_DRAFT_NOT_FOUND_MESSAGE = "Failed to retrieve updated AI expense draft";
 
 /**
- * 再解釈の適格性を判定する。不在 → 他グループ → 金額/税サマリ欠落の順。
- * 税サマリが無い下書きでも、ユーザーが新しい税情報を供給するオーバーライド
- * （decisionOverride・明細単位 override・未解決一括 override）があれば許可する。
+ * 再解釈の適格性を判定する。不在 → 他グループ → 金額欠落の順。
  */
 export function validateTaxInterpretationEligibility(
   draft: AiExpenseDraftFields | null,
   groupId: string,
-  overrides?: Pick<
+  _overrides?: Pick<
     TaxInterpretationPlanArgs,
     "decisionOverride" | "override" | "bulkUnresolvedOverride"
   >,
@@ -62,41 +68,10 @@ export function validateTaxInterpretationEligibility(
   | { success: false; error: TaxInterpretationEligibilityError } {
   if (draft === null) return { success: false, error: "not_found" };
   if (draft.groupId !== groupId) return { success: false, error: "wrong_group" };
-  const hasOverride =
-    overrides?.decisionOverride !== undefined ||
-    overrides?.override !== undefined ||
-    overrides?.bulkUnresolvedOverride !== undefined;
-  if (
-    draft.amountYen === undefined ||
-    ((!draft.taxSummaries || draft.taxSummaries.length === 0) && !hasOverride)
-  ) {
+  if (draft.amountYen === undefined) {
     return { success: false, error: "missing_amount_or_summaries" };
   }
   return { success: true, draft: { ...draft, amountYen: draft.amountYen } };
-}
-
-/** 保存済み合計候補から現在の amountYen に一致する source を採用する。3値以外は ai_estimate。 */
-export function resolveReceiptTotalSource(
-  draft: Pick<AiExpenseDraftFields, "amountYen" | "receiptTotalResolution">,
-): ReceiptTotalSource {
-  const persisted = draft.receiptTotalResolution?.candidates.find(
-    (candidate) => candidate.amountYen === draft.amountYen,
-  )?.source;
-  return persisted === "explicit_label" ||
-    persisted === "user_confirmed" ||
-    persisted === "ai_estimate"
-    ? persisted
-    : "ai_estimate";
-}
-
-/** 税サマリ由来・税計算由来の候補は再解釈の裏付けから除外する。 */
-export function resolveReceiptTotalSupportingCandidates(
-  draft: Pick<AiExpenseDraftFields, "receiptTotalResolution">,
-) {
-  return draft.receiptTotalResolution?.candidates.filter(
-    (candidate) =>
-      candidate.source !== "tax_summary_total" && candidate.source !== "tax_arithmetic",
-  );
 }
 
 export type TaxInterpretationPlanArgs = {
@@ -155,7 +130,10 @@ export function planDraftTaxInterpretation(
     receiptTotalSupportingCandidates: resolveReceiptTotalSupportingCandidates(draft),
     taxSummaries: draft.taxSummaries ?? [],
     sourceTaxSummaries: draft.receiptInterpretation?.values.taxSummaries,
-    correctedTaxSummaries: resolveReceiptTaxCorrections(draft.receiptUserOverride),
+    correctedTaxSummaries: resolveReceiptTaxCorrections(
+      draft.receiptUserOverride,
+      draft.receiptInterpretation?.values.taxSummaries,
+    ),
     markerDefinitions: draft.markerDefinitions,
     rawObservationLines:
       draft.rawObservation?.source === "ai_ocr" ? draft.rawObservation.lines : undefined,

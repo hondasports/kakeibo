@@ -132,6 +132,22 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
     ]);
   });
 
+  it.each([2180, 9999, null])("複数税率の印字対象額%sを合算照合して捨てない", (target) => {
+    const input = unprovenTargetReceipt();
+    input.amountYen = 2180;
+    input.items = [
+      { ...input.items[0], printedAmountYen: 1080, taxRatePercent: 8 },
+      { ...input.items[0], printedAmountYen: 1100, taxRatePercent: 10 },
+    ];
+    input.rawObservationLines = [
+      observationLine("合計2180円", 2180, 0),
+      observationLine("内消費税8% 80円", 80, 1),
+      observationLine("内消費税10% 100円", 100, 2),
+      { ...observationLine("8%・10%税込対象", target ?? 0, 3), amountYen: target },
+    ];
+    expect(allocated(input)).toBe(target === 2180);
+  });
+
   it("税率の帰属が不明な混在税額は誤配分しない", () => {
     const input = unprovenTargetReceipt();
     input.items[0].taxRatePercent = 8;
@@ -395,7 +411,7 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
     [91, 91],
     [91, 999],
     [999, 91],
-  ])("同率の旧税額候補%sを順序で選んで確定しない", (firstTax, secondTax) => {
+  ])("同率の旧税額候補%sは順序や値にかかわらず現行計算に使わない", (firstTax, secondTax) => {
     const input = unprovenTargetReceipt();
     input.amountYen = 1000;
     input.items = [{ ...input.items[0], printedAmountYen: 1000 }];
@@ -405,10 +421,8 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
       taxYen,
     }));
     const result = reinterpretDraftTax(input);
-    expect(result.interpretation.taxSummaries[0].status === "verified").toBe(
-      firstTax === secondTax,
-    );
-    expect(result.itemFields[0].taxAllocationStatus === "allocated").toBe(firstTax === secondTax);
+    expect(result.interpretation.taxSummaries[0]).toMatchObject({ status: "verified", taxYen: 91 });
+    expect(result.itemFields[0].taxAllocationStatus).toBe("allocated");
   });
   it("同率の旧税額候補が矛盾しても明示的な税額訂正を優先する", () => {
     const input = unprovenTargetReceipt();
@@ -606,21 +620,21 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
   });
   it("8%と10%の外税を非課税併存時にも支払合計だけで割り当てない", () => {
     const input = unprovenTargetReceipt();
-    input.amountYen = 2680;
+    input.amountYen = 2689;
     input.items = [
-      { ...input.items[0], printedAmountYen: 1000, amountBasis: "tax_excluded", taxRatePercent: 8 },
+      { ...input.items[0], printedAmountYen: 1001, amountBasis: "tax_excluded", taxRatePercent: 8 },
       {
         ...input.items[0],
-        printedAmountYen: 1000,
+        printedAmountYen: 1007,
         amountBasis: "tax_excluded",
         taxRatePercent: 10,
       },
       { ...input.items[0], printedAmountYen: 500, taxRatePercent: 0 },
     ];
     input.rawObservationLines = [
-      observationLine("8%対象1000円", 1000, 0),
-      observationLine("10%対象1000円", 1000, 1),
-      observationLine("合計2680円", 2680, 2),
+      observationLine("8%対象1001円", 1001, 0),
+      observationLine("10%対象1007円", 1007, 1),
+      observationLine("合計2689円", 2689, 2),
     ];
     expect(allocated(input)).toBe(false);
   });

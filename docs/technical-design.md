@@ -1282,6 +1282,11 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 
 原文は `rawObservation`、元の抽出値は `receiptInterpretation` に保持する。元のsnapshotがない旧下書きは、初回の再計算時に `source: legacy_projection` として保存する。旧フォームの明示訂正は `receiptUserOverride.taxSummaryCorrections` に履歴として保持し、対象額等を再入力にしない。税額の明示訂正だけを原文税額と区別して照合する。汎用の税内訳フォームと専用公開更新mutationは廃止する。
 
+旧税サマリの対象額・税額・税込補助額は、元のsnapshotを含めて再計算に使用しない。税額の明示訂正はフィールド単位の編集記録を必要とし、metadataのない旧形式は税内訳単独の編集で、同率の元snapshotが一意かつ税額変更を証明できる場合だけ訂正として扱う。対象額のみの訂正、元値と同値の履歴、元snapshot欠落・重複、商品から生成した値を税額訂正へ昇格しない。
+
+外税の推定は、現在の商品・許容端数処理・支払合計が一意に定める税率別組み合わせだけを確定する。複数の組み合わせが成立する場合、原文が矛盾・不読の場合、商品に未確認の税率・価格区分が残る場合は登録を保留する。保存だけで未確認の商品を確認済みへ昇格しない。税モデルの存在判定はプレビュー・保存・登録で共有し、税モデルのない手入力商品の単独配分flagは税モデルとして扱わない。
+
+
 ### 10.9 receipt analysis jobs
 
 - `receiptAnalysisJobs.mutations.createBatch(input)`
