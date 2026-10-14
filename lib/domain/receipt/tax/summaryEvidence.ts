@@ -91,12 +91,28 @@ export function taxSummaryEvidenceLines(
   lines: ReceiptRawObservationLine[] | undefined,
   rate: number,
   kind: "target" | "tax",
-  options: { singleSummary?: boolean; classifications?: ReceiptLineClassification[] } = {},
+  options: {
+    singleSummary?: boolean;
+    classifications?: ReceiptLineClassification[];
+    ignoreExemptRateForRateLess?: boolean;
+  } = {},
 ): ReceiptRawObservationLine[] {
   const independentLines = independentSummaryLines(lines, options.classifications);
   const canAssignRateLessLine =
     options.singleSummary === true &&
-    !independentLines.some((line) => hasConflictingRate(line.rawText, rate));
+    !independentLines.some((line) => {
+      const text = normalizedText(line.rawText);
+      const rates = printedRates(text);
+      if (
+        options.ignoreExemptRateForRateLess &&
+        rate !== 0 &&
+        rates.length > 0 &&
+        rates.length === (text.match(/%/g)?.length ?? 0) &&
+        rates.every((value) => value === 0)
+      )
+        return false;
+      return hasConflictingRate(text, rate);
+    });
   return independentLines.filter((line) => {
     if (!Number.isSafeInteger(line.amountYen)) return false;
     const text = normalizedText(line.rawText);

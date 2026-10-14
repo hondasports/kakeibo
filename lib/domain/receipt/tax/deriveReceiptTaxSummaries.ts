@@ -88,10 +88,13 @@ export function deriveReceiptTaxSummaries(args: {
     const group = items.filter((item) => item.taxRatePercent === rate);
     const basis = group[0].amountBasis;
     const target = group.reduce((sum, item) => sum + item.printedAmountYen, 0);
-    const taxLines = taxSummaryEvidenceLines(lines, rate, "tax", {
+    const evidenceOptions = {
       ...options,
       singleSummary: rate === 0 ? rates.length === 1 : taxableRates.length === 1,
-    });
+      ignoreExemptRateForRateLess: rate !== 0 && rates.includes(0),
+    };
+    const taxLines = taxSummaryEvidenceLines(lines, rate, "tax", evidenceOptions);
+    const targetLines = taxSummaryEvidenceLines(lines, rate, "target", evidenceOptions);
     const taxes = [...new Set(taxLines.map((line) => line.amountYen!))];
     const correctedTaxes = [
       ...new Set(
@@ -126,13 +129,13 @@ export function deriveReceiptTaxSummaries(args: {
     );
     const externalRates = new Set(
       items
-        .filter((item) => item.amountBasis === "tax_excluded")
+        .filter((item) => item.amountBasis === "tax_excluded" && item.taxRatePercent !== 0)
         .map((item) => item.taxRatePercent),
     );
     const paidTax = args.amountYen - items.reduce((sum, item) => sum + item.printedAmountYen, 0);
     const hasReconciledExternalTax =
       basis === "tax_excluded" &&
-      rates.length === 1 &&
+      taxableRates.length === 1 &&
       [Math.floor(exactTax), Math.ceil(exactTax)].includes(paidTax) &&
       lines.some(
         (line) =>
@@ -140,9 +143,7 @@ export function deriveReceiptTaxSummaries(args: {
           taxSummaryLineKind(line.rawText) === undefined &&
           line.amountYen === args.amountYen,
       ) &&
-      taxSummaryEvidenceLines(lines, rate, "target", options).some(
-        (line) => line.amountYen === target,
-      );
+      targetLines.some((line) => line.amountYen === target);
     const estimatedTax =
       basis === "tax_excluded" &&
       externalRates.size === 1 &&
@@ -184,7 +185,7 @@ export function deriveReceiptTaxSummaries(args: {
         const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
         return basis === "tax_included" && /外税|税抜|税別/.test(text);
       }) ||
-      taxSummaryEvidenceLines(lines, rate, "target", options).some((line) => {
+      targetLines.some((line) => {
         const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
         if (/税抜|税別/.test(text)) return line.amountYen !== excluded;
         if (/税込/.test(text)) return line.amountYen !== included;

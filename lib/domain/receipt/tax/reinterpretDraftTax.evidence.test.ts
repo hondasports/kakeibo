@@ -538,4 +538,135 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
       expect(allocated(input)).toBe(allCorrected);
     },
   );
+  for (const rate of [8, 10] as const) {
+    for (const exemptBasis of ["tax_included", "tax_excluded"] as const) {
+      it.each(["floor", "ceil"] as const)(
+        `税抜${rate}%と${exemptBasis}の非課税商品は印字合計の差額%sで確定する`,
+        (rounding) => {
+          const input = unprovenTargetReceipt();
+          const target = 1007;
+          const tax =
+            rounding === "floor"
+              ? Math.floor((target * rate) / 100)
+              : Math.ceil((target * rate) / 100);
+          input.amountYen = target + 500 + tax;
+          input.items = [
+            {
+              ...input.items[0],
+              printedAmountYen: target,
+              taxRatePercent: rate,
+              amountBasis: "tax_excluded",
+            },
+            {
+              ...input.items[0],
+              printedAmountYen: 500,
+              taxRatePercent: 0,
+              amountBasis: exemptBasis,
+            },
+          ];
+          input.taxSummaries = [];
+          input.rawObservationLines = [
+            observationLine(`${rate}%対象${target}円`, target, 0),
+            observationLine("0%対象500円", 500, 1),
+            observationLine(`合計${input.amountYen}円`, input.amountYen, 2),
+          ];
+          const first = reinterpretDraftTax(input);
+          expect(first.itemFields.map((item) => item.allocatedTaxYen)).toEqual([tax, 0]);
+          expect(first.itemFields.map((item) => item.taxAllocationStatus)).toEqual([
+            "allocated",
+            "allocated",
+          ]);
+          expect(first.itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0)).toBe(
+            input.amountYen,
+          );
+          expect(
+            reinterpretDraftTax({ ...input, taxSummaries: first.interpretation.taxSummaries })
+              .itemFields,
+          ).toEqual(first.itemFields);
+          input.rawObservationLines![0].amountYen = target - 1;
+          expect(allocated(input)).toBe(false);
+        },
+      );
+    }
+  }
+  it("非課税商品併存でも税率省略の税抜対象額と合計を照合する", () => {
+    const input = unprovenTargetReceipt();
+    input.amountYen = 1600;
+    input.items = [
+      { ...input.items[0], printedAmountYen: 1000, amountBasis: "tax_excluded" },
+      { ...input.items[0], printedAmountYen: 500, taxRatePercent: 0 },
+    ];
+    input.rawObservationLines = [
+      observationLine("税抜対象1000円", 1000, 0),
+      observationLine("合計1600円", 1600, 1),
+    ];
+    expect(allocated(input)).toBe(true);
+    input.rawObservationLines.pop();
+    expect(allocated(input)).toBe(false);
+  });
+  it("8%と10%の外税を非課税併存時にも支払合計だけで割り当てない", () => {
+    const input = unprovenTargetReceipt();
+    input.amountYen = 2680;
+    input.items = [
+      { ...input.items[0], printedAmountYen: 1000, amountBasis: "tax_excluded", taxRatePercent: 8 },
+      {
+        ...input.items[0],
+        printedAmountYen: 1000,
+        amountBasis: "tax_excluded",
+        taxRatePercent: 10,
+      },
+      { ...input.items[0], printedAmountYen: 500, taxRatePercent: 0 },
+    ];
+    input.rawObservationLines = [
+      observationLine("8%対象1000円", 1000, 0),
+      observationLine("10%対象1000円", 1000, 1),
+      observationLine("合計2680円", 2680, 2),
+    ];
+    expect(allocated(input)).toBe(false);
+  });
+  it.each([false, true])("非課税欄併存=%sでも率省略の対象額矛盾を捨てない", (hasExemptLine) => {
+    const input = unprovenTargetReceipt();
+    input.amountYen = 1600;
+    input.items = [
+      { ...input.items[0], printedAmountYen: 1000, amountBasis: "tax_excluded" },
+      { ...input.items[0], printedAmountYen: 500, taxRatePercent: 0 },
+    ];
+    input.rawObservationLines = [
+      observationLine("税抜対象1000円", 1000, 0),
+      observationLine("合計1600円", 1600, 1),
+      ...(hasExemptLine ? [observationLine("0%対象500円", 500, 2)] : []),
+    ];
+    expect(allocated(input)).toBe(true);
+    input.rawObservationLines.push(observationLine("10%対象1000円", 1000, 3));
+    input.rawObservationLines.push(observationLine("税抜対象999円", 999, 4));
+    expect(allocated(input)).toBe(false);
+  });
+  it.each(["税額不読", "不正な非課税税額", "非課税対象額矛盾", "未知税率"])(
+    "非課税併存の差額確定は%sを無視しない",
+    (problem) => {
+      const input = unprovenTargetReceipt();
+      input.amountYen = 1600;
+      input.items = [
+        { ...input.items[0], printedAmountYen: 1000, amountBasis: "tax_excluded" },
+        { ...input.items[0], printedAmountYen: 500, taxRatePercent: 0 },
+      ];
+      input.rawObservationLines = [
+        observationLine("税抜対象1000円", 1000, 0),
+        observationLine("合計1600円", 1600, 1),
+        observationLine("0%対象500円", 500, 2),
+      ];
+      if (problem === "税額不読")
+        input.rawObservationLines.push({
+          ...observationLine("消費税 読取不能", 0, 3),
+          amountYen: null,
+          amountText: null,
+        });
+      if (problem === "不正な非課税税額")
+        input.rawObservationLines.push(observationLine("0%消費税5円", 5, 3));
+      if (problem === "非課税対象額矛盾") input.rawObservationLines[2].amountYen = 499;
+      if (problem === "未知税率")
+        input.rawObservationLines.push(observationLine("12%対象1000円", 1000, 3));
+      expect(allocated(input)).toBe(false);
+    },
+  );
 });
