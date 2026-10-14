@@ -57,7 +57,7 @@ export function useReviewSubmit({
         draftId: selectedReviewDraftId as Id<"aiExpenseDrafts">,
       });
       setReviewSaveFeedback({
-        message: "ユーザー補正を解除し、AI判定へ戻しました。",
+        message: "ユーザー補正を解除し、修正前の内容へ戻しました。",
         severity: "success",
       });
       clearSelection();
@@ -113,6 +113,7 @@ export function useReviewSubmit({
             taxRateComposition: submittedForm.taxRateComposition,
             items: submittedItems.map((item) => ({
               itemName: item.itemName.trim(),
+              confirmedTaxRatePercent: item.confirmedTaxRatePercent,
               lineType: item.lineType,
               amountYen: Number(item.amountYen),
               categoryId: item.categoryId,
@@ -148,6 +149,7 @@ export function useReviewSubmit({
               ? { itemId: item.persistedItemId as Id<"aiExpenseDraftItems"> }
               : {}),
             itemName: item.itemName.trim(),
+            confirmedTaxRatePercent: item.confirmedTaxRatePercent,
             lineType: item.lineType,
             amountYen: Number(item.amountYen),
             categoryId: item.categoryId as Id<"categories">,

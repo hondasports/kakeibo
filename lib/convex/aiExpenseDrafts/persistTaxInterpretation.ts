@@ -3,7 +3,6 @@ import type { MutationCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type {
   BulkUnresolvedTaxOverride,
-  DraftSummaryOverride,
   DraftTaxOverride,
   ReinterpretDraftTaxInput,
 } from "../../receiptTax/reinterpretDraftTax";
@@ -22,7 +21,6 @@ export type PersistDraftTaxInterpretationArgs = {
   preservedNonTaxReasons?: AiExpenseDraftReviewReason[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
-  summaryOverride?: DraftSummaryOverride;
   receiptTotalSource?: "explicit_label" | "user_confirmed" | "ai_estimate";
   decisionOverride?: ReinterpretDraftTaxInput["decisionOverride"];
 };
@@ -70,7 +68,11 @@ export async function persistDraftTaxInterpretation(
     await ctx.db.patch(itemId as Id<"aiExpenseDraftItems">, patch);
   }
 
-  await ctx.db.patch(args.draftId, plan.draftPatch);
+  await ctx.db.patch(args.draftId, {
+    ...plan.draftPatch,
+    receiptInterpretation: plan.draftPatch
+      .receiptInterpretation as Doc<"aiExpenseDrafts">["receiptInterpretation"],
+  });
 
   const updatedDraft = await ctx.db.get(args.draftId);
   if (updatedDraft === null) {

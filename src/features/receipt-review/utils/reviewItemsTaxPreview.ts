@@ -1,3 +1,9 @@
+import {
+  resolveReceiptTotalSource,
+  resolveReceiptTotalSupportingCandidates,
+} from "../../../../lib/domain/aiExpenseDrafts/receiptTotalEvidence";
+import { hasReceiptTaxMetadata } from "../../../../lib/domain/receipt/tax/draftTaxMapping";
+import { resolveReceiptTaxCorrections } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import type { ReceiptLineClassification } from "../../../../lib/domain/receipt/observations";
 import { reinterpretDraftTax } from "../../../../lib/receiptTax/reinterpretDraftTax";
 import type { DraftItemTaxFields } from "../../../../lib/receiptTax/draftTaxMapping";
@@ -7,10 +13,6 @@ import type {
   TaxRateComposition,
 } from "../../../../lib/receiptTax/types";
 import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import {
-  isVerifiedTaxSummaryStatus,
-  reconcileTaxSummary,
-} from "../../../../lib/domain/receipt/tax/taxSummaryConsistency";
 
 function toExtractedTaxSummaries(
   taxSummaries: NonNullable<AiExpenseDraft["taxSummaries"]>,
@@ -28,6 +30,7 @@ function reviewItemToDraftFields(item: ReviewItemValues): DraftItemTaxFields {
 
   return {
     itemName: item.itemName,
+    lineType: item.lineType,
     printedAmountYen,
     amountBasis: item.amountBasis,
     taxRatePercent: item.taxRatePercent,
@@ -42,6 +45,7 @@ function reviewItemToDraftFields(item: ReviewItemValues): DraftItemTaxFields {
     taxResolutionStatus: item.taxResolutionStatus,
     taxResolutionSource: item.taxResolutionSource,
     taxReviewReasons: item.taxReviewReasons,
+    taxConfirmedFields: item.taxConfirmedFields,
   };
 }
 
@@ -50,7 +54,9 @@ type ReviewTaxPreviewArgs = {
   rawObservation?: AiExpenseDraft["rawObservation"];
   receiptUserOverride?: AiExpenseDraft["receiptUserOverride"];
   paidTotalYen?: number;
+  receiptTotalResolution?: AiExpenseDraft["receiptTotalResolution"];
   taxSummaries?: AiExpenseDraft["taxSummaries"];
+  sourceTaxSummaries?: AiExpenseDraft["taxSummaries"];
   markerDefinitions?: AiExpenseDraft["markerDefinitions"];
   priceTaxTreatment?: PriceTaxTreatment;
   taxRateComposition?: TaxRateComposition;
@@ -62,20 +68,17 @@ export function buildReviewTaxPreview(
 ): {
   items: ReviewItemValues[];
   taxSummaries: NonNullable<AiExpenseDraft["taxSummaries"]>;
-  summarySourceIndexes: number[];
 } {
   const unchanged = {
     items,
     taxSummaries: args.taxSummaries ?? [],
-    summarySourceIndexes: (args.taxSummaries ?? []).map((_, index) => index),
   };
   const paidTotalYen = args.paidTotalYen;
   if (paidTotalYen === undefined || !Number.isFinite(paidTotalYen) || paidTotalYen < 1) {
     return unchanged;
   }
   if (
-    (!args.taxSummaries || args.taxSummaries.length === 0) &&
-    !items.some((item) => item.taxRatePercent != null || item.amountBasis != null) &&
+    !hasReceiptTaxMetadata(args, items) &&
     args.priceTaxTreatment === undefined &&
     args.taxRateComposition === undefined
   ) {
@@ -85,9 +88,20 @@ export function buildReviewTaxPreview(
   const sourceSummaries = toExtractedTaxSummaries(args.taxSummaries ?? []);
   const { itemFields, interpretation } = reinterpretDraftTax({
     amountYen: paidTotalYen,
-    taxSummariesUserConfirmed: args.receiptUserOverride?.fields.includes("taxSummaries"),
+    receiptTotalSource: resolveReceiptTotalSource({
+      amountYen: paidTotalYen,
+      receiptTotalResolution: args.receiptTotalResolution,
+    }),
+    receiptTotalSupportingCandidates: resolveReceiptTotalSupportingCandidates(args),
+    correctedTaxSummaries: resolveReceiptTaxCorrections(
+      args.receiptUserOverride,
+      args.sourceTaxSummaries ? toExtractedTaxSummaries(args.sourceTaxSummaries) : undefined,
+    ),
     items: items.map(reviewItemToDraftFields),
     taxSummaries: sourceSummaries,
+    sourceTaxSummaries: args.sourceTaxSummaries
+      ? toExtractedTaxSummaries(args.sourceTaxSummaries)
+      : undefined,
     markerDefinitions: args.markerDefinitions,
     receiptLineClassifications: args.receiptLineClassifications,
     rawObservationLines:
@@ -114,55 +128,13 @@ export function buildReviewTaxPreview(
       taxResolutionStatus: fields.taxResolutionStatus,
       taxResolutionSource: fields.taxResolutionSource,
       taxReviewReasons: fields.taxReviewReasons,
+      taxConfirmedFields: fields.taxConfirmedFields,
       warnings: fields.warnings,
     };
   });
 
-  // 再解釈は同一サマリの重複を除く。保持されるconfidenceの参照で保存先を追跡する。
-  // ユーザーの全体選択から合成されたサマリには元の編集フォームがない。
-  const summarySourceIndexes = interpretation.taxSummaries.map((summary) => {
-    const originalIndex = sourceSummaries.findIndex(
-      (source) => source.confidence === summary.confidence,
-    );
-    if (originalIndex >= 0) return originalIndex;
-    // 保存済みの合成結果は値が同じ場合だけ元の編集先へ戻す。
-    const fields = [
-      "taxRatePercent",
-      "taxMode",
-      "taxableAmountYen",
-      "taxableAmountBasis",
-      "taxYen",
-      "taxIncludedAmountYen",
-    ] as const;
-    return sourceSummaries.findIndex((source) =>
-      fields.every((field) => source[field] === summary[field]),
-    );
-  });
-  const taxSummaries = interpretation.taxSummaries.map((summary, index) => {
-    const source = sourceSummaries[summarySourceIndexes[index]];
-    if (
-      !source ||
-      source.taxMode !== "unknown" ||
-      source.taxableAmountBasis !== "unknown" ||
-      args.priceTaxTreatment === "included" ||
-      args.priceTaxTreatment === "excluded"
-    ) {
-      return summary;
-    }
-    // 算術だけで両方不明の宣言を確認済みにしない。計算した登録額は維持する。
-    const declaration = reconcileTaxSummary({ summary: source });
-    return {
-      ...summary,
-      taxMode: source.taxMode,
-      taxableAmountBasis: source.taxableAmountBasis,
-      status:
-        summary.status && !isVerifiedTaxSummaryStatus(summary.status)
-          ? summary.status
-          : declaration.status,
-      reasons: [...new Set([...(summary.reasons ?? []), ...declaration.reasons])],
-    };
-  });
-  return { items: previewItems, taxSummaries, summarySourceIndexes };
+  const taxSummaries = interpretation.taxSummaries;
+  return { items: previewItems, taxSummaries };
 }
 
 export function applyReviewItemsTaxPreview(

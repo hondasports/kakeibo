@@ -101,8 +101,12 @@ it.each(["target", "tax-mode", "subtotal", "missing-raw"])(
       draft.rawObservation!.lines.push(observationLine("10%税込 4,373円", 4373, 2));
     if (kind === "tax-mode") draft.rawObservation!.lines[1].rawText = "外税10% 437円";
     if (kind === "subtotal")
-      draft.rawObservation!.lines.push(observationLine("小計 4,373円", 4373, 2));
-    if (kind === "missing-raw") draft.rawObservation = undefined;
+      draft.rawObservation!.lines.push(observationLine("小計 4,000円", 4000, 3));
+    if (kind === "missing-raw") {
+      draft.rawObservation = undefined;
+      items[0].amountBasis = "unknown";
+      items[0].taxRatePercent = null;
+    }
     const plan = planDraftTaxInterpretation(draft, items, {}, 1);
     expect(plan.draftPatch.status).toBe("needs_review");
     const savedItems = items.map((item, index) => ({ ...item, ...plan.itemPatches[index].patch }));
@@ -144,7 +148,7 @@ it.each(["classified", "ambiguous"] as const)(
     };
     const plan = planDraftTaxInterpretation(draft, items, {}, 1);
     expect(plan.draftPatch.status).toBe("needs_review");
-    expect(plan.draftPatch.taxSummaries![0].taxableAmountYen).toBe(4373);
+    expect(plan.draftPatch.taxSummaries![0].taxableAmountYen).toBe(4810);
     expect(() => buildDraftRegistrationItems(draft, items)).toThrow(/税額または税込登録額が未確定/);
   },
 );

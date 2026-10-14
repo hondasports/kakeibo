@@ -167,6 +167,18 @@ export function normalizeTaxSummary(
   summary: ExtractedTaxSummary,
   amountYen?: number,
 ): ExtractedTaxSummary {
+  if (
+    summary.warnings.includes("contradictory_receipt_tax_evidence") ||
+    summary.warnings.includes("unresolved_receipt_tax_evidence")
+  ) {
+    return {
+      ...summary,
+      status: summary.warnings.includes("contradictory_receipt_tax_evidence")
+        ? "contradictory"
+        : "ambiguous",
+      reasons: ["unresolved_tax_summary"],
+    };
+  }
   const canonical = canonicalizeTaxSummaryDeclaration(summary, amountYen);
   const consistency = reconcileTaxSummary({ amountYen, summary: canonical });
   return {

@@ -3,7 +3,7 @@ import {
   receiptTaxBasisCases,
   receiptTaxBasisInput,
 } from "../../../../lib/domain/receipt/tax/fixtures/receiptTaxBasisCases";
-import { applyReviewItemsTaxPreview } from "./reviewItemsTaxPreview";
+import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 import { buildAmountCheck } from "./reviewAmountChecks";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
 import { findBasisConflicts } from "./reviewCheckUtils";
@@ -41,6 +41,10 @@ function previewReceipt(input: ReturnType<typeof duplicatedExternalInput>) {
     items: applyReviewItemsTaxPreview(sourceItems, {
       paidTotalYen: input.amountYen,
       taxSummaries: interpretation.taxSummaries,
+      sourceTaxSummaries: input.taxSummaries,
+      rawObservation: input.rawObservationLines
+        ? { source: "ai_ocr", observedAt: 0, lines: input.rawObservationLines }
+        : undefined,
     }),
   };
 }
@@ -66,10 +70,8 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
         printedTaxYen: 32,
         expectedPaidYen: 436,
       });
-      expect(taxSummaries).toHaveLength(2);
-      expect(taxSummaries.map((summary) => summary.taxIncludedAmountYen)).toEqual(
-        input.taxSummaries.map((summary) => summary.taxIncludedAmountYen),
-      );
+      expect(taxSummaries).toHaveLength(1);
+
       expect(input).toEqual(snapshot);
     },
   );
@@ -102,16 +104,50 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
   ])("異なる税額・対象額・矛盾する税込補助額は同値として隠さない（%o）", (changes) => {
     const input = duplicatedExternalInput();
     input.taxSummaries[1] = { ...input.taxSummaries[1], ...changes };
+    input.rawObservationLines = input.taxSummaries.flatMap((summary, index) => [
+      {
+        rawText: "8%税抜対象 " + summary.taxableAmountYen + "円",
+        amountYen: summary.taxableAmountYen,
+        amountText: String(summary.taxableAmountYen),
+        sourceLineIndex: index * 2,
+        explicitlyPrinted: true,
+        lineRoleCandidates: ["tax"],
+        roleConfidence: 1,
+      },
+      {
+        rawText: "外税8% " + summary.taxYen + "円",
+        amountYen: summary.taxYen,
+        amountText: String(summary.taxYen),
+        sourceLineIndex: index * 2 + 1,
+        explicitlyPrinted: true,
+        lineRoleCandidates: ["tax"],
+        roleConfidence: 1,
+      },
+      ...(summary.taxIncludedAmountYen === undefined
+        ? []
+        : [
+            {
+              rawText: "8%税込合計 " + summary.taxIncludedAmountYen + "円",
+              amountYen: summary.taxIncludedAmountYen,
+              amountText: String(summary.taxIncludedAmountYen),
+              sourceLineIndex: index * 2 + 10,
+              explicitlyPrinted: true,
+              lineRoleCandidates: ["tax" as const],
+              roleConfidence: 1,
+            },
+          ]),
+    ]);
     const snapshot = structuredClone(input);
     const { items, taxSummaries } = previewReceipt(input);
 
-    expect(buildReviewChecks({ items, paidTotalYen: 436, taxSummaries }).amount.status).not.toBe(
+    expect(buildReviewChecks({ items, paidTotalYen: 436, taxSummaries }).taxRate.status).not.toBe(
       "matched",
     );
     expect(
       toReceiptTotalsViewModel({ reviewItems: items, paidTotalYen: 436, taxSummaries }).status,
     ).not.toBe("matched");
-    expect(taxSummaries).toHaveLength(2);
+    expect(items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+    expect(taxSummaries).toHaveLength(1);
     expect(input).toEqual(snapshot);
   });
 
@@ -142,34 +178,33 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
         id: `item-${index}`,
         amountYen: String(item.printedAmountYen),
         taxAllocationStatus: "unallocated",
+        taxResolutionSource: "item_explicit",
         normalizedAmountYen: item.printedAmountYen,
       }),
     );
-    const items = applyReviewItemsTaxPreview(sourceItems, {
+    const { items, taxSummaries } = buildReviewTaxPreview(sourceItems, {
       paidTotalYen: input.amountYen,
       taxSummaries: input.taxSummaries,
     });
     expect(items.map((item) => item.allocatedTaxYen)).toEqual(testCase.allocations);
-    expect(findBasisConflicts(items, input.taxSummaries)).toEqual([]);
-    expect(
-      buildAmountCheck({ items, paidTotalYen: input.amountYen, taxSummaries: input.taxSummaries }),
-    ).toMatchObject({
+    expect(findBasisConflicts(items, taxSummaries)).toEqual([]);
+    expect(buildAmountCheck({ items, paidTotalYen: input.amountYen, taxSummaries })).toMatchObject({
       status: "matched",
       itemsComparableTotalYen: input.amountYen,
     });
     const check = buildTaxRateCheck({
       items,
-      taxSummaries: input.taxSummaries,
+      taxSummaries,
       rawObservation: rawObservation([
-        { rawText: `8%対象額 ${testCase.paidYen}`, amountYen: testCase.paidYen },
+        { rawText: `8%税込対象額 ${testCase.paidYen}`, amountYen: testCase.paidYen },
       ]),
     });
     expect(check).toMatchObject({
       status: "matched",
       rows: [
         {
-          printedYen: testCase.paidYen,
-          currentYen: testCase.paidYen,
+          printedYen: testCase.amounts.reduce((sum, amount) => sum + amount, 0),
+          currentYen: testCase.amounts.reduce((sum, amount) => sum + amount, 0),
           matchKind: "exact",
         },
       ],
@@ -178,7 +213,7 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
     expect(sourceItems.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
   });
 
-  it("税抜内訳に対応する税込明細では支払額を直接比較する", () => {
+  it("確認済み税込明細は導出した税込対象額と支払額を直接比較する", () => {
     const input = receiptTaxBasisInput(receiptTaxBasisCases[0]);
     input.taxSummaries[0] = {
       ...input.taxSummaries[0],
@@ -186,23 +221,25 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
       taxableAmountBasis: "tax_excluded",
       taxableAmountYen: 404,
     };
-    const items = applyReviewItemsTaxPreview(
+    const { items, taxSummaries } = buildReviewTaxPreview(
       [106, 149, 181].map((amount, index) =>
         resolvedItem({
           id: `item-${index}`,
           amountBasis: "tax_included",
+          taxResolutionSource: "item_explicit",
           printedAmountYen: amount,
           amountYen: String(amount),
         }),
       ),
       { paidTotalYen: 436, taxSummaries: input.taxSummaries },
     );
-    expect(
-      buildAmountCheck({ items, paidTotalYen: 436, taxSummaries: input.taxSummaries }),
-    ).toMatchObject({ status: "matched", variant: "direct" });
-    expect(buildTaxRateCheck({ items, taxSummaries: input.taxSummaries })).toMatchObject({
+    expect(buildAmountCheck({ items, paidTotalYen: 436, taxSummaries })).toMatchObject({
       status: "matched",
-      rows: [{ printedYen: 404, currentYen: 404 }],
+      variant: "direct",
+    });
+    expect(buildTaxRateCheck({ items, taxSummaries })).toMatchObject({
+      status: "matched",
+      rows: [{ printedYen: 436, currentYen: 436 }],
     });
   });
 

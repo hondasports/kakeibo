@@ -62,11 +62,25 @@ function hasAmount(line: ReceiptRawObservationLine) {
   return line.amountYen !== null;
 }
 
+export function isReceiptCountLabel(rawText: string): boolean {
+  const text = normalizeText(rawText);
+  if (/[¥￥円]/.test(rawText.normalize("NFKC"))) return false;
+  return (
+    /^(?:(?:お|ご)?買上|購入|商品|合計|総計)*(?:点数|品数|数量|個数|件数)(?:合計|計)?(?:\d+(?:点|品|個|件)?)?$/.test(
+      text,
+    ) ||
+    /^(?:合計|総計|お買上)\d+(?:点|品|個|件)$/.test(text) ||
+    /^(?:total(?:items?|quantity|count)|(?:item|quantity|count)total)\d*$/.test(text) ||
+    /^(?:合計ポイント|ポイント合計|totalpoints|pointstotal)\d*(?:pt|p|ポイント)?$/.test(text)
+  );
+}
+
 /** 構造分類と税内訳の照合で共通の支払合計ラベルを使う。 */
 export function isReceiptTotalLabel(rawText: string): boolean {
   const text = normalizeText(rawText);
   return (
     /(?:合計|総計|お買上|ご請求額|お支払(?:額|合計)|今回支払額|total)/i.test(text) &&
+    !isReceiptCountLabel(rawText) &&
     !/(?:小計|値引|割引|subtotal)/i.test(text)
   );
 }

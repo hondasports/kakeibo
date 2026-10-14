@@ -107,9 +107,9 @@ describe("明細削除後の税条件", () => {
     expect(result.current.reviewItems[0].taxRatePercent).toBe(rate);
     if (rate === 8)
       expect(result.current.reviewItems[0]).toMatchObject({
-        normalizedAmountYen: 108,
-        allocatedTaxYen: 8,
-        taxAllocationStatus: "allocated",
+        normalizedAmountYen: 100,
+        allocatedTaxYen: 0,
+        taxAllocationStatus: "unallocated",
       });
     else expect(result.current.reviewItems[0].taxAllocationStatus).toBe("unallocated");
   });
@@ -169,4 +169,40 @@ it("初期化と金額変更で構造分類の決済行を税額へ流用しな�
   expect(
     result.current.reviewItems.some((item) => item.taxAllocationStatus === "unallocated"),
   ).toBe(true);
+});
+
+it("名前・行種別を変更した行だけ再確認を要求し、価格・カテゴリ変更では確認を保つ", () => {
+  const { result } = renderHook(() =>
+    useReviewFormState({
+      selectedReviewDraftId: null,
+      selectedReviewDraft: null,
+      localReviewItems: undefined,
+      selectedReviewDraftDetails: null,
+    }),
+  );
+  act(() => {
+    result.current.setReviewForm((f) => ({ ...f, amountYen: "200" }));
+    result.current.setReviewItems([item("edit", 10), item("keep", 10)]);
+  });
+  act(() => result.current.handleReviewItemChange("edit", "itemName", "変更後"));
+  expect(result.current.reviewItems[0].taxReviewReasons).toContain("item_identity_changed");
+  expect(result.current.reviewItems[0].taxConfirmedFields).toEqual(["amountBasis"]);
+  expect(result.current.reviewItems[1].taxReviewReasons ?? []).not.toContain(
+    "item_identity_changed",
+  );
+  act(() => result.current.handleReviewFieldChange("taxRateComposition", "rate8"));
+  expect(result.current.reviewItems[0].confirmedTaxRatePercent).toBe(8);
+  act(() => result.current.handleReviewItemChange("edit", "itemName", "さらに変更"));
+  expect(result.current.reviewItems[0].confirmedTaxRatePercent).toBeUndefined();
+  expect(result.current.reviewItems[0].taxConfirmedFields).toEqual(["amountBasis"]);
+  act(() => result.current.handleReviewItemChange("keep", "amountYen", "120"));
+  expect(result.current.reviewItems[1].taxConfirmedFields).toEqual([
+    "amountBasis",
+    "taxRatePercent",
+  ]);
+  act(() => result.current.handleReviewItemChange("keep", "categoryId", "cat2"));
+  expect(result.current.reviewItems[1].taxConfirmedFields).toEqual([
+    "amountBasis",
+    "taxRatePercent",
+  ]);
 });

@@ -1,3 +1,4 @@
+import { hasReceiptTaxMetadata } from "../../domain/receipt/tax/draftTaxMapping";
 import { ConvexError } from "convex/values";
 import {
   AiExpenseDraft,
@@ -13,6 +14,8 @@ import {
 } from "../../domain/aiExpenseDrafts/registrationItems";
 import {
   RECEIPT_TAX_CHOICE_FIELDS,
+  resolveReceiptTaxChoices,
+  snapshotReceiptDraftValues,
   type AiExpenseRegistrationMode,
 } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import {
@@ -99,7 +102,36 @@ export async function updateAiExpenseDraftForReview(
     throw new ConvexError(getReviewUpdateReadyErrorMessage(readyCheck.error, args.documentType));
   }
 
+  const effectiveComposition =
+    args.taxRateComposition ??
+    (args.priceTaxTreatment === undefined
+      ? resolveReceiptTaxChoices(fields).taxRateComposition
+      : undefined);
+  const globalRate =
+    effectiveComposition === "rate8" ? 8 : effectiveComposition === "rate10" ? 10 : undefined;
+  if (
+    globalRate !== undefined &&
+    args.items?.some(
+      (item) => item.confirmedTaxRatePercent != null && item.confirmedTaxRatePercent !== globalRate,
+    )
+  ) {
+    throw new ConvexError("Item tax rate confirmation conflicts with the receipt tax choice");
+  }
+
   const now = Date.now();
+  const hasTaxDecisionUpdate =
+    args.priceTaxTreatment !== undefined || args.taxRateComposition !== undefined;
+  const originalItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
+  const shouldReinterpretTax = hasTaxDecisionUpdate || hasReceiptTaxMetadata(fields, originalItems);
+  if (!fields.receiptInterpretation && shouldReinterpretTax) {
+    await deps.drafts.patch(args.draftId, {
+      receiptInterpretation: {
+        source: "legacy_projection",
+        interpretedAt: now,
+        values: snapshotReceiptDraftValues(fields, originalItems),
+      },
+    });
+  }
   if (args.items !== undefined) {
     if (registrationMode === "detailed" && !validatePositiveCategoryTotals(args.items)) {
       throw new ConvexError("Draft category total must be greater than zero");
@@ -150,13 +182,7 @@ export async function updateAiExpenseDraftForReview(
     updatedAt: now,
   });
 
-  const hasTaxDecisionUpdate =
-    args.priceTaxTreatment !== undefined || args.taxRateComposition !== undefined;
-  if (
-    (fields.taxSummaries && fields.taxSummaries.length > 0) ||
-    args.priceTaxTreatment !== undefined ||
-    args.taxRateComposition !== undefined
-  ) {
+  if (shouldReinterpretTax) {
     await deps.taxInterpretation.persistInterpretation({
       draftId: args.draftId,
       groupId: ctx.groupId,

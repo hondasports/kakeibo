@@ -1,8 +1,10 @@
+import { resetReceiptToAiInterpretationHandler } from "./receiptDataContract";
 import { buildDraftRegistrationItems } from "./reconcileExpenseEntries";
 import type { Doc } from "../../../convex/_generated/dataModel";
 import { describe, expect, it } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../../convex/_generated/server";
+import { updateDraftItemTaxOverridesHandler } from "./updateItemTaxOverrides";
 import { updateForReviewHandler } from "../../../convex/aiExpenseDrafts/mutations";
 import { GROUP_ID, DRAFT_ID, CAT_ID, StoredDoc, createInMemoryMutationCtx } from "./testHelpers";
 
@@ -238,7 +240,7 @@ describe("#835 保存時の税再解釈で未確定を解消する", () => {
     ).toBe(3500);
   });
 
-  it("税モードも基準も不明なサマリは保存後も未確定のまま残し登録を拒否する", async () => {
+  it("旧形式の内訳モードが不明でも、確認済みの商品から再計算して登録できる", async () => {
     const { ctx, getDraft, getItems } = makeCtx({
       amountYen: 3500,
       taxSummaries: [
@@ -295,8 +297,207 @@ describe("#835 保存時の税再解釈で未確定を解消する", () => {
 
     await save(ctx, 3500);
 
-    expect(getDraft().status).toBe("needs_review");
-    expect(getItems().some((i) => i.taxAllocationStatus === "unallocated")).toBe(true);
-    expect(register).toThrow(/未確定/);
+    expect(getDraft().status).toBe("ready");
+    expect(getItems().every((i) => i.taxAllocationStatus === "allocated")).toBe(true);
+    expect(register().reduce((sum, item) => sum + item.amountYen, 0)).toBe(3500);
+    expect(getDraft().receiptInterpretation).toMatchObject({
+      source: "legacy_projection",
+      values: {
+        taxSummaries: expect.arrayContaining([expect.objectContaining({ taxMode: "unknown" })]),
+      },
+    });
+  });
+  it("原文のない同一税率の旧税額を全体確認後の再保存で再入力しない", async () => {
+    const { ctx, getDraft, getItems } = makeCtx({
+      amountYen: 4810,
+      taxSummaries: [ambiguousSummary(10, 4373, 999, "included")],
+      items: [
+        resolvedItem({
+          _id: "item-1",
+          itemName: "商品",
+          amountYen: 4810,
+          printedAmountYen: 4810,
+          taxRatePercent: 10,
+        }),
+      ],
+    });
+    await updateForReviewHandler(ctx, {
+      draftId: DRAFT_ID,
+      documentType: "receipt",
+      shopName: "テスト店",
+      date: "2026-09-10",
+      amountYen: 4810,
+      categoryId: CAT_ID,
+      priceTaxTreatment: "included",
+      taxRateComposition: "rate10",
+    });
+    expect(getDraft().status).toBe("ready");
+    for (const taxRatePercent of [8, 10] as const) {
+      await updateDraftItemTaxOverridesHandler(
+        ctx,
+        {
+          draftId: DRAFT_ID,
+          itemId: "item-1" as Id<"aiExpenseDraftItems">,
+          taxRatePercent,
+        },
+        GROUP_ID,
+      );
+    }
+    await save(ctx, 4810);
+    expect(getDraft().status).toBe("ready");
+    expect(getDraft().taxSummaries).toMatchObject([
+      { taxYen: 437, valueOrigin: { source: "items" } },
+    ]);
+    expect(
+      buildDraftRegistrationItems(
+        getDraft() as unknown as Doc<"aiExpenseDrafts">,
+        getItems() as unknown as Doc<"aiExpenseDraftItems">[],
+      ).reduce((sum, item) => sum + item.amountYen, 0),
+    ).toBe(4810);
+  });
+  it("旧フォームの明示的な対象額訂正は計算結果と分離して履歴へ残す", async () => {
+    const { ctx, getDraft } = makeCtx({
+      amountYen: 4810,
+      taxSummaries: [ambiguousSummary(10, 4373, 437, "included")],
+      items: [
+        resolvedItem({
+          _id: "item-1",
+          itemName: "商品",
+          amountYen: 4810,
+          printedAmountYen: 4810,
+          taxRatePercent: 10,
+        }),
+      ],
+    });
+    const correction = {
+      ...getDraft().taxSummaries[0],
+      taxableAmountYen: 4000,
+      userEditedFields: ["taxableAmountYen"],
+      valueOrigin: { source: "user" },
+    };
+    await ctx.db.patch(DRAFT_ID, {
+      receiptUserOverride: {
+        source: "user",
+        updatedAt: 1,
+        fields: ["taxSummaries"],
+        values: {
+          status: "needs_review",
+          documentType: "receipt",
+          confidence: {},
+          warnings: [],
+          reviewReasons: [],
+          items: [],
+          taxSummaries: [correction],
+        },
+      },
+    } as never);
+    await save(ctx, 4810);
+    await save(ctx, 4810);
+    expect(getDraft().taxSummaries).toMatchObject([
+      { taxableAmountYen: 4810, valueOrigin: { source: "items" } },
+    ]);
+    expect(getDraft().receiptUserOverride.taxSummaryCorrections).toEqual([correction]);
+  });
+  it("metadataのない旧税額訂正438円を原文437円へ戻さず再保存できる", async () => {
+    const { ctx, getDraft, getItems } = makeCtx({
+      amountYen: 4810,
+      taxSummaries: [ambiguousSummary(10, 4373, 437, "included")],
+      items: [
+        resolvedItem({
+          _id: "item-1",
+          itemName: "商品",
+          amountYen: 4810,
+          printedAmountYen: 4810,
+          taxRatePercent: 10,
+        }),
+      ],
+    });
+    const correction = { ...getDraft().taxSummaries[0], taxYen: 438 };
+    await ctx.db.patch(DRAFT_ID, {
+      rawObservation: {
+        source: "ai_ocr",
+        observedAt: 1,
+        lines: [
+          {
+            rawText: "内消費税10%437円",
+            amountYen: 437,
+            amountText: "437",
+            explicitlyPrinted: true,
+            sourceLineIndex: 0,
+            lineRoleCandidates: ["tax"],
+            roleConfidence: 1,
+          },
+        ],
+      },
+      receiptUserOverride: {
+        source: "user",
+        updatedAt: 1,
+        fields: ["taxSummaries"],
+        values: {
+          status: "needs_review",
+          documentType: "receipt",
+          confidence: {},
+          warnings: [],
+          reviewReasons: [],
+          items: [],
+          taxSummaries: [correction],
+        },
+      },
+    } as never);
+    await save(ctx, 4810);
+    await save(ctx, 4810);
+    expect(getDraft().taxSummaries).toMatchObject([{ taxYen: 438 }]);
+    expect(getDraft().receiptUserOverride.taxSummaryCorrections).toMatchObject([
+      { taxYen: 438, userEditedFields: ["taxYen"] },
+    ]);
+    expect(getDraft().receiptTaxDecision.taxAmount).toMatchObject({
+      printedTaxYen: 437,
+      userConfirmedTaxYen: 438,
+      source: "user",
+    });
+    expect(getItems().reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(438);
+  });
+
+  it("旧下書きの初回保存前の商品・合計・基本情報を復元できる", async () => {
+    const { ctx, getDraft, getItems } = makeCtx({
+      amountYen: 4810,
+      taxSummaries: [ambiguousSummary(10, 4373, 437, "included")],
+      items: [
+        resolvedItem({
+          _id: "item-1",
+          itemName: "元の商品",
+          amountYen: 4810,
+          printedAmountYen: 4810,
+          taxRatePercent: 10,
+        }),
+      ],
+    });
+    await updateForReviewHandler(ctx, {
+      draftId: DRAFT_ID,
+      documentType: "receipt",
+      shopName: "修正後の店",
+      date: "2026-10-12",
+      amountYen: 5500,
+      categoryId: CAT_ID,
+      items: [
+        {
+          itemId: "item-1" as Id<"aiExpenseDraftItems">,
+          itemName: "修正後の商品",
+          amountYen: 5500,
+          categoryId: CAT_ID,
+          confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+        },
+      ],
+    });
+    expect(getDraft().amountYen).toBe(5500);
+    expect(getDraft().receiptInterpretation.values).toMatchObject({
+      shopName: "テスト店",
+      date: "2026-09-10",
+      amountYen: 4810,
+      items: [{ itemName: "元の商品", amountYen: 4810 }],
+    });
+    await resetReceiptToAiInterpretationHandler(ctx, { draftId: DRAFT_ID }, GROUP_ID);
+    expect(getDraft()).toMatchObject({ shopName: "テスト店", date: "2026-09-10", amountYen: 4810 });
+    expect(getItems()).toMatchObject([{ itemName: "元の商品", amountYen: 4810 }]);
   });
 });

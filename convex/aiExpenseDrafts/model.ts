@@ -26,6 +26,7 @@ export {
   receiptUserOverrideSnapshotValidator,
   taxModeValidator,
   taxResolutionSourceValidator,
+  taxConfirmedFieldsValidator,
   taxResolutionStatusValidator,
   taxSummaryTaxRatePercentValidator,
   taxSummaryValidator,

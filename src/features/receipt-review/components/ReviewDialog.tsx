@@ -14,7 +14,6 @@ import {
 } from "@mui/material";
 import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "../types/types";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
-import type { TaxSummaryChange } from "./ReceiptTaxSummaryEditor";
 import type { AmountBasis } from "../../../../lib/receiptTax/types";
 import { ReviewDialogActions } from "./ReviewDialogActions";
 import { ReviewDialogBasicsSection } from "./ReviewDialogBasicsSection";
@@ -60,8 +59,6 @@ export type ReviewDialogProps = {
   onResetToAiInterpretation: () => void;
   taxUpdatingItemId?: string | null;
   onTaxRateChange?: (itemId: string, taxRatePercent: 0 | 8 | 10 | null) => void;
-  taxSummaryUpdatingIndex?: number | null;
-  onTaxSummaryChange?: (index: number, change: TaxSummaryChange) => void;
   imageDataUrl?: string;
   onAmountBasisChange?: (itemId: string, amountBasis: AmountBasis) => void;
 };
@@ -88,10 +85,12 @@ export function ReviewDialog(props: ReviewDialogProps) {
       buildReviewTaxPreview(sourceItems, {
         paidTotalYen,
         taxSummaries: sourceDraft?.taxSummaries,
+        sourceTaxSummaries: sourceDraft?.receiptInterpretation?.values.taxSummaries,
         markerDefinitions: sourceDraft?.markerDefinitions,
         rawObservation: sourceDraft?.rawObservation,
         receiptLineClassifications:
           sourceDraft?.receiptInterpretation?.values.receiptLineClassifications,
+        receiptTotalResolution: sourceDraft?.receiptTotalResolution,
         receiptUserOverride: sourceDraft?.receiptUserOverride,
         priceTaxTreatment: form.priceTaxTreatment,
         taxRateComposition: form.taxRateComposition,
@@ -104,6 +103,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
       sourceDraft?.rawObservation,
       sourceDraft?.receiptInterpretation,
       sourceDraft?.receiptUserOverride,
+      sourceDraft?.receiptTotalResolution,
       form.priceTaxTreatment,
       form.taxRateComposition,
     ],
@@ -126,15 +126,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
     setTaxDetails({});
     setLocalError("");
   }
-  const guidance = getReviewGuidance(form, items, draft, {
-    summarySourceIndexes: preview.summarySourceIndexes,
-    sourceTaxSummaries: sourceDraft?.taxSummaries,
-  });
-  const editableSummaries = preview.summarySourceIndexes.map((sourceIndex, summaryIndex) => ({
-    summaryIndex,
-    sourceIndex,
-    message: guidance.find((issue) => issue.taxSummaryIndex === summaryIndex)?.message,
-  }));
+  const guidance = getReviewGuidance(form, items, draft);
   const required = guidance.filter((issue) => issue.required);
   const recommendations = guidance.filter((issue) => !issue.required && issue.scope !== "receipt");
   const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");
@@ -143,10 +135,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const bannerGuidance = specificGuidance.filter(
     (issue) =>
       issue.taxSummaryIndex !== undefined ||
-      (issue.required &&
-        issue.target !== "items" &&
-        issue.target !== "tax-summary" &&
-        !itemTargets.has(issue.target)),
+      (issue.required && issue.target !== "items" && !itemTargets.has(issue.target)),
   );
   const totalOnly = effectiveReviewMode(form) === "totalOnly";
   const checks = buildReviewChecks({
@@ -175,24 +164,12 @@ export function ReviewDialog(props: ReviewDialogProps) {
   ).length;
   const fixCount = required.length + checkMismatchCount;
   const recommendationCount = recommendations.length + checkUncomparableCount;
-  const busy =
-    props.reviewSubmitting ||
-    props.taxUpdatingItemId != null ||
-    props.taxSummaryUpdatingIndex != null;
+  const busy = props.reviewSubmitting || props.taxUpdatingItemId != null;
   const unavailable = isReviewDraftLoading || isReviewDraftNotFound || categories.length === 0;
   const products = items.filter((item) => !isDiscountLine(item.itemName, item.lineType));
   const categoryNames = new Map(categories.map((category) => [category._id, category.name]));
-  const canEditTax = editableSummaries.length > 0;
+
   const goTo = (target: string) => {
-    if (target === "tax-summary") {
-      target = editableSummaries.length
-        ? `tax-summary-${editableSummaries[0].sourceIndex}`
-        : "items";
-    }
-    if (target === "tax-summary" || target.startsWith("tax-summary-")) {
-      if (!editableSummaries.some(({ sourceIndex }) => target === `tax-summary-${sourceIndex}`))
-        target = "items";
-    }
     setExpanded((current) => ({
       ...current,
       [target]: true,
@@ -395,7 +372,6 @@ export function ReviewDialog(props: ReviewDialogProps) {
                   isCategorySplit={props.isCategorySplit}
                   draft={draft}
                   totalOnly={totalOnly}
-                  canEditTax={canEditTax}
                   taxUpdatingItemId={props.taxUpdatingItemId}
                   register={register}
                   onToggleItem={toggleExpanded}
@@ -417,14 +393,10 @@ export function ReviewDialog(props: ReviewDialogProps) {
                 />
                 <ReviewDialogReferenceSection
                   draft={draft}
-                  canEditTax={canEditTax}
-                  editableSummaries={editableSummaries}
                   open={expanded.reference ?? false}
                   busy={busy}
-                  taxSummaryUpdatingIndex={props.taxSummaryUpdatingIndex}
                   register={register}
                   onToggle={() => toggleExpanded("reference")}
-                  onTaxSummaryChange={props.onTaxSummaryChange}
                   onResetToAiInterpretation={props.onResetToAiInterpretation}
                 />
               </Stack>

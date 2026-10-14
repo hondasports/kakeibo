@@ -18,7 +18,6 @@ import type {
   AiExpenseDraft,
   AiExpenseDraftWithItems,
 } from "../../../src/features/receipt-review/types/types";
-import { updateSummaryTaxOverridesHandler } from "./updateSummaryTaxOverrides";
 import { RECEIPT_TAX_CHOICE_FIELDS } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { buildReviewChecks } from "../../../src/features/receipt-review/utils/reviewChecks";
 import { toReceiptTotalsViewModel } from "../../../src/features/receipt-review/utils/receiptTotalsViewModel";
@@ -137,8 +136,8 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
         );
 
         expect(draft.status).toBe("ready");
-        expect(draft.taxSummaries).toHaveLength(2);
-        expect(draft.taxSummaries).toMatchObject(printedSummaries);
+        expect(draft.taxSummaries).toHaveLength(1);
+        expect(draft.receiptInterpretation?.values.taxSummaries).toMatchObject(printedSummaries);
         expect(items.map((item) => item.allocatedTaxYen)).toEqual([8, 11, 13]);
         expect(registrationItems(env).reduce((sum, item) => sum + item.amountYen, 0)).toBe(436);
         expect(
@@ -178,40 +177,9 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
       await save(env, testCase, form);
       await save(env, testCase, reopen(env));
       expect(env.getDraft().status).toBe("ready");
-      expect(env.getDraft().taxSummaries).toMatchObject(printedSummary!);
-      expect(env.getItems().map((item) => item.allocatedTaxYen)).toEqual(testCase.allocations);
-      expect(registrationItems(env).reduce((sum, item) => sum + item.amountYen, 0)).toBe(
-        testCase.paidYen,
+      expect(env.getDraft().receiptInterpretation?.values.taxSummaries).toMatchObject(
+        printedSummary!,
       );
-    },
-  );
-
-  it.each(receiptTaxBasisCases)(
-    "$paidYen 円の税内訳を補正しても全体設定として再送しない",
-    async (testCase) => {
-      const env = setup(testCase);
-      const printedSummary = structuredClone(env.getDraft().taxSummaries);
-      await env.ctx.db.patch(DRAFT_ID, {
-        taxSummaries: printedSummary!.map((summary) => ({
-          ...summary,
-          taxYen: testCase.taxYen - 1,
-        })),
-      });
-      await correctItems(env);
-      await save(env, testCase, { taxRateComposition: "rate8" });
-      await updateSummaryTaxOverridesHandler(
-        env.ctx,
-        { draftId: DRAFT_ID, summaryIndex: 0, taxYen: testCase.taxYen },
-        GROUP_ID,
-      );
-      expect(reopen(env)).toMatchObject({
-        priceTaxTreatment: undefined,
-        taxRateComposition: undefined,
-      });
-      await save(env, testCase, reopen(env));
-      await save(env, testCase, reopen(env));
-      expect(env.getDraft().status).toBe("ready");
-      expect(env.getDraft().taxSummaries).toMatchObject(printedSummary!);
       expect(env.getItems().map((item) => item.allocatedTaxYen)).toEqual(testCase.allocations);
       expect(registrationItems(env).reduce((sum, item) => sum + item.amountYen, 0)).toBe(
         testCase.paidYen,
@@ -337,9 +305,9 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
         status: "ready",
         receiptTaxDecision: choice,
       });
-      // 旧保存形式は値を保持し、確認済みの出所だけを補完する。
+      // 内訳の計算結果は、明細から導出した値として保存される。
       expect(env.getDraft().taxSummaries).toEqual(
-        printedSummary.map((summary) => ({ ...summary, valueOrigin: { source: "user" } })),
+        printedSummary.map((summary) => ({ ...summary, valueOrigin: { source: "items" } })),
       );
       expect(registrationItems(env)).toEqual([
         expect.objectContaining({ amountYen: testCase.paidYen }),
@@ -387,7 +355,7 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
           (item) => item.amountBasis === "tax_excluded" && item.taxAllocationStatus === "allocated",
         ),
       ).toBe(true);
-      expect(getDraft().taxSummaries).toMatchObject(printedSummary!);
+      expect(getDraft().receiptInterpretation?.values.taxSummaries).toMatchObject(printedSummary!);
       const entries = buildDraftRegistrationItems(
         getDraft() as unknown as Doc<"aiExpenseDrafts">,
         getItems() as unknown as Doc<"aiExpenseDraftItems">[],

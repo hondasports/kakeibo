@@ -85,7 +85,7 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     await page.reload();
     const { queue, dialog } = await openFirstReviewDialog(page);
 
-    // 要確認の明細行は畳んだまま表示する。牛乳を開いて直すと残りはサーバ側の再解釈で解決される。
+    // 未確認の各商品は、旧税内訳から逆算せず商品ごとに確認する。
     const expectedMixedTaxRates = { パン: "8%", 洗剤: "10%", 牛乳: "8%", ラップ: "10%" };
     const milkRow = dialog.locator('section[aria-label="商品一覧"] details').filter({
       hasText: "牛乳",
@@ -95,6 +95,16 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     await page.getByRole("option", { name: "8%", exact: true }).click();
     await dialog.getByRole("combobox", { name: "牛乳の表示価格", exact: true }).click();
     await page.getByRole("option", { name: "税込", exact: true }).click();
+    await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("税率未確定 1件");
+    const wrapRow = dialog
+      .locator('section[aria-label="商品一覧"] details')
+      .filter({ hasText: "ラップ" });
+    if ((await wrapRow.getAttribute("open")) === null) await wrapRow.locator("summary").click();
+    await wrapRow.getByRole("combobox", { name: "ラップの税率", exact: true }).click();
+    await page.getByRole("option", { name: "10%", exact: true }).click();
+    await wrapRow.getByRole("combobox", { name: "ラップの表示価格", exact: true }).click();
+    await page.getByRole("option", { name: "税込", exact: true }).click();
+
     await expect(
       dialog.getByRole("region", { name: "全体の確認状態" }).getByText(/税率・税込／税抜/),
     ).toHaveCount(0);

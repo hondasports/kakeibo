@@ -243,9 +243,33 @@ export function ReviewItemCard({
                 onAmountBasisChange?.(item.id, event.target.value as AmountBasis)
               }
             >
-              <MenuItem value="tax_included">{discount ? "税込金額から引く" : "税込"}</MenuItem>
-              <MenuItem value="tax_excluded">{discount ? "税抜金額から引く" : "税抜"}</MenuItem>
-              <MenuItem value="unknown">不明</MenuItem>
+              <MenuItem
+                value="tax_included"
+                onClick={() => {
+                  if ((item.amountBasis ?? "unknown") === "tax_included")
+                    onAmountBasisChange?.(item.id, "tax_included");
+                }}
+              >
+                {discount ? "税込金額から引く" : "税込"}
+              </MenuItem>
+              <MenuItem
+                value="tax_excluded"
+                onClick={() => {
+                  if ((item.amountBasis ?? "unknown") === "tax_excluded")
+                    onAmountBasisChange?.(item.id, "tax_excluded");
+                }}
+              >
+                {discount ? "税抜金額から引く" : "税抜"}
+              </MenuItem>
+              <MenuItem
+                value="unknown"
+                onClick={() => {
+                  if ((item.amountBasis ?? "unknown") === "unknown")
+                    onAmountBasisChange?.(item.id, "unknown");
+                }}
+              >
+                不明
+              </MenuItem>
             </TextField>
           </Stack>
         )}

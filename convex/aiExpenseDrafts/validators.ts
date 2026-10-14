@@ -60,6 +60,10 @@ export const receiptItemTaxRatePercentValidator = v.union(
 );
 export const receiptMarkersValidator = v.array(v.string());
 export const taxResolutionStatusValidator = v.union(v.literal("resolved"), v.literal("unresolved"));
+export const taxConfirmedFieldsValidator = v.array(
+  v.union(v.literal("amountBasis"), v.literal("taxRatePercent")),
+);
+
 export const taxResolutionSourceValidator = v.union(
   v.literal("item_explicit"),
   v.literal("single_summary"),
@@ -204,6 +208,7 @@ export const receiptTaxDecisionValidator = v.object({
   reasons: v.array(v.string()),
   candidates: v.array(receiptTaxDecisionCandidateValidator),
   taxAmount: v.object({
+    userConfirmedTaxYen: v.optional(v.number()),
     printedTaxYen: v.optional(v.number()),
     estimatedTaxYen: v.optional(v.number()),
     roundingMethod: v.union(
@@ -212,7 +217,12 @@ export const receiptTaxDecisionValidator = v.object({
       v.literal("ceil"),
       v.literal("unknown"),
     ),
-    source: v.union(v.literal("printed"), v.literal("estimated"), v.literal("unknown")),
+    source: v.union(
+      v.literal("printed"),
+      v.literal("estimated"),
+      v.literal("unknown"),
+      v.literal("user"),
+    ),
   }),
 });
 
@@ -322,6 +332,7 @@ export const receiptDraftItemSnapshotValidator = v.object({
   taxResolutionStatus: v.optional(taxResolutionStatusValidator),
   taxResolutionSource: v.optional(taxResolutionSourceValidator),
   taxReviewReasons: v.optional(v.array(v.string())),
+  taxConfirmedFields: v.optional(taxConfirmedFieldsValidator),
   quantity: v.optional(v.number()),
   unitPriceYen: v.optional(v.number()),
   categoryName: v.optional(v.string()),
@@ -353,12 +364,13 @@ export const receiptDraftValueSnapshotValidator = v.object({
 });
 
 export const receiptInterpretationSnapshotValidator = v.object({
-  source: v.literal("ai"),
+  source: v.union(v.literal("ai"), v.literal("legacy_projection")),
   interpretedAt: v.number(),
   values: receiptDraftValueSnapshotValidator,
 });
 
 export const receiptUserOverrideSnapshotValidator = v.object({
+  taxSummaryCorrections: v.optional(v.array(taxSummaryValidator)),
   source: v.literal("user"),
   updatedAt: v.number(),
   fields: v.array(v.string()),

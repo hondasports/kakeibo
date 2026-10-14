@@ -2,6 +2,7 @@ import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../../convex/_generated/server";
 import {
   buildReceiptUserOverride,
+  resolveReceiptTaxCorrections,
   snapshotReceiptDraftValues as snapshotReceiptDraftValuesDomain,
   type ReceiptDraftValueSnapshot,
   type ReceiptUserOverrideSnapshot,
@@ -41,6 +42,10 @@ export async function persistReceiptUserOverrideSnapshot(
   const receiptUserOverride: ReceiptUserOverrideSnapshot<Id<"categories">> =
     buildReceiptUserOverride({
       existingFields: draft.receiptUserOverride?.fields,
+      taxSummaryCorrections: resolveReceiptTaxCorrections(
+        draft.receiptUserOverride,
+        draft.receiptInterpretation?.values.taxSummaries,
+      ),
       fields: args.fields,
       updatedAt,
       values: snapshotReceiptDraftValues(draft, items),

@@ -12,11 +12,13 @@ import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiEx
 
 export function useReviewTaxOverrides({
   selectedReviewDraftId,
+  reviewItems,
   setReviewItems,
   setReviewDraftOverride,
   setReviewError,
 }: {
   selectedReviewDraftId: string | null;
+  reviewItems: ReviewItemValues[];
   setReviewItems: Dispatch<SetStateAction<ReviewItemValues[]>>;
   setReviewDraftOverride: (draft: AiExpenseDraft) => void;
   setReviewError: (error: string) => void;
@@ -41,6 +43,11 @@ export function useReviewTaxOverrides({
     if (!selectedReviewDraftId) {
       return;
     }
+    const itemAtRequest = reviewItems.find((item) => item.id === itemId);
+    const rateConfirmation =
+      itemAtRequest && overrides.taxRatePercent !== undefined
+        ? { ...itemAtRequest, taxRatePercent: overrides.taxRatePercent }
+        : undefined;
     const requestId = ++taxOverrideRequestIdRef.current;
     setTaxUpdatingItemId(itemId);
     setReviewError("");
@@ -55,17 +62,23 @@ export function useReviewTaxOverrides({
       }
       setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft));
       setReviewItems((current) =>
-        mergeReviewTaxItems(
-          current,
-          applyReviewItemsTaxPreview(mapDraftItemsToReviewItems(result.items), {
+        applyReviewItemsTaxPreview(
+          mergeReviewTaxItems(
+            current,
+            mapDraftItemsToReviewItems(result.items),
+            rateConfirmation ? [rateConfirmation] : undefined,
+          ),
+          {
             paidTotalYen: result.draft.amountYen,
             taxSummaries: result.draft.taxSummaries,
+            sourceTaxSummaries: result.draft.receiptInterpretation?.values.taxSummaries,
             markerDefinitions: result.draft.markerDefinitions,
             rawObservation: result.draft.rawObservation,
             receiptLineClassifications:
               result.draft.receiptInterpretation?.values.receiptLineClassifications,
+            receiptTotalResolution: result.draft.receiptTotalResolution,
             receiptUserOverride: result.draft.receiptUserOverride,
-          }),
+          },
         ),
       );
     } catch (error) {
@@ -86,6 +99,7 @@ export function useReviewTaxOverrides({
       return;
     }
     const requestId = ++taxOverrideRequestIdRef.current;
+    const itemsAtRequest = reviewItems;
     setIsApplyingReceiptTax(true);
     setReviewError("");
     try {
@@ -97,17 +111,28 @@ export function useReviewTaxOverrides({
       }
       setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft));
       setReviewItems((current) =>
-        mergeReviewTaxItems(
-          current,
-          applyReviewItemsTaxPreview(mapDraftItemsToReviewItems(result.items), {
+        applyReviewItemsTaxPreview(
+          mergeReviewTaxItems(
+            current,
+            mapDraftItemsToReviewItems(result.items),
+            itemsAtRequest.flatMap((item) => {
+              const updated = result.items.find((row) => row._id === item.id);
+              return updated?.taxRatePercent != null
+                ? [{ ...item, taxRatePercent: updated.taxRatePercent }]
+                : [];
+            }),
+          ),
+          {
             paidTotalYen: result.draft.amountYen,
             taxSummaries: result.draft.taxSummaries,
+            sourceTaxSummaries: result.draft.receiptInterpretation?.values.taxSummaries,
             markerDefinitions: result.draft.markerDefinitions,
             rawObservation: result.draft.rawObservation,
             receiptLineClassifications:
               result.draft.receiptInterpretation?.values.receiptLineClassifications,
+            receiptTotalResolution: result.draft.receiptTotalResolution,
             receiptUserOverride: result.draft.receiptUserOverride,
-          }),
+          },
         ),
       );
     } catch (error) {

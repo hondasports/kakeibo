@@ -1,3 +1,4 @@
+import type { ReceiptItemTaxConfirmedField } from "../receipt/tax/types";
 import type {
   AiExpenseDraftConfidence,
   AiExpenseDraftDocumentType,
@@ -31,6 +32,7 @@ export type ReceiptDraftItemSnapshot<TCategoryId = string> = {
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
+  taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
   quantity?: number;
   unitPriceYen?: number;
   categoryName?: string;
@@ -67,12 +69,14 @@ export type ReceiptDraftValueSnapshot<TCategoryId = string> = {
 };
 
 export type ReceiptInterpretationSnapshot<TCategoryId = string> = {
-  source: "ai";
+  source: "ai" | "legacy_projection";
   interpretedAt: number;
   values: ReceiptDraftValueSnapshot<TCategoryId>;
 };
 
 export type ReceiptUserOverrideSnapshot<TCategoryId = string> = {
+  /** 廃止した編集フォームの訂正履歴。対象額は計算への再入力に使わない。 */
+  taxSummaryCorrections?: ExtractedTaxSummary[];
   source: "user";
   updatedAt: number;
   fields: string[];
@@ -197,6 +201,7 @@ export function snapshotReceiptDraftValues<TCategoryId>(
       taxResolutionStatus: item.taxResolutionStatus,
       taxResolutionSource: item.taxResolutionSource,
       taxReviewReasons: item.taxReviewReasons,
+      taxConfirmedFields: item.taxConfirmedFields,
       quantity: item.quantity,
       unitPriceYen: item.unitPriceYen,
       categoryName: item.categoryName,
@@ -210,6 +215,7 @@ export function snapshotReceiptDraftValues<TCategoryId>(
 /** 補正対象は累積し、税判定を更新するときは全体設定の軸の記録を置き換える。 */
 export function buildReceiptUserOverride<TCategoryId>(args: {
   existingFields?: readonly string[];
+  taxSummaryCorrections?: ExtractedTaxSummary[];
   fields: readonly string[];
   updatedAt: number;
   values: ReceiptDraftValueSnapshot<TCategoryId>;
@@ -220,8 +226,67 @@ export function buildReceiptUserOverride<TCategoryId>(args: {
     : args.existingFields;
   return {
     source: "user",
+    ...(args.taxSummaryCorrections?.length
+      ? { taxSummaryCorrections: args.taxSummaryCorrections }
+      : {}),
     updatedAt: args.updatedAt,
     fields: [...new Set([...(existingFields ?? []), ...args.fields])],
     values: args.values,
   };
+}
+
+export function resolveReceiptTaxChoices(draft: {
+  receiptUserOverride?: ReceiptUserOverrideSnapshot;
+  receiptTaxDecision?: ReceiptTaxDecision;
+  registrationMode?: AiExpenseRegistrationMode;
+}): {
+  priceTaxTreatment?: ReceiptTaxDecision["priceTaxTreatment"];
+  taxRateComposition?: ReceiptTaxDecision["taxRateComposition"];
+} {
+  const fields = draft.receiptUserOverride?.fields ?? [];
+  const legacyUnknown =
+    fields.includes("receiptTaxDecision") &&
+    (draft.registrationMode === "totalOnly" ||
+      (!fields.includes("items") && !fields.includes("taxSummaries")));
+  return {
+    priceTaxTreatment:
+      fields.includes(RECEIPT_TAX_CHOICE_FIELDS.priceTaxTreatment) ||
+      (legacyUnknown && draft.receiptTaxDecision?.priceTaxTreatment === "unknown")
+        ? draft.receiptTaxDecision?.priceTaxTreatment
+        : undefined,
+    taxRateComposition:
+      fields.includes(RECEIPT_TAX_CHOICE_FIELDS.taxRateComposition) ||
+      (legacyUnknown && draft.receiptTaxDecision?.taxRateComposition === "unknown")
+        ? draft.receiptTaxDecision?.taxRateComposition
+        : undefined,
+  };
+}
+
+export function resolveReceiptTaxCorrections(
+  override: ReceiptUserOverrideSnapshot | undefined,
+  originalSummaries?: ExtractedTaxSummary[],
+): ExtractedTaxSummary[] | undefined {
+  if (override?.taxSummaryCorrections) return override.taxSummaryCorrections;
+  if (!override?.fields.includes("taxSummaries")) return undefined;
+  const summaries = override.values.taxSummaries ?? [];
+  const isolatedLegacyEdit = override.fields.every((field) => field === "taxSummaries");
+  return summaries
+    .filter((summary) => summary.valueOrigin?.source !== "items")
+    .map((summary) => {
+      if (summary.userEditedFields?.length || summary.valueOrigin || !isolatedLegacyEdit) {
+        return summary;
+      }
+      const originals = originalSummaries?.filter(
+        (original) => original.taxRatePercent === summary.taxRatePercent,
+      );
+      const matchingEdits = summaries.filter(
+        (edit) => edit.taxRatePercent === summary.taxRatePercent,
+      );
+      return originals?.length === 1 &&
+        originals[0].valueOrigin?.source !== "items" &&
+        matchingEdits.length === 1 &&
+        originals[0].taxYen !== summary.taxYen
+        ? { ...summary, userEditedFields: ["taxYen"] }
+        : summary;
+    });
 }

@@ -1271,13 +1271,28 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `aiExpenseDrafts.mutations.updateForReview(draftId, input)`
 - `aiExpenseDrafts.mutations.deleteDraft(draftId)`
 - `aiExpenseDrafts.mutations.updateDraftItemTaxOverrides(draftId, itemId, taxRatePercent?, amountBasis?)`
-- `aiExpenseDrafts.mutations.updateSummaryTaxOverrides(draftId, summaryIndex, taxRatePercent?, taxMode?, taxableAmountYen?, taxYen?, ...)`
 - `aiExpenseDrafts.mutations.applyReceiptTaxSettings(draftId, taxRatePercent?, amountBasis?)`
 - `aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries(draftIds)`（主導線）
 - `aiExpenseDrafts.mutations.registerReadyDrafts(draftIds)`（レガシー。`receipts` へ登録し `registeredReceiptId` を設定）
 - `aiExpenseDrafts.actions.analyzeReceiptImageToDraft(input)`
 - `aiExpenseDrafts.internal.createFromExtraction(input)`（internal）
 - `aiExpenseDrafts.internal.createFailedDraftFromImageAnalysis(input)`（internal）
+
+税率別の対象額・税配分・登録額は `reinterpretDraftTax` で現在の商品と独立した印字証拠から導出する。プレビュー・保存・再表示・登録ガードは同じ境界を使い、計算済みの `taxSummaries` を次の計算の証拠にはしない。
+
+原文は `rawObservation`、元の抽出値は `receiptInterpretation` に保持する。元のsnapshotがない旧下書きは、初回の再計算時に `source: legacy_projection` として保存する。旧フォームの明示訂正は `receiptUserOverride.taxSummaryCorrections` に履歴として保持し、対象額等を再入力にしない。税額の明示訂正だけを原文税額と区別して照合する。汎用の税内訳フォームと専用公開更新mutationは廃止する。
+
+旧税サマリの対象額・税額・税込補助額は、元のsnapshotを含めて再計算に使用しない。税額の明示訂正はフィールド単位の編集記録を必要とし、metadataのない旧形式は税内訳単独の編集で、同率の元snapshotが一意かつ税額変更を証明できる場合だけ訂正として扱う。対象額のみの訂正、元値と同値の履歴、元snapshot欠落・重複、商品から生成した値を税額訂正へ昇格しない。
+
+外税の推定は、現在の商品・許容端数処理・支払合計が一意に定める税率別組み合わせだけを確定する。複数の組み合わせが成立する場合、原文が矛盾・不読の場合、商品に未確認の税率・価格区分が残る場合は登録を保留する。保存だけで未確認の商品を確認済みへ昇格しない。税モデルの存在判定はプレビュー・保存・登録で共有し、税モデルのない手入力商品の単独配分flagは税モデルとして扱わない。
+
+商品の `taxConfirmedFields` は税率・表示価格のどちらをユーザーが確認したかだけを保持するoptionalなmetadataで、金額を二重保存しない。片軸の確認は保存・商品置換・snapshot・再表示を跨いで保持し、もう片軸の旧推定値へ確認を波及させない。null税率・不明価格へ戻すと該当確認だけを除去する。既存の確定済み商品は互換fallbackを持つが、明示配列がある場合は空配列も正として扱う。同じ選択肢の選び直しでも、その軸の確認を保存する。
+
+商品名・実効行種別が変わった場合は税率確認だけを解除し、`item_identity_changed` を確認理由として保持する。原文や保存済み全体設定だけで解除せず、変更後の明示税率選択で解消する。未保存の商品名に対する税率選択は、今回の選択だけを `confirmedTaxRatePercent` としてレビュー保存へ渡す。非同期応答中に商品名・行種別が変わった場合は引き継がない。商品別確認と全体税率が競合する保存は更新前に拒否する。
+
+商品も税情報もないOCR払込票は既存の合計明細登録を維持する。商品なしでも独立した印字税証拠・税snapshot・訂正履歴がある場合は税ガードを省略しない。点数・数量の明示行は支払合計と税証拠から除外し、本物の合計の矛盾・不読は保持する。
+
+
 
 ### 10.9 receipt analysis jobs
 

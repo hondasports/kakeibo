@@ -72,3 +72,49 @@ describe("税情報更新時の入力保持", () => {
     });
   });
 });
+
+it("名前変更後に選んだ税率だけを今回の確認として保持し、応答待ち中の別名変更には引き継がない", () => {
+  const current: ReviewItemValues = {
+    id: "item",
+    itemName: "パン",
+    lineType: "item",
+    amountYen: "100",
+    printedAmountYen: 100,
+    categoryId: "cat",
+    amountBasis: "tax_included",
+    taxRatePercent: 10,
+    taxConfirmedFields: ["amountBasis"],
+    taxResolutionStatus: "unresolved",
+    taxReviewReasons: ["item_identity_changed"],
+  };
+  const server: ReviewItemValues = {
+    ...current,
+    itemName: "日用品",
+    taxRatePercent: 8,
+    taxReviewReasons: [],
+    taxConfirmedFields: ["amountBasis", "taxRatePercent"],
+    taxResolutionStatus: "resolved",
+  };
+  expect(mergeReviewTaxItems([current], [server])[0].taxReviewReasons).toContain(
+    "item_identity_changed",
+  );
+  const request = {
+    id: "item",
+    itemName: "パン",
+    lineType: "item" as const,
+    taxRatePercent: 8 as const,
+  };
+  expect(mergeReviewTaxItems([current], [server], [request])[0]).toMatchObject({
+    itemName: "パン",
+    confirmedTaxRatePercent: 8,
+    taxConfirmedFields: ["amountBasis", "taxRatePercent"],
+    taxReviewReasons: [],
+  });
+  expect(
+    mergeReviewTaxItems([{ ...current, itemName: "お酒" }], [server], [request])[0],
+  ).toMatchObject({
+    itemName: "お酒",
+    taxConfirmedFields: ["amountBasis"],
+    taxReviewReasons: ["item_identity_changed"],
+  });
+});

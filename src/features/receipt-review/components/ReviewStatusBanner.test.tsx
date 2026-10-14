@@ -111,7 +111,9 @@ describe("ReviewStatusBanner", () => {
       onJump,
     );
     expect(within(banner).getByText("商品の税率を確認してください")).toBeInTheDocument();
-    expect(within(banner).getByText(/税率または税込／税抜設定/)).toBeInTheDocument();
+    expect(
+      within(banner).getByText("割引対象の商品が未確定のため、税率別に集計できません"),
+    ).toBeInTheDocument();
     expect(within(banner).queryByText(/税率別の明細合計/)).not.toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "税率を確認する" }));
     expect(onJump).toHaveBeenCalledWith("discount-1");

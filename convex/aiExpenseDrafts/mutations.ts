@@ -8,19 +8,15 @@ import {
   aiExpenseRegistrationModeValidator,
   amountBasisValidator,
   receiptItemTaxRatePercentValidator,
-  taxModeValidator,
-  taxSummaryTaxRatePercentValidator,
 } from "./model";
 import { requireGroupMembership } from "../groups/membership";
 import { deleteAiExpenseDraft } from "../../lib/usecase/aiExpenseDrafts/deleteDraft";
 import { createAiExpenseDraftDeps } from "../../lib/convex/aiExpenseDrafts/draftUsecaseDeps";
 import { updateDraftItemTaxOverridesHandler } from "../../lib/convex/aiExpenseDrafts/updateItemTaxOverrides";
-import { updateSummaryTaxOverridesHandler } from "../../lib/convex/aiExpenseDrafts/updateSummaryTaxOverrides";
 import { registerReadyDraftsHandler } from "../../lib/convex/aiExpenseDrafts/registerToReceipts";
 import { registerReadyDraftsAsExpenseEntriesHandler } from "../../lib/convex/aiExpenseDrafts/registerToExpenseEntries";
 import { applyReceiptTaxSettingsHandler } from "../../lib/convex/aiExpenseDrafts/applyReceiptTaxSettings";
 import { updateForReviewHandler } from "../../lib/convex/aiExpenseDrafts/updateForReview";
-import type { TaxMode, TaxRatePercent } from "../../lib/receiptTax/types";
 import { priceTaxTreatmentValidator, taxRateCompositionValidator } from "./validators";
 import { resetReceiptToAiInterpretationHandler } from "../../lib/convex/aiExpenseDrafts/receiptDataContract";
 import { updateRegisteredDraftHandler } from "../../lib/convex/aiExpenseDrafts/updateRegisteredDraft";
@@ -45,23 +41,6 @@ export async function updateDraftItemTaxOverridesMutationHandler(
 ) {
   const { groupId } = await requireGroupMembership(ctx);
   return await updateDraftItemTaxOverridesHandler(ctx, args, groupId);
-}
-
-export async function updateSummaryTaxOverridesMutationHandler(
-  ctx: MutationCtx,
-  args: {
-    draftId: Id<"aiExpenseDrafts">;
-    summaryIndex: number;
-    taxRatePercent?: TaxRatePercent;
-    taxMode?: TaxMode;
-    taxableAmountYen?: number;
-    taxableAmountBasis?: Infer<typeof amountBasisValidator>;
-    taxYen?: number;
-    taxIncludedAmountYen?: number;
-  },
-) {
-  const { groupId } = await requireGroupMembership(ctx);
-  return await updateSummaryTaxOverridesHandler(ctx, args, groupId);
 }
 
 export async function applyReceiptTaxSettingsMutationHandler(
@@ -109,6 +88,7 @@ export const updateForReview = mutation({
       v.array(
         v.object({
           itemId: v.optional(v.id("aiExpenseDraftItems")),
+          confirmedTaxRatePercent: v.optional(receiptItemTaxRatePercentValidator),
           itemName: v.string(),
           lineType: v.optional(
             v.union(
@@ -137,20 +117,6 @@ export const updateDraftItemTaxOverrides = mutation({
     amountBasis: v.optional(amountBasisValidator),
   },
   handler: updateDraftItemTaxOverridesMutationHandler,
-});
-
-export const updateSummaryTaxOverrides = mutation({
-  args: {
-    draftId: v.id("aiExpenseDrafts"),
-    summaryIndex: v.number(),
-    taxRatePercent: v.optional(taxSummaryTaxRatePercentValidator),
-    taxMode: v.optional(taxModeValidator),
-    taxableAmountYen: v.optional(v.number()),
-    taxableAmountBasis: v.optional(amountBasisValidator),
-    taxYen: v.optional(v.number()),
-    taxIncludedAmountYen: v.optional(v.number()),
-  },
-  handler: updateSummaryTaxOverridesMutationHandler,
 });
 
 export const applyReceiptTaxSettings = mutation({

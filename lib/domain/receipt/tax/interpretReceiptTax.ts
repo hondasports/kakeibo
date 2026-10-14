@@ -53,7 +53,17 @@ export function interpretReceiptTax(input: ReceiptTaxInput): ReceiptTaxInterpret
     items: normalizedInput.items,
     contexts,
     taxSummaries: processableSummaries,
-  });
+  }).map((item) =>
+    item.taxRatePercent === 0 &&
+    normalizedAllSummaries.some(
+      (summary) =>
+        summary.taxRatePercent === 0 &&
+        summary.status !== "verified" &&
+        summary.status !== "coherent",
+    )
+      ? { ...item, taxAllocationStatus: "unallocated" as const }
+      : item,
+  );
   const validationWarnings = validateConsistency({
     amountYen: input.amountYen,
     items,

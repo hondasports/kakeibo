@@ -59,7 +59,7 @@ for (const receipt of [
       ).toBe(receipt.taxYen);
       const reference = dialog
         .locator("details")
-        .filter({ hasText: "読み取り原文・詳しい税情報（参考）" })
+        .filter({ hasText: "読み取り原文（参考）" })
         .first();
       if ((await reference.getAttribute("open")) === null)
         await reference.locator("summary").click();

@@ -1,3 +1,7 @@
+import type { ReceiptItemTaxConfirmedField } from "./types";
+import { hasPrintedTaxSummaryEvidence } from "./summaryEvidence";
+import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
+import type { ReceiptItemLineType } from "../discountItems";
 import type { AiExpenseDraftReviewReason } from "../../aiExpenseDrafts/constants";
 import type {
   AmountBasis,
@@ -14,6 +18,7 @@ import type {
 
 export type DraftItemTaxFields = {
   itemName: string;
+  lineType?: ReceiptItemLineType;
   printedAmountYen?: number;
   amountBasis?: AmountBasis;
   taxRatePercent?: TaxRatePercent | null;
@@ -29,10 +34,12 @@ export type DraftItemTaxFields = {
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
+  taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
 };
 
 export type DraftItemTaxFieldsSource = {
   itemName: string;
+  lineType?: ReceiptItemLineType;
   printedAmountYen?: number | null;
   amountYen: number;
   amountBasis?: AmountBasis;
@@ -46,6 +53,7 @@ export type DraftItemTaxFieldsSource = {
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource | null;
   taxReviewReasons?: string[];
+  taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
 };
 
 /**
@@ -55,6 +63,7 @@ export type DraftItemTaxFieldsSource = {
 export function mapDraftItemToTaxFields(item: DraftItemTaxFieldsSource): DraftItemTaxFields {
   return {
     itemName: item.itemName,
+    lineType: item.lineType,
     printedAmountYen: item.printedAmountYen ?? item.amountYen,
     amountBasis: item.amountBasis,
     taxRatePercent: item.taxRatePercent ?? null,
@@ -67,6 +76,7 @@ export function mapDraftItemToTaxFields(item: DraftItemTaxFieldsSource): DraftIt
     taxResolutionStatus: item.taxResolutionStatus,
     taxResolutionSource: item.taxResolutionSource ?? undefined,
     taxReviewReasons: item.taxReviewReasons,
+    taxConfirmedFields: item.taxConfirmedFields,
   };
 }
 
@@ -153,6 +163,7 @@ export function deriveTaxReviewReasons(
 export function draftItemToExtractedReceiptItem(item: DraftItemTaxFields): ExtractedReceiptItem {
   return {
     itemName: item.itemName,
+    lineType: item.lineType,
     printedAmountYen: item.printedAmountYen ?? 0,
     amountBasis: item.amountBasis ?? "unknown",
     taxRatePercent: item.taxRatePercent ?? null,
@@ -177,4 +188,47 @@ export function buildReceiptTaxInput(args: {
     taxSummaries: args.taxSummaries,
     markerDefinitions: args.markerDefinitions,
   };
+}
+
+export function hasReceiptTaxMetadata(
+  draft: {
+    taxSummaries?: readonly unknown[];
+    sourceTaxSummaries?: readonly unknown[];
+    receiptInterpretation?: {
+      values: {
+        taxSummaries?: readonly unknown[];
+        receiptLineClassifications?: ReceiptLineClassification[];
+      };
+    };
+    rawObservation?: { source: string; lines?: ReceiptRawObservationLine[] };
+    receiptUserOverride?: { fields: readonly string[]; taxSummaryCorrections?: readonly unknown[] };
+  },
+  items: readonly {
+    taxRatePercent?: number | null;
+    amountBasis?: string | null;
+    taxResolutionStatus?: string;
+    taxAllocationStatus?: string;
+    taxConfirmedFields?: readonly ReceiptItemTaxConfirmedField[];
+  }[],
+): boolean {
+  return Boolean(
+    draft.taxSummaries?.length ||
+    draft.sourceTaxSummaries?.length ||
+    draft.receiptInterpretation?.values.taxSummaries?.length ||
+    (draft.rawObservation?.source === "ai_ocr" &&
+      (items.length > 0 ||
+        hasPrintedTaxSummaryEvidence(
+          draft.rawObservation.lines,
+          draft.receiptInterpretation?.values.receiptLineClassifications,
+        ))) ||
+    draft.receiptUserOverride?.taxSummaryCorrections?.length ||
+    draft.receiptUserOverride?.fields.includes("taxSummaries") ||
+    items.some(
+      (item) =>
+        item.taxRatePercent != null ||
+        item.amountBasis != null ||
+        item.taxResolutionStatus !== undefined ||
+        Boolean(item.taxConfirmedFields?.length),
+    ),
+  );
 }

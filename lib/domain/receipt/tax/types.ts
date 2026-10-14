@@ -1,3 +1,6 @@
+export type ReceiptItemTaxConfirmedField = "amountBasis" | "taxRatePercent";
+
+import type { ReceiptItemLineType } from "../discountItems";
 export type TaxRatePercent = 0 | 8 | 10;
 export type AmountBasis = "tax_included" | "tax_excluded" | "unknown";
 export type ResolvedAmountBasis = Exclude<AmountBasis, "unknown">;
@@ -24,10 +27,11 @@ export type ReceiptTaxDecisionCandidate = {
 };
 
 export type ReceiptTaxAmountDecision = {
+  userConfirmedTaxYen?: number;
   printedTaxYen?: number;
   estimatedTaxYen?: number;
   roundingMethod: RoundingMethod;
-  source: "printed" | "estimated" | "unknown";
+  source: "printed" | "estimated" | "unknown" | "user";
 };
 
 export type ReceiptTaxDecision = ReceiptTaxDecisionCandidate & {
@@ -61,6 +65,7 @@ export type ReceiptMarkerDefinition = { marker: string; description: string };
 
 export type ExtractedReceiptItem = {
   itemName: string;
+  lineType?: ReceiptItemLineType;
   printedAmountYen: number;
   taxRatePercent: TaxRatePercent | null;
   amountBasis: AmountBasis;
@@ -97,21 +102,6 @@ export type ExtractedTaxSummary = {
   warnings: string[];
   status?: TaxSummaryConsistencyStatus;
   reasons?: TaxSummaryConsistencyReason[];
-};
-
-export type DraftSummaryOverride = {
-  index: number;
-  summary: Partial<
-    Pick<
-      ExtractedTaxSummary,
-      | "taxRatePercent"
-      | "taxMode"
-      | "taxableAmountYen"
-      | "taxableAmountBasis"
-      | "taxYen"
-      | "taxIncludedAmountYen"
-    >
-  >;
 };
 
 export type TaxResolutionSource =

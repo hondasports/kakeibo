@@ -331,54 +331,10 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
 
     expect(result.interpretation.decision).toMatchObject({
       priceTaxTreatment: "included",
-      taxRateComposition: "mixed",
+      taxRateComposition: "rate8",
       resolutionSource: "explicitLabel",
     });
     expect(result.interpretation.decision.evidence).toContain("user_override:composition");
     expect(result.interpretation.decision.evidence).not.toContain("user_override:treatment");
-  });
-
-  it("summaryだけの価格上書きはsummaryの値をuser根拠にする", () => {
-    const result = reinterpretDraftTax({
-      amountYen: 1100,
-      items: [
-        {
-          itemName: "商品",
-          printedAmountYen: 1100,
-          amountBasis: "tax_included",
-          taxRatePercent: 10,
-          markers: [],
-          warnings: [],
-        },
-      ],
-      taxSummaries: [
-        {
-          taxRatePercent: 10,
-          taxMode: "included",
-          taxableAmountYen: 1000,
-          taxableAmountBasis: "tax_included",
-          taxYen: 100,
-          roundingMethod: "round",
-          confidence: {},
-          warnings: [],
-          status: "ambiguous",
-        },
-      ],
-      summaryOverride: {
-        index: 0,
-        summary: { taxMode: "external", taxableAmountBasis: "tax_excluded" },
-      },
-    });
-
-    expect(result.interpretation.decision).toMatchObject({
-      priceTaxTreatment: "excluded",
-      resolutionSource: "reconciliation",
-    });
-    expect(result.interpretation.decision.evidence).toContain("user_override:treatment");
-    expect(result.itemFields[0]).toMatchObject({
-      amountBasis: "tax_included",
-      printedAmountYen: 1100,
-      normalizedAmountYen: 1100,
-    });
   });
 });
