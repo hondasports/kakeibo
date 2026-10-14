@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { interpretReceiptTax } from "./interpretReceiptTax";
 import { reinterpretDraftTax } from "./reinterpretDraftTax";
-import { unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";
+import { observationLine, unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";
 import { receiptTaxBasisCases, receiptTaxBasisInput } from "./fixtures/receiptTaxBasisCases";
 import {
   RECEIPT_TAX_GOLDEN_FAILURE_CLASSES,
@@ -302,5 +302,25 @@ it("Issue #1015: 小計・支払合計・内消費税の実再現で登録額と
       status: "verified",
       valueOrigin: { source: "items" },
     }),
+  ]);
+});
+
+it("税抜1000円と非課税500円・合計1600円の固定期待値を再現する", () => {
+  const input = unprovenTargetReceipt();
+  input.amountYen = 1600;
+  input.items = [
+    { ...input.items[0], printedAmountYen: 1000, amountBasis: "tax_excluded" },
+    { ...input.items[0], printedAmountYen: 500, taxRatePercent: 0 },
+  ];
+  input.rawObservationLines = [
+    observationLine("10%対象1000円", 1000, 0),
+    observationLine("合計1600円", 1600, 1),
+  ];
+  const result = reinterpretDraftTax(input);
+  expect(result.itemFields.map((item) => item.normalizedAmountYen)).toEqual([1100, 500]);
+  expect(result.itemFields.map((item) => item.allocatedTaxYen)).toEqual([100, 0]);
+  expect(result.itemFields.map((item) => item.taxAllocationStatus)).toEqual([
+    "allocated",
+    "allocated",
   ]);
 });
