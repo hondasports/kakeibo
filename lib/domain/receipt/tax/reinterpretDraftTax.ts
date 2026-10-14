@@ -15,6 +15,7 @@ import type {
   TaxRatePercent,
 } from "./types";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
+import { ITEM_IDENTITY_CHANGED, getItemTaxConfirmedFields } from "./itemTaxConfirmation";
 import { deriveReceiptTaxSummaries } from "./deriveReceiptTaxSummaries";
 
 export type DraftTaxOverride = {
@@ -68,6 +69,15 @@ function shouldApplyBulkOverride(
 }
 
 export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): ReinterpretDraftTaxResult {
+  const needsRateConfirmation = input.items.map(
+    (item, index) =>
+      Boolean(item.taxReviewReasons?.includes(ITEM_IDENTITY_CHANGED)) &&
+      !(input.override?.itemIndex === index && input.override.taxRatePercent != null) &&
+      !(
+        input.bulkUnresolvedOverride &&
+        shouldApplyBulkOverride(item, draftItemToExtractedReceiptItem(item))
+      ),
+  );
   const items = input.items.map((item, index) => {
     const extracted = draftItemToExtractedReceiptItem(item);
     // 前回の判定理由は再計算する。OCR由来の一般的な注意は保持する。
@@ -91,6 +101,18 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
       amountBasis: decisionAmountBasis ?? extracted.amountBasis,
       taxRatePercent: decisionTaxRate ?? extracted.taxRatePercent,
     };
+    if (needsRateConfirmation[index]) {
+      return {
+        ...decisionAdjusted,
+        amountBasis:
+          input.override?.itemIndex === index
+            ? (input.override.amountBasis ?? decisionAdjusted.amountBasis)
+            : decisionAdjusted.amountBasis,
+        taxRatePercent: null,
+        markers: [],
+        taxMarker: undefined,
+      };
+    }
     if (input.override?.itemIndex === index) {
       return {
         ...decisionAdjusted,
@@ -117,14 +139,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
 
   const confirmedFields = items.map((item, index) => {
     const original = input.items[index];
-    const originalConfirmed =
-      original.taxResolutionStatus !== "unresolved" &&
-      (original.taxResolutionSource === undefined ||
-        original.taxResolutionSource === "item_explicit");
-    const confirmed = new Set(
-      original.taxConfirmedFields ??
-        (originalConfirmed ? (["amountBasis", "taxRatePercent"] as const) : []),
-    );
+    const confirmed = new Set(getItemTaxConfirmedFields(original));
     const override = input.override?.itemIndex === index ? input.override : undefined;
     const bulk =
       input.bulkUnresolvedOverride &&
@@ -144,7 +159,8 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     )
       confirmed.add("taxRatePercent");
     if (item.amountBasis === "unknown") confirmed.delete("amountBasis");
-    if (item.taxRatePercent === null) confirmed.delete("taxRatePercent");
+    if (item.taxRatePercent === null || needsRateConfirmation[index])
+      confirmed.delete("taxRatePercent");
     return (["amountBasis", "taxRatePercent"] as const).filter((field) => confirmed.has(field));
   });
   const itemTaxWasConfirmed = (index: number): boolean => confirmedFields[index].length === 2;
@@ -235,12 +251,31 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     interpretation.taxSummaries.every((summary) => summary.status === "verified") &&
     interpretedItems.every((item) => item.taxAllocationStatus === "allocated") &&
     interpretedItems.reduce((sum, item) => sum + item.normalizedAmountYen, 0) === input.amountYen;
-  const effectiveItems = amountsResolved
-    ? interpretedItems.map((item) => ({
+  const effectiveItems = interpretedItems.map((item, index) => {
+    if (needsRateConfirmation[index]) {
+      const rate =
+        input.override?.itemIndex === index && input.override.taxRatePercent !== undefined
+          ? input.override.taxRatePercent
+          : (input.items[index].taxRatePercent ?? null);
+      return {
         ...item,
-        warnings: item.warnings.filter((warning) => warning !== "amount_mismatch"),
-      }))
-    : interpretedItems;
+        taxRatePercent: rate,
+        allocatedTaxYen: 0,
+        normalizedAmountYen: item.printedAmountYen,
+        taxAllocationStatus: "unallocated" as const,
+        taxContext: {
+          status: "unresolved" as const,
+          taxRatePercent: rate,
+          amountBasis: item.amountBasis,
+          reasons: [ITEM_IDENTITY_CHANGED, "unresolved_tax_rate"],
+        },
+        warnings: [...new Set([...item.warnings, "unresolved_tax_rate"])],
+      };
+    }
+    return amountsResolved
+      ? { ...item, warnings: item.warnings.filter((warning) => warning !== "amount_mismatch") }
+      : item;
+  });
   const hasTaxReadingCorrection = taxSummaries.some((summary) =>
     summary.userEditedFields?.includes("taxYen"),
   );

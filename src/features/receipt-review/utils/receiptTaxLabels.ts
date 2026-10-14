@@ -16,6 +16,7 @@ export const TAX_RESOLUTION_SOURCE_LABELS = {
 } satisfies Record<TaxResolutionSource, string>;
 
 export const TAX_REVIEW_REASON_LABELS: Record<string, string> = {
+  item_identity_changed: "商品名・行の種類を変更したため、税率を選び直してください",
   multiple_tax_summaries: "複数の税率があり、明細との対応を特定できませんでした",
   cannot_reconcile_item_amounts: "商品合計とレシート小計が一致しませんでした",
   unresolved_tax_rate: "税率を判定できませんでした",

@@ -1,7 +1,7 @@
+import type { DraftReviewItemInput } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import { ConvexError } from "convex/values";
 import type { MutationCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
-import { type ReceiptItemLineType } from "../../../lib/domain/receipt/discountItems";
 import {
   getReviewUpdateReadyErrorMessage,
   validateReviewUpdateCanBecomeReady,
@@ -32,19 +32,9 @@ export {
   summarizeItems,
 } from "../../../lib/domain/aiExpenseDrafts/reviewItems";
 
-export type UpdateForReviewItem = {
+export type UpdateForReviewItem = Omit<DraftReviewItemInput, "itemId" | "categoryId"> & {
   itemId?: Id<"aiExpenseDraftItems">;
-  itemName: string;
-  lineType?: ReceiptItemLineType;
-  amountYen: number;
   categoryId: Id<"categories">;
-  confidence?: {
-    itemName?: number;
-    amountYen?: number;
-    categoryName?: number;
-    categoryId?: number;
-  };
-  warnings?: string[];
 };
 
 export type UpdateForReviewArgs = {

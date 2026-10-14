@@ -14,6 +14,7 @@ import {
 } from "../../domain/aiExpenseDrafts/registrationItems";
 import {
   RECEIPT_TAX_CHOICE_FIELDS,
+  resolveReceiptTaxChoices,
   snapshotReceiptDraftValues,
   type AiExpenseRegistrationMode,
 } from "../../domain/aiExpenseDrafts/receiptDataContract";
@@ -99,6 +100,22 @@ export async function updateAiExpenseDraftForReview(
   const readyCheck = validateReviewUpdateCanBecomeReady(args);
   if (!readyCheck.success) {
     throw new ConvexError(getReviewUpdateReadyErrorMessage(readyCheck.error, args.documentType));
+  }
+
+  const effectiveComposition =
+    args.taxRateComposition ??
+    (args.priceTaxTreatment === undefined
+      ? resolveReceiptTaxChoices(fields).taxRateComposition
+      : undefined);
+  const globalRate =
+    effectiveComposition === "rate8" ? 8 : effectiveComposition === "rate10" ? 10 : undefined;
+  if (
+    globalRate !== undefined &&
+    args.items?.some(
+      (item) => item.confirmedTaxRatePercent != null && item.confirmedTaxRatePercent !== globalRate,
+    )
+  ) {
+    throw new ConvexError("Item tax rate confirmation conflicts with the receipt tax choice");
   }
 
   const now = Date.now();

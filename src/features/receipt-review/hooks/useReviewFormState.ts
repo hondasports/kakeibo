@@ -1,3 +1,9 @@
+import { hasReceiptTaxMetadata } from "../../../../lib/domain/receipt/tax/draftTaxMapping";
+import {
+  ITEM_IDENTITY_CHANGED,
+  confirmItemTaxRate,
+  invalidateItemTaxRateConfirmation,
+} from "../../../../lib/domain/receipt/tax/itemTaxConfirmation";
 import { useState } from "react";
 import {
   emptyReviewForm,
@@ -93,19 +99,32 @@ export function useReviewFormState({
       const nextTaxRateComposition =
         field === "taxRateComposition" ? value : reviewForm.taxRateComposition;
       setReviewItems((current) =>
-        applyReviewItemsTaxPreview(current, {
-          paidTotalYen: Number(reviewForm.amountYen),
-          taxSummaries: selectedReviewDraft?.taxSummaries,
-          sourceTaxSummaries: selectedReviewDraft?.receiptInterpretation?.values.taxSummaries,
-          markerDefinitions: selectedReviewDraft?.markerDefinitions,
-          rawObservation: selectedReviewDraft?.rawObservation,
-          receiptLineClassifications:
-            selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
-          receiptTotalResolution: selectedReviewDraft?.receiptTotalResolution,
-          receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
-          priceTaxTreatment: nextPriceTaxTreatment as ReviewFormValues["priceTaxTreatment"],
-          taxRateComposition: nextTaxRateComposition as ReviewFormValues["taxRateComposition"],
-        }),
+        applyReviewItemsTaxPreview(
+          current.map((item) => {
+            if (
+              field !== "taxRateComposition" ||
+              (value !== "rate8" && value !== "rate10") ||
+              (!item.taxReviewReasons?.includes(ITEM_IDENTITY_CHANGED) &&
+                item.confirmedTaxRatePercent === undefined)
+            )
+              return item;
+            const rate = value === "rate8" ? 8 : 10;
+            return { ...confirmItemTaxRate(item, rate), confirmedTaxRatePercent: rate };
+          }),
+          {
+            paidTotalYen: Number(reviewForm.amountYen),
+            taxSummaries: selectedReviewDraft?.taxSummaries,
+            sourceTaxSummaries: selectedReviewDraft?.receiptInterpretation?.values.taxSummaries,
+            markerDefinitions: selectedReviewDraft?.markerDefinitions,
+            rawObservation: selectedReviewDraft?.rawObservation,
+            receiptLineClassifications:
+              selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
+            receiptTotalResolution: selectedReviewDraft?.receiptTotalResolution,
+            receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
+            priceTaxTreatment: nextPriceTaxTreatment as ReviewFormValues["priceTaxTreatment"],
+            taxRateComposition: nextTaxRateComposition as ReviewFormValues["taxRateComposition"],
+          },
+        ),
       );
     }
     if (field === "amountYen") {
@@ -148,7 +167,7 @@ export function useReviewFormState({
       ) {
         return assignCategoryToItems(current, [itemId], value);
       }
-      const updated = current.map((item) => {
+      let updated = current.map((item) => {
         if (item.id !== itemId) {
           return item;
         }
@@ -221,7 +240,17 @@ export function useReviewFormState({
         return { ...item, itemName: value };
       });
 
-      if (field !== "amountYen") {
+      if (field === "itemName" || field === "lineType") {
+        updated = updated.map((item) => {
+          if (item.id !== itemId || !targetItem || !hasReceiptTaxMetadata({}, [item])) return item;
+          const changed =
+            item.itemName.trim() !== targetItem.itemName.trim() ||
+            (item.lineType ?? "item") !== (targetItem.lineType ?? "item");
+          return changed
+            ? { ...invalidateItemTaxRateConfirmation(item), confirmedTaxRatePercent: undefined }
+            : item;
+        });
+      } else if (field !== "amountYen") {
         return updated;
       }
 
