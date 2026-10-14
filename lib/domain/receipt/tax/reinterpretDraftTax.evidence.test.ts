@@ -99,6 +99,47 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
     expect(allocated(input)).toBe(false);
   });
 
+  describe("支払方法の行に税系の役割候補が付いた場合（Issue #1018）", () => {
+    const withPaymentLines = (role: "tax" | "subtotal", paymentYen: number) => {
+      const input = unprovenTargetReceipt();
+      input.rawObservationLines!.push(
+        {
+          ...observationLine("支払い方法", 0, 3),
+          amountYen: null,
+          amountText: null,
+          lineRoleCandidates: [role],
+        },
+        {
+          ...observationLine(`QUICPay ${paymentYen}円`, paymentYen, 4),
+          lineRoleCandidates: [role],
+        },
+      );
+      return input;
+    };
+
+    it.each(["tax", "subtotal"] as const)(
+      "支払総額の再掲に%s候補が付いても確認済み商品を配分できる",
+      (role) => {
+        const input = withPaymentLines(role, 4810);
+        expect(allocated(input)).toBe(true);
+        expect(reinterpretDraftTax(input).interpretation.taxSummaries[0]).toMatchObject({
+          status: "verified",
+          taxYen: 437,
+        });
+      },
+    );
+
+    it("支払総額と異なる金額の税系候補行は矛盾として保持する", () => {
+      expect(allocated(withPaymentLines("tax", 999))).toBe(false);
+    });
+
+    it("印字税額と矛盾する場合は支払方法の行があっても確定しない", () => {
+      const input = withPaymentLines("tax", 4810);
+      input.rawObservationLines![1].amountYen = 400;
+      expect(allocated(input)).toBe(false);
+    });
+  });
+
   it("印字合計との食い違いを計算値で上書きしない", () => {
     const input = unprovenTargetReceipt();
     input.rawObservationLines![0].amountYen = 4800;
