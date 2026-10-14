@@ -61,13 +61,7 @@ export function deriveReceiptTaxSummaries(args: {
   const unidentifiedEvidence = lines.some((line) => {
     if (isTaxRateDeclarationLine(line)) return false;
     if (taxSummaryLineKind(line.rawText) === undefined) {
-      // 税・税率の語がなく、金額もない行か支払総額の再掲だけの行（支払方法など）は、
-      // 役割候補が揺れても税額・対象額と矛盾しえない。税の語がある行は金額によらず根拠として扱う。
-      const mentionsTax = /%|税/.test(line.rawText.normalize("NFKC"));
-      const carriesTaxFigure =
-        mentionsTax || (line.amountYen !== null && line.amountYen !== args.amountYen);
       return (
-        carriesTaxFigure &&
         !isReceiptTotalLabel(line.rawText) &&
         !/subtotal/i.test(line.rawText) &&
         (line.lineRoleCandidates.includes("tax") || line.lineRoleCandidates.includes("subtotal"))
