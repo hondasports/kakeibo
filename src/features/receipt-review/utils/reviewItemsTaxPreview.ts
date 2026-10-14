@@ -45,6 +45,7 @@ function reviewItemToDraftFields(item: ReviewItemValues): DraftItemTaxFields {
     taxResolutionStatus: item.taxResolutionStatus,
     taxResolutionSource: item.taxResolutionSource,
     taxReviewReasons: item.taxReviewReasons,
+    taxConfirmedFields: item.taxConfirmedFields,
   };
 }
 
@@ -127,6 +128,7 @@ export function buildReviewTaxPreview(
       taxResolutionStatus: fields.taxResolutionStatus,
       taxResolutionSource: fields.taxResolutionSource,
       taxReviewReasons: fields.taxReviewReasons,
+      taxConfirmedFields: fields.taxConfirmedFields,
       warnings: fields.warnings,
     };
   });

@@ -1,3 +1,4 @@
+import type { ReceiptItemTaxConfirmedField } from "../receipt/tax/types";
 import type {
   AiExpenseDraftConfidence,
   AiExpenseDraftDocumentType,
@@ -31,6 +32,7 @@ export type ReceiptDraftItemSnapshot<TCategoryId = string> = {
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
+  taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
   quantity?: number;
   unitPriceYen?: number;
   categoryName?: string;
@@ -199,6 +201,7 @@ export function snapshotReceiptDraftValues<TCategoryId>(
       taxResolutionStatus: item.taxResolutionStatus,
       taxResolutionSource: item.taxResolutionSource,
       taxReviewReasons: item.taxReviewReasons,
+      taxConfirmedFields: item.taxConfirmedFields,
       quantity: item.quantity,
       unitPriceYen: item.unitPriceYen,
       categoryName: item.categoryName,

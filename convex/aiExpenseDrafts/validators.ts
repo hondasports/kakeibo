@@ -60,6 +60,10 @@ export const receiptItemTaxRatePercentValidator = v.union(
 );
 export const receiptMarkersValidator = v.array(v.string());
 export const taxResolutionStatusValidator = v.union(v.literal("resolved"), v.literal("unresolved"));
+export const taxConfirmedFieldsValidator = v.array(
+  v.union(v.literal("amountBasis"), v.literal("taxRatePercent")),
+);
+
 export const taxResolutionSourceValidator = v.union(
   v.literal("item_explicit"),
   v.literal("single_summary"),
@@ -328,6 +332,7 @@ export const receiptDraftItemSnapshotValidator = v.object({
   taxResolutionStatus: v.optional(taxResolutionStatusValidator),
   taxResolutionSource: v.optional(taxResolutionSourceValidator),
   taxReviewReasons: v.optional(v.array(v.string())),
+  taxConfirmedFields: v.optional(taxConfirmedFieldsValidator),
   quantity: v.optional(v.number()),
   unitPriceYen: v.optional(v.number()),
   categoryName: v.optional(v.string()),

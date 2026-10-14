@@ -93,6 +93,7 @@ export type DraftItemTaxPatch = {
   taxResolutionStatus?: AiExpenseDraftItemFields["taxResolutionStatus"];
   taxResolutionSource?: AiExpenseDraftItemFields["taxResolutionSource"];
   taxReviewReasons?: string[];
+  taxConfirmedFields?: AiExpenseDraftItemFields["taxConfirmedFields"];
   warnings?: string[];
   updatedAt: number;
 };
@@ -194,6 +195,7 @@ export function planDraftTaxInterpretation(
         taxResolutionStatus: fields.taxResolutionStatus,
         taxResolutionSource: fields.taxResolutionSource,
         taxReviewReasons: fields.taxReviewReasons,
+        taxConfirmedFields: fields.taxConfirmedFields,
         warnings: fields.warnings,
         updatedAt: now,
       },

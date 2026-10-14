@@ -102,6 +102,7 @@ export function buildReplacementDraftItemFields(args: {
       taxResolutionStatus: previous?.taxResolutionStatus,
       taxResolutionSource: previous?.taxResolutionSource,
       taxReviewReasons: previous?.taxReviewReasons,
+      taxConfirmedFields: previous?.taxConfirmedFields,
       quantity: previous?.quantity,
       unitPriceYen: previous?.unitPriceYen,
       categoryName: previous?.categoryName,

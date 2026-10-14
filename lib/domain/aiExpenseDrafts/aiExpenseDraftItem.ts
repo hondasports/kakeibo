@@ -1,3 +1,4 @@
+import type { ReceiptItemTaxConfirmedField } from "../receipt/tax/types";
 /**
  * aiExpenseDraftItems のドメイン型。
  * Convex の generated 型には依存せず、ID は string として扱う。
@@ -25,6 +26,7 @@ export type AiExpenseDraftItemFields = {
   taxResolutionStatus?: "resolved" | "unresolved";
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
+  taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
   quantity?: number;
   unitPriceYen?: number;
   categoryName?: string;

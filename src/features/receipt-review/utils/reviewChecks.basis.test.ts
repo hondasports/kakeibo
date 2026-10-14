@@ -213,7 +213,7 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
     expect(sourceItems.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
   });
 
-  it("税抜内訳に対応する税込明細では支払額を直接比較する", () => {
+  it("確認済み税込明細は導出した税込対象額と支払額を直接比較する", () => {
     const input = receiptTaxBasisInput(receiptTaxBasisCases[0]);
     input.taxSummaries[0] = {
       ...input.taxSummaries[0],
@@ -221,23 +221,25 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
       taxableAmountBasis: "tax_excluded",
       taxableAmountYen: 404,
     };
-    const items = applyReviewItemsTaxPreview(
+    const { items, taxSummaries } = buildReviewTaxPreview(
       [106, 149, 181].map((amount, index) =>
         resolvedItem({
           id: `item-${index}`,
           amountBasis: "tax_included",
+          taxResolutionSource: "item_explicit",
           printedAmountYen: amount,
           amountYen: String(amount),
         }),
       ),
       { paidTotalYen: 436, taxSummaries: input.taxSummaries },
     );
-    expect(
-      buildAmountCheck({ items, paidTotalYen: 436, taxSummaries: input.taxSummaries }),
-    ).toMatchObject({ status: "matched", variant: "direct" });
-    expect(buildTaxRateCheck({ items, taxSummaries: input.taxSummaries })).toMatchObject({
+    expect(buildAmountCheck({ items, paidTotalYen: 436, taxSummaries })).toMatchObject({
       status: "matched",
-      rows: [{ printedYen: 404, currentYen: 404 }],
+      variant: "direct",
+    });
+    expect(buildTaxRateCheck({ items, taxSummaries })).toMatchObject({
+      status: "matched",
+      rows: [{ printedYen: 436, currentYen: 436 }],
     });
   });
 
