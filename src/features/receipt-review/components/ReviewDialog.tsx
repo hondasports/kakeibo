@@ -23,7 +23,7 @@ import { ReviewCheckChips } from "./ReviewCheckChips";
 import { ReviewCheckCards } from "./ReviewCheckCards";
 import { ReviewStatusBanner } from "./ReviewStatusBanner";
 import { getReviewGuidance, effectiveReviewMode } from "../utils/reviewGuidance";
-import { buildReviewChecks } from "../utils/reviewChecks";
+import { buildReviewChecks, countActionableUncomparable } from "../utils/reviewChecks";
 import { buildTaxContextFromReviewItem } from "../utils/receiptItemTaxViewModel";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
@@ -159,9 +159,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const checkMismatchCount = [checks.amount, checks.taxRate].filter(
     (check) => check.status === "mismatch",
   ).length;
-  const checkUncomparableCount = [checks.amount, checks.taxRate].filter(
-    (check) => check.status === "uncomparable",
-  ).length;
+  const checkUncomparableCount = countActionableUncomparable(checks);
   const fixCount = required.length + checkMismatchCount;
   const recommendationCount = recommendations.length + checkUncomparableCount;
   const busy = props.reviewSubmitting || props.taxUpdatingItemId != null;

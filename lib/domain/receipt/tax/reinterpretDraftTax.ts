@@ -14,7 +14,11 @@ import type {
   TaxRateComposition,
   TaxRatePercent,
 } from "./types";
-import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
+import {
+  resolveObservationAmounts,
+  type ReceiptLineClassification,
+  type ReceiptRawObservationLine,
+} from "../observations";
 import { ITEM_IDENTITY_CHANGED, getItemTaxConfirmedFields } from "./itemTaxConfirmation";
 import { deriveReceiptTaxSummaries } from "./deriveReceiptTaxSummaries";
 
@@ -69,6 +73,7 @@ function shouldApplyBulkOverride(
 }
 
 export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): ReinterpretDraftTaxResult {
+  const rawObservationLines = resolveObservationAmounts(input.rawObservationLines);
   const needsRateConfirmation = input.items.map(
     (item, index) =>
       Boolean(item.taxReviewReasons?.includes(ITEM_IDENTITY_CHANGED)) &&
@@ -175,7 +180,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
         itemTaxWasConfirmed(index),
     ),
     correctedSummaries: input.correctedTaxSummaries,
-    lines: input.rawObservationLines,
+    lines: rawObservationLines,
     classifications: input.receiptLineClassifications,
   });
 
@@ -230,7 +235,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     items,
     taxSummaries,
     markerDefinitions: input.markerDefinitions,
-    rawObservationLines: input.rawObservationLines,
+    rawObservationLines,
     receiptLineClassifications: input.receiptLineClassifications,
     userOverride:
       userPriceWasEdited || userRateWasEdited

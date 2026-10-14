@@ -696,13 +696,12 @@ async function createE2eUnprovenTargetDraft(
 ) {
   const fixture = unprovenTargetReceipt();
   const now = Date.now();
+  // Issue #1018: AIは小計の金額を amountYen: null で返し、原文は amountText にだけ残す。
+  fixture.rawObservationLines = fixture.rawObservationLines!.map((line) =>
+    line.rawText.startsWith("小計") ? { ...line, amountYen: null } : line,
+  );
   if (args.receiptCase === "printed1003")
     fixture.rawObservationLines!.push(observationLine("10%対象 4,373円", 4373, 3));
-  // Issue #1018: 支払方法の行に税系の役割候補が付いても、確認済み商品の計算は妨げられない。
-  fixture.rawObservationLines!.push(
-    { ...observationLine("支払い方法", 0, 4), amountYen: null, amountText: null },
-    observationLine("QUICPay 4,810円", 4810, 5),
-  );
   const draftId = await ctx.db.insert("aiExpenseDrafts", {
     groupId: args.groupId,
     createdByUserId: args.createdByUserId,

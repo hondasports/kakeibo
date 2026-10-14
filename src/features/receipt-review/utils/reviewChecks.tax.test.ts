@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
+import { buildReviewChecks, countActionableUncomparable } from "./reviewChecks";
 import { resolvedItem, summary, rawObservation } from "./reviewChecksTestHelpers";
 
 describe("buildTaxRateCheck", () => {
@@ -390,5 +391,36 @@ describe("buildTaxRateCheck", () => {
       expect(check.status).toBe("uncomparable");
       expect(check.rows).toEqual([]);
     });
+  });
+});
+
+describe("countActionableUncomparable（Issue #1018）", () => {
+  const unresolved = () =>
+    resolvedItem({
+      id: "u1",
+      taxResolutionStatus: "unresolved",
+      taxRatePercent: null,
+      amountBasis: "unknown",
+      taxResolutionSource: undefined,
+    });
+
+  it("未確定の商品が原因の比較不能は、直せるため確認推奨に数える", () => {
+    const checks = buildReviewChecks({
+      items: [unresolved()],
+      paidTotalYen: 100,
+      taxSummaries: [],
+    });
+    expect(checks.taxRate.blockerCode).toBe("unresolved-tax");
+    expect(countActionableUncomparable(checks)).toBeGreaterThan(0);
+  });
+
+  it("レシートに税内訳が無いだけの比較不能は、直せないため数えない", () => {
+    const checks = buildReviewChecks({
+      items: [resolvedItem({ id: "p1", amountBasis: "tax_included", taxRatePercent: 10 })],
+      paidTotalYen: 100,
+      taxSummaries: [],
+    });
+    expect(checks.taxRate.blockerCode).toBe("missing-tax-summary");
+    expect(countActionableUncomparable(checks)).toBe(0);
   });
 });
