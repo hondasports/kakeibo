@@ -186,7 +186,7 @@ jobs:
       # 失敗時のみ artifact を保存（認証情報が含まれる可能性があるため短期保存）
       - name: Upload test results on failure
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report-${{ github.run_id }}-${{ matrix.name }}
           path: |

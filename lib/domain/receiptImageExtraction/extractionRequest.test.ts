@@ -6,6 +6,32 @@ import {
   RECEIPT_EXTRACTION_PROMPT_LINES,
 } from "./extractionRequest";
 
+describe("buildOpenAIReceiptExtractionRequestBody", () => {
+  it("gpt-6-luna と reasoning.effort=none を明示して送信する", () => {
+    const request = buildOpenAIReceiptExtractionRequestBody("data:image/jpeg;base64,AAA", []);
+
+    expect(request.model).toBe("gpt-6-luna");
+    expect(request.reasoning).toEqual({ effort: "none" });
+  });
+
+  it("画像入力とstrictなJSON SchemaのStructured Outputs形式を維持する", () => {
+    const imageDataUrl = "data:image/jpeg;base64,AAA";
+    const request = buildOpenAIReceiptExtractionRequestBody(imageDataUrl, ["食費"]);
+
+    expect(request.input).toHaveLength(1);
+    expect(request.input[0]?.role).toBe("user");
+    const content = request.input[0]?.content as Array<{ type: string }>;
+    expect(content.map((part) => part.type)).toEqual(["input_image", "input_text"]);
+    expect(content[0]).toMatchObject({ type: "input_image", image_url: imageDataUrl });
+    expect(request.text.format).toMatchObject({
+      type: "json_schema",
+      name: "receipt_extraction",
+      strict: true,
+    });
+    expect(request.text.format.schema).toBeDefined();
+  });
+});
+
 describe("RECEIPT_EXTRACTION_PROMPT_LINES", () => {
   it("印字金額と税率別集計を抽出し、小数税率を使わない", () => {
     const prompt = RECEIPT_EXTRACTION_PROMPT_LINES.join("\n");
