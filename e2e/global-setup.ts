@@ -1,6 +1,7 @@
 import { clerkSetup } from "@clerk/testing/playwright";
 import { test as setup } from "@playwright/test";
 import { verifyCleanupAuth } from "./helpers/cleanup";
+import { prepareVercelBypassState } from "../scripts/lib/vercel-protection";
 
 /**
  * Playwright グローバルセットアップ
@@ -21,6 +22,12 @@ import { verifyCleanupAuth } from "./helpers/cleanup";
 setup.describe.configure({ mode: "serial" });
 
 setup("global setup", async () => {
+  if (process.env.PLAYWRIGHT_BYPASS_SECRET) {
+    if (!process.env.E2E_BASE_URL) {
+      throw new Error("E2E_BASE_URL is required for Vercel protection setup.");
+    }
+    await prepareVercelBypassState(process.env.E2E_BASE_URL, process.env.PLAYWRIGHT_BYPASS_SECRET);
+  }
   if (!process.env.CLERK_PUBLISHABLE_KEY && process.env.VITE_CLERK_PUBLISHABLE_KEY) {
     process.env.CLERK_PUBLISHABLE_KEY = process.env.VITE_CLERK_PUBLISHABLE_KEY;
   }
