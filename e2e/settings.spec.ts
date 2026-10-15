@@ -46,7 +46,7 @@ test.describe("設定台帳（Issue #375）", () => {
     await expect(page.getByRole("heading", { name: "グループの削除", level: 3 })).toBeVisible();
   });
 
-  test("@smoke 週設定を保存して成功通知を表示する", async ({ page }) => {
+  test("@smoke @staging 週設定を保存して成功通知を表示する", async ({ page }) => {
     const ledger = page.getByTestId("settings-ledger");
     const weekSection = ledger.locator(".settings-ledger-section", {
       has: page.getByRole("heading", { name: "週の設定", level: 2 }),

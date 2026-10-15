@@ -305,7 +305,7 @@ Convex 関数のデプロイはローカル開発者が `pnpm run convex:dev:clo
 
 これらは GitHub Actions 上で生成される。Vercel Dashboard には `VITE_APP_VERSION` を固定値として設定しない。
 
-`preview` branch への push では、`preview-deploy.yml` が固定 Convex staging deployment を更新し、Vercel Preview へデプロイする。smoke E2E はそのURLではなくCI内Viteを対象にする。staging を共有する `production-release.yml` のリリース候補E2Eが実行・待機している間は、`preview-deploy.yml` 先頭の `Wait for staging window` ジョブが待機してからデプロイする（直列化の詳細は `docs/production-release.md` の「固定 staging の同時使用制御」）。
+`preview` branch への push では、`preview-deploy.yml` が固定 Convex staging deployment を更新し、Vercel Preview へデプロイする。E2EはそのURLではなくCI内Viteを対象にし、staging Convexへ流すのは `@staging` だけにする。`@public` / `@smoke` の全件は同じworkflowの `local-e2e` job が匿名使い捨てbackendで実行する（詳細は `docs/development-process.md` の Functional E2E）。`local-e2e` は staging を使わないため、待機しない。staging を共有する `production-release.yml` のリリース候補E2Eが実行・待機している間は、`preview-deploy.yml` の `Wait for staging window` ジョブが待機してからデプロイする（直列化の詳細は `docs/production-release.md` の「固定 staging の同時使用制御」）。
 
 PROD 反映では、`main` への push で `production-release.yml` が自動起動する。preflight の後にGitHub Environment `Preview` の固定stagingとVercel release candidateでsmoke E2Eを実行し、成功後にGitHub Environment `production` の承認を待つ。承認後に Convex Production、Vercel Production、PROD smoke checklist の順で実行する。手動リリースや forward-fix では、同じ workflow を `workflow_dispatch` で実行してよい。
 

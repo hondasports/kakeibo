@@ -23,6 +23,7 @@
     "e2e:env-sync": "node scripts/sync-e2e-env.mjs",
     "e2e:env-sync:cloud": "node scripts/sync-e2e-env.mjs --allow-cloud",
     "e2e:smoke": "node scripts/sync-e2e-env.mjs && playwright test --grep @smoke",
+    "e2e:staging": "node scripts/sync-e2e-env.mjs && playwright test --grep @staging",
     "e2e:public": "node scripts/sync-e2e-env.mjs && playwright test --grep @public",
     "e2e:isolated": "node scripts/start-ci-convex.mjs --run \"playwright test\"",
     "e2e:ui": "playwright test --ui",
