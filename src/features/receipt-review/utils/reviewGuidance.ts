@@ -25,6 +25,13 @@ export type ReviewGuidanceItem = {
   taxSummaryIndex?: number;
 };
 
+/** 内部の再解釈の経過で、商品を直しても解消しない・直す先が無い理由。 */
+const NON_ACTIONABLE_SUMMARY_REASONS: ReadonlySet<string> = new Set([
+  "unresolved_tax_summary",
+  "reconciled_to_included",
+  "reconciled_to_external",
+]);
+
 export function effectiveReviewMode(form: ReviewFormValues) {
   return form.priceTaxTreatment === "unknown" || form.taxRateComposition === "unknown"
     ? "totalOnly"
@@ -57,12 +64,10 @@ export function getReviewGuidance(
     });
     draft?.taxSummaries?.forEach((summary, index) => {
       const row = taxCheck.rows[index];
-      const unallocated = items.some(
-        (item) =>
-          item.taxRatePercent === summary.taxRatePercent &&
-          item.taxAllocationStatus === "unallocated",
-      );
-      const reasons = (summary.reasons ?? []).map(getTaxSummaryConflictLabel);
+      // 内部の再解釈状態や、ユーザーが触れない集計の読み取りは、確認推奨に出さない。
+      const reasons = (summary.reasons ?? [])
+        .filter((reason) => !NON_ACTIONABLE_SUMMARY_REASONS.has(reason))
+        .map(getTaxSummaryConflictLabel);
       const unresolvedDeclaration =
         summary.taxMode === "unknown" || summary.taxableAmountBasis === "unknown";
       if (unresolvedDeclaration) reasons.push("商品の税率・税込／税抜を確認してください");
@@ -71,7 +76,6 @@ export function getReviewGuidance(
           `明細の対象額 ${formatYen(row.currentYen ?? 0)} ／ 税内訳 ${formatYen(summary.taxableAmountYen)}`,
         );
       if (row?.blockerCode === "basis-conflict" && row.reason) reasons.push(row.reason);
-      if (unallocated) reasons.push("税額を商品に配分できていません");
       const unresolvedStatus =
         summary.status !== undefined && !isVerifiedTaxSummaryStatus(summary.status);
       if (!unresolvedStatus && reasons.length === 0) return;

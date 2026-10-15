@@ -13,10 +13,9 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: preview-staging-deploy
-  cancel-in-progress: true
-
+# 固定 staging を使う区間の直列化は、Deploy ジョブ側の concurrency で行う。
+# workflow 全体にかけないのは、待機ジョブがグループ外でポーリングすることで、
+# 待機中の preview push がリリース候補E2Eの pending を押し出さないようにするため。
 # preview への push では E2E を 2 つの目的に分ける。
 #   - local-e2e: マージ結果コミットの回帰検知。PR の e2e.yml と同じ匿名使い捨て backend
 #     （scripts/start-ci-convex.mjs）で @public / @smoke を実行し、cloud の Convex を読まない。
@@ -27,6 +26,12 @@ jobs:
     name: E2E on isolated backend (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: ${{ matrix.timeout }}
+    concurrency:
+      # backend はジョブごとの使い捨てで staging を触らないため、固定 staging の直列化グループ
+      # （preview-staging-deploy / preview-staging-wait）には入れない。同じ ref の古い run だけを
+      # キャンセルする。
+      group: preview-local-e2e-${{ matrix.name }}-${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref_name }}
+      cancel-in-progress: true
     env:
       SOURCE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref_name }}
     strategy:
@@ -97,7 +102,7 @@ jobs:
 
       - name: Upload test results on failure
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report-${{ github.run_id }}-${{ matrix.name }}
           path: |
@@ -110,10 +115,47 @@ jobs:
         continue-on-error: true
         run: node scripts/report-flaky-e2e.mjs >> "$GITHUB_STEP_SUMMARY"
 
+  wait-for-staging-window:
+    name: Wait for staging window
+    runs-on: ubuntu-latest
+    # 待機上限の根拠は scripts/wait-for-staging-window.mjs の --timeout-minutes
+    # 既定値コメントを参照。job 側はそれより余裕を持たせる。
+    timeout-minutes: 130
+    permissions:
+      contents: read
+      actions: read
+    concurrency:
+      # Deploy グループとは別。最新の preview run だけが待機を続け、
+      # 古い待機はキャンセルされる（preview 同士は常に最新を優先）。
+      group: preview-staging-wait
+      cancel-in-progress: true
+    env:
+      SOURCE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ env.SOURCE_REF }}
+
+      - name: Wait while a release candidate window is active
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # --timeout-minutes の根拠: 最悪ケースで「実行中 preview デプロイ(40m) +
+        # preflight(20m) + リリース候補E2E(40m)」≈ 100m。それを上回る 120m を上限とし、
+        # 超えた場合はデプロイせず失敗する（staging を壊さない側に倒す）。
+        run: node scripts/wait-for-staging-window.mjs --timeout-minutes 120 --poll-seconds 30
+
   preview:
     name: Deploy preview branch
+    needs: wait-for-staging-window
     runs-on: ubuntu-latest
     environment: Preview
+    concurrency:
+      # 固定 staging を触る区間の直列化。実行中のデプロイや、待機中の
+      # リリース候補E2Eをキャンセルしない。preview 同士は実行中1件+待機1件で、
+      # 待機は最新の run に置き換わる（最新の preview を常に優先）。
+      group: preview-staging-deploy
+      cancel-in-progress: false
     timeout-minutes: 40
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

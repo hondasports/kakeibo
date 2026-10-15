@@ -696,6 +696,10 @@ async function createE2eUnprovenTargetDraft(
 ) {
   const fixture = unprovenTargetReceipt();
   const now = Date.now();
+  // Issue #1018: AIは小計の金額を amountYen: null で返し、原文は amountText にだけ残す。
+  fixture.rawObservationLines = fixture.rawObservationLines!.map((line) =>
+    line.rawText.startsWith("小計") ? { ...line, amountYen: null } : line,
+  );
   if (args.receiptCase === "printed1003")
     fixture.rawObservationLines!.push(observationLine("10%対象 4,373円", 4373, 3));
   const draftId = await ctx.db.insert("aiExpenseDrafts", {

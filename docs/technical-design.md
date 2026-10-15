@@ -663,6 +663,9 @@ parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を再利�
   BiDi制御文字 sanitize・重複排除 `normalizeCategories`、プロンプト構築
   `buildReceiptExtractionPrompt`、JSONスキーマ `buildReceiptExtractionJsonSchema`、
   リクエストボディ `buildOpenAIReceiptExtractionRequestBody`）。
+  OpenAI モデルは `RECEIPT_EXTRACTION_OPENAI_MODEL`（現在 `gpt-6-luna`）、
+  reasoning 設定は `RECEIPT_EXTRACTION_REASONING`（`effort: "none"` 固定）の
+  定数で一元管理し、環境変数では切り替えない。
 - **ユースケース**（`lib/usecase/receiptImageExtraction/`）: `extractReceiptFields`
   （検証 → 計画 → mock/real）と `extractReceiptFieldsForCurrentGroup`
   （group → consent+categories 並列取得 → 抽出）。

@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
+import { parse } from "yaml";
 
 const workflow = () => readFileSync(".github/workflows/preview-deploy.yml", "utf8");
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const jobs = (): Record<string, any> => parse(workflow()).jobs;
 
 describe("preview-deploy workflow", () => {
   test("keeps the preview deployment but runs only @staging E2E against staging Convex", () => {
@@ -17,28 +20,31 @@ describe("preview-deploy workflow", () => {
   });
 
   test("runs the full @public / @smoke E2E on an isolated backend, not on staging", () => {
-    const yaml = workflow();
-    const localE2eJob = yaml.slice(yaml.indexOf("  local-e2e:"), yaml.indexOf("  preview:"));
+    const job = jobs()["local-e2e"];
+    const text = JSON.stringify(job);
 
-    expect(localE2eJob).toContain(
-      'node scripts/start-ci-convex.mjs --run "${{ matrix.e2e_command }}"',
+    expect(text).toContain(
+      'node scripts/start-ci-convex.mjs --run \\"${{ matrix.e2e_command }}\\"',
     );
-    expect(localE2eJob).toContain("pnpm run e2e:public --project=chromium --workers=3");
-    expect(localE2eJob).toContain(
+    expect(text).toContain("pnpm run e2e:public --project=chromium --workers=3");
+    expect(text).toContain(
       "pnpm run e2e:smoke --project=chromium --grep-invert @public --workers=1",
     );
-    expect(localE2eJob).toContain("path: ~/.cache/convex");
-    expect(localE2eJob).not.toContain("CONVEX_DEPLOY_KEY");
-    expect(localE2eJob).not.toContain("E2E_CLEANUP_SECRET");
-    expect(localE2eJob).not.toContain("environment:");
-    expect(localE2eJob).not.toContain("needs:");
+    expect(text).toContain("~/.cache/convex");
+    expect(text).not.toContain("CONVEX_DEPLOY_KEY");
+    expect(text).not.toContain("E2E_CLEANUP_SECRET");
+    expect(job.environment).toBeUndefined();
   });
 
-  test("does not make the staging deployment wait for the isolated E2E", () => {
-    const yaml = workflow();
-    const previewJob = yaml.slice(yaml.indexOf("  preview:"));
+  test("keeps the isolated E2E out of the staging serialization groups", () => {
+    const { "local-e2e": localE2e, preview, "wait-for-staging-window": wait } = jobs();
 
-    expect(previewJob).not.toContain("needs:");
+    expect(localE2e.needs).toBeUndefined();
+    expect(localE2e.concurrency["cancel-in-progress"]).toBe(true);
+    expect(localE2e.concurrency.group).toContain("preview-local-e2e");
+    expect(localE2e.concurrency.group).not.toContain("preview-staging");
+    expect(preview.needs).not.toContain("local-e2e");
+    expect(wait.needs).toBeUndefined();
   });
 
   test("does not overwrite an existing LINE_INTEGRATION_MODE", () => {

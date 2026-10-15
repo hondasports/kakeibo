@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
+import { buildReviewChecks, countActionableUncomparable } from "./reviewChecks";
 import { resolvedItem, summary, rawObservation } from "./reviewChecksTestHelpers";
 
 describe("buildTaxRateCheck", () => {
@@ -306,6 +307,31 @@ describe("buildTaxRateCheck", () => {
       expect(check.reason).toContain("割引対象");
     });
 
+    it("税率別集計が無くても未確定の商品があれば、その商品の入力欄へ案内する（Issue #1018）", () => {
+      const check = buildTaxRateCheck({
+        items: [
+          resolvedItem({ id: "p1" }),
+          resolvedItem({
+            id: "u1",
+            taxResolutionStatus: "unresolved",
+            taxRatePercent: null,
+            amountBasis: "unknown",
+            taxResolutionSource: undefined,
+          }),
+        ],
+        taxSummaries: [],
+      });
+      expect(check.blockerCode).toBe("unresolved-tax");
+      expect(check.affectedItemIds).toEqual(["u1"]);
+      expect(check.focusTarget).toBe("u1");
+    });
+
+    it("商品の税率が確定済みで集計だけ無い場合は、読み取り原文の確認へ案内する", () => {
+      const check = buildTaxRateCheck({ items: [resolvedItem({ id: "p1" })], taxSummaries: [] });
+      expect(check.blockerCode).toBe("missing-tax-summary");
+      expect(check.focusTarget).toBe("reference");
+    });
+
     it("税率未確定の明細があると全体を比較不能にする", () => {
       const check = buildTaxRateCheck({
         items: [
@@ -365,5 +391,36 @@ describe("buildTaxRateCheck", () => {
       expect(check.status).toBe("uncomparable");
       expect(check.rows).toEqual([]);
     });
+  });
+});
+
+describe("countActionableUncomparable（Issue #1018）", () => {
+  const unresolved = () =>
+    resolvedItem({
+      id: "u1",
+      taxResolutionStatus: "unresolved",
+      taxRatePercent: null,
+      amountBasis: "unknown",
+      taxResolutionSource: undefined,
+    });
+
+  it("未確定の商品が原因の比較不能は、直せるため確認推奨に数える", () => {
+    const checks = buildReviewChecks({
+      items: [unresolved()],
+      paidTotalYen: 100,
+      taxSummaries: [],
+    });
+    expect(checks.taxRate.blockerCode).toBe("unresolved-tax");
+    expect(countActionableUncomparable(checks)).toBeGreaterThan(0);
+  });
+
+  it("レシートに税内訳が無いだけの比較不能は、直せないため数えない", () => {
+    const checks = buildReviewChecks({
+      items: [resolvedItem({ id: "p1", amountBasis: "tax_included", taxRatePercent: 10 })],
+      paidTotalYen: 100,
+      taxSummaries: [],
+    });
+    expect(checks.taxRate.blockerCode).toBe("missing-tax-summary");
+    expect(countActionableUncomparable(checks)).toBe(0);
   });
 });
