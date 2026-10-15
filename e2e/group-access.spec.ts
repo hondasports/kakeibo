@@ -44,15 +44,45 @@ test.describe("グループアクセス", () => {
   let currentUserIdForCleanup: string | undefined;
   let seededMemberUserIdForCleanup: string | undefined;
 
-  test.afterEach(async () => {
-    if (seededMemberUserIdForCleanup) {
-      await cleanupGroupMembershipsByUser(seededMemberUserIdForCleanup, currentUserIdForCleanup);
-      seededMemberUserIdForCleanup = undefined;
-    }
-    if (currentUserIdForCleanup) {
-      await cleanupGroupInvitationsByUser(currentUserIdForCleanup);
-      await cleanupGroupMembershipsByUser(currentUserIdForCleanup);
-      currentUserIdForCleanup = undefined;
+  test.afterEach(async ({ page }, testInfo) => {
+    try {
+      if ((currentUserIdForCleanup || seededMemberUserIdForCleanup) && !page.isClosed()) {
+        if (testInfo.status !== testInfo.expectedStatus) {
+          try {
+            await testInfo.attach("before-group-cleanup", {
+              body: await page.screenshot(),
+              contentType: "image/png",
+            });
+          } catch {
+            testInfo.annotations.push({
+              type: "cleanup",
+              description: "失敗時の画面証跡を取得できませんでした",
+            });
+          }
+        }
+        try {
+          await page.goto("about:blank");
+        } catch {
+          if (!page.isClosed()) await page.close();
+        }
+        if (!page.isClosed()) await expect(page).toHaveURL("about:blank");
+      }
+    } finally {
+      try {
+        if (seededMemberUserIdForCleanup) {
+          await cleanupGroupMembershipsByUser(
+            seededMemberUserIdForCleanup,
+            currentUserIdForCleanup,
+          );
+          seededMemberUserIdForCleanup = undefined;
+        }
+      } finally {
+        if (currentUserIdForCleanup) {
+          await cleanupGroupInvitationsByUser(currentUserIdForCleanup);
+          await cleanupGroupMembershipsByUser(currentUserIdForCleanup);
+          currentUserIdForCleanup = undefined;
+        }
+      }
     }
   });
 
@@ -63,6 +93,7 @@ test.describe("グループアクセス", () => {
 
     const currentUserId = await getCurrentClerkTokenIdentifier(page);
     currentUserIdForCleanup = currentUserId;
+    await page.goto("about:blank");
     await cleanupGroupMembershipsByUser(currentUserId);
 
     await waitForGroupSetupRedirect(page);
@@ -94,6 +125,7 @@ test.describe("グループアクセス", () => {
 
     const currentUserId = await getCurrentClerkTokenIdentifier(page);
     currentUserIdForCleanup = currentUserId;
+    await page.goto("about:blank");
     await cleanupGroupMembershipsByUser(currentUserId);
 
     await waitForGroupSetupRedirect(page);
@@ -121,6 +153,7 @@ test.describe("グループアクセス", () => {
 
     const currentUserId = await getCurrentClerkTokenIdentifier(page);
     currentUserIdForCleanup = currentUserId;
+    await page.goto("about:blank");
     await cleanupGroupMembershipsByUser(currentUserId);
 
     await waitForGroupSetupRedirect(page);
@@ -144,9 +177,10 @@ test.describe("グループアクセス", () => {
 
     const currentUserId = await getCurrentClerkTokenIdentifier(page);
     currentUserIdForCleanup = currentUserId;
+    await page.goto("about:blank");
     await setE2eGroupMemberRole(currentUserId, "member");
 
-    await page.reload();
+    await page.goto("/settings");
     await expect(page.getByRole("heading", { name: "グループ", level: 2 })).toBeVisible();
     await expandGroupManagement(page);
     await expect(page.getByRole("heading", { name: "グループ情報", level: 3 })).toBeVisible();
@@ -203,9 +237,10 @@ test.describe("グループアクセス", () => {
 
     const currentUserId = await getCurrentClerkTokenIdentifier(page);
     currentUserIdForCleanup = currentUserId;
+    await page.goto("about:blank");
     await setE2eGroupMemberRole(currentUserId, "member");
 
-    await page.reload();
+    await page.goto("/settings");
     await expect(page.getByRole("heading", { name: "グループ", level: 2 })).toBeVisible();
     await expandGroupManagement(page);
     await expect(page.getByRole("textbox", { name: "グループ名" })).toHaveCount(0);
