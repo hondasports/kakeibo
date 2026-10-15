@@ -32,6 +32,18 @@ describe("税設定の確認表示", () => {
     expect(vm.message).toContain("商品名・行の種類が変わっています");
     expect(vm.canConfirm).toBe(true);
   });
+  it.each([
+    { taxRatePercent: null, amountBasis: "tax_included" as const, missing: "税率" },
+    { taxRatePercent: 8 as const, amountBasis: "unknown" as const, missing: "税込／税抜" },
+  ])("商品変更後でも未設定の $missing を選択するよう案内する", ({ missing, ...fields }) => {
+    const vm = getReviewItemTaxConfirmation({
+      ...item,
+      ...fields,
+      taxReviewReasons: ["item_identity_changed"],
+    });
+    expect(vm.canConfirm).toBe(false);
+    expect(vm.message).toBe(`${missing}が未設定です。レシートと照合して選択してください。`);
+  });
   it("非課税0%も入力済みとして確認できる", () => {
     expect(getReviewItemTaxConfirmation({ ...item, taxRatePercent: 0 }).canConfirm).toBe(true);
   });
