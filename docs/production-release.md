@@ -34,6 +34,27 @@ preflight後、GitHub Environment: production の承認待ち
 ```
 
 通常の PREVIEW デプロイは、`preview` branch への push で `preview-deploy.yml` が自動実行する。
+
+## 固定 staging の同時使用制御
+
+固定 Convex staging deployment と GitHub Environment `Preview` の資格情報は、次の2つのジョブで共有する。
+
+- `preview-deploy.yml` の `Deploy preview branch`
+- `production-release.yml` の `Vercel release candidate E2E`（リリース候補E2E）
+
+両者は同じ concurrency group `preview-staging-deploy` で直列化する。グループ内は「実行中1件 + 待機1件」で、後から来たジョブは待機中のジョブを押し出す。押し出しによってリリース候補E2Eがキャンセルされ本番リリースが止まる事故（2026-10-14）を防ぐため、`preview-deploy.yml` は次の構造を取る。
+
+1. `Wait for staging window` ジョブが、`preview-staging-deploy` グループの外で `scripts/wait-for-staging-window.mjs` をポーリング実行する。
+2. `production-release` の run のうち未完了のものについて、`Vercel release candidate E2E` ジョブが存在しないか未完了なら、リリース候補が staging を使う区間とみなしてデプロイを開始しない（ジョブログに待機中であることと対象 run を出力する）。
+3. リリース候補E2Eが完了した run（`production` 環境の承認待ち・本番デプロイ中）は staging を使わないため、待機の理由にしない。
+4. 窓が空いた後だけ `Deploy preview branch` ジョブが `preview-staging-deploy` グループに入る。
+
+待機中の `preview` への push は `Wait for staging window` ジョブ同士のグループ `preview-staging-wait`（cancel-in-progress: true）で最新 run のみ残るため、グループ外で待つ間にリリース候補の pending を押し出すことはない。`Deploy preview branch` は `cancel-in-progress: false` で、実行中のデプロイも実行中・待機中のリリース候補E2Eもキャンセルしない。preview 同士は実行中1件+待機1件で、待機は最新の run に置き換わる（最新の preview を常に優先する）。
+
+待機には上限（`--timeout-minutes`、既定120分）があり、超えた場合は staging へデプロイせず失敗する。中途半端な staging を作らない側に倒す。
+
+既知の残存競合: 待機ジョブが「窓が空いている」と判定してから `Deploy preview branch` がグループに入るまでの数秒〜数十秒の間に、リリース候補E2Eが pending になると、入ってきたデプロイに押し出される可能性がある。グループへの進入と判定を不可分にする手段が GitHub Actions には無いため、この時間窓は残る。
+
 ## PREVIEW 確認の事前条件
 
 - 対象変更が `preview` branch に merge 済みである。
