@@ -5,12 +5,10 @@ import { bypassClerkBotDetection } from "./helpers/auth";
  * 公開・異常系ページ E2E（Milestone 23 / #249-#255, #266, #268）
  *
  * 未ログインでも閲覧できる公開ページ、404、メンテナンス、Error Boundary を確認する。
- * 認証は不要なため storageState を空にする。
+ * Clerkのログイン状態を持たない新規contextで実行し、Vercelの保護cookieは維持する。
  */
 
 test.describe("公開・異常系ページ", () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
-
   test("@public @smoke 未ログインで /privacy を表示できる (#249)", async ({ page }) => {
     await page.goto("/privacy");
 
