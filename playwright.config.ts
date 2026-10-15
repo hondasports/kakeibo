@@ -2,6 +2,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 import dotenv from "dotenv";
+import { vercelBypassStatePath } from "./scripts/lib/vercel-protection";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: resolve(projectRoot, ".env.local") });
@@ -41,20 +42,18 @@ export default defineConfig({
     /* 失敗時のみ trace 保存 */
     trace: "on-first-retry",
     /*
-     * storageState はここでは設定しない。
+     * storageState は Vercel protection のホスト限定cookieだけに使う。
      * @clerk/testing/playwright の認証は storageState ではなく
      * setupClerkTestingToken({ page }) による Testing Token 方式を使う。
      * 認証が必要な各テスト／beforeEach で setupClerkTestingToken を呼ぶこと。
      */
     /*
-     * Vercel Protection Bypass for Automation ヘッダー
+     * Vercel Protection Bypass for Automation cookie
      * GitHub Actions から PLAYWRIGHT_BYPASS_SECRET が渡された場合のみ有効になる。
      * ローカル実行時は undefined になるため影響なし。
      * 詳細: docs/development-process.md「E2E 確認方針」
      */
-    extraHTTPHeaders: process.env.PLAYWRIGHT_BYPASS_SECRET
-      ? { "x-vercel-protection-bypass": process.env.PLAYWRIGHT_BYPASS_SECRET }
-      : undefined,
+    storageState: process.env.PLAYWRIGHT_BYPASS_SECRET ? vercelBypassStatePath : undefined,
   },
   projects: [
     {
