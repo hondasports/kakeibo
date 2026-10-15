@@ -229,6 +229,17 @@ required checksがPASSした後は、content change / material failure / unresol
 
 push前の検証は `.husky/pre-push` から走る `pnpm run verify:prepush` に一本化する。内容は型（`tsc -b`）→ lint/format → `vitest related`（差分に関係するunit）→ 対象E2E（`e2e:isolated`）。E2Eの対象specは `e2e/spec-map.json` の変更パスglobで選び、`@smoke` のspecを最低ラインとして必ず合流させる。mapにないパスを変更した場合は安全側に `@smoke` + `@public` 全件を選び、map追記を促すファイル名を表示する。ローカル実行はマージ判定材料ではない（判定はCIのcheckが正本）。
 
+E2Eをどのbackendで実行するかは次の通り。cloudのConvexはDatabase I/OをFree枠のteam合算で消費するため、全件を流さない。
+
+| 契機 | backend | 対象 |
+| --- | --- | --- |
+| PR（`e2e.yml`） | 匿名使い捨てbackend | `@public` / `@smoke` |
+| `preview` push（`preview-deploy.yml` の `local-e2e`） | 匿名使い捨てbackend | `@public` / `@smoke`（マージ結果の回帰検知） |
+| `preview` push（`preview-deploy.yml` の `preview`） | 固定staging | `@staging` のみ（`pnpm run e2e:staging`。staging固有の接続・設定の確認） |
+| `main` push（`production-release.yml` のRC） | 固定staging | `@smoke`（本番前の最終確認） |
+
+`@staging` は `@smoke` のうち、ローカルbackendでは検知できないstaging固有の確認だけに付ける。付ける数を増やす前に、ローカルbackendで足りないか確認する。
+
 CIで失敗したテストをローカルで再現するときは `--include` で対象を追加する（複数指定可）。
 
 ```bash
