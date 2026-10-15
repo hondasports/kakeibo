@@ -114,7 +114,10 @@ export async function updateReceiptAnalysisJobStatus(
   now = Date.now(),
 ): Promise<{ applied: boolean }> {
   const job = await deps.store.getJob(args.jobId);
-  if (!job) throw new Error("Job not found");
+  if (!job) {
+    if (args.expectedDraftId !== undefined) return { applied: false };
+    throw new Error("Job not found");
+  }
   if (args.expectedDraftId !== undefined && (job.draftId ?? null) !== args.expectedDraftId)
     return { applied: false };
   if (job.status === "cancelled") {
@@ -135,6 +138,7 @@ export async function finalizeReceiptAnalysisAttempt(
   deps: { store: ReceiptAnalysisStore; scheduler: ReceiptAnalysisScheduler },
   args: {
     jobId: string;
+    groupId?: string;
     expectedDraftId: string | null;
     expectedDraftUpdatedAt?: number;
     newDraftId: string;
@@ -144,7 +148,17 @@ export async function finalizeReceiptAnalysisAttempt(
   now = Date.now(),
 ): Promise<{ applied: boolean; reason?: "draft_changed" }> {
   const job = await deps.store.getJob(args.jobId);
-  if (!job) throw new Error("Job not found");
+  if (!job) {
+    if (
+      args.groupId !== undefined &&
+      args.newDraftId !== args.expectedDraftId &&
+      !(await deps.store.findJobByDraftId(args.newDraftId))
+    ) {
+      await deps.store.deleteDraftAndItems(args.newDraftId, args.groupId);
+    }
+    return { applied: false };
+  }
+  if (args.groupId !== undefined && job.groupId !== args.groupId) throw new Error("Job not found");
   const isStale = (job.draftId ?? null) !== args.expectedDraftId;
   if (job.status === "cancelled" || isStale) {
     if (job.draftId !== args.newDraftId)
@@ -214,7 +228,7 @@ export async function incrementReceiptAnalysisBatchProcessedCount(
   now = Date.now(),
 ): Promise<void> {
   const batch = await store.getBatch(batchId);
-  if (!batch) throw new Error("Batch not found");
+  if (!batch) return;
   await store.patchBatch(batchId, {
     processedCount: batch.processedCount + 1,
     status: "running",

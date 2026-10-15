@@ -23,14 +23,16 @@ type GroupListItem = {
 function useGroupSettingsValue() {
   const group = useQuery(api.groups.queries.getMyGroup) as GroupInfo | null | undefined;
   const groups = useQuery(api.groups.queries.listMyGroups) as GroupListItem[] | undefined;
-  const members = useQuery(api.groups.queries.getGroupMembers) as GroupMemberListItem[] | undefined;
+  const members = useQuery(api.groups.queries.getGroupMembers, { allowUnavailable: true }) as
+    | GroupMemberListItem[]
+    | undefined;
   const pendingInvitations = useQuery(
     api.groups.queries.listPendingGroupInvitations,
-    group?.role === "owner" ? {} : "skip",
+    group?.role === "owner" ? { allowUnavailable: true } : "skip",
   ) as GroupPendingInvitationListItem[] | undefined;
   const managementAuditLogs = useQuery(
     api.groups.auditLogs.listManagementAuditLogs,
-    group?.role === "owner" ? {} : "skip",
+    group?.role === "owner" ? { allowUnavailable: true } : "skip",
   ) as GroupManagementAuditLogListItem[] | undefined;
 
   return {

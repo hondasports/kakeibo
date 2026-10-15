@@ -68,6 +68,7 @@ export async function finalizeAnalysisAttemptHandler(
   ctx: MutationCtx,
   args: {
     jobId: Id<"receiptAnalysisImageJobs">;
+    groupId?: Id<"groups">;
     expectedDraftId: Id<"aiExpenseDrafts"> | null;
     expectedDraftUpdatedAt?: number;
     newDraftId: Id<"aiExpenseDrafts">;
@@ -145,6 +146,7 @@ export const updateJobStatus = internalMutation({
 export const finalizeAnalysisAttempt = internalMutation({
   args: {
     jobId: v.id("receiptAnalysisImageJobs"),
+    groupId: v.optional(v.id("groups")),
     expectedDraftId: v.union(v.id("aiExpenseDrafts"), v.null()),
     expectedDraftUpdatedAt: v.optional(v.number()),
     newDraftId: v.id("aiExpenseDrafts"),

@@ -1,7 +1,8 @@
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "./test/render";
 import App from "./App";
+import { setSignOutState } from "./features/auth/hooks/signOutState";
 
 const {
   useAuthMock,
@@ -52,6 +53,7 @@ vi.mock("convex/react", () => ({
 
 describe("App authentication states", () => {
   beforeEach(() => {
+    setSignOutState({ pending: false, error: "" });
     window.history.pushState({}, "", "/");
     useAuthMock.mockReset();
     useConvexAuthMock.mockReset();
@@ -71,6 +73,20 @@ describe("App authentication states", () => {
       signOut: vi.fn(),
     });
     useUserMock.mockReturnValue({ user: null });
+  });
+
+  it("ログアウト開始時はrouterと初期化queryを外す", () => {
+    useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: true });
+    useConvexAuthMock.mockReturnValue({ isLoading: false, isAuthenticated: true });
+    useMutationMock.mockReturnValue(vi.fn().mockResolvedValue(undefined));
+    renderWithProviders(<App />);
+    expect(screen.getByTestId("router-provider")).toBeInTheDocument();
+    useQueryMock.mockClear();
+    act(() => setSignOutState({ pending: true, error: "" }));
+    expect(screen.queryByTestId("router-provider")).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "ログアウト中" })).toBeInTheDocument();
+    expect(useQueryMock).not.toHaveBeenCalled();
+    act(() => setSignOutState({ pending: false, error: "" }));
   });
 
   it("Clerkの読み込み中は葉のロゴ付きローディング画面を表示する", () => {
