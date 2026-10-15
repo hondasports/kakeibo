@@ -95,7 +95,9 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     await page.getByRole("option", { name: "8%", exact: true }).click();
     await dialog.getByRole("combobox", { name: "牛乳の表示価格", exact: true }).click();
     await page.getByRole("option", { name: "税込", exact: true }).click();
-    await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("税率未確定 1件");
+    await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
+      "税の確認待ち 1件",
+    );
     const wrapRow = dialog
       .locator('section[aria-label="商品一覧"] details')
       .filter({ hasText: "ラップ" });

@@ -43,7 +43,7 @@ export function ReviewDialogActions({
         : basisConflictItemCount > 0
           ? `税込・税抜の不一致 ${basisConflictItemCount}件。該当商品を確認してください。`
           : unresolvedTaxItemCount > 0
-            ? `税率未確定 ${unresolvedTaxItemCount}件。商品ごとに税率を確認してください。`
+            ? `税の確認待ち ${unresolvedTaxItemCount}件。商品ごとに税設定を確認してください。`
             : recommendationCount > 0
               ? "確認事項があります。確認事項を残したまま下書きを保存できます。"
               : "確認結果：計算した金額が一致しています。";
@@ -60,7 +60,7 @@ export function ReviewDialogActions({
       : basisConflictItemCount > 0
         ? `税込・税抜の不一致 ${basisConflictItemCount}件`
         : unresolvedTaxItemCount > 0
-          ? `税率未確定 ${unresolvedTaxItemCount}件`
+          ? `税の確認待ち ${unresolvedTaxItemCount}件`
           : recommendationCount > 0
             ? "確認事項あり"
             : "金額を確認済み";

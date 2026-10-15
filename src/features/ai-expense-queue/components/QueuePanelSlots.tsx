@@ -158,6 +158,7 @@ export function QueuePanelDialogs({ categories = [] }: { categories?: AiExpenseQ
         onResetToAiInterpretation={() => void queue.handleResetToAiInterpretation()}
         taxUpdatingItemId={queue.taxUpdatingItemId}
         onTaxRateChange={queue.handleTaxRateChange}
+        onConfirmItemTax={queue.handleConfirmItemTax}
         onAmountBasisChange={queue.handleAmountBasisChange}
       />
 

@@ -410,12 +410,12 @@ test.describe("Issue #431 レシート税判定UI", () => {
     await expect(checkSection).toBeVisible();
     await expect(checkSection.getByText("比較不能", { exact: true })).toHaveCount(2);
     await expect(
-      checkSection.getByText("税率・税込／税抜が未確定の明細があるため、支払額と比較できません"),
+      checkSection.getByText("税設定・登録額の確認が必要な明細があるため、支払額と比較できません"),
     ).toBeVisible();
     await expect(dialog.getByLabel("合計金額", { exact: true })).toHaveValue("9120");
     // 集計が無い原因は商品の税率未確定なので、原文の確認ではなく商品の確認を案内する（Issue #1018）。
     await expect(
-      checkSection.getByText(/「.+」など税率・税込／税抜が未確定の明細があります/),
+      checkSection.getByText(/「.+」など税設定の確認が必要な明細があります/),
     ).toBeVisible();
 
     await expect(
@@ -455,10 +455,12 @@ test.describe("下書き確認の税状態保存", () => {
       .first();
     if ((await taxItemRow.getAttribute("open")) === null)
       await taxItemRow.locator("summary").click();
-    await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("税率未確定 1件");
+    await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
+      "税の確認待ち 1件",
+    );
     const checkSection = dialog.getByRole("region", { name: "確認結果" });
     await expect(
-      checkSection.getByText("税率・税込／税抜が未確定の明細があるため、支払額と比較できません"),
+      checkSection.getByText("税設定・登録額の確認が必要な明細があるため、支払額と比較できません"),
     ).toBeVisible();
     await taxItemRow.getByRole("combobox", { name: "E2E税テスト商品の税率", exact: true }).click();
     await page.getByRole("option", { name: "非課税", exact: true }).click();
@@ -631,7 +633,7 @@ test.describe("Issue #669 初心者向け税修正", () => {
     const dialog = page.getByRole("dialog", { name: "下書き確認" });
     const checkSection = dialog.getByRole("region", { name: "確認結果" });
     await expect(
-      checkSection.getByText(/「.+」など税率・税込／税抜が未確定の明細があります/),
+      checkSection.getByText(/「.+」など税設定の確認が必要な明細があります/),
     ).toBeVisible();
     await expect(dialog.getByRole("radio", { name: "分からない" })).toHaveCount(0);
 
@@ -685,7 +687,9 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
     await page.getByRole("option", { name: "8%", exact: true }).click();
     await dialog.getByRole("combobox", { name: "牛乳の表示価格", exact: true }).click();
     await page.getByRole("option", { name: "税込", exact: true }).click();
-    await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("税率未確定 1件");
+    await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
+      "税の確認待ち 1件",
+    );
     const wrapRow = dialog
       .locator('section[aria-label="商品一覧"] details')
       .filter({ hasText: "ラップ" });

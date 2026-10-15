@@ -110,6 +110,28 @@ const corrections = [
 ];
 
 describe("税修正応答と全体税設定の同期", () => {
+  it("表示中の税設定の確認は税率と税込／税抜を1回のリクエストで送る", async () => {
+    mutation.mockReset();
+    mutation.mockResolvedValue({ draft: savedGlobalChoiceDraft(), items: [initialItem] });
+    const { result } = renderHook(() =>
+      useReviewDialog({
+        initialReviewDrafts: { draft: savedGlobalChoiceDraft() },
+        initialReviewDraftItems: { draft: [initialItem] },
+        categories,
+        onReviewSubmit: vi.fn(),
+      }),
+    );
+    act(() => result.current.handleOpenReview("draft"));
+    act(() => result.current.handleConfirmItemTax("item", 8, "tax_excluded"));
+    await waitFor(() =>
+      expect(mutation).toHaveBeenCalledExactlyOnceWith({
+        draftId: "draft",
+        itemId: "item",
+        taxRatePercent: 8,
+        amountBasis: "tax_excluded",
+      }),
+    );
+  });
   it.each(corrections)(
     "$label の成功後は古い全体設定を再適用・再送しない",
     async ({ item, change }) => {

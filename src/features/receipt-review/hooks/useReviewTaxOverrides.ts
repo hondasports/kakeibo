@@ -158,6 +158,8 @@ export function useReviewTaxOverrides({
       ),
     handleAmountBasisChange: (itemId: string, amountBasis: AmountBasis) =>
       void applyTaxOverride(itemId, { amountBasis }),
+    handleConfirmItemTax: (itemId: string, taxRatePercent: 0 | 8 | 10, amountBasis: AmountBasis) =>
+      void applyTaxOverride(itemId, { taxRatePercent, amountBasis }),
     handleApplyReceiptTaxSettings: () => void handleApplyReceiptTaxSettings(),
   };
 }

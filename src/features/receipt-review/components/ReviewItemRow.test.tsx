@@ -34,6 +34,20 @@ function renderRow(overrides: Partial<Parameters<typeof ReviewItemRow>[0]> = {})
 }
 
 describe("ReviewItemRow", () => {
+  it("確認前でも選択済みの税率と税込／税抜を隠さず確認待ちを示す", () => {
+    renderRow({
+      item: { ...item, taxResolutionStatus: "unresolved", taxResolutionSource: undefined },
+    });
+    expect(screen.getByText("8%")).toBeInTheDocument();
+    expect(screen.getByText("税抜")).toBeInTheDocument();
+    expect(screen.getByText("確認待ち")).toBeInTheDocument();
+  });
+
+  it("税設定が確定していても税額が未配分ならその状態を分けて示す", () => {
+    renderRow({ item: { ...item, taxAllocationStatus: "unallocated" } });
+    expect(screen.getByText("8%")).toBeInTheDocument();
+    expect(screen.getByText("税額未確定")).toBeInTheDocument();
+  });
   it("番号・商品名・金額・税率・アコーディオン表示を1行で表示する", () => {
     renderRow();
     expect(screen.getByText("1")).toBeInTheDocument();

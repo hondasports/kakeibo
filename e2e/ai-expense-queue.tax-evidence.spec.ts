@@ -187,7 +187,7 @@ for (const reverse of [false, true]) {
         await expect(select).toBeEnabled();
         if (index === 0) {
           await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
-            "税率未確定 1件",
+            "税の確認待ち 1件",
           );
           await dialog.getByRole("button", { name: "下書きを保存", exact: true }).click();
           await expect(dialog).toBeHidden();
@@ -197,13 +197,13 @@ for (const reverse of [false, true]) {
             step.option,
           );
           await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
-            "税率未確定 1件",
+            "税の確認待ち 1件",
           );
           await item.getByRole("combobox", { name: step.label, exact: true }).click();
           await page.getByRole("option", { name: step.option, exact: true }).click();
           await expect(item.getByRole("combobox", { name: step.label, exact: true })).toBeEnabled();
           await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
-            "税率未確定 1件",
+            "税の確認待ち 1件",
           );
         }
       }
@@ -230,7 +230,8 @@ for (const reverse of [false, true]) {
 for (const saveBeforeRate of [false, true]) {
   test(`Issue #1015 商品名変更後に税率を再確認して保存・登録できる 途中保存=${saveBeforeRate}`, async ({
     page,
-  }) => {
+  }, testInfo) => {
+    await page.setViewportSize({ width: saveBeforeRate ? 320 : 1280, height: 900 });
     await gotoAuthenticated(page, "/weeks/current/input");
     await cleanupAiExpenseQueue();
     try {
@@ -264,22 +265,38 @@ for (const saveBeforeRate of [false, true]) {
         .locator("details")
         .filter({ hasText: "変更後の商品" });
       await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
-        "税率未確定 1件",
+        "税の確認待ち 1件",
       );
       if (saveBeforeRate) {
         await dialog.getByRole("button", { name: "下書きを保存", exact: true }).click();
         await expect(dialog).toBeHidden();
         await queued.getByRole("button", { name: "確認する", exact: true }).click();
         await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
-          "税率未確定 1件",
+          "税の確認待ち 1件",
         );
       }
       if ((await product.getAttribute("open")) === null) await product.locator("summary").click();
+      await expect(product.locator("summary")).toContainText("8%");
+      await expect(product.locator("summary")).toContainText("税抜");
+      await expect(product.locator("summary")).toContainText("確認待ち");
+      await expect(product).toContainText("商品名・行の種類が変わっています");
+      await expect(dialog.getByText(/税内訳を読み取れていません/)).toHaveCount(0);
+      const bounds = await product.boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(saveBeforeRate ? 320 : 1280);
+      await product.screenshot({ path: testInfo.outputPath("tax-confirmation-pending.png") });
       const rate = product.getByRole("combobox", { name: "変更後の商品の税率", exact: true });
-      await rate.click();
-      await page.getByRole("option", { name: "8%", exact: true }).click();
+      if (saveBeforeRate) {
+        await product.getByRole("button", { name: "この税設定を確認する", exact: true }).click();
+      } else {
+        await rate.click();
+        await page.getByRole("option", { name: "8%", exact: true }).click();
+      }
       await expect(rate).toBeEnabled();
       await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+      await expect(
+        product.getByRole("button", { name: "この税設定を確認する", exact: true }),
+      ).toHaveCount(0);
       await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
       await expect(dialog).toBeHidden();
       const ready = queue
