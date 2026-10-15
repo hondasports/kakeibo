@@ -339,12 +339,21 @@ export function buildReceiptExtractionJsonSchema(categories: CategoryInput[]) {
   };
 }
 
+/**
+ * レシート画像抽出に使う OpenAI モデルと reasoning 設定の唯一の定義箇所。
+ * effort は "none" に固定する。暗黙の既定値に依存せず、推論トークンを発生させず
+ * コストを抑えるため。モデル変更はここだけを更新する。
+ */
+export const RECEIPT_EXTRACTION_OPENAI_MODEL = "gpt-6-luna";
+export const RECEIPT_EXTRACTION_REASONING = { effort: "none" } as const;
+
 export function buildOpenAIReceiptExtractionRequestBody(
   imageDataUrl: string,
   categories: CategoryInput[] = [],
 ) {
   return {
-    model: "gpt-4.1-mini",
+    model: RECEIPT_EXTRACTION_OPENAI_MODEL,
+    reasoning: RECEIPT_EXTRACTION_REASONING,
     input: [
       {
         role: "user",
