@@ -95,10 +95,10 @@ export function getReviewItemTaxConfirmation(item: ReviewItemValues) {
   const missing = [!hasRate && "税率", !hasBasis && "税込／税抜"].filter(Boolean).join("・");
   return {
     statusLabel: hasRate && hasBasis ? "確認待ち" : "未確定",
-    message: identityChanged
-      ? "商品名・行の種類が変わっています。レシートと照合して税率を確認してください。"
-      : missing
-        ? `${missing}が未設定です。レシートと照合して選択してください。`
+    message: missing
+      ? `${missing}が未設定です。レシートと照合して選択してください。`
+      : identityChanged
+        ? "商品名・行の種類が変わっています。レシートと照合して税率を確認してください。"
         : "表示中の税率・税込／税抜はまだ確認されていません。レシートと照合して確認してください。",
     canConfirm: hasRate && hasBasis,
   };
