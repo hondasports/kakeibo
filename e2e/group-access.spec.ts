@@ -78,9 +78,15 @@ test.describe("グループアクセス", () => {
         }
       } finally {
         if (currentUserIdForCleanup) {
-          await cleanupGroupInvitationsByUser(currentUserIdForCleanup);
-          await cleanupGroupMembershipsByUser(currentUserIdForCleanup);
-          currentUserIdForCleanup = undefined;
+          try {
+            await cleanupGroupInvitationsByUser(currentUserIdForCleanup);
+          } finally {
+            try {
+              await cleanupGroupMembershipsByUser(currentUserIdForCleanup);
+            } finally {
+              currentUserIdForCleanup = undefined;
+            }
+          }
         }
       }
     }
