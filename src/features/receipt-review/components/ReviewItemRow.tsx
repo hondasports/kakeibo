@@ -4,7 +4,8 @@ import { formatYen } from "../../../utils/currency";
 import type { ReviewItemValues } from "../types/types";
 import type { ReviewGuidanceItem } from "../utils/reviewGuidance";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
-import { buildTaxContextFromReviewItem } from "../utils/receiptItemTaxViewModel";
+import { getReviewItemTaxConfirmation } from "../utils/receiptItemTaxViewModel";
+import { formatTaxRateLabel, getAmountBasisLabel } from "../utils/receiptTaxLabels";
 
 function amountLabel(item: ReviewItemValues): string {
   const trimmed = item.amountYen.trim();
@@ -14,10 +15,7 @@ function amountLabel(item: ReviewItemValues): string {
 }
 
 function taxLabel(item: ReviewItemValues): string {
-  const context = buildTaxContextFromReviewItem(item);
-  if (context.status !== "resolved") return "税率：未確定";
-  const basis = context.amountBasis === "tax_included" ? "税込" : "税抜";
-  return `${context.taxRatePercent}%・${basis}`;
+  return `${formatTaxRateLabel(item.taxRatePercent)}・${getAmountBasisLabel(item.amountBasis ?? "unknown")}`;
 }
 
 export function ReviewItemRow({
@@ -47,12 +45,13 @@ export function ReviewItemRow({
   children: React.ReactNode;
 }) {
   const discount = isDiscountLine(item.itemName, item.lineType);
-  const context = buildTaxContextFromReviewItem(item);
+  const confirmation = getReviewItemTaxConfirmation(item);
   const hasRequired = issues.some((issue) => issue.required);
   const issueLabel = hasRequired ? "修正必須" : undefined;
   const supplementary = [
     categoryName ?? "カテゴリ未設定",
     taxLabel(item),
+    confirmation.statusLabel,
     discount ? `割引対象：${targetName ?? "未確定"}` : undefined,
   ]
     .filter(Boolean)
@@ -134,11 +133,14 @@ export function ReviewItemRow({
             }}
           >
             <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
-              {context.status === "resolved" ? `${context.taxRatePercent}%` : "未確定"}
+              {formatTaxRateLabel(item.taxRatePercent)}
             </Typography>
-            {context.status === "resolved" && (
-              <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-                {context.amountBasis === "tax_included" ? "税込" : "税抜"}
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+              {getAmountBasisLabel(item.amountBasis ?? "unknown")}
+            </Typography>
+            {confirmation.statusLabel && (
+              <Typography variant="caption" color="warning.main" sx={{ display: "block" }}>
+                {confirmation.statusLabel}
               </Typography>
             )}
           </Box>

@@ -347,7 +347,7 @@ describe("buildTaxRateCheck", () => {
         taxSummaries: [summary()],
       });
       expect(check.status).toBe("uncomparable");
-      expect(check.rows[0].reason).toContain("未確定");
+      expect(check.rows[0].reason).toContain("税設定の確認が必要");
     });
 
     it("対象額の税込／税抜が未確定ならその行だけ比較不能", () => {

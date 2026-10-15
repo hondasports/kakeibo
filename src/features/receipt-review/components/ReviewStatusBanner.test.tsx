@@ -172,12 +172,10 @@ describe("ReviewStatusBanner", () => {
       3,
       onJump,
     );
-    expect(
-      within(banner).getByText("税率・税込／税抜が未確定の商品があります"),
-    ).toBeInTheDocument();
-    expect(within(banner).getByText(/未確定の商品が3件/)).toBeInTheDocument();
+    expect(within(banner).getByText("税設定の確認が必要な商品があります")).toBeInTheDocument();
+    expect(within(banner).getByText(/確認が必要な商品が3件/)).toBeInTheDocument();
     expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
-    await user.click(within(banner).getByRole("button", { name: "未確定の商品を確認する" }));
+    await user.click(within(banner).getByRole("button", { name: "税設定を確認する" }));
     expect(onJump).toHaveBeenCalledWith("item-1");
   });
 

@@ -1,6 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { toReceiptAnalysisViewModel, toReceiptItemTaxViewModel } from "./receiptItemTaxViewModel";
+import {
+  getReviewItemTaxConfirmation,
+  toReceiptAnalysisViewModel,
+  toReceiptItemTaxViewModel,
+} from "./receiptItemTaxViewModel";
 import type { ReviewItemValues } from "../types/types";
+
+describe("税設定の確認表示", () => {
+  const item: ReviewItemValues = {
+    id: "item",
+    itemName: "商品",
+    amountYen: "100",
+    categoryId: "food",
+    taxRatePercent: 8,
+    amountBasis: "tax_included",
+    taxResolutionStatus: "unresolved",
+  };
+  it.each([
+    { taxRatePercent: null, amountBasis: "tax_included" as const, missing: "税率" },
+    { taxRatePercent: 8 as const, amountBasis: "unknown" as const, missing: "税込／税抜" },
+  ])("$missing の未設定を確認待ちと区別する", ({ missing, ...fields }) => {
+    const vm = getReviewItemTaxConfirmation({ ...item, ...fields });
+    expect(vm.canConfirm).toBe(false);
+    expect(vm.message).toBe(`${missing}が未設定です。レシートと照合して選択してください。`);
+  });
+  it("商品変更後は税内訳の欠落ではなく税率の再確認を案内する", () => {
+    const vm = getReviewItemTaxConfirmation({
+      ...item,
+      taxReviewReasons: ["item_identity_changed"],
+    });
+    expect(vm.message).toContain("商品名・行の種類が変わっています");
+    expect(vm.canConfirm).toBe(true);
+  });
+  it("非課税0%も入力済みとして確認できる", () => {
+    expect(getReviewItemTaxConfirmation({ ...item, taxRatePercent: 0 }).canConfirm).toBe(true);
+  });
+});
 
 describe("toReceiptItemTaxViewModel", () => {
   it("keeps printed and normalized amounts distinct", () => {

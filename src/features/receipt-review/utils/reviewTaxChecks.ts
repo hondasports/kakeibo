@@ -77,7 +77,7 @@ export function buildTaxRateCheck(args: {
   const globalReason = untargetedDiscount
     ? "割引対象の商品が未確定のため、税率別に集計できません"
     : unresolved.length > 0
-      ? `「${unresolved[0].itemName || "名称未設定"}」など税率・税込／税抜が未確定の明細があります`
+      ? `「${unresolved[0].itemName || "名称未設定"}」など税設定の確認が必要な明細があります`
       : items.length === 0
         ? "比較対象の明細がありません"
         : undefined;

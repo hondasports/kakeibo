@@ -53,6 +53,40 @@ const props: ComponentProps<typeof ReviewDialog> = {
 };
 
 describe("下書きの修正導線", () => {
+  it("選択済みの未確認明細は理由と確認操作を表示し、読み取り失敗と決めつけない", async () => {
+    const user = userEvent.setup();
+    const onConfirmItemTax = vi.fn();
+    render(
+      <ReviewDialog
+        {...props}
+        reviewForm={{
+          ...props.reviewForm,
+          amountYen: "116",
+          priceTaxTreatment: undefined,
+          taxRateComposition: undefined,
+        }}
+        reviewItems={[
+          {
+            ...props.reviewItems[0],
+            persistedItemId: "food",
+            amountBasis: "tax_included",
+            taxResolutionStatus: "unresolved",
+            taxConfirmedFields: [],
+          },
+        ]}
+        onConfirmItemTax={onConfirmItemTax}
+      />,
+    );
+    const row = screen.getByText("ホットケーキ").closest("details")!;
+    await user.click(row.querySelector("summary")!);
+    expect(within(row).getByRole("combobox", { name: "ホットケーキの税率" })).toHaveTextContent(
+      "8%",
+    );
+    expect(within(row).getByText(/表示中の税率・税込／税抜はまだ確認されていません/)).toBeVisible();
+    expect(screen.queryByText(/税内訳を読み取れていません/)).not.toBeInTheDocument();
+    await user.click(within(row).getByRole("button", { name: "この税設定を確認する" }));
+    expect(onConfirmItemTax).toHaveBeenCalledExactlyOnceWith("food", 8, "tax_included");
+  });
   it("一致時は全体の読み取り確認を個別推奨に数えず、重複表示もしない", () => {
     render(
       <ReviewDialog

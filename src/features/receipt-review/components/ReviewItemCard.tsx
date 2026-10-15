@@ -24,6 +24,7 @@ import {
 import { isLowConfidenceItem } from "../utils/reviewDialogUtils";
 import {
   buildTaxContextFromReviewItem,
+  getReviewItemTaxConfirmation,
   toReceiptItemTaxViewModel,
 } from "../utils/receiptItemTaxViewModel";
 import { formatTaxWarnings } from "../utils/taxWarnings";
@@ -56,6 +57,7 @@ export type ReviewItemCardProps = {
   onAssignCategoryToItems: (itemIds: string[], categoryId: string) => void;
   onDiscountTargetChange: (discountItemId: string, targetItemId: string) => void;
   onTaxRateChange?: (itemId: string, taxRatePercent: 0 | 8 | 10 | null) => void;
+  onConfirmItemTax?: (itemId: string, taxRatePercent: 0 | 8 | 10, amountBasis: AmountBasis) => void;
   onToggleDetail: () => void;
 };
 
@@ -79,6 +81,7 @@ export function ReviewItemCard({
   onAssignCategoryToItems,
   onDiscountTargetChange,
   onTaxRateChange,
+  onConfirmItemTax,
   onToggleDetail,
 }: ReviewItemCardProps) {
   const discount = isDiscountLine(item.itemName, item.lineType);
@@ -87,6 +90,7 @@ export function ReviewItemCard({
   const categoryName = categoryNamesById.get(item.categoryId);
   const taxContext = buildTaxContextFromReviewItem(item);
   const taxVm = toReceiptItemTaxViewModel(item);
+  const confirmation = getReviewItemTaxConfirmation(item);
   const isTaxUpdating = disabled || taxUpdatingItemId === item.id;
   const showTaxRateSelect = enableItemTaxEditing && taxContext.status === "unresolved";
   const showRegistrationAmount =
@@ -273,6 +277,26 @@ export function ReviewItemCard({
             </TextField>
           </Stack>
         )}
+        {inlineTaxEditing &&
+          enableItemTaxEditing &&
+          confirmation.canConfirm &&
+          onConfirmItemTax && (
+            <Button
+              disabled={isTaxUpdating}
+              type="button"
+              variant="outlined"
+              onClick={() => {
+                if (
+                  item.taxRatePercent != null &&
+                  item.amountBasis &&
+                  item.amountBasis !== "unknown"
+                )
+                  onConfirmItemTax(item.id, item.taxRatePercent, item.amountBasis);
+              }}
+            >
+              この税設定を確認する
+            </Button>
+          )}
         <Button
           endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
           onClick={onToggleDetail}

@@ -166,7 +166,7 @@ describe("buildAmountCheck", () => {
         paidTotalYen: 108,
       });
       expect(check.status).toBe("uncomparable");
-      expect(check.reason).toContain("未確定");
+      expect(check.reason).toContain("税設定・登録額の確認が必要");
       expect(check.focusTarget).toBe("item-1");
     });
 
