@@ -188,7 +188,7 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     expect(within(dialog).queryByText(/判定が曖昧なOCR行/)).not.toBeInTheDocument();
     // 商品の税率が未確定なら、金額と税率の比較不能を1つにまとめて商品の確認へ案内する。
     expect(within(dialog).getByRole("region", { name: "全体の確認状態" })).toHaveTextContent(
-      "税率・税込／税抜が未確定の商品があります",
+      "税設定の確認が必要な商品があります",
     );
     const itemInput = within(dialog).getByDisplayValue("パン");
     const detail = itemInput.closest("details")!;

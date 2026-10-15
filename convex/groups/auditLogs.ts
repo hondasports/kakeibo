@@ -6,7 +6,7 @@ import {
   MANAGEMENT_AUDIT_ACTION_LABELS,
   managementAuditLogListItemValidator,
 } from "./lib/managementAuditLogModel";
-import { requireGroupOwner } from "./membership";
+import { getGroupReadMembership } from "./membership";
 import {
   listManagementAuditLogs as listManagementAuditLogsUsecase,
   MANAGEMENT_AUDIT_LOG_LIST_LIMIT,
@@ -15,8 +15,13 @@ import { createGroupQueryDeps } from "../../lib/convex/groups/groupUsecaseDeps";
 
 export { MANAGEMENT_AUDIT_LOG_LIST_LIMIT };
 
-export async function listManagementAuditLogsHandler(ctx: QueryCtx) {
-  const { groupId } = await requireGroupOwner(ctx);
+export async function listManagementAuditLogsHandler(
+  ctx: QueryCtx,
+  args: { allowUnavailable?: boolean } = {},
+) {
+  const membership = await getGroupReadMembership(ctx, { ...args, ownerOnly: true });
+  if (!membership) return [];
+  const { groupId } = membership;
 
   const logs = await listManagementAuditLogsUsecase({ groupId }, createGroupQueryDeps(ctx));
   return logs.map((log) => ({
@@ -32,7 +37,7 @@ export async function listManagementAuditLogsHandler(ctx: QueryCtx) {
 }
 
 export const listManagementAuditLogs = query({
-  args: {},
+  args: { allowUnavailable: v.optional(v.boolean()) },
   returns: v.array(managementAuditLogListItemValidator),
   handler: listManagementAuditLogsHandler,
 });

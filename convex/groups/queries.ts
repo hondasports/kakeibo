@@ -11,12 +11,7 @@ import { listMyGroups as listMyGroupsUsecase } from "../../lib/usecase/groups/li
 import { getGroupMembers as getGroupMembersUsecase } from "../../lib/usecase/groups/getGroupMembers";
 import { listPendingGroupInvitations as listPendingGroupInvitationsUsecase } from "../../lib/usecase/groups/listPendingGroupInvitations";
 import { createGroupQueryDeps } from "../../lib/convex/groups/groupUsecaseDeps";
-import {
-  getGroupMembership,
-  getResolvedMemberships,
-  requireGroupMembership,
-  requireGroupOwner,
-} from "./membership";
+import { getGroupMembership, getResolvedMemberships, getGroupReadMembership } from "./membership";
 
 export async function getMyGroupHandler(ctx: QueryCtx) {
   const membership = await getGroupMembership(ctx);
@@ -56,13 +51,23 @@ export async function listMyGroupsHandler(ctx: QueryCtx) {
   }));
 }
 
-export async function getGroupMembersHandler(ctx: QueryCtx) {
-  const { groupId } = await requireGroupMembership(ctx);
+export async function getGroupMembersHandler(
+  ctx: QueryCtx,
+  args: { allowUnavailable?: boolean } = {},
+) {
+  const membership = await getGroupReadMembership(ctx, args);
+  if (!membership) return [];
+  const { groupId } = membership;
   return await getGroupMembersUsecase({ groupId }, createGroupQueryDeps(ctx));
 }
 
-export async function listPendingGroupInvitationsHandler(ctx: QueryCtx) {
-  const { groupId } = await requireGroupOwner(ctx);
+export async function listPendingGroupInvitationsHandler(
+  ctx: QueryCtx,
+  args: { allowUnavailable?: boolean } = {},
+) {
+  const membership = await getGroupReadMembership(ctx, { ...args, ownerOnly: true });
+  if (!membership) return [];
+  const { groupId } = membership;
 
   const items = await listPendingGroupInvitationsUsecase({ groupId }, createGroupQueryDeps(ctx));
   return items.map((item) => ({
@@ -84,13 +89,13 @@ export const listMyGroups = query({
 });
 
 export const getGroupMembers = query({
-  args: {},
+  args: { allowUnavailable: v.optional(v.boolean()) },
   returns: v.array(groupMemberListItemValidator),
   handler: getGroupMembersHandler,
 });
 
 export const listPendingGroupInvitations = query({
-  args: {},
+  args: { allowUnavailable: v.optional(v.boolean()) },
   returns: v.array(groupPendingInvitationListItemValidator),
   handler: listPendingGroupInvitationsHandler,
 });

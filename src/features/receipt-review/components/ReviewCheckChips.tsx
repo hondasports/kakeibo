@@ -38,7 +38,7 @@ export function ReviewCheckChips({
           basisConflictItemCount > 0
             ? `税込・税抜の不一致 ${basisConflictItemCount}件`
             : unresolvedTaxItemCount > 0
-              ? `税率未確定 ${unresolvedTaxItemCount}件`
+              ? `税の確認待ち ${unresolvedTaxItemCount}件`
               : `確認推奨 ${recommendationCount}件`
         }
       />

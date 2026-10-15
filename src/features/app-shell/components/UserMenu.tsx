@@ -1,15 +1,16 @@
+import { flushSync } from "react-dom";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useClerk, useUser } from "@clerk/react";
 import { Alert, Avatar, Button, Menu, MenuItem } from "@mui/material";
+import { setSignOutState, useSignOutState } from "../../auth/hooks/signOutState";
 import { getClerkErrorMessage, getClerkUserFriendlyDisplayName } from "../../auth";
 
 export function UserMenu() {
   const { openUserProfile, signOut } = useClerk();
   const { user } = useUser();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [signOutError, setSignOutError] = useState("");
-  const [isSigningOut, setIsSigningOut] = useState(false);
+  const { pending: isSigningOut, error: signOutError } = useSignOutState();
   const open = Boolean(anchorEl);
   const displayName = getClerkUserFriendlyDisplayName(user) ?? "ログイン中";
 
@@ -23,18 +24,18 @@ export function UserMenu() {
   const handleSignOut = async () => {
     if (isSigningOut) return;
     handleClose();
-    setSignOutError("");
-    setIsSigningOut(true);
+    flushSync(() => setSignOutState({ pending: true, error: "" }));
     try {
       await signOut({ redirectUrl: "/" });
+      setSignOutState({ pending: false, error: "" });
     } catch (caughtError) {
-      setSignOutError(
-        getClerkErrorMessage(
+      setSignOutState({
+        pending: false,
+        error: getClerkErrorMessage(
           caughtError,
           "ログアウトできませんでした。通信状態を確認して、もう一度お試しください。",
         ),
-      );
-      setIsSigningOut(false);
+      });
     }
   };
 
@@ -42,7 +43,7 @@ export function UserMenu() {
     <>
       {signOutError ? (
         <Alert
-          onClose={() => setSignOutError("")}
+          onClose={() => setSignOutState({ pending: false, error: "" })}
           severity="error"
           sx={{ width: { xs: "100%", sm: 360 } }}
           variant="outlined"

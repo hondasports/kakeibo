@@ -33,6 +33,7 @@ export interface ReceiptAnalysisActionRunner {
   ): Promise<AnalysisDraftResult>;
   finalizeAttempt(args: {
     jobId: string;
+    groupId: string;
     expectedDraftId: string | null;
     expectedDraftUpdatedAt?: number;
     newDraftId: string;

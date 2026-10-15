@@ -10,7 +10,10 @@ import {
   getReviewItemsErrorMessage,
   getReviewCategoryAggregateErrorMessage,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
-import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
+import {
+  buildTaxContextFromReviewItem,
+  getReviewItemTaxConfirmation,
+} from "./receiptItemTaxViewModel";
 import { isVerifiedTaxSummaryStatus } from "../../../../lib/domain/receipt/tax/taxSummaryConsistency";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
 import { getTaxSummaryConflictLabel } from "./receiptTaxLabels";
@@ -148,7 +151,7 @@ export function getReviewGuidance(
       if (buildTaxContextFromReviewItem(item).status === "unresolved") {
         add(
           `tax-${item.id}`,
-          `「${item.itemName || "名称未設定"}」：税率・税込／税抜を確認してください。`,
+          `「${item.itemName || "名称未設定"}」：${getReviewItemTaxConfirmation(item).message}`,
           item.id,
           false,
         );

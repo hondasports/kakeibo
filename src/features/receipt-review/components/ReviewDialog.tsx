@@ -59,6 +59,7 @@ export type ReviewDialogProps = {
   onResetToAiInterpretation: () => void;
   taxUpdatingItemId?: string | null;
   onTaxRateChange?: (itemId: string, taxRatePercent: 0 | 8 | 10 | null) => void;
+  onConfirmItemTax?: (itemId: string, taxRatePercent: 0 | 8 | 10, amountBasis: AmountBasis) => void;
   imageDataUrl?: string;
   onAmountBasisChange?: (itemId: string, amountBasis: AmountBasis) => void;
 };
@@ -387,6 +388,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                   onAssignCategoryToItems={props.onAssignCategoryToItems}
                   onDiscountTargetChange={props.onDiscountTargetChange}
                   onTaxRateChange={props.onTaxRateChange}
+                  onConfirmItemTax={props.onConfirmItemTax}
                   onAmountBasisChange={props.onAmountBasisChange}
                 />
                 <ReviewDialogReferenceSection

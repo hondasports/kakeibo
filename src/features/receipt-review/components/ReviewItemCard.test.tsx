@@ -43,6 +43,38 @@ function renderCard(props: Partial<Parameters<typeof ReviewItemCard>[0]>) {
 }
 
 describe("ReviewItemCard", () => {
+  it("税設定の確認中は確認ボタンを無効にする", () => {
+    renderCard({
+      item: makeItem({
+        taxRatePercent: 8,
+        amountBasis: "tax_included",
+        taxResolutionStatus: "unresolved",
+      }),
+      inlineTaxEditing: true,
+      enableItemTaxEditing: true,
+      taxUpdatingItemId: "item-1",
+      onConfirmItemTax: vi.fn(),
+    });
+    expect(screen.getByRole("button", { name: "この税設定を確認する" })).toBeDisabled();
+  });
+  it.each([
+    { taxRatePercent: null, amountBasis: "tax_included" as const },
+    { taxRatePercent: 8 as const, amountBasis: "unknown" as const },
+    {
+      taxRatePercent: 8 as const,
+      amountBasis: "tax_included" as const,
+      taxResolutionStatus: "resolved" as const,
+      taxResolutionSource: "item_explicit" as const,
+    },
+  ])("不足または確認済みの税設定は確認ボタンを出さない: %j", (fields) => {
+    renderCard({
+      item: makeItem({ taxResolutionStatus: "unresolved", ...fields }),
+      inlineTaxEditing: true,
+      enableItemTaxEditing: true,
+      onConfirmItemTax: vi.fn(),
+    });
+    expect(screen.queryByRole("button", { name: "この税設定を確認する" })).not.toBeInTheDocument();
+  });
   it("未配分では税込登録額を使うという補足を表示しない", () => {
     renderCard({
       item: makeItem({

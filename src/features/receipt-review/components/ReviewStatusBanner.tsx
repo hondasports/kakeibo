@@ -82,12 +82,12 @@ export function ReviewStatusBanner({
           <Typography variant="subtitle2">
             {sharedBlockerCode === "basis-conflict"
               ? "商品の税込／税抜設定が、レシートの税内訳と一致していません"
-              : "税率・税込／税抜が未確定の商品があります"}
+              : "税設定の確認が必要な商品があります"}
           </Typography>
           <Typography variant="body2">
             {sharedBlockerCode === "basis-conflict"
               ? `税込／税抜の設定が一致していない商品が${combinedItemCount}件あります。商品ごとに確認してください。`
-              : `税率・税込／税抜が未確定の商品が${combinedItemCount}件あります。商品ごとに確認してください。`}
+              : `税設定の確認が必要な商品が${combinedItemCount}件あります。商品ごとに確認してください。`}
           </Typography>
           <Box>
             <Button
@@ -96,9 +96,7 @@ export function ReviewStatusBanner({
               type="button"
               onClick={() => onJump(taxRate.focusTarget ?? amount.focusTarget ?? "items")}
             >
-              {sharedBlockerCode === "basis-conflict"
-                ? "該当商品を確認する"
-                : "未確定の商品を確認する"}
+              {sharedBlockerCode === "basis-conflict" ? "該当商品を確認する" : "税設定を確認する"}
             </Button>
           </Box>
         </Alert>

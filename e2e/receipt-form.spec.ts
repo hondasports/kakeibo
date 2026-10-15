@@ -98,7 +98,7 @@ function addWeeks(weekStartDate: string, weeks: number): string {
 // ---------------------------------------------------------------------------
 
 test.describe("メイン画面の表示確認", () => {
-  test("@smoke シナリオ2: ログイン済みでアクセスするとダッシュボードが表示される", async ({
+  test("@smoke @staging シナリオ2: ログイン済みでアクセスするとダッシュボードが表示される", async ({
     page,
   }) => {
     await gotoAuthenticated(page);
@@ -228,7 +228,7 @@ test.describe("支出項目保存フロー（Issue #13 / #181 受け入れ確認
     await expect(page.getByLabel("合計金額")).toHaveValue("");
   });
 
-  test("@smoke シナリオ6: 保存後に支出一覧に追加される", async ({ page }) => {
+  test("@smoke @staging シナリオ6: 保存後に支出一覧に追加される", async ({ page }) => {
     // Issue #181: ExpenseEntryForm セレクターに変更
     // 1件目を保存
     await page.getByLabel("店舗名 / 支払先").fill("スーパー北浜");

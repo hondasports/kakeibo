@@ -171,7 +171,17 @@ test.describe("通知設定（Issue #893）", () => {
         );
       }
     } finally {
-      await cleanupSystemAdminMembershipFixture(fixture);
+      try {
+        if (!page.isClosed()) {
+          try {
+            await page.goto("about:blank");
+          } catch {
+            await page.close();
+          }
+        }
+      } finally {
+        await cleanupSystemAdminMembershipFixture(fixture);
+      }
     }
   });
 

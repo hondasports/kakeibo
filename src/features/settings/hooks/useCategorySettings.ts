@@ -21,7 +21,9 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export function useCategorySettings() {
-  const categories = useQuery(api.categories.queries.listForSettings) as Category[] | undefined;
+  const categories = useQuery(api.categories.queries.listForSettings, {
+    allowUnavailable: true,
+  }) as Category[] | undefined;
   const createCategory = useMutation(api.categories.mutations.createCategory);
   const updateCategory = useMutation(api.categories.mutations.updateCategory);
   const deactivateCategory = useMutation(api.categories.mutations.deactivateCategory);

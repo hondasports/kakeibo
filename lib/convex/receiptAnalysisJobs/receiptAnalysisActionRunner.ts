@@ -95,6 +95,7 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
     finalizeAttempt: (args) =>
       ctx.runMutation(internal.receiptAnalysisJobs.internal.finalizeAnalysisAttempt, {
         jobId: args.jobId as Id<"receiptAnalysisImageJobs">,
+        groupId: args.groupId as Id<"groups">,
         expectedDraftId: args.expectedDraftId as Id<"aiExpenseDrafts"> | null,
         ...(args.expectedDraftUpdatedAt === undefined
           ? {}

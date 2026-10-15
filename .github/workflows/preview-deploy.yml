@@ -16,7 +16,105 @@ permissions:
 # 固定 staging を使う区間の直列化は、Deploy ジョブ側の concurrency で行う。
 # workflow 全体にかけないのは、待機ジョブがグループ外でポーリングすることで、
 # 待機中の preview push がリリース候補E2Eの pending を押し出さないようにするため。
+# preview への push では E2E を 2 つの目的に分ける。
+#   - local-e2e: マージ結果コミットの回帰検知。PR の e2e.yml と同じ匿名使い捨て backend
+#     （scripts/start-ci-convex.mjs）で @public / @smoke を実行し、cloud の Convex を読まない。
+#   - preview: 固定 staging の設定ミス検知。staging の Convex に対しては @staging の少数だけ実行する。
+# staging の Database I/O は Free 枠を team 合算で消費するため、全件を staging へ流さない。
 jobs:
+  local-e2e:
+    name: E2E on isolated backend (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.timeout }}
+    concurrency:
+      # backend はジョブごとの使い捨てで staging を触らないため、固定 staging の直列化グループ
+      # （preview-staging-deploy / preview-staging-wait）には入れない。同じ ref の古い run だけを
+      # キャンセルする。
+      group: preview-local-e2e-${{ matrix.name }}-${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref_name }}
+      cancel-in-progress: true
+    env:
+      SOURCE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref_name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: public
+            # `--` 以降の引数は playwright に位置引数フィルタとして飲まれるため
+            # フラグは script 名の直後に付ける
+            e2e_command: pnpm run e2e:public --project=chromium --workers=3
+            timeout: 10
+          - name: authenticated
+            e2e_command: pnpm run e2e:smoke --project=chromium --grep-invert @public --workers=1
+            timeout: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ env.SOURCE_REF }}
+
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve E2E Clerk user identifier
+        env:
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
+        run: node scripts/resolve-e2e-clerk-user-id.mjs
+
+      - name: Resolve Convex version
+        id: convex-version
+        run: echo "version=$(node -p "require('convex/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Convex backend binary
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/convex
+          key: convex-${{ steps.convex-version.outputs.version }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers (Chromium only)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Install Playwright system dependencies (cache hit時)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Run E2E tests on isolated backend
+        run: node scripts/start-ci-convex.mjs --run "${{ matrix.e2e_command }}" --timeout 180
+        env:
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          E2E_SYSTEM_ADMIN_MEMBERSHIP_FIXTURE: ${{ matrix.name == 'authenticated' }}
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-report-${{ github.run_id }}-${{ matrix.name }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 1
+
+      - name: Report flaky tests
+        if: always()
+        continue-on-error: true
+        run: node scripts/report-flaky-e2e.mjs >> "$GITHUB_STEP_SUMMARY"
+
   wait-for-staging-window:
     name: Wait for staging window
     runs-on: ubuntu-latest
@@ -205,8 +303,10 @@ jobs:
           echo "VITE_CONVEX_URL=$VITE_CONVEX_URL" >> "$GITHUB_ENV"
           echo "VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY" >> "$GITHUB_ENV"
 
-      - name: Run local smoke E2E tests
-        run: pnpm run e2e:smoke -- --project=chromium
+      # staging への読み書きを増やさないよう @staging（認証・保存・設定保存）だけに絞る。
+      # ロジックの回帰は local-e2e job が見るため、ここは staging 固有の接続・設定の確認に限る。
+      - name: Run staging integration smoke E2E tests
+        run: pnpm run e2e:staging -- --project=chromium
         env:
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}

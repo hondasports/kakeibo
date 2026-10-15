@@ -5,7 +5,6 @@ import type { ReviewGuidanceItem } from "../utils/reviewGuidance";
 import type { AmountBasis } from "../../../../lib/receiptTax/types";
 import { ReviewItemCard } from "./ReviewItemCard";
 import { ReviewItemRow } from "./ReviewItemRow";
-import { buildTaxContextFromReviewItem } from "../utils/receiptItemTaxViewModel";
 
 export type ReviewDialogItemsSectionProps = {
   items: ReviewItemValues[];
@@ -35,6 +34,7 @@ export type ReviewDialogItemsSectionProps = {
   onAssignCategoryToItems: (itemIds: string[], categoryId: string) => void;
   onDiscountTargetChange: (discountItemId: string, targetItemId: string) => void;
   onTaxRateChange?: (itemId: string, taxRatePercent: 0 | 8 | 10 | null) => void;
+  onConfirmItemTax?: (itemId: string, taxRatePercent: 0 | 8 | 10, amountBasis: AmountBasis) => void;
   onAmountBasisChange?: (itemId: string, amountBasis: AmountBasis) => void;
 };
 
@@ -62,6 +62,7 @@ export function ReviewDialogItemsSection({
   onAssignCategoryToItems,
   onDiscountTargetChange,
   onTaxRateChange,
+  onConfirmItemTax,
   onAmountBasisChange,
 }: ReviewDialogItemsSectionProps) {
   return (
@@ -201,13 +202,9 @@ export function ReviewDialogItemsSection({
                     onAssignCategoryToItems={onAssignCategoryToItems}
                     onDiscountTargetChange={onDiscountTargetChange}
                     onTaxRateChange={onTaxRateChange}
+                    onConfirmItemTax={onConfirmItemTax}
                     onToggleDetail={() => onToggleTaxDetail(item.id)}
                   />
-                  {buildTaxContextFromReviewItem(item).status === "unresolved" && (
-                    <Typography variant="body2" color="text.secondary">
-                      税内訳を読み取れていません。レシートと照合して税率・税込／税抜を確認してください。
-                    </Typography>
-                  )}
                 </Stack>
               </ReviewItemRow>
             );

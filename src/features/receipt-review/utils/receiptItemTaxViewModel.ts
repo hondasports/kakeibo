@@ -5,6 +5,7 @@ import type {
   TaxResolutionSource,
 } from "../../../../lib/receiptTax/types";
 import type { AiExpenseDraftItem, ReviewItemValues } from "../types/types";
+import { ITEM_IDENTITY_CHANGED } from "../../../../lib/domain/receipt/tax/itemTaxConfirmation";
 import {
   formatTaxRateLabel,
   formatYenLabel,
@@ -77,6 +78,30 @@ export function buildTaxContextFromReviewItem(item: ReviewItemValues): TaxContex
 
 export function buildTaxContextFromDraftItem(item: AiExpenseDraftItem): TaxContextResolution {
   return buildTaxContext(item);
+}
+
+export function getReviewItemTaxConfirmation(item: ReviewItemValues) {
+  const context = buildTaxContextFromReviewItem(item);
+  const hasRate = item.taxRatePercent != null;
+  const hasBasis = item.amountBasis === "tax_included" || item.amountBasis === "tax_excluded";
+  if (context.status === "resolved") {
+    return {
+      statusLabel: item.taxAllocationStatus === "unallocated" ? "税額未確定" : undefined,
+      message: undefined,
+      canConfirm: false,
+    };
+  }
+  const identityChanged = item.taxReviewReasons?.includes(ITEM_IDENTITY_CHANGED);
+  const missing = [!hasRate && "税率", !hasBasis && "税込／税抜"].filter(Boolean).join("・");
+  return {
+    statusLabel: hasRate && hasBasis ? "確認待ち" : "未確定",
+    message: missing
+      ? `${missing}が未設定です。レシートと照合して選択してください。`
+      : identityChanged
+        ? "商品名・行の種類が変わっています。レシートと照合して税率を確認してください。"
+        : "表示中の税率・税込／税抜はまだ確認されていません。レシートと照合して確認してください。",
+    canConfirm: hasRate && hasBasis,
+  };
 }
 
 export function toReceiptItemTaxViewModel(item: ReviewItemValues): ReceiptItemTaxViewModel {

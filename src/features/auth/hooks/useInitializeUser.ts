@@ -1,4 +1,5 @@
 import { api } from "../../../../convex/_generated/api";
+import { useAuth } from "@clerk/react";
 import { useEffect, useRef, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 /**
@@ -15,7 +16,9 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
  * - エラーは console.error に記録し、UI をブロックしない。
  */
 export function useInitializeUser() {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
+  const { isSignedIn } = useAuth();
+  const isAuthenticated = isSignedIn === true && isConvexAuthenticated;
   const upsertUser = useMutation(api.users.mutations.upsertUser);
   const seedDefaultCategories = useMutation(api.categories.mutations.seedDefaultCategories);
   const group = useQuery(api.groups.queries.getMyGroup, isAuthenticated ? {} : "skip");

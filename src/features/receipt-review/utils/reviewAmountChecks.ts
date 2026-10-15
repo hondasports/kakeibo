@@ -148,7 +148,7 @@ export function buildAmountCheck(args: {
       variant,
       paidTotalYen,
       itemsPrintedTotalYen,
-      reason: "税率・税込／税抜が未確定の明細があるため、支払額と比較できません",
+      reason: "税設定・登録額の確認が必要な明細があるため、支払額と比較できません",
       blockerCode: "unresolved-tax",
       affectedItemIds: args.items
         .filter((item) => itemComparableYen(item) === undefined)

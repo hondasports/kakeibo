@@ -158,3 +158,19 @@ export async function requireGroupOwner(
   assertGroupOwnerRole(membership.role);
   return membership;
 }
+
+export async function getGroupReadMembership(
+  ctx: Pick<QueryCtx, "auth" | "db">,
+  options: { allowUnavailable?: boolean; ownerOnly?: boolean } = {},
+): Promise<GroupMembership | null> {
+  const membership = await getGroupMembership(ctx);
+  if (membership === null) {
+    if (options.allowUnavailable) return null;
+    throw new ConvexError("グループに所属していません");
+  }
+  if (options.ownerOnly && membership.role !== "owner") {
+    if (options.allowUnavailable) return null;
+    assertGroupOwnerRole(membership.role);
+  }
+  return membership;
+}
