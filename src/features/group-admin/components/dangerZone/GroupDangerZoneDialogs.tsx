@@ -50,7 +50,7 @@ class PreviewErrorBoundary extends Component<
 function DeleteGroupDialogWithPreview(props: DeleteDialogProps) {
   const preview = useQuery(
     api.groups.deletion.getGroupDeletionPreview,
-    props.pendingDeleteGroup ? {} : "skip",
+    props.pendingDeleteGroup ? { allowUnavailable: true } : "skip",
   );
   return (
     <ConfirmDeleteGroupDialog

@@ -1,7 +1,8 @@
+import { v } from "convex/values";
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
-import { requireGroupMembership } from "../groups/membership";
+import { getGroupReadMembership, requireGroupMembership } from "../groups/membership";
 import {
   categoryRecordToDoc,
   createCategoryReader,
@@ -19,8 +20,13 @@ export async function listActiveHandler(ctx: QueryCtx): Promise<Doc<"categories"
 }
 
 /** listForSettings query の handler ロジック（テスト用に export） */
-export async function listForSettingsHandler(ctx: QueryCtx): Promise<Doc<"categories">[]> {
-  const { groupId } = await requireGroupMembership(ctx);
+export async function listForSettingsHandler(
+  ctx: QueryCtx,
+  args: { allowUnavailable?: boolean } = {},
+): Promise<Doc<"categories">[]> {
+  const membership = await getGroupReadMembership(ctx, args);
+  if (!membership) return [];
+  const { groupId } = membership;
   const records = await listForSettingsUsecase(createCategoryReader(ctx), groupId);
   return records.map(categoryRecordToDoc);
 }
@@ -40,6 +46,6 @@ export const listActive = query({
  * 既存 receipt は categoryId 参照を維持するため、カテゴリは削除せず無効化する。
  */
 export const listForSettings = query({
-  args: {},
+  args: { allowUnavailable: v.optional(v.boolean()) },
   handler: listForSettingsHandler,
 });

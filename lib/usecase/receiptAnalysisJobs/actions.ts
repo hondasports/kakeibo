@@ -31,6 +31,7 @@ export async function analyzeReceiptImageJob(
   }
   const finalization = await runner.finalizeAttempt({
     jobId: args.jobId,
+    groupId: job.groupId,
     expectedDraftId: job.draftId ?? null,
     ...(preserved === null ? {} : { expectedDraftUpdatedAt: preserved.draftUpdatedAt }),
     newDraftId: draft.id,

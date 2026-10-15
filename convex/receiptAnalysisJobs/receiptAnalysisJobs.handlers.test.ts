@@ -356,6 +356,48 @@ describe("updateJobStatusHandler", () => {
 });
 
 describe("finalizeAnalysisAttemptHandler", () => {
+  it.each([
+    { status: "ready", groupId: GROUP_ID, deleted: true },
+    { status: "registered", groupId: GROUP_ID, deleted: false },
+    { status: "ready", groupId: "other-group", deleted: false },
+  ])(
+    "job消失時に生成draftのgroup/status境界を守る: $groupId/$status",
+    async ({ status, groupId, deleted }) => {
+      const ctx = createMutationCtx(createIdentity(), {
+        docs: { "draft-new": { _id: "draft-new", groupId, status } },
+        queryResult: [{ _id: "item-new" }],
+      });
+      await expect(
+        finalizeAnalysisAttemptHandler(ctx, {
+          jobId: "missing" as Id<"receiptAnalysisImageJobs">,
+          groupId: GROUP_ID as Id<"groups">,
+          expectedDraftId: null,
+          newDraftId: "draft-new" as Id<"aiExpenseDrafts">,
+          status: "ready",
+        }),
+      ).resolves.toEqual({ applied: false });
+      expect(ctx.db.patch).not.toHaveBeenCalled();
+      if (deleted) {
+        expect(ctx.db.delete).toHaveBeenCalledWith("draft-new");
+        expect(ctx.db.delete).toHaveBeenCalledWith("item-new");
+      } else {
+        expect(ctx.db.delete).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it("解析開始直前にjobが削除されたら書き込まず終了する", async () => {
+    const ctx = createMutationCtx(createIdentity());
+    await expect(
+      updateJobStatusHandler(ctx, {
+        jobId: "missing" as Id<"receiptAnalysisImageJobs">,
+        status: "running",
+        expectedDraftId: null,
+      }),
+    ).resolves.toEqual({ applied: false });
+    expect(ctx.db.patch).not.toHaveBeenCalled();
+  });
+
   it("成功attemptだけがjobを切り替え、後着の失敗attemptは自分のdraftだけ片付ける", async () => {
     const docs = new Map<string, Record<string, unknown>>([
       [
@@ -395,12 +437,14 @@ describe("finalizeAnalysisAttemptHandler", () => {
     } as unknown as MutationCtx;
 
     const success = await finalizeAnalysisAttemptHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
       expectedDraftId: "draft-old" as Id<"aiExpenseDrafts">,
       newDraftId: "draft-success" as Id<"aiExpenseDrafts">,
       status: "ready",
     });
     const staleFailure = await finalizeAnalysisAttemptHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
       expectedDraftId: "draft-old" as Id<"aiExpenseDrafts">,
       newDraftId: "draft-failed" as Id<"aiExpenseDrafts">,
@@ -472,6 +516,7 @@ describe("finalizeAnalysisAttemptHandler", () => {
     } as unknown as MutationCtx;
 
     const result = await finalizeAnalysisAttemptHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
       expectedDraftId: "draft-old" as Id<"aiExpenseDrafts">,
       expectedDraftUpdatedAt: 10,
@@ -565,7 +610,7 @@ describe("receipt analysis internal handlers", () => {
       incrementBatchProcessedCountHandler(createInternalCtx(), {
         batchId: "missing" as Id<"receiptAnalysisBatches">,
       }),
-    ).rejects.toThrow("Batch not found");
+    ).resolves.toBeUndefined();
 
     await finalizeBatchStatusHandler(ctx, {
       batchId: "batch-incomplete" as Id<"receiptAnalysisBatches">,

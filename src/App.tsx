@@ -1,3 +1,4 @@
+import { useSignOutState } from "./features/auth/hooks/signOutState";
 import { useState } from "react";
 import { AuthenticateWithRedirectCallback, useAuth } from "@clerk/react";
 import { useSignIn } from "@clerk/react/legacy";
@@ -22,6 +23,16 @@ function E2eAppErrorBoundaryTrigger(): never {
 }
 
 function App() {
+  const { pending: isSigningOut } = useSignOutState();
+  if (isSigningOut) {
+    return (
+      <SuzumemoLoadingState
+        label="ログアウト中"
+        message="ログアウトしています。"
+        variant="fullscreen"
+      />
+    );
+  }
   const pathname = window.location.pathname;
 
   if (import.meta.env.DEV && pathname === E2E_APP_ERROR_BOUNDARY_PATH) {

@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { requireGroupOwner } from "./membership";
+import { getGroupReadMembership, requireGroupOwner } from "./membership";
 import { groupDeletionPreviewValidator } from "./validators";
 import { requireAuthenticatedUserId } from "../users/auth";
 import { groupDeletionStatusValidator } from "./lib/groupDeletionJobModel";
@@ -15,8 +15,13 @@ import {
   createGroupQueryDeps,
 } from "../../lib/convex/groups/groupUsecaseDeps";
 
-export async function getGroupDeletionPreviewHandler(ctx: QueryCtx) {
-  const { groupId } = await requireGroupOwner(ctx);
+export async function getGroupDeletionPreviewHandler(
+  ctx: QueryCtx,
+  args: { allowUnavailable?: boolean } = {},
+) {
+  const membership = await getGroupReadMembership(ctx, { ...args, ownerOnly: true });
+  if (!membership) return null;
+  const { groupId } = membership;
   return await getGroupDeletionPreviewUsecase({ groupId }, createGroupQueryDeps(ctx));
 }
 
@@ -34,8 +39,8 @@ export async function requestGroupDeletionHandler(
 }
 
 export const getGroupDeletionPreview = query({
-  args: {},
-  returns: groupDeletionPreviewValidator,
+  args: { allowUnavailable: v.optional(v.boolean()) },
+  returns: v.union(v.null(), groupDeletionPreviewValidator),
   handler: getGroupDeletionPreviewHandler,
 });
 
