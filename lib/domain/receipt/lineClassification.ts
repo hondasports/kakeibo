@@ -75,12 +75,25 @@ export function isReceiptCountLabel(rawText: string): boolean {
   );
 }
 
+/**
+ * 「今回お買上げポイント 9P」や「今月購入金額合計」のように、合計の語を含むが今回の支払額ではない行。
+ * 円表記のないポイント行に限るのは、「ポイント利用後合計 ¥2,408」のような支払合計を残すため。
+ */
+function isNonPaymentTotalLabel(rawText: string): boolean {
+  const text = normalizeText(rawText);
+  return (
+    (/(?:ポイント|point)/i.test(text) && !/[¥￥円]/.test(rawText.normalize("NFKC"))) ||
+    /(?:今月|当月|先月|前月|累計|年間|本年|今年|前回まで|これまで)/.test(text)
+  );
+}
+
 /** 構造分類と税内訳の照合で共通の支払合計ラベルを使う。 */
 export function isReceiptTotalLabel(rawText: string): boolean {
   const text = normalizeText(rawText);
   return (
     /(?:合計|総計|お買上|ご請求額|お支払(?:額|合計)|今回支払額|total)/i.test(text) &&
     !isReceiptCountLabel(rawText) &&
+    !isNonPaymentTotalLabel(rawText) &&
     !/(?:小計|値引|割引|subtotal)/i.test(text)
   );
 }
