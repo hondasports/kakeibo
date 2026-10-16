@@ -35,23 +35,24 @@ describe("レシート末尾のポイント行（Issue #1042）", () => {
     expect(result.itemFields.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(226);
   });
 
-  it.each(["今回お買上げポイント 9P", "今回合計付与ポイント 9P"])(
-    "%s の1行だけでも税集計を矛盾扱いにしない",
-    (rawText) => {
-      const input = withLines((lines) =>
-        lines
-          .filter((line) => line.sourceLineIndex < 16)
-          .concat(receiptLine(16, rawText, null, "unknown", "9P")),
-      );
-      expect(statuses(input)).toEqual({
-        summaries: [
-          [10, "verified"],
-          [8, "verified"],
-        ],
-        allocated: true,
-      });
-    },
-  );
+  it.each([
+    ["今回お買上げポイント 9P", null, "9P"],
+    ["今回合計付与ポイント 9P", null, "9P"],
+    ["今回合計付与ポイント 9P（9円相当）", 9, "9円"],
+  ] as const)("%s の1行だけでも税集計を矛盾扱いにしない", (rawText, amountYen, amountText) => {
+    const input = withLines((lines) =>
+      lines
+        .filter((line) => line.sourceLineIndex < 16)
+        .concat(receiptLine(16, rawText, amountYen, "unknown", amountText)),
+    );
+    expect(statuses(input)).toEqual({
+      summaries: [
+        [10, "verified"],
+        [8, "verified"],
+      ],
+      allocated: true,
+    });
+  });
 
   it.each([
     ["今月購入金額合計 12,345円（税抜）", 12345, "12,345円"],
@@ -70,28 +71,27 @@ describe("レシート末尾のポイント行（Issue #1042）", () => {
   );
 
   it.each([
-    ["支払合計と異なる", 2500, "¥2,500"],
-    ["金額が読めない", null, null],
-  ] as const)("実際の合計行の金額が%s場合は矛盾として止める", (_, amountYen, amountText) => {
-    const input = withLines((lines) =>
-      lines.map((line) =>
-        line.sourceLineIndex === 13
-          ? receiptLine(
-              13,
-              amountYen === null ? "合計" : `合計 ${amountText}`,
-              amountYen,
-              "total",
-              amountText,
-            )
-          : line,
-      ),
-    );
-    expect(statuses(input)).toEqual({
-      summaries: [
-        [10, "contradictory"],
-        [8, "contradictory"],
-      ],
-      allocated: false,
-    });
-  });
+    ["合計 ¥2,500", 2500, "¥2,500"],
+    ["合計", null, null],
+    ["ポイント利用後合計 2,500", 2500, "2,500"],
+    ["合計（ポイント利用後）2,500", 2500, "2,500"],
+  ] as const)(
+    "実際の合計行 %s が支払合計と食い違う場合は矛盾として止める",
+    (rawText, amountYen, amountText) => {
+      const input = withLines((lines) =>
+        lines.map((line) =>
+          line.sourceLineIndex === 13
+            ? receiptLine(13, rawText, amountYen, "total", amountText)
+            : line,
+        ),
+      );
+      expect(statuses(input)).toEqual({
+        summaries: [
+          [10, "contradictory"],
+          [8, "contradictory"],
+        ],
+        allocated: false,
+      });
+    },
+  );
 });
