@@ -77,6 +77,22 @@ task worktree:
 git worktree add ../kakeibo-worktrees/<branch-name> -b <branch-name> origin/preview
 ```
 
+### Worktree作成時セットアップ
+
+task worktreeを作ったら、最初の編集前にworktree rootで次を実行する。どれもworktreeごとの状態を作るため、別worktreeで実行済みでも省略しない。
+
+```bash
+mise install
+pnpm install
+pnpm exec husky
+pnpm run e2e:env-sync -- --copy-only
+command -v indexion >/dev/null && indexion digest build .
+```
+
+- `pnpm exec husky`: `pnpm-workspace.yaml` の `ignoreScripts: true` で `prepare` が走らないため、hookを手動で有効にする。`core.hooksPath` は `.husky/_` を指すので、`.husky/_` が無いworktreeでは `pre-commit` / `pre-push` が実行されないままcommit・pushが通る。実行後に `.husky/_/pre-push` があることを確認する。
+- `e2e:env-sync -- --copy-only`: `.env.local` を正本からコピーする（[3. `.env.local` とローカル環境](#3-envlocal-とローカル環境)）。
+- `indexion digest build .`: `.indexion/` はworktreeごとに空から始まるため、作成時にdigestを構築する。indexionが無い環境では実行せず、`skills/impact-analysis` のfallbackに従う。
+
 既存の他task差分をreset / stash / deleteして作業場所を空けない。別worktreeへ分離する。
 
 ### Workspace Preflight
@@ -257,13 +273,7 @@ E2Eの実行には事前条件がある。満たさない場合はE2Eを実行�
 
 初回または新しいtask worktreeでは、次の順に準備する。通常の `pnpm run dev` はlocal Convex watcherとViteを同時に起動する。
 
-Node.jsとpnpmはリポジトリの `mise.toml` と `package.json` から選択されるため、新しいworktreeでは最初に次を実行する。
-
-```bash
-mise install
-```
-
-indexionの `.indexion/` はworktreeごとに空から始まる。コード調査の直前にdigestを構築する手順は `skills/impact-analysis` を参照する。
+Node.jsとpnpmはリポジトリの `mise.toml` と `package.json` から選択される。新しいworktreeでは、先に[Worktree作成時セットアップ](#worktree作成時セットアップ)を実行しておく。
 
 ターミナル1:
 

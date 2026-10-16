@@ -44,6 +44,8 @@ FAILしたまま編集しない。
 git worktree add <task-path> -b <task-branch> preview
 ```
 
+作成後は `docs/development-process.md` の「Worktree作成時セットアップ」（依存・hook・`.env.local`・indexion digest）を実行してから編集する。`.husky/_` が無いとhookが動かないままcommit・pushが通る。
+
 既存差分を勝手にreset/stash/deleteしない。
 
 ## 例外
