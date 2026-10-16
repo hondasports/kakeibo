@@ -14,7 +14,7 @@ license: Apache-2.0
 
 ## 手順
 
-1. 新しいworktreeでは最初に `mise install`（Node.jsとpnpmは `mise.toml` / `package.json` が選択元）
+1. 新しいworktreeでは最初に `docs/development-process.md` の「Worktree作成時セットアップ」（`mise install`・依存・hook・`.env.local`・indexion digest）を実行する。Node.jsとpnpmは `mise.toml` / `package.json` が選択元
 2. `.env.local` の正本は `preview` worktree。task worktreeへのコピーは `pnpm run e2e:env-sync -- --copy-only`（`.env.local` のコピーのみ。コピー元がcloud devを向いていてもdeploymentの環境変数を書き換えない）。preview側に無ければclone元からコピーし、どちらにも無ければ復旧まで進めない
 3. `pnpm run dev` はlocal Convex watcherとViteを同時起動する。local deploymentが無ければ作成される。起動直後に `CLERK_JWT_ISSUER_DOMAIN` 不足でFunction準備が待機してもwatcherは止めず、次の同期を実行する
 4. E2E実行前に別ターミナルで `pnpm run e2e:env-sync`。Clerk publishable keyからissuerを復元し、選択中のlocal deploymentへ `CLERK_JWT_ISSUER_DOMAIN`、`APP_ENV=development`、mock抽出、E2Eユーザー/cleanup設定を反映する。cloud dev deploymentへ同期する場合だけ `pnpm run e2e:env-sync:cloud` を明示する
