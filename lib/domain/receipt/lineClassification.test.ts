@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReceiptRawObservationLine } from "./observations";
-import { classifyReceiptLines } from "./lineClassification";
+import { classifyReceiptLines, isReceiptTotalLabel } from "./lineClassification";
 
 function line(
   rawText: string,
@@ -172,5 +172,38 @@ describe("classifyReceiptLines", () => {
 
     expect(result).toMatchObject({ status: "ambiguous" });
     expect(result.candidates[0]?.role).toBe("unknown");
+  });
+});
+
+describe("isReceiptTotalLabel", () => {
+  it.each([
+    "合計 ¥2,508",
+    "お買上計 ¥2,508",
+    "お支払合計 ¥2,508",
+    "今回支払額 ¥2,508",
+    "ポイント利用後合計 ¥2,408",
+    "Total ¥2,508",
+  ])("%s を支払合計ラベルにする", (rawText) => {
+    expect(isReceiptTotalLabel(rawText)).toBe(true);
+  });
+
+  it.each([
+    "今回お買上げポイント 9P",
+    "今回合計付与ポイント 9P",
+    "ご利用ポイント合計 100pt",
+    "累計ポイント 29P",
+    "今月購入金額合計 12,345円（税抜）",
+    "累計お買上金額 ¥30,000",
+    "年間お買上合計 ¥30,000",
+    "小計 ¥2,508",
+    "合計 4点",
+  ])("%s を支払合計ラベルにしない", (rawText) => {
+    expect(isReceiptTotalLabel(rawText)).toBe(false);
+  });
+
+  it("ポイント行は合計候補に分類しない", () => {
+    const [result] = classifyReceiptLines([line("今回お買上げポイント 9P", null, 16)]);
+
+    expect(result.candidates.map((candidate) => candidate.role)).not.toContain("totalCandidate");
   });
 });
