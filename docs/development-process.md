@@ -86,11 +86,13 @@ mise install
 pnpm install
 pnpm exec husky
 pnpm run e2e:env-sync -- --copy-only
-command -v indexion >/dev/null && indexion digest build .
+if command -v indexion >/dev/null; then
+  indexion digest build .
+fi
 ```
 
 - `pnpm exec husky`: `pnpm-workspace.yaml` の `ignoreScripts: true` で `prepare` が走らないため、hookを手動で有効にする。`core.hooksPath` は `.husky/_` を指すので、`.husky/_` が無いworktreeでは `pre-commit` / `pre-push` が実行されないままcommit・pushが通る。実行後に `.husky/_/pre-push` があることを確認する。
-- `e2e:env-sync -- --copy-only`: `.env.local` を正本からコピーする（[3. `.env.local` とローカル環境](#3-envlocal-とローカル環境)）。
+- `e2e:env-sync -- --copy-only`: `.env.local` がlocal Convexを選択していなければ正本からコピーし、選択済みならそのまま維持する（[3. `.env.local` とローカル環境](#3-envlocal-とローカル環境)）。
 - `indexion digest build .`: `.indexion/` はworktreeごとに空から始まるため、作成時にdigestを構築する。indexionが無い環境では実行せず、`skills/impact-analysis` のfallbackに従う。
 
 既存の他task差分をreset / stash / deleteして作業場所を空けない。別worktreeへ分離する。
