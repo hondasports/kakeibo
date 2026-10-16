@@ -1,5 +1,6 @@
 import type { ReinterpretDraftTaxInput } from "../reinterpretDraftTax";
 import type { ReceiptRawObservationLine } from "../../observations";
+import type { DraftItemTaxFields } from "../draftTaxMapping";
 
 type Role = ReceiptRawObservationLine["lineRoleCandidates"][number];
 
@@ -26,12 +27,12 @@ export function receiptLine(
  * 10%と8%の混在、割引2行、末尾のポイント行（amountYen: null、amountText は `9P` 形式）を含む。
  */
 export function pointFooterReceipt(): ReinterpretDraftTaxInput {
-  const confirmed = {
+  const confirmed: Partial<DraftItemTaxFields> = {
     amountBasis: "tax_included",
     taxResolutionStatus: "resolved",
     taxResolutionSource: "item_explicit",
     taxConfirmedFields: ["amountBasis", "taxRatePercent"],
-  } as const;
+  };
   return {
     amountYen: 2508,
     receiptTotalSource: "explicit_label",
