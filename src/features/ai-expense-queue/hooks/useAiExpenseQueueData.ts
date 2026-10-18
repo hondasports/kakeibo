@@ -147,6 +147,18 @@ export function useAiExpenseQueueData({
   const unbatchedReadyItems = readyItems.filter(
     (item) => !item.batchId || !sessionBatchIds.has(item.batchId),
   );
+  const unregisteredDraftIds = useMemo(() => {
+    if (
+      readyDrafts === undefined ||
+      needsReviewDrafts === undefined ||
+      failedDrafts === undefined
+    ) {
+      return undefined;
+    }
+    return new Set(
+      [...readyDrafts, ...needsReviewDrafts, ...failedDrafts].map((draft) => draft._id),
+    );
+  }, [failedDrafts, needsReviewDrafts, readyDrafts]);
   const sessionBatchSummaries = useMemo<AiExpenseQueueBatchSummary[]>(() => {
     const itemByJobId = new Map<string, AiExpenseQueueItem>();
     for (const item of items) {
@@ -154,18 +166,36 @@ export function useAiExpenseQueueData({
         itemByJobId.set(item.jobId, item);
       }
     }
+    const jobById = new Map((jobs ?? []).map((job) => [job._id as string, job]));
+    // 登録済みは初回ページ分しか読まないため、下書きを作り終えたジョブのうち
+    // 未登録の一覧（ready / needs_review / failed）に無いものを登録済みとみなす。
+    // 削除した下書きは hiddenItemIds に残るので、登録済みに数えない。
+    const isRegisteredOutsidePage = (jobId: string) => {
+      const draftId = jobById.get(jobId)?.draftId;
+      return (
+        unregisteredDraftIds !== undefined &&
+        draftId !== undefined &&
+        !unregisteredDraftIds.has(draftId) &&
+        !hiddenItemIds.includes(draftId)
+      );
+    };
 
     return sessionBatches.flatMap((batch) => {
       const batchItems = batch.jobIds.flatMap((jobId) => {
         const item = itemByJobId.get(jobId);
         return item ? [item] : [];
       });
+      const registeredOutsidePageCount = batch.jobIds.filter(
+        (jobId) => !itemByJobId.has(jobId) && isRegisteredOutsidePage(jobId),
+      ).length;
       const readyItems = batchItems.filter((item) => item.status === "ready");
       const queuedCount = batchItems.filter((item) => item.status === "queued").length;
       const analyzingCount = batchItems.filter((item) => item.status === "analyzing").length;
       const needsReviewCount = batchItems.filter((item) => item.status === "needs_review").length;
       const failedCount = batchItems.filter((item) => item.status === "failed").length;
-      const registeredCount = batchItems.filter((item) => item.status === "registered").length;
+      const registeredCount =
+        batchItems.filter((item) => item.status === "registered").length +
+        registeredOutsidePageCount;
 
       const summary: AiExpenseQueueBatchSummary = {
         ...batch,
@@ -178,7 +208,7 @@ export function useAiExpenseQueueData({
         needsReviewCount,
         failedCount,
         registeredCount,
-        missingCount: batch.jobIds.length - batchItems.length,
+        missingCount: batch.jobIds.length - batchItems.length - registeredOutsidePageCount,
         isAllReady:
           batchItems.length === batch.jobIds.length &&
           batchItems.length > 0 &&
@@ -187,7 +217,7 @@ export function useAiExpenseQueueData({
 
       return summary.registeredCount === summary.totalCount ? [] : [summary];
     });
-  }, [items, sessionBatches]);
+  }, [hiddenItemIds, items, jobs, sessionBatches, unregisteredDraftIds]);
 
   return {
     clearableItems,
