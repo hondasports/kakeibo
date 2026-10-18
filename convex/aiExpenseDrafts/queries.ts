@@ -1,10 +1,15 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { aiExpenseDraftStatusValidator } from "./model";
 import { requireGroupMembership } from "../groups/membership";
-import { listAiExpenseDraftsByStatus } from "../../lib/usecase/aiExpenseDrafts/listDraftsByStatus";
+import {
+  listAiExpenseDraftsByStatus,
+  listAiExpenseDraftsByStatusPaginated,
+  type AiExpenseDraftListEntry,
+} from "../../lib/usecase/aiExpenseDrafts/listDraftsByStatus";
 import { getAiExpenseDraftWithItems } from "../../lib/usecase/aiExpenseDrafts/getDraftWithItems";
 import { createAiExpenseDraftQueryDeps } from "../../lib/convex/aiExpenseDrafts/draftUsecaseDeps";
 import {
@@ -17,9 +22,23 @@ type ListByStatusArgs = {
   status: AiExpenseDraftStatus;
 };
 
+type ListByStatusPaginatedArgs = {
+  status: AiExpenseDraftStatus;
+  paginationOpts: { numItems: number; cursor: string | null };
+};
+
 type GetWithItemsArgs = {
   draftId: Id<"aiExpenseDrafts">;
 };
+
+function listEntryToDoc({ id, creationTime, items, ...entry }: AiExpenseDraftListEntry) {
+  return {
+    ...entry,
+    ...(items === undefined ? {} : { items: items.map(draftItemFieldsToDoc) }),
+    _id: id,
+    _creationTime: creationTime,
+  };
+}
 
 export async function listByStatusHandler(ctx: QueryCtx, args: ListByStatusArgs) {
   const { groupId } = await requireGroupMembership(ctx);
@@ -28,12 +47,20 @@ export async function listByStatusHandler(ctx: QueryCtx, args: ListByStatusArgs)
     createAiExpenseDraftQueryDeps(ctx),
     args,
   );
-  return entries.map(({ id, creationTime, items, ...entry }) => ({
-    ...entry,
-    ...(items === undefined ? {} : { items: items.map(draftItemFieldsToDoc) }),
-    _id: id,
-    _creationTime: creationTime,
-  }));
+  return entries.map(listEntryToDoc);
+}
+
+export async function listByStatusPaginatedHandler(ctx: QueryCtx, args: ListByStatusPaginatedArgs) {
+  const { groupId } = await requireGroupMembership(ctx);
+  const result = await listAiExpenseDraftsByStatusPaginated(
+    { groupId },
+    createAiExpenseDraftQueryDeps(ctx),
+    args,
+  );
+  return {
+    ...result,
+    page: result.page.map(listEntryToDoc),
+  };
 }
 
 export async function getWithItemsHandler(ctx: QueryCtx, args: GetWithItemsArgs) {
@@ -57,6 +84,14 @@ export const listByStatus = query({
     status: aiExpenseDraftStatusValidator,
   },
   handler: listByStatusHandler,
+});
+
+export const listByStatusPaginated = query({
+  args: {
+    status: aiExpenseDraftStatusValidator,
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: listByStatusPaginatedHandler,
 });
 
 export const getWithItems = query({

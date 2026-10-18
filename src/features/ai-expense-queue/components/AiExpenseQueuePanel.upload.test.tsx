@@ -180,6 +180,82 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
     });
   });
 
+  describe("登録済み一覧の初回ページに入らない下書きを含むバッチ", () => {
+    const batchJobs = [
+      {
+        _id: "job-1",
+        batchId: "batch-1",
+        fileName: "batch-first.png",
+        status: "ready",
+        draftId: "draft-batch-1",
+      },
+      {
+        _id: "job-2",
+        batchId: "batch-1",
+        fileName: "batch-second.png",
+        status: "ready",
+        draftId: "draft-batch-2",
+      },
+    ];
+    const registeredFirstDraft = {
+      _id: "draft-batch-1",
+      status: "registered",
+      documentType: "receipt",
+      imageFileName: "batch-first.png",
+      shopName: "バッチ一店",
+      amountYen: 100,
+      date: "2026-06-01",
+      categoryId: "cat-food",
+      reviewReasons: [],
+    };
+
+    async function uploadBatch(unregisteredLists: "loaded" | "loading") {
+      const user = userEvent.setup();
+      let jobs: typeof batchJobs = batchJobs.map((job) => ({ ...job, status: "queued" }));
+      useQueryMock.mockImplementation((reference: string, args: { status?: string }) => {
+        if (reference === "receiptAnalysisJobs.queries.listJobs") return jobs;
+        if (reference === "aiExpenseDrafts.queries.listByStatus") {
+          // draft-batch-2 は登録済みだが、登録済み一覧の初回ページに入らない
+          if (args.status === "registered") return [registeredFirstDraft];
+          return unregisteredLists === "loaded" ? [] : undefined;
+        }
+        if (reference === "users.queries.getReceiptImageConsent") {
+          return { hasAcceptedExternalApiConsent: true, acceptedAt: 1234567890 };
+        }
+        return [];
+      });
+      const { rerender } = renderWithProviders(<AiExpenseQueuePanel />);
+      await user.upload(screen.getByLabelText("読み取り用画像を追加"), [
+        new File(["first"], "batch-first.png", { type: "image/png" }),
+        new File(["second"], "batch-second.png", { type: "image/png" }),
+      ]);
+      expect(await screen.findByText("今回の追加 0/2件が登録準備OK")).toBeInTheDocument();
+
+      jobs = batchJobs;
+      rerender(
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <AiExpenseQueuePanel />
+        </ThemeProvider>,
+      );
+    }
+
+    it("未登録の一覧にない下書きは登録済みとして数え、要約を閉じる", async () => {
+      await uploadBatch("loaded");
+
+      await waitFor(() => {
+        expect(screen.queryByText(/今回の追加/)).not.toBeInTheDocument();
+      });
+      expect(screen.queryByText(/反映待ち/)).not.toBeInTheDocument();
+    });
+
+    it("未登録の一覧を読み込み中の間は登録済みとみなさない", async () => {
+      await uploadBatch("loading");
+
+      expect(await screen.findByText(/反映待ち 1件/)).toBeInTheDocument();
+    });
+  });
+
   it("1枚だけ追加した画像の解析完了後に確認フォームを自動表示する", async () => {
     const user = userEvent.setup();
     const jobs = [

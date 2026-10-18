@@ -1,0 +1,2 @@
+export const MAX_LINE_TEXT_LENGTH = 5_000;
+export const MAX_LINE_MESSAGE_ID_LENGTH = 256;

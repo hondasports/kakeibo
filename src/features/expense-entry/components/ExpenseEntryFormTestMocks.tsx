@@ -23,6 +23,7 @@ vi.mock("../../../../convex/_generated/api", () => ({
       },
       queries: {
         listByStatus: "aiExpenseDrafts.queries.listByStatus",
+        listByStatusPaginated: "aiExpenseDrafts.queries.listByStatusPaginated",
       },
     },
     users: {
@@ -96,6 +97,15 @@ vi.mock("convex/react", () => ({
     }
     return undefined;
   },
+  usePaginatedQuery: (functionRef: string, args?: unknown) => ({
+    results:
+      functionRef === "aiExpenseDrafts.queries.listByStatusPaginated"
+        ? (aiExpenseDraftsByStatusQueryMock(args) ?? [])
+        : [],
+    status: "Exhausted",
+    loadMore: vi.fn(),
+    isLoading: false,
+  }),
   useConvex: () => ({
     query: vi.fn().mockResolvedValue(null),
   }),

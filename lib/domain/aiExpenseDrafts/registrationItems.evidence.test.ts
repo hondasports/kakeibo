@@ -6,10 +6,10 @@ import {
   unprovenTargetReceipt,
   observationLine,
 } from "../receipt/tax/fixtures/unprovenTargetReceipt";
+import { pointFooterReceipt } from "../receipt/tax/fixtures/pointFooterReceipt";
 import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 
-function fixture() {
-  const input = unprovenTargetReceipt();
+function fixture(input = unprovenTargetReceipt()) {
   const draft: AiExpenseDraftFields & { amountYen: number } = {
     groupId: "group",
     sourceType: "image_upload",
@@ -61,6 +61,20 @@ it("プレビュー・保存計画・再表示・登録で同じ対象額と税�
   expect(planDraftTaxInterpretation(savedDraft, savedItems, {}, 2).draftPatch.taxSummaries).toEqual(
     plan.draftPatch.taxSummaries,
   );
+});
+
+it("末尾にポイント行があるレシートも、確認済みの商品で保存すれば登録できる（Issue #1042）", () => {
+  const { draft, items } = fixture(pointFooterReceipt());
+  draft.reviewReasons = ["user_confirmation_required"];
+  const plan = planDraftTaxInterpretation(draft, items, {}, 1);
+  expect(plan.draftPatch.status).toBe("ready");
+  const savedItems = items.map((item, index) => ({ ...item, ...plan.itemPatches[index].patch }));
+  expect(
+    buildDraftRegistrationItems({ ...draft, ...plan.draftPatch }, savedItems).reduce(
+      (sum, item) => sum + item.amountYen,
+      0,
+    ),
+  ).toBe(2508);
 });
 
 it.each(["missing", "stale"])(

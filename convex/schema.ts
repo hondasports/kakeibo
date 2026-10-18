@@ -162,6 +162,7 @@ export default defineSchema({
   groups: defineTable({
     name: v.string(),
     clerkOrganizationId: v.optional(v.string()),
+    defaultCategoriesSeedVersion: v.optional(v.number()),
     status: v.optional(
       v.union(
         v.literal("active"),
@@ -557,13 +558,17 @@ export default defineSchema({
     warnings: v.optional(v.array(v.string())),
     reviewReasons: v.array(aiExpenseDraftReviewReasonValidator),
     registeredReceiptId: v.optional(v.id("receipts")),
+    // 一覧 index に乗せるため derivedRegistration.registeredAt と同じ値を保持する。
+    // backfill 完了前の登録済み下書きは未設定のまま残り得る。
+    registeredAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_group_id_and_status_and_created_at", ["groupId", "status", "createdAt"])
     .index("by_group_id_and_created_by_user_id", ["groupId", "createdByUserId"])
     .index("by_group_id_and_created_at", ["groupId", "createdAt"])
-    .index("by_group_id_and_registered_receipt_id", ["groupId", "registeredReceiptId"]),
+    .index("by_group_id_and_registered_receipt_id", ["groupId", "registeredReceiptId"])
+    .index("by_group_id_and_status_and_registered_at", ["groupId", "status", "registeredAt"]),
 
   aiExpenseDraftItems: defineTable({
     groupId: v.id("groups"),

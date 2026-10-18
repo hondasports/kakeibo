@@ -51,8 +51,6 @@ export function getTaxInterpretationEligibilityErrorMessage(
   return eligibilityErrorMessages[error];
 }
 
-export const UPDATED_DRAFT_NOT_FOUND_MESSAGE = "Failed to retrieve updated AI expense draft";
-
 /**
  * 再解釈の適格性を判定する。不在 → 他グループ → 金額欠落の順。
  */

@@ -7,6 +7,7 @@ import { DEFAULT_CATEGORIES, MAX_CATEGORIES_PER_GROUP } from "../../lib/domain/c
 import { E2E_CATEGORY_NAME_PREFIX } from "../../lib/domain/categories/rules";
 import {
   categoryRecordToDoc,
+  createCategorySeedStore,
   createCategoryStore,
 } from "../../lib/convex/categories/convexCategoryStore";
 import {
@@ -30,7 +31,7 @@ function convexError(error: unknown): never {
 export async function seedDefaultCategoriesHandler(ctx: MutationCtx) {
   const { groupId } = await requireGroupMembership(ctx);
   try {
-    return await seedDefaultCategoriesUsecase(createCategoryStore(ctx), groupId, Date.now());
+    return await seedDefaultCategoriesUsecase(createCategorySeedStore(ctx), groupId, Date.now());
   } catch (error) {
     convexError(error);
   }

@@ -1,4 +1,4 @@
-const DAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"] as const;
+export const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
 const dateTimeFormatter = new Intl.DateTimeFormat("ja-JP", {
   year: "numeric",
@@ -32,7 +32,7 @@ export function formatShortDateWithWeekday(isoDate: string): string {
   const date = new Date(`${isoDate}T00:00:00`);
   const month = date.getMonth() + 1;
   const day = date.getDate();
-  const dayLabel = DAY_LABELS[date.getDay()];
+  const dayLabel = WEEKDAY_LABELS[date.getDay()];
   return `${month}/${day}（${dayLabel}）`;
 }
 

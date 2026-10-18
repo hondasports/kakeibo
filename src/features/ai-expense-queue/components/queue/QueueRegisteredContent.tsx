@@ -7,6 +7,9 @@ export function QueueRegisteredContent({
   groupedItems,
   registeringIds,
   selectedReadyIds,
+  registeredHasMore,
+  registeredIsLoadingMore,
+  onLoadMoreRegistered,
   onOpenReview,
   onRegisterReady,
   onToggleReadySelection,
@@ -22,6 +25,9 @@ export function QueueRegisteredContent({
         onToggleReadySelection={onToggleReadySelection}
         deletingIds={deletingIds}
         registeringIds={registeringIds}
+        hasMore={registeredHasMore}
+        isLoadingMore={registeredIsLoadingMore}
+        onLoadMore={onLoadMoreRegistered}
       />
     </Stack>
   );

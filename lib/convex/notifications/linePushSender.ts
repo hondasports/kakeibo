@@ -1,4 +1,5 @@
 import { getLineIntegrationMode } from "../lineLink/lineIntegrationConfig";
+import { MAX_LINE_TEXT_LENGTH } from "../../domain/lineMessaging/limits";
 import type { LinePushSendResult, LinePushSender } from "../../domain/notifications/runner";
 import {
   LINE_NOTIFICATION_PROVIDER_TIMEOUT_MS,
@@ -6,7 +7,6 @@ import {
 } from "../../domain/notifications/rules";
 
 const LINE_PUSH_ENDPOINT = "https://api.line.me/v2/bot/message/push";
-const MAX_PUSH_TEXT_LENGTH = 5_000;
 
 export type LineFetch = typeof fetch;
 
@@ -14,7 +14,7 @@ export async function sendLineTextPush(
   input: { to: string; text: string; retryKey: string },
   fetchImpl: LineFetch = fetch,
 ): Promise<LinePushSendResult> {
-  if (!input.to || !input.text || input.text.length > MAX_PUSH_TEXT_LENGTH) {
+  if (!input.to || !input.text || input.text.length > MAX_LINE_TEXT_LENGTH) {
     return { kind: "permanent", errorCode: "invalid_request" };
   }
   if (!isValidRetryKey(input.retryKey)) {

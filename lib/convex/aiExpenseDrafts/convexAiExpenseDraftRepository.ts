@@ -10,6 +10,12 @@ import type {
 } from "../../domain/aiExpenseDrafts/aiExpenseDraftRepository";
 import { draftDocToFields } from "./draftRecordMapping";
 
+function statusIndexName(status: AiExpenseDraftStatus) {
+  return status === "registered"
+    ? "by_group_id_and_status_and_registered_at"
+    : "by_group_id_and_status_and_created_at";
+}
+
 export function createAiExpenseDraftRepository(
   ctx: Pick<MutationCtx, "db">,
 ): AiExpenseDraftRepository {
@@ -27,12 +33,22 @@ export function createAiExpenseDraftRepository(
     async listByGroupAndStatus(groupId, status, limit) {
       const docs = await ctx.db
         .query("aiExpenseDrafts")
-        .withIndex("by_group_id_and_status_and_created_at", (q) =>
-          q.eq("groupId", groupId as Id<"groups">).eq("status", status as AiExpenseDraftStatus),
+        .withIndex(statusIndexName(status), (q) =>
+          q.eq("groupId", groupId as Id<"groups">).eq("status", status),
         )
         .order("desc")
         .take(limit);
       return docs.map(draftDocToFields);
+    },
+    async paginateByGroupAndStatus(groupId, status, opts) {
+      const page = await ctx.db
+        .query("aiExpenseDrafts")
+        .withIndex(statusIndexName(status), (q) =>
+          q.eq("groupId", groupId as Id<"groups">).eq("status", status),
+        )
+        .order("desc")
+        .paginate(opts);
+      return { ...page, page: page.page.map(draftDocToFields) };
     },
   };
 }
@@ -49,12 +65,22 @@ export function createAiExpenseDraftReadRepository(
     async listByGroupAndStatus(groupId, status, limit) {
       const docs = await ctx.db
         .query("aiExpenseDrafts")
-        .withIndex("by_group_id_and_status_and_created_at", (q) =>
-          q.eq("groupId", groupId as Id<"groups">).eq("status", status as AiExpenseDraftStatus),
+        .withIndex(statusIndexName(status), (q) =>
+          q.eq("groupId", groupId as Id<"groups">).eq("status", status),
         )
         .order("desc")
         .take(limit);
       return docs.map(draftDocToFields);
+    },
+    async paginateByGroupAndStatus(groupId, status, opts) {
+      const page = await ctx.db
+        .query("aiExpenseDrafts")
+        .withIndex(statusIndexName(status), (q) =>
+          q.eq("groupId", groupId as Id<"groups">).eq("status", status),
+        )
+        .order("desc")
+        .paginate(opts);
+      return { ...page, page: page.page.map(draftDocToFields) };
     },
   };
 }

@@ -55,6 +55,7 @@ export type AiExpenseDraftFields = {
   warnings?: string[];
   reviewReasons: AiExpenseDraftReviewReason[];
   registeredReceiptId?: string;
+  registeredAt?: number;
   createdAt: number;
   updatedAt: number;
 };

@@ -4,10 +4,16 @@ import {
   AiExpenseDraft,
   type AiExpenseDraftFields,
 } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
-import type { DraftReviewItemInput } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
+import type {
+  AiExpenseDraftItemFields,
+  DraftReviewItemInput,
+} from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftDocumentType } from "../../domain/aiExpenseDrafts/constants";
 import { classifyAiExpenseDraft } from "../../domain/aiExpenseDrafts/classification";
-import { buildDerivedRegistration } from "../../domain/aiExpenseDrafts/registration";
+import {
+  buildRegistrationPatchFields,
+  resolveRegisteredAt,
+} from "../../domain/aiExpenseDrafts/registration";
 import {
   buildDraftRegistrationItems,
   resolveRegistrationMode,
@@ -26,6 +32,7 @@ import {
 } from "../../domain/aiExpenseDrafts/review";
 import { nonTaxReviewReasons } from "../../domain/aiExpenseDrafts/reviewReasons";
 import { validatePositiveCategoryTotals } from "../../domain/aiExpenseDrafts/reviewItems";
+import { applyRecordPatch } from "../../domain/common/recordPatch";
 import { trimOptional } from "../../domain/common/string";
 import { resolveReceiptTotal } from "../../domain/receipt/tax/resolveReceiptTotal";
 import type { PriceTaxTreatment, TaxRateComposition } from "../../domain/receipt/tax/types";
@@ -123,20 +130,34 @@ export async function updateAiExpenseDraftForReview(
     args.priceTaxTreatment !== undefined || args.taxRateComposition !== undefined;
   const originalItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
   const shouldReinterpretTax = hasTaxDecisionUpdate || hasReceiptTaxMetadata(fields, originalItems);
+  // 読み込み済みの下書き・明細を引き回し、patch 内容をメモリ上で追跡して再読み込みを省く。
+  let currentDraft = fields;
   if (!fields.receiptInterpretation && shouldReinterpretTax) {
-    await deps.drafts.patch(args.draftId, {
+    const legacyInterpretationPatch = {
       receiptInterpretation: {
-        source: "legacy_projection",
+        source: "legacy_projection" as const,
         interpretedAt: now,
         values: snapshotReceiptDraftValues(fields, originalItems),
       },
-    });
+    };
+    await deps.drafts.patch(args.draftId, legacyInterpretationPatch);
+    currentDraft = applyRecordPatch(
+      currentDraft as unknown as Record<string, unknown>,
+      legacyInterpretationPatch,
+    ) as unknown as AiExpenseDraftFields;
   }
+  let currentItems = originalItems;
   if (args.items !== undefined) {
     if (registrationMode === "detailed" && !validatePositiveCategoryTotals(args.items)) {
       throw new ConvexError("Draft category total must be greater than zero");
     }
-    await deps.itemReplace.replaceForReview(args.draftId, ctx.groupId, args.items, now);
+    currentItems = await deps.itemReplace.replaceForReview(
+      args.draftId,
+      ctx.groupId,
+      args.items,
+      now,
+      originalItems,
+    );
   }
 
   const reviewConfidence = buildReviewConfidence(fields.confidence, {
@@ -168,7 +189,7 @@ export async function updateAiExpenseDraftForReview(
         : undefined,
   });
 
-  await deps.drafts.patch(args.draftId, {
+  const reviewFieldsPatch = {
     documentType: args.documentType,
     shopName: trimOptional(args.shopName),
     paymentPlace: trimOptional(args.paymentPlace),
@@ -180,12 +201,19 @@ export async function updateAiExpenseDraftForReview(
     categoryId: args.categoryId,
     confidence: reviewConfidence,
     updatedAt: now,
-  });
+  };
+  await deps.drafts.patch(args.draftId, reviewFieldsPatch);
+  currentDraft = applyRecordPatch(
+    currentDraft as unknown as Record<string, unknown>,
+    reviewFieldsPatch,
+  ) as unknown as AiExpenseDraftFields;
 
   if (shouldReinterpretTax) {
-    await deps.taxInterpretation.persistInterpretation({
+    const reinterpreted = await deps.taxInterpretation.persistInterpretation({
       draftId: args.draftId,
       groupId: ctx.groupId,
+      draft: currentDraft,
+      items: currentItems,
       receiptTotalSource: "user_confirmed",
       decisionOverride: hasTaxDecisionUpdate
         ? {
@@ -211,11 +239,13 @@ export async function updateAiExpenseDraftForReview(
         ...(args.items === undefined ? [] : ["items"]),
       ],
       updatedAt: now,
+      draft: reinterpreted.draft,
+      items: reinterpreted.items,
     });
-    return await reconcileRegisteredDraft(updated);
+    return await reconcileRegisteredDraft(updated, reinterpreted.items);
   }
 
-  await deps.drafts.patch(args.draftId, {
+  const statusPatch = {
     status: classification.status,
     receiptTotalResolution: resolveReceiptTotal({
       amountYen: args.amountYen,
@@ -228,7 +258,12 @@ export async function updateAiExpenseDraftForReview(
     }),
     reviewReasons: classification.reviewReasons,
     updatedAt: now,
-  });
+  };
+  await deps.drafts.patch(args.draftId, statusPatch);
+  currentDraft = applyRecordPatch(
+    currentDraft as unknown as Record<string, unknown>,
+    statusPatch,
+  ) as unknown as AiExpenseDraftFields;
 
   const updated = await deps.overrideSnapshots.persist({
     draftId: args.draftId,
@@ -239,16 +274,18 @@ export async function updateAiExpenseDraftForReview(
       ...(args.items === undefined ? [] : ["items"]),
     ],
     updatedAt: now,
+    draft: currentDraft,
+    items: currentItems,
   });
-  return await reconcileRegisteredDraft(updated);
+  return await reconcileRegisteredDraft(updated, currentItems);
 
   async function reconcileRegisteredDraft(
     updatedDraft: AiExpenseDraftFields,
+    updatedItems: AiExpenseDraftItemFields[],
   ): Promise<AiExpenseDraftFields> {
     if (!wasRegistered) {
       return updatedDraft;
     }
-    const updatedItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
     let registrationItems;
     try {
       registrationItems = buildDraftRegistrationItems(updatedDraft, updatedItems);
@@ -262,22 +299,22 @@ export async function updateAiExpenseDraftForReview(
       items: registrationItems,
       now,
     });
-    await deps.drafts.patch(args.draftId, {
-      status: "registered",
-      derivedRegistration: buildDerivedRegistration({
-        destination: "expense_entries",
+    const reconcilePatch = {
+      status: "registered" as const,
+      ...buildRegistrationPatchFields({
+        destination: "expense_entries" as const,
         registrationMode: resolveRegistrationMode(updatedDraft),
         amountYen: updatedDraft.amountYen!,
         date: updatedDraft.date!,
         categoryIds: [...new Set(registrationItems.map((item) => item.categoryId))],
-        registeredAt: updatedDraft.derivedRegistration?.registeredAt ?? now,
+        registeredAt: resolveRegisteredAt(updatedDraft, now),
       }),
       updatedAt: now,
-    });
-    const reconciled = await deps.drafts.findById(args.draftId);
-    if (reconciled === null) {
-      throw new ConvexError("AI expense draft not found after registered update");
-    }
-    return reconciled;
+    };
+    await deps.drafts.patch(args.draftId, reconcilePatch);
+    return applyRecordPatch(
+      updatedDraft as unknown as Record<string, unknown>,
+      reconcilePatch,
+    ) as unknown as AiExpenseDraftFields;
   }
 }

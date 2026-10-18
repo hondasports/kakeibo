@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildRegistrationPatchFields,
   dedupeDraftIds,
   getReadyDraftRegistrationErrorMessage,
   isAlreadyRegistered,
   isAlreadyRegisteredAsReceipt,
+  resolveRegisteredAt,
   validateReadyDraftForRegistration,
 } from "./registration";
 
@@ -56,6 +58,37 @@ describe("isAlreadyRegisteredAsReceipt", () => {
     [{ status: "ready", registeredReceiptId: "r1" }, false],
   ] as const)("%o -> %s", (draft, expected) => {
     expect(isAlreadyRegisteredAsReceipt(draft as never)).toBe(expected);
+  });
+});
+
+describe("resolveRegisteredAt", () => {
+  it.each([
+    [{ derivedRegistration: { registeredAt: 500 }, registeredAt: 400 }, 500],
+    [{ registeredAt: 400 }, 400],
+    [{}, 999],
+  ] as const)("%o -> %s", (fields, expected) => {
+    expect(resolveRegisteredAt(fields as never, 999)).toBe(expected);
+  });
+});
+
+describe("buildRegistrationPatchFields", () => {
+  it("トップレベルの registeredAt は derivedRegistration.registeredAt と常に同じ値になる", () => {
+    const fields = buildRegistrationPatchFields({
+      destination: "expense_entries",
+      registrationMode: "detailed",
+      amountYen: 1200,
+      date: "2026-08-26",
+      categoryIds: ["cat-food"],
+      registeredAt: 1234,
+    });
+    expect(fields.registeredAt).toBe(1234);
+    expect(fields.registeredAt).toBe(fields.derivedRegistration.registeredAt);
+    expect(fields.derivedRegistration).toMatchObject({
+      source: "derived",
+      destination: "expense_entries",
+      amountYen: 1200,
+      categoryIds: ["cat-food"],
+    });
   });
 });
 

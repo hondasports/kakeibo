@@ -272,6 +272,7 @@ convex/
   systemAdminGroupDeletion.ts
   legacyGroupDeletionAuditMigration.ts
   orphanedLineLinkMigration.ts   # 退会済みユーザーに残った LINE 連携データの一回限り内部 migration（§16.4）
+  aiExpenseDraftRegisteredAtMigration.ts # 登録済み下書きの registeredAt を補完する一回限り内部 backfill（§16.4）
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
@@ -684,9 +685,12 @@ parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を再利�
   からの税関連フィールド継承を含む置換明細フィールド構築、エラー文言変換）と
   `reviewCategory.ts`（レビュー用カテゴリ利用可否: 不在/他グループ・非アクティブ）。
 - **ユースケース**: `assertActiveCategoryForDraft` は `reviewCategory.ts` へ委譲する。
-- **インフラ**: `lib/convex/aiExpenseDrafts/reviewValidation.ts` は既存明細取得・削除・
-  insert と Doc/Fields 変換のみを担い、判定順序（上限 → 取得 → ID 検証 → 削除 →
-  各明細で名前/金額 → カテゴリ → insert）と文言は不変とする。
+- **インフラ**: `lib/convex/aiExpenseDrafts/reviewValidation.ts` は既存明細取得（または
+  既読データの流用）・差分適用と Doc/Fields 変換のみを担う。Database I/O 削減のため
+  全件削除＋再 insert ではなく差分更新（変わった明細だけ patch・増えた明細は insert・
+  消えた明細は delete）とし、判定順序（上限 → 取得 → ID 検証 → 不在分 delete →
+  各明細で名前/金額 → カテゴリ → 差分 patch/insert）と文言は不変とする。明細の
+  `_id` は保持される。
 
 `receipts` 集計の新旧形式フォールバック判定も `lib/domain/receipt/legacyFallback.ts`
 へ分離済み。
@@ -820,9 +824,10 @@ domain へ分離済み。
   `snapshotReceiptDraftValues`（draft・明細のフィールド射影。warnings 未設定は
   空配列へ正規化）と `buildReceiptUserOverride`（fields の和集合マージ・
   税判定更新時の全体設定の軸の記録置換・`source: "user"` 組立）。
-- **インフラ**: `lib/convex/aiExpenseDrafts/receiptDataContract.ts` は draft get・
-  所有権チェック（`groupId` 不一致または不存在で Error・文言維持）・明細
-  `by_group_id_and_draft_id` asc take(100)・patch・再取得のみを担い、
+- **インフラ**: `lib/convex/aiExpenseDrafts/receiptDataContract.ts` は draft 取得
+  （`draft`/`items` 引数による既読データの流用可）・所有権チェック（`groupId` 不一致
+  または不存在で Error・文言維持）・明細 `by_group_id_and_draft_id` asc take(100)・
+  patch・patch 適用済み結果のメモリ組立のみを担い、
   `persistReceiptUserOverrideSnapshot` / `snapshotReceiptDraftValues` /
   `resetReceiptToAiInterpretationHandler` の公開シグネチャは不変とする。
 
@@ -1163,6 +1168,7 @@ MVPの画面で全明細を常時表示しない場合でも、将来の複数�
 | categories   | `by_group_id_and_is_active_and_sort_order` | 有効カテゴリの表示                                 |
 | categories   | `by_group_id_and_sort_order`               | カテゴリ設定画面、無効化済みカテゴリを含む履歴表示 |
 | aiExpenseDrafts | `by_group_id_and_status_and_created_at` | 指定グループのキューを状態別・作成順で取得         |
+| aiExpenseDrafts | `by_group_id_and_status_and_registered_at` | 指定グループの登録済み下書きを登録日時降順で取得   |
 | aiExpenseDrafts | `by_group_id_and_created_at` | 指定グループの下書き一覧を作成順で取得             |
 | aiExpenseDrafts | `by_group_id_and_registered_receipt_id` | receipt登録済み下書きの参照・重複登録防止          |
 | aiExpenseDraftItems | `by_group_id_and_draft_id` | 所属グループ確認済みの明細取得                     |
@@ -1239,6 +1245,23 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `categories.mutations.deactivateCategory(id)`
 - `categories.internal.deleteE2eCategoriesByUser(groupId)`（internal）
 
+`seedDefaultCategories()` のhandlerは認証・グループ所属の確認、依存構築、エラー変換を担う。
+バージョンの判定・seed・保存は `lib/usecase/categories/operations.ts` の
+`seedDefaultCategories()` にまとめ、`lib/domain/categories/store.ts` の `CategorySeedStore`
+ポート経由で永続化する。Convex実装は `lib/convex/categories/convexCategoryStore.ts` の
+`createCategorySeedStore()` に置く。
+
+`groups.defaultCategoriesSeedVersion` が `lib/domain/categories/defaults.ts` の
+`DEFAULT_CATEGORIES_SEED_VERSION` と一致すればカテゴリの読み取りとグループ更新を省略する。
+未設定・不一致の場合は従来どおり不足カテゴリの作成と既存カテゴリの補完を行い、
+同じmutation内で成功後にバージョンだけを保存する。無効化状態とユーザーの設定は維持する。
+
+`DEFAULT_CATEGORIES` を変更するときは、同じファイルの `DEFAULT_CATEGORIES_SEED_VERSION` を
+増やす。これにより既存グループにも次回のseed呼び出しで定義変更の補完が適用される。
+`lib/domain/categories/defaults.test.ts` の版別定義との一致検証が上げ忘れを検出するため、既存版を変更せず対応表に新しい版の定義を追加する。
+保存フィールドはoptionalで、既存データの一括移行は不要。
+アプリの変更を戻す場合もこのoptionalフィールドを残せば、従来のseed処理を継続できる。
+
 ### 10.5 users
 
 - `users.mutations.upsertUser()`
@@ -1270,6 +1293,7 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 ### 10.8 AI expense drafts
 
 - `aiExpenseDrafts.queries.listByStatus(status)`
+- `aiExpenseDrafts.queries.listByStatusPaginated(status, paginationOpts)`
 - `aiExpenseDrafts.queries.getWithItems(draftId)`
 - `aiExpenseDrafts.mutations.updateForReview(draftId, input)`
 - `aiExpenseDrafts.mutations.deleteDraft(draftId)`
@@ -1582,6 +1606,20 @@ cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` �
 1. `pnpm exec convex run orphanedLineLinkMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`orphanLinks` / `orphanRequests` / `orphanAuditLogs` と `wouldDelete` を確認。`wouldDelete` は phase 間で重複しうる上限見積もり）
 2. `pnpm exec convex run orphanedLineLinkMigration:executeBatch '{}'`（自己再スケジュールで全 phase を最後まで進む。冪等なので再実行可。`isDone: true` を戻り値かログで確認）
 3. `pnpm exec convex run orphanedLineLinkMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remainingOrphanLinks` / `remainingOrphanRequests` / `remainingOrphanAuditLogs` が 0 であること）
+
+#### 登録済み下書きの registeredAt 補完（一回限りの内部 backfill）
+
+登録済み下書き一覧は `by_group_id_and_status_and_registered_at` index で登録日時降順に並ぶ。フィールド追加前の登録済み下書きは `registeredAt` を持たず、index 上は未設定（最小値）として一覧の末尾に並ぶため、登録日時の正しい位置に戻すには本 backfill が必要である。
+
+`convex/aiExpenseDraftRegisteredAtMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`status === "registered"` かつ `registeredAt` 未設定の `aiExpenseDrafts` に `registeredAt` を書き込む。値は `derivedRegistration.registeredAt`（無ければ `updatedAt` を登録時点の近似として使う）。`registeredAt` を持つ下書き・未登録の下書き・`updatedAt` には触れない。
+
+走査はテーブル全体の pagination を 1 batch 25 件で行い、`executeBatch` は自分自身を再スケジュールして最後まで進む。冪等なので再実行してよい。戻り値・ログは件数のみで、ユーザー識別子を含まない。
+
+運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の `needsBackfill` が既存の登録済み下書き数と妥当に一致することを確認してから `executeBatch` を実行する。**
+
+1. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` を確認）
+2. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
+3. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること）
 
 ## 17. テスト方針
 

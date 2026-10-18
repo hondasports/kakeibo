@@ -16,9 +16,7 @@ import type {
   LineSummaryRunner,
   SendSummaryReplyJobArgs,
 } from "../../domain/lineWebhook/actionRunner";
-
-const GUIDE_RETRY_DELAY_MS = 1_000;
-const MAX_GUIDE_RETRIES = 2;
+import { LINE_REPLY_RETRY_DELAY_MS, MAX_LINE_REPLY_RETRIES } from "./replyRetryPolicy";
 
 export type SendSummaryReplyDeps = {
   replySender: LineReplySender;
@@ -54,8 +52,8 @@ export async function sendSummaryReply(
     );
     await deps.replySender.sendTextReply(args.replyToken, replyText, quickReplyActions);
   } catch {
-    if (attempt < MAX_GUIDE_RETRIES) {
-      await deps.actionScheduler.scheduleSummaryReplyRetry(GUIDE_RETRY_DELAY_MS, {
+    if (attempt < MAX_LINE_REPLY_RETRIES) {
+      await deps.actionScheduler.scheduleSummaryReplyRetry(LINE_REPLY_RETRY_DELAY_MS, {
         replyToken: args.replyToken,
         userId: args.userId,
         messageText: args.messageText,

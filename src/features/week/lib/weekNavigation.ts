@@ -3,6 +3,7 @@ import {
   getWeekEndDay,
   normalizeWeekStartDay,
 } from "../../../../lib/domain/week/weekDates";
+import { WEEKDAY_LABELS } from "../../../utils/date";
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -93,7 +94,6 @@ export function generateWeekDays(
   weekStartDate: string,
   weekEndDate: string,
 ): Array<{ label: string; date: string; isoDate: string }> {
-  const dayLabels = ["日", "月", "火", "水", "木", "金", "土"];
   const days: Array<{ label: string; date: string; isoDate: string }> = [];
   const start = new Date(weekStartDate + "T00:00:00");
   const end = new Date(weekEndDate + "T00:00:00");
@@ -106,7 +106,7 @@ export function generateWeekDays(
     const mm = String(m).padStart(2, "0");
     const dd = String(d).padStart(2, "0");
     days.push({
-      label: dayLabels[current.getDay()],
+      label: WEEKDAY_LABELS[current.getDay()],
       date: `${m}/${d}`,
       isoDate: `${y}-${mm}-${dd}`,
     });

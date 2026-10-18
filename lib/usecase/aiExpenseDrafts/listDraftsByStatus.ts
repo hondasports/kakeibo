@@ -3,10 +3,12 @@ import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpens
 import type { AiExpenseDraftReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftRepository";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftItemReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftItemRepository";
+import type { PaginatedResult, PaginationOpts } from "../../domain/pagination";
 import { summarizeItems, type ItemSummary } from "../../domain/aiExpenseDrafts/reviewItems";
 import type { UsecaseGroupContext } from "../context";
 
 const LIST_LIMIT = 100;
+const ITEM_LIST_LIMIT = 100;
 
 export type AiExpenseDraftListEntry = AiExpenseDraftFields & {
   itemSummary?: ItemSummary;
@@ -14,22 +16,23 @@ export type AiExpenseDraftListEntry = AiExpenseDraftFields & {
   items?: AiExpenseDraftItemFields[];
 };
 
-/** ステータスで下書き一覧を取得する。ready/needs_review には明細サマリと明細を付与する。 */
-export async function listAiExpenseDraftsByStatus(
+type DraftListDeps = {
+  drafts: AiExpenseDraftReadRepository;
+  draftItems: AiExpenseDraftItemReadRepository;
+};
+
+async function attachItemDetails(
   ctx: Pick<UsecaseGroupContext, "groupId">,
-  deps: {
-    drafts: AiExpenseDraftReadRepository;
-    draftItems: AiExpenseDraftItemReadRepository;
-  },
-  args: { status: AiExpenseDraftStatus },
+  deps: DraftListDeps,
+  status: AiExpenseDraftStatus,
+  drafts: AiExpenseDraftFields[],
 ): Promise<AiExpenseDraftListEntry[]> {
-  const drafts = await deps.drafts.listByGroupAndStatus(ctx.groupId, args.status, LIST_LIMIT);
-  if (args.status !== "ready" && args.status !== "needs_review") {
+  if (status !== "ready" && status !== "needs_review") {
     return drafts;
   }
   return await Promise.all(
     drafts.map(async (draft) => {
-      const items = await deps.draftItems.listByDraftAsc(ctx.groupId, draft.id!, LIST_LIMIT);
+      const items = await deps.draftItems.listByDraftAsc(ctx.groupId, draft.id!, ITEM_LIST_LIMIT);
       return {
         ...draft,
         itemSummary: summarizeItems(draft, items),
@@ -37,4 +40,29 @@ export async function listAiExpenseDraftsByStatus(
       };
     }),
   );
+}
+
+/** ステータスで下書き一覧を取得する。ready/needs_review には明細サマリと明細を付与する。 */
+export async function listAiExpenseDraftsByStatus(
+  ctx: Pick<UsecaseGroupContext, "groupId">,
+  deps: DraftListDeps,
+  args: { status: AiExpenseDraftStatus },
+): Promise<AiExpenseDraftListEntry[]> {
+  const drafts = await deps.drafts.listByGroupAndStatus(ctx.groupId, args.status, LIST_LIMIT);
+  return await attachItemDetails(ctx, deps, args.status, drafts);
+}
+
+/** ステータスで下書き一覧をページング取得する。明細の付与ルールは一括取得と同じ。 */
+export async function listAiExpenseDraftsByStatusPaginated(
+  ctx: Pick<UsecaseGroupContext, "groupId">,
+  deps: DraftListDeps,
+  args: { status: AiExpenseDraftStatus; paginationOpts: PaginationOpts },
+): Promise<PaginatedResult<AiExpenseDraftListEntry>> {
+  const draftsPage = await deps.drafts.paginateByGroupAndStatus(
+    ctx.groupId,
+    args.status,
+    args.paginationOpts,
+  );
+  const page = await attachItemDetails(ctx, deps, args.status, draftsPage.page);
+  return { ...draftsPage, page };
 }

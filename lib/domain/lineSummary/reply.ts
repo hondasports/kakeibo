@@ -1,7 +1,6 @@
 import { addDays } from "../common/date";
+import { MAX_LINE_TEXT_LENGTH } from "../lineMessaging/limits";
 import type { CategorySummary } from "../receipt/summary";
-
-export const LINE_REPLY_MAX_LENGTH = 5_000;
 
 export const LINE_HELP_MESSAGE = [
   "家計簿の読み取り専用サマリーです。次から選ぶか、メッセージを送ってください。",
@@ -56,8 +55,8 @@ export type WeekTrendReplyInput = {
 };
 
 function clipReply(text: string): string {
-  if (text.length <= LINE_REPLY_MAX_LENGTH) return text;
-  return `${text.slice(0, LINE_REPLY_MAX_LENGTH - 1)}…`;
+  if (text.length <= MAX_LINE_TEXT_LENGTH) return text;
+  return `${text.slice(0, MAX_LINE_TEXT_LENGTH - 1)}…`;
 }
 
 function formatAmountOrMissing(count: number, amountYen: number): string {

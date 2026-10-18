@@ -4,7 +4,7 @@ import {
   type AiExpenseDraftFields,
 } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import {
-  buildDerivedRegistration,
+  buildRegistrationPatchFields,
   dedupeDraftIds,
   getReadyDraftRegistrationErrorMessage,
   isAlreadyRegistered,
@@ -99,7 +99,7 @@ export async function registerReadyDraftsAsExpenseEntries(
     draftsToRegister.map((draft) =>
       deps.drafts.patch(draft.id!, {
         status: "registered",
-        derivedRegistration: buildDerivedRegistration({
+        ...buildRegistrationPatchFields({
           destination: "expense_entries",
           registrationMode: resolveRegistrationMode(draft),
           amountYen: draft.amountYen!,

@@ -2,6 +2,7 @@
  * LINE webhook payload の解析ルール（純粋関数）。
  * Convex validator は convex/lineWebhook/model.ts が保持する。
  */
+import { MAX_LINE_MESSAGE_ID_LENGTH } from "../lineMessaging/limits";
 
 export type LineWebhookEventType = "text" | "image" | "postback" | "follow" | "unfollow";
 
@@ -20,7 +21,6 @@ export const MAX_EVENTS_PER_REQUEST = 20;
 const MAX_EVENT_ID_LENGTH = 256;
 const MAX_LINE_USER_ID_LENGTH = 256;
 const MAX_REPLY_TOKEN_LENGTH = 2048;
-const MAX_MESSAGE_ID_LENGTH = 256;
 const MAX_MESSAGE_TEXT_LENGTH = 10_000;
 const MAX_POSTBACK_DATA_LENGTH = 10_000;
 
@@ -89,7 +89,7 @@ function parseEvent(event: unknown): LineWebhookEventInput | null {
     if (lineUserId === null) return null;
     if (!isRecord(event.message)) throw new LineWebhookPayloadError();
     const messageType = readRequiredString(event.message.type, 32);
-    const messageId = readRequiredString(event.message.id, MAX_MESSAGE_ID_LENGTH);
+    const messageId = readRequiredString(event.message.id, MAX_LINE_MESSAGE_ID_LENGTH);
     const replyToken = readReplyToken(event);
 
     if (messageType === "text") {

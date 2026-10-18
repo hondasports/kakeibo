@@ -55,6 +55,7 @@ export async function applyReceiptTaxSettings(
   const result = await deps.taxInterpretation.persistInterpretation({
     draftId: args.draftId,
     groupId: ctx.groupId,
+    draft: draft.persisted,
     bulkUnresolvedOverride: {
       taxRatePercent: settingsResult.taxRatePercent as TaxRatePercent,
       amountBasis: settingsResult.amountBasis,
@@ -64,6 +65,8 @@ export async function applyReceiptTaxSettings(
     draftId: args.draftId,
     groupId: ctx.groupId,
     fields: ["items", "receiptTotalResolution", "receiptTaxDecision"],
+    draft: result.draft,
+    items: result.items,
   });
   return { ...result, draft: updatedDraft };
 }

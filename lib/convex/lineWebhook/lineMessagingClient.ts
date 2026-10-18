@@ -8,6 +8,10 @@ import {
   type LineImageContent,
 } from "../../domain/lineImage/content";
 import { getLineIntegrationMode } from "../lineLink/lineIntegrationConfig";
+import {
+  MAX_LINE_MESSAGE_ID_LENGTH,
+  MAX_LINE_TEXT_LENGTH,
+} from "../../domain/lineMessaging/limits";
 import { getAppBaseUrl } from "../../email/url";
 import {
   LINE_WEB_APP_PATH,
@@ -20,8 +24,6 @@ export { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../domain/lineWebhook/reply";
 const LINE_REPLY_ENDPOINT = "https://api.line.me/v2/bot/message/reply";
 const LINE_CONTENT_ENDPOINT_PREFIX = "https://api-data.line.me/v2/bot/message/";
 const PROVIDER_TIMEOUT_MS = 10_000;
-const MAX_REPLY_TEXT_LENGTH = 5_000;
-const MAX_MESSAGE_ID_LENGTH = 256;
 
 export const MOCK_LINE_IMAGE_BYTES = Uint8Array.from([0xff, 0xd8, 0xff, 0xd9]);
 
@@ -36,7 +38,7 @@ export async function sendLineTextReply(
   if (!replyToken || replyToken.length > 2048) {
     throw new Error("LINE reply token is invalid");
   }
-  if (!text || text.length > MAX_REPLY_TEXT_LENGTH) {
+  if (!text || text.length > MAX_LINE_TEXT_LENGTH) {
     throw new Error("LINE reply text is invalid");
   }
 
@@ -78,7 +80,11 @@ export async function getLineMessageContent(
   messageId: string,
   fetchImpl: LineFetch = fetch,
 ): Promise<LineImageContent> {
-  if (!messageId || messageId.length > MAX_MESSAGE_ID_LENGTH || messageId.trim().length === 0) {
+  if (
+    !messageId ||
+    messageId.length > MAX_LINE_MESSAGE_ID_LENGTH ||
+    messageId.trim().length === 0
+  ) {
     throw new Error("LINE message id is invalid");
   }
 

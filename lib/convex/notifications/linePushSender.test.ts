@@ -13,6 +13,22 @@ afterEach(() => {
 });
 
 describe("sendLineTextPush", () => {
+  it("本文は5000文字まで許可し、空文字と5001文字を送信前に拒否する", async () => {
+    vi.stubEnv("LINE_INTEGRATION_MODE", "mock");
+    vi.stubEnv("APP_ENV", "development");
+    const fetchImpl = vi.fn();
+    expect(await sendLineTextPush({ ...INPUT, text: "あ".repeat(5000) }, fetchImpl)).toEqual({
+      kind: "sent",
+    });
+    for (const text of ["", "あ".repeat(5001)]) {
+      expect(await sendLineTextPush({ ...INPUT, text }, fetchImpl)).toEqual({
+        kind: "permanent",
+        errorCode: "invalid_request",
+      });
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("returns sent without any fetch in mock mode", async () => {
     vi.stubEnv("LINE_INTEGRATION_MODE", "mock");
     vi.stubEnv("APP_ENV", "development");
