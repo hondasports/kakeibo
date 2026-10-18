@@ -98,7 +98,7 @@ describe("税再解釈系mutationのDatabase I/O", () => {
   });
 
   it("persistDraftTaxInterpretation は税関連フィールドが変わらない明細をpatchしない", async () => {
-    const { ctx } = createInMemoryMutationCtx({
+    const { ctx, getItems } = createInMemoryMutationCtx({
       draft: { ...draftSeed },
       items: itemSeeds.map((item) => ({ ...item })),
     });
@@ -107,9 +107,14 @@ describe("税再解釈系mutationのDatabase I/O", () => {
     await persistDraftTaxInterpretation(ctx, args);
     vi.mocked(ctx.db.patch).mockClear();
 
-    await persistDraftTaxInterpretation(ctx, args);
+    const result = await persistDraftTaxInterpretation(ctx, args);
 
     expect(patchIds(ctx).filter((id) => id !== DRAFT_ID)).toHaveLength(0);
+    // patch を skip した明細は、返却値の updatedAt も DB の値と一致する
+    for (const item of result.items) {
+      const stored = getItems().find((doc) => doc._id === item._id);
+      expect(item.updatedAt).toBe(stored?.updatedAt);
+    }
   });
 
   it("persistDraftTaxInterpretation は変わった明細だけpatchする", async () => {
