@@ -2,7 +2,7 @@ import { BarChart } from "@mui/x-charts/BarChart";
 import { Box, Paper, Skeleton, Stack, Typography, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { HistoryTrendPoint } from "../../../../lib/domain/expenseSearch/analytics";
-import { formatYenCompact } from "../../../utils/currency";
+import { formatYenCompact } from "../../../../lib/domain/common/currency";
 import { formatDateForDisplay } from "../../../utils/date";
 
 function pointLabel(point: HistoryTrendPoint): string {

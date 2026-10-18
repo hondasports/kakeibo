@@ -1,6 +1,6 @@
-import type { ReceiptRawObservation } from "../../../../lib/domain/receipt/observations";
-import type { ExtractedTaxSummary } from "../../../../lib/receiptTax/types";
-import type { ReviewItemValues } from "../types/types";
+import type { ReceiptRawObservation } from "../receipt/observations";
+import type { ExtractedTaxSummary } from "../receipt/tax/types";
+import type { ReviewItemValues } from "./reviewTypes";
 
 export function resolvedItem(overrides: Partial<ReviewItemValues> = {}): ReviewItemValues {
   return {

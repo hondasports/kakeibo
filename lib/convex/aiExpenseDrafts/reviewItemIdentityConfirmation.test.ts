@@ -5,8 +5,8 @@ import { GROUP_ID, DRAFT_ID, CAT_ID, createInMemoryMutationCtx } from "./testHel
 import { updateForReviewHandler } from "../../../convex/aiExpenseDrafts/mutations";
 import { updateDraftItemTaxOverridesHandler } from "./updateItemTaxOverrides";
 import { buildDraftRegistrationItems } from "./reconcileExpenseEntries";
-import { buildReviewTaxPreview } from "../../../src/features/receipt-review/utils/reviewItemsTaxPreview";
-import { mapDraftItemsToReviewItems } from "../../../src/features/receipt-review/utils/mappers";
+import { buildReviewTaxPreview } from "../../domain/aiExpenseDrafts/reviewItemsTaxPreview";
+import { mapDraftItemsToReviewItems } from "../../domain/aiExpenseDrafts/reviewDraftMapping";
 
 function fixture(raw: boolean) {
   const state = createInMemoryMutationCtx({

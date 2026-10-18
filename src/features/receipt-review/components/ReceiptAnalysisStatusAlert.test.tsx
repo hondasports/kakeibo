@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { toReceiptAnalysisViewModel } from "../utils/receiptItemTaxViewModel";
+import { toReceiptAnalysisViewModel } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
 import { ReceiptAnalysisStatusAlert } from "./ReceiptAnalysisStatusAlert";
 
 describe("ReceiptAnalysisStatusAlert", () => {

@@ -2,11 +2,11 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { Box, Chip, Stack, Typography } from "@mui/material";
-import { formatYen } from "../../../utils/currency";
-import { getTaxModeLabel } from "../utils/receiptItemTaxViewModel";
-import type { ReviewAmountCheck } from "../utils/reviewAmountChecks";
-import type { ReviewCheckStatus } from "../utils/reviewCheckUtils";
-import type { ReviewTaxRateCheck } from "../utils/reviewTaxChecks";
+import { formatYen } from "../../../../lib/domain/common/currency";
+import { getTaxModeLabel } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
+import type { ReviewAmountCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewAmountChecks";
+import type { ReviewCheckStatus } from "../../../../lib/domain/aiExpenseDrafts/reviewCheckUtils";
+import type { ReviewTaxRateCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewTaxChecks";
 
 const STATUS_LABEL: Record<ReviewCheckStatus, string> = {
   matched: "一致",

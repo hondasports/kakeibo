@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { unallocatedTaxReceipt } from "./fixtures/unallocatedTaxReceipt";
 import { reinterpretDraftTax } from "./reinterpretDraftTax";
-import { buildAmountCheck } from "../../../../src/features/receipt-review/utils/reviewAmountChecks";
-import type { ReviewItemValues } from "../../../../src/features/receipt-review/types/types";
+import { buildAmountCheck } from "../../aiExpenseDrafts/reviewAmountChecks";
+import type { ReviewItemValues } from "../../aiExpenseDrafts/reviewTypes";
 import type { ReinterpretDraftTaxInput } from "./reinterpretDraftTax";
 const reviewItems = (
   fields: ReturnType<typeof reinterpretDraftTax>["itemFields"],

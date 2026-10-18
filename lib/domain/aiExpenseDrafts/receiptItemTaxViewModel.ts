@@ -3,9 +3,9 @@ import type {
   ExtractedTaxSummary,
   TaxContextResolution,
   TaxResolutionSource,
-} from "../../../../lib/receiptTax/types";
-import type { AiExpenseDraftItem, ReviewItemValues } from "../types/types";
-import { ITEM_IDENTITY_CHANGED } from "../../../../lib/domain/receipt/tax/itemTaxConfirmation";
+} from "../receipt/tax/types";
+import type { AiExpenseDraftItem, ReviewItemValues } from "./reviewTypes";
+import { ITEM_IDENTITY_CHANGED } from "../receipt/tax/itemTaxConfirmation";
 import {
   formatTaxRateLabel,
   formatYenLabel,

@@ -1,18 +1,18 @@
 import {
   resolveReceiptTotalSource,
   resolveReceiptTotalSupportingCandidates,
-} from "../../../../lib/domain/aiExpenseDrafts/receiptTotalEvidence";
-import { hasReceiptTaxMetadata } from "../../../../lib/domain/receipt/tax/draftTaxMapping";
-import { resolveReceiptTaxCorrections } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
-import type { ReceiptLineClassification } from "../../../../lib/domain/receipt/observations";
-import { reinterpretDraftTax } from "../../../../lib/receiptTax/reinterpretDraftTax";
-import type { DraftItemTaxFields } from "../../../../lib/receiptTax/draftTaxMapping";
+} from "./receiptTotalEvidence";
+import { hasReceiptTaxMetadata } from "../receipt/tax/draftTaxMapping";
+import { resolveReceiptTaxCorrections } from "./receiptDataContract";
+import type { ReceiptLineClassification } from "../receipt/observations";
+import { reinterpretDraftTax } from "../receipt/tax/reinterpretDraftTax";
+import type { DraftItemTaxFields } from "../receipt/tax/draftTaxMapping";
 import type {
   ExtractedTaxSummary,
   PriceTaxTreatment,
   TaxRateComposition,
-} from "../../../../lib/receiptTax/types";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
+} from "../receipt/tax/types";
+import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
 
 function toExtractedTaxSummaries(
   taxSummaries: NonNullable<AiExpenseDraft["taxSummaries"]>,

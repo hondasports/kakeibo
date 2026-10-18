@@ -1,7 +1,10 @@
 import AddIcon from "@mui/icons-material/Add";
 import { Button, Stack, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
+import type {
+  AiExpenseDraft,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { ReviewItemCard } from "./ReviewItemCard";

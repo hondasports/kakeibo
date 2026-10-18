@@ -1458,7 +1458,7 @@ Issue #890の回帰例（すべて8%、対象額は税込、商品印字額は�
 | 132 / 108 | 259 | 19 | 10 / 9 | 142 / 117 |
 | 109 / 78 / 58 | 264 | 19 | 8 / 6 / 5 | 117 / 84 / 63 |
 
-最後の例は印字税額19円を保持し、再保存で税20円・合計265円へ変化させない。入力は[共通回帰fixture](../lib/domain/receipt/tax/fixtures/receiptTaxBasisCases.ts)、画面の照合は[基準換算テスト](../src/features/receipt-review/utils/reviewChecks.basis.test.ts)、補正・再保存・登録は[E2E](../e2e/ai-expense-queue.basis-regression.spec.ts)で検証する。
+最後の例は印字税額19円を保持し、再保存で税20円・合計265円へ変化させない。入力は[共通回帰fixture](../lib/domain/receipt/tax/fixtures/receiptTaxBasisCases.ts)、画面の照合は[基準換算テスト](../lib/domain/aiExpenseDrafts/reviewChecks.basis.test.ts)、補正・再保存・登録は[E2E](../e2e/ai-expense-queue.basis-regression.spec.ts)で検証する。
 
 全体の税設定と、商品・税内訳の補正から派生した税判定は区別して保存・復元する。
 

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import { ReviewDialog } from "./ReviewDialog";
-import { mixedTaxReviewFixture } from "../utils/reviewTaxPreviewTestHelpers";
+import { mixedTaxReviewFixture } from "../../../../lib/domain/aiExpenseDrafts/reviewTaxPreviewTestHelpers";
 
 const props: ComponentProps<typeof ReviewDialog> = {
   open: true,

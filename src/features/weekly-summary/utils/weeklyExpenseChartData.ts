@@ -1,4 +1,4 @@
-import { formatYen } from "../../../utils/currency";
+import { formatYen } from "../../../../lib/domain/common/currency";
 import { formatDateForDisplay } from "../../../utils/date";
 
 export type WeeklyCategoryBreakdown = {

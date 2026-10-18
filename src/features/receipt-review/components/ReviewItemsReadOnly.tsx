@@ -1,5 +1,8 @@
 import { Alert, Box, Stack, Typography } from "@mui/material";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
+import type {
+  AiExpenseDraft,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { formatTaxWarnings } from "../utils/taxWarnings";
 import { ReceiptItemRow } from "./ReceiptItemRow";

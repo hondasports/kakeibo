@@ -1,8 +1,8 @@
 import { Alert, Box, Button, Stack, Typography } from "@mui/material";
-import { formatYen } from "../../../utils/currency";
-import type { ReviewGuidanceItem } from "../utils/reviewGuidance";
-import type { ReviewAmountCheck } from "../utils/reviewAmountChecks";
-import type { ReviewChecks } from "../utils/reviewChecks";
+import { formatYen } from "../../../../lib/domain/common/currency";
+import type { ReviewGuidanceItem } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
+import type { ReviewAmountCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewAmountChecks";
+import type { ReviewChecks } from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
 
 function yen(value: number | undefined): string {
   return value === undefined ? "未確定" : formatYen(value);

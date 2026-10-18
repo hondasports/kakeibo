@@ -4,10 +4,13 @@ import { useMutation } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
-import type { ReviewFormValues, ReviewItemValues } from "../types/types";
+import type {
+  ReviewFormValues,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueuePanelProps } from "../../../types/aiExpenseQueue";
-import { prepareReviewItemsForSubmit } from "../utils/reviewItemCategories";
-import { formatReviewSaveMessage } from "../utils/reviewFeedback";
+import { prepareReviewItemsForSubmit } from "../../../../lib/domain/aiExpenseDrafts/reviewItemCategories";
+import { formatReviewSaveMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewFeedback";
 
 export function useReviewSubmit({
   selectedReviewDraftId,

@@ -10,7 +10,7 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { formatYenCompact } from "../../../utils/currency";
+import { formatYenCompact } from "../../../../lib/domain/common/currency";
 import { buildYearlyLineSeries, type YearlyTrendChartData } from "../utils/yearlyTrendChartData";
 
 export type YearlyChartMode = "balance" | "category";

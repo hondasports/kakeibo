@@ -3,8 +3,8 @@ import type {
   TaxResolutionSource,
   TaxSummaryConsistencyReason,
   TaxSummaryConsistencyStatus,
-} from "../../../../lib/receiptTax/types";
-import { formatYen } from "../../../utils/currency";
+} from "../receipt/tax/types";
+import { formatYen } from "../common/currency";
 
 export const TAX_RESOLUTION_SOURCE_LABELS = {
   item_explicit: "レシート明細に税率表記があります",

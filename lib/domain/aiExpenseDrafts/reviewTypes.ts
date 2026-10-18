@@ -1,4 +1,4 @@
-import type { ReceiptItemTaxConfirmedField } from "../../../../lib/receiptTax/types";
+import type { ReceiptItemTaxConfirmedField } from "../receipt/tax/types";
 import type {
   ExtractedTaxSummary,
   PriceTaxTreatment,
@@ -6,19 +6,27 @@ import type {
   ReceiptTotalResolution,
   TaxRateComposition,
   TaxResolutionSource,
-} from "../../../../lib/receiptTax/types";
-import type { ReceiptRawObservation } from "../../../../lib/domain/receipt/observations";
+} from "../receipt/tax/types";
+import type { ReceiptRawObservation } from "../receipt/observations";
 import type {
   AiExpenseRegistrationMode,
   DerivedRegistrationSnapshot,
   ReceiptInterpretationSnapshot,
   ReceiptUserOverrideSnapshot,
-} from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
-import type { ReceiptItemLineType } from "../../../../lib/domain/receipt/discountItems";
+} from "./receiptDataContract";
+import type { ReceiptItemLineType } from "../receipt/discountItems";
+import type {
+  AiExpenseDraftDocumentType,
+  AiExpenseDraftStatus as PersistedDraftStatus,
+} from "./constants";
 
-export type AiExpenseQueueDocumentType = "receipt" | "convenience_payment" | "unknown";
+export type AiExpenseQueueDocumentType = AiExpenseDraftDocumentType;
 
-export type AiExpenseDraftStatus = "ready" | "needs_review" | "failed" | "registered";
+/** 一覧・レビュー画面で扱う下書き状態。解析中・登録中の status はこの境界には出さない。 */
+export type AiExpenseDraftStatus = Extract<
+  PersistedDraftStatus,
+  "ready" | "needs_review" | "failed" | "registered"
+>;
 
 export type AiExpenseDraft = {
   _id: string;

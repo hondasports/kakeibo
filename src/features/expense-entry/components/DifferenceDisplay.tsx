@@ -1,5 +1,5 @@
 import { Chip, Stack, Typography } from "@mui/material";
-import { currencyFormatter, formatYen, formatYenAbs } from "../../../utils/currency";
+import { currencyFormatter, formatYen, formatYenAbs } from "../../../../lib/domain/common/currency";
 
 export function DifferenceDisplay({
   difference,

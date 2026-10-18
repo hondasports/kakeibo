@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import { Alert, Box, Button, Collapse, Stack, Typography } from "@mui/material";
 import { useState } from "react";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import { toReceiptTotalsViewModel } from "../utils/receiptTotalsViewModel";
+import type {
+  AiExpenseDraft,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
+import { toReceiptTotalsViewModel } from "../../../../lib/domain/aiExpenseDrafts/receiptTotalsViewModel";
 
 function TotalsRow({
   label,

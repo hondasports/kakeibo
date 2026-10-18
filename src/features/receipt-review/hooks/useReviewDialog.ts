@@ -1,4 +1,7 @@
-import type { AiExpenseDraft, AiExpenseDraftItem } from "../types/types";
+import type {
+  AiExpenseDraft,
+  AiExpenseDraftItem,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type {
   AiExpenseQueuePanelProps,
   AiExpenseQueueCategory,
@@ -7,7 +10,7 @@ import { useReviewDraftSelection } from "./useReviewDraftSelection";
 import { useReviewFormState } from "./useReviewFormState";
 import { useReviewSubmit } from "./useReviewSubmit";
 import { useReviewTaxOverrides } from "./useReviewTaxOverrides";
-import { mapDraftToReviewForm } from "../utils/mappers";
+import { mapDraftToReviewForm } from "../../../../lib/domain/aiExpenseDrafts/reviewDraftMapping";
 
 export function useReviewDialog({
   initialReviewDrafts,

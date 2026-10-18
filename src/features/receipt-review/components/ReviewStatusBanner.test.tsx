@@ -2,8 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ReviewStatusBanner } from "./ReviewStatusBanner";
-import type { ReviewChecks } from "../utils/reviewChecks";
-import type { ReviewGuidanceItem } from "../utils/reviewGuidance";
+import type { ReviewChecks } from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
+import type { ReviewGuidanceItem } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
 
 const matchedChecks: ReviewChecks = {
   amount: { status: "matched", variant: "direct" },

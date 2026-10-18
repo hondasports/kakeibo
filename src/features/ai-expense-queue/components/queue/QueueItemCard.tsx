@@ -18,8 +18,8 @@ import { documentTypeLabels, getSectionKey } from "../../../receipt-review/compo
 import { ReviewReasonChips } from "../../../receipt-review/components/ReviewReasonChips";
 import { StatusChip } from "../../../receipt-review/components/StatusChip";
 import type { AiExpenseQueueItem } from "../../../../types/aiExpenseQueue";
-import { formatYen } from "../../../../utils/currency";
-import { getPrimaryReviewReason } from "../../../receipt-review/utils/reviewFeedback";
+import { formatYen } from "../../../../../lib/domain/common/currency";
+import { getPrimaryReviewReason } from "../../../../../lib/domain/aiExpenseDrafts/reviewFeedback";
 import { formatQueueDate } from "./queueDisplayFormatters";
 import { QueueItemActions } from "./QueueItemActions";
 

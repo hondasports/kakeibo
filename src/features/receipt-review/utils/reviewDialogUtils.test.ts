@@ -7,7 +7,7 @@ import {
   hasUncategorizedItems,
   isLowConfidenceItem,
 } from "./reviewDialogUtils";
-import type { ReviewItemValues } from "../types/types";
+import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 
 const categories: AiExpenseQueueCategory[] = [

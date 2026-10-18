@@ -7,7 +7,7 @@ import { getImageCaptureFailureHint } from "../../../../lib/domain/aiExpenseDraf
 import { mapDraftToQueueItem } from "../../receipt-review/utils/mappers";
 import type { AiExpenseQueueCategory, AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
 import type { AiExpenseQueueBatchSummary, AiExpenseUploadBatch } from "../types/types";
-import type { AiExpenseDraft } from "../../receipt-review/types/types";
+import type { AiExpenseDraft } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 
 const REGISTERED_PAGE_SIZE = 10;
 

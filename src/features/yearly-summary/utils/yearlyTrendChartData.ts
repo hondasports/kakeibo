@@ -1,5 +1,5 @@
 import type { YearlySummary } from "../../../../lib/domain/receipt/yearlySummary";
-import { formatYen } from "../../../utils/currency";
+import { formatYen } from "../../../../lib/domain/common/currency";
 
 export const OTHER_SERIES_DATA_KEY = "__yearly_other__";
 export const MAX_STACKED_CATEGORIES = 5;

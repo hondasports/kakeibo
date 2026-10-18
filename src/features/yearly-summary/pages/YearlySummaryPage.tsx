@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { formatMonthLabel } from "../../../../lib/domain/common/month";
-import { formatYen } from "../../../utils/currency";
+import { formatYen } from "../../../../lib/domain/common/currency";
 import { CategoryBreakdownCard } from "../../summary-shared/components/CategoryBreakdownCard";
 import { MonthlyMetricsPanel } from "../../summary-shared/components/MonthlyMetricsPanel";
 import { YearNavigator } from "../components/YearNavigator";

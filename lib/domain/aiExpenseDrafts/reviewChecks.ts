@@ -1,8 +1,5 @@
-import type {
-  ReceiptLineClassification,
-  ReceiptRawObservation,
-} from "../../../../lib/domain/receipt/observations";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
+import type { ReceiptLineClassification, ReceiptRawObservation } from "../receipt/observations";
+import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
 import type { ReviewAmountCheck } from "./reviewAmountChecks";
 import type { ReviewTaxRateCheck } from "./reviewTaxChecks";
 import { buildAmountCheck } from "./reviewAmountChecks";
