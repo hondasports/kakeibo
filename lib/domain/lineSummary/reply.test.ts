@@ -38,6 +38,23 @@ const weekInput = {
 };
 
 describe("LINE summary reply formatting", () => {
+  it.each([
+    { name: "週サマリー", format: formatWeekSummaryReply },
+    { name: "カテゴリ別", format: formatWeekCategoriesReply },
+  ])("長い$name返信を省略記号込み5000文字に収める", ({ format }) => {
+    const text = format({
+      ...weekInput,
+      byCategory: Array.from({ length: 200 }, (_, index) => ({
+        ...weekInput.byCategory[0],
+        categoryId: `category-${index}`,
+        categoryName: "あ".repeat(30),
+      })),
+    });
+
+    expect(text).toHaveLength(5000);
+    expect(text.endsWith("…")).toBe(true);
+  });
+
   it("データがある週サマリーは支出・収入・内訳を含む", () => {
     const text = formatWeekSummaryReply(weekInput);
     expect(text).toContain("2026-08-10〜2026-08-16");
