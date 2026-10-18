@@ -94,3 +94,23 @@ export function buildDerivedRegistration(args: {
     registeredAt: args.registeredAt,
   };
 }
+
+/**
+ * registered 遷移時の patch に展開する登録フィールドを構築する。
+ * トップレベルの registeredAt は一覧 index 用の写しで、derivedRegistration.registeredAt と
+ * 同じ値にしないと一覧の末尾に沈むため、ここでしか作らない。
+ */
+export function buildRegistrationPatchFields(args: {
+  destination: "receipt" | "expense_entries";
+  registrationMode: "detailed" | "totalOnly";
+  amountYen: number;
+  date: string;
+  categoryIds: string[];
+  registeredAt: number;
+}): {
+  registeredAt: number;
+  derivedRegistration: ReturnType<typeof buildDerivedRegistration>;
+} {
+  const derivedRegistration = buildDerivedRegistration(args);
+  return { registeredAt: derivedRegistration.registeredAt, derivedRegistration };
+}

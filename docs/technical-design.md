@@ -272,6 +272,7 @@ convex/
   systemAdminGroupDeletion.ts
   legacyGroupDeletionAuditMigration.ts
   orphanedLineLinkMigration.ts   # 退会済みユーザーに残った LINE 連携データの一回限り内部 migration（§16.4）
+  aiExpenseDraftRegisteredAtMigration.ts # 登録済み下書きの registeredAt を補完する一回限り内部 backfill（§16.4）
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
@@ -1167,6 +1168,7 @@ MVPの画面で全明細を常時表示しない場合でも、将来の複数�
 | categories   | `by_group_id_and_is_active_and_sort_order` | 有効カテゴリの表示                                 |
 | categories   | `by_group_id_and_sort_order`               | カテゴリ設定画面、無効化済みカテゴリを含む履歴表示 |
 | aiExpenseDrafts | `by_group_id_and_status_and_created_at` | 指定グループのキューを状態別・作成順で取得         |
+| aiExpenseDrafts | `by_group_id_and_status_and_registered_at` | 指定グループの登録済み下書きを登録日時降順で取得   |
 | aiExpenseDrafts | `by_group_id_and_created_at` | 指定グループの下書き一覧を作成順で取得             |
 | aiExpenseDrafts | `by_group_id_and_registered_receipt_id` | receipt登録済み下書きの参照・重複登録防止          |
 | aiExpenseDraftItems | `by_group_id_and_draft_id` | 所属グループ確認済みの明細取得                     |
@@ -1604,6 +1606,20 @@ cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` �
 1. `pnpm exec convex run orphanedLineLinkMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`orphanLinks` / `orphanRequests` / `orphanAuditLogs` と `wouldDelete` を確認。`wouldDelete` は phase 間で重複しうる上限見積もり）
 2. `pnpm exec convex run orphanedLineLinkMigration:executeBatch '{}'`（自己再スケジュールで全 phase を最後まで進む。冪等なので再実行可。`isDone: true` を戻り値かログで確認）
 3. `pnpm exec convex run orphanedLineLinkMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remainingOrphanLinks` / `remainingOrphanRequests` / `remainingOrphanAuditLogs` が 0 であること）
+
+#### 登録済み下書きの registeredAt 補完（一回限りの内部 backfill）
+
+登録済み下書き一覧は `by_group_id_and_status_and_registered_at` index で登録日時降順に並ぶ。フィールド追加前の登録済み下書きは `registeredAt` を持たず、index 上は未設定（最小値）として一覧の末尾に並ぶため、登録日時の正しい位置に戻すには本 backfill が必要である。
+
+`convex/aiExpenseDraftRegisteredAtMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`status === "registered"` かつ `registeredAt` 未設定の `aiExpenseDrafts` に `registeredAt` を書き込む。値は `derivedRegistration.registeredAt`（無ければ `updatedAt` を登録時点の近似として使う）。`registeredAt` を持つ下書き・未登録の下書き・`updatedAt` には触れない。
+
+走査はテーブル全体の pagination を 1 batch 25 件で行い、`executeBatch` は自分自身を再スケジュールして最後まで進む。冪等なので再実行してよい。戻り値・ログは件数のみで、ユーザー識別子を含まない。
+
+運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の `needsBackfill` が既存の登録済み下書き数と妥当に一致することを確認してから `executeBatch` を実行する。**
+
+1. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` を確認）
+2. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
+3. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること）
 
 ## 17. テスト方針
 

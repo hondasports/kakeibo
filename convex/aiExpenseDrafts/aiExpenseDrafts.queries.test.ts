@@ -182,14 +182,14 @@ describe("aiExpenseDrafts (queries)", () => {
     const queryMock = ctx.db.query as ReturnType<typeof vi.fn>;
     const withIndexMock = queryMock.mock.results[0]?.value.withIndex as ReturnType<typeof vi.fn>;
     const indexNames = withIndexMock.mock.calls.map(([indexName]) => indexName);
-    expect(indexNames).toContain("by_group_id_and_status_and_created_at");
+    expect(indexNames).toContain("by_group_id_and_status_and_registered_at");
     expect(indexNames).not.toContain("by_group_id_and_draft_id");
     const paginateMock = withIndexMock.mock.results
       .map((call, index) => ({
         indexName: withIndexMock.mock.calls[index]?.[0],
         chain: call.value as { paginate?: ReturnType<typeof vi.fn> },
       }))
-      .find((entry) => entry.indexName === "by_group_id_and_status_and_created_at")
+      .find((entry) => entry.indexName === "by_group_id_and_status_and_registered_at")
       ?.chain?.paginate;
     expect(paginateMock).toHaveBeenCalledWith({ numItems: 10, cursor: null });
   });
