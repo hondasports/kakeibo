@@ -8,6 +8,7 @@ import { requireGroupMembership } from "../groups/membership";
 import {
   listAiExpenseDraftsByStatus,
   listAiExpenseDraftsByStatusPaginated,
+  type AiExpenseDraftListEntry,
 } from "../../lib/usecase/aiExpenseDrafts/listDraftsByStatus";
 import { getAiExpenseDraftWithItems } from "../../lib/usecase/aiExpenseDrafts/getDraftWithItems";
 import { createAiExpenseDraftQueryDeps } from "../../lib/convex/aiExpenseDrafts/draftUsecaseDeps";
@@ -30,6 +31,15 @@ type GetWithItemsArgs = {
   draftId: Id<"aiExpenseDrafts">;
 };
 
+function listEntryToDoc({ id, creationTime, items, ...entry }: AiExpenseDraftListEntry) {
+  return {
+    ...entry,
+    ...(items === undefined ? {} : { items: items.map(draftItemFieldsToDoc) }),
+    _id: id,
+    _creationTime: creationTime,
+  };
+}
+
 export async function listByStatusHandler(ctx: QueryCtx, args: ListByStatusArgs) {
   const { groupId } = await requireGroupMembership(ctx);
   const entries = await listAiExpenseDraftsByStatus(
@@ -37,12 +47,7 @@ export async function listByStatusHandler(ctx: QueryCtx, args: ListByStatusArgs)
     createAiExpenseDraftQueryDeps(ctx),
     args,
   );
-  return entries.map(({ id, creationTime, items, ...entry }) => ({
-    ...entry,
-    ...(items === undefined ? {} : { items: items.map(draftItemFieldsToDoc) }),
-    _id: id,
-    _creationTime: creationTime,
-  }));
+  return entries.map(listEntryToDoc);
 }
 
 export async function listByStatusPaginatedHandler(ctx: QueryCtx, args: ListByStatusPaginatedArgs) {
@@ -54,12 +59,7 @@ export async function listByStatusPaginatedHandler(ctx: QueryCtx, args: ListBySt
   );
   return {
     ...result,
-    page: result.page.map(({ id, creationTime, items, ...entry }) => ({
-      ...entry,
-      ...(items === undefined ? {} : { items: items.map(draftItemFieldsToDoc) }),
-      _id: id,
-      _creationTime: creationTime,
-    })),
+    page: result.page.map(listEntryToDoc),
   };
 }
 
