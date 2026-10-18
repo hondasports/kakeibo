@@ -1256,6 +1256,7 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 
 `DEFAULT_CATEGORIES` を変更するときは、同じファイルの `DEFAULT_CATEGORIES_SEED_VERSION` を
 増やす。これにより既存グループにも次回のseed呼び出しで定義変更の補完が適用される。
+`lib/domain/categories/defaults.test.ts` の版別定義との一致検証が上げ忘れを検出するため、既存版を変更せず対応表に新しい版の定義を追加する。
 保存フィールドはoptionalで、既存データの一括移行は不要。
 アプリの変更を戻す場合もこのoptionalフィールドを残せば、従来のseed処理を継続できる。
 
