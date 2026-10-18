@@ -60,6 +60,10 @@
     "e2e/ai-expense-queue*.spec.ts",
     "e2e/ai-expense-tax-allocation.spec.ts"
   ],
+  "lib/domain/common/**": [
+    "e2e/ai-expense-queue*.spec.ts",
+    "e2e/ai-expense-tax-allocation.spec.ts"
+  ],
   "lib/domain/receipt/lineClassification*.ts": [
     "e2e/ai-expense-queue*.spec.ts",
     "e2e/ai-expense-tax-allocation.spec.ts"
