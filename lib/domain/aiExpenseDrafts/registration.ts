@@ -96,6 +96,21 @@ export function buildDerivedRegistration(args: {
 }
 
 /**
+ * 既存の登録日時を解決する。derivedRegistration を持たない旧データは
+ * backfill 済みのトップレベル値を使う。編集のたびに現在時刻へ書き換えると
+ * 一覧の先頭へ不正に移動するため、now はどちらも無い場合だけの最後の手段。
+ */
+export function resolveRegisteredAt(
+  draft: {
+    derivedRegistration?: { registeredAt: number } | null;
+    registeredAt?: number;
+  },
+  now: number,
+): number {
+  return draft.derivedRegistration?.registeredAt ?? draft.registeredAt ?? now;
+}
+
+/**
  * registered 遷移時の patch に展開する登録フィールドを構築する。
  * トップレベルの registeredAt は一覧 index 用の写しで、derivedRegistration.registeredAt と
  * 同じ値にしないと一覧の末尾に沈むため、ここでしか作らない。
