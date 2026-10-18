@@ -3,7 +3,11 @@
  * membership 認可は presentation 層で済んでいる前提で、
  * groupId を受け取ってドメインルールとストアを組み合わせる。
  */
-import { DEFAULT_CATEGORIES, MAX_CATEGORIES_PER_GROUP } from "../../domain/categories/defaults";
+import {
+  DEFAULT_CATEGORIES,
+  DEFAULT_CATEGORIES_SEED_VERSION,
+  MAX_CATEGORIES_PER_GROUP,
+} from "../../domain/categories/defaults";
 import {
   normalizeCategoryColor,
   normalizeCategoryDescription,
@@ -15,13 +19,25 @@ import {
   buildSeedPatch,
   nextSortOrder,
 } from "../../domain/categories/rules";
-import type { CategoryStore, CategoryStoreRecord } from "../../domain/categories/store";
+import type {
+  CategorySeedStore,
+  CategoryStore,
+  CategoryStoreRecord,
+} from "../../domain/categories/store";
 
 export async function seedDefaultCategories(
-  store: CategoryStore,
+  store: CategorySeedStore,
   groupId: string,
   now: number,
 ): Promise<{ created: number; skipped: number }> {
+  const group = await store.getGroupSeedState(groupId);
+  if (group === null) {
+    throw new Error("グループが見つかりません");
+  }
+  if (group.defaultCategoriesSeedVersion === DEFAULT_CATEGORIES_SEED_VERSION) {
+    return { created: 0, skipped: DEFAULT_CATEGORIES.length };
+  }
+
   let created = 0;
   let skipped = 0;
 
@@ -52,6 +68,7 @@ export async function seedDefaultCategories(
     created++;
   }
 
+  await store.setGroupSeedVersion(groupId, DEFAULT_CATEGORIES_SEED_VERSION);
   return { created, skipped };
 }
 

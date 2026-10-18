@@ -54,3 +54,11 @@ export interface CategoryStore {
   /** 指定 ID をすべて削除する。 */
   deleteMany(ids: string[]): Promise<void>;
 }
+
+export interface CategorySeedStore extends Pick<
+  CategoryStore,
+  "findByGroupAndSortOrder" | "insert" | "patch"
+> {
+  getGroupSeedState(groupId: string): Promise<{ defaultCategoriesSeedVersion?: number } | null>;
+  setGroupSeedVersion(groupId: string, version: number): Promise<void>;
+}

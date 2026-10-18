@@ -59,6 +59,15 @@ export function createMutationCtx(
   const insertMock = vi.fn().mockResolvedValue("new-doc-id");
   const patchMock = vi.fn().mockResolvedValue(undefined);
   const getMock = vi.fn().mockImplementation(async (id: string) => {
+    if (groupMember !== null && id === groupMember.groupId) {
+      return {
+        _id: groupMember.groupId,
+        _creationTime: 1000,
+        name: "テストグループ",
+        createdAt: 1000,
+        updatedAt: 1000,
+      };
+    }
     return existingDocs.find((doc) => doc._id === id) ?? null;
   });
 
