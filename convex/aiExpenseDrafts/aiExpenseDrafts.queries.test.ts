@@ -1,6 +1,6 @@
 import { analyzeReceiptImageToDraftHandler } from "./actions";
 import { deleteDraftHandler } from "./mutations";
-import { getWithItemsHandler, listByStatusHandler } from "./queries";
+import { getWithItemsHandler, listByStatusHandler, listByStatusPaginatedHandler } from "./queries";
 import {
   GROUP_ID,
   OTHER_GROUP_ID,
@@ -161,6 +161,37 @@ describe("aiExpenseDrafts (queries)", () => {
         ]),
       }),
     ]);
+  });
+
+  it("listByStatusPaginated は numItems をそのまま paginate に渡し、registered では明細を読まない", async () => {
+    const drafts = Array.from({ length: 15 }, (_, index) => ({
+      ...ownedDraft,
+      _id: `draft-registered-${index}`,
+      status: "registered" as const,
+      createdAt: index + 1,
+    }));
+    const ctx = createQueryCtx(createIdentity(), { drafts });
+
+    const result = await listByStatusPaginatedHandler(ctx, {
+      status: "registered",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+
+    expect(result.page).toHaveLength(10);
+    expect(result.isDone).toBe(false);
+    const queryMock = ctx.db.query as ReturnType<typeof vi.fn>;
+    const withIndexMock = queryMock.mock.results[0]?.value.withIndex as ReturnType<typeof vi.fn>;
+    const indexNames = withIndexMock.mock.calls.map(([indexName]) => indexName);
+    expect(indexNames).toContain("by_group_id_and_status_and_created_at");
+    expect(indexNames).not.toContain("by_group_id_and_draft_id");
+    const paginateMock = withIndexMock.mock.results
+      .map((call, index) => ({
+        indexName: withIndexMock.mock.calls[index]?.[0],
+        chain: call.value as { paginate?: ReturnType<typeof vi.fn> },
+      }))
+      .find((entry) => entry.indexName === "by_group_id_and_status_and_created_at")
+      ?.chain?.paginate;
+    expect(paginateMock).toHaveBeenCalledWith({ numItems: 10, cursor: null });
   });
 
   it("getWithItems は他ユーザーの下書きを参照できない", async () => {

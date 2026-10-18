@@ -5,7 +5,7 @@ import "./AiExpenseQueuePanelTestMocks";
 import { renderWithProviders } from "../../../test/render";
 import { AiExpenseQueuePanel } from "./AiExpenseQueuePanel";
 import { categories, queueItems } from "../../receipt-review/utils/testFixtures";
-import { useQueryMock } from "./AiExpenseQueuePanelTestMocks";
+import { usePaginatedQueryMock, useQueryMock } from "./AiExpenseQueuePanelTestMocks";
 
 describe("AiExpenseQueuePanel（表示）", () => {
   it("空状態では主導線と短い説明だけを表示する", () => {
@@ -31,6 +31,16 @@ describe("AiExpenseQueuePanel（表示）", () => {
       "environment",
     );
     expect(screen.getByRole("button", { name: "詳しい説明" })).toBeInTheDocument();
+  });
+
+  it("登録済み一覧は初回10件のページング購読を使う", () => {
+    renderWithProviders(<AiExpenseQueuePanel />);
+
+    expect(usePaginatedQueryMock).toHaveBeenCalledWith(
+      "aiExpenseDrafts.queries.listByStatusPaginated",
+      { status: "registered" },
+      { initialNumItems: 10 },
+    );
   });
 
   it("初期アイテムでも保存済みwarningから失敗原因を表示する", () => {

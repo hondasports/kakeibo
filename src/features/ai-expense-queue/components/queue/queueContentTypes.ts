@@ -32,4 +32,8 @@ export type QueueRegisteredContentProps = Pick<
   | "onOpenReview"
   | "onRegisterReady"
   | "onToggleReadySelection"
->;
+> & {
+  registeredHasMore: boolean;
+  registeredIsLoadingMore: boolean;
+  onLoadMoreRegistered: () => void;
+};

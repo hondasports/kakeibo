@@ -15,13 +15,20 @@ const registeredItem: AiExpenseQueueItem = {
   categoryName: "日用品",
 };
 
-function renderQueueContent(groupedItems: {
-  processing: AiExpenseQueueItem[];
-  ready: AiExpenseQueueItem[];
-  needs_review: AiExpenseQueueItem[];
-  failed: AiExpenseQueueItem[];
-  registered: AiExpenseQueueItem[];
-}) {
+function renderQueueContent(
+  groupedItems: {
+    processing: AiExpenseQueueItem[];
+    ready: AiExpenseQueueItem[];
+    needs_review: AiExpenseQueueItem[];
+    failed: AiExpenseQueueItem[];
+    registered: AiExpenseQueueItem[];
+  },
+  registeredPagination?: {
+    registeredHasMore?: boolean;
+    registeredIsLoadingMore?: boolean;
+    onLoadMoreRegistered?: () => void;
+  },
+) {
   const items = Object.values(groupedItems).flat();
   const props = {
     clearableCount: 0,
@@ -52,6 +59,9 @@ function renderQueueContent(groupedItems: {
         onOpenReview={props.onOpenReview}
         onRegisterReady={props.onRegisterReady}
         onToggleReadySelection={props.onToggleReadySelection}
+        registeredHasMore={registeredPagination?.registeredHasMore ?? false}
+        registeredIsLoadingMore={registeredPagination?.registeredIsLoadingMore ?? false}
+        onLoadMoreRegistered={registeredPagination?.onLoadMoreRegistered ?? (() => {})}
       />
     </>,
   );
@@ -101,6 +111,44 @@ describe("QueueContent の一覧制御", () => {
     expect(screen.queryByText("登録済み 4")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "残り2件を見る" }));
     expect(screen.getByText("登録済み 5")).toBeInTheDocument();
+  });
+
+  it("登録済みに続きがある場合は件数を『N件以上』と表示し、展開後にさらに読み込める", async () => {
+    const user = userEvent.setup();
+    const onLoadMoreRegistered = vi.fn();
+    const registered = Array.from({ length: 5 }, (_, index) => ({
+      ...registeredItem,
+      id: `registered-${index}`,
+      title: `登録済み ${index + 1}`,
+    }));
+    renderQueueContent(
+      { processing: [], ready: [], needs_review: [], failed: [], registered },
+      { registeredHasMore: true, onLoadMoreRegistered },
+    );
+
+    expect(screen.getByText("5件以上")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "残り2件を見る" }));
+    await user.click(screen.getByRole("button", { name: "さらに読み込む" }));
+    expect(onLoadMoreRegistered).toHaveBeenCalledTimes(1);
+  });
+
+  it("登録済みの読み込み済み件数が3件以下でも続きがあればさらに読み込める", async () => {
+    const user = userEvent.setup();
+    const onLoadMoreRegistered = vi.fn();
+    renderQueueContent(
+      {
+        processing: [],
+        ready: [],
+        needs_review: [],
+        failed: [],
+        registered: [registeredItem],
+      },
+      { registeredHasMore: true, onLoadMoreRegistered },
+    );
+
+    expect(screen.getByText("1件以上")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "さらに読み込む" }));
+    expect(onLoadMoreRegistered).toHaveBeenCalledTimes(1);
   });
 
   it("確認対象を金額不一致、カテゴリ、その他の順に並べる", () => {

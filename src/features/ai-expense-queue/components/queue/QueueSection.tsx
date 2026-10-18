@@ -21,6 +21,9 @@ export function QueueSection({
   onReturnToManualInput,
   deletingIds,
   registeringIds,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
 }: {
   sectionKey: QueueSectionKey;
   items: AiExpenseQueueItem[];
@@ -35,6 +38,9 @@ export function QueueSection({
   onReturnToManualInput?: (item: AiExpenseQueueItem) => void;
   deletingIds: string[];
   registeringIds: string[];
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (items.length === 0) {
@@ -54,7 +60,11 @@ export function QueueSection({
           <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 700 }}>
             {label}
           </Typography>
-          <Chip label={`${items.length}件`} size="small" variant="outlined" />
+          <Chip
+            label={hasMore ? `${items.length}件以上` : `${items.length}件`}
+            size="small"
+            variant="outlined"
+          />
         </Stack>
         {description && (
           <Typography color="text.secondary" variant="body2">
@@ -85,6 +95,16 @@ export function QueueSection({
             {sectionKey === "needs_review"
               ? `残り${remainingCount}件を確認`
               : `残り${remainingCount}件を見る`}
+          </Button>
+        )}
+        {remainingCount === 0 && hasMore && (
+          <Button
+            disabled={isLoadingMore}
+            onClick={() => onLoadMore?.()}
+            type="button"
+            variant="text"
+          >
+            さらに読み込む
           </Button>
         )}
       </Stack>

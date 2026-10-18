@@ -11,6 +11,7 @@ const {
   deleteDraftMock,
   acceptReceiptImageExternalApiConsentMock,
   useQueryMock,
+  usePaginatedQueryMock,
 } = vi.hoisted(() => ({
   registerReadyDraftsAsExpenseEntriesMock: vi.fn(),
   legacyRegisterReadyDraftsMock: vi.fn(),
@@ -23,6 +24,7 @@ const {
   deleteDraftMock: vi.fn(),
   acceptReceiptImageExternalApiConsentMock: vi.fn(),
   useQueryMock: vi.fn(),
+  usePaginatedQueryMock: vi.fn(),
 }));
 vi.mock("../../../../convex/_generated/api", () => ({
   api: {
@@ -30,6 +32,7 @@ vi.mock("../../../../convex/_generated/api", () => ({
       queries: {
         getWithItems: "aiExpenseDrafts.queries.getWithItems",
         listByStatus: "aiExpenseDrafts.queries.listByStatus",
+        listByStatusPaginated: "aiExpenseDrafts.queries.listByStatusPaginated",
       },
       mutations: {
         registerReadyDrafts: "aiExpenseDrafts.mutations.registerReadyDrafts",
@@ -91,6 +94,8 @@ vi.mock("convex/react", () => ({
     return vi.fn();
   },
   useQuery: (reference: string, args: unknown) => useQueryMock(reference, args),
+  usePaginatedQuery: (reference: string, args: unknown, options: unknown) =>
+    usePaginatedQueryMock(reference, args, options),
   useConvex: () => ({
     query: vi.fn().mockResolvedValue(null),
   }),
@@ -137,6 +142,17 @@ beforeEach(() => {
     }
     return [];
   });
+  usePaginatedQueryMock.mockReset();
+  // 登録済み一覧のページング購読は listByStatus の mock 注入をそのまま流用する
+  usePaginatedQueryMock.mockImplementation((reference: string, args: unknown) => ({
+    results:
+      reference === "aiExpenseDrafts.queries.listByStatusPaginated"
+        ? (useQueryMock("aiExpenseDrafts.queries.listByStatus", args) ?? [])
+        : [],
+    status: "Exhausted",
+    loadMore: vi.fn(),
+    isLoading: false,
+  }));
 });
 
 export {
@@ -151,4 +167,5 @@ export {
   deleteDraftMock,
   acceptReceiptImageExternalApiConsentMock,
   useQueryMock,
+  usePaginatedQueryMock,
 };
