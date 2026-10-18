@@ -1270,6 +1270,7 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 ### 10.8 AI expense drafts
 
 - `aiExpenseDrafts.queries.listByStatus(status)`
+- `aiExpenseDrafts.queries.listByStatusPaginated(status, paginationOpts)`
 - `aiExpenseDrafts.queries.getWithItems(draftId)`
 - `aiExpenseDrafts.mutations.updateForReview(draftId, input)`
 - `aiExpenseDrafts.mutations.deleteDraft(draftId)`

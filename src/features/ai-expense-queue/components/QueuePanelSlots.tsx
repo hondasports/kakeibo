@@ -112,6 +112,12 @@ export function QueuePanelRegistered({ className }: { className?: string }) {
         groupedItems={queue.groupedItems}
         registeringIds={queue.registeringIds}
         selectedReadyIds={queue.selectedReadyIds}
+        registeredHasMore={
+          queue.registeredListStatus === "CanLoadMore" ||
+          queue.registeredListStatus === "LoadingMore"
+        }
+        registeredIsLoadingMore={queue.registeredListStatus === "LoadingMore"}
+        onLoadMoreRegistered={queue.loadMoreRegistered}
         onOpenReview={queue.handleOpenReview}
         onRegisterReady={queue.handleRegisterReady}
         onToggleReadySelection={queue.handleToggleReadySelection}

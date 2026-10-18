@@ -226,6 +226,20 @@ export function createQueryCtx(
           return typeof limit === "number" ? filteredDocs.slice(0, limit) : filteredDocs;
         }),
         collect: vi.fn().mockResolvedValue(filteredDocs),
+        paginate: vi
+          .fn()
+          .mockImplementation(
+            async (paginationOpts: { numItems: number; cursor: string | null }) => {
+              const offset =
+                paginationOpts.cursor === null ? 0 : Number.parseInt(paginationOpts.cursor, 10);
+              const page = filteredDocs.slice(offset, offset + paginationOpts.numItems);
+              return {
+                page,
+                isDone: offset + paginationOpts.numItems >= filteredDocs.length,
+                continueCursor: String(offset + paginationOpts.numItems),
+              };
+            },
+          ),
       };
       chain.order.mockReturnValue(chain);
       return chain;

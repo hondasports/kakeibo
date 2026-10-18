@@ -99,6 +99,8 @@ export function useAiExpenseQueuePanel({
     sessionBatchSummaries: queueData.sessionBatchSummaries,
     unbatchedReadyItems: queueData.unbatchedReadyItems,
     registeringIds: bulkRegister.registeringIds,
+    registeredListStatus: queueData.registeredListStatus,
+    loadMoreRegistered: queueData.loadMoreRegistered,
     registrationError: bulkRegister.registrationError,
     retryError: imageUpload.uploadError || retry.retryError,
     retryInputRef: retry.retryInputRef,

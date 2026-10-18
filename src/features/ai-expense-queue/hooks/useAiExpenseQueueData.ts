@@ -1,6 +1,6 @@
 import { api } from "../../../../convex/_generated/api";
-import { useMemo } from "react";
-import { useQuery } from "convex/react";
+import { useCallback, useMemo } from "react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import type { Doc } from "../../../../convex/_generated/dataModel";
 import { getSectionKey } from "../../receipt-review/components/labels";
 import { getImageCaptureFailureHint } from "../../../../lib/domain/aiExpenseDrafts/failure";
@@ -8,6 +8,8 @@ import { mapDraftToQueueItem } from "../../receipt-review/utils/mappers";
 import type { AiExpenseQueueCategory, AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
 import type { AiExpenseQueueBatchSummary, AiExpenseUploadBatch } from "../types/types";
 import type { AiExpenseDraft } from "../../receipt-review/types/types";
+
+const REGISTERED_PAGE_SIZE = 10;
 
 export function useAiExpenseQueueData({
   categories,
@@ -31,9 +33,14 @@ export function useAiExpenseQueueData({
   const failedDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, { status: "failed" }) as
     | AiExpenseDraft[]
     | undefined;
-  const registeredDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, {
-    status: "registered",
-  }) as AiExpenseDraft[] | undefined;
+  const registeredPage = usePaginatedQuery(
+    api.aiExpenseDrafts.queries.listByStatusPaginated,
+    { status: "registered" },
+    { initialNumItems: REGISTERED_PAGE_SIZE },
+  );
+  const registeredDrafts = registeredPage.results as AiExpenseDraft[];
+  const { loadMore } = registeredPage;
+  const loadMoreRegistered = useCallback(() => loadMore(REGISTERED_PAGE_SIZE), [loadMore]);
   const jobs = useQuery(api.receiptAnalysisJobs.queries.listJobs) as
     | Doc<"receiptAnalysisImageJobs">[]
     | undefined;
@@ -189,6 +196,8 @@ export function useAiExpenseQueueData({
     jobs,
     readyItemIds,
     readyItems,
+    registeredListStatus: registeredPage.status,
+    loadMoreRegistered,
     sessionBatchSummaries,
     unbatchedReadyItems,
   };

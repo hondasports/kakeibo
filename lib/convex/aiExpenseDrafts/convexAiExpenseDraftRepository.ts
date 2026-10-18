@@ -34,6 +34,16 @@ export function createAiExpenseDraftRepository(
         .take(limit);
       return docs.map(draftDocToFields);
     },
+    async paginateByGroupAndStatus(groupId, status, opts) {
+      const page = await ctx.db
+        .query("aiExpenseDrafts")
+        .withIndex("by_group_id_and_status_and_created_at", (q) =>
+          q.eq("groupId", groupId as Id<"groups">).eq("status", status as AiExpenseDraftStatus),
+        )
+        .order("desc")
+        .paginate(opts);
+      return { ...page, page: page.page.map(draftDocToFields) };
+    },
   };
 }
 
@@ -55,6 +65,16 @@ export function createAiExpenseDraftReadRepository(
         .order("desc")
         .take(limit);
       return docs.map(draftDocToFields);
+    },
+    async paginateByGroupAndStatus(groupId, status, opts) {
+      const page = await ctx.db
+        .query("aiExpenseDrafts")
+        .withIndex("by_group_id_and_status_and_created_at", (q) =>
+          q.eq("groupId", groupId as Id<"groups">).eq("status", status as AiExpenseDraftStatus),
+        )
+        .order("desc")
+        .paginate(opts);
+      return { ...page, page: page.page.map(draftDocToFields) };
     },
   };
 }

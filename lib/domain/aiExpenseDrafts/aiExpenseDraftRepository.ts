@@ -5,6 +5,7 @@
  */
 import type { AiExpenseDraftStatus } from "./constants";
 import type { AiExpenseDraftFields, AiExpenseDraftPatch } from "./aiExpenseDraft";
+import type { PaginatedResult, PaginationOpts } from "../pagination";
 
 export interface AiExpenseDraftReadRepository {
   /** ID で取得する。存在しなければ null。 */
@@ -15,6 +16,12 @@ export interface AiExpenseDraftReadRepository {
     status: AiExpenseDraftStatus,
     limit: number,
   ): Promise<AiExpenseDraftFields[]>;
+  /** グループ+ステータスで作成日時降順にページング取得する。 */
+  paginateByGroupAndStatus(
+    groupId: string,
+    status: AiExpenseDraftStatus,
+    opts: PaginationOpts,
+  ): Promise<PaginatedResult<AiExpenseDraftFields>>;
 }
 
 export interface AiExpenseDraftRepository extends AiExpenseDraftReadRepository {
