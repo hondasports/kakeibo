@@ -79,11 +79,12 @@ export async function persistDraftTaxInterpretation(
   );
 
   const itemDocsById = new Map(items.map((item) => [item._id, item]));
-  const itemPatchByItemId = new Map(plan.itemPatches.map(({ itemId, patch }) => [itemId, patch]));
+  const itemDiffByItemId = new Map<string, Record<string, unknown>>();
   for (const { itemId, patch } of plan.itemPatches) {
     const id = itemId as Id<"aiExpenseDraftItems">;
     const diff = diffRecordPatch(itemDocsById.get(id) ?? {}, patch);
     if (diff !== null) {
+      itemDiffByItemId.set(itemId, diff);
       await ctx.db.patch(id, diff);
     }
   }
@@ -94,18 +95,18 @@ export async function persistDraftTaxInterpretation(
       .receiptInterpretation as Doc<"aiExpenseDrafts">["receiptInterpretation"],
   });
 
-  // patch 結果はメモリ上で doc に適用して組み立て、再読み込みを省く。
+  // DB に書いた diff と同じものをメモリ上で doc に適用して組み立て、再読み込みを省く。
   const updatedDraft = applyRecordPatch(
     draftDoc as unknown as Record<string, unknown>,
     plan.draftPatch as Record<string, unknown>,
   ) as unknown as Doc<"aiExpenseDrafts">;
   const updatedItems = items.map((item) => {
-    const patch = itemPatchByItemId.get(item._id);
-    return patch === undefined
+    const diff = itemDiffByItemId.get(item._id);
+    return diff === undefined
       ? item
       : (applyRecordPatch(
           item as unknown as Record<string, unknown>,
-          patch as Record<string, unknown>,
+          diff,
         ) as unknown as Doc<"aiExpenseDraftItems">);
   });
 
