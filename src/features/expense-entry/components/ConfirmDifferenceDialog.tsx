@@ -6,7 +6,7 @@ import {
   DialogTitle,
   Typography,
 } from "@mui/material";
-import { formatYen } from "../../../utils/currency";
+import { formatYen } from "../../../../lib/domain/common/currency";
 
 export function ConfirmDifferenceDialog({
   open,

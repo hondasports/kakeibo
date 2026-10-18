@@ -1,5 +1,5 @@
 import { Box, Button, Stack, Typography } from "@mui/material";
-import type { AiExpenseDraft } from "../types/types";
+import type { AiExpenseDraft } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 
 export type ReviewDialogReferenceSectionProps = {
   draft: AiExpenseDraft | null;

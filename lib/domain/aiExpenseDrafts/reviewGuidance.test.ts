@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "../types/types";
+import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "./reviewTypes";
 import { effectiveReviewMode, getReviewGuidance } from "./reviewGuidance";
 import { buildAmountCheck } from "./reviewAmountChecks";
-import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
+import { getReviewSubmitErrorMessage } from "./reviewValidation";
 import { mixedTaxReviewFixture } from "./reviewTaxPreviewTestHelpers";
 import { buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 

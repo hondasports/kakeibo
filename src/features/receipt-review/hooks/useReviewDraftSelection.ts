@@ -3,7 +3,11 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { isDraftWithItems } from "../utils/mappers";
-import type { AiExpenseDraft, AiExpenseDraftItem, AiExpenseDraftWithItems } from "../types/types";
+import type {
+  AiExpenseDraft,
+  AiExpenseDraftItem,
+  AiExpenseDraftWithItems,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 
 export function useReviewDraftSelection({
   initialReviewDrafts,

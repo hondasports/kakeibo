@@ -4,10 +4,17 @@ import { Box, Button, Collapse, Stack, Typography } from "@mui/material";
 import { useState } from "react";
 import { ReviewReasonChips } from "./ReviewReasonChips";
 import { StatusChip } from "./StatusChip";
-import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "../types/types";
+import type {
+  AiExpenseDraft,
+  ReviewFormValues,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { formatReviewDraftHeader, resolveReviewShopName } from "../utils/reviewDialogUtils";
-import { deriveVisibleReviewReasons, getPrimaryReviewReason } from "../utils/reviewFeedback";
+import {
+  deriveVisibleReviewReasons,
+  getPrimaryReviewReason,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewFeedback";
 import { ReceiptTotalsPanel } from "./ReceiptTotalsPanel";
 import { ReviewItemsReadOnly } from "./ReviewItemsReadOnly";
 

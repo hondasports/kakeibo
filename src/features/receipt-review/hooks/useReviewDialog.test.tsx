@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { RECEIPT_TAX_CHOICE_FIELDS } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import { ReviewDialog } from "../components/ReviewDialog";
-import type { AiExpenseDraft, AiExpenseDraftItem } from "../types/types";
+import type {
+  AiExpenseDraft,
+  AiExpenseDraftItem,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import { useReviewDialog } from "./useReviewDialog";
 
 const { mutation } = vi.hoisted(() => ({ mutation: vi.fn() }));

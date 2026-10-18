@@ -7,7 +7,7 @@ import type {
   AiExpenseDraftItem,
   AiExpenseQueueDocumentType,
   AiExpenseReviewSubmitResult,
-} from "../features/receipt-review/types/types";
+} from "../../lib/domain/aiExpenseDrafts/reviewTypes";
 
 export type AiExpenseQueueStatus =
   | "adding"

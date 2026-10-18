@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   receiptTaxBasisCases,
   receiptTaxBasisInput,
-} from "../../../../lib/domain/receipt/tax/fixtures/receiptTaxBasisCases";
+} from "../receipt/tax/fixtures/receiptTaxBasisCases";
 import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 import { buildAmountCheck } from "./reviewAmountChecks";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
 import { findBasisConflicts } from "./reviewCheckUtils";
 import { resolvedItem, rawObservation } from "./reviewChecksTestHelpers";
-import { reinterpretDraftTax } from "../../../../lib/domain/receipt/tax/reinterpretDraftTax";
+import { reinterpretDraftTax } from "../receipt/tax/reinterpretDraftTax";
 import { buildReviewChecks } from "./reviewChecks";
 import { toReceiptTotalsViewModel } from "./receiptTotalsViewModel";
 

@@ -12,7 +12,11 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "../types/types";
+import type {
+  AiExpenseDraft,
+  ReviewFormValues,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import type { AmountBasis } from "../../../../lib/receiptTax/types";
 import { ReviewDialogActions } from "./ReviewDialogActions";
@@ -22,12 +26,18 @@ import { ReviewDialogReferenceSection } from "./ReviewDialogReferenceSection";
 import { ReviewCheckChips } from "./ReviewCheckChips";
 import { ReviewCheckCards } from "./ReviewCheckCards";
 import { ReviewStatusBanner } from "./ReviewStatusBanner";
-import { getReviewGuidance, effectiveReviewMode } from "../utils/reviewGuidance";
-import { buildReviewChecks, countActionableUncomparable } from "../utils/reviewChecks";
-import { buildTaxContextFromReviewItem } from "../utils/receiptItemTaxViewModel";
+import {
+  getReviewGuidance,
+  effectiveReviewMode,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
+import {
+  buildReviewChecks,
+  countActionableUncomparable,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
+import { buildTaxContextFromReviewItem } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
-import { buildReviewTaxPreview } from "../utils/reviewItemsTaxPreview";
+import { buildReviewTaxPreview } from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
 
 export type ReviewDialogProps = {
   open: boolean;

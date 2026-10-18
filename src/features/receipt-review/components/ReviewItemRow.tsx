@@ -1,11 +1,14 @@
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Box, Stack, Typography } from "@mui/material";
-import { formatYen } from "../../../utils/currency";
-import type { ReviewItemValues } from "../types/types";
-import type { ReviewGuidanceItem } from "../utils/reviewGuidance";
+import { formatYen } from "../../../../lib/domain/common/currency";
+import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
+import type { ReviewGuidanceItem } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
-import { getReviewItemTaxConfirmation } from "../utils/receiptItemTaxViewModel";
-import { formatTaxRateLabel, getAmountBasisLabel } from "../utils/receiptTaxLabels";
+import { getReviewItemTaxConfirmation } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
+import {
+  formatTaxRateLabel,
+  getAmountBasisLabel,
+} from "../../../../lib/domain/aiExpenseDrafts/receiptTaxLabels";
 
 function amountLabel(item: ReviewItemValues): string {
   const trimmed = item.amountYen.trim();

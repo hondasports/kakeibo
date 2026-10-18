@@ -4,7 +4,7 @@ import {
   toReceiptAnalysisViewModel,
   toReceiptItemTaxViewModel,
 } from "./receiptItemTaxViewModel";
-import type { ReviewItemValues } from "../types/types";
+import type { ReviewItemValues } from "./reviewTypes";
 
 describe("税設定の確認表示", () => {
   const item: ReviewItemValues = {

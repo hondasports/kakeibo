@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { ReviewItemValues } from "../types/types";
+import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import { ReceiptTotalsPanel } from "./ReceiptTotalsPanel";
 
 function item(overrides: Partial<ReviewItemValues> = {}): ReviewItemValues {

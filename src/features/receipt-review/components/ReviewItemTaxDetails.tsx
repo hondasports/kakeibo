@@ -1,6 +1,6 @@
 import { Stack, Typography } from "@mui/material";
-import type { ReviewItemValues } from "../types/types";
-import { formatYen } from "../../../utils/currency";
+import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
+import { formatYen } from "../../../../lib/domain/common/currency";
 
 const amountBasisLabels = {
   tax_included: "税込",

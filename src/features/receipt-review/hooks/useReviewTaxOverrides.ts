@@ -1,13 +1,17 @@
 import { api } from "../../../../convex/_generated/api";
-import { applyReviewItemsTaxPreview } from "../utils/reviewItemsTaxPreview";
+import { applyReviewItemsTaxPreview } from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
 import type { Dispatch, SetStateAction } from "react";
 import { mergeReviewTaxItems } from "../utils/reviewTaxItemMerge";
 import { useMutation } from "convex/react";
 import { useRef, useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { mapConvexDraftToAiExpenseDraft, mapDraftItemsToReviewItems } from "../utils/mappers";
+import { mapConvexDraftToAiExpenseDraft } from "../utils/mappers";
+import { mapDraftItemsToReviewItems } from "../../../../lib/domain/aiExpenseDrafts/reviewDraftMapping";
 import type { AmountBasis } from "../../../../lib/receiptTax/types";
-import type { ReviewItemValues, AiExpenseDraft } from "../types/types";
+import type {
+  ReviewItemValues,
+  AiExpenseDraft,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 
 export function useReviewTaxOverrides({

@@ -2,14 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   isAmountAndTaxResolved,
   isUnrelatedToAmountTaxGuidanceId,
-  mapConvexDraftToAiExpenseDraft,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewJudgment";
+import {
   mapDraftItemsToReviewItems,
-  mapDraftToQueueItem,
   mapDraftToReviewForm,
-} from "./mappers";
-import type { AiExpenseDraft } from "../types/types";
+} from "../../../../lib/domain/aiExpenseDrafts/reviewDraftMapping";
+import { mapConvexDraftToAiExpenseDraft, mapDraftToQueueItem } from "./mappers";
+import type { AiExpenseDraft } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import { getReviewPriority } from "../../../../lib/domain/aiExpenseDrafts/queue";
-import { mixedTaxReviewFixture } from "./reviewTaxPreviewTestHelpers";
+import { mixedTaxReviewFixture } from "../../../../lib/domain/aiExpenseDrafts/reviewTaxPreviewTestHelpers";
 import { RECEIPT_TAX_CHOICE_FIELDS } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 
 describe("mapDraftToReviewForm: 税設定の補正元を保持する", () => {

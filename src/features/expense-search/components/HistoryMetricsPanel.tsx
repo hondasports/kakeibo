@@ -1,5 +1,5 @@
 import { Box, Paper, Stack, Typography } from "@mui/material";
-import { formatYen } from "../../../utils/currency";
+import { formatYen } from "../../../../lib/domain/common/currency";
 import { formatSignedYen } from "./historyFormat";
 
 function Metric({

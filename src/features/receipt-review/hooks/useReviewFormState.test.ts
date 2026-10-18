@@ -2,7 +2,10 @@ import { unprovenTargetReceipt } from "../../../../lib/domain/receipt/tax/fixtur
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useReviewFormState } from "./useReviewFormState";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
+import type {
+  AiExpenseDraft,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import { RECEIPT_TAX_CHOICE_FIELDS } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 
 function item(id: string, rate: 8 | 10): ReviewItemValues {

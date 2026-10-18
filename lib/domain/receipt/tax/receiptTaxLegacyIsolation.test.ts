@@ -1,4 +1,4 @@
-import { buildReviewTaxPreview } from "../../../../src/features/receipt-review/utils/reviewItemsTaxPreview";
+import { buildReviewTaxPreview } from "../../aiExpenseDrafts/reviewItemsTaxPreview";
 import { expect, it } from "vitest";
 import { reinterpretDraftTax } from "./reinterpretDraftTax";
 import { observationLine, unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";

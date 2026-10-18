@@ -1,5 +1,5 @@
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import { distinctTaxSummaryAmounts } from "../../../../lib/domain/receipt/tax/taxAmountBasis";
+import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
+import { distinctTaxSummaryAmounts } from "../receipt/tax/taxAmountBasis";
 import type { ReviewBlockerCode, ReviewCheckStatus } from "./reviewCheckUtils";
 import {
   findBasisConflicts,

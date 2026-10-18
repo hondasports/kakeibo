@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ReviewItemValues } from "../types/types";
+import type { ReviewItemValues } from "./reviewTypes";
 import {
   applyReceiptCategory,
   assignCategoryToItems,

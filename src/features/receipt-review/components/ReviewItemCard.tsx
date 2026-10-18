@@ -13,8 +13,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { formatYen } from "../../../utils/currency";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
+import { formatYen } from "../../../../lib/domain/common/currency";
+import type {
+  AiExpenseDraft,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import {
   isDiscountLine,
@@ -26,7 +29,7 @@ import {
   buildTaxContextFromReviewItem,
   getReviewItemTaxConfirmation,
   toReceiptItemTaxViewModel,
-} from "../utils/receiptItemTaxViewModel";
+} from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
 import { formatTaxWarnings } from "../utils/taxWarnings";
 import { ReceiptItemTaxDetail } from "./ReceiptItemTaxDetail";
 import { ReviewItemCategoryControl } from "./ReviewItemCategoryControl";

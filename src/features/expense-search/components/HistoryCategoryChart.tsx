@@ -6,7 +6,7 @@ import {
   HISTORY_OTHER_CATEGORY_ID,
 } from "../../../../lib/domain/expenseSearch/analytics";
 import type { CategorySummary } from "../../../../lib/domain/receipt/summary";
-import { formatYen, formatYenCompact } from "../../../utils/currency";
+import { formatYen, formatYenCompact } from "../../../../lib/domain/common/currency";
 
 export function HistoryCategoryChart({
   categories,

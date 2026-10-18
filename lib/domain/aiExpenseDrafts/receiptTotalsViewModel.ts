@@ -1,10 +1,10 @@
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
+import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
 import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
 import { formatYenLabel } from "./receiptTaxLabels";
 import { getTaxModeLabel } from "./receiptItemTaxViewModel";
-import { formatYenAbs } from "../../../utils/currency";
-import { isVerifiedTaxSummaryStatus } from "../../../../lib/domain/receipt/tax/taxSummaryConsistency";
-import { distinctTaxSummaryAmounts } from "../../../../lib/domain/receipt/tax/taxAmountBasis";
+import { formatYenAbs } from "../common/currency";
+import { isVerifiedTaxSummaryStatus } from "../receipt/tax/taxSummaryConsistency";
+import { distinctTaxSummaryAmounts } from "../receipt/tax/taxAmountBasis";
 
 export type ReceiptTotalsStatus = "matched" | "mismatch" | "subtotalUnavailable";
 

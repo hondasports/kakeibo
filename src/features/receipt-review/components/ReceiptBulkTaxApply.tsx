@@ -1,6 +1,9 @@
 import { Button, Stack, Typography } from "@mui/material";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import { toReceiptTotalsViewModel } from "../utils/receiptTotalsViewModel";
+import type {
+  AiExpenseDraft,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
+import { toReceiptTotalsViewModel } from "../../../../lib/domain/aiExpenseDrafts/receiptTotalsViewModel";
 
 export function ReceiptBulkTaxApply({
   reviewItems,

@@ -3,7 +3,7 @@ import {
   confirmItemTaxRate,
   invalidateItemTaxRateConfirmation,
 } from "../../../../lib/domain/receipt/tax/itemTaxConfirmation";
-import type { ReviewItemValues } from "../types/types";
+import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 
 /** Tax responses update tax fields, without discarding edits owned by the open form. */
 export function mergeReviewTaxItems(
