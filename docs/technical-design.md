@@ -1243,6 +1243,22 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `categories.mutations.deactivateCategory(id)`
 - `categories.internal.deleteE2eCategoriesByUser(groupId)`（internal）
 
+`seedDefaultCategories()` のhandlerは認証・グループ所属の確認、依存構築、エラー変換を担う。
+バージョンの判定・seed・保存は `lib/usecase/categories/operations.ts` の
+`seedDefaultCategories()` にまとめ、`lib/domain/categories/store.ts` の `CategorySeedStore`
+ポート経由で永続化する。Convex実装は `lib/convex/categories/convexCategoryStore.ts` の
+`createCategorySeedStore()` に置く。
+
+`groups.defaultCategoriesSeedVersion` が `lib/domain/categories/defaults.ts` の
+`DEFAULT_CATEGORIES_SEED_VERSION` と一致すればカテゴリの読み取りとグループ更新を省略する。
+未設定・不一致の場合は従来どおり不足カテゴリの作成と既存カテゴリの補完を行い、
+同じmutation内で成功後にバージョンだけを保存する。無効化状態とユーザーの設定は維持する。
+
+`DEFAULT_CATEGORIES` を変更するときは、同じファイルの `DEFAULT_CATEGORIES_SEED_VERSION` を
+増やす。これにより既存グループにも次回のseed呼び出しで定義変更の補完が適用される。
+保存フィールドはoptionalで、既存データの一括移行は不要。
+アプリの変更を戻す場合もこのoptionalフィールドを残せば、従来のseed処理を継続できる。
+
 ### 10.5 users
 
 - `users.mutations.upsertUser()`

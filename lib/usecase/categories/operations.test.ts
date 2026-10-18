@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_CATEGORIES } from "../../domain/categories/defaults";
+import {
+  DEFAULT_CATEGORIES,
+  DEFAULT_CATEGORIES_SEED_VERSION,
+} from "../../domain/categories/defaults";
 import type {
+  CategorySeedStore,
   CategoryStore,
   CategoryStoreRecord,
   NewCategoryFields,
@@ -28,8 +32,12 @@ function record(partial: Partial<CategoryStoreRecord>): CategoryStoreRecord {
   };
 }
 
-function createStore(overrides: Partial<CategoryStore> = {}): CategoryStore {
+function createStore(
+  overrides: Partial<CategoryStore & CategorySeedStore> = {},
+): CategoryStore & CategorySeedStore {
   return {
+    getGroupSeedState: vi.fn().mockResolvedValue({}),
+    setGroupSeedVersion: vi.fn().mockResolvedValue(undefined),
     findByGroupAndSortOrder: vi.fn().mockResolvedValue(null),
     listForWriteByGroup: vi.fn().mockResolvedValue([]),
     listActive: vi.fn().mockResolvedValue([]),
@@ -43,6 +51,62 @@ function createStore(overrides: Partial<CategoryStore> = {}): CategoryStore {
 }
 
 describe("seedDefaultCategories", () => {
+  it("現行バージョンならカテゴリを参照・更新せずバージョンも保存しない", async () => {
+    const store = createStore({
+      getGroupSeedState: vi.fn().mockResolvedValue({
+        defaultCategoriesSeedVersion: DEFAULT_CATEGORIES_SEED_VERSION,
+      }),
+    });
+
+    const result = await seedDefaultCategories(store, "g1", 5000);
+
+    expect(result).toEqual({ created: 0, skipped: DEFAULT_CATEGORIES.length });
+    expect(store.getGroupSeedState).toHaveBeenCalledWith("g1");
+    expect(store.findByGroupAndSortOrder).not.toHaveBeenCalled();
+    expect(store.insert).not.toHaveBeenCalled();
+    expect(store.patch).not.toHaveBeenCalled();
+    expect(store.setGroupSeedVersion).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, DEFAULT_CATEGORIES_SEED_VERSION - 1, DEFAULT_CATEGORIES_SEED_VERSION + 1])(
+    "バージョン%sならseed成功後に現行バージョンを保存する",
+    async (version) => {
+      const store = createStore({
+        getGroupSeedState: vi.fn().mockResolvedValue({ defaultCategoriesSeedVersion: version }),
+      });
+
+      const result = await seedDefaultCategories(store, "g1", 5000);
+
+      expect(result).toEqual({ created: DEFAULT_CATEGORIES.length, skipped: 0 });
+      expect(store.insert).toHaveBeenCalledTimes(DEFAULT_CATEGORIES.length);
+      expect(store.setGroupSeedVersion).toHaveBeenCalledExactlyOnceWith(
+        "g1",
+        DEFAULT_CATEGORIES_SEED_VERSION,
+      );
+    },
+  );
+
+  it("seed失敗時にはバージョンを保存しない", async () => {
+    const store = createStore({ insert: vi.fn().mockRejectedValue(new Error("seed failed")) });
+
+    await expect(seedDefaultCategories(store, "g1", 5000)).rejects.toThrow("seed failed");
+
+    expect(store.setGroupSeedVersion).not.toHaveBeenCalled();
+  });
+
+  it("グループがなければカテゴリを参照せずエラーにする", async () => {
+    const store = createStore({ getGroupSeedState: vi.fn().mockResolvedValue(null) });
+
+    await expect(seedDefaultCategories(store, "g1", 5000)).rejects.toThrow(
+      "グループが見つかりません",
+    );
+
+    expect(store.findByGroupAndSortOrder).not.toHaveBeenCalled();
+    expect(store.insert).not.toHaveBeenCalled();
+    expect(store.patch).not.toHaveBeenCalled();
+    expect(store.setGroupSeedVersion).not.toHaveBeenCalled();
+  });
+
   it("既存なしなら全件 insert して created を返す", async () => {
     const store = createStore();
     const result = await seedDefaultCategories(store, "g1", 5000);

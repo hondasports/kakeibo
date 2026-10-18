@@ -6,6 +6,7 @@ import type { MutationCtx, QueryCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type {
   CategoryPatch,
+  CategorySeedStore,
   CategoryStore,
   CategoryStoreRecord,
   NewCategoryFields,
@@ -112,6 +113,23 @@ export function createCategoryStore(ctx: Pick<MutationCtx, "db">): CategoryStore
 
     async deleteMany(ids) {
       await Promise.all(ids.map((id) => ctx.db.delete(id as Id<"categories">)));
+    },
+  };
+}
+
+export function createCategorySeedStore(ctx: Pick<MutationCtx, "db">): CategorySeedStore {
+  return {
+    ...createCategoryStore(ctx),
+
+    async getGroupSeedState(groupId) {
+      const group = await ctx.db.get(groupId as Id<"groups">);
+      return group === null
+        ? null
+        : { defaultCategoriesSeedVersion: group.defaultCategoriesSeedVersion };
+    },
+
+    async setGroupSeedVersion(groupId, version) {
+      await ctx.db.patch(groupId as Id<"groups">, { defaultCategoriesSeedVersion: version });
     },
   };
 }

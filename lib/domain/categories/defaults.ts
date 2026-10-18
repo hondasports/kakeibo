@@ -1,3 +1,5 @@
+export const DEFAULT_CATEGORIES_SEED_VERSION = 1;
+
 export const DEFAULT_CATEGORIES = [
   {
     name: "食費",

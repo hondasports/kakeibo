@@ -162,6 +162,7 @@ export default defineSchema({
   groups: defineTable({
     name: v.string(),
     clerkOrganizationId: v.optional(v.string()),
+    defaultCategoriesSeedVersion: v.optional(v.number()),
     status: v.optional(
       v.union(
         v.literal("active"),
