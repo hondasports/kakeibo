@@ -3,9 +3,7 @@
  */
 import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../domain/lineWebhook/reply";
 import type { LineActionScheduler, LineReplySender } from "../../domain/lineWebhook/actionRunner";
-
-const GUIDE_RETRY_DELAY_MS = 1_000;
-const MAX_GUIDE_RETRIES = 2;
+import { LINE_REPLY_RETRY_DELAY_MS, MAX_LINE_REPLY_RETRIES } from "./replyRetryPolicy";
 
 export type SendUnlinkedGuideDeps = {
   replySender: LineReplySender;
@@ -20,8 +18,8 @@ export async function sendUnlinkedGuide(
   try {
     await deps.replySender.sendTextReply(args.replyToken, LINE_UNLINKED_GUIDANCE_MESSAGE);
   } catch {
-    if (attempt < MAX_GUIDE_RETRIES) {
-      await deps.actionScheduler.scheduleUnlinkedGuideRetry(GUIDE_RETRY_DELAY_MS, {
+    if (attempt < MAX_LINE_REPLY_RETRIES) {
+      await deps.actionScheduler.scheduleUnlinkedGuideRetry(LINE_REPLY_RETRY_DELAY_MS, {
         replyToken: args.replyToken,
         attempt: attempt + 1,
       });

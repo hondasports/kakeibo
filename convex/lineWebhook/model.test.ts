@@ -4,6 +4,23 @@ import { LineWebhookPayloadError, MAX_EVENTS_PER_REQUEST, parseLineWebhookPayloa
 const source = { type: "user", userId: "line-user-private" };
 
 describe("parseLineWebhookPayload", () => {
+  it("メッセージIDは256文字まで許可し、空文字・空白・257文字を拒否する", () => {
+    const payload = (messageId: string) => ({
+      events: [
+        {
+          type: "message",
+          webhookEventId: "event-image",
+          source,
+          message: { type: "image", id: messageId },
+        },
+      ],
+    });
+    expect(parseLineWebhookPayload(payload("a".repeat(256)))[0]?.messageId).toBe("a".repeat(256));
+    for (const messageId of ["", " ", "a".repeat(257)]) {
+      expect(() => parseLineWebhookPayload(payload(messageId))).toThrow(LineWebhookPayloadError);
+    }
+  });
+
   it("text/image/postback/follow/unfollowをallowlist済みイベントへ正規化する", () => {
     expect(
       parseLineWebhookPayload({

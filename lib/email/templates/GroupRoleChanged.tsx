@@ -1,15 +1,12 @@
 import { Body, Button, Container, Head, Heading, Html, Preview, Section, Text } from "react-email";
+import { formatGroupRoleLabel } from "../../domain/groups/role";
 import { type GroupRoleChangedPayload } from "../model";
 import { buildEmailUrl } from "../url";
 import { EmailFooter } from "./Footer";
 
-function formatRole(role: "owner" | "member"): string {
-  return role === "owner" ? "オーナー" : "メンバー";
-}
-
 export function GroupRoleChanged({ groupName, previousRole, newRole }: GroupRoleChangedPayload) {
-  const previousRoleLabel = formatRole(previousRole);
-  const newRoleLabel = formatRole(newRole);
+  const previousRoleLabel = formatGroupRoleLabel(previousRole);
+  const newRoleLabel = formatGroupRoleLabel(newRole);
 
   const bodyText =
     newRole === "owner"
