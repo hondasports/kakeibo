@@ -34,7 +34,7 @@ export async function updateDraftItemTaxOverrides(
 ): Promise<{ draft: AiExpenseDraftFields; items: AiExpenseDraftItemFields[] }> {
   // 税内訳が無い下書きでも明細単位の補正は受け付ける。金額・サマリ欠落の判定は
   // persistInterpretation 内の validateTaxInterpretationEligibility に委譲する。
-  await loadEditableDraft(deps, ctx.groupId, args.draftId);
+  const draft = await loadEditableDraft(deps, ctx.groupId, args.draftId);
 
   const items = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
   const itemIndex = items.findIndex((item) => item.id === args.itemId);
@@ -42,9 +42,12 @@ export async function updateDraftItemTaxOverrides(
     throw new ConvexError("AI expense draft item not found");
   }
 
+  // 読み込み済みの下書き・明細を引き回し、persist 側での読み直しを省く。
   const result = await deps.taxInterpretation.persistInterpretation({
     draftId: args.draftId,
     groupId: ctx.groupId,
+    draft: draft.persisted,
+    items,
     override: {
       itemIndex,
       taxRatePercent: args.taxRatePercent,
@@ -55,6 +58,8 @@ export async function updateDraftItemTaxOverrides(
     draftId: args.draftId,
     groupId: ctx.groupId,
     fields: ["items", "receiptTotalResolution", "receiptTaxDecision"],
+    draft: result.draft,
+    items: result.items,
   });
   return { ...result, draft: updatedDraft };
 }

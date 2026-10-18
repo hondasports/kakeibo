@@ -17,7 +17,12 @@ import { persistReceiptUserOverrideSnapshot } from "./receiptDataContract";
 import { replaceDraftItemsForReview } from "./reviewValidation";
 import { reconcileDraftExpenseEntries } from "./reconcileExpenseEntries";
 import { insertReceiptForGroup } from "../receipts/insert";
-import { draftDocToFields, draftFieldsToDoc, draftItemDocToFields } from "./draftRecordMapping";
+import {
+  draftDocToFields,
+  draftFieldsToDoc,
+  draftItemDocToFields,
+  draftItemFieldsToDoc,
+} from "./draftRecordMapping";
 
 export function createDraftTaxInterpretationService(
   ctx: MutationCtx,
@@ -27,6 +32,8 @@ export function createDraftTaxInterpretationService(
       const result = await persistDraftTaxInterpretation(ctx, {
         draftId: request.draftId as Id<"aiExpenseDrafts">,
         groupId: request.groupId as Id<"groups">,
+        draft: request.draft,
+        items: request.items,
         preservedNonTaxReasons: request.preservedNonTaxReasons,
         override: request.override,
         bulkUnresolvedOverride: request.bulkUnresolvedOverride,
@@ -49,6 +56,8 @@ export function createDraftOverrideSnapshotService(ctx: MutationCtx): DraftOverr
         groupId: args.groupId as Id<"groups">,
         fields: args.fields,
         updatedAt: args.updatedAt,
+        draft: args.draft,
+        items: args.items,
       });
       return draftDocToFields(doc);
     },
@@ -57,14 +66,16 @@ export function createDraftOverrideSnapshotService(ctx: MutationCtx): DraftOverr
 
 export function createDraftItemReplaceService(ctx: MutationCtx): DraftItemReplaceService {
   return {
-    async replaceForReview(draftId, groupId, items, now) {
-      await replaceDraftItemsForReview(
+    async replaceForReview(draftId, groupId, items, now, existingItems) {
+      const docs = await replaceDraftItemsForReview(
         ctx,
         draftId as Id<"aiExpenseDrafts">,
         groupId as Id<"groups">,
         items as UpdateForReviewItem[],
         now,
+        existingItems?.map(draftItemFieldsToDoc),
       );
+      return docs.map(draftItemDocToFields);
     },
   };
 }

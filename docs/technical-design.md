@@ -684,9 +684,12 @@ parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を再利�
   からの税関連フィールド継承を含む置換明細フィールド構築、エラー文言変換）と
   `reviewCategory.ts`（レビュー用カテゴリ利用可否: 不在/他グループ・非アクティブ）。
 - **ユースケース**: `assertActiveCategoryForDraft` は `reviewCategory.ts` へ委譲する。
-- **インフラ**: `lib/convex/aiExpenseDrafts/reviewValidation.ts` は既存明細取得・削除・
-  insert と Doc/Fields 変換のみを担い、判定順序（上限 → 取得 → ID 検証 → 削除 →
-  各明細で名前/金額 → カテゴリ → insert）と文言は不変とする。
+- **インフラ**: `lib/convex/aiExpenseDrafts/reviewValidation.ts` は既存明細取得（または
+  既読データの流用）・差分適用と Doc/Fields 変換のみを担う。Database I/O 削減のため
+  全件削除＋再 insert ではなく差分更新（変わった明細だけ patch・増えた明細は insert・
+  消えた明細は delete）とし、判定順序（上限 → 取得 → ID 検証 → 不在分 delete →
+  各明細で名前/金額 → カテゴリ → 差分 patch/insert）と文言は不変とする。明細の
+  `_id` は保持される。
 
 `receipts` 集計の新旧形式フォールバック判定も `lib/domain/receipt/legacyFallback.ts`
 へ分離済み。
@@ -820,9 +823,10 @@ domain へ分離済み。
   `snapshotReceiptDraftValues`（draft・明細のフィールド射影。warnings 未設定は
   空配列へ正規化）と `buildReceiptUserOverride`（fields の和集合マージ・
   税判定更新時の全体設定の軸の記録置換・`source: "user"` 組立）。
-- **インフラ**: `lib/convex/aiExpenseDrafts/receiptDataContract.ts` は draft get・
-  所有権チェック（`groupId` 不一致または不存在で Error・文言維持）・明細
-  `by_group_id_and_draft_id` asc take(100)・patch・再取得のみを担い、
+- **インフラ**: `lib/convex/aiExpenseDrafts/receiptDataContract.ts` は draft 取得
+  （`draft`/`items` 引数による既読データの流用可）・所有権チェック（`groupId` 不一致
+  または不存在で Error・文言維持）・明細 `by_group_id_and_draft_id` asc take(100)・
+  patch・patch 適用済み結果のメモリ組立のみを担い、
   `persistReceiptUserOverrideSnapshot` / `snapshotReceiptDraftValues` /
   `resetReceiptToAiInterpretationHandler` の公開シグネチャは不変とする。
 

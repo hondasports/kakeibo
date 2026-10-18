@@ -1,5 +1,8 @@
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../../convex/_generated/server";
+import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
+import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
+import { applyRecordPatch } from "../../domain/common/recordPatch";
 import {
   buildReceiptUserOverride,
   resolveReceiptTaxCorrections,
@@ -25,19 +28,26 @@ export async function persistReceiptUserOverrideSnapshot(
     groupId: Id<"groups">;
     fields: string[];
     updatedAt?: number;
+    /** 既に読み込んだ（または直前の永続化結果の）下書き・明細。渡せば DB 再取得を省略する。 */
+    draft?: AiExpenseDraftFields;
+    items?: AiExpenseDraftItemFields[];
   },
 ): Promise<Doc<"aiExpenseDrafts">> {
-  const draft = await ctx.db.get(args.draftId);
+  const draft =
+    args.draft !== undefined ? draftFieldsToDoc(args.draft) : await ctx.db.get(args.draftId);
   if (draft === null || draft.groupId !== args.groupId) {
     throw new Error("AI expense draft not found while saving user override");
   }
-  const items = await ctx.db
-    .query("aiExpenseDraftItems")
-    .withIndex("by_group_id_and_draft_id", (q) =>
-      q.eq("groupId", args.groupId).eq("draftId", args.draftId),
-    )
-    .order("asc")
-    .take(100);
+  const items =
+    args.items !== undefined
+      ? args.items.slice(0, 100).map(draftItemFieldsToDoc)
+      : await ctx.db
+          .query("aiExpenseDraftItems")
+          .withIndex("by_group_id_and_draft_id", (q) =>
+            q.eq("groupId", args.groupId).eq("draftId", args.draftId),
+          )
+          .order("asc")
+          .take(100);
   const updatedAt = args.updatedAt ?? Date.now();
   const receiptUserOverride: ReceiptUserOverrideSnapshot<Id<"categories">> =
     buildReceiptUserOverride({
@@ -51,11 +61,10 @@ export async function persistReceiptUserOverrideSnapshot(
       values: snapshotReceiptDraftValues(draft, items),
     });
   await ctx.db.patch(args.draftId, { receiptUserOverride, updatedAt });
-  const updated = await ctx.db.get(args.draftId);
-  if (updated === null) {
-    throw new Error("AI expense draft not found after saving user override");
-  }
-  return updated;
+  return applyRecordPatch(draft as unknown as Record<string, unknown>, {
+    receiptUserOverride,
+    updatedAt,
+  }) as unknown as Doc<"aiExpenseDrafts">;
 }
 
 /** ハンドラ互換のグルー。実装は lib/usecase/aiExpenseDrafts/resetReceiptToAiInterpretation。 */

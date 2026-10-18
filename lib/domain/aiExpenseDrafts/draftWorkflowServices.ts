@@ -18,6 +18,10 @@ import type { DraftRegistrationItem } from "./registrationItems";
 export type DraftTaxInterpretationRequest = {
   draftId: string;
   groupId: string;
+  /** 既に読み込んだ下書き。渡せば DB 再取得を省略する。 */
+  draft?: AiExpenseDraftFields;
+  /** 既に読み込んだ明細一覧。渡せば DB 再取得を省略する。 */
+  items?: AiExpenseDraftItemFields[];
   preservedNonTaxReasons?: AiExpenseDraftReviewReason[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
@@ -42,17 +46,26 @@ export interface DraftOverrideSnapshotService {
     groupId: string;
     fields: string[];
     updatedAt?: number;
+    /** 既に読み込んだ（または直前の永続化結果の）下書き・明細。渡せば DB 再取得を省略する。 */
+    draft?: AiExpenseDraftFields;
+    items?: AiExpenseDraftItemFields[];
   }): Promise<AiExpenseDraftFields>;
 }
 
 /** レビュー入力で下書き明細を置き換えるサービス。 */
 export interface DraftItemReplaceService {
+  /**
+   * 変わった明細だけ patch・増えた明細は insert・消えた明細は delete し、
+   * 置き換え後の明細一覧（ストレージ順）を返す。
+   * existingItems に既読の明細を渡せば DB 再取得を省略する。
+   */
   replaceForReview(
     draftId: string,
     groupId: string,
     items: DraftReviewItemInput[],
     now: number,
-  ): Promise<void>;
+    existingItems?: AiExpenseDraftItemFields[],
+  ): Promise<AiExpenseDraftItemFields[]>;
 }
 
 /** 下書きに紐づく支出エントリを upsert/delete で同期するサービス。 */
