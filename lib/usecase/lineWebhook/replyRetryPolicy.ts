@@ -1,0 +1,2 @@
+export const LINE_REPLY_RETRY_DELAY_MS = 1_000;
+export const MAX_LINE_REPLY_RETRIES = 2;

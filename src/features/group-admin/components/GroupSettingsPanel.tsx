@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatGroupRoleLabel } from "../../../../lib/domain/groups/role";
 import {
   Alert,
   Box,
@@ -142,7 +143,7 @@ function GroupSettingsPanelContent({ defaultExpanded = true }: GroupSettingsPane
           <Box sx={{ minWidth: 0 }}>
             <Typography sx={{ fontWeight: 700, overflowWrap: "anywhere" }}>{group.name}</Typography>
             <Typography color="text.secondary" variant="body2">
-              {members.length}人・{isOwner ? "オーナー" : "メンバー"}
+              {members.length}人・{formatGroupRoleLabel(group.role)}
               {isOwner ? `・保留中の招待 ${pendingInvitations?.length ?? 0}件` : ""}
             </Typography>
           </Box>
@@ -168,7 +169,7 @@ function GroupSettingsPanelContent({ defaultExpanded = true }: GroupSettingsPane
                 <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                   <Chip
                     color={isOwner ? "primary" : "secondary"}
-                    label={isOwner ? "オーナー" : "メンバー"}
+                    label={formatGroupRoleLabel(group.role)}
                   />
                   <Chip label={`${members.length}人`} variant="outlined" />
                 </Stack>

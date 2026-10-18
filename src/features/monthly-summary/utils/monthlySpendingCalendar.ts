@@ -1,6 +1,7 @@
 import { normalizeMonth } from "../lib/monthNavigation";
+import { WEEKDAY_LABELS as CALENDAR_WEEKDAY_LABELS } from "../../../utils/date";
 
-export const CALENDAR_WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"] as const;
+export { CALENDAR_WEEKDAY_LABELS };
 
 export type MonthlyCalendarDay = {
   date: string;

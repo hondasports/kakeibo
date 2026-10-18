@@ -1,4 +1,5 @@
 import { api } from "../../../../convex/_generated/api";
+import { formatGroupRoleLabel } from "../../../../lib/domain/groups/role";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation } from "convex/react";
 import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
@@ -77,7 +78,7 @@ export function GroupSelectPage() {
                         ) : null}
                       </Stack>
                       <Typography color="text.secondary" variant="body2">
-                        {group.role === "owner" ? "オーナー" : "メンバー"}
+                        {formatGroupRoleLabel(group.role)}
                       </Typography>
                     </Box>
 

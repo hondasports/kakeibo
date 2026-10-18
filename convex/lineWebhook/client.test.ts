@@ -33,6 +33,82 @@ describe("LINE messaging client", () => {
     process.env.APP_ENV = "development";
   });
 
+  it("返信本文は5000文字まで許可し、空文字と5001文字を送信前に拒否する", async () => {
+    const restore = setEnvironment({ LINE_INTEGRATION_MODE: "mock" });
+    const fetchImpl = vi.fn();
+    try {
+      await expect(
+        sendLineTextReply("reply-token", "あ".repeat(5000), fetchImpl),
+      ).resolves.toBeUndefined();
+      for (const text of ["", "あ".repeat(5001)]) {
+        await expect(sendLineTextReply("reply-token", text, fetchImpl)).rejects.toThrow(
+          "LINE reply text is invalid",
+        );
+      }
+      expect(fetchImpl).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("画像取得IDは256文字まで許可し、空文字・空白・257文字を取得前に拒否する", async () => {
+    const restore = setEnvironment({ LINE_INTEGRATION_MODE: "mock" });
+    const fetchImpl = vi.fn();
+    try {
+      await expect(getLineMessageContent("a".repeat(256), fetchImpl)).resolves.toMatchObject({
+        contentType: "image/jpeg",
+      });
+      for (const messageId of ["", " ", "a".repeat(257)]) {
+        await expect(getLineMessageContent(messageId, fetchImpl)).rejects.toThrow(
+          "LINE message id is invalid",
+        );
+      }
+      expect(fetchImpl).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it.each([1, 2])("案内とサマリーの再試行はattempt=%iで同じ上限を守る", async (attempt) => {
+    const restore = setEnvironment({
+      LINE_INTEGRATION_MODE: "real",
+      LINE_MESSAGING_CHANNEL_ACCESS_TOKEN: "access-token",
+    });
+    const runAfter = vi.fn().mockResolvedValue(undefined);
+    const runQuery = vi.fn().mockResolvedValue({ replyText: "今週の支出: 1,000円" });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("provider unavailable")));
+    try {
+      const ctx = { runQuery, scheduler: { runAfter } } as unknown as ActionCtx;
+      await sendUnlinkedGuideHandler(ctx, { replyToken: "reply-token", attempt });
+      await sendSummaryReplyHandler(ctx, {
+        replyToken: "reply-token",
+        userId: "user-a",
+        messageText: "今週の支出",
+        nowMs: 1,
+        attempt,
+      });
+      if (attempt === 1) {
+        expect(runAfter).toHaveBeenCalledTimes(2);
+        expect(runAfter).toHaveBeenNthCalledWith(1, 1_000, expect.anything(), {
+          replyToken: "reply-token",
+          attempt: 2,
+        });
+        expect(runAfter).toHaveBeenNthCalledWith(2, 1_000, expect.anything(), {
+          replyToken: "reply-token",
+          userId: "user-a",
+          messageText: "今週の支出",
+          nowMs: 1,
+          attempt: 2,
+        });
+      } else {
+        expect(runAfter).not.toHaveBeenCalled();
+      }
+    } finally {
+      vi.unstubAllGlobals();
+      restore();
+    }
+  });
+
   it("mock modeでは外部APIへ送信しない", async () => {
     const restore = setEnvironment({ LINE_INTEGRATION_MODE: "mock" });
     const fetchImpl = vi.fn();
