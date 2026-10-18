@@ -10,7 +10,10 @@ import type {
 } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftDocumentType } from "../../domain/aiExpenseDrafts/constants";
 import { classifyAiExpenseDraft } from "../../domain/aiExpenseDrafts/classification";
-import { buildRegistrationPatchFields } from "../../domain/aiExpenseDrafts/registration";
+import {
+  buildRegistrationPatchFields,
+  resolveRegisteredAt,
+} from "../../domain/aiExpenseDrafts/registration";
 import {
   buildDraftRegistrationItems,
   resolveRegistrationMode,
@@ -304,7 +307,7 @@ export async function updateAiExpenseDraftForReview(
         amountYen: updatedDraft.amountYen!,
         date: updatedDraft.date!,
         categoryIds: [...new Set(registrationItems.map((item) => item.categoryId))],
-        registeredAt: updatedDraft.derivedRegistration?.registeredAt ?? now,
+        registeredAt: resolveRegisteredAt(updatedDraft, now),
       }),
       updatedAt: now,
     };

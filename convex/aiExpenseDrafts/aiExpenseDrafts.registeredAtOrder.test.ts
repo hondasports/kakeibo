@@ -305,4 +305,72 @@ describe("登録・登録済み編集の各経路でトップレベル registere
       expect(doc?.registeredAt).toBe(1111);
     },
   );
+
+  it.each(["updateRegisteredDraft", "updateForReview"] as const)(
+    "%s は derivedRegistration を持たない登録済みでも backfill 済みの登録日時を維持する",
+    async (mutation) => {
+      const t = convexTest(schema, convexTestModules);
+      const { groupId, categoryId } = await seedGroup(t);
+      const draftId = await t.run(async (ctx) => {
+        const draftId = await ctx.db.insert(
+          "aiExpenseDrafts",
+          draftSeed(groupId, {
+            status: "registered",
+            shopName: "backfill 済みの旧データ",
+            date: "2026-08-26",
+            amountYen: 1200,
+            categoryId,
+            registeredAt: 1111,
+            createdAt: 100,
+            updatedAt: 100,
+          }),
+        );
+        await ctx.db.insert("aiExpenseDraftItems", {
+          groupId,
+          draftId,
+          itemName: "食品",
+          amountYen: 400,
+          categoryId,
+          confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+          createdAt: 100,
+          updatedAt: 100,
+        });
+        await ctx.db.insert("aiExpenseDraftItems", {
+          groupId,
+          draftId,
+          itemName: "惣菜",
+          amountYen: 800,
+          categoryId,
+          confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+          createdAt: 101,
+          updatedAt: 101,
+        });
+        return draftId;
+      });
+
+      const authed = t.withIdentity(identity);
+      const base = {
+        draftId,
+        date: "2026-08-27",
+        amountYen: 1200,
+        categoryId,
+        shopName: "backfill 済みの旧データ",
+      };
+      if (mutation === "updateRegisteredDraft") {
+        await authed.mutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft, {
+          ...base,
+          registrationMode: "detailed",
+        });
+      } else {
+        await authed.mutation(api.aiExpenseDrafts.mutations.updateForReview, {
+          ...base,
+          documentType: "receipt",
+        });
+      }
+
+      const doc = await t.run(async (ctx) => await ctx.db.get(draftId));
+      expect(doc?.registeredAt).toBe(1111);
+      expect(doc?.derivedRegistration?.registeredAt).toBe(1111);
+    },
+  );
 });

@@ -5,6 +5,7 @@ import {
   getReadyDraftRegistrationErrorMessage,
   isAlreadyRegistered,
   isAlreadyRegisteredAsReceipt,
+  resolveRegisteredAt,
   validateReadyDraftForRegistration,
 } from "./registration";
 
@@ -57,6 +58,16 @@ describe("isAlreadyRegisteredAsReceipt", () => {
     [{ status: "ready", registeredReceiptId: "r1" }, false],
   ] as const)("%o -> %s", (draft, expected) => {
     expect(isAlreadyRegisteredAsReceipt(draft as never)).toBe(expected);
+  });
+});
+
+describe("resolveRegisteredAt", () => {
+  it.each([
+    [{ derivedRegistration: { registeredAt: 500 }, registeredAt: 400 }, 500],
+    [{ registeredAt: 400 }, 400],
+    [{}, 999],
+  ] as const)("%o -> %s", (fields, expected) => {
+    expect(resolveRegisteredAt(fields as never, 999)).toBe(expected);
   });
 });
 

@@ -5,7 +5,10 @@ import {
 } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { DraftReviewItemInput } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import { applyRecordPatch } from "../../domain/common/recordPatch";
-import { buildRegistrationPatchFields } from "../../domain/aiExpenseDrafts/registration";
+import {
+  buildRegistrationPatchFields,
+  resolveRegisteredAt,
+} from "../../domain/aiExpenseDrafts/registration";
 import { buildDraftRegistrationItems } from "../../domain/aiExpenseDrafts/registrationItems";
 import type { AiExpenseRegistrationMode } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { validatePositiveCategoryTotals } from "../../domain/aiExpenseDrafts/reviewItems";
@@ -157,7 +160,7 @@ export async function updateRegisteredAiExpenseDraft(
       amountYen: args.amountYen,
       date: args.date,
       categoryIds: [...new Set(registrationItems.map((item) => item.categoryId))],
-      registeredAt: fields.derivedRegistration?.registeredAt ?? now,
+      registeredAt: resolveRegisteredAt(fields, now),
     }),
     updatedAt: now,
   });
