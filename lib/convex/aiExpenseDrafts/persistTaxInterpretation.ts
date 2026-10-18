@@ -7,17 +7,27 @@ import type {
   ReinterpretDraftTaxInput,
 } from "../../receiptTax/reinterpretDraftTax";
 import type { AiExpenseDraftReviewReason } from "../../../lib/domain/aiExpenseDrafts/constants";
+import type { AiExpenseDraftFields } from "../../../lib/domain/aiExpenseDrafts/aiExpenseDraft";
+import type { AiExpenseDraftItemFields } from "../../../lib/domain/aiExpenseDrafts/aiExpenseDraftItem";
+import { applyRecordPatch, diffRecordPatch } from "../../../lib/domain/common/recordPatch";
 import {
   getTaxInterpretationEligibilityErrorMessage,
   planDraftTaxInterpretation,
-  UPDATED_DRAFT_NOT_FOUND_MESSAGE,
   validateTaxInterpretationEligibility,
 } from "../../../lib/domain/aiExpenseDrafts/taxInterpretationPlan";
-import { draftDocToFields, draftItemDocToFields } from "./draftRecordMapping";
+import {
+  draftDocToFields,
+  draftItemDocToFields,
+  draftFieldsToDoc,
+  draftItemFieldsToDoc,
+} from "./draftRecordMapping";
 
 export type PersistDraftTaxInterpretationArgs = {
   draftId: Id<"aiExpenseDrafts">;
   groupId: Id<"groups">;
+  /** 既に読み込んだ下書き・明細。渡せば DB 再取得を省略する。 */
+  draft?: AiExpenseDraftFields;
+  items?: AiExpenseDraftItemFields[];
   preservedNonTaxReasons?: AiExpenseDraftReviewReason[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
@@ -34,7 +44,8 @@ export async function persistDraftTaxInterpretation(
   ctx: MutationCtx,
   args: PersistDraftTaxInterpretationArgs,
 ): Promise<PersistDraftTaxInterpretationResult> {
-  const draftDoc = await ctx.db.get(args.draftId);
+  const draftDoc =
+    args.draft !== undefined ? draftFieldsToDoc(args.draft) : await ctx.db.get(args.draftId);
   const eligibility = validateTaxInterpretationEligibility(
     draftDoc === null ? null : draftDocToFields(draftDoc),
     args.groupId,
@@ -48,13 +59,16 @@ export async function persistDraftTaxInterpretation(
     throw new ConvexError(getTaxInterpretationEligibilityErrorMessage(eligibility.error));
   }
 
-  const items = await ctx.db
-    .query("aiExpenseDraftItems")
-    .withIndex("by_group_id_and_draft_id", (q) =>
-      q.eq("groupId", args.groupId).eq("draftId", args.draftId),
-    )
-    .order("asc")
-    .collect();
+  const items =
+    args.items !== undefined
+      ? args.items.map(draftItemFieldsToDoc)
+      : await ctx.db
+          .query("aiExpenseDraftItems")
+          .withIndex("by_group_id_and_draft_id", (q) =>
+            q.eq("groupId", args.groupId).eq("draftId", args.draftId),
+          )
+          .order("asc")
+          .collect();
 
   const now = Date.now();
   const plan = planDraftTaxInterpretation(
@@ -64,8 +78,14 @@ export async function persistDraftTaxInterpretation(
     now,
   );
 
+  const itemDocsById = new Map(items.map((item) => [item._id, item]));
+  const itemPatchByItemId = new Map(plan.itemPatches.map(({ itemId, patch }) => [itemId, patch]));
   for (const { itemId, patch } of plan.itemPatches) {
-    await ctx.db.patch(itemId as Id<"aiExpenseDraftItems">, patch);
+    const id = itemId as Id<"aiExpenseDraftItems">;
+    const diff = diffRecordPatch(itemDocsById.get(id) ?? {}, patch);
+    if (diff !== null) {
+      await ctx.db.patch(id, diff);
+    }
   }
 
   await ctx.db.patch(args.draftId, {
@@ -74,18 +94,20 @@ export async function persistDraftTaxInterpretation(
       .receiptInterpretation as Doc<"aiExpenseDrafts">["receiptInterpretation"],
   });
 
-  const updatedDraft = await ctx.db.get(args.draftId);
-  if (updatedDraft === null) {
-    throw new ConvexError(UPDATED_DRAFT_NOT_FOUND_MESSAGE);
-  }
-
-  const updatedItems = await ctx.db
-    .query("aiExpenseDraftItems")
-    .withIndex("by_group_id_and_draft_id", (q) =>
-      q.eq("groupId", args.groupId).eq("draftId", args.draftId),
-    )
-    .order("asc")
-    .collect();
+  // patch 結果はメモリ上で doc に適用して組み立て、再読み込みを省く。
+  const updatedDraft = applyRecordPatch(
+    draftDoc as unknown as Record<string, unknown>,
+    plan.draftPatch as Record<string, unknown>,
+  ) as unknown as Doc<"aiExpenseDrafts">;
+  const updatedItems = items.map((item) => {
+    const patch = itemPatchByItemId.get(item._id);
+    return patch === undefined
+      ? item
+      : (applyRecordPatch(
+          item as unknown as Record<string, unknown>,
+          patch as Record<string, unknown>,
+        ) as unknown as Doc<"aiExpenseDraftItems">);
+  });
 
   return { draft: updatedDraft, items: updatedItems };
 }

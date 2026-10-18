@@ -1,6 +1,10 @@
 import { ConvexError } from "convex/values";
-import { AiExpenseDraft } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
+import {
+  AiExpenseDraft,
+  type AiExpenseDraftFields,
+} from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { DraftReviewItemInput } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
+import { applyRecordPatch } from "../../domain/common/recordPatch";
 import { buildDerivedRegistration } from "../../domain/aiExpenseDrafts/registration";
 import { buildDraftRegistrationItems } from "../../domain/aiExpenseDrafts/registrationItems";
 import type { AiExpenseRegistrationMode } from "../../domain/aiExpenseDrafts/receiptDataContract";
@@ -87,9 +91,13 @@ export async function updateRegisteredAiExpenseDraft(
     if (args.registrationMode === "detailed" && !validatePositiveCategoryTotals(args.items)) {
       throw new ConvexError("Draft category total must be greater than zero");
     }
-    await deps.itemReplace.replaceForReview(args.draftId, ctx.groupId, args.items, now);
   }
-  await deps.drafts.patch(args.draftId, {
+  // 読み込み済みの下書き・明細を引き回し、persist 側での読み直しを省く。
+  const items =
+    args.items === undefined
+      ? await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId)
+      : await deps.itemReplace.replaceForReview(args.draftId, ctx.groupId, args.items, now);
+  const draftPatch = {
     date: args.date,
     amountYen: args.amountYen,
     categoryId: args.categoryId,
@@ -105,7 +113,12 @@ export async function updateRegisteredAiExpenseDraft(
       taxSummaries: fields.taxSummaries ?? [],
     }),
     updatedAt: now,
-  });
+  };
+  await deps.drafts.patch(args.draftId, draftPatch);
+  const patchedDraft = applyRecordPatch(
+    fields as unknown as Record<string, unknown>,
+    draftPatch,
+  ) as unknown as AiExpenseDraftFields;
   const updated = await deps.overrideSnapshots.persist({
     draftId: args.draftId,
     groupId: ctx.groupId,
@@ -119,8 +132,9 @@ export async function updateRegisteredAiExpenseDraft(
       ...(args.items === undefined ? [] : ["items"]),
     ],
     updatedAt: now,
+    draft: patchedDraft,
+    items,
   });
-  const items = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
   let registrationItems;
   try {
     registrationItems = buildDraftRegistrationItems(updated, items);
