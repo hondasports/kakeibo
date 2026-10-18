@@ -10,7 +10,7 @@ import type {
 } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftDocumentType } from "../../domain/aiExpenseDrafts/constants";
 import { classifyAiExpenseDraft } from "../../domain/aiExpenseDrafts/classification";
-import { buildDerivedRegistration } from "../../domain/aiExpenseDrafts/registration";
+import { buildRegistrationPatchFields } from "../../domain/aiExpenseDrafts/registration";
 import {
   buildDraftRegistrationItems,
   resolveRegistrationMode,
@@ -298,7 +298,7 @@ export async function updateAiExpenseDraftForReview(
     });
     const reconcilePatch = {
       status: "registered" as const,
-      derivedRegistration: buildDerivedRegistration({
+      ...buildRegistrationPatchFields({
         destination: "expense_entries" as const,
         registrationMode: resolveRegistrationMode(updatedDraft),
         amountYen: updatedDraft.amountYen!,

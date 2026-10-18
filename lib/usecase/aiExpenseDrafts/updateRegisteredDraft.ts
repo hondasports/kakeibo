@@ -5,7 +5,7 @@ import {
 } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { DraftReviewItemInput } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import { applyRecordPatch } from "../../domain/common/recordPatch";
-import { buildDerivedRegistration } from "../../domain/aiExpenseDrafts/registration";
+import { buildRegistrationPatchFields } from "../../domain/aiExpenseDrafts/registration";
 import { buildDraftRegistrationItems } from "../../domain/aiExpenseDrafts/registrationItems";
 import type { AiExpenseRegistrationMode } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { validatePositiveCategoryTotals } from "../../domain/aiExpenseDrafts/reviewItems";
@@ -151,7 +151,7 @@ export async function updateRegisteredAiExpenseDraft(
   });
   await deps.drafts.patch(args.draftId, {
     status: "registered",
-    derivedRegistration: buildDerivedRegistration({
+    ...buildRegistrationPatchFields({
       destination: "expense_entries",
       registrationMode: args.registrationMode,
       amountYen: args.amountYen,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildRegistrationPatchFields,
   dedupeDraftIds,
   getReadyDraftRegistrationErrorMessage,
   isAlreadyRegistered,
@@ -56,6 +57,27 @@ describe("isAlreadyRegisteredAsReceipt", () => {
     [{ status: "ready", registeredReceiptId: "r1" }, false],
   ] as const)("%o -> %s", (draft, expected) => {
     expect(isAlreadyRegisteredAsReceipt(draft as never)).toBe(expected);
+  });
+});
+
+describe("buildRegistrationPatchFields", () => {
+  it("トップレベルの registeredAt は derivedRegistration.registeredAt と常に同じ値になる", () => {
+    const fields = buildRegistrationPatchFields({
+      destination: "expense_entries",
+      registrationMode: "detailed",
+      amountYen: 1200,
+      date: "2026-08-26",
+      categoryIds: ["cat-food"],
+      registeredAt: 1234,
+    });
+    expect(fields.registeredAt).toBe(1234);
+    expect(fields.registeredAt).toBe(fields.derivedRegistration.registeredAt);
+    expect(fields.derivedRegistration).toMatchObject({
+      source: "derived",
+      destination: "expense_entries",
+      amountYen: 1200,
+      categoryIds: ["cat-food"],
+    });
   });
 });
 
