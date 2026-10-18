@@ -105,12 +105,16 @@ describe("税再解釈系mutationのDatabase I/O", () => {
     const args = { draftId: DRAFT_ID, groupId: GROUP_ID };
 
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1_000);
-    await persistDraftTaxInterpretation(ctx, args);
-    vi.mocked(ctx.db.patch).mockClear();
+    let result: Awaited<ReturnType<typeof persistDraftTaxInterpretation>>;
+    try {
+      await persistDraftTaxInterpretation(ctx, args);
+      vi.mocked(ctx.db.patch).mockClear();
 
-    nowSpy.mockReturnValue(2_000);
-    const result = await persistDraftTaxInterpretation(ctx, args);
-    nowSpy.mockRestore();
+      nowSpy.mockReturnValue(2_000);
+      result = await persistDraftTaxInterpretation(ctx, args);
+    } finally {
+      nowSpy.mockRestore();
+    }
 
     expect(patchIds(ctx).filter((id) => id !== DRAFT_ID)).toHaveLength(0);
     // patch を skip した明細は、返却値の updatedAt も DB の値と一致する
