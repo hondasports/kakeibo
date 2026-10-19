@@ -3,7 +3,7 @@ import { getReviewGuidance } from "./reviewGuidance";
 import { initializeReviewCategoryState } from "./reviewItemCategories";
 import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 import { mapDraftItemsToReviewItems, mapDraftToReviewForm } from "./reviewDraftMapping";
-import type { AiExpenseDraft } from "./reviewTypes";
+import type { AiExpenseDraftJudgmentInput } from "./reviewTypes";
 
 /**
  * 金額・税内訳の解決に関係しない案内のid（店名・日付・カテゴリ・読み取り確認）。
@@ -25,7 +25,7 @@ export function isUnrelatedToAmountTaxGuidanceId(id: string): boolean {
  * 下書き確認ダイアログと同じ初期化・再解釈・照合で、金額と税内訳が解決済みか判定する。
  * 明細が無い、または照合できない場合は解決済みとみなさない。
  */
-export function isAmountAndTaxResolved(draft: AiExpenseDraft): boolean {
+export function isAmountAndTaxResolved(draft: AiExpenseDraftJudgmentInput): boolean {
   const paidTotalYen = draft.amountYen;
   if (!draft.items || draft.items.length === 0 || paidTotalYen === undefined) return false;
   const mappedForm = mapDraftToReviewForm(draft);

@@ -32,6 +32,11 @@ async function attachItemDetails(
   }
   return await Promise.all(
     drafts.map(async (draft) => {
+      // 保存済みサマリがある下書きは明細を読まない。
+      // 無い旧データのみ従来どおり明細を読む（フォールバック。Phase 3 で外す）。
+      if (draft.listSummary !== undefined) {
+        return { ...draft, itemSummary: draft.listSummary.itemSummary };
+      }
       const items = await deps.draftItems.listByDraftAsc(ctx.groupId, draft.id!, ITEM_LIST_LIMIT);
       return {
         ...draft,

@@ -30,7 +30,8 @@ export function hasLowConfidenceItem(item: { confidence?: ItemConfidence | undef
 
 export type ItemSummary = {
   itemTotalYen: number;
-  itemDifferenceYen: number | undefined;
+  /** 下書き金額が無い等で差分を出せない場合は省略（Convex では undefined はキー非存在として保存される）。 */
+  itemDifferenceYen?: number;
   hasUncategorizedItems: boolean;
   hasLowConfidenceItems: boolean;
   categoryAggregates: Array<{ categoryId: string; amountYen: number }>;

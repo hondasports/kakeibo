@@ -1,7 +1,11 @@
 import { parseExpenseAmountString } from "../expenseEntries/expenseEntryItem";
 import { isValidIsoDateString } from "../week/weekDates";
 import { isDiscountLine, isValidSignedLineItemAmount } from "../receipt/discountItems";
-import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "./reviewTypes";
+import type {
+  AiExpenseDraftJudgmentInput,
+  ReviewFormValues,
+  ReviewItemValues,
+} from "./reviewTypes";
 import {
   getReviewDocumentTypeErrorMessage,
   getReviewItemsErrorMessage,
@@ -42,7 +46,7 @@ export function effectiveReviewMode(form: ReviewFormValues) {
 export function getReviewGuidance(
   form: ReviewFormValues,
   items: ReviewItemValues[],
-  draft?: AiExpenseDraft | null,
+  draft?: AiExpenseDraftJudgmentInput | null,
 ): ReviewGuidanceItem[] {
   const issues: ReviewGuidanceItem[] = [];
   const add = (id: string, message: string, target: string, required: boolean) =>

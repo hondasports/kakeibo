@@ -7,6 +7,9 @@ import {
   mapDraftItemsToReviewItems,
   mapDraftToReviewForm,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewDraftMapping";
+import { buildDraftListSummary } from "../../../../lib/domain/aiExpenseDrafts/listSummary";
+import type { AiExpenseDraftFields } from "../../../../lib/domain/aiExpenseDrafts/aiExpenseDraft";
+import type { AiExpenseDraftItemFields } from "../../../../lib/domain/aiExpenseDrafts/aiExpenseDraftItem";
 import { mapConvexDraftToAiExpenseDraft, mapDraftToQueueItem } from "./mappers";
 import type { AiExpenseDraft } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import { getReviewPriority } from "../../../../lib/domain/aiExpenseDrafts/queue";
@@ -460,6 +463,64 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
       { _id: "item-zero", itemName: "無料品", amountYen: 0, categoryId: "food" },
     ];
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toContain("amount_mismatch");
+  });
+
+  it("保存済み listSummary の判定を使い、明細が無くても解決済みの理由を落とす", () => {
+    const draft = summary892Draft({
+      items: undefined,
+      listSummary: { amountAndTaxResolved: true },
+    });
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual(["user_confirmation_required"]);
+  });
+
+  it("保存済み判定が未解決なら明細が解決可能でも理由を残す（保存値優先）", () => {
+    const draft = summary892Draft({ listSummary: { amountAndTaxResolved: false } });
+    expect(isAmountAndTaxResolved(draft)).toBe(true);
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
+      "user_confirmation_required",
+      "amount_mismatch",
+    ]);
+  });
+
+  it("一覧の保存値と確認画面の判定が同じ入力で一致する（#997）", () => {
+    const draft = summary892Draft();
+    const draftFields: AiExpenseDraftFields = {
+      id: draft._id,
+      groupId: "group-1",
+      sourceType: "image_upload",
+      status: draft.status,
+      documentType: draft.documentType,
+      amountYen: draft.amountYen,
+      categoryId: draft.categoryId,
+      taxSummaries: draft.taxSummaries?.map((summary) => ({ ...summary, confidence: {} })),
+      rawObservation: draft.rawObservation,
+      confidence: {},
+      reviewReasons: draft.reviewReasons as AiExpenseDraftFields["reviewReasons"],
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const itemFields: AiExpenseDraftItemFields[] = (draft.items ?? []).map((item) => ({
+      id: item._id,
+      groupId: "group-1",
+      draftId: draft._id,
+      itemName: item.itemName,
+      amountYen: item.amountYen,
+      printedAmountYen: item.printedAmountYen,
+      amountBasis: item.amountBasis,
+      taxRatePercent: item.taxRatePercent,
+      taxResolutionStatus: item.taxResolutionStatus,
+      taxResolutionSource: item.taxResolutionSource,
+      categoryId: item.categoryId,
+      confidence: item.confidence ?? {},
+      createdAt: 0,
+      updatedAt: 0,
+    }));
+    const saved = buildDraftListSummary(draftFields, itemFields);
+
+    const withSaved = mapDraftToQueueItem({ ...draft, items: undefined, listSummary: saved }, {});
+    const withLive = mapDraftToQueueItem(draft, {});
+    expect(saved.amountAndTaxResolved).toBe(true);
+    expect(withSaved.reviewReasons).toEqual(withLive.reviewReasons);
   });
 });
 

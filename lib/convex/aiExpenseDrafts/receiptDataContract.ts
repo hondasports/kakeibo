@@ -11,8 +11,14 @@ import {
   type ReceiptUserOverrideSnapshot,
 } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { resetReceiptToAiInterpretation } from "../../usecase/aiExpenseDrafts/resetReceiptToAiInterpretation";
+import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
 import { createAiExpenseDraftDeps } from "./draftUsecaseDeps";
-import { draftFieldsToDoc, draftItemFieldsToDoc } from "./draftRecordMapping";
+import {
+  draftDocToFields,
+  draftFieldsToDoc,
+  draftItemDocToFields,
+  draftItemFieldsToDoc,
+} from "./draftRecordMapping";
 
 export function snapshotReceiptDraftValues(
   draft: Doc<"aiExpenseDrafts">,
@@ -60,11 +66,17 @@ export async function persistReceiptUserOverrideSnapshot(
       updatedAt,
       values: snapshotReceiptDraftValues(draft, items),
     });
-  await ctx.db.patch(args.draftId, { receiptUserOverride, updatedAt });
-  return applyRecordPatch(draft as unknown as Record<string, unknown>, {
+  const updatedDraft = applyRecordPatch(draft as unknown as Record<string, unknown>, {
     receiptUserOverride,
     updatedAt,
   }) as unknown as Doc<"aiExpenseDrafts">;
+  // 一覧用の保存サマリは override 適用後の下書きと明細から計算して同じ patch に載せる。
+  const listSummary = buildDraftListSummary(
+    draftDocToFields(updatedDraft),
+    items.map(draftItemDocToFields),
+  );
+  await ctx.db.patch(args.draftId, { receiptUserOverride, updatedAt, listSummary });
+  return { ...updatedDraft, listSummary };
 }
 
 /** ハンドラ互換のグルー。実装は lib/usecase/aiExpenseDrafts/resetReceiptToAiInterpretation。 */
