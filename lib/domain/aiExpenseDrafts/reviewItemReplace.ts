@@ -10,9 +10,8 @@ import { hasReceiptTaxMetadata } from "../receipt/tax/draftTaxMapping";
 import { isValidSignedLineItemAmount } from "../receipt/discountItems";
 import { trimOptional } from "../common/string";
 import type { AiExpenseDraftItemFields, DraftReviewItemInput } from "./aiExpenseDraftItem";
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "./judgmentItemWindow";
 import { resolveReviewItemAmountsForReplace } from "./reviewItemAmounts";
-
-export const MAX_DRAFT_REVIEW_ITEMS = 100;
 
 export type ReviewItemReplaceError =
   | "too_many_items"
@@ -21,7 +20,7 @@ export type ReviewItemReplaceError =
   | "name_or_amount_required";
 
 const reviewItemReplaceErrorMessages: Record<ReviewItemReplaceError, string> = {
-  too_many_items: "Draft items must be 100 or fewer",
+  too_many_items: `Draft items must be ${DRAFT_JUDGMENT_ITEM_LIMIT} or fewer`,
   duplicate_item_id: "Draft item ID must not be duplicated",
   item_not_in_draft: "Draft item does not belong to the current draft",
   name_or_amount_required: "Draft item name and amount are required",
@@ -31,11 +30,11 @@ export function getReviewItemReplaceErrorMessage(error: ReviewItemReplaceError):
   return reviewItemReplaceErrorMessages[error];
 }
 
-/** 送信明細数の上限を検証する。既存明細の取得前に行う。 */
+/** 送信明細数の上限を検証する。既存明細の取得前に行う。上限は判定窓と同じ。 */
 export function validateReviewItemCount(
   items: readonly unknown[],
 ): { success: true } | { success: false; error: "too_many_items" } {
-  if (items.length > MAX_DRAFT_REVIEW_ITEMS) {
+  if (items.length > DRAFT_JUDGMENT_ITEM_LIMIT) {
     return { success: false, error: "too_many_items" };
   }
   return { success: true };

@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
+import type { ExtractedDraftItemInput } from "../../domain/aiExpenseDrafts/createFromExtraction";
 import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
+import { isAmountAndTaxResolved } from "../../domain/aiExpenseDrafts/reviewJudgment";
+import type {
+  AiExpenseDraftItem,
+  DraftListSummary,
+} from "../../domain/aiExpenseDrafts/reviewTypes";
+import { getAiExpenseDraftWithItems } from "../../usecase/aiExpenseDrafts/getDraftWithItems";
 import {
   CAT_ID,
   createInMemoryMutationCtx,
@@ -347,6 +354,159 @@ describe("解析結果からの作成", () => {
     );
     expect(summaryPatch).toBeDefined();
     expect((summaryPatch![1] as { listSummary: unknown }).listSummary).toEqual(expected);
+  });
+
+  it("createFromExtraction: 明細が101件でも保存値は先頭100件の判定窓と一致する", async () => {
+    // 判定窓の仕様値。定数参照ではなく件数そのものを固定する。
+    const JUDGMENT_WINDOW = 100;
+    const windowItem = (index: number): ExtractedDraftItemInput<Id<"categories">> => ({
+      itemName: `食品${index + 1}`,
+      amountYen: 100,
+      printedAmountYen: 100,
+      amountBasis: "tax_excluded",
+      taxRatePercent: 8,
+      taxResolutionStatus: "resolved",
+      taxResolutionSource: "item_explicit",
+      categoryId: "cat-food" as Id<"categories">,
+      confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+    });
+    // 先頭100件は 8%外税 99×100=9900（税792）+ 10%内税 1060（税96）で支払合計 11752 に一致する。
+    // 窓の外に落ちる101件目を含めると明細合計が支払合計を超えて未解決側に変わる。
+    const items: ExtractedDraftItemInput<Id<"categories">>[] = [
+      ...Array.from({ length: JUDGMENT_WINDOW - 1 }, (_, index) => windowItem(index)),
+      {
+        itemName: "日用品",
+        amountYen: 1060,
+        printedAmountYen: 1060,
+        amountBasis: "tax_included",
+        taxRatePercent: 10,
+        taxResolutionStatus: "resolved",
+        taxResolutionSource: "item_explicit",
+        categoryId: "cat-food" as Id<"categories">,
+        confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+      },
+      {
+        ...windowItem(JUDGMENT_WINDOW),
+        itemName: "窓外の商品",
+        amountYen: 500,
+        printedAmountYen: 500,
+      },
+    ];
+
+    const ctx = createMutationCtx(createIdentity(), {
+      insertedIds: ["new-draft-id", ...items.map((_, index) => `item-${index + 1}`)],
+      insertedDoc: {
+        ...ownedDraft,
+        _id: "new-draft-id",
+        status: "needs_review",
+      },
+      getDocById: {
+        "cat-food": { _id: "cat-food", groupId: GROUP_ID, isActive: true },
+      },
+    });
+
+    await createFromExtractionHandler(ctx, {
+      documentType: "receipt",
+      shopName: "テスト店",
+      date: "2026-10-14",
+      amountYen: 11752,
+      categoryId: "cat-food" as Id<"categories">,
+      confidence: { shopName: 1, date: 1, amountYen: 1, categoryId: 1 },
+      warnings: [],
+      taxSummaries: [
+        {
+          taxRatePercent: 8,
+          taxMode: "external",
+          taxableAmountYen: 9900,
+          taxableAmountBasis: "unknown",
+          taxYen: 792,
+          roundingMethod: "floor",
+          status: "ambiguous",
+          reasons: ["unresolved_tax_summary"],
+          warnings: [],
+          confidence: {},
+        },
+        {
+          taxRatePercent: 10,
+          taxMode: "included",
+          taxableAmountYen: 1060,
+          taxableAmountBasis: "tax_included",
+          taxYen: 96,
+          roundingMethod: "floor",
+          status: "verified",
+          reasons: [],
+          warnings: [],
+          confidence: {},
+        },
+      ],
+      rawObservationLines: [
+        {
+          rawText: "合計 11,752円",
+          amountText: "11,752円",
+          amountYen: 11752,
+          lineRoleCandidates: ["total"],
+          roleConfidence: 1,
+          explicitlyPrinted: true,
+          sourceLineIndex: 0,
+        },
+      ],
+      items,
+    });
+
+    const inserts = vi.mocked(ctx.db.insert).mock.calls;
+    const draftInsert = inserts.find((call) => call[0] === "aiExpenseDrafts");
+    const itemInserts = inserts.filter((call) => call[0] === "aiExpenseDraftItems");
+    expect(itemInserts).toHaveLength(JUDGMENT_WINDOW + 1);
+
+    const draftFields = {
+      ...(draftInsert![1] as object),
+      id: "new-draft-id",
+    } as AiExpenseDraftFields;
+    const allItems = itemInserts.map(
+      (call, index) =>
+        ({ ...(call[1] as object), id: `item-${index + 1}` }) as AiExpenseDraftItemFields,
+    );
+
+    const summaryPatch = vi
+      .mocked(ctx.db.patch)
+      .mock.calls.find(
+        ([id, fields]) => id === "new-draft-id" && "listSummary" in (fields as object),
+      );
+    expect(summaryPatch).toBeDefined();
+    const saved = (summaryPatch![1] as { listSummary: DraftListSummary }).listSummary;
+
+    // 保存値は下書き確認と同じ「先頭100件」の明細で計算した値と一致しなければならない。
+    const expected = buildDraftListSummary(draftFields, allItems.slice(0, JUDGMENT_WINDOW));
+    expect(saved).toEqual(expected);
+
+    // 実際の読み取り経路（getWithItems）が返す明細での判定とも一致する。
+    const persistedDraft = { ...draftFields, listSummary: saved };
+    const view = await getAiExpenseDraftWithItems(
+      { groupId: GROUP_ID },
+      {
+        drafts: {
+          findById: async () => persistedDraft,
+          listByGroupAndStatus: async () => [],
+          paginateByGroupAndStatus: async () => {
+            throw new Error("not used");
+          },
+        },
+        draftItems: {
+          listByDraftAsc: async (_groupId, _draftId, limit) =>
+            limit === undefined ? allItems : allItems.slice(0, limit),
+          listAllByDraft: async () => allItems,
+        },
+      },
+      { draftId: "new-draft-id" },
+    );
+    expect(view?.items).toHaveLength(JUDGMENT_WINDOW);
+    const viewJudgment = isAmountAndTaxResolved({
+      ...persistedDraft,
+      items: view!.items.map(({ id, ...rest }) => ({ ...rest, _id: id }) as AiExpenseDraftItem),
+    });
+    // 先頭100件では解決済み・101件目を含めると未解決になる入力であること（偽の一致を防ぐ）。
+    expect(viewJudgment).toBe(true);
+    expect(saved.amountAndTaxResolved).toBe(viewJudgment);
   });
 
   it("createFailedDraftFromImageAnalysis: 失敗下書きも未解決の保存値を持つ", async () => {

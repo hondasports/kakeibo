@@ -26,6 +26,7 @@ import {
   createFromExtractionHandler,
   deleteOrphanedDraftHandler,
 } from "../../lib/convex/aiExpenseDrafts/createFromExtraction";
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../lib/domain/aiExpenseDrafts/judgmentItemWindow";
 import {
   createE2eReadyDraftForUserHandler,
   createE2eMixedTaxReviewDraftForUserHandler,
@@ -166,7 +167,7 @@ export const getForReanalysis = internalQuery({
         q.eq("groupId", args.groupId).eq("draftId", args.draftId),
       )
       .order("asc")
-      .take(100);
+      .take(DRAFT_JUDGMENT_ITEM_LIMIT);
     return { draft, items };
   },
 });
