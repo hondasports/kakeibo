@@ -26,7 +26,9 @@ export function mapDraftToQueueItem(
   categories?: Array<{ _id: Id<"categories"> | string; name: string }>,
   previewImageDataUrl?: string,
 ): AiExpenseQueueItem {
-  const amountAndTaxResolved = isAmountAndTaxResolved(draft);
+  // 保存済みサマリがあればその判定を使う。無い旧データのみ従来どおり明細から判定する。
+  const amountAndTaxResolved =
+    draft.listSummary?.amountAndTaxResolved ?? isAmountAndTaxResolved(draft);
   const categoryName = categories?.find((c) => c._id === draft.categoryId)?.name;
   const categoryAggregates = draft.itemSummary?.categoryAggregates.map((aggregate) => ({
     ...aggregate,
@@ -83,6 +85,7 @@ export function mapConvexDraftToAiExpenseDraft(draft: Doc<"aiExpenseDrafts">): A
     warnings: draft.warnings,
     taxSummaries: draft.taxSummaries,
     markerDefinitions: draft.markerDefinitions,
+    listSummary: draft.listSummary,
   };
 }
 

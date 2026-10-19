@@ -2,13 +2,13 @@ import { resolveReceiptTaxChoices } from "./receiptDataContract";
 import { resolveReviewItemDisplayAmountYen } from "./reviewItemAmounts";
 import { getDraftTitle } from "./title";
 import type {
-  AiExpenseDraft,
+  AiExpenseDraftJudgmentInput,
   AiExpenseDraftWithItems,
   ReviewFormValues,
   ReviewItemValues,
 } from "./reviewTypes";
 
-export function mapDraftToReviewForm(draft: AiExpenseDraft): ReviewFormValues {
+export function mapDraftToReviewForm(draft: AiExpenseDraftJudgmentInput): ReviewFormValues {
   const choices = resolveReceiptTaxChoices(draft);
   return {
     documentType: draft.documentType,

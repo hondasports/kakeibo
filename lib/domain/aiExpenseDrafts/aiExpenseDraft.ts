@@ -23,6 +23,7 @@ import type {
   ReceiptTotalResolution,
 } from "../receipt/tax/types";
 import type { ReceiptRawObservation } from "../receipt/observations";
+import type { DraftListSummary } from "./reviewTypes";
 
 /** aiExpenseDrafts ドキュメントのフィールド。id/creationTime は永続化済みの場合のみ存在する。 */
 export type AiExpenseDraftFields = {
@@ -56,6 +57,8 @@ export type AiExpenseDraftFields = {
   reviewReasons: AiExpenseDraftReviewReason[];
   registeredReceiptId?: string;
   registeredAt?: number;
+  /** 一覧用の保存サマリ。無い旧データは一覧側が明細から再計算する（Phase 3 で外す）。 */
+  listSummary?: DraftListSummary;
   createdAt: number;
   updatedAt: number;
 };

@@ -49,6 +49,16 @@ export type DraftDoc = {
     | "parse_failed"
   >;
   registeredReceiptId?: string;
+  listSummary?: {
+    amountAndTaxResolved: boolean;
+    itemSummary?: {
+      itemTotalYen: number;
+      itemDifferenceYen?: number;
+      hasUncategorizedItems: boolean;
+      hasLowConfidenceItems: boolean;
+      categoryAggregates: Array<{ categoryId: string; amountYen: number }>;
+    };
+  };
   createdAt: number;
   updatedAt: number;
 };
