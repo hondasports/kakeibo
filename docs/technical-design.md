@@ -1183,6 +1183,7 @@ MVPの画面で全明細を常時表示しない場合でも、将来の複数�
 | receiptAnalysisBatches | `by_group_id_and_created_at` | バッチ一覧 |
 | receiptAnalysisImageJobs | `by_batch_id` | バッチ内ジョブ取得 |
 | receiptAnalysisImageJobs | `by_group_id_and_status` | グループ・状態別ジョブ取得 |
+| receiptAnalysisImageJobs | `by_group_id_and_created_at` | ジョブ一覧（作成日時の新しい順） |
 | receiptAnalysisImageJobs | `by_draft_id` | 下書きに紐づく解析ジョブ |
 | managementAuditLogs | `by_group_id_and_created_at` | グループ管理操作ログ |
 
