@@ -12,6 +12,10 @@ import {
 } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { resetReceiptToAiInterpretation } from "../../usecase/aiExpenseDrafts/resetReceiptToAiInterpretation";
 import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
+import {
+  DRAFT_JUDGMENT_ITEM_LIMIT,
+  takeDraftJudgmentItems,
+} from "../../domain/aiExpenseDrafts/judgmentItemWindow";
 import { createAiExpenseDraftDeps } from "./draftUsecaseDeps";
 import {
   draftDocToFields,
@@ -46,14 +50,14 @@ export async function persistReceiptUserOverrideSnapshot(
   }
   const items =
     args.items !== undefined
-      ? args.items.slice(0, 100).map(draftItemFieldsToDoc)
+      ? takeDraftJudgmentItems(args.items).map(draftItemFieldsToDoc)
       : await ctx.db
           .query("aiExpenseDraftItems")
           .withIndex("by_group_id_and_draft_id", (q) =>
             q.eq("groupId", args.groupId).eq("draftId", args.draftId),
           )
           .order("asc")
-          .take(100);
+          .take(DRAFT_JUDGMENT_ITEM_LIMIT);
   const updatedAt = args.updatedAt ?? Date.now();
   const receiptUserOverride: ReceiptUserOverrideSnapshot<Id<"categories">> =
     buildReceiptUserOverride({

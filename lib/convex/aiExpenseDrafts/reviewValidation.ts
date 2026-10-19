@@ -20,6 +20,7 @@ import {
   validateReviewItemCount,
   validateReviewItemIds,
 } from "../../../lib/domain/aiExpenseDrafts/reviewItemReplace";
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../../lib/domain/aiExpenseDrafts/judgmentItemWindow";
 import { draftItemDocToFields, draftItemFieldsToDoc } from "./draftRecordMapping";
 import {
   aggregateDraftItemsByCategory as aggregateDraftItemsByCategoryDomain,
@@ -129,7 +130,7 @@ export async function replaceDraftItemsForReview(
       .query("aiExpenseDraftItems")
       .withIndex("by_group_id_and_draft_id", (q) => q.eq("groupId", groupId).eq("draftId", draftId))
       .order("asc")
-      .take(100));
+      .take(DRAFT_JUDGMENT_ITEM_LIMIT));
   const existingItemsById = new Map(existingItems.map((item) => [item._id, item]));
   const idsResult = validateReviewItemIds(items, new Set<string>(existingItemsById.keys()));
   if (!idsResult.success) {

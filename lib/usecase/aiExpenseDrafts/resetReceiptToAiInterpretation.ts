@@ -5,12 +5,11 @@ import {
 } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
 import { applyRecordPatch } from "../../domain/common/recordPatch";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import type { AiExpenseDraftDeps } from "./deps";
-
-const LIST_LIMIT = 100;
 
 /**
  * 下書きを AI 解釈スナップショットの値へリセットする。
@@ -86,6 +85,10 @@ export async function resetReceiptToAiInterpretation(
   if (updatedDraft === null) {
     throw new ConvexError("AI expense draft not found after reset");
   }
-  const updatedItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId, LIST_LIMIT);
+  const updatedItems = await deps.draftItems.listByDraftAsc(
+    ctx.groupId,
+    args.draftId,
+    DRAFT_JUDGMENT_ITEM_LIMIT,
+  );
   return { draft: updatedDraft, items: updatedItems };
 }

@@ -6,9 +6,8 @@ import {
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftRepository";
 import type { AiExpenseDraftItemReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftItemRepository";
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
 import type { UsecaseGroupContext } from "../context";
-
-const LIST_LIMIT = 100;
 
 /** 下書きと明細を取得する。存在しなければ null、他グループなら拒否する。 */
 export async function getAiExpenseDraftWithItems(
@@ -27,6 +26,10 @@ export async function getAiExpenseDraftWithItems(
   if (!draft.belongsToGroup(ctx.groupId)) {
     throw new ConvexError("AI expense draft does not belong to the current group");
   }
-  const items = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId, LIST_LIMIT);
+  const items = await deps.draftItems.listByDraftAsc(
+    ctx.groupId,
+    args.draftId,
+    DRAFT_JUDGMENT_ITEM_LIMIT,
+  );
   return { draft: fields, items };
 }
