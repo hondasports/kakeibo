@@ -1,7 +1,9 @@
+import schema from "../schema";
+import { MAX_RECEIPT_ANALYSIS_DRAFT_IDS } from "../../lib/domain/receiptAnalysisJobs/rules";
 import { ConvexError, v } from "convex/values";
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { requireGroupMembership } from "../groups/membership";
 import {
   batchRecordToDoc,
@@ -9,9 +11,9 @@ import {
 } from "../../lib/convex/receiptAnalysisJobs/convexReceiptAnalysisStore";
 import { createReceiptAnalysisQueryDeps } from "../../lib/convex/receiptAnalysisJobs/receiptAnalysisDeps";
 import {
-  getReceiptAnalysisJobByDraftId,
+  listReceiptAnalysisJobsByDraftIds,
   listReceiptAnalysisBatches,
-  listReceiptAnalysisJobs,
+  listActiveReceiptAnalysisJobs,
   listReceiptAnalysisJobsByBatch,
 } from "../../lib/usecase/receiptAnalysisJobs/queries";
 
@@ -22,11 +24,11 @@ export async function listBatchesHandler(ctx: QueryCtx) {
   ).map(batchRecordToDoc);
 }
 
-export async function listJobsHandler(ctx: QueryCtx) {
+export async function listActiveJobsHandler(ctx: QueryCtx) {
   const { groupId } = await requireGroupMembership(ctx);
-  return (await listReceiptAnalysisJobs(createReceiptAnalysisQueryDeps(ctx).reader, groupId)).map(
-    jobRecordToDoc,
-  );
+  return (
+    await listActiveReceiptAnalysisJobs(createReceiptAnalysisQueryDeps(ctx).reader, groupId)
+  ).map(jobRecordToDoc);
 }
 
 export async function listJobsByBatchHandler(
@@ -48,26 +50,37 @@ export async function listJobsByBatchHandler(
   }
 }
 
-export async function getJobByDraftIdHandler(
+export async function listJobsByDraftIdsHandler(
   ctx: QueryCtx,
-  { draftId }: { draftId: Id<"aiExpenseDrafts"> },
-) {
+  { draftIds }: { draftIds: Id<"aiExpenseDrafts">[] },
+): Promise<Doc<"receiptAnalysisImageJobs">[]> {
   const { groupId } = await requireGroupMembership(ctx);
-  const job = await getReceiptAnalysisJobByDraftId(
-    createReceiptAnalysisQueryDeps(ctx).reader,
-    groupId,
-    draftId,
-  );
-  return job === null ? null : jobRecordToDoc(job);
+  if (draftIds.length > MAX_RECEIPT_ANALYSIS_DRAFT_IDS) {
+    throw new ConvexError(`下書きIDは${MAX_RECEIPT_ANALYSIS_DRAFT_IDS}件まで指定できます`);
+  }
+  return (
+    await listReceiptAnalysisJobsByDraftIds(
+      createReceiptAnalysisQueryDeps(ctx).reader,
+      groupId,
+      draftIds,
+    )
+  ).map(jobRecordToDoc);
 }
 
 export const listBatches = query({ args: {}, handler: listBatchesHandler });
-export const listJobs = query({ args: {}, handler: listJobsHandler });
+export const listActiveJobs = query({ args: {}, handler: listActiveJobsHandler });
 export const listJobsByBatch = query({
   args: { batchId: v.id("receiptAnalysisBatches") },
   handler: listJobsByBatchHandler,
 });
-export const getJobByDraftId = query({
-  args: { draftId: v.id("aiExpenseDrafts") },
-  handler: getJobByDraftIdHandler,
+export const listJobsByDraftIds = query({
+  args: { draftIds: v.array(v.id("aiExpenseDrafts")) },
+  returns: v.array(
+    v.object({
+      ...schema.tables.receiptAnalysisImageJobs.validator.fields,
+      _id: v.id("receiptAnalysisImageJobs"),
+      _creationTime: v.number(),
+    }),
+  ),
+  handler: listJobsByDraftIdsHandler,
 });

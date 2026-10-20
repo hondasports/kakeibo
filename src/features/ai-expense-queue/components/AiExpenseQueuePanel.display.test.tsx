@@ -63,7 +63,7 @@ describe("AiExpenseQueuePanel（表示）", () => {
 
   it("画像送信の同意状態を読み込み中は画像追加導線を無効化する", () => {
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") return [];
+      if (reference === "receiptAnalysisJobs.queries.listActiveJobs") return [];
       if (reference === "users.queries.getReceiptImageConsent") return undefined;
       return [];
     });

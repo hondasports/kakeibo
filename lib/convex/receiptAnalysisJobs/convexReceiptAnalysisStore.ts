@@ -80,6 +80,29 @@ export function jobRecordToDoc(record: ReceiptAnalysisJobRecord): Doc<"receiptAn
   };
 }
 
+async function listActiveJobsByGroup(
+  ctx: Pick<QueryCtx, "db">,
+  groupId: string,
+  limit: number,
+): Promise<ReceiptAnalysisJobRecord[]> {
+  const jobsByStatus = await Promise.all(
+    (["queued", "running"] as const).map((status) =>
+      ctx.db
+        .query("receiptAnalysisImageJobs")
+        .withIndex("by_group_id_and_status", (q) =>
+          q.eq("groupId", groupId as Id<"groups">).eq("status", status),
+        )
+        .order("desc")
+        .take(limit),
+    ),
+  );
+  return jobsByStatus
+    .flat()
+    .sort((a, b) => b.createdAt - a.createdAt || b._creationTime - a._creationTime)
+    .slice(0, limit)
+    .map(toJobRecord);
+}
+
 export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): ReceiptAnalysisStore {
   return {
     async getBatch(id) {
@@ -161,14 +184,7 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
       const docs = limit === undefined ? await query.collect() : await query.take(limit);
       return docs.map(toJobRecord);
     },
-    async listJobsByGroup(groupId, limit) {
-      const docs = await ctx.db
-        .query("receiptAnalysisImageJobs")
-        .withIndex("by_group_id_and_created_at", (q) => q.eq("groupId", groupId as Id<"groups">))
-        .order("desc")
-        .take(limit);
-      return docs.map(toJobRecord);
-    },
+    listActiveJobsByGroup: (groupId, limit) => listActiveJobsByGroup(ctx, groupId, limit),
     async findJobByDraftId(draftId) {
       const doc = await ctx.db
         .query("receiptAnalysisImageJobs")
@@ -225,14 +241,7 @@ export function createReceiptAnalysisReader(ctx: Pick<QueryCtx, "db">): ReceiptA
       const docs = limit === undefined ? await query.collect() : await query.take(limit);
       return docs.map(toJobRecord);
     },
-    async listJobsByGroup(groupId, limit) {
-      const docs = await ctx.db
-        .query("receiptAnalysisImageJobs")
-        .withIndex("by_group_id_and_created_at", (q) => q.eq("groupId", groupId as Id<"groups">))
-        .order("desc")
-        .take(limit);
-      return docs.map(toJobRecord);
-    },
+    listActiveJobsByGroup: (groupId, limit) => listActiveJobsByGroup(ctx, groupId, limit),
     async findJobByDraftId(draftId) {
       const doc = await ctx.db
         .query("receiptAnalysisImageJobs")

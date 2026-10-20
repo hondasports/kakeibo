@@ -5,6 +5,12 @@ import type {
 } from "./records";
 import { isTerminalImageJobStatus } from "./status";
 
+import { AI_EXPENSE_DRAFT_LIST_LIMIT } from "../aiExpenseDrafts/constants";
+
+export const RECEIPT_ANALYSIS_RETRY_DRAFT_STATUSES = ["needs_review", "failed"] as const;
+export const MAX_RECEIPT_ANALYSIS_DRAFT_IDS =
+  AI_EXPENSE_DRAFT_LIST_LIMIT * RECEIPT_ANALYSIS_RETRY_DRAFT_STATUSES.length;
+
 export function canRetryReceiptAnalysisJob(status: ReceiptAnalysisJobStatus): boolean {
   return status === "failed" || status === "needs_review";
 }

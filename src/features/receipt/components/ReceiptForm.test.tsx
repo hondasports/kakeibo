@@ -54,7 +54,9 @@ vi.mock("../../../../convex/_generated/api", () => ({
     },
     receiptAnalysisJobs: {
       queries: {
-        listJobs: "receiptAnalysisJobs.queries.listJobs",
+        listActiveJobs: "receiptAnalysisJobs.queries.listActiveJobs",
+        listJobsByBatch: "receiptAnalysisJobs.queries.listJobsByBatch",
+        listJobsByDraftIds: "receiptAnalysisJobs.queries.listJobsByDraftIds",
       },
       mutations: {
         createBatch: "receiptAnalysisJobs.mutations.createBatch",
@@ -103,11 +105,18 @@ vi.mock("convex/react", () => ({
     if (functionRef === "aiExpenseDrafts.queries.listByStatus") {
       return aiExpenseDraftsByStatusQueryMock(args);
     }
-    if (functionRef === "receiptAnalysisJobs.queries.listJobs") {
+    if (functionRef === "receiptAnalysisJobs.queries.listActiveJobs") {
       return [];
     }
     return undefined;
   },
+  useQueries: (queries: Record<string, { query: string }>) =>
+    Object.fromEntries(
+      Object.entries(queries).map(([key, { query }]) => [
+        key,
+        query === "receiptAnalysisJobs.queries.listJobsByBatch" ? [] : null,
+      ]),
+    ),
   usePaginatedQuery: (functionRef: string, args?: unknown) => ({
     results:
       functionRef === "aiExpenseDrafts.queries.listByStatusPaginated"

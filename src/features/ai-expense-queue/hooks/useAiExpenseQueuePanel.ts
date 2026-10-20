@@ -17,12 +17,17 @@ export function useAiExpenseQueuePanel({
   Pick<AiExpenseQueuePanelProps, "initialItems" | "initialReviewDraftItems" | "onReviewSubmit">) {
   const imageUpload = useImageUpload();
   const queueDelete = useQueueDelete();
+  const retry = useRetry({
+    pendingImageDataUrls: imageUpload.pendingImageDataUrls,
+    setPendingImageDataUrls: imageUpload.setPendingImageDataUrls,
+  });
   const queueData = useAiExpenseQueueData({
     categories,
     hiddenItemIds: queueDelete.hiddenItemIds,
     initialItems,
     pendingImageDataUrls: imageUpload.pendingImageDataUrls,
     sessionBatches: imageUpload.sessionBatches,
+    retryBatchIds: retry.retryBatchIds,
   });
   const bulkRegister = useBulkRegister({
     readyItemIds: queueData.readyItemIds,
@@ -32,10 +37,6 @@ export function useAiExpenseQueuePanel({
     initialReviewDrafts,
     initialReviewDraftItems: initialReviewDraftItems ?? {},
     onReviewSubmit,
-  });
-  const retry = useRetry({
-    pendingImageDataUrls: imageUpload.pendingImageDataUrls,
-    setPendingImageDataUrls: imageUpload.setPendingImageDataUrls,
   });
   const autoReviewJobId = imageUpload.autoReviewJobId;
   const autoReviewJob = queueData.jobs?.find((job) => job._id === autoReviewJobId);
