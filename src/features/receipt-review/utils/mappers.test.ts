@@ -342,9 +342,18 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
   }
 
   it("ダイアログで解決済みの金額・税内訳は、一覧に古い理由を残さない（#997）", () => {
-    const draft = summary892Draft();
+    const draft = summary892Draft({ listSummary: { amountAndTaxResolved: true } });
     expect(isAmountAndTaxResolved(draft)).toBe(true);
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual(["user_confirmation_required"]);
+  });
+
+  it("listSummary が無い下書きは明細があっても再判定せず未解決として扱う", () => {
+    const draft = summary892Draft();
+    expect(isAmountAndTaxResolved(draft)).toBe(true);
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
+      "user_confirmation_required",
+      "amount_mismatch",
+    ]);
   });
 
   it("解決済みなら保存時の明細差額を残さず、確認の優先度を上げない", () => {
@@ -355,11 +364,17 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
       hasLowConfidenceItems: false,
       categoryAggregates: [],
     };
-    const resolved = mapDraftToQueueItem(summary892Draft({ itemSummary }), {});
+    const resolved = mapDraftToQueueItem(
+      summary892Draft({ itemSummary, listSummary: { amountAndTaxResolved: true } }),
+      {},
+    );
     expect(resolved.itemDifferenceYen).toBe(0);
     expect(getReviewPriority(resolved)).not.toBe(0);
 
-    const conflict = summary892Draft({ itemSummary });
+    const conflict = summary892Draft({
+      itemSummary,
+      listSummary: { amountAndTaxResolved: false },
+    });
     conflict.taxSummaries = conflict.taxSummaries?.map((summary) =>
       summary.taxRatePercent === 10
         ? { ...summary, taxableAmountBasis: "tax_excluded", status: "contradictory" }
@@ -418,6 +433,7 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
   it("税以外の独立した理由は解決済みでも隠さない", () => {
     const draft = summary892Draft({
       reviewReasons: ["amount_mismatch", "low_confidence", "ambiguous_category"],
+      listSummary: { amountAndTaxResolved: true },
     });
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
       "low_confidence",
@@ -518,9 +534,8 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
     const saved = buildDraftListSummary(draftFields, itemFields);
 
     const withSaved = mapDraftToQueueItem({ ...draft, items: undefined, listSummary: saved }, {});
-    const withLive = mapDraftToQueueItem(draft, {});
     expect(saved.amountAndTaxResolved).toBe(true);
-    expect(withSaved.reviewReasons).toEqual(withLive.reviewReasons);
+    expect(withSaved.reviewReasons).toEqual(["user_confirmation_required"]);
   });
 });
 

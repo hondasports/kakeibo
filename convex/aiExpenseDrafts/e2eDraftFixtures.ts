@@ -9,6 +9,12 @@ import {
 } from "../../lib/domain/receipt/tax/fixtures/receiptTaxBasisCases";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../lib/domain/aiExpenseDrafts/judgmentItemWindow";
+import { buildDraftListSummary } from "../../lib/domain/aiExpenseDrafts/listSummary";
+import {
+  draftDocToFields,
+  draftItemDocToFields,
+} from "../../lib/convex/aiExpenseDrafts/draftRecordMapping";
 
 export type E2eTaxReviewReceiptCase =
   | "unproven1003"
@@ -33,6 +39,25 @@ export type CreateE2eReadyDraftForUserArgs = {
   categoryId: Id<"categories">;
   secondaryCategoryId?: Id<"categories">;
 };
+
+// fixture も書き込み経路と同じく、明細を含む最終状態から listSummary を保存する。
+// 一覧は明細を読まないため、保存値が無い下書きは未解決として扱われる（組み立ては buildDraftListSummary だけが担う。SSoT）。
+async function saveFixtureListSummary(
+  ctx: Pick<MutationCtx, "db">,
+  groupId: Id<"groups">,
+  draftId: Id<"aiExpenseDrafts">,
+) {
+  const draft = await ctx.db.get(draftId);
+  if (draft === null) return;
+  const items = await ctx.db
+    .query("aiExpenseDraftItems")
+    .withIndex("by_group_id_and_draft_id", (q) => q.eq("groupId", groupId).eq("draftId", draftId))
+    .order("asc")
+    .take(DRAFT_JUDGMENT_ITEM_LIMIT);
+  await ctx.db.patch(draftId, {
+    listSummary: buildDraftListSummary(draftDocToFields(draft), items.map(draftItemDocToFields)),
+  });
+}
 
 async function insertDraftItems(
   ctx: Pick<MutationCtx, "db">,
@@ -170,6 +195,7 @@ export async function createE2eReadyDraftForUserHandler(
     now,
   );
 
+  await saveFixtureListSummary(ctx, args.groupId, draftId);
   return draftId;
 }
 
@@ -260,6 +286,7 @@ export async function createE2eTaxReviewDraftForUserHandler(
     updatedAt: now,
   });
 
+  await saveFixtureListSummary(ctx, args.groupId, draftId);
   return draftId;
 }
 
@@ -345,6 +372,7 @@ async function createE2eSummaryReviewDraft(
       updatedAt: now,
     });
   }
+  await saveFixtureListSummary(ctx, args.groupId, draftId);
   return draftId;
 }
 
@@ -428,6 +456,7 @@ async function createE2eCrossBasisTaxDraft(
       updatedAt: now,
     });
   }
+  await saveFixtureListSummary(ctx, args.groupId, draftId);
   return draftId;
 }
 
@@ -583,6 +612,7 @@ export async function createE2eMixedTaxReviewDraftForUserHandler(
     taxReviewReasons: ["unresolved_tax_rate"],
   });
 
+  await saveFixtureListSummary(ctx, args.groupId, draftId);
   return draftId;
 }
 
@@ -648,6 +678,7 @@ export async function createE2eTaxSummaryConflictDraftForUserHandler(
     updatedAt: now,
   });
 
+  await saveFixtureListSummary(ctx, args.groupId, draftId);
   return draftId;
 }
 
@@ -687,6 +718,7 @@ export async function createE2eUnallocatedTaxDraftForUserHandler(
       updatedAt: now,
     });
   }
+  await saveFixtureListSummary(ctx, args.groupId, draftId);
   return draftId;
 }
 
@@ -736,5 +768,6 @@ async function createE2eUnprovenTargetDraft(
       createdAt: now,
       updatedAt: now,
     });
+  await saveFixtureListSummary(ctx, args.groupId, draftId);
   return draftId;
 }

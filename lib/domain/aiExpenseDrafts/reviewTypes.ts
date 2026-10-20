@@ -53,10 +53,10 @@ export type AiExpenseDraft = {
   registrationMode?: AiExpenseRegistrationMode;
   derivedRegistration?: DerivedRegistrationSnapshot;
   markerDefinitions?: Array<{ marker: string; description: string }>;
-  /** 一覧用に付与される明細（ready / needs_review のみ）。確認理由の導出に使う。 */
+  /** 金額・税内訳判定の入力となる明細。一覧の取得では付与せず、判定（isAmountAndTaxResolved / buildDraftListSummary）で使う。 */
   items?: AiExpenseDraftItem[];
   itemSummary?: ItemSummary;
-  /** 一覧用に永続化された判定サマリ。無い旧データは明細から再計算する（Phase 3 でフォールバックを外す）。 */
+  /** 一覧用に永続化された判定サマリ。無い下書きは一覧で未解決として扱う（明細から再判定しない）。 */
   listSummary?: DraftListSummary;
 };
 

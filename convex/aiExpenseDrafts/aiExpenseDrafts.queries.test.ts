@@ -1,6 +1,8 @@
 import { analyzeReceiptImageToDraftHandler } from "./actions";
 import { deleteDraftHandler } from "./mutations";
 import { getWithItemsHandler, listByStatusHandler, listByStatusPaginatedHandler } from "./queries";
+import { buildDraftListSummary } from "../../lib/domain/aiExpenseDrafts/listSummary";
+import type { AiExpenseDraftItemFields } from "../../lib/domain/aiExpenseDrafts/aiExpenseDraftItem";
 import {
   GROUP_ID,
   OTHER_GROUP_ID,
@@ -118,27 +120,53 @@ describe("aiExpenseDrafts (queries)", () => {
     });
   });
 
-  it("listByStatus は明細のカテゴリ別集約サマリーを返す", async () => {
+  it("listByStatus は保存済みの明細カテゴリ別集約サマリーを返し、明細は読まない", async () => {
     const draft = {
       ...readyDraft,
       amountYen: 1500,
     };
+    const items = [
+      ...mixedCategoryDraftItems,
+      {
+        _id: "draft-item-uncategorized",
+        _creationTime: 0,
+        groupId: GROUP_ID,
+        draftId: "draft-ready",
+        itemName: "未分類品",
+        amountYen: 120,
+        confidence: { itemName: 0.99, amountYen: 0.99, categoryId: 0.7 },
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    ];
+    // 一覧が使う集約サマリーは書き込み時の保存値（buildDraftListSummary の結果）に限る。
+    const listSummary = buildDraftListSummary(
+      {
+        groupId: GROUP_ID,
+        sourceType: "image_upload",
+        status: "ready",
+        documentType: "receipt",
+        amountYen: 1500,
+        confidence: {},
+        reviewReasons: [],
+        createdAt: 0,
+        updatedAt: 0,
+      },
+      items.map((item): AiExpenseDraftItemFields => ({
+        id: item._id,
+        groupId: item.groupId,
+        draftId: item.draftId,
+        itemName: item.itemName,
+        amountYen: item.amountYen,
+        categoryId: item.categoryId,
+        confidence: item.confidence,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      })),
+    );
     const ctx = createQueryCtx(createIdentity(), {
-      drafts: [draft],
-      items: [
-        ...mixedCategoryDraftItems,
-        {
-          _id: "draft-item-uncategorized",
-          _creationTime: 0,
-          groupId: GROUP_ID,
-          draftId: "draft-ready",
-          itemName: "未分類品",
-          amountYen: 120,
-          confidence: { itemName: 0.99, amountYen: 0.99, categoryId: 0.7 },
-          createdAt: 0,
-          updatedAt: 0,
-        },
-      ],
+      drafts: [{ ...draft, listSummary }],
+      items,
     });
 
     const result = await listByStatusHandler(ctx, { status: "ready" });
@@ -156,11 +184,14 @@ describe("aiExpenseDrafts (queries)", () => {
             { categoryId: "cat-medical", amountYen: 980 },
           ],
         },
-        items: expect.arrayContaining([
-          expect.objectContaining({ _id: "draft-item-uncategorized", itemName: "未分類品" }),
-        ]),
       }),
     ]);
+    expect(result[0]).not.toHaveProperty("items");
+    const queryMock = vi.mocked(ctx.db.query);
+    const indexNames = queryMock.mock.results.flatMap((r) =>
+      (r.value.withIndex.mock.calls as [string][]).map(([indexName]) => indexName),
+    );
+    expect(indexNames).not.toContain("by_group_id_and_draft_id");
   });
 
   it("listByStatusPaginated は numItems をそのまま paginate に渡し、registered では明細を読まない", async () => {

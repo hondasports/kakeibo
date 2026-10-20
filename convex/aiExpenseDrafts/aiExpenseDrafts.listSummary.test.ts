@@ -42,7 +42,7 @@ describe("一覧の保存サマリ（listSummary）", () => {
     expect(queriedIndexNames(ctx)).not.toContain("by_group_id_and_draft_id");
   });
 
-  it("保存値が無い旧下書きは従来どおり明細を読んで集計する", async () => {
+  it("保存値が無い下書きは明細を読まず、itemSummary を付けずに返す", async () => {
     const ctx = createQueryCtx(createIdentity(), {
       drafts: [{ ...readyDraft }],
       items: readyDraftItems,
@@ -51,9 +51,23 @@ describe("一覧の保存サマリ（listSummary）", () => {
     const result = await listByStatusHandler(ctx, { status: "ready" });
 
     expect(result).toHaveLength(1);
-    expect(result[0].itemSummary?.itemTotalYen).toBe(1_500);
-    expect(result[0].items).toHaveLength(2);
-    expect(queriedIndexNames(ctx)).toContain("by_group_id_and_draft_id");
+    expect(result[0].itemSummary).toBeUndefined();
+    expect(result[0]).not.toHaveProperty("items");
+    expect(queriedIndexNames(ctx)).not.toContain("by_group_id_and_draft_id");
+  });
+
+  it("needs_review の一覧も明細テーブルを読まない", async () => {
+    const ctx = createQueryCtx(createIdentity(), {
+      drafts: [{ ...readyDraft, _id: "draft-needs-review", status: "needs_review" }],
+      items: readyDraftItems,
+    });
+
+    const result = await listByStatusHandler(ctx, { status: "needs_review" });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].itemSummary).toBeUndefined();
+    expect(result[0]).not.toHaveProperty("items");
+    expect(queriedIndexNames(ctx)).not.toContain("by_group_id_and_draft_id");
   });
 
   it("保存値があっても明細行が残っていれば items は返さない（読まない）", async () => {
@@ -73,7 +87,7 @@ describe("一覧の保存サマリ（listSummary）", () => {
     expect(queriedIndexNames(ctx)).not.toContain("by_group_id_and_draft_id");
   });
 
-  it("ページング版も保存値が無い旧下書きは明細を読む", async () => {
+  it("ページング版も保存値が無い下書きは明細を読まず、itemSummary を付けずに返す", async () => {
     const ctx = createQueryCtx(createIdentity(), {
       drafts: [{ ...readyDraft }],
       items: readyDraftItems,
@@ -84,8 +98,8 @@ describe("一覧の保存サマリ（listSummary）", () => {
       paginationOpts: { numItems: 10, cursor: null },
     });
 
-    expect(result.page[0].itemSummary?.itemTotalYen).toBe(1_500);
-    expect(result.page[0].items).toHaveLength(2);
-    expect(queriedIndexNames(ctx)).toContain("by_group_id_and_draft_id");
+    expect(result.page[0].itemSummary).toBeUndefined();
+    expect(result.page[0]).not.toHaveProperty("items");
+    expect(queriedIndexNames(ctx)).not.toContain("by_group_id_and_draft_id");
   });
 });
