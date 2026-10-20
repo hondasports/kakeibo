@@ -273,6 +273,7 @@ convex/
   legacyGroupDeletionAuditMigration.ts
   orphanedLineLinkMigration.ts   # 退会済みユーザーに残った LINE 連携データの一回限り内部 migration（§16.4）
   aiExpenseDraftRegisteredAtMigration.ts # 登録済み下書きの registeredAt を補完する一回限り内部 backfill（§16.4）
+  aiExpenseDraftListSummaryMigration.ts # 下書き一覧用の保存サマリ（listSummary）を補完する一回限り内部 backfill（§16.4）
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
@@ -1621,6 +1622,20 @@ cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` �
 1. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` を確認）
 2. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
 3. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること）
+
+#### 下書き一覧の保存サマリ（listSummary）補完（一回限りの内部 backfill）
+
+ready / needs_review の下書き一覧は明細読み取り（N+1）を避けるため `listSummary` を読む（Issue #1062 Phase 2）。フィールド追加前の下書きは `listSummary` を持たず、一覧側が明細から再計算するフォールバックに残るため、N+1 をなくすには本 backfill が必要である。本番での backfill 完了を確認してから、一覧のフォールバックを外す（Phase 3b）。
+
+`convex/aiExpenseDraftListSummaryMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`status === "ready" | "needs_review"` かつ `listSummary` 未設定の `aiExpenseDrafts` に `listSummary` を書き込む。値は `buildDraftListSummary`（`lib/domain/aiExpenseDrafts/listSummary.ts`）に、その下書きの明細を作成順の昇順（`by_group_id_and_draft_id` index の asc、判定窓と同じ先頭100件）で渡して計算する。`listSummary` を既に持つ下書き・対象外 status の下書き・`updatedAt` には触れない。
+
+走査はテーブル全体の pagination を 1 batch 25 件で行い、`executeBatch` は自分自身を再スケジュールして最後まで進む。冪等なので再実行してよい。戻り値・ログは件数のみで、ユーザー識別子を含まない。
+
+運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の `needsBackfill` が `listSummary` 未設定の ready / needs_review 下書き数と妥当に一致することを確認してから `executeBatch` を実行する。**
+
+1. `pnpm exec convex run aiExpenseDraftListSummaryMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` を確認）
+2. `pnpm exec convex run aiExpenseDraftListSummaryMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
+3. `pnpm exec convex run aiExpenseDraftListSummaryMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること）
 
 ## 17. テスト方針
 
