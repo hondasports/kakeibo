@@ -653,3 +653,38 @@ describe("receipt analysis internal handlers", () => {
     expect(ctx.db.delete).toHaveBeenCalledWith("batch-1");
   });
 });
+
+describe("listJobsByDraftIdsHandler", () => {
+  it("候補が複数あっても下書き本体を読まない", async () => {
+    const { listJobsByDraftIdsHandler } = await import("./queries");
+    const ctx = createQueryCtx(createIdentity(), {
+      docs: {
+        "draft-1": { groupId: GROUP_ID },
+        "draft-2": { groupId: GROUP_ID },
+      },
+    });
+    await listJobsByDraftIdsHandler(ctx, {
+      draftIds: ["draft-1", "draft-2"] as Id<"aiExpenseDrafts">[],
+    });
+    expect(ctx.db.get).not.toHaveBeenCalledWith("draft-1");
+    expect(ctx.db.get).not.toHaveBeenCalledWith("draft-2");
+    expect(ctx.db.query).not.toHaveBeenCalledWith("aiExpenseDrafts");
+  });
+
+  it("候補が複数あっても所属確認を1回だけ行う", async () => {
+    const { listJobsByDraftIdsHandler } = await import("./queries");
+    const ctx = createQueryCtx(createIdentity(), {
+      docs: {
+        "draft-1": { groupId: GROUP_ID },
+        "draft-2": { groupId: GROUP_ID },
+      },
+    });
+    await listJobsByDraftIdsHandler(ctx, {
+      draftIds: ["draft-1", "draft-2"] as Id<"aiExpenseDrafts">[],
+    });
+    expect(ctx.auth.getUserIdentity).toHaveBeenCalledTimes(1);
+    const queriedTables = vi.mocked(ctx.db.query).mock.calls.map(([table]) => table);
+    expect(queriedTables.filter((table) => table === "groupMembers")).toHaveLength(1);
+    expect(queriedTables.filter((table) => table === "receiptAnalysisImageJobs")).toHaveLength(2);
+  });
+});

@@ -11,6 +11,7 @@ export function useRetry({
   pendingImageDataUrls: Map<string, string>;
   setPendingImageDataUrls: React.Dispatch<React.SetStateAction<Map<string, string>>>;
 }) {
+  const [retryBatchIds, setRetryBatchIds] = useState<string[]>([]);
   const retryInputRef = useRef<HTMLInputElement>(null);
   const [retryError, setRetryError] = useState("");
   const [retryingItemId, setRetryingItemId] = useState<string | null>(null);
@@ -23,6 +24,9 @@ export function useRetry({
 
   const runRetry = async (job: Doc<"receiptAnalysisImageJobs">, imageDataUrl: string) => {
     setRetryError("");
+    setRetryBatchIds((current) =>
+      current.includes(job.batchId) ? current : [...current, job.batchId],
+    );
     setRetryingItemId(job.draftId ?? null);
     setPendingImageDataUrls((current) => {
       const next = new Map(current);
@@ -89,6 +93,7 @@ export function useRetry({
   };
 
   return {
+    retryBatchIds,
     retryError,
     retryInputRef,
     retryingItemId,

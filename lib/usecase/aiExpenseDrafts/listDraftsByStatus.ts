@@ -1,12 +1,12 @@
-import type { AiExpenseDraftStatus } from "../../domain/aiExpenseDrafts/constants";
+import {
+  AI_EXPENSE_DRAFT_LIST_LIMIT,
+  type AiExpenseDraftStatus,
+} from "../../domain/aiExpenseDrafts/constants";
 import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftRepository";
 import type { PaginatedResult, PaginationOpts } from "../../domain/pagination";
 import type { ItemSummary } from "../../domain/aiExpenseDrafts/reviewItems";
 import type { UsecaseGroupContext } from "../context";
-
-/** 一覧1回分の下書き件数の上限。明細の判定窓（DRAFT_JUDGMENT_ITEM_LIMIT）とは別概念。 */
-const DRAFT_LIST_LIMIT = 100;
 
 export type AiExpenseDraftListEntry = AiExpenseDraftFields & {
   itemSummary?: ItemSummary;
@@ -42,7 +42,11 @@ export async function listAiExpenseDraftsByStatus(
   deps: DraftListDeps,
   args: { status: AiExpenseDraftStatus },
 ): Promise<AiExpenseDraftListEntry[]> {
-  const drafts = await deps.drafts.listByGroupAndStatus(ctx.groupId, args.status, DRAFT_LIST_LIMIT);
+  const drafts = await deps.drafts.listByGroupAndStatus(
+    ctx.groupId,
+    args.status,
+    AI_EXPENSE_DRAFT_LIST_LIMIT,
+  );
   return attachItemSummary(args.status, drafts);
 }
 

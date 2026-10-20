@@ -90,15 +90,18 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
   it("失敗ジョブの画像を選び直して再試行できる", async () => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") {
-        return [
-          {
-            _id: "job-failed",
-            draftId: "draft-failed",
-            fileName: "failed-receipt.png",
-            status: "failed",
-          },
-        ];
+      if (
+        reference === "receiptAnalysisJobs.queries.listJobsByDraftIds" ||
+        reference === "receiptAnalysisJobs.queries.listJobsByBatch"
+      ) {
+        const job = {
+          batchId: "batch-failed",
+          _id: "job-failed",
+          draftId: "draft-failed",
+          fileName: "failed-receipt.png",
+          status: "failed",
+        };
+        return [job];
       }
       return [];
     });
@@ -127,15 +130,18 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
       jobs: [{ _id: "job-failed" }],
     });
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") {
-        return [
-          {
-            _id: "job-failed",
-            draftId: "draft-failed",
-            fileName: "failed-receipt.png",
-            status: "failed",
-          },
-        ];
+      if (
+        reference === "receiptAnalysisJobs.queries.listJobsByDraftIds" ||
+        reference === "receiptAnalysisJobs.queries.listJobsByBatch"
+      ) {
+        const job = {
+          batchId: "batch-failed",
+          _id: "job-failed",
+          draftId: "draft-failed",
+          fileName: "failed-receipt.png",
+          status: "failed",
+        };
+        return [job];
       }
       if (reference === "users.queries.getReceiptImageConsent") {
         return { hasAcceptedExternalApiConsent: true, acceptedAt: 1234567890 };
@@ -167,15 +173,18 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
   it("確認待ちの保存済み下書きを画像を選び直して再解析できる", async () => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") {
-        return [
-          {
-            _id: "job-review",
-            draftId: "draft-review",
-            fileName: "review-payment.png",
-            status: "needs_review",
-          },
-        ];
+      if (
+        reference === "receiptAnalysisJobs.queries.listJobsByDraftIds" ||
+        reference === "receiptAnalysisJobs.queries.listJobsByBatch"
+      ) {
+        const job = {
+          batchId: "batch-failed",
+          _id: "job-review",
+          draftId: "draft-review",
+          fileName: "review-payment.png",
+          status: "needs_review",
+        };
+        return [job];
       }
       if (reference === "users.queries.getReceiptImageConsent") {
         return { hasAcceptedExternalApiConsent: true, acceptedAt: 1234567890 };
@@ -215,7 +224,7 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
   it("処理中ジョブを一覧から削除できる", async () => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") {
+      if (reference === "receiptAnalysisJobs.queries.listActiveJobs") {
         return [
           {
             _id: "job-running",
@@ -259,15 +268,18 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
     const user = userEvent.setup();
     const createImageBitmapSpy = rejectImageDecoding();
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") {
-        return [
-          {
-            _id: "job-failed",
-            draftId: "draft-failed",
-            fileName: "failed-receipt.png",
-            status: "failed",
-          },
-        ];
+      if (
+        reference === "receiptAnalysisJobs.queries.listJobsByDraftIds" ||
+        reference === "receiptAnalysisJobs.queries.listJobsByBatch"
+      ) {
+        const job = {
+          batchId: "batch-failed",
+          _id: "job-failed",
+          draftId: "draft-failed",
+          fileName: "failed-receipt.png",
+          status: "failed",
+        };
+        return [job];
       }
       return [];
     });

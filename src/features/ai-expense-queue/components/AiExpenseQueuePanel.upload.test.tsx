@@ -19,7 +19,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
   it("複数画像を選ぶとキューへ解析待ちとして追加される", async () => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") {
+      if (reference === "receiptAnalysisJobs.queries.listActiveJobs") {
         return [
           { _id: "job-1", fileName: "first-receipt.png", status: "queued" },
           { _id: "job-2", fileName: "second-payment.png", status: "queued" },
@@ -99,7 +99,10 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
     };
 
     useQueryMock.mockImplementation((reference: string, args: { status?: string }) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") return jobs;
+      if (reference === "receiptAnalysisJobs.queries.listActiveJobs") {
+        return jobs.filter((job) => job.status === "queued" || job.status === "running");
+      }
+      if (reference === "receiptAnalysisJobs.queries.listJobsByBatch") return jobs;
       if (reference === "aiExpenseDrafts.queries.listByStatus") {
         if (args.status === "ready") return readyDrafts;
         if (args.status === "needs_review") return reviewDrafts;
@@ -213,7 +216,10 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
       const user = userEvent.setup();
       let jobs: typeof batchJobs = batchJobs.map((job) => ({ ...job, status: "queued" }));
       useQueryMock.mockImplementation((reference: string, args: { status?: string }) => {
-        if (reference === "receiptAnalysisJobs.queries.listJobs") return jobs;
+        if (reference === "receiptAnalysisJobs.queries.listActiveJobs") {
+          return jobs.filter((job) => job.status === "queued" || job.status === "running");
+        }
+        if (reference === "receiptAnalysisJobs.queries.listJobsByBatch") return jobs;
         if (reference === "aiExpenseDrafts.queries.listByStatus") {
           // draft-batch-2 は登録済みだが、登録済み一覧の初回ページに入らない
           if (args.status === "registered") return [registeredFirstDraft];
@@ -271,7 +277,10 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
       jobs: [{ _id: "job-auto" }],
     });
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") return jobs;
+      if (reference === "receiptAnalysisJobs.queries.listActiveJobs") {
+        return jobs.filter((job) => job.status === "queued" || job.status === "running");
+      }
+      if (reference === "receiptAnalysisJobs.queries.listJobsByBatch") return jobs;
       if (reference === "users.queries.getReceiptImageConsent") {
         return { hasAcceptedExternalApiConsent: true, acceptedAt: 1234567890 };
       }
@@ -305,7 +314,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
   it("画像送信に未同意なら同意ダイアログを表示して解析を開始しない", async () => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") return [];
+      if (reference === "receiptAnalysisJobs.queries.listActiveJobs") return [];
       if (reference === "users.queries.getReceiptImageConsent") {
         return { hasAcceptedExternalApiConsent: false, acceptedAt: null };
       }
@@ -326,7 +335,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
   it("画像送信に同意すると保留した画像の解析を開始する", async () => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") return [];
+      if (reference === "receiptAnalysisJobs.queries.listActiveJobs") return [];
       if (reference === "users.queries.getReceiptImageConsent") {
         return { hasAcceptedExternalApiConsent: false, acceptedAt: null };
       }
@@ -360,7 +369,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
   it("画像送信への同意を断ると保留した画像を破棄する", async () => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") return [];
+      if (reference === "receiptAnalysisJobs.queries.listActiveJobs") return [];
       if (reference === "users.queries.getReceiptImageConsent") {
         return { hasAcceptedExternalApiConsent: false, acceptedAt: null };
       }
@@ -385,7 +394,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
   it("画像送信の同意保存に失敗したら解析せずエラーを表示する", async () => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") return [];
+      if (reference === "receiptAnalysisJobs.queries.listActiveJobs") return [];
       if (reference === "users.queries.getReceiptImageConsent") {
         return { hasAcceptedExternalApiConsent: false, acceptedAt: null };
       }
@@ -415,7 +424,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
       jobs: [{ _id: "job-camera-1" }, { _id: "job-camera-2" }],
     });
     useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-      if (reference === "receiptAnalysisJobs.queries.listJobs") {
+      if (reference === "receiptAnalysisJobs.queries.listActiveJobs") {
         return [{ _id: "job-camera-1", fileName: "camera-receipt.png", status: "queued" }];
       }
       if (reference === "users.queries.getReceiptImageConsent") {
