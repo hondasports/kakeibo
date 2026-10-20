@@ -1,5 +1,5 @@
 import { Box, Paper, Skeleton, Typography } from "@mui/material";
-import { formatYen, formatYenAbs } from "../../../utils/currency";
+import { formatYen, formatYenAbs } from "../../../../lib/domain/common/currency";
 
 function formatSignedAmount(value: number | null): string {
   if (value === null) return "比較データなし";

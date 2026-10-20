@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mergeReviewTaxItems } from "./reviewTaxItemMerge";
-import type { ReviewItemValues } from "../types/types";
+import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 
 describe("税情報更新時の入力保持", () => {
   it("割引対象・編集中の値・追加行を保持し、削除行を復活させない", () => {

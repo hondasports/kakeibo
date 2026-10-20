@@ -6,7 +6,7 @@ import {
   formatPrevWeekDiff,
   formatPrevWeekRate,
 } from "../../../lib/weekComparison";
-import { formatYen } from "../../../utils/currency";
+import { formatYen } from "../../../../lib/domain/common/currency";
 
 type WeekComparisonChartProps = {
   currentTotalAmountYen: number;

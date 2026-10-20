@@ -1,7 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
+import type {
+  AiExpenseDraft,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import { MixedTaxItemCorrection } from "./MixedTaxItemCorrection";
 
 const draft: AiExpenseDraft = {

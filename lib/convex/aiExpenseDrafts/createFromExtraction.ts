@@ -6,6 +6,9 @@ import {
   resolveActiveGroupForUserId,
 } from "../../../convex/groups/membership";
 import { deleteDraftAndItems } from "./draftRepository";
+import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
+import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
+import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
 import {
   ACTIVE_GROUP_REQUIRED_MESSAGE,
   buildExtractedDraftFields,
@@ -57,14 +60,15 @@ async function insertDraftItems(
   draftId: Id<"aiExpenseDrafts">,
   items: ExtractedDraftItemInput<Id<"categories">>[],
   now: number,
-) {
+): Promise<AiExpenseDraftItemFields[]> {
+  const inserted: AiExpenseDraftItemFields[] = [];
   for (const item of items) {
     await assertCategoryBelongsToGroup(ctx, item.categoryId, groupId);
-    await ctx.db.insert(
-      "aiExpenseDraftItems",
-      buildExtractedDraftItemFields(groupId, draftId, item, now),
-    );
+    const fields = buildExtractedDraftItemFields(groupId, draftId, item, now);
+    const id = await ctx.db.insert("aiExpenseDraftItems", fields);
+    inserted.push({ ...fields, id });
   }
+  return inserted;
 }
 
 async function persistExtractedDraft(
@@ -79,7 +83,13 @@ async function persistExtractedDraft(
   await assertCategoryBelongsToGroup(ctx, values.categoryId, actor.groupId);
   const draftId = await ctx.db.insert("aiExpenseDrafts", draft);
 
-  await insertDraftItems(ctx, actor.groupId, draftId, values.items, now);
+  const insertedItems = await insertDraftItems(ctx, actor.groupId, draftId, values.items, now);
+  // 一覧用の保存サマリは採番済みの明細を含む最終状態から計算する。
+  const listSummary = buildDraftListSummary(
+    { ...draft, id: draftId } as AiExpenseDraftFields,
+    insertedItems,
+  );
+  await ctx.db.patch(draftId, { listSummary, updatedAt: now });
 
   const created = await ctx.db.get(draftId);
   if (created === null) {
@@ -94,7 +104,11 @@ async function persistFailedDraft(
   args: CreateFailedDraftFromImageAnalysisArgs,
 ) {
   const now = Date.now();
-  const draftId = await ctx.db.insert("aiExpenseDrafts", buildFailedDraftFields(actor, args, now));
+  const fields = buildFailedDraftFields(actor, args, now);
+  const draftId = await ctx.db.insert("aiExpenseDrafts", {
+    ...fields,
+    listSummary: buildDraftListSummary(fields, []),
+  });
 
   const draft = await ctx.db.get(draftId);
   if (draft === null) {

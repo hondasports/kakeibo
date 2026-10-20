@@ -1,13 +1,10 @@
-import { taxSummaryEvidenceLines } from "../../../../lib/domain/receipt/tax/summaryEvidence";
-import type {
-  ReceiptLineClassification,
-  ReceiptRawObservation,
-} from "../../../../lib/domain/receipt/observations";
-import type { AmountBasis, TaxMode, TaxRatePercent } from "../../../../lib/receiptTax/types";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
+import { taxSummaryEvidenceLines } from "../receipt/tax/summaryEvidence";
+import type { ReceiptLineClassification, ReceiptRawObservation } from "../receipt/observations";
+import type { AmountBasis, TaxMode, TaxRatePercent } from "../receipt/tax/types";
+import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
+import { isDiscountLine } from "../receipt/discountItems";
 import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
-import { matchTaxSummaryItems } from "../../../../lib/domain/receipt/tax/taxAmountBasis";
+import { matchTaxSummaryItems } from "../receipt/tax/taxAmountBasis";
 import type {
   ReviewBlockerCode,
   ReviewCheckStatus,

@@ -1,6 +1,6 @@
 import { Alert, Stack, Typography } from "@mui/material";
-import type { ReceiptAnalysisViewModel } from "../utils/receiptItemTaxViewModel";
-import { formatYenAbs } from "../../../utils/currency";
+import type { ReceiptAnalysisViewModel } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
+import { formatYenAbs } from "../../../../lib/domain/common/currency";
 
 export function ReceiptAnalysisStatusAlert({ analysis }: { analysis: ReceiptAnalysisViewModel }) {
   if (analysis.status === "resolved") {

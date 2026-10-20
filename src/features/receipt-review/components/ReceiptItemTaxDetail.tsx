@@ -1,10 +1,10 @@
 import { Stack, Typography } from "@mui/material";
 import { useMemo } from "react";
-import type { ReviewItemValues } from "../types/types";
+import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import {
   buildTaxContextFromReviewItem,
   toReceiptItemTaxViewModel,
-} from "../utils/receiptItemTaxViewModel";
+} from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
 
 export function ReceiptItemTaxDetail({
   item,

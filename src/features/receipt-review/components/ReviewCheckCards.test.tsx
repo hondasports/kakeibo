@@ -1,9 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ReviewCheckCards } from "./ReviewCheckCards";
-import type { ReviewAmountCheck } from "../utils/reviewAmountChecks";
-import type { ReviewCheckStatus } from "../utils/reviewCheckUtils";
-import type { ReviewTaxRateCheck } from "../utils/reviewTaxChecks";
+import type { ReviewAmountCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewAmountChecks";
+import type { ReviewCheckStatus } from "../../../../lib/domain/aiExpenseDrafts/reviewCheckUtils";
+import type { ReviewTaxRateCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewTaxChecks";
 
 const amountBase: ReviewAmountCheck = { status: "matched", variant: "direct" };
 const taxRateBase: ReviewTaxRateCheck = { status: "matched", rows: [] };

@@ -1,4 +1,4 @@
-import type { ReceiptItemTaxConfirmedField } from "../../../../lib/receiptTax/types";
+import type { ReceiptItemTaxConfirmedField } from "../receipt/tax/types";
 import type {
   ExtractedTaxSummary,
   PriceTaxTreatment,
@@ -6,19 +6,28 @@ import type {
   ReceiptTotalResolution,
   TaxRateComposition,
   TaxResolutionSource,
-} from "../../../../lib/receiptTax/types";
-import type { ReceiptRawObservation } from "../../../../lib/domain/receipt/observations";
+} from "../receipt/tax/types";
+import type { ReceiptRawObservation } from "../receipt/observations";
+import type { ItemSummary } from "./reviewItems";
 import type {
   AiExpenseRegistrationMode,
   DerivedRegistrationSnapshot,
   ReceiptInterpretationSnapshot,
   ReceiptUserOverrideSnapshot,
-} from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
-import type { ReceiptItemLineType } from "../../../../lib/domain/receipt/discountItems";
+} from "./receiptDataContract";
+import type { ReceiptItemLineType } from "../receipt/discountItems";
+import type {
+  AiExpenseDraftDocumentType,
+  AiExpenseDraftStatus as PersistedDraftStatus,
+} from "./constants";
 
-export type AiExpenseQueueDocumentType = "receipt" | "convenience_payment" | "unknown";
+export type AiExpenseQueueDocumentType = AiExpenseDraftDocumentType;
 
-export type AiExpenseDraftStatus = "ready" | "needs_review" | "failed" | "registered";
+/** 一覧・レビュー画面で扱う下書き状態。解析中・登録中の status はこの境界には出さない。 */
+export type AiExpenseDraftStatus = Extract<
+  PersistedDraftStatus,
+  "ready" | "needs_review" | "failed" | "registered"
+>;
 
 export type AiExpenseDraft = {
   _id: string;
@@ -46,17 +55,29 @@ export type AiExpenseDraft = {
   markerDefinitions?: Array<{ marker: string; description: string }>;
   /** 一覧用に付与される明細（ready / needs_review のみ）。確認理由の導出に使う。 */
   items?: AiExpenseDraftItem[];
-  itemSummary?: {
-    itemTotalYen: number;
-    itemDifferenceYen?: number;
-    hasUncategorizedItems: boolean;
-    hasLowConfidenceItems: boolean;
-    categoryAggregates: Array<{
-      categoryId: string;
-      amountYen: number;
-    }>;
-  };
+  itemSummary?: ItemSummary;
+  /** 一覧用に永続化された判定サマリ。無い旧データは明細から再計算する（Phase 3 でフォールバックを外す）。 */
+  listSummary?: DraftListSummary;
 };
+
+/**
+ * aiExpenseDrafts.listSummary に保存する一覧用判定結果。
+ * 一覧は保存値がある下書きの明細を読まないため、判定入力を変え得る
+ * 全書き込み経路で最新化する（組み立ては buildDraftListSummary だけが担う）。
+ */
+export type DraftListSummary = {
+  /** 金額・税内訳が解決済みか（isAmountAndTaxResolved と同じ入力・同じ結果）。 */
+  amountAndTaxResolved: boolean;
+  /** 明細集計（summarizeItems と同じ。明細0件なら省略）。 */
+  itemSummary?: ItemSummary;
+};
+
+/**
+ * 金額・税内訳の解決判定に必要な入力。
+ * 永続化レコード（_id/status が Id や広い status union の AiExpenseDraftFields）と
+ * クライアントの AiExpenseDraft の両方を受けられるよう、判定に使わない _id/status を除く。
+ */
+export type AiExpenseDraftJudgmentInput = Omit<AiExpenseDraft, "_id" | "status">;
 
 export type AiExpenseItemTaxDetails = {
   printedAmountYen?: number;

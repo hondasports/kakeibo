@@ -13,14 +13,14 @@ import { GROUP_ID, DRAFT_ID, CAT_ID, createInMemoryMutationCtx } from "./testHel
 import {
   mapDraftToReviewForm,
   mapDraftItemsToReviewItems,
-} from "../../../src/features/receipt-review/utils/mappers";
+} from "../../domain/aiExpenseDrafts/reviewDraftMapping";
 import type {
   AiExpenseDraft,
   AiExpenseDraftWithItems,
-} from "../../../src/features/receipt-review/types/types";
+} from "../../domain/aiExpenseDrafts/reviewTypes";
 import { RECEIPT_TAX_CHOICE_FIELDS } from "../../domain/aiExpenseDrafts/receiptDataContract";
-import { buildReviewChecks } from "../../../src/features/receipt-review/utils/reviewChecks";
-import { toReceiptTotalsViewModel } from "../../../src/features/receipt-review/utils/receiptTotalsViewModel";
+import { buildReviewChecks } from "../../domain/aiExpenseDrafts/reviewChecks";
+import { toReceiptTotalsViewModel } from "../../domain/aiExpenseDrafts/receiptTotalsViewModel";
 
 function setup(testCase: (typeof receiptTaxBasisCases)[number]) {
   const input = receiptTaxBasisInput(testCase);

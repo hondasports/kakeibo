@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "./judgmentItemWindow";
 import {
   buildReplacementDraftItemFields,
   getReviewItemReplaceErrorMessage,
-  MAX_DRAFT_REVIEW_ITEMS,
   validateReviewItemCount,
   validateReviewItemIds,
 } from "./reviewItemReplace";
 
 describe("validateReviewItemCount", () => {
-  it("100件までは許可し101件は拒否する", () => {
-    expect(validateReviewItemCount(new Array(MAX_DRAFT_REVIEW_ITEMS).fill({}))).toEqual({
+  it("判定窓の件数までは許可し、超えると拒否する", () => {
+    expect(validateReviewItemCount(new Array(DRAFT_JUDGMENT_ITEM_LIMIT).fill({}))).toEqual({
       success: true,
     });
     expect(validateReviewItemCount(new Array(101).fill({}))).toEqual({

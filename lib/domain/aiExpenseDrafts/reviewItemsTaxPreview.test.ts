@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   unprovenTargetReceipt,
   observationLine,
-} from "../../../../lib/domain/receipt/tax/fixtures/unprovenTargetReceipt";
+} from "../receipt/tax/fixtures/unprovenTargetReceipt";
 import { buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 import { buildReviewChecks } from "./reviewChecks";
-import type { ReinterpretDraftTaxInput } from "../../../../lib/domain/receipt/tax/reinterpretDraftTax";
-import type { ReviewItemValues } from "../types/types";
+import type { ReinterpretDraftTaxInput } from "../receipt/tax/reinterpretDraftTax";
+import type { ReviewItemValues } from "./reviewTypes";
 
 function preview(input: ReinterpretDraftTaxInput) {
   const items: ReviewItemValues[] = input.items.map((item, index) => ({

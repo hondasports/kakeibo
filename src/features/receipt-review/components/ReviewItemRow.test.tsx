@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ReviewItemRow } from "./ReviewItemRow";
-import type { ReviewItemValues } from "../types/types";
+import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 
 const item: ReviewItemValues = {
   id: "item-1",

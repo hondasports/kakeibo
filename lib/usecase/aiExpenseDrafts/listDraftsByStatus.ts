@@ -4,11 +4,12 @@ import type { AiExpenseDraftReadRepository } from "../../domain/aiExpenseDrafts/
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftItemReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftItemRepository";
 import type { PaginatedResult, PaginationOpts } from "../../domain/pagination";
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
 import { summarizeItems, type ItemSummary } from "../../domain/aiExpenseDrafts/reviewItems";
 import type { UsecaseGroupContext } from "../context";
 
-const LIST_LIMIT = 100;
-const ITEM_LIST_LIMIT = 100;
+/** 一覧1回分の下書き件数の上限。明細の判定窓（DRAFT_JUDGMENT_ITEM_LIMIT）とは別概念。 */
+const DRAFT_LIST_LIMIT = 100;
 
 export type AiExpenseDraftListEntry = AiExpenseDraftFields & {
   itemSummary?: ItemSummary;
@@ -32,7 +33,16 @@ async function attachItemDetails(
   }
   return await Promise.all(
     drafts.map(async (draft) => {
-      const items = await deps.draftItems.listByDraftAsc(ctx.groupId, draft.id!, ITEM_LIST_LIMIT);
+      // 保存済みサマリがある下書きは明細を読まない。
+      // 無い旧データのみ従来どおり明細を読む（フォールバック。Phase 3 で外す）。
+      if (draft.listSummary !== undefined) {
+        return { ...draft, itemSummary: draft.listSummary.itemSummary };
+      }
+      const items = await deps.draftItems.listByDraftAsc(
+        ctx.groupId,
+        draft.id!,
+        DRAFT_JUDGMENT_ITEM_LIMIT,
+      );
       return {
         ...draft,
         itemSummary: summarizeItems(draft, items),
@@ -48,7 +58,7 @@ export async function listAiExpenseDraftsByStatus(
   deps: DraftListDeps,
   args: { status: AiExpenseDraftStatus },
 ): Promise<AiExpenseDraftListEntry[]> {
-  const drafts = await deps.drafts.listByGroupAndStatus(ctx.groupId, args.status, LIST_LIMIT);
+  const drafts = await deps.drafts.listByGroupAndStatus(ctx.groupId, args.status, DRAFT_LIST_LIMIT);
   return await attachItemDetails(ctx, deps, args.status, drafts);
 }
 

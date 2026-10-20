@@ -5,7 +5,7 @@ import {
   formatWeeklyExpenseTooltip,
   type WeeklyExpenseChartData,
 } from "../utils/weeklyExpenseChartData";
-import { formatYen, formatYenCompact } from "../../../utils/currency";
+import { formatYen, formatYenCompact } from "../../../../lib/domain/common/currency";
 import { formatDateForDisplay } from "../../../utils/date";
 
 type WeeklyTrendChartProps = {

@@ -1,4 +1,4 @@
-import { formatYen, formatYenAbs } from "../../../utils/currency";
+import { formatYen, formatYenAbs } from "../../../../lib/domain/common/currency";
 
 export function formatSignedYen(value: number): string {
   if (value === 0) {

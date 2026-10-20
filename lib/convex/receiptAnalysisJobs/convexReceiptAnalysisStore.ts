@@ -164,7 +164,7 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
     async listJobsByGroup(groupId, limit) {
       const docs = await ctx.db
         .query("receiptAnalysisImageJobs")
-        .withIndex("by_group_id_and_status", (q) => q.eq("groupId", groupId as Id<"groups">))
+        .withIndex("by_group_id_and_created_at", (q) => q.eq("groupId", groupId as Id<"groups">))
         .order("desc")
         .take(limit);
       return docs.map(toJobRecord);
@@ -228,7 +228,7 @@ export function createReceiptAnalysisReader(ctx: Pick<QueryCtx, "db">): ReceiptA
     async listJobsByGroup(groupId, limit) {
       const docs = await ctx.db
         .query("receiptAnalysisImageJobs")
-        .withIndex("by_group_id_and_status", (q) => q.eq("groupId", groupId as Id<"groups">))
+        .withIndex("by_group_id_and_created_at", (q) => q.eq("groupId", groupId as Id<"groups">))
         .order("desc")
         .take(limit);
       return docs.map(toJobRecord);

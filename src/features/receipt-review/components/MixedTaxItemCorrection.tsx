@@ -11,8 +11,11 @@ import {
   Typography,
 } from "@mui/material";
 import type { AmountBasis } from "../../../../lib/receiptTax/types";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import { buildTaxContextFromReviewItem } from "../utils/receiptItemTaxViewModel";
+import type {
+  AiExpenseDraft,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
+import { buildTaxContextFromReviewItem } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
 import { TaxRateSelect } from "./TaxRateSelect";
 
 function needsTaxCorrection(item: ReviewItemValues) {

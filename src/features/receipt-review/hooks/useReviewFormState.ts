@@ -6,27 +6,26 @@ import {
 } from "../../../../lib/domain/receipt/tax/itemTaxConfirmation";
 import { useState } from "react";
 import {
-  emptyReviewForm,
   mapDraftItemsToReviewItems,
   mapDraftToReviewForm,
-} from "../utils/mappers";
-import { isDraftWithItems } from "../utils/mappers";
+} from "../../../../lib/domain/aiExpenseDrafts/reviewDraftMapping";
+import { emptyReviewForm, isDraftWithItems } from "../utils/mappers";
 import type {
   AiExpenseDraft,
   AiExpenseDraftItem,
   AiExpenseDraftWithItems,
   ReviewFormValues,
   ReviewItemValues,
-} from "../types/types";
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import {
   applyReceiptCategory,
   assignCategoryToItems,
   assignDiscountTarget,
   initializeReviewCategoryState,
   prepareReviewItemsForSubmit,
-} from "../utils/reviewItemCategories";
+} from "../../../../lib/domain/aiExpenseDrafts/reviewItemCategories";
 import { isDiscountItemName, isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
-import { applyReviewItemsTaxPreview } from "../utils/reviewItemsTaxPreview";
+import { applyReviewItemsTaxPreview } from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
 import { reconcileNegativeLineWarnings } from "../utils/negativeLineWarnings";
 
 export function useReviewFormState({

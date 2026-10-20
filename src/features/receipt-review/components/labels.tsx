@@ -2,9 +2,9 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined";
 import HelpIcon from "@mui/icons-material/Help";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
-import type { AiExpenseQueueDocumentType } from "../types/types";
+import type { AiExpenseQueueDocumentType } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueStatus, QueueSectionKey } from "../../../types/aiExpenseQueue";
-export { getReviewReasonLabel } from "../utils/reviewFeedback";
+export { getReviewReasonLabel } from "../../../../lib/domain/aiExpenseDrafts/reviewFeedback";
 
 export const statusLabels: Record<AiExpenseQueueStatus, string> = {
   adding: "追加中",

@@ -1,7 +1,7 @@
 import { alpha } from "@mui/material/styles";
 import { Box, ButtonBase, Paper, Skeleton, Stack, Typography, useTheme } from "@mui/material";
 import { formatJapaneseDate } from "../../../utils/date";
-import { formatYen, formatYenCompact } from "../../../utils/currency";
+import { formatYen, formatYenCompact } from "../../../../lib/domain/common/currency";
 import { formatMonthLabel } from "../lib/monthNavigation";
 import {
   buildMonthlySpendingCalendarData,

@@ -1,5 +1,5 @@
 import { Box, Paper, Skeleton, Stack, Typography } from "@mui/material";
-import { formatYen, formatYenAbs } from "../../../utils/currency";
+import { formatYen, formatYenAbs } from "../../../../lib/domain/common/currency";
 
 function formatNetAmount(value: number): string {
   if (value === 0) {

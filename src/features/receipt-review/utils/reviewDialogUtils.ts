@@ -1,6 +1,9 @@
-import type { ReviewFormValues, ReviewItemValues } from "../types/types";
+import type {
+  ReviewFormValues,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
-import { formatYen } from "../../../utils/currency";
+import { formatYen } from "../../../../lib/domain/common/currency";
 import { hasLowConfidenceItem } from "../../../../lib/domain/aiExpenseDrafts/reviewItems";
 import {
   computeReviewCategoryAggregates,

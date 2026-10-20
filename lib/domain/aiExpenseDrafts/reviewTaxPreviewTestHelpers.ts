@@ -1,4 +1,4 @@
-import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "../types/types";
+import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "./reviewTypes";
 
 export function mixedTaxReviewFixture(): {
   draft: AiExpenseDraft;

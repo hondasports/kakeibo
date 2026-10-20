@@ -1,23 +1,24 @@
-import { parseExpenseAmountString } from "../../../../lib/domain/expenseEntries/expenseEntryItem";
-import { isValidIsoDateString } from "../../../../lib/domain/week/weekDates";
-import {
-  isDiscountLine,
-  isValidSignedLineItemAmount,
-} from "../../../../lib/domain/receipt/discountItems";
-import type { AiExpenseDraft, ReviewFormValues, ReviewItemValues } from "../types/types";
+import { parseExpenseAmountString } from "../expenseEntries/expenseEntryItem";
+import { isValidIsoDateString } from "../week/weekDates";
+import { isDiscountLine, isValidSignedLineItemAmount } from "../receipt/discountItems";
+import type {
+  AiExpenseDraftJudgmentInput,
+  ReviewFormValues,
+  ReviewItemValues,
+} from "./reviewTypes";
 import {
   getReviewDocumentTypeErrorMessage,
   getReviewItemsErrorMessage,
   getReviewCategoryAggregateErrorMessage,
-} from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
+} from "./reviewValidation";
 import {
   buildTaxContextFromReviewItem,
   getReviewItemTaxConfirmation,
 } from "./receiptItemTaxViewModel";
-import { isVerifiedTaxSummaryStatus } from "../../../../lib/domain/receipt/tax/taxSummaryConsistency";
+import { isVerifiedTaxSummaryStatus } from "../receipt/tax/taxSummaryConsistency";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
 import { getTaxSummaryConflictLabel } from "./receiptTaxLabels";
-import { formatYen } from "../../../utils/currency";
+import { formatYen } from "../common/currency";
 
 export type ReviewGuidanceItem = {
   id: string;
@@ -45,7 +46,7 @@ export function effectiveReviewMode(form: ReviewFormValues) {
 export function getReviewGuidance(
   form: ReviewFormValues,
   items: ReviewItemValues[],
-  draft?: AiExpenseDraft | null,
+  draft?: AiExpenseDraftJudgmentInput | null,
 ): ReviewGuidanceItem[] {
   const issues: ReviewGuidanceItem[] = [];
   const add = (id: string, message: string, target: string, required: boolean) =>

@@ -76,26 +76,35 @@ export function isReceiptCountLabel(rawText: string): boolean {
 }
 
 /**
+ * 支払合計を明示するラベル。合計・お買上・total のような汎用語を含まないため、
+ * 期間語を含む行を除外するかの判定にも共通で使う。
+ */
+const EXPLICIT_PAYMENT_TOTAL_LABEL = /(?:ご請求額|お支払(?:額|合計)|今回支払額)/;
+
+/**
  * 「今回お買上げポイント 9P」や「今月購入金額合計」のように、合計の語を含むが今回の支払額ではない行。
  * 通貨記号の有無では判定しない。「ポイント利用後合計 2,408」は記号が無くても支払合計で、
  * 「付与ポイント 9P（9円相当）」は円を含んでも支払合計ではないため。
+ * 期間語だけでは除外しない。「今月のご請求額」のような払込票の支払合計を外さないため、
+ * 今回分の期間語（今月・当月）と明示的な支払ラベルの組合せだけ対象にする。
+ * 「先月ご請求額」「累計お支払合計」は今回の支払額ではないため、支払ラベルがあっても除外する。
  */
 function isNonPaymentTotalLabel(rawText: string): boolean {
   const text = normalizeText(rawText);
   const pointAmount = /\d(?:pt|p|ポイント)(?:$|\()/i.test(text);
   const earnedOrBalance =
     /(?:付与|獲得|加算|進呈|残高|保有)/.test(text) && !/(?:お支払|ご請求|今回支払額)/.test(text);
-  return (
-    (/(?:ポイント|point)/i.test(text) && (pointAmount || earnedOrBalance)) ||
-    /(?:今月|当月|先月|前月|累計|年間|本年|今年|前回まで|これまで)/.test(text)
-  );
+  const periodTotal =
+    /(?:先月|前月|累計|年間|本年|今年|前回まで|これまで)/.test(text) ||
+    (/(?:今月|当月)/.test(text) && !EXPLICIT_PAYMENT_TOTAL_LABEL.test(text));
+  return (/(?:ポイント|point)/i.test(text) && (pointAmount || earnedOrBalance)) || periodTotal;
 }
 
 /** 構造分類と税内訳の照合で共通の支払合計ラベルを使う。 */
 export function isReceiptTotalLabel(rawText: string): boolean {
   const text = normalizeText(rawText);
   return (
-    /(?:合計|総計|お買上|ご請求額|お支払(?:額|合計)|今回支払額|total)/i.test(text) &&
+    (/(?:合計|総計|お買上|total)/i.test(text) || EXPLICIT_PAYMENT_TOTAL_LABEL.test(text)) &&
     !isReceiptCountLabel(rawText) &&
     !isNonPaymentTotalLabel(rawText) &&
     !/(?:小計|値引|割引|subtotal)/i.test(text)

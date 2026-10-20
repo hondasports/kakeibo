@@ -3,7 +3,7 @@ import { Button, Stack, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import type { AiExpenseQueueItem } from "../../../../types/aiExpenseQueue";
 import type { AiExpenseQueueBatchSummary } from "../../types/types";
-import { formatYen } from "../../../../utils/currency";
+import { formatYen } from "../../../../../lib/domain/common/currency";
 import { BulkRegisterConfirmDialog } from "../BulkRegisterConfirmDialog";
 
 type QueueReadyRegisterPanelProps = {

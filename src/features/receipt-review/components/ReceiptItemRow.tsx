@@ -1,6 +1,6 @@
 import { Alert, Button, Stack, Typography } from "@mui/material";
-import type { ReviewItemValues } from "../types/types";
-import { toReceiptItemTaxViewModel } from "../utils/receiptItemTaxViewModel";
+import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
+import { toReceiptItemTaxViewModel } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
 
 export function ReceiptItemRow({
   item,

@@ -1,8 +1,8 @@
-import type { AmountBasis, TaxMode, TaxRatePercent } from "../../../../lib/receiptTax/types";
-import type { AiExpenseDraft, ReviewItemValues } from "../types/types";
-import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
-import { resolveAmountBasis } from "../../../../lib/domain/receipt/tax/resolveAmountBasis";
-import { matchTaxSummaryItems } from "../../../../lib/domain/receipt/tax/taxAmountBasis";
+import type { AmountBasis, TaxMode, TaxRatePercent } from "../receipt/tax/types";
+import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
+import { isDiscountLine } from "../receipt/discountItems";
+import { resolveAmountBasis } from "../receipt/tax/resolveAmountBasis";
+import { matchTaxSummaryItems } from "../receipt/tax/taxAmountBasis";
 /** 金額確認・税率別集計それぞれの判定状態。 */
 export type ReviewCheckStatus = "matched" | "mismatch" | "uncomparable";
 

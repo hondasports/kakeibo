@@ -557,6 +557,24 @@ export default defineSchema({
     // 既存の dev 下書きには warnings が無いものがあるため optional とする。
     warnings: v.optional(v.array(v.string())),
     reviewReasons: v.array(aiExpenseDraftReviewReasonValidator),
+    // 一覧の明細 N+1 解消用の保存サマリ（Issue #1062 Phase 2）。
+    // 無い旧データは一覧側が明細から再計算する。Phase 3 で backfill とフォールバック除去を行う。
+    listSummary: v.optional(
+      v.object({
+        amountAndTaxResolved: v.boolean(),
+        itemSummary: v.optional(
+          v.object({
+            itemTotalYen: v.number(),
+            itemDifferenceYen: v.optional(v.number()),
+            hasUncategorizedItems: v.boolean(),
+            hasLowConfidenceItems: v.boolean(),
+            categoryAggregates: v.array(
+              v.object({ categoryId: v.string(), amountYen: v.number() }),
+            ),
+          }),
+        ),
+      }),
+    ),
     registeredReceiptId: v.optional(v.id("receipts")),
     // 一覧 index に乗せるため derivedRegistration.registeredAt と同じ値を保持する。
     // backfill 完了前の登録済み下書きは未設定のまま残り得る。
@@ -648,6 +666,7 @@ export default defineSchema({
   })
     .index("by_batch_id", ["batchId"])
     .index("by_group_id_and_status", ["groupId", "status", "createdAt"])
+    .index("by_group_id_and_created_at", ["groupId", "createdAt"])
     .index("by_draft_id", ["draftId"]),
 
   transactionalEmailJobs: defineTable({

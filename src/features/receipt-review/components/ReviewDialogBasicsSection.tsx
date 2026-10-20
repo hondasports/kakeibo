@@ -1,5 +1,5 @@
 import { Box, MenuItem, Stack, TextField, Typography } from "@mui/material";
-import type { ReviewFormValues } from "../types/types";
+import type { ReviewFormValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { documentTypeLabels, reviewDocumentTypeOptions } from "./labels";
 

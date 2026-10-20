@@ -1,6 +1,9 @@
 import { Stack, Typography } from "@mui/material";
 import type { TaxContextResolution } from "../../../../lib/receiptTax/types";
-import { getReviewReasonLabel, getTaxResolutionSourceLabel } from "../utils/receiptTaxLabels";
+import {
+  getReviewReasonLabel,
+  getTaxResolutionSourceLabel,
+} from "../../../../lib/domain/aiExpenseDrafts/receiptTaxLabels";
 
 export function TaxResolutionReason({ context }: { context: TaxContextResolution }) {
   if (context.status === "unresolved") {

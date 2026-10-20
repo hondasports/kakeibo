@@ -1,5 +1,5 @@
 import { Autocomplete, MenuItem, TextField, Typography } from "@mui/material";
-import type { ReviewItemValues } from "../types/types";
+import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 
