@@ -2,7 +2,6 @@ import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { getImageCaptureFailureHint } from "../../../../lib/domain/aiExpenseDrafts/failure";
 import { getDraftTitle } from "../../../../lib/domain/aiExpenseDrafts/title";
 import { dropResolvedAmountTaxReasons } from "../../../../lib/domain/aiExpenseDrafts/reviewFeedback";
-import { isAmountAndTaxResolved } from "../../../../lib/domain/aiExpenseDrafts/reviewJudgment";
 import type {
   AiExpenseDraft,
   AiExpenseDraftStatus,
@@ -26,9 +25,8 @@ export function mapDraftToQueueItem(
   categories?: Array<{ _id: Id<"categories"> | string; name: string }>,
   previewImageDataUrl?: string,
 ): AiExpenseQueueItem {
-  // 保存済みサマリがあればその判定を使う。無い旧データのみ従来どおり明細から判定する。
-  const amountAndTaxResolved =
-    draft.listSummary?.amountAndTaxResolved ?? isAmountAndTaxResolved(draft);
+  // 保存済みサマリの判定を使う。無い下書きは未解決として扱う（一覧は明細を持たないため再判定しない）。
+  const amountAndTaxResolved = draft.listSummary?.amountAndTaxResolved ?? false;
   const categoryName = categories?.find((c) => c._id === draft.categoryId)?.name;
   const categoryAggregates = draft.itemSummary?.categoryAggregates.map((aggregate) => ({
     ...aggregate,

@@ -1625,7 +1625,7 @@ cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` �
 
 #### 下書き一覧の保存サマリ（listSummary）補完（一回限りの内部 backfill）
 
-ready / needs_review の下書き一覧は明細読み取り（N+1）を避けるため `listSummary` を読む（Issue #1062 Phase 2）。フィールド追加前の下書きは `listSummary` を持たず、一覧側が明細から再計算するフォールバックに残るため、N+1 をなくすには本 backfill が必要である。本番での backfill 完了を確認してから、一覧のフォールバックを外す（Phase 3b）。
+ready / needs_review の下書き一覧は明細読み取り（N+1）を避けるため `listSummary` を読む（Issue #1062 Phase 2）。フィールド追加前の下書きは `listSummary` を持たなかったため、追加当初は一覧側が明細から再計算するフォールバックを置いていた。本番での backfill 完了（2026-10-20、verify の `remaining=0`）を確認し、Phase 3b でフォールバックを除去した。現在は `listSummary` を持たない下書きに `itemSummary` を付けずに返し、クライアント側でも保存値が無い場合は明細から再判定せず「金額・税内訳が未解決」と同じ扱いにする。
 
 `convex/aiExpenseDraftListSummaryMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`status === "ready" | "needs_review"` かつ `listSummary` 未設定の `aiExpenseDrafts` に `listSummary` を書き込む。値は `buildDraftListSummary`（`lib/domain/aiExpenseDrafts/listSummary.ts`）に、その下書きの明細を作成順の昇順（`by_group_id_and_draft_id` index の asc、判定窓と同じ先頭100件）で渡して計算する。`listSummary` を既に持つ下書き・対象外 status の下書き・`updatedAt` には触れない。
 
