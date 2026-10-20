@@ -10,6 +10,7 @@
 
 import type * as accountDeletion from "../accountDeletion.js";
 import type * as accountDeletionActions from "../accountDeletionActions.js";
+import type * as aiExpenseDraftListSummaryMigration from "../aiExpenseDraftListSummaryMigration.js";
 import type * as aiExpenseDraftRegisteredAtMigration from "../aiExpenseDraftRegisteredAtMigration.js";
 import type * as aiExpenseDrafts_actions from "../aiExpenseDrafts/actions.js";
 import type * as aiExpenseDrafts_e2eDraftFixtures from "../aiExpenseDrafts/e2eDraftFixtures.js";
@@ -150,6 +151,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   accountDeletion: typeof accountDeletion;
   accountDeletionActions: typeof accountDeletionActions;
+  aiExpenseDraftListSummaryMigration: typeof aiExpenseDraftListSummaryMigration;
   aiExpenseDraftRegisteredAtMigration: typeof aiExpenseDraftRegisteredAtMigration;
   "aiExpenseDrafts/actions": typeof aiExpenseDrafts_actions;
   "aiExpenseDrafts/e2eDraftFixtures": typeof aiExpenseDrafts_e2eDraftFixtures;
