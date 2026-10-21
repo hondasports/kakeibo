@@ -355,3 +355,86 @@ describe("下書きIDをまとめたジョブ取得", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("旧クライアント向けlistJobsの互換性", () => {
+  it("全statusを含む所属グループの最新100件だけを作成日時の降順で返す", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await seedGroup(t);
+    const expectedIds = await t.run(async (ctx) => {
+      const otherGroupId = await ctx.db.insert("groups", {
+        name: "別グループ",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const batchId = await ctx.db.insert("receiptAnalysisBatches", {
+        groupId,
+        totalCount: 103,
+        processedCount: 0,
+        status: "running",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const statuses = [
+        "queued",
+        "running",
+        "ready",
+        "needs_review",
+        "failed",
+        "cancelled",
+      ] as const;
+      const ids: Id<"receiptAnalysisImageJobs">[] = [];
+      for (let imageIndex = 0; imageIndex < 103; imageIndex++) {
+        ids.push(
+          await ctx.db.insert("receiptAnalysisImageJobs", {
+            groupId,
+            batchId,
+            imageIndex,
+            fileName: `${imageIndex}.jpg`,
+            status: statuses[imageIndex % statuses.length],
+            createdAt: imageIndex,
+            updatedAt: imageIndex,
+          }),
+        );
+      }
+      const otherBatchId = await ctx.db.insert("receiptAnalysisBatches", {
+        groupId: otherGroupId,
+        totalCount: 1,
+        processedCount: 1,
+        status: "completed",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.insert("receiptAnalysisImageJobs", {
+        groupId: otherGroupId,
+        batchId: otherBatchId,
+        imageIndex: 0,
+        fileName: "other.jpg",
+        status: "ready",
+        createdAt: 1000,
+        updatedAt: 1000,
+      });
+      return ids.reverse().slice(0, 100);
+    });
+    const jobs = await t.withIdentity(identity).query(api.receiptAnalysisJobs.queries.listJobs, {});
+    expect(jobs).toHaveLength(100);
+    expect(jobs.map((job) => job._id)).toEqual(expectedIds);
+    expect(new Set(jobs.map((job) => job.status)).size).toBe(6);
+    expect(jobs.every((job) => job.groupId === groupId)).toBe(true);
+  });
+
+  it("未認証またはグループ未所属のユーザーは取得できない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    await seedGroup(t);
+    await expect(t.query(api.receiptAnalysisJobs.queries.listJobs, {})).rejects.toThrow();
+    await expect(
+      t
+        .withIdentity({
+          ...identity,
+          tokenIdentifier: "legacy-non-member",
+          subject: "legacy-non-member",
+        })
+        .query(api.receiptAnalysisJobs.queries.listJobs, {}),
+    ).rejects.toThrow();
+  });
+});
