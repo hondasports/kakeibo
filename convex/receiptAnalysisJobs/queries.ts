@@ -17,6 +17,12 @@ import {
   listReceiptAnalysisJobsByBatch,
 } from "../../lib/usecase/receiptAnalysisJobs/queries";
 
+const jobDocumentValidator = v.object({
+  ...schema.tables.receiptAnalysisImageJobs.validator.fields,
+  _id: v.id("receiptAnalysisImageJobs"),
+  _creationTime: v.number(),
+});
+
 export async function listBatchesHandler(ctx: QueryCtx) {
   const { groupId } = await requireGroupMembership(ctx);
   return (
@@ -68,6 +74,19 @@ export async function listJobsByDraftIdsHandler(
 }
 
 export const listBatches = query({ args: {}, handler: listBatchesHandler });
+// Convexを先にデプロイするため、旧タブが移行するまで少なくとも1リリースは残す（削除は #1092）。
+export const listJobs = query({
+  args: {},
+  returns: v.array(jobDocumentValidator),
+  handler: async (ctx) => {
+    const { groupId } = await requireGroupMembership(ctx);
+    return ctx.db
+      .query("receiptAnalysisImageJobs")
+      .withIndex("by_group_id_and_created_at", (q) => q.eq("groupId", groupId))
+      .order("desc")
+      .take(100);
+  },
+});
 export const listActiveJobs = query({ args: {}, handler: listActiveJobsHandler });
 export const listJobsByBatch = query({
   args: { batchId: v.id("receiptAnalysisBatches") },
@@ -75,12 +94,6 @@ export const listJobsByBatch = query({
 });
 export const listJobsByDraftIds = query({
   args: { draftIds: v.array(v.id("aiExpenseDrafts")) },
-  returns: v.array(
-    v.object({
-      ...schema.tables.receiptAnalysisImageJobs.validator.fields,
-      _id: v.id("receiptAnalysisImageJobs"),
-      _creationTime: v.number(),
-    }),
-  ),
+  returns: v.array(jobDocumentValidator),
   handler: listJobsByDraftIdsHandler,
 });
