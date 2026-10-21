@@ -57,7 +57,7 @@
     "valibot": "^1.5.0"
   },
   "devDependencies": {
-    "@clerk/testing": "^2.2.30",
+    "@clerk/testing": "^2.2.47",
     "@edge-runtime/vm": "5.0.0",
     "@playwright/test": "^1.64.0",
     "@testing-library/jest-dom": "^7.0.1",
