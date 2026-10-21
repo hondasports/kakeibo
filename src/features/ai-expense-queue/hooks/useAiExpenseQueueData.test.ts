@@ -143,6 +143,67 @@ it("再試行対象が無ければ補助クエリを購読しない", () => {
   expect(useQueryMock).toHaveBeenCalledWith("draftJobs", "skip");
 });
 
+it("固定IDのinitialItemsだけではジョブを問い合わせず、表示項目を維持する", () => {
+  const initialItems = [
+    {
+      id: "e2e-review-draft",
+      fileName: "review.png",
+      status: "needs_review" as const,
+      documentType: "unknown" as const,
+    },
+    {
+      id: "e2e-failed-draft",
+      fileName: "failed.png",
+      status: "failed" as const,
+      documentType: "unknown" as const,
+    },
+  ];
+  const { result } = renderHook(() =>
+    useAiExpenseQueueData({
+      ...options,
+      sessionBatches: [],
+      initialItems,
+    }),
+  );
+  expect(useQueryMock).toHaveBeenCalledWith("draftJobs", "skip");
+  expect(result.current.items).toHaveLength(2);
+  expect(result.current.items).toMatchObject(
+    initialItems.map((item) => ({
+      ...item,
+      jobId: undefined,
+      batchId: undefined,
+    })),
+  );
+});
+
+it("initialItemsがあってもConvexの一覧から取得した再試行対象だけを問い合わせる", () => {
+  useQueryMock.mockImplementation((reference, args) => {
+    if (reference !== "drafts") return [];
+    if (args.status === "needs_review")
+      return [{ ...readyDraft, _id: "persisted-review", status: "needs_review" }];
+    if (args.status === "failed")
+      return [{ ...readyDraft, _id: "persisted-failed", status: "failed" }];
+    return [];
+  });
+  renderHook(() =>
+    useAiExpenseQueueData({
+      ...options,
+      sessionBatches: [],
+      initialItems: [
+        {
+          id: "e2e-review-draft",
+          fileName: "review.png",
+          status: "needs_review",
+          documentType: "unknown",
+        },
+      ],
+    }),
+  );
+  expect(useQueryMock).toHaveBeenCalledWith("draftJobs", {
+    draftIds: ["persisted-review", "persisted-failed"],
+  });
+});
+
 it("再解析したセッション外バッチで下書きIDが変わっても画像を維持し、今回の追加の要約には含めない", () => {
   let completed = false;
   const oldJob = { ...readyJob, draftId: "old-draft", status: "failed" };
@@ -185,17 +246,20 @@ it("再解析したセッション外バッチで下書きIDが変わっても�
 });
 
 it("重複と非表示の候補を除き、一括購読の引数を200件以内に保つ", () => {
-  const initialItems = Array.from({ length: 202 }, (_, index) => ({
-    id: `retry-${index}`,
-    fileName: `${index}.png`,
+  const drafts = Array.from({ length: 202 }, (_, index) => ({
+    ...readyDraft,
+    _id: `retry-${index}`,
+    imageFileName: `${index}.png`,
     status: "needs_review" as const,
     documentType: "unknown" as const,
   }));
+  useQueryMock.mockImplementation((reference, args) =>
+    reference === "drafts" && args.status === "needs_review" ? [drafts[0], ...drafts] : [],
+  );
   renderHook(() =>
     useAiExpenseQueueData({
       ...options,
       sessionBatches: [],
-      initialItems: [initialItems[0], ...initialItems],
       hiddenItemIds: ["retry-1"],
     }),
   );

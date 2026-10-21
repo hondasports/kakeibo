@@ -15,6 +15,17 @@ import {
   useQueryMock,
 } from "./AiExpenseQueuePanelTestMocks";
 
+const savedDrafts = [queueItems[1], queueItems[2]].map((item) => ({
+  _id: item.id,
+  status: item.status,
+  documentType: item.documentType,
+  imageFileName: item.fileName,
+  shopName: item.title,
+  amountYen: item.amountYen,
+  date: item.date,
+  reviewReasons: item.reviewReasons ?? [],
+}));
+
 describe("AiExpenseQueuePanel（再試行・削除）", () => {
   it("登録準備OKカードの主アクションから単体登録できる", async () => {
     const user = userEvent.setup();
@@ -89,7 +100,12 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
 
   it("失敗ジョブの画像を選び直して再試行できる", async () => {
     const user = userEvent.setup();
-    useQueryMock.mockImplementation((reference: string, _args: unknown) => {
+    useQueryMock.mockImplementation((reference: string, args: { status?: string }) => {
+      if (reference === "aiExpenseDrafts.queries.listByStatus") {
+        return savedDrafts.filter(
+          (draft) => draft._id === queueItems[2].id && draft.status === args.status,
+        );
+      }
       if (
         reference === "receiptAnalysisJobs.queries.listJobsByDraftIds" ||
         reference === "receiptAnalysisJobs.queries.listJobsByBatch"
@@ -106,7 +122,7 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
       return [];
     });
 
-    renderWithProviders(<AiExpenseQueuePanel initialItems={[queueItems[2]]} />);
+    renderWithProviders(<AiExpenseQueuePanel />);
 
     await user.click(screen.getByRole("button", { name: "再撮影" }));
     await user.upload(
@@ -129,7 +145,12 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
       batch: { _id: "batch-failed" },
       jobs: [{ _id: "job-failed" }],
     });
-    useQueryMock.mockImplementation((reference: string, _args: unknown) => {
+    useQueryMock.mockImplementation((reference: string, args: { status?: string }) => {
+      if (reference === "aiExpenseDrafts.queries.listByStatus") {
+        return savedDrafts.filter(
+          (draft) => draft._id === queueItems[2].id && draft.status === args.status,
+        );
+      }
       if (
         reference === "receiptAnalysisJobs.queries.listJobsByDraftIds" ||
         reference === "receiptAnalysisJobs.queries.listJobsByBatch"
@@ -149,7 +170,7 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
       return [];
     });
 
-    renderWithProviders(<AiExpenseQueuePanel initialItems={[queueItems[2]]} />);
+    renderWithProviders(<AiExpenseQueuePanel />);
 
     await user.upload(
       screen.getByLabelText("読み取り用画像を追加"),
@@ -172,7 +193,12 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
 
   it("確認待ちの保存済み下書きを画像を選び直して再解析できる", async () => {
     const user = userEvent.setup();
-    useQueryMock.mockImplementation((reference: string, _args: unknown) => {
+    useQueryMock.mockImplementation((reference: string, args: { status?: string }) => {
+      if (reference === "aiExpenseDrafts.queries.listByStatus") {
+        return savedDrafts.filter(
+          (draft) => draft._id === queueItems[1].id && draft.status === args.status,
+        );
+      }
       if (
         reference === "receiptAnalysisJobs.queries.listJobsByDraftIds" ||
         reference === "receiptAnalysisJobs.queries.listJobsByBatch"
@@ -192,7 +218,7 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
       return [];
     });
 
-    renderWithProviders(<AiExpenseQueuePanel initialItems={[queueItems[1]]} />);
+    renderWithProviders(<AiExpenseQueuePanel />);
 
     await user.click(screen.getByRole("button", { name: "再解析" }));
     await user.upload(
@@ -267,7 +293,12 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
   it("再試行画像の読み込み失敗をUIエラーとして表示する", async () => {
     const user = userEvent.setup();
     const createImageBitmapSpy = rejectImageDecoding();
-    useQueryMock.mockImplementation((reference: string, _args: unknown) => {
+    useQueryMock.mockImplementation((reference: string, args: { status?: string }) => {
+      if (reference === "aiExpenseDrafts.queries.listByStatus") {
+        return savedDrafts.filter(
+          (draft) => draft._id === queueItems[2].id && draft.status === args.status,
+        );
+      }
       if (
         reference === "receiptAnalysisJobs.queries.listJobsByDraftIds" ||
         reference === "receiptAnalysisJobs.queries.listJobsByBatch"
@@ -284,7 +315,7 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
       return [];
     });
 
-    renderWithProviders(<AiExpenseQueuePanel initialItems={[queueItems[2]]} />);
+    renderWithProviders(<AiExpenseQueuePanel />);
 
     await user.click(screen.getByRole("button", { name: "再撮影" }));
     await user.upload(
