@@ -76,13 +76,11 @@ export function useAiExpenseQueueData({
   );
   const retryDraftIds = useMemo(() => {
     const linkedDraftIds = new Set([...batchJobs, ...(activeJobs ?? [])].map((job) => job.draftId));
-    const candidates =
-      initialItems && initialItems.length > 0
-        ? initialItems.map((item) => ({ id: item.id, status: item.status }))
-        : [...(needsReviewDrafts ?? []), ...(failedDrafts ?? [])].map((draft) => ({
-            id: draft._id,
-            status: draft.status,
-          }));
+    // initialItemsには表示用の固定IDがあるため、検索元にしない。
+    const candidates = [...(needsReviewDrafts ?? []), ...(failedDrafts ?? [])].map((draft) => ({
+      id: draft._id,
+      status: draft.status,
+    }));
     return [
       ...new Set(
         candidates
@@ -95,7 +93,7 @@ export function useAiExpenseQueueData({
           .map((draft) => draft.id as Id<"aiExpenseDrafts">),
       ),
     ].slice(0, MAX_RECEIPT_ANALYSIS_DRAFT_IDS);
-  }, [activeJobs, batchJobs, failedDrafts, hiddenItemIds, initialItems, needsReviewDrafts]);
+  }, [activeJobs, batchJobs, failedDrafts, hiddenItemIds, needsReviewDrafts]);
   const retryDraftJobs = useQuery(
     api.receiptAnalysisJobs.queries.listJobsByDraftIds,
     retryDraftIds.length > 0 ? { draftIds: retryDraftIds } : "skip",

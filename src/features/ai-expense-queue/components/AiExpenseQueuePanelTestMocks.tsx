@@ -97,7 +97,10 @@ vi.mock("convex/react", () => ({
     if (reference === "receiptAnalysisJobs.actions.analyzeImageJob") return analyzeImageJobMock;
     return vi.fn();
   },
-  useQuery: (reference: string, args: unknown) => useQueryMock(reference, args),
+  useQuery: (reference: string, args: unknown) => {
+    const result = useQueryMock(reference, args);
+    return args === "skip" ? undefined : result;
+  },
   useQueries: (queries: unknown) => useQueriesMock(queries),
   usePaginatedQuery: (reference: string, args: unknown, options: unknown) =>
     usePaginatedQueryMock(reference, args, options),
