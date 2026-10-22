@@ -99,34 +99,7 @@ fi
 
 ### Workspace Preflight
 
-repository fileを変更するtaskは、**最初の編集前**にtask worktree rootで実行する。
-
-```bash
-node scripts/check-task-worktree.mjs --require-clean
-```
-
-PASS条件:
-
-- exit code `0`
-- `WORKSPACE_PREFLIGHT status: PASS`
-- `main` / `preview`ではない
-- detached HEADではない
-- Gitに登録済みtask worktree
-- clean baseline
-- 他task差分なし
-
-FAILしたまま編集しない。
-
-`docs/`、`README.md`だけのpure docsは理由を記録して例外にできる。ただし次はpure docs扱いしない。
-
-- `AGENTS.md`
-- `skills/`
-- `scripts/`
-- `.github/`
-- 設定ファイル
-- アプリコード
-
-pre-commitの `check-task-worktree.mjs --staged` は最後の安全網であり、編集前preflightの代替ではない。
+repository fileを変更するtaskは、**最初の編集前**にtask worktree rootで `node scripts/check-task-worktree.mjs --require-clean` を実行し、FAILしたまま編集しない。PASS条件・FAIL時の対処・pure docsの例外は `skills/workspace-preflight` を正本とする。
 
 ---
 
@@ -146,15 +119,7 @@ if [ ! -f ../kakeibo-worktrees/preview/.env.local ]; then
 fi
 ```
 
-task worktree作成後は、同期コマンドのcopy-only modeで正本をコピーする。
-
-```bash
-pnpm run e2e:env-sync -- --copy-only
-```
-
-`--copy-only` は `.env.local` のコピーだけを行い、コピー元がcloud devを向いていてもConvex deploymentの環境変数を書き換えない。手動コピーよりこちらを既定とする。
-
-秘密値はchat、Issue、PR、log、commitへ出さない。
+task worktree作成後のコピー（`pnpm run e2e:env-sync -- --copy-only`）とローカル起動の手順は `skills/local-dev-env` を正本とする。秘密値はchat、Issue、PR、log、commitへ出さない。
 
 環境変数の個別用途・CI Secretの対応は `docs/environment-variables.md` を正本とする。
 
@@ -273,46 +238,11 @@ E2Eの実行には事前条件がある。満たさない場合はE2Eを実行�
 
 ローカルE2Eは実DB、Clerk認証、Convex HTTP／mutation、画面の状態遷移をまとめて確認する層とし、関数単位の分岐は `convex-test`、外部公開URLが必要な確認だけcloud deploymentへ分ける。レシート抽出は `RECEIPT_IMAGE_EXTRACTOR_MODE=mock` とし、OpenAI APIは呼ばない。
 
-初回または新しいtask worktreeでは、次の順に準備する。通常の `pnpm run dev` はlocal Convex watcherとViteを同時に起動する。
-
-Node.jsとpnpmはリポジトリの `mise.toml` と `package.json` から選択される。新しいworktreeでは、先に[Worktree作成時セットアップ](#worktree作成時セットアップ)を実行しておく。
-
-ターミナル1:
-
-```bash
-pnpm run e2e:env-sync -- --copy-only
-pnpm run dev
-```
-
-`--copy-only` は初回bootstrap時だけ実行する。`pnpm run dev` はlocal deploymentが無ければ作成する。起動直後に `CLERK_JWT_ISSUER_DOMAIN` 不足でFunction準備が待機しても、watcherは止めずにターミナル2の同期を実行する。
-
-ターミナル2（PowerShell）:
-
-```powershell
-pnpm run e2e:env-sync
-pnpm exec playwright test e2e/<spec>.spec.ts --project=chromium
-```
-
-同期処理はlocal deploymentを選択した `.env.local` をcloudの正本で上書きせず、Clerk publishable keyからissuerを復元して選択中のlocal deploymentへ `CLERK_JWT_ISSUER_DOMAIN`、`APP_ENV=development`、mock抽出、E2Eユーザー／cleanup設定を反映する。cloud dev deploymentへ同期する場合だけ `pnpm run e2e:env-sync:cloud` を明示する。secretやissuerの実値はログへ出さない。
-
-WindowsでConvex CLIが設定成功後の終了処理だけassertする既知パターンは、成功メッセージだけでPASSにせず、最後のcleanup認証HTTPが200になることまで同期処理が確認する。
-
-CIと同じ「匿名使い捨てbackend」構成でE2Eを実行したい場合は `pnpm run e2e:isolated -- e2e/<spec>.spec.ts` を使う。`CONVEX_AGENT_MODE=anonymous` のlocal deploymentが起動し、現在のworktreeの `convex/**` がpushされてからspecが走る。終了時にbackendと `.env.local` は元の状態へ戻る。CIでこけたspecのローカル再現にも使える。
-
-注意: CIではジョブごとにVM自体が使い捨てだが、ローカルではanonymous deploymentの状態が `.convex/local/default/` に持続するため、以前の実行のDBデータやcredentialが残る場合がある。seed/cleanup系のspecは前回実行の残骸に影響されうることを前提に動く（CIより緩い）。真にクリーンな状態で試したい場合は `.convex/local/default/` を削除してから実行する。
-
-E2E終了後はターミナル1のwatcherを `Ctrl+C` で停止する。
+ローカルでE2Eを実行する手順（`pnpm run dev` とenv同期、CIと同じ匿名使い捨てbackendで走らせる `pnpm run e2e:isolated`、`.convex/local/default/` に状態が残る注意）は `skills/local-dev-env` を正本とする。新しいworktreeでは、先に[Worktree作成時セットアップ](#worktree作成時セットアップ)を実行しておく。
 
 ### E2E seed
 
-再現性が必要なデータは、specから `e2e/helpers/seed.ts` の専用helperを呼び出して作る。手動でlocal DBへ共通seedを流し込む運用にはしない。
-
-- seed HTTP routeは `APP_ENV=development`、cleanup secret、固定E2Eユーザー／所属groupで保護する
-- まっさらなlocal DBでは、先に認証済みページを1回表示してユーザーとgroupを作成し、その後seedしてreloadする
-- specが作ったデータはcleanup helperで後始末し、spec間で状態を共有しない
-- Issue固有の状態は必要最小限のfixtureにする。Issue #670の混在税率レビューも専用seedを同じPRに含める
-
-広い主要導線を変更した場合のみ、必要に応じて範囲を広げる。
+再現性が必要なデータは、specから `e2e/helpers/seed.ts` の専用helperで作る。seed・cleanup・projectの選び方は `skills/e2e-spec-authoring` を正本とする。
 
 `src/**` や `e2e/**` を変更したという**pathだけ**を理由にローカル全E2Eを要求しない。
 
@@ -326,15 +256,7 @@ CIで実行するbackendは共有cloud devではなく、ジョブごとの `CON
 
 ### Convex reflection
 
-`convex/**` の新規/変更関数をローカルE2Eで使う場合、上記のwatcherが変更をlocal deploymentへ自動反映する。1回だけ反映したい場合はlocal環境同期後に次を使う。
-
-```bash
-pnpm run convex:dev -- --once
-```
-
-この手順はlocal deploymentへ反映する。GitHub ActionsのE2EはPR/ジョブ専用の匿名使い捨てlocal deploymentで実行するため、cloud devへの反映が必要なのはローカルから共有cloud devを検証したい場合だけ、そのときは `pnpm run convex:dev:cloud -- --once` を明示的に使う。
-
-required environment不足、env sync失敗、Convex CLI未反映を「未実行理由」として先へ進まない。復旧できなければblockerとして報告する。
+`convex/**` の変更をlocal deploymentやcloud devへ反映する手順は `skills/convex-local-ops` を正本とする。required environment不足、env sync失敗、Convex CLI未反映を「未実行理由」として先へ進まない。
 
 ### Test gap
 
