@@ -20,7 +20,7 @@ license: Apache-2.0
 ## 手順
 
 1. **変更する識別子を列挙する。** 識別子が分からないときは、先に下の「indexionで当たりを付ける」を行う。
-2. **callerとtestを列挙する。** 識別子ごとに `rg -n "\b<識別子>\b" src lib convex e2e scripts` を実行する。Convex関数は `api.` / `internal.` から始まる参照（例: `api.systemAdmins.getMySystemAdminContext`）も検索する。
+2. **callerとtestを列挙する。** 識別子ごとに `rg -n "\b<識別子>\b" src lib convex e2e scripts tests` を実行する。Convex関数は `api.` / `internal.` から始まる参照（例: `api.systemAdmins.getMySystemAdminContext`）も検索する。
 3. **観点ごとに確認する。** 該当する観点だけを見て、確認したことを1行で残す。
 
    | 観点 | 確認済みと言える状態 |

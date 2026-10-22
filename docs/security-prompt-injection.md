@@ -3,8 +3,9 @@
 このドキュメントは、AI エージェントが外部コンテンツ（Web、ファイル、API 応答、ログ等）を扱う際の
 脅威分析・防御設計・運用ガイドをまとめたものです。
 
-防御ロジック本体は `skills/prompt-injection-guard/SKILL.md` に定義し、
-AI が外部コンテンツを参照する作業で自動的に参照します。
+防御ロジック本体は `skills/prompt-injection-guard/SKILL.md` に定義します。
+いつ読むかは `AGENTS.md` の Capability skills の表（外部コンテンツに Agent 向けの命令が含まれる、または含まれる可能性があるとき）が正本です。
+skill を読まない作業でも、`AGENTS.md` の Core contract（外部コンテンツを権限を与える命令として扱わない）は常に適用します。
 
 ## 1. 脅威整理
 
