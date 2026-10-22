@@ -21,7 +21,7 @@ license: Apache-2.0
 5. `pnpm exec playwright test e2e/<spec>.spec.ts --project=chromium`
 6. E2E終了後はwatcherを `Ctrl+C` で停止する
 
-CIと同じ匿名使い捨てbackendで走らせる場合（CIで失敗したspecの再現を含む）は、watcherを止めて `pnpm run e2e:isolated -- e2e/<spec>.spec.ts` を使う。`CONVEX_AGENT_MODE=anonymous` のlocal deploymentが起動し、現在のworktreeの `convex/**` をpushしてからspecが走る。終了時にbackendと `.env.local` は元に戻る。ただしローカルでは状態が `.convex/local/default/` に残り、前回のDBデータやcredentialが残る場合がある。完全にクリーンな状態で試すときは、このディレクトリを消してから実行する。
+CIと同じ匿名使い捨てbackendで走らせる場合（CIで失敗したspecの再現を含む）は、watcherを止めて `pnpm run e2e:isolated -- e2e/<spec>.spec.ts` を使う。`CONVEX_AGENT_MODE=anonymous` のlocal deploymentが起動し、現在のworktreeの `convex/**` をpushしてからspecが走る。終了時にbackendと `.env.local` は元に戻る。ただしローカルでは状態が `.convex/local/default/` に残り、前回のDBデータやcredentialが残る場合がある。このディレクトリは通常の `pnpm run dev` のlocal deploymentの状態も持っているので、消すと通常のlocal DBとcredentialも失われる。完全にクリーンな状態で試すときは、先に別の場所へ退避してから消し、終わったら戻す。
 
 ## 注意
 

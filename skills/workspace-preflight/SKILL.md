@@ -23,10 +23,11 @@ scriptは「task identity == branch」や「差分が他task由来ではない�
 
 FAILしたまま編集しない。既存差分をreset / stash / deleteして場所を空けず、別worktreeへ分離する。
 
-1. preview からtask branchとworktreeを作る（branch prefixはruntime固有の約束で固定しない）。
+1. 最新の `origin/preview` からtask branchとworktreeを作る（branch prefixはruntime固有の約束で固定しない）。
 
    ```bash
-   git worktree add <task-path> -b <task-branch> preview
+   git fetch origin preview
+   git worktree add <task-path> -b <task-branch> origin/preview
    ```
 
 2. `docs/development-process.md` の「Worktree作成時セットアップ」（依存・hook・`.env.local`・indexion digest）を実行する。`.husky/_` が無いとhookが動かないままcommit・pushが通る。
