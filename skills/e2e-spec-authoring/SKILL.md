@@ -17,5 +17,6 @@ license: Apache-2.0
 - レシート抽出は `RECEIPT_IMAGE_EXTRACTOR_MODE=mock`（OpenAI APIは呼ばない）
 - browser層の受入条件がある変更だけ対象specをlocal実行する。`src/**`・`e2e/**` のpathだけを理由にローカル全E2Eは要求しない
 - PR上のE2E要否は `scripts/classify-e2e-relevance.mjs` が機械判定するので、手動でskip判断しない
+- 広い主要導線を変えた場合だけ、必要に応じてlocal実行の範囲を広げる
 
-実行手順は `skills/local-dev-env`、例外ケースや背景だけ `docs/development-process.md#6-verification`（seed・差分判定を含む）を参照する。
+実行手順は `skills/local-dev-env`、PR CIの差分判定の背景は `docs/development-process.md#pr-ci-e2eの差分判定` を参照する。

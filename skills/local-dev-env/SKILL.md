@@ -21,8 +21,10 @@ license: Apache-2.0
 5. `pnpm exec playwright test e2e/<spec>.spec.ts --project=chromium`
 6. E2E終了後はwatcherを `Ctrl+C` で停止する
 
+CIと同じ匿名使い捨てbackendで走らせる場合（CIで失敗したspecの再現を含む）は、watcherを止めて `pnpm run e2e:isolated -- e2e/<spec>.spec.ts` を使う。`CONVEX_AGENT_MODE=anonymous` のlocal deploymentが起動し、現在のworktreeの `convex/**` をpushしてからspecが走る。終了時にbackendと `.env.local` は元に戻る。ただしローカルでは状態が `.convex/local/default/` に残り、前回のDBデータやcredentialが残る場合がある。完全にクリーンな状態で試すときは、このディレクトリを消してから実行する。
+
 ## 注意
 
 - secretやissuerの実値をchat・Issue・PR・log・commitへ出さない
 - Windowsの既知パターン: Convex CLIが設定成功後の終了処理だけassertするケースでは、成功メッセージだけでPASSにせず最後のcleanup認証HTTPが200になるまで確認する
-- 例外ケースや背景だけ `docs/development-process.md#3-envlocal-とローカル環境` ・ `docs/development-process.md#6-verification` 、環境変数の正本は `docs/environment-variables.md` を参照する。通常の手順は本ファイルで完結する
+- 正本 `.env.local` の初回bootstrapは `docs/development-process.md#3-envlocal-とローカル環境`、push前ゲートとE2Eのbackend構成は `docs/development-process.md#functional-e2e`、環境変数は `docs/environment-variables.md` を参照する。ローカルでの手順は本ファイルで完結する
