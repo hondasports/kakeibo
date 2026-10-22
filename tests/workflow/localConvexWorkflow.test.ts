@@ -58,7 +58,7 @@ describe("local Convex development workflow", () => {
 
   test("keeps initial env copying separate from deployment writes", () => {
     const syncScript = readDocument("scripts/sync-e2e-env.mjs");
-    const developmentProcess = readDocument("docs/development-process.md");
+    const localDevEnv = readDocument("skills/local-dev-env/SKILL.md");
 
     expect(syncScript).toContain('includes("--copy-only")');
     expect(syncScript).toContain('includes("--allow-cloud")');
@@ -68,9 +68,9 @@ describe("local Convex development workflow", () => {
     expect(syncScript).toContain("cloud Convex deploymentへのE2E環境変数反映を拒否しました");
     expect(syncScript).toContain('syncConvexEnv("CLERK_JWT_ISSUER_DOMAIN"');
     expect(syncScript).toContain("windowsExitAssertionAfterSuccess");
-    expect(developmentProcess).toContain("pnpm run e2e:env-sync -- --copy-only");
-    expect(developmentProcess).toContain("pnpm run e2e:env-sync");
-    expect(developmentProcess).toContain("pnpm run e2e:env-sync:cloud");
+    expect(localDevEnv).toContain("pnpm run e2e:env-sync -- --copy-only");
+    expect(localDevEnv).toContain("pnpm run e2e:env-sync");
+    expect(localDevEnv).toContain("pnpm run e2e:env-sync:cloud");
   });
 
   test("recognizes the bracketed IPv6 loopback as a local Convex endpoint", () => {
