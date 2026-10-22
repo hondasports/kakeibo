@@ -1,6 +1,6 @@
 ---
 name: pr-update-spec
-description: preview向けPRを作るとき、本文の更新履歴ブロック（suzumemo-update）を正しく記入するために使う。
+description: baseが preview のPRを作成する、または本文を編集するときに使う。本文の更新履歴ブロック（suzumemo-update）の書き方。
 license: Apache-2.0
 ---
 

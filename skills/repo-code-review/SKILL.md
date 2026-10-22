@@ -1,6 +1,6 @@
 ---
 name: repo-code-review
-description: 差分・PRをレビューするときに使う。セキュリティ・技術スタック・ユニットテスト・E2Eのrepo固有チェックを変更パスに応じて読み分ける。
+description: 差分・PRをレビューするとき（セルフレビューを含む）に使う。変更パスに応じて、security・stack・unit-test・E2Eのrepo固有チェックを読み分ける。
 license: Apache-2.0
 ---
 
