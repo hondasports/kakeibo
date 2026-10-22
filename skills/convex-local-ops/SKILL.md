@@ -1,6 +1,6 @@
 ---
 name: convex-local-ops
-description: Convexのlocal/cloud deployment選択、変更の反映、schema・migration変更を扱うときに使う。
+description: convex/** の関数・schemaを変更するとき、またはConvex deploymentへの反映・migrationを行うときに使う。対象パスは convex/**。反映コマンドと高リスク変更の扱い。
 license: Apache-2.0
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: receipt-tax-domain
-description: レシートOCR・税額・税配分・下書き金額の正規化を変更・レビューするときに使う。
+description: レシートの税額・税配分・下書き金額の正規化を変更・レビューするときに使う。対象パスは lib/domain/receipt/tax/**・lib/receiptTax/**、ファイル名にtax/Taxを含むlib/**・src/**・e2e/**。構成・不変条件・回帰資産。
 license: Apache-2.0
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: local-dev-env
-description: ローカル開発・E2E用の環境準備（.env.local正本、env同期、devサーバ起動）が必要なときに使う。
+description: ローカルで pnpm run dev やE2Eを実行するとき、または .env.local を準備するときに使う。env同期・devサーバ起動・e2e:isolated の手順。
 license: Apache-2.0
 ---
 
