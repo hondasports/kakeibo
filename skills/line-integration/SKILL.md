@@ -1,6 +1,6 @@
 ---
 name: line-integration
-description: LINE連携（webhook・リッチメニュー・連携mode・画像処理）の変更・操作をするときに使う。
+description: LINE連携（webhook・アカウント連携・リッチメニュー・連携mode）を変更・操作するときに使う。対象パスは convex/lineWebhook/**・convex/lineLink/**・lib/**/lineWebhook/**・lib/**/lineLink/**・scripts/*line*。構成と注意点。
 license: Apache-2.0
 ---
 

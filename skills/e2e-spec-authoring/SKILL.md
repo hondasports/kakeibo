@@ -1,6 +1,6 @@
 ---
 name: e2e-spec-authoring
-description: E2E specの追加・修正でseed・cleanup・project選択が必要なときに使う。
+description: E2E specを追加・修正するときに使う。対象パスは e2e/**。seed・cleanup・projectの選び方。
 license: Apache-2.0
 ---
 
