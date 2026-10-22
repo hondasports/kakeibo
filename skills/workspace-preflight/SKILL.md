@@ -1,63 +1,46 @@
 ---
 name: workspace-preflight
-description: repository変更の最初の編集前に使うcheap deterministic control。task worktree、非protected branch、clean baselineを強制する。
+description: 編集前のpreflight（scripts/check-task-worktree.mjs）がFAILしたとき、またはtask worktreeを作るときに使う。PASS条件・FAIL時の対処・pure docsの例外の正本。
 license: Apache-2.0
 ---
 
 # Workspace Preflight
 
-## 適用
+実行するコマンドは `AGENTS.md` のCore contractにある。このファイルは判定の意味と、FAILしたときの対処を持つ。
 
-repository fileを変更するtaskでは最初の編集前に実行するdeterministic control。
+## PASS条件
 
-## 実行
+`node scripts/check-task-worktree.mjs --require-clean` をtask worktree rootで実行し、次を満たす。
 
-task worktree rootで:
-
-```bash
-node scripts/check-task-worktree.mjs --require-clean
-```
-
-このscriptが機械的に証明するPASS条件:
-
-- exit code 0
-- `WORKSPACE_PREFLIGHT status: PASS`
-- `main` / `preview` ではないtask branch
-- canonical worktreeとは別の登録済みworktree
+- exit code 0 と `WORKSPACE_PREFLIGHT status: PASS`
+- `main` / `preview` ではなく、detached HEADでもないtask branch
+- canonical worktreeとは別の、Gitに登録済みのworktree
 - clean baseline
 
-`task identity == branch` や「差分が他task由来ではない」ことは、このscript単体では判定しない。task↔branchの紐付けと差分範囲の整合はIssue・PR本文で確認し、scriptのPASS証跡として水増ししない。
+scriptは「task identity == branch」や「差分が他task由来ではない」ことを判定しない。task↔branchの紐付けと差分範囲はIssue・PR本文で確認し、scriptのPASS証跡として水増ししない。
 
-## FAIL
+## FAILしたとき
 
-FAILしたまま編集しない。
+FAILしたまま編集しない。既存差分をreset / stash / deleteして場所を空けず、別worktreeへ分離する。
 
-- canonical worktree
-- `main` / `preview`
-- detached HEAD
-- unregistered worktree
-- pre-existing uncommitted diff
+1. preview からtask branchとworktreeを作る（branch prefixはruntime固有の約束で固定しない）。
 
-必要ならtask branchを作ってworktreeを追加する（branch prefixはruntime固有の約束で固定しない）。
+   ```bash
+   git worktree add <task-path> -b <task-branch> preview
+   ```
 
-```bash
-git worktree add <task-path> -b <task-branch> preview
-```
-
-作成後は `docs/development-process.md` の「Worktree作成時セットアップ」（依存・hook・`.env.local`・indexion digest）を実行してから編集する。`.husky/_` が無いとhookが動かないままcommit・pushが通る。
-
-既存差分を勝手にreset/stash/deleteしない。
+2. `docs/development-process.md` の「Worktree作成時セットアップ」（依存・hook・`.env.local`・indexion digest）を実行する。`.husky/_` が無いとhookが動かないままcommit・pushが通る。
+3. preflightを再実行してPASSを確認してから編集する。
 
 ## 例外
 
-`docs/`、`README.md`だけのpure docsは理由を記録して省略可。
-
-次はpure docs扱いしない。
+`docs/`・`README.md` だけのpure docsは、理由を記録すれば省略できる。次はpure docs扱いしない。
 
 - `AGENTS.md`
 - `skills/`
 - `scripts/`
-- config
-- app code
+- `.github/`
+- 設定ファイル
+- アプリコード
 
-pre-commitの`--staged` checkは最後の安全網であり、編集前preflightの代替ではない。
+pre-commitの `--staged` checkは最後の安全網で、編集前preflightの代わりにはならない。
