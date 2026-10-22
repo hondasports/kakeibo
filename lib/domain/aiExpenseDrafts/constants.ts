@@ -1,3 +1,6 @@
+/** 一覧1回分の下書き件数の上限。明細の判定窓とは別概念。 */
+export const AI_EXPENSE_DRAFT_LIST_LIMIT = 100;
+
 export const AI_EXPENSE_DRAFT_STATUSES = [
   "queued",
   "analyzing",

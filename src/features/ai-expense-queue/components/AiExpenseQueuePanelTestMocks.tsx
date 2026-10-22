@@ -12,6 +12,7 @@ const {
   acceptReceiptImageExternalApiConsentMock,
   useQueryMock,
   usePaginatedQueryMock,
+  useQueriesMock,
 } = vi.hoisted(() => ({
   registerReadyDraftsAsExpenseEntriesMock: vi.fn(),
   legacyRegisterReadyDraftsMock: vi.fn(),
@@ -25,6 +26,7 @@ const {
   acceptReceiptImageExternalApiConsentMock: vi.fn(),
   useQueryMock: vi.fn(),
   usePaginatedQueryMock: vi.fn(),
+  useQueriesMock: vi.fn(),
 }));
 vi.mock("../../../../convex/_generated/api", () => ({
   api: {
@@ -45,7 +47,9 @@ vi.mock("../../../../convex/_generated/api", () => ({
     },
     receiptAnalysisJobs: {
       queries: {
-        listJobs: "receiptAnalysisJobs.queries.listJobs",
+        listActiveJobs: "receiptAnalysisJobs.queries.listActiveJobs",
+        listJobsByBatch: "receiptAnalysisJobs.queries.listJobsByBatch",
+        listJobsByDraftIds: "receiptAnalysisJobs.queries.listJobsByDraftIds",
       },
       mutations: {
         createBatch: "receiptAnalysisJobs.mutations.createBatch",
@@ -93,7 +97,11 @@ vi.mock("convex/react", () => ({
     if (reference === "receiptAnalysisJobs.actions.analyzeImageJob") return analyzeImageJobMock;
     return vi.fn();
   },
-  useQuery: (reference: string, args: unknown) => useQueryMock(reference, args),
+  useQuery: (reference: string, args: unknown) => {
+    const result = useQueryMock(reference, args);
+    return args === "skip" ? undefined : result;
+  },
+  useQueries: (queries: unknown) => useQueriesMock(queries),
   usePaginatedQuery: (reference: string, args: unknown, options: unknown) =>
     usePaginatedQueryMock(reference, args, options),
   useConvex: () => ({
@@ -136,13 +144,19 @@ beforeEach(() => {
   acceptReceiptImageExternalApiConsentMock.mockResolvedValue(undefined);
   useQueryMock.mockReset();
   useQueryMock.mockImplementation((reference: string, _args: unknown) => {
-    if (reference === "receiptAnalysisJobs.queries.listJobs") return [];
+    if (reference === "receiptAnalysisJobs.queries.listActiveJobs") return [];
     if (reference === "users.queries.getReceiptImageConsent") {
       return { hasAcceptedExternalApiConsent: true, acceptedAt: 1234567890 };
     }
     return [];
   });
   usePaginatedQueryMock.mockReset();
+  useQueriesMock.mockReset();
+  useQueriesMock.mockImplementation((queries: Record<string, { query: string; args: unknown }>) =>
+    Object.fromEntries(
+      Object.entries(queries).map(([key, { query, args }]) => [key, useQueryMock(query, args)]),
+    ),
+  );
   // 登録済み一覧のページング購読は listByStatus の mock 注入をそのまま流用する
   usePaginatedQueryMock.mockImplementation((reference: string, args: unknown) => ({
     results:
@@ -168,4 +182,5 @@ export {
   acceptReceiptImageExternalApiConsentMock,
   useQueryMock,
   usePaginatedQueryMock,
+  useQueriesMock,
 };

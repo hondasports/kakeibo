@@ -57,7 +57,7 @@ export type AiExpenseDraftFields = {
   reviewReasons: AiExpenseDraftReviewReason[];
   registeredReceiptId?: string;
   registeredAt?: number;
-  /** 一覧用の保存サマリ。無い旧データは一覧側が明細から再計算する（Phase 3 で外す）。 */
+  /** 一覧用の保存サマリ。無い下書きは一覧で明細を読まず、未解決として扱う。 */
   listSummary?: DraftListSummary;
   createdAt: number;
   updatedAt: number;

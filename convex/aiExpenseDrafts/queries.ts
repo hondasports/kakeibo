@@ -31,10 +31,9 @@ type GetWithItemsArgs = {
   draftId: Id<"aiExpenseDrafts">;
 };
 
-function listEntryToDoc({ id, creationTime, items, ...entry }: AiExpenseDraftListEntry) {
+function listEntryToDoc({ id, creationTime, ...entry }: AiExpenseDraftListEntry) {
   return {
     ...entry,
-    ...(items === undefined ? {} : { items: items.map(draftItemFieldsToDoc) }),
     _id: id,
     _creationTime: creationTime,
   };

@@ -3,8 +3,8 @@ import type { ReceiptAnalysisReader } from "../../domain/receiptAnalysisJobs/sto
 export const listReceiptAnalysisBatches = (reader: ReceiptAnalysisReader, groupId: string) =>
   reader.listBatchesByGroup(groupId, 50);
 
-export const listReceiptAnalysisJobs = (reader: ReceiptAnalysisReader, groupId: string) =>
-  reader.listJobsByGroup(groupId, 100);
+export const listActiveReceiptAnalysisJobs = (reader: ReceiptAnalysisReader, groupId: string) =>
+  reader.listActiveJobsByGroup(groupId, 100);
 
 export async function listReceiptAnalysisJobsByBatch(
   reader: ReceiptAnalysisReader,
@@ -13,14 +13,19 @@ export async function listReceiptAnalysisJobsByBatch(
 ) {
   const batch = await reader.getBatch(batchId);
   if (!batch || batch.groupId !== groupId) throw new Error("Batch not found");
-  return reader.listJobsByBatch(batchId, 50);
+  return reader.listJobsByBatch(batchId);
 }
 
-export async function getReceiptAnalysisJobByDraftId(
+export async function listReceiptAnalysisJobsByDraftIds(
   reader: ReceiptAnalysisReader,
   groupId: string,
-  draftId: string,
+  draftIds: string[],
 ) {
-  const job = await reader.findJobByDraftId(draftId);
-  return !job || job.groupId !== groupId ? null : job;
+  const jobs = await Promise.all(
+    [...new Set(draftIds)].map(async (draftId) => {
+      const job = await reader.findJobByDraftId(draftId);
+      return job?.groupId === groupId ? job : null;
+    }),
+  );
+  return jobs.filter((job) => job !== null);
 }

@@ -557,8 +557,8 @@ export default defineSchema({
     // 既存の dev 下書きには warnings が無いものがあるため optional とする。
     warnings: v.optional(v.array(v.string())),
     reviewReasons: v.array(aiExpenseDraftReviewReasonValidator),
-    // 一覧の明細 N+1 解消用の保存サマリ（Issue #1062 Phase 2）。
-    // 無い旧データは一覧側が明細から再計算する。Phase 3 で backfill とフォールバック除去を行う。
+    // 一覧の明細 N+1 解消用の保存サマリ（Issue #1062）。
+    // 無い下書きは一覧で明細を読まず、未解決として扱う。
     listSummary: v.optional(
       v.object({
         amountAndTaxResolved: v.boolean(),

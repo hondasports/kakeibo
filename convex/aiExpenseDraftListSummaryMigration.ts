@@ -19,7 +19,7 @@ async function loadPage(ctx: ReadCtx, cursor: string | null) {
   return await ctx.db.query("aiExpenseDrafts").paginate({ cursor, numItems: BATCH_SIZE });
 }
 
-// 一覧が listSummary を使う status（listDraftsByStatus の明細フォールバックと同じ境界）。
+// 一覧が listSummary を使う status（listDraftsByStatus と同じ境界）。
 // それ以外の status の一覧は明細を読まず、保存値も使わないため補完しない。
 function usesListSummary(draft: Doc<"aiExpenseDrafts">): boolean {
   return draft.status === "ready" || draft.status === "needs_review";

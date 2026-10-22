@@ -6,6 +6,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import { internal } from "../_generated/api";
 import schema from "../schema";
 import { convexTestModules } from "../test.setup";
+import { buildDraftListSummary } from "../../lib/domain/aiExpenseDrafts/listSummary";
+import {
+  draftDocToFields,
+  draftItemDocToFields,
+} from "../../lib/convex/aiExpenseDrafts/draftRecordMapping";
 
 const originalAppEnv = process.env.APP_ENV;
 const originalUserId = process.env.E2E_CLERK_USER_ID;
@@ -629,5 +634,92 @@ describe("AI expense E2E fixtures", () => {
     expect(firstBatch).toEqual({ deletedDraftCount: 1, deletedItemCount: 3, hasMore: true });
     expect(secondBatch).toEqual({ deletedDraftCount: 3, deletedItemCount: 5, hasMore: false });
     expect(readyDraftId).toBeDefined();
+  });
+
+  it("seed で作る下書きは一覧用の listSummary を保存済みにする", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const ids = await t.run(async (ctx) => {
+      const groupId = await ctx.db.insert("groups", {
+        name: "AI fixture group",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const categoryId = await ctx.db.insert("categories", {
+        groupId,
+        name: "食費",
+        color: "#AAB7C4",
+        isActive: true,
+        sortOrder: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      return { groupId, categoryId };
+    });
+
+    const draftIds = [
+      await t.mutation(internal.aiExpenseDrafts.internal.createE2eReadyDraftForUser, {
+        groupId: ids.groupId,
+        createdByUserId: "fixture-user",
+        categoryId: ids.categoryId,
+      }),
+      await t.mutation(internal.aiExpenseDrafts.internal.createE2eTaxReviewDraftForUser, {
+        groupId: ids.groupId,
+        createdByUserId: "fixture-user",
+        categoryId: ids.categoryId,
+      }),
+      await t.mutation(internal.aiExpenseDrafts.internal.createE2eMixedTaxReviewDraftForUser, {
+        groupId: ids.groupId,
+        createdByUserId: "fixture-user",
+        categoryId: ids.categoryId,
+      }),
+      await t.mutation(internal.aiExpenseDrafts.internal.createE2eTaxSummaryConflictDraftForUser, {
+        groupId: ids.groupId,
+        createdByUserId: "fixture-user",
+        categoryId: ids.categoryId,
+      }),
+      await t.mutation(internal.aiExpenseDrafts.internal.createE2eUnallocatedTaxDraftForUser, {
+        groupId: ids.groupId,
+        createdByUserId: "fixture-user",
+        categoryId: ids.categoryId,
+      }),
+      await t.mutation(internal.aiExpenseDrafts.internal.createE2eTaxReviewDraftForUser, {
+        groupId: ids.groupId,
+        createdByUserId: "fixture-user",
+        categoryId: ids.categoryId,
+        receiptCase: "unproven1003",
+      }),
+      await t.mutation(internal.aiExpenseDrafts.internal.createE2eTaxReviewDraftForUser, {
+        groupId: ids.groupId,
+        createdByUserId: "fixture-user",
+        categoryId: ids.categoryId,
+        receiptCase: "summary892",
+      }),
+      await t.mutation(internal.aiExpenseDrafts.internal.createE2eTaxReviewDraftForUser, {
+        groupId: ids.groupId,
+        createdByUserId: "fixture-user",
+        categoryId: ids.categoryId,
+        receiptCase: "basis890",
+      }),
+    ];
+
+    for (const draftId of draftIds) {
+      const { draft, items } = await t.run(async (ctx) => ({
+        draft: await ctx.db.get(draftId),
+        items: await ctx.db
+          .query("aiExpenseDraftItems")
+          .withIndex("by_group_id_and_draft_id", (q) =>
+            q.eq("groupId", ids.groupId).eq("draftId", draftId),
+          )
+          .order("asc")
+          .collect(),
+      }));
+      expect(draft).not.toBeNull();
+      const expected = buildDraftListSummary(
+        draftDocToFields(draft!),
+        items.map(draftItemDocToFields),
+      );
+      expect(draft!.listSummary).toEqual(expected);
+    }
   });
 });

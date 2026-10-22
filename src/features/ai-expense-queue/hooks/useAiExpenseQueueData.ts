@@ -1,7 +1,11 @@
+import {
+  MAX_RECEIPT_ANALYSIS_DRAFT_IDS,
+  RECEIPT_ANALYSIS_RETRY_DRAFT_STATUSES,
+} from "../../../../lib/domain/receiptAnalysisJobs/rules";
 import { api } from "../../../../convex/_generated/api";
 import { useCallback, useMemo } from "react";
-import { usePaginatedQuery, useQuery } from "convex/react";
-import type { Doc } from "../../../../convex/_generated/dataModel";
+import { usePaginatedQuery, useQueries, useQuery } from "convex/react";
+import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { getSectionKey } from "../../receipt-review/components/labels";
 import { getImageCaptureFailureHint } from "../../../../lib/domain/aiExpenseDrafts/failure";
 import { mapDraftToQueueItem } from "../../receipt-review/utils/mappers";
@@ -16,12 +20,14 @@ export function useAiExpenseQueueData({
   hiddenItemIds,
   pendingImageDataUrls,
   sessionBatches,
+  retryBatchIds = [],
   initialItems,
 }: {
   categories: AiExpenseQueueCategory[];
   hiddenItemIds: string[];
   pendingImageDataUrls: Map<string, string>;
   sessionBatches: AiExpenseUploadBatch[];
+  retryBatchIds?: string[];
   initialItems?: AiExpenseQueueItem[];
 }) {
   const readyDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, { status: "ready" }) as
@@ -41,9 +47,63 @@ export function useAiExpenseQueueData({
   const registeredDrafts = registeredPage.results as AiExpenseDraft[];
   const { loadMore } = registeredPage;
   const loadMoreRegistered = useCallback(() => loadMore(REGISTERED_PAGE_SIZE), [loadMore]);
-  const jobs = useQuery(api.receiptAnalysisJobs.queries.listJobs) as
+  const activeJobs = useQuery(api.receiptAnalysisJobs.queries.listActiveJobs) as
     | Doc<"receiptAnalysisImageJobs">[]
     | undefined;
+  const batchQueries = useMemo(
+    () =>
+      Object.fromEntries(
+        [...new Set([...sessionBatches.map((batch) => batch.batchId), ...retryBatchIds])].map(
+          (batchId) => [
+            batchId,
+            {
+              query: api.receiptAnalysisJobs.queries.listJobsByBatch,
+              args: { batchId: batchId as Id<"receiptAnalysisBatches"> },
+            },
+          ],
+        ),
+      ),
+    [sessionBatches, retryBatchIds],
+  );
+  const batchResults = useQueries(batchQueries);
+  const batchJobs = useMemo(
+    () =>
+      Object.values(batchResults).flatMap((result) => {
+        if (result instanceof Error) throw result;
+        return (result as Doc<"receiptAnalysisImageJobs">[] | undefined) ?? [];
+      }),
+    [batchResults],
+  );
+  const retryDraftIds = useMemo(() => {
+    const linkedDraftIds = new Set([...batchJobs, ...(activeJobs ?? [])].map((job) => job.draftId));
+    // initialItemsには表示用の固定IDがあるため、検索元にしない。
+    const candidates = [...(needsReviewDrafts ?? []), ...(failedDrafts ?? [])].map((draft) => ({
+      id: draft._id,
+      status: draft.status,
+    }));
+    return [
+      ...new Set(
+        candidates
+          .filter(
+            (draft) =>
+              RECEIPT_ANALYSIS_RETRY_DRAFT_STATUSES.some((status) => status === draft.status) &&
+              !linkedDraftIds.has(draft.id as Id<"aiExpenseDrafts">) &&
+              !hiddenItemIds.includes(draft.id),
+          )
+          .map((draft) => draft.id as Id<"aiExpenseDrafts">),
+      ),
+    ].slice(0, MAX_RECEIPT_ANALYSIS_DRAFT_IDS);
+  }, [activeJobs, batchJobs, failedDrafts, hiddenItemIds, needsReviewDrafts]);
+  const retryDraftJobs = useQuery(
+    api.receiptAnalysisJobs.queries.listJobsByDraftIds,
+    retryDraftIds.length > 0 ? { draftIds: retryDraftIds } : "skip",
+  );
+  const jobs = useMemo(() => {
+    const byId = new Map(
+      [...batchJobs, ...(activeJobs ?? []), ...(retryDraftJobs ?? [])].map((job) => [job._id, job]),
+    );
+    return [...byId.values()];
+  }, [activeJobs, batchJobs, retryDraftJobs]);
   const jobByDraftId = useMemo(() => {
     const result = new Map<string, Doc<"receiptAnalysisImageJobs">>();
     for (const job of jobs ?? []) {
@@ -55,7 +115,7 @@ export function useAiExpenseQueueData({
   }, [jobs]);
 
   const processingItems = useMemo(() => {
-    return (jobs ?? [])
+    return (activeJobs ?? [])
       .filter((job) => job.status === "queued" || job.status === "running")
       .map((job): AiExpenseQueueItem => ({
         id: job._id,
@@ -66,7 +126,7 @@ export function useAiExpenseQueueData({
         status: job.status === "queued" ? "queued" : "analyzing",
         documentType: "unknown",
       }));
-  }, [jobs, pendingImageDataUrls]);
+  }, [activeJobs, pendingImageDataUrls]);
 
   const initialItemsWithSessionData = useMemo(
     () =>

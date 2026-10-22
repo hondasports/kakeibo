@@ -56,7 +56,7 @@ export function useImageUpload() {
 
     for (let i = 0; i < result.jobs.length; i++) {
       analyzeImageJob({ jobId: result.jobs[i]._id, imageDataUrl: fileDataUrls[i] }).catch(() => {
-        // fire-and-forget: job failures update status via listJobs subscription and show in UI
+        // バッチの購読で失敗状態を表示するため、ここでは個別のエラーを表示しない。
       });
     }
   };

@@ -10,7 +10,7 @@ export interface ReceiptAnalysisReader {
   listBatchesByGroup(groupId: string, limit: number): Promise<ReceiptAnalysisBatchRecord[]>;
   getJob(id: string): Promise<ReceiptAnalysisJobRecord | null>;
   listJobsByBatch(batchId: string, limit?: number): Promise<ReceiptAnalysisJobRecord[]>;
-  listJobsByGroup(groupId: string, limit: number): Promise<ReceiptAnalysisJobRecord[]>;
+  listActiveJobsByGroup(groupId: string, limit: number): Promise<ReceiptAnalysisJobRecord[]>;
   findJobByDraftId(draftId: string): Promise<ReceiptAnalysisJobRecord | null>;
   countJobsByStatus(batchId: string, status: ReceiptAnalysisJobStatus): Promise<number>;
 }

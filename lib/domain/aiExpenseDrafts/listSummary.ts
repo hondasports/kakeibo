@@ -10,7 +10,7 @@ import type { AiExpenseDraftItem, DraftListSummary } from "./reviewTypes";
  * 判定は下書きの値（金額・税内訳・rawObservation・receiptInterpretation 等）と明細の
  * 両方に依存するため、判定結果が変わり得る全書き込み経路はこの関数だけで保存値を作る（SSoT）。
  * 明細は全件ではなく判定窓（先頭 DRAFT_JUDGMENT_ITEM_LIMIT 件）で切ってから使う。
- * 呼び出し側が窓を意識しなくても、確認画面・一覧のフォールバックと同じ入力になる。
+ * 呼び出し側が窓を意識しなくても、確認画面と同じ入力になる。
  */
 export function buildDraftListSummary(
   draft: AiExpenseDraftFields,
