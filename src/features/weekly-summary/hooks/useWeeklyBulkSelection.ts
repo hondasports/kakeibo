@@ -3,7 +3,7 @@ import {
   MAX_BULK_SPENDING_SELECTION,
   canSelectAnotherSpendingRecord,
   getBulkSpendingLimitErrorMessage,
-} from "../../../../lib/convex/spending/bulkOps";
+} from "../../../../lib/domain/spending/bulkSpending";
 import type { ReceiptItem } from "../../summary-shared/types/types";
 import {
   getSpendingSelectionKey,

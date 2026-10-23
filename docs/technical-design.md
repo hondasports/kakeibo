@@ -155,11 +155,6 @@ src/
       pages/
       utils/
       index.ts
-    receipt/
-      components/              # ReceiptForm, ReceiptImageExtractor 等
-      hooks/                   # useReceiptForm, useReceiptImageExtraction
-      validation/
-      index.ts
     settings/
       components/              # CategorySettingsPanel, CategorySettingsList, WeekDaySettingsPanel, ...
       hooks/                   # useCategorySettings

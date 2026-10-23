@@ -1,6 +1,6 @@
 import type { Id } from "../_generated/dataModel";
 import { deleteGroupMembershipsByUserHandler } from "./e2e";
-import { sortGroupMembersForDisplay } from "./memberDisplay";
+import { sortGroupMembersForDisplay } from "../../lib/domain/groups/members";
 import { getGroupMembership } from "./membership";
 import { createGroupHandler, setActiveGroupHandler } from "./mutations";
 import { getGroupMembersHandler, listMyGroupsHandler } from "./queries";
