@@ -8,7 +8,11 @@ import type {
   BulkUnresolvedTaxOverride,
   DraftTaxOverride,
 } from "../receipt/tax/reinterpretDraftTax";
-import type { PriceTaxTreatment, TaxRateComposition } from "../receipt/tax/types";
+import type {
+  ReceiptTotalSource,
+  PriceTaxTreatment,
+  TaxRateComposition,
+} from "../receipt/tax/types";
 import type { AiExpenseDraftReviewReason } from "./constants";
 import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields, DraftReviewItemInput } from "./aiExpenseDraftItem";
@@ -25,7 +29,7 @@ export type DraftTaxInterpretationRequest = {
   preservedNonTaxReasons?: AiExpenseDraftReviewReason[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
-  receiptTotalSource?: "explicit_label" | "user_confirmed" | "ai_estimate";
+  receiptTotalSource?: ReceiptTotalSource;
   decisionOverride?: {
     priceTaxTreatment?: PriceTaxTreatment;
     taxRateComposition?: TaxRateComposition;

@@ -4,34 +4,23 @@
  * 実装は infrastructure 層（lib/convex）が提供する。
  */
 import type { PaginatedResult, PaginationOpts } from "../pagination";
+import type { GROUP_DELETION_JOB_STAGES } from "./stages";
 
-export type GroupDeletionJobSource = "owner" | "account_deletion" | "e2e_cleanup";
+export const GROUP_DELETION_JOB_SOURCES = ["owner", "account_deletion", "e2e_cleanup"] as const;
 
-export type GroupDeletionJobStatus =
-  | "requested"
-  | "running"
-  | "retry_wait"
-  | "failed"
-  | "completed";
+export type GroupDeletionJobSource = (typeof GROUP_DELETION_JOB_SOURCES)[number];
 
-export type GroupDeletionJobStage =
-  | "recipientSnapshot"
-  | "startedEnqueue"
-  | "receiptAnalysisImageJobs"
-  | "aiExpenseDraftItems"
-  | "aiExpenseDrafts"
-  | "receiptAnalysisBatches"
-  | "expenseEntries"
-  | "receipts"
-  | "sourceDocuments"
-  | "weekSessions"
-  | "categories"
-  | "groupInvitations"
-  | "managementAuditLogs"
-  | "groupMembers"
-  | "finalSweep"
-  | "completedEnqueue"
-  | "recipientCleanup";
+export const GROUP_DELETION_JOB_STATUSES = [
+  "requested",
+  "running",
+  "retry_wait",
+  "failed",
+  "completed",
+] as const;
+
+export type GroupDeletionJobStatus = (typeof GROUP_DELETION_JOB_STATUSES)[number];
+
+export type GroupDeletionJobStage = (typeof GROUP_DELETION_JOB_STAGES)[number];
 
 export type GroupDeletionJobCounts = {
   receiptAnalysisImageJobs: number;

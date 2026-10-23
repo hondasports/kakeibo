@@ -9,6 +9,7 @@ import type {
   ExtractedTaxSummary,
   ReceiptMarkerDefinition,
   ReceiptTaxInput,
+  ReceiptTotalSource,
   ReceiptTaxInterpretation,
   PriceTaxTreatment,
   TaxRateComposition,
@@ -35,7 +36,7 @@ export type BulkUnresolvedTaxOverride = {
 
 export type ReinterpretDraftTaxInput = {
   amountYen: number;
-  receiptTotalSource?: "explicit_label" | "user_confirmed" | "ai_estimate";
+  receiptTotalSource?: ReceiptTotalSource;
   receiptTotalConfidence?: number;
   receiptTotalSupportingCandidates?: ReceiptTaxInput["receiptTotalSupportingCandidates"];
   items: DraftItemTaxFields[];

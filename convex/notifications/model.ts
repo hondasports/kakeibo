@@ -1,18 +1,13 @@
+import { NOTIFICATION_CHANNELS } from "../../lib/domain/notifications/model";
+import { LINE_NOTIFICATION_JOB_STATUSES } from "../../lib/domain/notifications/records";
+export { NOTIFICATION_CHANNELS } from "../../lib/domain/notifications/model";
+export { LINE_NOTIFICATION_JOB_STATUSES } from "../../lib/domain/notifications/records";
 import { v } from "convex/values";
 import { transactionalEmailTypeValidator } from "../email/model";
 
-export const NOTIFICATION_CHANNELS = ["email", "line"] as const;
-
-export const notificationChannelValidator = v.union(v.literal("email"), v.literal("line"));
-
-export const LINE_NOTIFICATION_JOB_STATUSES = [
-  "queued",
-  "processing",
-  "retrying",
-  "sent",
-  "suppressed",
-  "failed",
-] as const;
+export const notificationChannelValidator = v.union(
+  ...NOTIFICATION_CHANNELS.map((value) => v.literal(value)),
+);
 
 export const lineNotificationJobStatusValidator = v.union(
   ...LINE_NOTIFICATION_JOB_STATUSES.map((s) => v.literal(s)),

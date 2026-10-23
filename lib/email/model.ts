@@ -1,17 +1,15 @@
-export const TRANSACTIONAL_EMAIL_TYPES = [
-  "email_delivery_test",
-  "group_membership_removed",
-  "group_role_changed",
-  "group_ownership_received",
-  "group_ownership_transferred",
-  "group_deletion_started",
-  "group_deletion_failed",
-  "group_deleted",
-  "ai_review_required",
-  "account_deletion_completed",
-] as const;
-
-export type TransactionalEmailType = (typeof TRANSACTIONAL_EMAIL_TYPES)[number];
+export {
+  TRANSACTIONAL_EMAIL_TYPES,
+  TRANSACTIONAL_EMAIL_JOB_STATUSES,
+  EMAIL_SUPPRESSION_REASONS,
+  EMAIL_WEBHOOK_EVENT_TYPES,
+} from "../domain/email/model";
+export type {
+  TransactionalEmailType,
+  TransactionalEmailJobStatus,
+  EmailSuppressionReason,
+  EmailWebhookEventType,
+} from "../domain/email/model";
 
 export type EmailDeliveryTestPayload = {
   to: string;
@@ -131,25 +129,3 @@ export class EmailProviderError extends Error {
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
-
-export type TransactionalEmailJobStatus =
-  | "queued"
-  | "processing"
-  | "sent"
-  | "delivered"
-  | "bounced"
-  | "complained"
-  | "suppressed"
-  | "failed"
-  | "retrying";
-
-export type EmailSuppressionReason = "bounce" | "complaint" | "provider_suppressed";
-
-export type EmailWebhookEventType =
-  | "email.sent"
-  | "email.delivered"
-  | "email.delivery_delayed"
-  | "email.complained"
-  | "email.bounced"
-  | "email.failed"
-  | "email.suppressed";

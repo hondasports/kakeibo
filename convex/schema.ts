@@ -1,3 +1,4 @@
+import { systemAdminAuditActionValidator } from "../lib/convex/systemAdmin/validators";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
@@ -10,6 +11,7 @@ import {
   amountBasisValidator,
   derivedRegistrationSnapshotValidator,
   markerDefinitionsValidator,
+  receiptItemLineTypeValidator,
   receiptItemTaxRatePercentValidator,
   receiptMarkersValidator,
   receiptInterpretationSnapshotValidator,
@@ -247,27 +249,7 @@ export default defineSchema({
     .index("by_status", ["status"]),
 
   systemAdminAuditLogs: defineTable({
-    action: v.union(
-      v.literal("system_admin_bootstrapped"),
-      v.literal("system_admin_granted"),
-      v.literal("system_admin_revoked"),
-      v.literal("system_admin_recovered"),
-      v.literal("system_admin_user_searched"),
-      v.literal("system_admin_group_searched"),
-      v.literal("system_admin_user_viewed"),
-      v.literal("system_admin_group_viewed"),
-      v.literal("system_admin_membership_added"),
-      v.literal("system_admin_membership_removed"),
-      v.literal("system_admin_membership_transferred"),
-      v.literal("system_admin_active_group_set"),
-      v.literal("system_admin_active_group_cleared"),
-      v.literal("system_admin_group_deletion_resumed"),
-      v.literal("system_admin_ownerless_group_recovered"),
-      v.literal("system_admin_group_role_changed"),
-      v.literal("system_admin_group_owner_transferred"),
-      v.literal("system_admin_group_invitation_revoked"),
-      v.literal("system_admin_notification_setting_changed"),
-    ),
+    action: systemAdminAuditActionValidator,
     actorType: v.union(v.literal("system"), v.literal("system_admin")),
     actorUserId: v.optional(v.id("users")),
     targetKind: v.union(
@@ -592,14 +574,7 @@ export default defineSchema({
     groupId: v.id("groups"),
     draftId: v.id("aiExpenseDrafts"),
     itemName: v.string(),
-    lineType: v.optional(
-      v.union(
-        v.literal("item"),
-        v.literal("discount"),
-        v.literal("promotion_adjustment"),
-        v.literal("unknown"),
-      ),
-    ),
+    lineType: v.optional(receiptItemLineTypeValidator),
     amountYen: v.number(),
     printedAmountYen: v.optional(v.number()),
     amountBasis: v.optional(amountBasisValidator),
