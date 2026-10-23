@@ -11,7 +11,7 @@ import type {
 } from "../../domain/groups/groupInvitationRepository";
 import { readQueryDoc, readQueryDocs } from "../../../convex/groups/lib/groupQueryHelpers";
 
-function invitationDocToFields(doc: Doc<"groupInvitations">): GroupInvitationRecord {
+export function invitationDocToFields(doc: Doc<"groupInvitations">): GroupInvitationRecord {
   return {
     id: doc._id,
     groupId: doc.groupId,
