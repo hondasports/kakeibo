@@ -1,6 +1,6 @@
 import type { AiExpenseDraftStatus } from "../../lib/domain/aiExpenseDrafts/constants";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { PriceTaxTreatment, TaxRateComposition } from "../../lib/receiptTax/types";
+import type { PriceTaxTreatment, TaxRateComposition } from "../../lib/domain/receipt/tax/types";
 import type { ReceiptItemLineType } from "../../lib/domain/receipt/discountItems";
 import type { AiExpenseRegistrationMode } from "../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import type {

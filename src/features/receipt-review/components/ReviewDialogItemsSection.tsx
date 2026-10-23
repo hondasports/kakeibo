@@ -5,7 +5,7 @@ import type {
 } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import type { ReviewGuidanceItem } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
-import type { AmountBasis } from "../../../../lib/receiptTax/types";
+import type { AmountBasis } from "../../../../lib/domain/receipt/tax/types";
 import { ReviewItemCard } from "./ReviewItemCard";
 import { ReviewItemRow } from "./ReviewItemRow";
 

@@ -1,4 +1,4 @@
-import type { AmountBasis } from "../../../../lib/receiptTax/types";
+import type { AmountBasis } from "../../../../lib/domain/receipt/tax/types";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DeleteIcon from "@mui/icons-material/Delete";

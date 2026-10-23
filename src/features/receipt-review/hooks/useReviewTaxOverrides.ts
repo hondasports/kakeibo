@@ -7,7 +7,7 @@ import { useRef, useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { mapConvexDraftToAiExpenseDraft } from "../utils/mappers";
 import { mapDraftItemsToReviewItems } from "../../../../lib/domain/aiExpenseDrafts/reviewDraftMapping";
-import type { AmountBasis } from "../../../../lib/receiptTax/types";
+import type { AmountBasis } from "../../../../lib/domain/receipt/tax/types";
 import type {
   ReviewItemValues,
   AiExpenseDraft,

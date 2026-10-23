@@ -9,7 +9,7 @@ import {
 } from "../../../lib/domain/aiExpenseDrafts/review";
 import { type AiExpenseDraftDocumentType } from "../../../lib/domain/aiExpenseDrafts/constants";
 import type { AiExpenseRegistrationMode } from "../../../lib/domain/aiExpenseDrafts/receiptDataContract";
-import type { PriceTaxTreatment, TaxRateComposition } from "../../receiptTax/types";
+import type { PriceTaxTreatment, TaxRateComposition } from "../../domain/receipt/tax/types";
 import {
   getReviewCategoryErrorMessage,
   validateReviewCategory,
