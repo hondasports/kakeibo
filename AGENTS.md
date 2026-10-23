@@ -31,7 +31,7 @@
 | `pnpm run dev`・ローカルE2Eの実行、`.env.local` の準備 | `skills/local-dev-env` |
 | `convex/**` の編集、schema・migration、Convex deploymentへの反映 | `skills/convex-local-ops` |
 | `e2e/**` の追加・修正 | `skills/e2e-spec-authoring` |
-| `lib/domain/receipt/tax/**`・`lib/receiptTax/**`、またはファイル名に `tax`/`Tax` を含む `lib/**`・`src/**`・`e2e/**` | `skills/receipt-tax-domain` |
+| `lib/domain/receipt/tax/**`、またはファイル名に `tax`/`Tax` を含む `lib/**`・`src/**`・`e2e/**` | `skills/receipt-tax-domain` |
 | `convex/line*/**`・`lib/**/line*/**`（`lineWebhook`・`lineLink`・`lineSummary`）、パスに `LineLink` を含むファイル（設定画面・migration）、`convex/notifications/**`・`lib/**/notifications/**` のうちファイル名に `line`/`Line` を含むもの（LINE通知）、`scripts/*line*` | `skills/line-integration` |
 | baseが `preview` のPRの作成・本文の編集 | `skills/pr-update-spec` |
 | 差分・PRのレビュー（セルフレビューを含む） | `skills/repo-code-review` |

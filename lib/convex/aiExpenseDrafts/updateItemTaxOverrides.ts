@@ -3,7 +3,7 @@ import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { updateDraftItemTaxOverrides } from "../../usecase/aiExpenseDrafts/updateDraftItemTaxOverrides";
 import { createAiExpenseDraftDeps } from "./draftUsecaseDeps";
 import { draftFieldsToDoc, draftItemFieldsToDoc } from "./draftRecordMapping";
-import type { AmountBasis } from "../../receiptTax/types";
+import type { AmountBasis } from "../../domain/receipt/tax/types";
 import type { ReceiptItemTaxRatePercent } from "../receiptImageExtraction/types";
 
 export type UpdateDraftItemTaxOverridesArgs = {
