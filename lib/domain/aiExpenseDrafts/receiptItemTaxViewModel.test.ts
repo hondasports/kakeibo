@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  getReviewItemTaxConfirmation,
-  toReceiptAnalysisViewModel,
-  toReceiptItemTaxViewModel,
-} from "./receiptItemTaxViewModel";
+import { getReviewItemTaxConfirmation, toReceiptItemTaxViewModel } from "./receiptItemTaxViewModel";
 import type { ReviewItemValues } from "./reviewTypes";
 
 describe("税設定の確認表示", () => {
@@ -102,33 +98,5 @@ describe("toReceiptItemTaxViewModel", () => {
     });
 
     expect(vm.reviewReasonLabels[0]).toBe("分析結果に確認が必要な項目があります");
-  });
-});
-
-describe("toReceiptAnalysisViewModel", () => {
-  const baseItem: ReviewItemValues = {
-    id: "1",
-    itemName: "item",
-    amountYen: "100",
-    categoryId: "cat",
-    normalizedAmountYen: 100,
-    taxResolutionStatus: "resolved",
-    taxAllocationStatus: "allocated",
-    taxResolutionSource: "single_summary",
-    taxRatePercent: 8,
-    amountBasis: "tax_included",
-  };
-
-  it("marks needs_review when unresolved items exist", () => {
-    const analysis = toReceiptAnalysisViewModel({
-      reviewItems: [
-        baseItem,
-        { ...baseItem, id: "2", taxResolutionStatus: "unresolved", taxRatePercent: null },
-      ],
-      paidTotalYen: 200,
-    });
-
-    expect(analysis.status).toBe("needs_review");
-    expect(analysis.unresolvedCount).toBe(1);
   });
 });

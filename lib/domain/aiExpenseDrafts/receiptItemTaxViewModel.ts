@@ -14,8 +14,6 @@ import {
   getTaxResolutionSourceLabel,
 } from "./receiptTaxLabels";
 
-export type ReceiptAnalysisStatus = "resolved" | "needs_review";
-
 export type ReceiptItemTaxViewModel = {
   itemName: string;
   printedAmountLabel: string;
@@ -28,16 +26,6 @@ export type ReceiptItemTaxViewModel = {
   reviewReasonLabels: string[];
   markerLabels: string[];
   showAmountBasisSelect: boolean;
-};
-
-export type ReceiptAnalysisViewModel = {
-  status: ReceiptAnalysisStatus;
-  unresolvedCount: number;
-  warningCount: number;
-  paidTotalLabel: string;
-  normalizedItemsTotalLabel: string;
-  differenceYen?: number;
-  showDifference: boolean;
 };
 
 type TaxContextSourceItem = {
@@ -129,37 +117,6 @@ export function toReceiptItemTaxViewModel(item: ReviewItemValues): ReceiptItemTa
       context.status === "unresolved" ? context.reasons.map(getReviewReasonLabel) : [],
     markerLabels: item.markers ?? (item.taxMarker ? [item.taxMarker] : []),
     showAmountBasisSelect: context.status === "unresolved" && context.amountBasis === "unknown",
-  };
-}
-
-export function toReceiptAnalysisViewModel(args: {
-  reviewItems: ReviewItemValues[];
-  paidTotalYen?: number;
-  draftWarnings?: string[];
-}): ReceiptAnalysisViewModel {
-  const unresolvedCount = args.reviewItems.filter(
-    (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
-  ).length;
-  const normalizedItemsTotalYen = args.reviewItems.reduce(
-    (sum, item) => sum + (item.normalizedAmountYen ?? (Number(item.amountYen) || 0)),
-    0,
-  );
-  const paidTotalYen = args.paidTotalYen ?? 0;
-  const differenceYen =
-    args.paidTotalYen !== undefined ? paidTotalYen - normalizedItemsTotalYen : undefined;
-  const showDifference = differenceYen !== undefined && differenceYen !== 0;
-  const warningCount =
-    (args.draftWarnings?.length ?? 0) +
-    args.reviewItems.reduce((sum, item) => sum + (item.warnings?.length ?? 0), 0);
-
-  return {
-    status: unresolvedCount > 0 || showDifference ? "needs_review" : "resolved",
-    unresolvedCount,
-    warningCount,
-    paidTotalLabel: formatYenLabel(args.paidTotalYen),
-    normalizedItemsTotalLabel: formatYenLabel(normalizedItemsTotalYen),
-    differenceYen,
-    showDifference,
   };
 }
 
