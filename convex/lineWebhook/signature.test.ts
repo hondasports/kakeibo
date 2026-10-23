@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { verifyLineSignature } from "./signature";
+import { verifyLineSignature } from "../../lib/domain/lineWebhook/signature";
 
 async function createSignature(rawBody: Uint8Array, secret: string) {
   const key = await crypto.subtle.importKey(

@@ -1,3 +1,4 @@
+import { EXPENSE_ENTRY_AMOUNT_MAX } from "../../expenseEntries/expenseEntryItem";
 import type { ExtractedTaxSummary, ReceiptTotalCandidate, ReceiptTotalResolution } from "./types";
 import { distinctTaxSummaryAmounts } from "./taxAmountBasis";
 
@@ -74,7 +75,7 @@ export function resolveReceiptTotal(args: {
     args.amountYen === null ||
     !Number.isInteger(args.amountYen) ||
     args.amountYen < 1 ||
-    args.amountYen > 9_999_999
+    args.amountYen > EXPENSE_ENTRY_AMOUNT_MAX
   ) {
     return {
       status: "ambiguous",
