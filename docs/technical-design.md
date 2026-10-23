@@ -94,12 +94,11 @@ src/
       utils/                     # queueContent（キュー表示導出）
       index.ts
     receipt-review/              # AI下書きレビュー（単票レビューダイアログ・税補正）
-      components/                # ReviewDialog, ReviewItemsEditor, ReceiptTaxSummary, ...
+      components/                # ReviewDialog, ReviewItemCard, ReviewCheckCards, ...
       hooks/                     # useReviewDialog, useReviewSubmit, useReviewTaxOverrides, ...
       types/
-      utils/                     # mappers, reviewCheckUtils, reviewAmountChecks,
-                               #   reviewTaxChecks, reviewChecks, taxWarnings,
-                               #   receiptTotalsViewModel, ...
+      utils/                     # mappers, taxWarnings, negativeLineWarnings, ...
+                               #   （確認結果の判定は lib/domain/aiExpenseDrafts の reviewChecks 等）
     monthly-summary/           # 月次サマリページ
       components/
       lib/
@@ -155,11 +154,6 @@ src/
       lib/
       pages/
       utils/
-      index.ts
-    receipt/
-      components/              # ReceiptForm, ReceiptImageExtractor 等
-      hooks/                   # useReceiptForm, useReceiptImageExtraction
-      validation/
       index.ts
     settings/
       components/              # CategorySettingsPanel, CategorySettingsList, WeekDaySettingsPanel, ...

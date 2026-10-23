@@ -1,41 +1,21 @@
+import {
+  MANAGEMENT_AUDIT_ACTIONS,
+  MANAGEMENT_AUDIT_TARGET_KINDS,
+  type ManagementAuditAction,
+} from "../../../lib/domain/groups/managementAudit";
+export type {
+  ManagementAuditAction,
+  ManagementAuditTargetKind,
+} from "../../../lib/domain/groups/managementAudit";
 import { v } from "convex/values";
 
 export const managementAuditActionValidator = v.union(
-  v.literal("group_name_changed"),
-  v.literal("member_removed"),
-  v.literal("invitation_revoked"),
-  v.literal("member_role_changed"),
-  v.literal("owner_transferred"),
-  v.literal("group_archived"),
-  v.literal("group_deleted"),
-  v.literal("system_admin_granted"),
-  v.literal("system_admin_revoked"),
-  v.literal("system_admin_delegated"),
-  v.literal("spending_bulk_category_changed"),
-  v.literal("spending_bulk_deleted"),
+  ...MANAGEMENT_AUDIT_ACTIONS.map((value) => v.literal(value)),
 );
-
-export type ManagementAuditAction =
-  | "group_name_changed"
-  | "member_removed"
-  | "invitation_revoked"
-  | "member_role_changed"
-  | "owner_transferred"
-  | "group_archived"
-  | "group_deleted"
-  | "system_admin_granted"
-  | "system_admin_revoked"
-  | "system_admin_delegated"
-  | "spending_bulk_category_changed"
-  | "spending_bulk_deleted";
 
 export const managementAuditTargetKindValidator = v.union(
-  v.literal("group"),
-  v.literal("member"),
-  v.literal("invitation"),
+  ...MANAGEMENT_AUDIT_TARGET_KINDS.map((value) => v.literal(value)),
 );
-
-export type ManagementAuditTargetKind = "group" | "member" | "invitation";
 
 export const MANAGEMENT_AUDIT_ACTION_LABELS: Record<ManagementAuditAction, string> = {
   group_name_changed: "グループ名を変更",

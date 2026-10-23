@@ -37,7 +37,6 @@ import type * as email_actions from "../email/actions.js";
 import type * as email_cleanup from "../email/cleanup.js";
 import type * as email_internal from "../email/internal.js";
 import type * as email_jobs from "../email/jobs.js";
-import type * as email_lib_providers from "../email/lib/providers.js";
 import type * as email_model from "../email/model.js";
 import type * as email_suppressions from "../email/suppressions.js";
 import type * as email_webhooks_processResendEvent from "../email/webhooks/processResendEvent.js";
@@ -64,7 +63,6 @@ import type * as groups_lib_groupDeletionJobModel from "../groups/lib/groupDelet
 import type * as groups_lib_groupDeletionRecipientNotifications from "../groups/lib/groupDeletionRecipientNotifications.js";
 import type * as groups_lib_groupDeletionRegistry from "../groups/lib/groupDeletionRegistry.js";
 import type * as groups_lib_groupDeletionResume from "../groups/lib/groupDeletionResume.js";
-import type * as groups_lib_groupDeletionRetry from "../groups/lib/groupDeletionRetry.js";
 import type * as groups_lib_groupDeletionScheduling from "../groups/lib/groupDeletionScheduling.js";
 import type * as groups_lib_groupDeletionStagePurge from "../groups/lib/groupDeletionStagePurge.js";
 import type * as groups_lib_groupDeletionStart from "../groups/lib/groupDeletionStart.js";
@@ -77,7 +75,6 @@ import type * as groups_lib_groupRoleLabel from "../groups/lib/groupRoleLabel.js
 import type * as groups_lib_groupTypes from "../groups/lib/groupTypes.js";
 import type * as groups_lib_managementAuditLog from "../groups/lib/managementAuditLog.js";
 import type * as groups_lib_managementAuditLogModel from "../groups/lib/managementAuditLogModel.js";
-import type * as groups_memberDisplay from "../groups/memberDisplay.js";
 import type * as groups_members from "../groups/members.js";
 import type * as groups_membership from "../groups/membership.js";
 import type * as groups_mutations from "../groups/mutations.js";
@@ -100,7 +97,6 @@ import type * as lineWebhook_image from "../lineWebhook/image.js";
 import type * as lineWebhook_internal from "../lineWebhook/internal.js";
 import type * as lineWebhook_model from "../lineWebhook/model.js";
 import type * as lineWebhook_richMenuClient from "../lineWebhook/richMenuClient.js";
-import type * as lineWebhook_signature from "../lineWebhook/signature.js";
 import type * as lineWebhook_summary from "../lineWebhook/summary.js";
 import type * as lineWebhook_webhook from "../lineWebhook/webhook.js";
 import type * as notificationSettings from "../notificationSettings.js";
@@ -178,7 +174,6 @@ declare const fullApi: ApiFromModules<{
   "email/cleanup": typeof email_cleanup;
   "email/internal": typeof email_internal;
   "email/jobs": typeof email_jobs;
-  "email/lib/providers": typeof email_lib_providers;
   "email/model": typeof email_model;
   "email/suppressions": typeof email_suppressions;
   "email/webhooks/processResendEvent": typeof email_webhooks_processResendEvent;
@@ -205,7 +200,6 @@ declare const fullApi: ApiFromModules<{
   "groups/lib/groupDeletionRecipientNotifications": typeof groups_lib_groupDeletionRecipientNotifications;
   "groups/lib/groupDeletionRegistry": typeof groups_lib_groupDeletionRegistry;
   "groups/lib/groupDeletionResume": typeof groups_lib_groupDeletionResume;
-  "groups/lib/groupDeletionRetry": typeof groups_lib_groupDeletionRetry;
   "groups/lib/groupDeletionScheduling": typeof groups_lib_groupDeletionScheduling;
   "groups/lib/groupDeletionStagePurge": typeof groups_lib_groupDeletionStagePurge;
   "groups/lib/groupDeletionStart": typeof groups_lib_groupDeletionStart;
@@ -218,7 +212,6 @@ declare const fullApi: ApiFromModules<{
   "groups/lib/groupTypes": typeof groups_lib_groupTypes;
   "groups/lib/managementAuditLog": typeof groups_lib_managementAuditLog;
   "groups/lib/managementAuditLogModel": typeof groups_lib_managementAuditLogModel;
-  "groups/memberDisplay": typeof groups_memberDisplay;
   "groups/members": typeof groups_members;
   "groups/membership": typeof groups_membership;
   "groups/mutations": typeof groups_mutations;
@@ -241,7 +234,6 @@ declare const fullApi: ApiFromModules<{
   "lineWebhook/internal": typeof lineWebhook_internal;
   "lineWebhook/model": typeof lineWebhook_model;
   "lineWebhook/richMenuClient": typeof lineWebhook_richMenuClient;
-  "lineWebhook/signature": typeof lineWebhook_signature;
   "lineWebhook/summary": typeof lineWebhook_summary;
   "lineWebhook/webhook": typeof lineWebhook_webhook;
   notificationSettings: typeof notificationSettings;

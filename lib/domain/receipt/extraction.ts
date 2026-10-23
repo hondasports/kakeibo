@@ -1,3 +1,4 @@
+import { EXPENSE_ENTRY_AMOUNT_MAX } from "../expenseEntries/expenseEntryItem";
 import {
   isDiscountItemName,
   RECEIPT_ITEM_LINE_TYPES,
@@ -198,7 +199,7 @@ function parseRawObservation(value: unknown, index: number): ReceiptRawObservati
     line.amountYen !== null &&
     (typeof line.amountYen !== "number" ||
       !Number.isInteger(line.amountYen) ||
-      Math.abs(line.amountYen) > 9_999_999)
+      Math.abs(line.amountYen) > EXPENSE_ENTRY_AMOUNT_MAX)
   ) {
     throw new Error(`OpenAI レスポンスの ${field}.amountYen が不正です`);
   }

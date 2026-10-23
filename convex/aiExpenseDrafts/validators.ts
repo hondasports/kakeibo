@@ -1,4 +1,28 @@
 import { v } from "convex/values";
+import {
+  AI_EXPENSE_DRAFT_STATUSES,
+  AI_EXPENSE_DRAFT_SOURCE_TYPES,
+  AI_EXPENSE_DRAFT_DOCUMENT_TYPES,
+  AI_EXPENSE_DRAFT_REVIEW_REASONS,
+} from "../../lib/domain/aiExpenseDrafts/constants";
+import {
+  AMOUNT_BASES,
+  TAX_RATE_PERCENTS,
+  TAX_MODES,
+  ROUNDING_METHODS,
+} from "../../lib/domain/receipt/tax/types";
+import { RECEIPT_ITEM_LINE_TYPES } from "../../lib/domain/receipt/discountItems";
+import {
+  RECEIPT_LINE_ROLES,
+  RECEIPT_STRUCTURAL_LINE_ROLES,
+} from "../../lib/domain/receipt/observations";
+export const roundingMethodValidator = v.union(
+  ...ROUNDING_METHODS.map((method) => v.literal(method)),
+);
+export const receiptItemLineTypeValidator = v.union(
+  ...RECEIPT_ITEM_LINE_TYPES.map((lineType) => v.literal(lineType)),
+);
+
 export {
   AI_EXPENSE_DRAFT_CONFIDENCE_THRESHOLD,
   AI_EXPENSE_DRAFT_DOCUMENT_TYPES,
@@ -13,49 +37,28 @@ export {
 } from "../../lib/domain/aiExpenseDrafts/constants";
 
 export const aiExpenseDraftStatusValidator = v.union(
-  v.literal("queued"),
-  v.literal("analyzing"),
-  v.literal("ready"),
-  v.literal("needs_review"),
-  v.literal("failed"),
-  v.literal("registered"),
+  ...AI_EXPENSE_DRAFT_STATUSES.map((value) => v.literal(value)),
 );
 
-export const aiExpenseDraftSourceTypeValidator = v.union(v.literal("image_upload"));
+export const aiExpenseDraftSourceTypeValidator = v.union(
+  ...AI_EXPENSE_DRAFT_SOURCE_TYPES.map((value) => v.literal(value)),
+);
 
 export const aiExpenseDraftDocumentTypeValidator = v.union(
-  v.literal("receipt"),
-  v.literal("convenience_payment"),
-  v.literal("unknown"),
+  ...AI_EXPENSE_DRAFT_DOCUMENT_TYPES.map((value) => v.literal(value)),
 );
 
 export const aiExpenseDraftReviewReasonValidator = v.union(
-  v.literal("low_confidence"),
-  v.literal("missing_required_field"),
-  v.literal("ambiguous_document_type"),
-  v.literal("ambiguous_category"),
-  v.literal("multiple_categories"),
-  v.literal("user_confirmation_required"),
-  v.literal("amount_mismatch"),
-  v.literal("parse_failed"),
+  ...AI_EXPENSE_DRAFT_REVIEW_REASONS.map((value) => v.literal(value)),
 );
 
-export const amountBasisValidator = v.union(
-  v.literal("tax_included"),
-  v.literal("tax_excluded"),
-  v.literal("unknown"),
+export const amountBasisValidator = v.union(...AMOUNT_BASES.map((value) => v.literal(value)));
+export const taxSummaryTaxRatePercentValidator = v.union(
+  ...TAX_RATE_PERCENTS.map((value) => v.literal(value)),
 );
-export const taxSummaryTaxRatePercentValidator = v.union(v.literal(0), v.literal(8), v.literal(10));
-export const taxModeValidator = v.union(
-  v.literal("external"),
-  v.literal("included"),
-  v.literal("mixed"),
-  v.literal("unknown"),
-);
+export const taxModeValidator = v.union(...TAX_MODES.map((value) => v.literal(value)));
 export const receiptItemTaxRatePercentValidator = v.union(
-  v.literal(0),
-  v.literal(8),
-  v.literal(10),
+  ...TAX_RATE_PERCENTS.map((rate) => v.literal(rate)),
   v.null(),
 );
 export const receiptMarkersValidator = v.array(v.string());
@@ -102,12 +105,7 @@ export const taxSummaryValidator = v.object({
   taxableAmountBasis: amountBasisValidator,
   taxYen: v.number(),
   taxIncludedAmountYen: v.optional(v.number()),
-  roundingMethod: v.union(
-    v.literal("floor"),
-    v.literal("round"),
-    v.literal("ceil"),
-    v.literal("unknown"),
-  ),
+  roundingMethod: roundingMethodValidator,
   confidence: v.object({
     taxRatePercent: v.optional(v.number()),
     taxMode: v.optional(v.number()),
@@ -211,12 +209,7 @@ export const receiptTaxDecisionValidator = v.object({
     userConfirmedTaxYen: v.optional(v.number()),
     printedTaxYen: v.optional(v.number()),
     estimatedTaxYen: v.optional(v.number()),
-    roundingMethod: v.union(
-      v.literal("floor"),
-      v.literal("round"),
-      v.literal("ceil"),
-      v.literal("unknown"),
-    ),
+    roundingMethod: roundingMethodValidator,
     source: v.union(
       v.literal("printed"),
       v.literal("estimated"),
@@ -248,14 +241,7 @@ export const aiExpenseDraftItemConfidenceValidator = v.object({
 });
 
 export const receiptLineRoleValidator = v.union(
-  v.literal("item"),
-  v.literal("discount"),
-  v.literal("tax"),
-  v.literal("subtotal"),
-  v.literal("total"),
-  v.literal("payment"),
-  v.literal("change"),
-  v.literal("unknown"),
+  ...RECEIPT_LINE_ROLES.map((value) => v.literal(value)),
 );
 
 export const receiptObservationBoundingBoxValidator = v.object({
@@ -283,19 +269,7 @@ export const receiptRawObservationValidator = v.object({
 });
 
 export const receiptStructuralLineRoleValidator = v.union(
-  v.literal("item"),
-  v.literal("itemDiscount"),
-  v.literal("receiptDiscount"),
-  v.literal("coupon"),
-  v.literal("pointsUsed"),
-  v.literal("fee"),
-  v.literal("tax"),
-  v.literal("subtotal"),
-  v.literal("totalCandidate"),
-  v.literal("paymentMethodAmount"),
-  v.literal("cashReceived"),
-  v.literal("change"),
-  v.literal("unknown"),
+  ...RECEIPT_STRUCTURAL_LINE_ROLES.map((value) => v.literal(value)),
 );
 
 export const receiptLineClassificationValidator = v.object({
@@ -312,14 +286,7 @@ export const receiptLineClassificationValidator = v.object({
 
 export const receiptDraftItemSnapshotValidator = v.object({
   itemName: v.string(),
-  lineType: v.optional(
-    v.union(
-      v.literal("item"),
-      v.literal("discount"),
-      v.literal("promotion_adjustment"),
-      v.literal("unknown"),
-    ),
-  ),
+  lineType: v.optional(receiptItemLineTypeValidator),
   amountYen: v.number(),
   printedAmountYen: v.optional(v.number()),
   amountBasis: v.optional(amountBasisValidator),
@@ -381,7 +348,7 @@ export const derivedRegistrationSnapshotValidator = v.object({
   source: v.literal("derived"),
   destination: v.union(v.literal("receipt"), v.literal("expense_entries")),
   registrationMode: v.optional(v.union(v.literal("detailed"), v.literal("totalOnly"))),
-  taxRatePercent: v.optional(v.union(v.literal(0), v.literal(8), v.literal(10), v.null())),
+  taxRatePercent: v.optional(receiptItemTaxRatePercentValidator),
   taxableAmountYen: v.optional(v.union(v.number(), v.null())),
   taxYen: v.optional(v.union(v.number(), v.null())),
   amountYen: v.number(),

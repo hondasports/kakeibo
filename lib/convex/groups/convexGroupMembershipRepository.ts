@@ -11,7 +11,7 @@ import type {
 } from "../../domain/groups/groupMembershipRepository";
 import { readQueryDoc, readQueryDocs } from "../../../convex/groups/lib/groupQueryHelpers";
 
-function memberDocToFields(doc: Doc<"groupMembers">): GroupMemberRecord {
+export function memberDocToFields(doc: Doc<"groupMembers">): GroupMemberRecord {
   return {
     id: doc._id,
     groupId: doc.groupId,

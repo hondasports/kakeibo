@@ -1,4 +1,5 @@
 import { Box, Stack, Typography } from "@mui/material";
+import { currencyFormatter } from "../../../../lib/domain/common/currency";
 
 export function SourceSummary({
   sourceAmount,
@@ -23,7 +24,7 @@ export function SourceSummary({
             入力元合計
           </Typography>
           <Typography variant="body1" sx={{ fontWeight: 700 }}>
-            {sourceAmount.toLocaleString("ja-JP")}
+            {currencyFormatter.format(sourceAmount)}
             <Typography component="span" variant="caption" sx={{ ml: 0.5 }}>
               円
             </Typography>

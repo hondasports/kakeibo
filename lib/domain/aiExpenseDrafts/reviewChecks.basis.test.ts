@@ -7,10 +7,9 @@ import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItems
 import { buildAmountCheck } from "./reviewAmountChecks";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
 import { findBasisConflicts } from "./reviewCheckUtils";
-import { resolvedItem, rawObservation } from "./reviewChecksTestHelpers";
+import { resolvedItem, rawObservation, summary } from "./reviewChecksTestHelpers";
 import { reinterpretDraftTax } from "../receipt/tax/reinterpretDraftTax";
 import { buildReviewChecks } from "./reviewChecks";
-import { toReceiptTotalsViewModel } from "./receiptTotalsViewModel";
 
 function duplicatedExternalInput(reverse = false) {
   const input = receiptTaxBasisInput(receiptTaxBasisCases[0]);
@@ -76,27 +75,6 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
     },
   );
 
-  it.each([false, true])(
-    "同値の外税内訳2行でも照合パネルの小計は404円になる（逆順=%s）",
-    (reverse) => {
-      const input = duplicatedExternalInput(reverse);
-      const { items, taxSummaries } = previewReceipt(input);
-      const snapshot = structuredClone(taxSummaries);
-      const vm = toReceiptTotalsViewModel({ reviewItems: items, paidTotalYen: 436, taxSummaries });
-
-      expect(vm).toMatchObject({
-        status: "matched",
-        receiptSubtotalYen: 404,
-        itemsPrintedTotalYen: 404,
-        itemsNormalizedTotalYen: 436,
-        gapPaidVsItems: 0,
-        gapItemsVsSubtotal: 0,
-      });
-      expect(vm.guidanceLines).toEqual(["金額は一致しています"]);
-      expect(taxSummaries).toEqual(snapshot);
-    },
-  );
-
   it.each([
     { taxYen: 31, taxIncludedAmountYen: 435 },
     { taxableAmountYen: 403, taxIncludedAmountYen: 435 },
@@ -143,32 +121,57 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
     expect(buildReviewChecks({ items, paidTotalYen: 436, taxSummaries }).taxRate.status).not.toBe(
       "matched",
     );
-    expect(
-      toReceiptTotalsViewModel({ reviewItems: items, paidTotalYen: 436, taxSummaries }).status,
-    ).not.toBe("matched");
     expect(items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
     expect(taxSummaries).toHaveLength(1);
     expect(input).toEqual(snapshot);
   });
 
-  it.each(["ambiguous", "contradictory"] as const)(
-    "照合パネルは同値の行でも未検証の内訳を隠さない（%s）",
-    (status) => {
-      const input = duplicatedExternalInput();
-      const { items } = previewReceipt(input);
-      const taxSummaries = input.taxSummaries.map((summary, index) => ({
-        ...summary,
-        status: index === 1 ? status : ("verified" as const),
-      }));
-      const snapshot = structuredClone(taxSummaries);
-      const vm = toReceiptTotalsViewModel({ reviewItems: items, paidTotalYen: 436, taxSummaries });
+  it("外税の税額未配分でも印字小計と税額が支払額に一致すれば金額確認は一致する", () => {
+    const checks = buildReviewChecks({
+      items: [
+        resolvedItem({
+          taxRatePercent: 10,
+          taxAllocationStatus: "unallocated",
+          normalizedAmountYen: 100,
+        }),
+      ],
+      paidTotalYen: 110,
+      taxSummaries: [summary({ taxRatePercent: 10, taxYen: 10 })],
+    });
 
-      expect(vm.receiptSubtotalYen).toBeUndefined();
-      expect(vm.status).toBe("subtotalUnavailable");
-      expect(vm.canBulkApplyTax).toBe(false);
-      expect(taxSummaries).toEqual(snapshot);
-    },
-  );
+    expect(checks.amount).toMatchObject({
+      status: "matched",
+      variant: "external",
+      printedSubtotalYen: 100,
+      printedTaxYen: 10,
+      expectedPaidYen: 110,
+    });
+  });
+
+  it("入力金額が空欄なら以前の印字額・登録額が残っていても比較不能にする", () => {
+    const checks = buildReviewChecks({
+      items: [
+        resolvedItem({
+          amountYen: "",
+          amountBasis: "tax_included",
+          normalizedAmountYen: 100,
+          taxAllocationStatus: "allocated",
+        }),
+      ],
+      paidTotalYen: 100,
+      taxSummaries: [
+        summary({
+          taxMode: "included",
+          taxableAmountBasis: "tax_included",
+        }),
+      ],
+    });
+
+    expect(checks.amount).toMatchObject({
+      status: "uncomparable",
+      blockerCode: "missing-amount",
+    });
+  });
 
   it.each(receiptTaxBasisCases)("税抜補正後は税込対象額$paidYen 円と一致する", (testCase) => {
     const input = receiptTaxBasisInput(testCase);

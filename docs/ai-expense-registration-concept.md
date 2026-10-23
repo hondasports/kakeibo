@@ -168,7 +168,7 @@ AIの結果は、最初から確定値として扱うのではなく、信頼度
   - 手入力 UI（`expenseEntries` 保存）。フィールド群は `SingleEntryFields` / `MultiEntryFields`、送信は `useExpenseEntrySubmit`
 
 現行実装では、AI 下書きキューが主導線であり、`registerReadyDraftsAsExpenseEntries` で
-`expenseEntries` に一括登録する。`ReceiptForm` / `useReceiptForm` はレガシー互換として残存する。
+`expenseEntries` に一括登録する。旧レシートフォーム（`ReceiptForm` / `useReceiptForm`）は、現行導線から参照されなくなったため削除した（#1044）。
 
 ## 次にやること
 

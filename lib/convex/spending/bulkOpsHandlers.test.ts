@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values";
 import { describe, expect, it, vi } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../../convex/_generated/server";
-import { MAX_BULK_SPENDING_SELECTION } from "./bulkOps";
+import { MAX_BULK_SPENDING_SELECTION } from "../../domain/spending/bulkSpending";
 import {
   bulkDeleteSpendingRecordsHandler,
   bulkUpdateSpendingCategoriesHandler,

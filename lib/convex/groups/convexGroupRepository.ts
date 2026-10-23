@@ -6,7 +6,7 @@ import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { GroupRecord } from "../../domain/groups/group";
 import type { GroupReadRepository, GroupRepository } from "../../domain/groups/groupRepository";
 
-function groupDocToFields(doc: Doc<"groups">): GroupRecord {
+export function groupDocToFields(doc: Doc<"groups">): GroupRecord {
   return {
     id: doc._id,
     name: doc.name,

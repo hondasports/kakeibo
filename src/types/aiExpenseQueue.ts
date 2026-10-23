@@ -1,5 +1,6 @@
+import type { AiExpenseDraftStatus } from "../../lib/domain/aiExpenseDrafts/constants";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { PriceTaxTreatment, TaxRateComposition } from "../../lib/receiptTax/types";
+import type { PriceTaxTreatment, TaxRateComposition } from "../../lib/domain/receipt/tax/types";
 import type { ReceiptItemLineType } from "../../lib/domain/receipt/discountItems";
 import type { AiExpenseRegistrationMode } from "../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import type {
@@ -9,15 +10,7 @@ import type {
   AiExpenseReviewSubmitResult,
 } from "../../lib/domain/aiExpenseDrafts/reviewTypes";
 
-export type AiExpenseQueueStatus =
-  | "adding"
-  | "queued"
-  | "analyzing"
-  | "ready"
-  | "needs_review"
-  | "failed"
-  | "registering"
-  | "registered";
+export type AiExpenseQueueStatus = AiExpenseDraftStatus | "adding" | "registering";
 
 export type AiExpenseQueueItem = {
   id: string;

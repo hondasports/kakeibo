@@ -3,26 +3,29 @@
  */
 import type { PaginatedResult, PaginationOpts } from "../pagination";
 
-export type SystemAdminAuditAction =
-  | "system_admin_bootstrapped"
-  | "system_admin_granted"
-  | "system_admin_revoked"
-  | "system_admin_recovered"
-  | "system_admin_user_searched"
-  | "system_admin_group_searched"
-  | "system_admin_user_viewed"
-  | "system_admin_group_viewed"
-  | "system_admin_membership_added"
-  | "system_admin_membership_removed"
-  | "system_admin_membership_transferred"
-  | "system_admin_active_group_set"
-  | "system_admin_active_group_cleared"
-  | "system_admin_group_deletion_resumed"
-  | "system_admin_ownerless_group_recovered"
-  | "system_admin_group_role_changed"
-  | "system_admin_group_owner_transferred"
-  | "system_admin_group_invitation_revoked"
-  | "system_admin_notification_setting_changed";
+export const SYSTEM_ADMIN_AUDIT_ACTIONS = [
+  "system_admin_bootstrapped",
+  "system_admin_granted",
+  "system_admin_revoked",
+  "system_admin_recovered",
+  "system_admin_user_searched",
+  "system_admin_group_searched",
+  "system_admin_user_viewed",
+  "system_admin_group_viewed",
+  "system_admin_membership_added",
+  "system_admin_membership_removed",
+  "system_admin_membership_transferred",
+  "system_admin_active_group_set",
+  "system_admin_active_group_cleared",
+  "system_admin_group_deletion_resumed",
+  "system_admin_ownerless_group_recovered",
+  "system_admin_group_role_changed",
+  "system_admin_group_owner_transferred",
+  "system_admin_group_invitation_revoked",
+  "system_admin_notification_setting_changed",
+] as const;
+
+export type SystemAdminAuditAction = (typeof SYSTEM_ADMIN_AUDIT_ACTIONS)[number];
 
 export type SystemAdminAuditActorType = "system" | "system_admin";
 export type SystemAdminAuditTargetKind =

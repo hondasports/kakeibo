@@ -6,7 +6,7 @@ import {
   dedupeIds,
   getBulkSpendingLimitErrorMessage,
   isExpenseReceiptType,
-} from "./bulkOps";
+} from "../../domain/spending/bulkSpending";
 
 describe("bulk spending id helpers", () => {
   it("重複IDを除いて件数を数える", () => {

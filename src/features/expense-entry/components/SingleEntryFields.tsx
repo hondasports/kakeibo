@@ -1,4 +1,5 @@
 import { Stack, TextField, Typography } from "@mui/material";
+import { currencyFormatter } from "../../../../lib/domain/common/currency";
 import { CategoryGrid } from "./CategoryGrid";
 import type { ExpenseEntryCategory } from "../types/types";
 
@@ -55,7 +56,7 @@ export function SingleEntryFields({
           onSourceAmountChange(digits);
         }}
         placeholder="例: 4,280"
-        value={sourceAmount ? parseInt(sourceAmount, 10).toLocaleString("ja-JP") : ""}
+        value={sourceAmount ? currencyFormatter.format(parseInt(sourceAmount, 10)) : ""}
       />
 
       <Stack spacing={1}>

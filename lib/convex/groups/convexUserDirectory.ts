@@ -8,7 +8,7 @@ import type { GroupUserRecord } from "../../domain/groups/groupUser";
 import type { UserDirectory, UserDirectoryRead } from "../../domain/groups/userDirectory";
 import { readQueryDoc } from "../../../convex/groups/lib/groupQueryHelpers";
 
-function userDocToRecord(doc: Doc<"users">): GroupUserRecord {
+export function userDocToRecord(doc: Doc<"users">): GroupUserRecord {
   return {
     docId: doc._id,
     userId: doc.userId,

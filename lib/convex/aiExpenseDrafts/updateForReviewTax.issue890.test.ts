@@ -20,7 +20,6 @@ import type {
 } from "../../domain/aiExpenseDrafts/reviewTypes";
 import { RECEIPT_TAX_CHOICE_FIELDS } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { buildReviewChecks } from "../../domain/aiExpenseDrafts/reviewChecks";
-import { toReceiptTotalsViewModel } from "../../domain/aiExpenseDrafts/receiptTotalsViewModel";
 
 function setup(testCase: (typeof receiptTaxBasisCases)[number]) {
   const input = receiptTaxBasisInput(testCase);
@@ -142,14 +141,10 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
         expect(registrationItems(env).reduce((sum, item) => sum + item.amountYen, 0)).toBe(436);
         expect(
           buildReviewChecks({ items, paidTotalYen: 436, taxSummaries: draft.taxSummaries }),
-        ).toMatchObject({ amount: { status: "matched" }, taxRate: { status: "matched" } });
-        expect(
-          toReceiptTotalsViewModel({
-            reviewItems: items,
-            paidTotalYen: 436,
-            taxSummaries: draft.taxSummaries,
-          }),
-        ).toMatchObject({ status: "matched", receiptSubtotalYen: 404 });
+        ).toMatchObject({
+          amount: { status: "matched", printedSubtotalYen: 404 },
+          taxRate: { status: "matched" },
+        });
       }
     },
   );

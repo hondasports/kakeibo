@@ -5,7 +5,7 @@ import type {
   BulkUnresolvedTaxOverride,
   DraftTaxOverride,
   ReinterpretDraftTaxInput,
-} from "../../receiptTax/reinterpretDraftTax";
+} from "../../domain/receipt/tax/reinterpretDraftTax";
 import type { AiExpenseDraftReviewReason } from "../../../lib/domain/aiExpenseDrafts/constants";
 import type { AiExpenseDraftFields } from "../../../lib/domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../../lib/domain/aiExpenseDrafts/aiExpenseDraftItem";

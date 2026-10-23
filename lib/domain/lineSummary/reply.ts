@@ -1,3 +1,4 @@
+import { formatYen } from "../common/currency";
 import { addDays } from "../common/date";
 import { MAX_LINE_TEXT_LENGTH } from "../lineMessaging/limits";
 import type { CategorySummary } from "../receipt/summary";
@@ -28,10 +29,8 @@ export const LINE_UNRESOLVED_GROUP_MESSAGE =
 export const LINE_SUMMARY_UNAVAILABLE_MESSAGE =
   "家計データを取得できませんでした。しばらくしてから、もう一度お試しください。";
 
-const yenFormatter = new Intl.NumberFormat("ja-JP");
-
 export function formatLineYen(amount: number): string {
-  return `${yenFormatter.format(amount)}円`;
+  return formatYen(amount);
 }
 
 export function formatWeekRange(weekStartDate: string): string {
