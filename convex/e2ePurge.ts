@@ -1,3 +1,4 @@
+import { GROUP_DELETION_PURGE_STAGES } from "../lib/domain/groupDeletion/stages";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { httpAction, internalAction, internalMutation, internalQuery } from "./_generated/server";
@@ -74,20 +75,7 @@ function emptyStats(): OrphanPurgeStats {
 
 // 物理削除済み group を指す group-scoped ドキュメントを掃除する対象テーブル。
 // 全テーブルで `groupId: v.id("groups")` が必須フィールドであることが前提。
-const ORPHAN_GROUP_SCOPED_TABLES = [
-  "groupMembers",
-  "groupInvitations",
-  "managementAuditLogs",
-  "sourceDocuments",
-  "expenseEntries",
-  "receipts",
-  "weekSessions",
-  "categories",
-  "aiExpenseDrafts",
-  "aiExpenseDraftItems",
-  "receiptAnalysisBatches",
-  "receiptAnalysisImageJobs",
-] as const;
+const ORPHAN_GROUP_SCOPED_TABLES = GROUP_DELETION_PURGE_STAGES;
 
 type DbReader = Pick<QueryCtx, "db">["db"];
 
@@ -163,20 +151,7 @@ export const purgeGroupsBatch = internalMutation({
 // 孤児ドキュメント（死んだ groupId を指す doc）を除去する。
 export const purgeOrphanGroupScopedDocsStep = internalMutation({
   args: {
-    table: v.union(
-      v.literal("groupMembers"),
-      v.literal("groupInvitations"),
-      v.literal("managementAuditLogs"),
-      v.literal("sourceDocuments"),
-      v.literal("expenseEntries"),
-      v.literal("receipts"),
-      v.literal("weekSessions"),
-      v.literal("categories"),
-      v.literal("aiExpenseDrafts"),
-      v.literal("aiExpenseDraftItems"),
-      v.literal("receiptAnalysisBatches"),
-      v.literal("receiptAnalysisImageJobs"),
-    ),
+    table: v.union(...GROUP_DELETION_PURGE_STAGES.map((table) => v.literal(table))),
     paginationOpts: paginationOptsValidator,
   },
   returns: stepResultValidator,

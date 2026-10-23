@@ -1,3 +1,4 @@
+import { systemAdminAuditActionValidator } from "../lib/convex/systemAdmin/validators";
 import { ConvexError, v } from "convex/values";
 import type { Infer } from "convex/values";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
@@ -33,27 +34,6 @@ function getAppEnvironment(expected?: string): AppEnvironment {
 }
 
 const systemAdminStatusValidator = v.union(v.literal("active"), v.literal("revoked"));
-const systemAdminAuditActionValidator = v.union(
-  v.literal("system_admin_bootstrapped"),
-  v.literal("system_admin_granted"),
-  v.literal("system_admin_revoked"),
-  v.literal("system_admin_recovered"),
-  v.literal("system_admin_user_searched"),
-  v.literal("system_admin_group_searched"),
-  v.literal("system_admin_user_viewed"),
-  v.literal("system_admin_group_viewed"),
-  v.literal("system_admin_membership_added"),
-  v.literal("system_admin_membership_removed"),
-  v.literal("system_admin_membership_transferred"),
-  v.literal("system_admin_active_group_set"),
-  v.literal("system_admin_active_group_cleared"),
-  v.literal("system_admin_group_deletion_resumed"),
-  v.literal("system_admin_ownerless_group_recovered"),
-  v.literal("system_admin_group_role_changed"),
-  v.literal("system_admin_group_owner_transferred"),
-  v.literal("system_admin_group_invitation_revoked"),
-  v.literal("system_admin_notification_setting_changed"),
-);
 const systemAdminContextValidator = v.union(
   v.object({ status: v.literal("active"), environment: v.string(), userId: v.id("users") }),
   v.object({ status: v.literal("revoked"), environment: v.string() }),

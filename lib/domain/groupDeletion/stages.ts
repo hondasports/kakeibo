@@ -27,16 +27,21 @@ export const GROUP_DELETION_PURGE_STAGES = [
   "groupMembers",
 ] as const;
 
-/** purge 対象ステージ（テーブル名と一致する）。 */
-export type PurgeStage = (typeof GROUP_DELETION_PURGE_STAGES)[number];
-
-/** nextDeletionStage が辿るステージ列（recipientSnapshot/startedEnqueue は別系統）。 */
-const DELETION_STAGE_ORDER: ReadonlyArray<GroupDeletionJobStage> = [
+export const GROUP_DELETION_JOB_STAGES = [
+  "recipientSnapshot",
+  "startedEnqueue",
   ...GROUP_DELETION_PURGE_STAGES,
   "finalSweep",
   "completedEnqueue",
   "recipientCleanup",
-];
+] as const;
+
+/** purge 対象ステージ（テーブル名と一致する）。 */
+export type PurgeStage = (typeof GROUP_DELETION_PURGE_STAGES)[number];
+
+/** nextDeletionStage が辿るステージ列（recipientSnapshot/startedEnqueue は別系統）。 */
+const DELETION_STAGE_ORDER: ReadonlyArray<GroupDeletionJobStage> =
+  GROUP_DELETION_JOB_STAGES.slice(2);
 
 /** 次のステージを返す。末尾では末尾を維持する。 */
 export function nextDeletionStage(stage: GroupDeletionJobStage): GroupDeletionJobStage {

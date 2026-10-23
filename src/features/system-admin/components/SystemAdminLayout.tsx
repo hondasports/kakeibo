@@ -24,7 +24,7 @@ import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import { useTheme } from "@mui/material/styles";
 
-type AppEnvironment = "development" | "preview" | "production";
+import type { AppEnvironment } from "../../../../lib/domain/systemAdmin/environment";
 
 const DRAWER_WIDTH = 248;
 const navItems = [

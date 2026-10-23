@@ -1,8 +1,10 @@
 import {
+  type ReceiptTotalSource,
   resolveReceiptTotalSource,
   resolveReceiptTotalSupportingCandidates,
 } from "./receiptTotalEvidence";
 export {
+  type ReceiptTotalSource,
   resolveReceiptTotalSource,
   resolveReceiptTotalSupportingCandidates,
 } from "./receiptTotalEvidence";
@@ -31,8 +33,6 @@ import {
   type DraftTaxOverride,
   type ReinterpretDraftTaxInput,
 } from "../receipt/tax/reinterpretDraftTax";
-
-export type ReceiptTotalSource = "explicit_label" | "user_confirmed" | "ai_estimate";
 
 export type TaxInterpretationEligibilityError =
   | "not_found"

@@ -8,6 +8,7 @@ import {
   aiExpenseDraftReviewReasonValidator,
   amountBasisValidator,
   markerDefinitionsValidator,
+  receiptItemLineTypeValidator,
   receiptItemTaxRatePercentValidator,
   receiptMarkersValidator,
   receiptRawObservationLineValidator,
@@ -71,14 +72,7 @@ export const createFailedDraftFromImageAnalysis = internalMutation({
 
 const extractedDraftItemValidator = v.object({
   itemName: v.string(),
-  lineType: v.optional(
-    v.union(
-      v.literal("item"),
-      v.literal("discount"),
-      v.literal("promotion_adjustment"),
-      v.literal("unknown"),
-    ),
-  ),
+  lineType: v.optional(receiptItemLineTypeValidator),
   amountYen: v.number(),
   printedAmountYen: v.optional(v.number()),
   amountBasis: v.optional(amountBasisValidator),

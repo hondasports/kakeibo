@@ -2,21 +2,26 @@
  * managementAuditLogs のドメイン型。
  * Convex の generated 型には依存せず、ID は string として扱う。
  */
-export type ManagementAuditAction =
-  | "group_name_changed"
-  | "member_removed"
-  | "invitation_revoked"
-  | "member_role_changed"
-  | "owner_transferred"
-  | "group_archived"
-  | "group_deleted"
-  | "system_admin_granted"
-  | "system_admin_revoked"
-  | "system_admin_delegated"
-  | "spending_bulk_category_changed"
-  | "spending_bulk_deleted";
+export const MANAGEMENT_AUDIT_ACTIONS = [
+  "group_name_changed",
+  "member_removed",
+  "invitation_revoked",
+  "member_role_changed",
+  "owner_transferred",
+  "group_archived",
+  "group_deleted",
+  "system_admin_granted",
+  "system_admin_revoked",
+  "system_admin_delegated",
+  "spending_bulk_category_changed",
+  "spending_bulk_deleted",
+] as const;
 
-export type ManagementAuditTargetKind = "group" | "member" | "invitation";
+export type ManagementAuditAction = (typeof MANAGEMENT_AUDIT_ACTIONS)[number];
+
+export const MANAGEMENT_AUDIT_TARGET_KINDS = ["group", "member", "invitation"] as const;
+
+export type ManagementAuditTargetKind = (typeof MANAGEMENT_AUDIT_TARGET_KINDS)[number];
 
 /** managementAuditLogs ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
 export type ManagementAuditLogFields = {

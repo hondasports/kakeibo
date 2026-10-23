@@ -4,31 +4,38 @@ import { useQuery } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { SystemAdminAuditAction, SystemAdminAuditItem } from "../types";
 
+const actionLabels: Record<SystemAdminAuditAction, string> = {
+  system_admin_granted: "付与",
+  system_admin_revoked: "剥奪",
+  system_admin_recovered: "復旧",
+  system_admin_bootstrapped: "初期登録",
+  system_admin_user_searched: "ユーザー検索",
+  system_admin_group_searched: "グループ検索",
+  system_admin_user_viewed: "ユーザー詳細",
+  system_admin_group_viewed: "グループ詳細",
+  system_admin_membership_added: "所属追加",
+  system_admin_membership_removed: "所属解除",
+  system_admin_membership_transferred: "所属移動",
+  system_admin_active_group_set: "active設定",
+  system_admin_active_group_cleared: "active解除",
+  system_admin_group_deletion_resumed: "削除ジョブ再開",
+  system_admin_ownerless_group_recovered: "owner不在復旧",
+  system_admin_group_role_changed: "role変更",
+  system_admin_group_owner_transferred: "owner付替え",
+  system_admin_group_invitation_revoked: "pending招待取消",
+  system_admin_notification_setting_changed: "通知設定変更",
+};
+
 export const actionOptions: Array<{ value: SystemAdminAuditAction | ""; label: string }> = [
   { value: "", label: "すべての操作" },
-  { value: "system_admin_granted", label: "付与" },
-  { value: "system_admin_revoked", label: "剥奪" },
-  { value: "system_admin_recovered", label: "復旧" },
-  { value: "system_admin_bootstrapped", label: "初期登録" },
-  { value: "system_admin_user_searched", label: "ユーザー検索" },
-  { value: "system_admin_group_searched", label: "グループ検索" },
-  { value: "system_admin_user_viewed", label: "ユーザー詳細" },
-  { value: "system_admin_group_viewed", label: "グループ詳細" },
-  { value: "system_admin_membership_added", label: "所属追加" },
-  { value: "system_admin_membership_removed", label: "所属解除" },
-  { value: "system_admin_membership_transferred", label: "所属移動" },
-  { value: "system_admin_active_group_set", label: "active設定" },
-  { value: "system_admin_active_group_cleared", label: "active解除" },
-  { value: "system_admin_group_deletion_resumed", label: "削除ジョブ再開" },
-  { value: "system_admin_ownerless_group_recovered", label: "owner不在復旧" },
-  { value: "system_admin_group_role_changed", label: "role変更" },
-  { value: "system_admin_group_owner_transferred", label: "owner付替え" },
-  { value: "system_admin_group_invitation_revoked", label: "pending招待取消" },
-  { value: "system_admin_notification_setting_changed", label: "通知設定変更" },
+  ...Object.entries(actionLabels).map(([value, label]) => ({
+    value: value as SystemAdminAuditAction,
+    label,
+  })),
 ];
 
 export function formatAction(action: SystemAdminAuditAction) {
-  return actionOptions.find((option) => option.value === action)?.label ?? action;
+  return actionLabels[action] ?? action;
 }
 
 function parseDateBoundary(value: string, endOfDay: boolean) {

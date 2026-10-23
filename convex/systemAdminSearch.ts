@@ -1,3 +1,4 @@
+import { APP_ENVIRONMENTS } from "../lib/domain/systemAdmin/environment";
 import { paginationResultValidator, paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import type { Infer } from "convex/values";
@@ -12,9 +13,7 @@ import {
 } from "../lib/usecase/systemAdmin";
 
 const systemAdminEnvironmentValidator = v.union(
-  v.literal("development"),
-  v.literal("preview"),
-  v.literal("production"),
+  ...APP_ENVIRONMENTS.map((value) => v.literal(value)),
 );
 const userSearchTypeValidator = v.union(
   v.literal("displayName"),
