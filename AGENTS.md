@@ -35,6 +35,7 @@
 | `convex/line*/**`・`lib/**/line*/**`（`lineWebhook`・`lineLink`・`lineSummary`）、パスに `LineLink` を含むファイル（設定画面・migration）、`convex/notifications/**`・`lib/**/notifications/**` のうちファイル名に `line`/`Line` を含むもの（LINE通知）、`scripts/*line*` | `skills/line-integration` |
 | baseが `preview` のPRの作成・本文の編集 | `skills/pr-update-spec` |
 | 差分・PRのレビュー（セルフレビューを含む） | `skills/repo-code-review` |
+| repository全体の定期点検（security・ssot・docs-drift・tests）。調べて Issue にまとめるだけで、直す作業は含まない | `skills/codebase-audit` |
 
 ## Code Review Rules
 
