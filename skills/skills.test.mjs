@@ -7,7 +7,8 @@ import { describe, expect, test } from "vitest";
 const SKILLS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.dirname(SKILLS_DIR);
 
-const SKILL_REFERENCE = /(?<![\w./-])skills\/([a-z0-9-]+)/g;
+// skills/skills.test.mjs のような skills/ 直下のファイルは、skill への参照として数えない。
+const SKILL_REFERENCE = /(?<![\w./-])skills\/([a-z0-9-]+)(?![\w.-])/g;
 
 const skillNames = () =>
   readdirSync(SKILLS_DIR, { withFileTypes: true })
