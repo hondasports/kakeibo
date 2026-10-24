@@ -8,6 +8,7 @@
 - Workspace preflight: `node scripts/check-task-worktree.mjs --require-clean`
 - PR上の未対応指摘の収集・照合: `node scripts/collect-pr-findings.mjs --pr <番号> [--handled <ファイル>]`
 - 専門能力: `skills/*/SKILL.md`
+- repository全体の定期点検（テーマと範囲の指定の仕方を含む）: `skills/codebase-audit/SKILL.md` の「呼び出し方」
 - 技術設計: `docs/technical-design.md`
 - 認証: `docs/auth-guard.md`
 - UI/UX: `docs/ui-ux-design.md`
