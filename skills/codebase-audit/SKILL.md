@@ -10,14 +10,14 @@ repository 全体を1テーマずつ調べ、結果を Issue にまとめる。*
 
 ## テーマ
 
-| テーマ | 観点 | 頻度の目安 |
-| --- | --- | --- |
-| `security` | `references/security.md` | 毎月 |
-| `ssot` | `references/ssot.md` | 3か月に1回 |
-| `docs-drift` | `references/docs-drift.md` | 3か月に1回 |
-| `tests` | `references/tests.md` | 3か月に1回 |
+| テーマ | 観点 |
+| --- | --- |
+| `security` | `references/security.md` |
+| `ssot` | `references/ssot.md` |
+| `docs-drift` | `references/docs-drift.md` |
+| `tests` | `references/tests.md` |
 
-security 以外の3つは、毎月1つずつ順に回す。1回に扱うのは1テーマだけにし、範囲が広ければディレクトリ（例: `convex/**` だけ）でさらに絞る。
+いつ・どのテーマを実行するかは、このskillでは決めない。呼び出す側が、テーマと範囲（例: `convex/**` だけ）を指定する。テーマの指定が無ければ、どのテーマにするかを確かめてから始める。1回に扱うのは1テーマだけにし、範囲が広ければディレクトリでさらに絞る。
 
 ## 手順
 
