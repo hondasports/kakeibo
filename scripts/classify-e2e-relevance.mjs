@@ -89,6 +89,23 @@ export function classifyChangedFiles(changedPaths = []) {
   };
 }
 
+/**
+ * Classify a pull request. A same-repository `preview` -> `main` promotion is skipped:
+ * the E2E job checks out the PR head commit, which is the `preview` commit that
+ * `preview-deploy.yml` (`local-e2e`) already tests with the same commands on push.
+ */
+export function classifyPullRequest({ baseRef = "", headRef = "", changedPaths = [] } = {}) {
+  const result = classifyChangedFiles(changedPaths);
+  if (baseRef === "main" && headRef === "preview") {
+    return {
+      ...result,
+      runtimeRelevant: false,
+      reason: "promotion_head_verified_by_preview_push",
+    };
+  }
+  return result;
+}
+
 /** Reject untrusted git revision input before passing it to the git subprocess. */
 function validateCommitSha(value, name) {
   if (!COMMIT_SHA_PATTERN.test(value)) {
@@ -145,8 +162,19 @@ function printResult(result) {
 }
 
 /** Run classification for a pull request and optionally write its Actions outputs. */
-export function runE2ERelevanceCheck({ baseSha, headSha, cwd = process.cwd(), githubOutput } = {}) {
-  const result = classifyChangedFiles(readChangedFiles({ baseSha, headSha, cwd }));
+export function runE2ERelevanceCheck({
+  baseSha,
+  headSha,
+  baseRef = "",
+  headRef = "",
+  cwd = process.cwd(),
+  githubOutput,
+} = {}) {
+  const result = classifyPullRequest({
+    baseRef,
+    headRef,
+    changedPaths: readChangedFiles({ baseSha, headSha, cwd }),
+  });
   printResult(result);
   if (githubOutput) {
     writeGitHubOutput(githubOutput, result);
@@ -156,7 +184,7 @@ export function runE2ERelevanceCheck({ baseSha, headSha, cwd = process.cwd(), gi
 
 /** Parse the CLI arguments used by the pull-request classification job. */
 export function parseArguments(args) {
-  const options = { baseSha: "", headSha: "", githubOutput: "" };
+  const options = { baseSha: "", headSha: "", baseRef: "", headRef: "", githubOutput: "" };
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -166,6 +194,12 @@ export function parseArguments(args) {
       index += 1;
     } else if (arg === "--head") {
       options.headSha = args[index + 1] ?? "";
+      index += 1;
+    } else if (arg === "--base-ref") {
+      options.baseRef = args[index + 1] ?? "";
+      index += 1;
+    } else if (arg === "--head-ref") {
+      options.headRef = args[index + 1] ?? "";
       index += 1;
     } else if (arg === "--github-output") {
       const outputPath = args[index + 1] ?? "";

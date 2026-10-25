@@ -2,6 +2,7 @@ name: E2E
 
 # 同一リポジトリの PR 作成・更新時に、CI 内の Vite dev server に対して実行する。
 # 先に changed-path classification を行い、process-only変更ではE2E jobをskipする。
+# preview -> main の昇格PRも skip する（同じ commit を preview-deploy.yml の local-e2e が push 時に検証するため）。
 # fork PR と Dependabot PR には Actions Secrets が渡らないため、Secrets を使う E2E は実行しない。
 # Preview URL 自体は E2E 対象にしない。Vercel 対象 E2E は main の release candidate だけで実行する。
 #
@@ -57,7 +58,10 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node scripts/classify-e2e-relevance.mjs --base "$BASE_SHA" --head "$HEAD_SHA" --github-output "$GITHUB_OUTPUT"
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          # fork の同名 branch を preview からの昇格と取り違えないよう、同一リポジトリのときだけ渡す。
+          HEAD_REF: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref || '' }}
+        run: node scripts/classify-e2e-relevance.mjs --base "$BASE_SHA" --head "$HEAD_SHA" --base-ref "$BASE_REF" --head-ref "$HEAD_REF" --github-output "$GITHUB_OUTPUT"
 
       - name: Publish classification summary
         env:
