@@ -56,6 +56,38 @@ describe("imageDataUrl", () => {
       error: "invalid_base64",
     });
   });
+
+  it.each(["A", "AA", "AAA", "A=", "AA==", "+/09Az"])(
+    "既存の base64 本文 %s を受け付ける",
+    (body) => {
+      expect(validateImageDataUrl(`data:image/jpeg;base64,${body}`)).toEqual({ success: true });
+    },
+  );
+
+  it.each(["=", "==", "A===", "A=A", "A==A", "A A", "A\n", "Ａ"])(
+    "不正な base64 本文 %s を拒否する",
+    (body) => {
+      expect(validateImageDataUrl(`data:image/jpeg;base64,${body}`)).toEqual({
+        success: false,
+        error: "invalid_base64",
+      });
+    },
+  );
+
+  it("長い本文でもパディング位置の検証が500ms以内に終わる", () => {
+    const dataUrl = `data:image/jpeg;base64,A${"=".repeat(80_000)}A`;
+    const start = performance.now();
+    expect(validateImageDataUrl(dataUrl)).toEqual({ success: false, error: "invalid_base64" });
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  it("最大長の本文と末尾のパディングを受け付ける", () => {
+    const header = "data:image/jpeg;base64,";
+    const body = `${"A".repeat(MAX_IMAGE_DATA_URL_LENGTH - header.length - 2)}==`;
+    const start = performance.now();
+    expect(validateImageDataUrl(`${header}${body}`)).toEqual({ success: true });
+    expect(performance.now() - start).toBeLessThan(500);
+  });
 });
 
 describe("getImageDataUrlErrorMessage", () => {

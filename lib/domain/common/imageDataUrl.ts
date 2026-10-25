@@ -18,14 +18,26 @@ const BASE64_MARKER = ";base64,";
 
 function isValidBase64(value: string): boolean {
   if (value.length === 0) return false;
-  if (!/^[A-Za-z0-9+/=]+$/.test(value)) return false;
-  const trailingEquals = value.match(/=+$/);
-  const padding = trailingEquals ? trailingEquals[0] : "";
-  const body = value.slice(0, value.length - padding.length);
-  if (padding.length > 2) return false;
-  if (padding.length > 0 && body.length === 0) return false;
-  if (body.includes("=")) return false;
-  return true;
+  let padding = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code === 61) {
+      padding += 1;
+      if (padding > 2) return false;
+    } else {
+      if (padding > 0) return false;
+      if (
+        !(code >= 65 && code <= 90) &&
+        !(code >= 97 && code <= 122) &&
+        !(code >= 48 && code <= 57) &&
+        code !== 43 &&
+        code !== 47
+      ) {
+        return false;
+      }
+    }
+  }
+  return value.length > padding;
 }
 
 /**
