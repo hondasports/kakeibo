@@ -5,6 +5,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { deleteAllGroupScopedData } from "./lib/deleteGroupPhysically";
 import { normalizeEmail } from "./lib/groupEmailMatching";
 import { readQueryDoc, readQueryDocs } from "./lib/groupQueryHelpers";
+import { isGroupDeleted } from "../../lib/domain/groups/lifecycle";
 
 async function deleteMembershipPreservingOwnerInvariant(
   ctx: MutationCtx,
@@ -77,8 +78,16 @@ export async function deleteGroupMembershipsByUserHandler(
     if (userId.startsWith("e2e-seed|") && remainingMemberships.length === 0) {
       await ctx.db.delete(user._id);
     } else if (user.activeGroupId === groupId) {
+      let nextActiveGroupId: Id<"groups"> | undefined;
+      for (const membership of remainingMemberships) {
+        const candidate = await ctx.db.get(membership.groupId);
+        if (candidate !== null && !isGroupDeleted(candidate)) {
+          nextActiveGroupId = membership.groupId;
+          break;
+        }
+      }
       await ctx.db.patch(user._id, {
-        activeGroupId: remainingMemberships[0]?.groupId,
+        activeGroupId: nextActiveGroupId,
         updatedAt: Date.now(),
       });
     }

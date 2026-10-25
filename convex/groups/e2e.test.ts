@@ -165,6 +165,57 @@ describe("E2E メンバーの所属範囲", () => {
     },
   );
 
+  it.each(["deleting", "deleted", "archived", "missing"] as const)(
+    "残る所属の先頭が %s の場合は次の利用可能なグループを active にする",
+    async (status) => {
+      const { t, ids, userId } = await fixture();
+      const nextGroupId = await t.run(async (ctx) => {
+        if (status === "missing") await ctx.db.delete(ids.otherGroupId);
+        else await ctx.db.patch(ids.otherGroupId, { status });
+        const nextGroupId = await ctx.db.insert("groups", {
+          name: "利用可能なグループ",
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        await ctx.db.insert("groupMembers", {
+          groupId: nextGroupId,
+          userId,
+          role: "member",
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        return nextGroupId;
+      });
+      await t.mutation(internal.groups.e2e.deleteGroupMembershipsByUser, {
+        userId,
+        groupId: ids.groupId,
+      });
+      expect(await t.run(async (ctx) => ctx.db.get(ids.userRecordId))).toMatchObject({
+        activeGroupId: nextGroupId,
+      });
+      expect(await t.run(async (ctx) => ctx.db.get(ids.otherMembershipId!))).not.toBeNull();
+    },
+  );
+
+  it.each(["deleting", "deleted", "archived", "missing"] as const)(
+    "残る所属が %s のグループだけなら activeGroupId を外してユーザーと所属を保持する",
+    async (status) => {
+      const { t, ids, userId } = await fixture();
+      await t.run(async (ctx) => {
+        if (status === "missing") await ctx.db.delete(ids.otherGroupId);
+        else await ctx.db.patch(ids.otherGroupId, { status });
+      });
+      await t.mutation(internal.groups.e2e.deleteGroupMembershipsByUser, {
+        userId,
+        groupId: ids.groupId,
+      });
+      const user = await t.run(async (ctx) => ctx.db.get(ids.userRecordId));
+      expect(user).not.toBeNull();
+      expect(user?.activeGroupId).toBeUndefined();
+      expect(await t.run(async (ctx) => ctx.db.get(ids.otherMembershipId!))).not.toBeNull();
+    },
+  );
+
   it("対象グループがない cleanup は既存の所属とユーザーを保つ", async () => {
     const { t, ids, userId } = await fixture();
     await expect(
