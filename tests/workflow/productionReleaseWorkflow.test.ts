@@ -75,6 +75,24 @@ describe("production-release workflow", () => {
     expect(yaml).toContain("needs: [release-candidate, preflight]");
   });
 
+  test("候補ビルドが使った Convex URL を smoke E2E に渡す", () => {
+    const steps: { name?: string; run?: string }[] =
+      parse(workflow()).jobs["release-candidate"].steps;
+    const buildIndex = steps.findIndex(
+      (step) => step.name === "Build Convex staging and Vercel release candidate",
+    );
+    const smokeIndex = steps.findIndex(
+      (step) => step.name === "Run Vercel release candidate smoke E2E",
+    );
+
+    expect(buildIndex).toBeGreaterThan(-1);
+    expect(smokeIndex).toBeGreaterThan(buildIndex);
+    expect(steps[buildIndex].run).toContain("--cmd-url-env-var-name VITE_CONVEX_URL");
+    expect(steps[buildIndex].run).toContain(
+      'echo "VITE_CONVEX_URL=$VITE_CONVEX_URL" >> "$GITHUB_ENV"',
+    );
+  });
+
   test("deploys Convex production before Vercel production and records smoke results", () => {
     const yaml = workflow();
     const convexIndex = yaml.indexOf("Deploy Convex Production");
