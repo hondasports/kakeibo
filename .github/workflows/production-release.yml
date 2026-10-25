@@ -243,13 +243,15 @@ jobs:
           pnpm exec convex env set E2E_CLERK_USER_ID "$E2E_CLERK_USER_ID"
           pnpm exec convex env set E2E_CLEANUP_SECRET "$E2E_CLEANUP_SECRET"
 
+      # smoke E2E の VITE_CONVEX_URL は vars.VITE_CONVEX_SITE_URL から組み立てず、
+      # デプロイ先と食い違わないよう、ビルドに焼き込んだ URL をそのまま後続 step へ渡す。
       - name: Build Convex staging and Vercel release candidate
         run: |
           export VITE_ENABLE_E2E_ROUTES=1
           pnpm exec convex deploy \
             --cmd-url-env-var-name VITE_CONVEX_URL \
             --message "release candidate ${SOURCE_REF}" \
-            --cmd 'pnpm exec vercel build --yes --target=preview --token "$VERCEL_TOKEN"'
+            --cmd 'pnpm exec vercel build --yes --target=preview --token "$VERCEL_TOKEN" && echo "VITE_CONVEX_URL=$VITE_CONVEX_URL" >> "$GITHUB_ENV"'
 
       - name: Deploy Vercel release candidate
         id: vercel
