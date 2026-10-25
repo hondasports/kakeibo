@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -403,6 +405,99 @@ describe("toFindings", () => {
 });
 
 describe("stripInvisibleMarkup", () => {
+  it("keeps repeated unmatched openers without exhausting a regexp backtrack budget", () => {
+    const moduleUrl = pathToFileURL(`${process.cwd()}/scripts/collect-pr-findings.mjs`).href;
+    const output = execFileSync(
+      process.execPath,
+      [
+        "--regexp-interpret-all",
+        "--enable-experimental-regexp-engine-on-excessive-backtracks",
+        "--regexp-backtracks-before-fallback=1000",
+        "--trace-experimental-regexp-engine",
+        "--input-type=module",
+        "--eval",
+        `
+          const { stripInvisibleMarkup } = await import(${JSON.stringify(moduleUrl)});
+          const input = "<!--".repeat(4096);
+          console.log("SCAN_START");
+          const result = stripInvisibleMarkup(input);
+          console.log(JSON.stringify({ unchanged: result.body === input, strippedChars: result.strippedChars }));
+          console.log("SCAN_END");
+        `,
+      ],
+      { encoding: "utf8" },
+    );
+    const processingOutput = output.split("SCAN_START\n")[1]?.split("\nSCAN_END")[0];
+    expect(processingOutput).toBe(JSON.stringify({ unchanged: true, strippedChars: 0 }));
+  });
+
+  it.each([
+    ["a<!-- one -->b<!-- two\nlines -->c<!-- three -->d", "abcd"],
+    ["<!-- first --><!-- second -->tail", "tail"],
+    ["head<!-- outer <!-- inner -->tail", "headtail"],
+    ["head<!-- removed -->tail<!-- unfinished <!--", "headtail<!-- unfinished <!--"],
+    ["head<!--<!--<!--", "head<!--<!--<!--"],
+    ["head<!-->tail", "head<!-->tail"],
+    ["head<!--->tail", "head<!--->tail"],
+    ["head<!-- -->tail -->", "headtail -->"],
+  ])("preserves comment removal semantics for %j", (input, expected) => {
+    expect(stripInvisibleMarkup(input)).toEqual({
+      body: expected,
+      strippedChars: input.length - expected.length,
+    });
+  });
+
+  it("handles large text with many complete comments followed by unmatched openers", () => {
+    const visible = "本文🙂".repeat(25000);
+    const hidden = "<!-- hidden -->".repeat(25000);
+    const unmatched = "<!--".repeat(25000);
+    const input = `${visible}${hidden}tail${unmatched}`;
+    expect(stripInvisibleMarkup(input)).toEqual({
+      body: `${visible}tail${unmatched}`,
+      strippedChars: hidden.length,
+    });
+  });
+
+  it("preserves mixed markup summaries and finding metadata across every body source", () => {
+    const fence = "```html\n<!-- shown in fence -->\n[x]: /visible\n```";
+    const hidden = "<!-- hidden -->".repeat(4096);
+    const unmatched = "<!--".repeat(4096);
+    const body = `本文${hidden}\n${fence}\n\`<!-- inline -->\`\n[ref]: /hidden\n${unmatched}`;
+    const normalized = `本文\n${fence}\n\`<!-- inline -->\`\n${unmatched}`;
+    const updatedAt = "2026-01-05T00:00:00Z";
+    const comment = { body, url: "u", createdAt: updatedAt, updatedAt };
+    const result = toFindings({
+      reviewThreads: [thread({ comments: { nodes: [comment, comment] } })],
+      reviews: [{ ...comment, id: "PRR_mixed", state: "COMMENTED", submittedAt: updatedAt }],
+      comments: [{ ...comment, id: "IC_mixed" }],
+      handled: parseHandledContent(`PRR_mixed ${updatedAt}\nIC_mixed ${updatedAt}`),
+    });
+
+    expect(result).toMatchObject({
+      pagesComplete: true,
+      unresolvedThreadCount: 1,
+      reviewFindingCount: 1,
+      issueCommentCount: 1,
+      unhandledCount: 1,
+      unhandled: [{ kind: "review_thread", id: "PRRT_t1" }],
+    });
+    expect(result.findings.map((finding) => finding.id)).toEqual([
+      "PRRT_t1",
+      "PRR_mixed",
+      "IC_mixed",
+    ]);
+    const reply = result.findings[0].replies[0];
+    for (const summary of [...result.findings, reply]) {
+      expect(summary).toMatchObject({
+        body: normalized.slice(0, 1000),
+        bodyTruncated: true,
+        strippedChars: body.length - normalized.length,
+        updatedAt,
+      });
+      expect(summary.bodyInvisibleOnly).toBeUndefined();
+    }
+  });
+
   it("removes single-line and multi-line HTML comments", () => {
     const { body } = stripInvisibleMarkup(
       "本文A<!-- hidden -->\n<!-- multi\nline\ncomment -->\n本文B",

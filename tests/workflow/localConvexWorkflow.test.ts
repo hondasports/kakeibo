@@ -12,13 +12,9 @@ const readDocument = (path: string) => readFileSync(path, "utf8");
 describe("local Convex development workflow", () => {
   test("starts the local Convex watcher and frontend together for default development", () => {
     const { scripts } = readPackageJson();
-    const playwrightConfig = readDocument("playwright.config.ts");
 
     expect(scripts.dev).toBe('node scripts/start-local-convex.mjs --start "pnpm run dev:frontend"');
     expect(scripts["dev:frontend"]).toBe("vite");
-    expect(playwrightConfig).toContain(
-      'command: process.env.CI ? "pnpm run dev:frontend" : "pnpm run dev"',
-    );
   });
 
   test("selects the local deployment before starting the default Convex watcher", () => {

@@ -232,10 +232,18 @@ pnpm run verify:prepush -- --include e2e/settings.spec.ts --include src/features
 
 E2Eの実行には事前条件がある。満たさない場合はE2Eを実行せずに満たしていない条件と対処方法を表示して止まる。どうしても迂回する場合は `git push --no-verify` を使い、その事実をPR本文に記載する。
 
-- Convex local backendのバイナリが取得済み、またはダウンロードできるネットワークがあること（convex CLIのキャッシュは `~/.convex` 配下。制限された環境では先に `pnpm run e2e:isolated -- --probe` で取得しておく）
+- Convex local backendのバイナリが取得済み、またはダウンロードできるネットワークがあること（macOS/Linuxのバイナリキャッシュは `~/.cache/convex/binaries/` 配下。制限された環境では先に `pnpm run e2e:isolated -- --probe` で取得しておく）
 - `5173`（Vite dev、`pnpm run dev` 起動中は衝突するので停止する）と `3210`/`3211`（local backend）のポートが空いていること
 - `.env.local` に `VITE_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` / `E2E_CLERK_USER_EMAIL` があること（`docs/environment-variables.md` 参照）
 - PlaywrightのChromiumがインストール済みであること（`pnpm exec playwright install chromium`）
+
+別作業のサーバーを維持する場合は、Vite・Convex API・HTTP actionsに空いている別々のポートを指定できる。事前検査、匿名backend、Playwrightの起動先は同じ設定を使い、既存サーバーを再利用しない。
+
+```bash
+E2E_VITE_PORT=15173 E2E_CONVEX_CLOUD_PORT=13210 E2E_CONVEX_SITE_PORT=13211 pnpm run verify:prepush
+```
+
+同じ環境変数は `pnpm run e2e:isolated -- <spec>` と `git push` のpre-push hookでも使用できる。指定しない場合は従来の `5173` / `3210` / `3211` を使う。
 
 ローカルE2Eは実DB、Clerk認証、Convex HTTP／mutation、画面の状態遷移をまとめて確認する層とし、関数単位の分岐は `convex-test`、外部公開URLが必要な確認だけcloud deploymentへ分ける。レシート抽出は `RECEIPT_IMAGE_EXTRACTOR_MODE=mock` とし、OpenAI APIは呼ばない。
 

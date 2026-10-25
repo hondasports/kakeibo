@@ -43,6 +43,7 @@ async function waitForGroupSetupRedirect(page: Page) {
 test.describe("グループアクセス", () => {
   let currentUserIdForCleanup: string | undefined;
   let seededMemberUserIdForCleanup: string | undefined;
+  let hasAdditionalGroupForCleanup = false;
 
   test.afterEach(async ({ page }, testInfo) => {
     try {
@@ -84,7 +85,18 @@ test.describe("グループアクセス", () => {
             try {
               await cleanupGroupMembershipsByUser(currentUserIdForCleanup);
             } finally {
-              currentUserIdForCleanup = undefined;
+              try {
+                if (hasAdditionalGroupForCleanup) {
+                  try {
+                    await cleanupGroupInvitationsByUser(currentUserIdForCleanup);
+                  } finally {
+                    await cleanupGroupMembershipsByUser(currentUserIdForCleanup);
+                  }
+                }
+              } finally {
+                hasAdditionalGroupForCleanup = false;
+                currentUserIdForCleanup = undefined;
+              }
             }
           }
         }
@@ -209,6 +221,50 @@ test.describe("グループアクセス", () => {
     await expect(page.getByTestId("group-pending-invitation-list-empty")).toHaveText(
       "送信済みの招待はありません。",
     );
+  });
+
+  test("@smoke @group-access 招待URLは参加を保存せず、切替同意と受諾操作を待つ", async ({
+    page,
+  }) => {
+    await gotoAuthenticated(page, "/", { ensureGroup: false });
+    const userId = await getCurrentClerkTokenIdentifier(page);
+    currentUserIdForCleanup = userId;
+    const recipientEmail = process.env.E2E_CLERK_USER_EMAIL;
+    if (!recipientEmail) throw new Error("E2E_CLERK_USER_EMAIL is not set");
+
+    await page.goto("about:blank");
+    await cleanupGroupMembershipsByUser(userId);
+    await waitForGroupSetupRedirect(page);
+    await page.getByRole("textbox", { name: "グループ名" }).fill("招待先の家計");
+    await page.getByRole("button", { name: "グループを作成" }).click();
+    await expect(page).toHaveURL("/");
+    const { token } = await seedPendingGroupInvitationForUser(userId, recipientEmail);
+
+    hasAdditionalGroupForCleanup = true;
+    await page.goto("/group/setup");
+    await page.getByRole("textbox", { name: "グループ名" }).fill("切替前の家計");
+    await page.getByRole("button", { name: "グループを作成" }).click();
+    await expect(page).toHaveURL("/");
+    const invitationPath = `/group/invitations/accept?token=${encodeURIComponent(token)}`;
+    await page.goto(invitationPath);
+    await expect(page.getByRole("heading", { name: "招待先の家計" })).toBeVisible();
+    await expect(page.getByText(/「切替前の家計」から招待先に切り替わります/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "招待を受け入れて参加する" })).toBeDisabled();
+    await page.reload();
+    await expect(page.getByRole("button", { name: "招待を受け入れて参加する" })).toBeDisabled();
+
+    await page.goto("/settings");
+    await expandGroupManagement(page);
+    await expect(page.getByRole("textbox", { name: "グループ名" })).toHaveValue("切替前の家計");
+
+    await page.goto(invitationPath);
+    await page.getByRole("checkbox", { name: "表示するグループの切り替えに同意する" }).check();
+    await page.getByRole("button", { name: "招待を受け入れて参加する" }).click();
+    await expect(page).toHaveURL("/");
+    await page.goto("/settings");
+    await expandGroupManagement(page);
+    await expect(page.getByRole("textbox", { name: "グループ名" })).toHaveValue("招待先の家計");
+    await expect(page.getByTestId("group-pending-invitation-list-empty")).toBeVisible();
   });
 
   test("@smoke @group-access owner は pending 招待を確認ダイアログ経由で取り消せる", async ({

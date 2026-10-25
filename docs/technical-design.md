@@ -203,7 +203,7 @@ convex/
     mutations.ts
     queries.ts
     members.ts                 # addMemberByEmail, removeMember 等
-    invitations.ts             # 薄い re-export ラッパー
+    invitations.ts             # 招待API登録とハンドラへの委譲
     clerkInvitations.ts
     deletion.ts
     e2e.ts
@@ -925,9 +925,8 @@ Convex関数を実装する時点で、未認証の場合に拒否されるこ�
 2. グループ作成時に、作成者は `groupMembers` へ `owner` として追加される。
 3. オーナーは `/settings` の「グループ管理」で対象メールアドレスを入力し、Clerkを経由して招待を送る。
 4. 招待リンクには `/group/invitations/accept?token=...` への戻り先を設定する。
-5. 招待されたユーザーがリンクから認証を完了すると、アプリは招待トークンを検証し、
-   `groupMembers` へ `member` として追加する。
-6. 追加されたグループは `users.activeGroupId` に設定され、通常画面へ進める。
+5. 招待されたユーザーがリンクから認証を完了すると、アプリは招待トークンとメール一致を読み取り専用で検証し、招待先グループと表示対象の切替影響を確認画面に表示する。URLを開くだけでは所属・表示対象を更新しない。
+6. 本人が「招待を受け入れて参加する」を操作すると、再検証後に `groupMembers` へ `member` として追加し、`users.activeGroupId` を設定する。既存の所属とロールは維持する。別のactive groupを置き換える場合は切替への個別同意を要求し、確認時からactive groupが変わっていれば再確認を求める。Clerk ticket経由でも認証後にこの確認を行う。
 7. 複数グループに所属しているユーザーは `/group/select` または設定画面から表示対象グループを切り替える。
 8. メンバーを外す場合は、オーナーが `/settings` からそのユーザーを削除する。
 9. 削除対象ユーザーの activeGroupId が削除されたグループだった場合、残りの所属グループへ切り替える。

@@ -126,15 +126,17 @@ export async function seedPendingGroupInvitationForE2eHandler(
   args: { groupId: Id<"groups">; email: string; invitedByUserId: string },
 ) {
   const now = Date.now();
-  return await ctx.db.insert("groupInvitations", {
+  const token = `e2e-pending-${now}`;
+  const invitationId = await ctx.db.insert("groupInvitations", {
     groupId: args.groupId,
     email: normalizeEmail(args.email),
-    token: `e2e-pending-${now}`,
+    token,
     status: "pending",
     invitedByUserId: args.invitedByUserId,
     createdAt: now,
     updatedAt: now,
   });
+  return { invitationId, token };
 }
 
 export async function seedGroupMemberForE2eHandler(
@@ -247,7 +249,7 @@ export const seedPendingGroupInvitationForE2e = internalMutation({
     email: v.string(),
     invitedByUserId: v.string(),
   },
-  returns: v.id("groupInvitations"),
+  returns: v.object({ invitationId: v.id("groupInvitations"), token: v.string() }),
   handler: seedPendingGroupInvitationForE2eHandler,
 });
 

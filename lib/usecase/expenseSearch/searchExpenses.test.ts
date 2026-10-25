@@ -27,6 +27,88 @@ const baseArgs = {
 };
 
 describe("searchExpenses", () => {
+  it("ページサイズ1でも指定範囲全体のトレンド・集計を返す", async () => {
+    const { store } = createStore({
+      loadHistoryEntries: async () => ({
+        entries: [
+          {
+            _id: "first",
+            date: "2026-01-01",
+            amountYen: 100,
+            categoryId: "cat-a",
+            recordType: "expenseEntry",
+          },
+          {
+            _id: "last",
+            date: "2026-12-31",
+            amountYen: 200,
+            categoryId: "cat-a",
+            recordType: "expenseEntry",
+          },
+        ],
+        incomes: [],
+        truncated: false,
+      }),
+    });
+    const result = await searchExpenses(store, "g1", {
+      paginationOpts: { numItems: 1, cursor: null },
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+    });
+    expect(result.page).toHaveLength(1);
+    expect(result.isDone).toBe(false);
+    expect(result.totalExpenseYen).toBe(300);
+    expect(result.trend).toHaveLength(12);
+    expect(result.trend[0]?.totalExpenseYen).toBe(100);
+    expect(result.trend.at(-1)?.totalExpenseYen).toBe(200);
+  });
+
+  it.each([{}, { startDate: "2000-01-01" }, { endDate: "2100-01-01" }])(
+    "履歴から補完した過大範囲もドメインエラーとして返す: %j",
+    async (dates) => {
+      const { store } = createStore({
+        loadHistoryEntries: async () => ({
+          entries: [
+            {
+              _id: "first",
+              date: "2000-01-01",
+              amountYen: 100,
+              categoryId: "cat-a",
+              recordType: "expenseEntry",
+            },
+            {
+              _id: "last",
+              date: "2100-01-01",
+              amountYen: 200,
+              categoryId: "cat-a",
+              recordType: "expenseEntry",
+            },
+          ],
+          incomes: [],
+          truncated: false,
+        }),
+      });
+      await expect(searchExpenses(store, "g1", { ...baseArgs, ...dates })).rejects.toBeInstanceOf(
+        ExpenseSearchDomainError,
+      );
+    },
+  );
+
+  it("巨大な明示期間は履歴・カテゴリの読み込み前にドメインエラーで拒否する", async () => {
+    const { store, loadHistoryEntries, getCategoryGroupId, buildCategoryInfoMap } = createStore();
+    await expect(
+      searchExpenses(store, "g1", {
+        ...baseArgs,
+        categoryId: "cat-a",
+        startDate: "0100-01-01",
+        endDate: "9999-12-31",
+      }),
+    ).rejects.toThrow("期間は1200か月以内で指定してください");
+    expect(loadHistoryEntries).not.toHaveBeenCalled();
+    expect(getCategoryGroupId).not.toHaveBeenCalled();
+    expect(buildCategoryInfoMap).not.toHaveBeenCalled();
+  });
+
   it("フィルタが不正ならパースエラーの文言でドメインエラーを投げる", async () => {
     const { store } = createStore();
     await expect(

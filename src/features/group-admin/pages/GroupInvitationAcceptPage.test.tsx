@@ -1,3 +1,4 @@
+import { getFunctionName } from "convex/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -5,6 +6,7 @@ import { renderWithProviders } from "../../../test/render";
 import { GroupInvitationAcceptPage } from "./GroupInvitationAcceptPage";
 
 const {
+  previewInvitationMock,
   acceptGroupInvitationMock,
   signInSsoMock,
   signUpFinalizeMock,
@@ -19,6 +21,7 @@ const {
   useSignInMock,
   useSignUpMock,
 } = vi.hoisted(() => ({
+  previewInvitationMock: vi.fn(),
   acceptGroupInvitationMock: vi.fn(),
   signInSsoMock: vi.fn(),
   signUpFinalizeMock: vi.fn(),
@@ -42,7 +45,10 @@ vi.mock("@clerk/react", () => ({
 }));
 
 vi.mock("convex/react", () => ({
-  useAction: () => acceptGroupInvitationMock,
+  useAction: (reference: Parameters<typeof getFunctionName>[0]) =>
+    getFunctionName(reference).endsWith(":previewInvitation")
+      ? previewInvitationMock
+      : acceptGroupInvitationMock,
   useConvexAuth: useConvexAuthMock,
 }));
 
@@ -67,6 +73,14 @@ function renderPage(initialEntry = "/group/invitations/accept?token=invite-token
 
 describe("GroupInvitationAcceptPage", () => {
   beforeEach(() => {
+    previewInvitationMock.mockReset();
+    previewInvitationMock.mockResolvedValue({
+      groupId: "group-001",
+      groupName: "招待先の家計",
+      activeGroupId: null,
+      activeGroupName: null,
+      isExistingMember: false,
+    });
     acceptGroupInvitationMock.mockReset();
     signInSsoMock.mockReset();
     signUpFinalizeMock.mockReset();
@@ -118,19 +132,126 @@ describe("GroupInvitationAcceptPage", () => {
     expect(screen.getByText("招待トークンが見つかりませんでした。")).toBeInTheDocument();
   });
 
-  it("認証済みなら招待を受け入れて home へ遷移する", async () => {
-    const navigateMock = vi.fn();
-    useNavigateMock.mockReturnValue(navigateMock);
+  function authenticateToken() {
     useConvexAuthMock.mockReturnValue({ isAuthenticated: true });
     useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: true });
     useSearchParamsMock.mockImplementation(() => [new URLSearchParams("token=invite-token")]);
+  }
 
+  it("URLを開いても受諾せず、招待先を確認してクリックした場合だけ参加する", async () => {
+    const navigateMock = vi.fn();
+    useNavigateMock.mockReturnValue(navigateMock);
+    authenticateToken();
     renderPage();
 
+    await screen.findByText("招待先の家計");
+    expect(acceptGroupInvitationMock).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "招待を受け入れて参加する" }));
     await waitFor(() => {
-      expect(acceptGroupInvitationMock).toHaveBeenCalledWith({ token: "invite-token" });
+      expect(acceptGroupInvitationMock).toHaveBeenCalledWith({
+        token: "invite-token",
+        switchActiveGroup: false,
+      });
       expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
     });
+  });
+
+  it("別のactive groupからの切替には個別の同意を要求する", async () => {
+    authenticateToken();
+    previewInvitationMock.mockResolvedValue({
+      groupId: "group-001",
+      groupName: "招待先の家計",
+      activeGroupId: "group-current",
+      activeGroupName: "現在の家計",
+      isExistingMember: false,
+    });
+    renderPage();
+    await screen.findByText("招待先の家計");
+    expect(screen.getByText(/現在の家計/)).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "招待を受け入れて参加する" });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(acceptGroupInvitationMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "表示するグループの切り替えに同意する" }));
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(acceptGroupInvitationMock).toHaveBeenCalledWith({
+        token: "invite-token",
+        switchActiveGroup: true,
+        expectedActiveGroupId: "group-current",
+      }),
+    );
+  });
+
+  it("受諾中の二重送信を防ぐ", async () => {
+    authenticateToken();
+    let finish: (groupId: string) => void = () => {};
+    acceptGroupInvitationMock.mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    renderPage();
+    const button = await screen.findByRole("button", { name: "招待を受け入れて参加する" });
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(acceptGroupInvitationMock).toHaveBeenCalledTimes(1);
+    await act(async () => finish("group-001"));
+  });
+
+  it("受諾失敗後は確認を読み直し、切替への同意を取り直して再試行できる", async () => {
+    authenticateToken();
+    previewInvitationMock.mockResolvedValue({
+      groupId: "group-001",
+      groupName: "招待先の家計",
+      activeGroupId: "group-current",
+      activeGroupName: "現在の家計",
+      isExistingMember: false,
+    });
+    acceptGroupInvitationMock.mockRejectedValueOnce(new Error("active group changed"));
+    renderPage();
+    const consent = await screen.findByRole("checkbox", {
+      name: "表示するグループの切り替えに同意する",
+    });
+    fireEvent.click(consent);
+    fireEvent.click(screen.getByRole("button", { name: "招待を受け入れて参加する" }));
+    expect(await screen.findByText(/招待内容を再確認して/)).toBeInTheDocument();
+    await waitFor(() => expect(previewInvitationMock).toHaveBeenCalledTimes(2));
+    const retryConsent = await screen.findByRole("checkbox", {
+      name: "表示するグループの切り替えに同意する",
+    });
+    expect(retryConsent).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "招待を受け入れて参加する" })).toBeDisabled();
+    fireEvent.click(retryConsent);
+    fireEvent.click(screen.getByRole("button", { name: "招待を受け入れて参加する" }));
+    await waitFor(() => expect(acceptGroupInvitationMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("無効な招待やメール不一致では確認エラーを表示し、受諾操作を提供しない", async () => {
+    authenticateToken();
+    previewInvitationMock.mockRejectedValue(new Error("invitation not available"));
+    renderPage();
+    expect(await screen.findByText(/招待内容を確認できませんでした/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "招待を受け入れて参加する" }),
+    ).not.toBeInTheDocument();
+    expect(acceptGroupInvitationMock).not.toHaveBeenCalled();
+  });
+
+  it("Clerk認証からtoken URLへ戻った後も、確認のクリックまでは受諾しない", async () => {
+    const page = renderPage();
+    await waitFor(() => expect(signUpFinalizeMock).toHaveBeenCalled());
+    expect(acceptGroupInvitationMock).not.toHaveBeenCalled();
+    page.unmount();
+    authenticateToken();
+    renderPage();
+    await screen.findByText("招待先の家計");
+    expect(acceptGroupInvitationMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "招待を受け入れて参加する" }));
+    await waitFor(() => expect(acceptGroupInvitationMock).toHaveBeenCalledTimes(1));
   });
 
   it("未ログインかつ Clerk ticket があれば招待を消費して同じ受け入れURLへ戻す", async () => {
