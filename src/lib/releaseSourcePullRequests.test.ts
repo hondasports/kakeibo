@@ -250,6 +250,20 @@ describe("collectPullRequestDecisions", () => {
     expect(result.drafts).toEqual([]);
   });
 
+  test("excludes child PRs merged into a parent branch instead of an integration branch", () => {
+    const record = prRecord({ number: 1099, baseRef: "refactor/issue-1044-ssot", body: null });
+    const result = collectPullRequestDecisions([{ number: 1099 }], [record]);
+    expect(result.errors).toEqual([]);
+    expect(result.drafts).toEqual([]);
+    expect(result.decisions[0]).toMatchObject({ pullRequest: 1099, outcome: "integration" });
+  });
+
+  test("still requires a spec block for PRs merged directly into main", () => {
+    const record = prRecord({ number: 1200, baseRef: "main", body: null });
+    const result = collectPullRequestDecisions([{ number: 1200 }], [record]);
+    expect(result.errors[0]).toContain("PR #1200");
+  });
+
   test("exempts bot-authored PRs only when the spec marker is absent", () => {
     const record = prRecord({ number: 751, authorType: "Bot", body: null });
     const result = collectPullRequestDecisions([{ number: 751 }], [record]);
