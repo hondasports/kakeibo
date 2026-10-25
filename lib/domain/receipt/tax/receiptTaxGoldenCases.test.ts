@@ -18,6 +18,49 @@ const availableCases = receiptTaxGoldenCaseLedger.filter(
 );
 
 describe("Issue #890 印字基準が異なるgolden cases", () => {
+  it("税込換算が上限ちょうどの明細でも税合計と支払額を保持する", () => {
+    const result = interpretReceiptTax(
+      receiptTaxBasisInput({
+        amounts: [9_259_258, -9_259_158],
+        taxYen: 8,
+        paidYen: 108,
+        allocations: [740_741, -740_733],
+      }),
+    );
+    expect(result.items.map((item) => item.allocatedTaxYen)).toEqual([740_741, -740_733]);
+    expect(result.items.map((item) => item.normalizedAmountYen)).toEqual([9_999_999, -9_999_891]);
+    expect(result.items.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+    expect(result.items.reduce((sum, item) => sum + item.normalizedAmountYen, 0)).toBe(108);
+    expect(result.items.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(8);
+  });
+
+  it.each([
+    {
+      amounts: [500, -111],
+      taxYen: 38,
+      paidYen: 427,
+      allocations: [49, -11],
+      normalizedAmounts: [549, -122],
+    },
+    {
+      amounts: [1, 5, 16],
+      taxYen: 2,
+      paidYen: 24,
+      allocations: [0, 1, 1],
+      normalizedAmounts: [1, 6, 17],
+    },
+  ])("印字金額 $amounts の税額を整数の端数順で配分する", (testCase) => {
+    const input = receiptTaxBasisInput(testCase);
+    input.items = input.items.map((item) => ({ ...item, taxRatePercent: 10 }));
+    input.taxSummaries = input.taxSummaries.map((summary) => ({ ...summary, taxRatePercent: 10 }));
+    const result = interpretReceiptTax(input);
+    expect(result.items.map((item) => item.allocatedTaxYen)).toEqual(testCase.allocations);
+    expect(result.items.map((item) => item.normalizedAmountYen)).toEqual(
+      testCase.normalizedAmounts,
+    );
+    expect(result.items.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+  });
+
   it.each(receiptTaxBasisCases)(
     "税込対象額$paidYen 円と税抜明細の固定期待値を再現する",
     (testCase) => {

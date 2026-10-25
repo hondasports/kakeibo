@@ -1,15 +1,15 @@
 /**
  * サマリ応答送信ユースケース。
- * query失敗時は LINE_SUMMARY_UNAVAILABLE_MESSAGE へフォールバックし、
+ * 旧形式ジョブとquery失敗時は金額を含まない固定文を返し、
  * 送信失敗時は attempt<2 まで 1秒後にリトライする。
  */
-import { LINE_SUMMARY_UNAVAILABLE_MESSAGE } from "../../domain/lineSummary/reply";
 import {
   LINE_WEB_APP_PATH,
   buildLineQuickReplyActions,
   type LineReplyKind,
 } from "../../domain/lineSummary/quickReply";
 import { buildEmailUrl } from "../../email/url";
+import { LINE_SUMMARY_UNAVAILABLE_MESSAGE } from "../../domain/lineSummary/reply";
 import type {
   LineActionScheduler,
   LineReplySender,
@@ -31,18 +31,20 @@ export async function sendSummaryReply(
   const attempt = args.attempt ?? 0;
   let replyText = LINE_SUMMARY_UNAVAILABLE_MESSAGE;
   let replyKind: LineReplyKind = "unavailable";
-  try {
-    const result = await deps.summary.buildReply({
-      userId: args.userId,
-      messageText: args.messageText,
-      nowMs: args.nowMs,
-    });
-    replyText = result.replyText;
-    replyKind = result.replyKind ?? "unavailable";
-  } catch {
-    console.error("LINE summary query failed");
-    replyText = LINE_SUMMARY_UNAVAILABLE_MESSAGE;
-    replyKind = "unavailable";
+  if (args.linkId !== undefined && args.lineUserId !== undefined) {
+    try {
+      const result = await deps.summary.buildReply({
+        userId: args.userId,
+        linkId: args.linkId,
+        lineUserId: args.lineUserId,
+        messageText: args.messageText,
+        nowMs: args.nowMs,
+      });
+      replyText = result.replyText;
+      replyKind = result.replyKind ?? "unavailable";
+    } catch {
+      console.error("LINE summary query failed");
+    }
   }
 
   try {
@@ -54,10 +56,7 @@ export async function sendSummaryReply(
   } catch {
     if (attempt < MAX_LINE_REPLY_RETRIES) {
       await deps.actionScheduler.scheduleSummaryReplyRetry(LINE_REPLY_RETRY_DELAY_MS, {
-        replyToken: args.replyToken,
-        userId: args.userId,
-        messageText: args.messageText,
-        nowMs: args.nowMs,
+        ...args,
         attempt: attempt + 1,
       });
     }

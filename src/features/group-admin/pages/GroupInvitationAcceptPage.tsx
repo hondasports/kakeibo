@@ -7,10 +7,12 @@ export function GroupInvitationAcceptPage() {
     error,
     firstName,
     handleProfileDetailsSubmit,
+    handleAccountSwitch,
     isCompletingInvitation,
     lastName,
     missingProfileFields,
     needsProfileDetails,
+    needsAccountSwitch,
     setFirstName,
     setLastName,
     token,
@@ -36,6 +38,8 @@ export function GroupInvitationAcceptPage() {
       lastName={lastName}
       missingProfileFields={missingProfileFields}
       needsProfileDetails={needsProfileDetails}
+      needsAccountSwitch={needsAccountSwitch}
+      onAccountSwitch={handleAccountSwitch}
       onFirstNameChange={setFirstName}
       onLastNameChange={setLastName}
       onProfileDetailsSubmit={handleProfileDetailsSubmit}

@@ -230,6 +230,7 @@ export default defineSchema({
     afterValue: v.optional(v.string()),
     createdAt: v.number(),
   })
+    .index("by_group_id_and_target_id_and_action", ["groupId", "targetId", "action"])
     .index("by_group_id_and_created_at", ["groupId", "createdAt"])
     .index("by_action_and_created_at", ["action", "createdAt"]),
 
@@ -289,6 +290,12 @@ export default defineSchema({
     result: v.optional(v.union(v.literal("success"), v.literal("denied"))),
     createdAt: v.number(),
   })
+    .index("by_source_group_id_and_target_user_id_and_action_and_result", [
+      "sourceGroupId",
+      "targetUserId",
+      "action",
+      "result",
+    ])
     .index("by_created_at", ["createdAt"])
     .index("by_action_and_created_at", ["action", "createdAt"])
     .index("by_actor_user_id_and_created_at", ["actorUserId", "createdAt"])

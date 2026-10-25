@@ -1,6 +1,7 @@
 import { internalAction } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
+import type { SendSummaryReplyJobArgs } from "../../lib/domain/lineWebhook/actionRunner";
 import { createLineWebhookActionDeps } from "../../lib/convex/lineWebhook/lineWebhookDeps";
 import { sendSummaryReply as sendSummaryReplyUseCase } from "../../lib/usecase/lineWebhook/sendSummaryReply";
 import { sendUnlinkedGuide as sendUnlinkedGuideUseCase } from "../../lib/usecase/lineWebhook/sendUnlinkedGuide";
@@ -19,16 +20,7 @@ export const sendUnlinkedGuide = internalAction({
   handler: sendUnlinkedGuideHandler,
 });
 
-export async function sendSummaryReplyHandler(
-  ctx: ActionCtx,
-  args: {
-    replyToken: string;
-    userId: string;
-    messageText: string;
-    nowMs: number;
-    attempt?: number;
-  },
-) {
+export async function sendSummaryReplyHandler(ctx: ActionCtx, args: SendSummaryReplyJobArgs) {
   return await sendSummaryReplyUseCase(createLineWebhookActionDeps(ctx), args);
 }
 
@@ -36,6 +28,8 @@ export const sendSummaryReply = internalAction({
   args: {
     replyToken: v.string(),
     userId: v.string(),
+    linkId: v.optional(v.id("lineAccountLinks")),
+    lineUserId: v.optional(v.string()),
     messageText: v.string(),
     nowMs: v.number(),
     attempt: v.optional(v.number()),

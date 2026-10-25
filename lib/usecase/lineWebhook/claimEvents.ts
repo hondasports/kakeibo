@@ -63,15 +63,18 @@ export async function claimEvents(
 
     const activeLinks = await deps.accountLinks.listActiveByLineUserId(event.lineUserId, 2);
     const activeUserId = resolveUniqueActiveUserId(activeLinks);
+    const activeLink = activeLinks[0];
     const now = Date.now();
 
-    if (activeUserId) {
+    if (activeUserId && activeLink) {
       await deps.webhookEvents.insert(buildLinkedWebhookEventFields(event, activeUserId, now));
       const commandText = resolveLineEventCommandText(event);
       if (commandText !== undefined && event.replyToken) {
         await deps.scheduler.scheduleSummaryReply({
           replyToken: event.replyToken,
           userId: activeUserId,
+          linkId: activeLink.id,
+          lineUserId: event.lineUserId,
           messageText: commandText,
           nowMs: event.eventTimestamp ?? now,
         });

@@ -18,6 +18,8 @@ type GroupInvitationAcceptViewProps = {
   lastName: string;
   missingProfileFields: string[];
   needsProfileDetails: boolean;
+  needsAccountSwitch: boolean;
+  onAccountSwitch: () => void;
   onFirstNameChange: (value: string) => void;
   onLastNameChange: (value: string) => void;
   onProfileDetailsSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -30,6 +32,8 @@ export function GroupInvitationAcceptView({
   lastName,
   missingProfileFields,
   needsProfileDetails,
+  needsAccountSwitch,
+  onAccountSwitch,
   onFirstNameChange,
   onLastNameChange,
   onProfileDetailsSubmit,
@@ -41,15 +45,32 @@ export function GroupInvitationAcceptView({
           {isCompletingInvitation ? <CircularProgress aria-label="招待を処理中" /> : null}
           <Box>
             <Typography component="h1" variant="h5">
-              {needsProfileDetails ? "招待を完了する" : "グループ招待を処理中"}
+              {needsAccountSwitch
+                ? "招待先のアカウントで続ける"
+                : needsProfileDetails
+                  ? "招待を完了する"
+                  : "グループ招待を処理中"}
             </Typography>
             <Typography color="text.secondary" variant="body2">
-              {needsProfileDetails
-                ? "招待を受け入れるため、名前を入力してください。"
-                : "招待を受け取り次第、家計簿画面へ進みます。"}
+              {needsAccountSwitch
+                ? "招待先のアカウントで続けるには、現在のアカウントからサインアウトしてください。"
+                : needsProfileDetails
+                  ? "招待を受け入れるため、名前を入力してください。"
+                  : "招待を受け取り次第、家計簿画面へ進みます。"}
             </Typography>
           </Box>
           <Box id="clerk-captcha" sx={{ minHeight: 1 }} />
+
+          {needsAccountSwitch ? (
+            <Button
+              disabled={isCompletingInvitation}
+              onClick={onAccountSwitch}
+              size="large"
+              variant="contained"
+            >
+              アカウントを切り替える
+            </Button>
+          ) : null}
 
           {needsProfileDetails ? (
             <Box component="form" onSubmit={onProfileDetailsSubmit} sx={{ width: "100%" }}>
