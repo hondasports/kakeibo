@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { LineReplyKind } from "../../lib/domain/lineSummary/quickReply";
+import type { SummaryReplyJobArgs } from "../../lib/domain/lineWebhook/scheduler";
 import { createLineWebhookQueryDeps } from "../../lib/convex/lineWebhook/lineWebhookDeps";
 import { buildSummaryReply } from "../../lib/usecase/lineWebhook/buildSummaryReply";
 
@@ -27,17 +28,19 @@ const summaryReplyValidator = v.object({
 
 export async function buildSummaryReplyHandler(
   ctx: QueryCtx,
-  args: { userId: string; messageText: string; nowMs: number },
-): Promise<{ replyText: string; replyKind: LineReplyKind }> {
+  args: Omit<SummaryReplyJobArgs, "replyToken">,
+): Promise<{ replyText: string; replyKind: LineReplyKind } | null> {
   return await buildSummaryReply(createLineWebhookQueryDeps(ctx), args);
 }
 
 export const buildReply = internalQuery({
   args: {
     userId: v.string(),
+    linkId: v.id("lineAccountLinks"),
+    lineUserId: v.string(),
     messageText: v.string(),
     nowMs: v.number(),
   },
-  returns: summaryReplyValidator,
+  returns: v.union(summaryReplyValidator, v.null()),
   handler: buildSummaryReplyHandler,
 });

@@ -10,7 +10,7 @@ import type { UserSettingsRepository } from "../../domain/users/userSettingsRepo
 import type { LineActiveGroupResolver } from "../../domain/lineWebhook/activeGroupResolver";
 import type { LineAccountLinkReader } from "../../domain/lineWebhook/accountLinkReader";
 import type { LineSummaryDataReader } from "../../domain/lineWebhook/summaryDataReader";
-import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../domain/lineWebhook/reply";
+import type { SummaryReplyJobArgs } from "../../domain/lineWebhook/scheduler";
 import { parseLineSummaryCommand, resolveCategoryLookup } from "../../domain/lineSummary/commands";
 import type { LineReplyKind } from "../../domain/lineSummary/quickReply";
 import {
@@ -76,11 +76,17 @@ function reply(replyKind: LineReplyKind, replyText: string) {
 
 export async function buildSummaryReply(
   deps: BuildSummaryReplyDeps,
-  args: { userId: string; messageText: string; nowMs: number },
-): Promise<{ replyText: string; replyKind: LineReplyKind }> {
+  args: Omit<SummaryReplyJobArgs, "replyToken">,
+): Promise<{ replyText: string; replyKind: LineReplyKind } | null> {
   const activeLinks = await deps.accountLinks.listActiveByUserId(args.userId, 2);
-  if (activeLinks.length !== 1) {
-    return reply("unlinked", LINE_UNLINKED_GUIDANCE_MESSAGE);
+  const activeLink = activeLinks[0];
+  if (
+    activeLinks.length !== 1 ||
+    activeLink?.id !== args.linkId ||
+    activeLink.userId !== args.userId ||
+    activeLink.lineUserId !== args.lineUserId
+  ) {
+    return null;
   }
 
   const command = parseLineSummaryCommand(args.messageText);

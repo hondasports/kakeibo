@@ -1,9 +1,8 @@
 /**
  * サマリ応答送信ユースケース。
- * query失敗時は LINE_SUMMARY_UNAVAILABLE_MESSAGE へフォールバックし、
+ * リンクを確認できない場合は送信せず、
  * 送信失敗時は attempt<2 まで 1秒後にリトライする。
  */
-import { LINE_SUMMARY_UNAVAILABLE_MESSAGE } from "../../domain/lineSummary/reply";
 import {
   LINE_WEB_APP_PATH,
   buildLineQuickReplyActions,
@@ -28,21 +27,25 @@ export async function sendSummaryReply(
   deps: SendSummaryReplyDeps,
   args: SendSummaryReplyJobArgs,
 ): Promise<null> {
+  if (args.linkId === undefined || args.lineUserId === undefined) return null;
+
   const attempt = args.attempt ?? 0;
-  let replyText = LINE_SUMMARY_UNAVAILABLE_MESSAGE;
-  let replyKind: LineReplyKind = "unavailable";
+  let replyText: string;
+  let replyKind: LineReplyKind;
   try {
     const result = await deps.summary.buildReply({
       userId: args.userId,
+      linkId: args.linkId,
+      lineUserId: args.lineUserId,
       messageText: args.messageText,
       nowMs: args.nowMs,
     });
+    if (result === null) return null;
     replyText = result.replyText;
     replyKind = result.replyKind ?? "unavailable";
   } catch {
     console.error("LINE summary query failed");
-    replyText = LINE_SUMMARY_UNAVAILABLE_MESSAGE;
-    replyKind = "unavailable";
+    return null;
   }
 
   try {
@@ -56,6 +59,8 @@ export async function sendSummaryReply(
       await deps.actionScheduler.scheduleSummaryReplyRetry(LINE_REPLY_RETRY_DELAY_MS, {
         replyToken: args.replyToken,
         userId: args.userId,
+        linkId: args.linkId,
+        lineUserId: args.lineUserId,
         messageText: args.messageText,
         nowMs: args.nowMs,
         attempt: attempt + 1,
