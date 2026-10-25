@@ -90,6 +90,59 @@ describe("unitRelatedTargets", () => {
 });
 
 describe("runPrepush", () => {
+  test("rejects invalid ports before preflight or commands", async () => {
+    let called = false;
+    await expect(
+      runPrepush({
+        env: { E2E_VITE_PORT: "0" },
+        preflight: async () => {
+          called = true;
+          return [];
+        },
+        runStep: () => {
+          called = true;
+          return 0;
+        },
+      }),
+    ).rejects.toThrow("E2E_VITE_PORT");
+    expect(called).toBe(false);
+  });
+  test("uses one custom port environment for preflight and every invoked step", async () => {
+    const env = {
+      E2E_VITE_PORT: "15173",
+      E2E_CONVEX_CLOUD_PORT: "13210",
+      E2E_CONVEX_SITE_PORT: "13211",
+      GIT_DIR: "dummy",
+    };
+    const preflights = [];
+    const calls = [];
+    const code = await runPrepush({
+      cwd: repoRoot,
+      env,
+      changedFilesOverride: ["src/features/expense-search/index.ts"],
+      gitOps: gitOpsFor(),
+      out: () => {},
+      preflight: async (options) => {
+        preflights.push(options);
+        return [];
+      },
+      runStep: (_cmd, args, _cwd, _log, stepEnv) => {
+        calls.push({ args, env: stepEnv });
+        return 0;
+      },
+    });
+    expect(code).toBe(0);
+    expect(preflights[0].ports.map(({ port }) => port)).toEqual([15173, 13210, 13211]);
+    expect(calls.some(({ args }) => args.includes("e2e:isolated"))).toBe(true);
+    for (const call of calls) {
+      expect(call.env).toMatchObject({
+        E2E_VITE_PORT: "15173",
+        E2E_CONVEX_CLOUD_PORT: "13210",
+        E2E_CONVEX_SITE_PORT: "13211",
+      });
+      expect(call.env.GIT_DIR).toBeUndefined();
+    }
+  });
   test("AC2: docsのみなら unit/e2eなしで数秒（3ステップのみ）", async () => {
     const { lines, out } = collectOut();
     const calls = [];
@@ -113,7 +166,7 @@ describe("runPrepush", () => {
 
   test("AC1相当: feature変更なら unit(related)+e2e spec選定で実行", async () => {
     const calls = [];
-    const { lines, out } = collectOut();
+    const { out } = collectOut();
     const code = await runPrepush({
       argv: [],
       cwd: repoRoot,
@@ -333,6 +386,26 @@ describe("portBusy", () => {
 });
 
 describe("e2ePreflight", () => {
+  test("checks custom ports only and reports the selected busy port", async () => {
+    const seen = [];
+    const failures = await e2ePreflight({
+      env: {
+        E2E_VITE_PORT: "15173",
+        E2E_CONVEX_CLOUD_PORT: "13210",
+        E2E_CONVEX_SITE_PORT: "13211",
+      },
+      requiredEnv: [],
+      chromiumPath: () => fileURLToPath(import.meta.url),
+      backendBinaryPresent: async () => true,
+      checkPort: async (port) => {
+        seen.push(port);
+        return port === 13211;
+      },
+    });
+    expect(seen).toEqual([15173, 13210, 13211]);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain("13211");
+  });
   const okDeps = {
     ports: [],
     requiredEnv: ["AAA", "E2E_CLERK_USER_ID"],

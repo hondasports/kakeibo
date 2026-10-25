@@ -1,3 +1,5 @@
+import type { Id } from "../../../../convex/_generated/dataModel";
+import type { GroupInvitationPreview } from "../../../../lib/domain/groups/groupInvitation";
 import { api } from "../../../../convex/_generated/api";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -28,6 +30,12 @@ export function useGroupInvitationAccept() {
   const signIn = rawSignIn as unknown as ClerkSignIn | undefined;
   const signUp = rawSignUp as unknown as ClerkSignUp | undefined;
   const { isAuthenticated } = useConvexAuth();
+  const previewInvitation = useAction(api.groups.clerkInvitations.previewInvitation);
+  const [previewResult, setPreviewResult] = useState<{
+    token: string;
+    details: GroupInvitationPreview;
+  } | null>(null);
+  const [switchActiveGroup, setSwitchActiveGroup] = useState(false);
   const acceptInvitation = useAction(api.groups.clerkInvitations.acceptInvitation);
   const [error, setError] = useState("");
   const [needsProfileDetails, setNeedsProfileDetails] = useState(false);
@@ -239,27 +247,86 @@ export function useGroupInvitationAccept() {
     }
   };
 
+  const invitation =
+    isAuthenticated && !clerkTicket && previewResult?.token === token
+      ? previewResult.details
+      : null;
+  const needsGroupSwitch = Boolean(
+    invitation?.activeGroupId && invitation.activeGroupId !== invitation.groupId,
+  );
+
   useEffect(() => {
-    if (!isAuthenticated || hasAccepted.current || !token || clerkTicket) {
+    let cancelled = false;
+    hasAccepted.current = false;
+    Promise.resolve().then(async () => {
+      if (cancelled) return;
+      setPreviewResult(null);
+      setSwitchActiveGroup(false);
+      setError("");
+      if (!isAuthenticated || !token || clerkTicket) return;
+      try {
+        const details = await previewInvitation({ token });
+        if (!cancelled) setPreviewResult({ token, details });
+      } catch {
+        if (!cancelled)
+          setError(
+            "招待内容を確認できませんでした。招待先のアカウントとリンクの有効性を確認してください。",
+          );
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [clerkTicket, isAuthenticated, previewInvitation, token]);
+
+  const handleAcceptInvitation = async () => {
+    if (
+      !isAuthenticated ||
+      !invitation ||
+      !token ||
+      clerkTicket ||
+      hasAccepted.current ||
+      (needsGroupSwitch && !switchActiveGroup)
+    ) {
       return;
     }
-
     hasAccepted.current = true;
-    acceptInvitation({ token })
-      .then(() => {
-        navigate("/", { replace: true });
-      })
-      .catch((caughtError: unknown) => {
-        hasAccepted.current = false;
-        console.error("[GroupInvitationAcceptPage] failed to accept invitation:", caughtError);
-        setError(
-          "招待を処理できませんでした。招待リンクを確認し、時間を置いて再度お試しください。",
-        );
+    setIsCompletingInvitation(true);
+    setError("");
+    try {
+      await acceptInvitation({
+        token,
+        switchActiveGroup: needsGroupSwitch && switchActiveGroup,
+        ...(invitation.activeGroupId
+          ? { expectedActiveGroupId: invitation.activeGroupId as Id<"groups"> }
+          : {}),
       });
-  }, [acceptInvitation, clerkTicket, isAuthenticated, navigate, token]);
+      navigate("/", { replace: true });
+    } catch {
+      hasAccepted.current = false;
+      setSwitchActiveGroup(false);
+      setPreviewResult(null);
+      setError("招待を処理できませんでした。招待内容を再確認して、もう一度操作してください。");
+      try {
+        const details = await previewInvitation({ token });
+        setPreviewResult({ token, details });
+      } catch {
+        setError(
+          "招待内容を確認できませんでした。招待先のアカウントとリンクの有効性を確認してください。",
+        );
+      }
+    } finally {
+      setIsCompletingInvitation(false);
+    }
+  };
 
   return {
     error,
+    invitation,
+    needsGroupSwitch,
+    switchActiveGroup,
+    setSwitchActiveGroup,
+    handleAcceptInvitation,
     firstName,
     isCompletingInvitation,
     lastName,

@@ -10,10 +10,11 @@
  *   node scripts/start-ci-convex.mjs --probe                    # backend起動と疎通だけ確認
  *   node scripts/start-ci-convex.mjs --run "<command>" [-- args] # 準備後にコマンド実行
  *   node scripts/start-ci-convex.mjs                            # 起動したまま待機（Ctrl+Cで終了）
+ *   ポート指定: E2E_VITE_PORT / E2E_CONVEX_CLOUD_PORT / E2E_CONVEX_SITE_PORT
  *
  * 仕組み:
- *   1. cloud向け環境変数を取り除いた子環境で `CONVEX_AGENT_MODE=anonymous` の
- *      `convex dev` を起動する（ログイン不要の使い捨てlocal deployment）。
+ *   1. cloud向け環境変数を取り除き、匿名localを指定する専用 `--env-file` で
+ *      `convex dev` を起動する（checkoutの `.env` / `.env.local` は選択に使わない）。
  *   2. CLIが `.env.local` へ local URL を書き出すのを待つ。既存の `.env.local`
  *      は起動前に `.env.local.e2e-isolated.bak` へ退避し、終了時に復元する。
  *   3. `convex env set` で E2E 用の環境変数を deployment へ設定する。
@@ -36,17 +37,21 @@ import {
   appendFileSync,
   copyFileSync,
   existsSync,
+  mkdtempSync,
   readFileSync,
   renameSync,
   rmSync,
   utimesSync,
+  writeFileSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 import { parseEnvFile, deriveClerkJwtIssuerDomain } from "./sync-e2e-env.mjs";
 import { ensureLineIntegrationMode } from "./ensure-line-integration-mode.mjs";
+import { E2E_PORT_ENV_VARS, e2ePortEnv, resolveE2EPorts } from "./lib/isolated-e2e-ports.ts";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const envLocalPath = resolve(repoRoot, ".env.local");
@@ -60,6 +65,7 @@ const BACKEND_ENV_DENYLIST = [
   "CONVEX_DEPLOYMENT_TOKEN",
   "CONVEX_SELF_HOSTED_URL",
   "CONVEX_SELF_HOSTED_ADMIN_KEY",
+  "CONVEX_OVERRIDE_ACCESS_TOKEN",
   "VITE_CONVEX_URL",
   "VITE_CONVEX_SITE_URL",
 ];
@@ -78,7 +84,37 @@ export function backendEnv(base = process.env) {
   const env = { ...base };
   for (const name of BACKEND_ENV_DENYLIST) env[name] = undefined;
   env.CONVEX_AGENT_MODE = "anonymous";
+  env.CONVEX_ALLOW_ANONYMOUS = "true";
   return env;
+}
+
+export function createLocalDeploymentConfig({ tempRoot = tmpdir() } = {}) {
+  const dir = mkdtempSync(resolve(tempRoot, "ci-convex-config-"));
+  const envFile = resolve(dir, "deployment.env");
+  try {
+    writeFileSync(envFile, "CONVEX_DEPLOYMENT=anonymous:anonymous-agent\n", { mode: 0o600 });
+  } catch (error) {
+    rmSync(dir, { recursive: true, force: true });
+    throw error;
+  }
+  return {
+    envFile,
+    bind(env) {
+      const deployment = env.get("CONVEX_DEPLOYMENT");
+      if (!/^(anonymous|local):anonymous-[a-zA-Z0-9_-]+$/.test(deployment ?? "")) {
+        throw new Error("匿名local deployment以外の設定は使用できません");
+      }
+      writeFileSync(envFile, `CONVEX_DEPLOYMENT=${deployment}\n`);
+    },
+    cleanup() {
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
+}
+
+function localConfigArgs(envFile) {
+  if (!envFile) throw new Error("local deployment専用のenv fileが必要です");
+  return ["--env-file", envFile];
 }
 
 export function parseArgs(argv) {
@@ -172,6 +208,7 @@ export async function waitForLocalEnvFile({
   timeoutMs = ENV_FILE_TIMEOUT_MS,
   intervalMs = 500,
   now = Date.now,
+  ports,
 } = {}) {
   const deadline = now() + timeoutMs;
   while (now() < deadline) {
@@ -179,7 +216,11 @@ export async function waitForLocalEnvFile({
       const env = parseEnvFile(readFileSync(envPath, "utf8"));
       const url = env.get("VITE_CONVEX_URL");
       const siteUrl = env.get("VITE_CONVEX_SITE_URL");
-      if (url && siteUrl && /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])/.test(url)) {
+      if (
+        isLoopbackUrl(url) &&
+        isLoopbackUrl(siteUrl) &&
+        (!ports || (urlPort(url) === ports.convexCloud && urlPort(siteUrl) === ports.convexSite))
+      ) {
         return { url, siteUrl, env };
       }
     }
@@ -188,6 +229,25 @@ export async function waitForLocalEnvFile({
   throw new Error(
     `convex dev が .env.local に local deployment の URL を書き込みませんでした（${timeoutMs / 1000}秒タイムアウト）`,
   );
+}
+
+function urlPort(value) {
+  const url = new URL(value);
+  return Number(url.port || "80");
+}
+
+function isLoopbackUrl(value) {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "http:" &&
+      ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -245,16 +305,20 @@ export async function waitForCleanupAuth({
   );
 }
 
-function runConvexCli(args, env) {
-  const result = spawnSync(process.execPath, [convexBinPath(), ...args], {
-    cwd: repoRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    env,
-    // CLIがhangしてもGHAのstep timeoutで原因が隠れないよう早期に切る
-    timeout: 60_000,
-    killSignal: "SIGKILL",
-  });
+export function runConvexCli(args, env, { envFile, spawnSyncImpl = spawnSync } = {}) {
+  const result = spawnSyncImpl(
+    process.execPath,
+    [convexBinPath(), ...args, ...localConfigArgs(envFile)],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env,
+      // CLIがhangしてもGHAのstep timeoutで原因が隠れないよう早期に切る
+      timeout: 60_000,
+      killSignal: "SIGKILL",
+    },
+  );
   return {
     status: result.status ?? 1,
     stdout: result.stdout?.toString() ?? "",
@@ -262,10 +326,10 @@ function runConvexCli(args, env) {
   };
 }
 
-async function setConvexEnv(env, name, value, secrets, { attempts = 5 } = {}) {
+async function setConvexEnv(env, envFile, name, value, secrets, { attempts = 5 } = {}) {
   let lastDetail = "";
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const result = runConvexCli(["env", "set", name, value], env);
+    const result = runConvexCli(["env", "set", name, value], env, { envFile });
     if (result.status === 0) return;
     lastDetail = redact(`${result.stdout}\n${result.stderr}`, secrets).trim();
     // `.convex/local/default` のcredential書き込みと `convex env` の解決が
@@ -275,25 +339,32 @@ async function setConvexEnv(env, name, value, secrets, { attempts = 5 } = {}) {
   throw new Error(`convex env set ${name} に失敗しました。${lastDetail ? ` (${lastDetail})` : ""}`);
 }
 
-async function applyConvexEnv({ env, secrets, clerkIssuerDomain, e2eClerkUserId, clerkSecretKey }) {
+async function applyConvexEnv({
+  env,
+  envFile,
+  secrets,
+  clerkIssuerDomain,
+  e2eClerkUserId,
+  clerkSecretKey,
+}) {
   const secret = generateCleanupSecret();
   const allSecrets = [...secrets, secret];
   // auth.config.ts が参照する env が無いとpush自体が失敗するため最優先で設定する
   if (clerkIssuerDomain) {
-    await setConvexEnv(env, "CLERK_JWT_ISSUER_DOMAIN", clerkIssuerDomain, allSecrets);
+    await setConvexEnv(env, envFile, "CLERK_JWT_ISSUER_DOMAIN", clerkIssuerDomain, allSecrets);
   }
-  await setConvexEnv(env, "APP_ENV", "development", allSecrets);
-  await setConvexEnv(env, "RECEIPT_IMAGE_EXTRACTOR_MODE", "mock", allSecrets);
+  await setConvexEnv(env, envFile, "APP_ENV", "development", allSecrets);
+  await setConvexEnv(env, envFile, "RECEIPT_IMAGE_EXTRACTOR_MODE", "mock", allSecrets);
   if (e2eClerkUserId) {
-    await setConvexEnv(env, "E2E_CLERK_USER_ID", e2eClerkUserId, allSecrets);
+    await setConvexEnv(env, envFile, "E2E_CLERK_USER_ID", e2eClerkUserId, allSecrets);
   }
   // 招待系actionが Clerk API を呼ぶ経路のため、利用可能なら同期する（throwaway backendのみ）
   if (clerkSecretKey) {
-    await setConvexEnv(env, "CLERK_SECRET_KEY", clerkSecretKey, allSecrets);
+    await setConvexEnv(env, envFile, "CLERK_SECRET_KEY", clerkSecretKey, allSecrets);
   }
-  await setConvexEnv(env, "E2E_CLEANUP_SECRET", secret, allSecrets);
+  await setConvexEnv(env, envFile, "E2E_CLEANUP_SECRET", secret, allSecrets);
   ensureLineIntegrationMode({
-    runConvexEnv: (args) => runConvexCli(args, env),
+    runConvexEnv: (args) => runConvexCli(args, env, { envFile }),
     log,
   });
   return secret;
@@ -329,10 +400,15 @@ const CHILD_ENV_DENYLIST = new Set([
   "VITE_CONVEX_URL",
   "VITE_CONVEX_SITE_URL",
   "E2E_CLEANUP_SECRET",
+  "E2E_BASE_URL",
+  "PLAYWRIGHT_BYPASS_SECRET",
+  "E2E_ISOLATED",
+  ...E2E_PORT_ENV_VARS,
 ]);
 
 export function buildChildEnv(base, { url, siteUrl, cleanupSecret, fallbackEnv } = {}) {
-  const env = { ...base };
+  const ports = resolveE2EPorts(base);
+  const env = backendEnv(base);
   // ローカル実行用: 正本が .env.local のみの環境でも backend生成物以外の
   // Clerk/E2E系変数を子へ届ける（実際の環境変数を .env.local で上書きはしない）
   if (fallbackEnv instanceof Map) {
@@ -341,9 +417,13 @@ export function buildChildEnv(base, { url, siteUrl, cleanupSecret, fallbackEnv }
     }
   }
   Object.assign(env, {
+    ...e2ePortEnv(ports),
     // CIモードにして playwright の webServer が vite のみ（dev:frontend）を
     // 起動するようにし、sync-e2e-env の .env.local 同期を止める。
     CI: "true",
+    E2E_ISOLATED: "true",
+    E2E_BASE_URL: undefined,
+    PLAYWRIGHT_BYPASS_SECRET: undefined,
     VITE_CONVEX_URL: url,
     VITE_CONVEX_SITE_URL: siteUrl,
     E2E_CLEANUP_SECRET: cleanupSecret,
@@ -396,15 +476,28 @@ function appendGithubEnv(envValues) {
   appendFileSync(githubEnvPath, `${lines}\n`, { encoding: "utf8" });
 }
 
-function startBackend(env) {
+export function startBackend(env, { envFile, spawnImpl = spawn } = {}) {
+  const ports = resolveE2EPorts(env);
   let logBuffer = "";
-  const child = spawn(process.execPath, [convexBinPath(), "dev"], {
-    cwd: repoRoot,
-    env,
-    // プロセスグループごと終了できるようdetachedにする
-    detached: process.platform !== "win32",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const child = spawnImpl(
+    process.execPath,
+    [
+      convexBinPath(),
+      "dev",
+      ...localConfigArgs(envFile),
+      "--local-cloud-port",
+      String(ports.convexCloud),
+      "--local-site-port",
+      String(ports.convexSite),
+    ],
+    {
+      cwd: repoRoot,
+      env,
+      // プロセスグループごと終了できるようdetachedにする
+      detached: process.platform !== "win32",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   const onData = (chunk) => {
     logBuffer += chunk.toString();
     if (logBuffer.length > 512 * 1024) logBuffer = logBuffer.slice(-256 * 1024);
@@ -444,6 +537,23 @@ function stopBackend(child) {
   });
 }
 
+export async function cleanupIsolatedBackend({
+  backend,
+  localConfig,
+  restoreEnv = restoreEnvLocal,
+  stopBackendImpl = stopBackend,
+}) {
+  try {
+    if (backend) await stopBackendImpl(backend);
+  } finally {
+    try {
+      if (restoreEnv()) log(".env.local を復元しました");
+    } finally {
+      localConfig.cleanup();
+    }
+  }
+}
+
 function runChildCommand(command, extraArgs, env) {
   const fullCommand = extraArgs.length > 0 ? `${command} ${extraArgs.join(" ")}` : command;
   log(`実行: ${fullCommand}`);
@@ -469,17 +579,19 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const timeoutMs = args.timeoutSec * 1000;
   const env = backendEnv();
-
-  const hadBackup = backupEnvLocal();
-  if (hadBackup) log("既存の .env.local を退避しました（終了時に復元）");
-
-  const { child: backend, getLog } = startBackend(env);
+  const ports = resolveE2EPorts(env);
+  const localConfig = createLocalDeploymentConfig();
+  let backend;
+  let envPrepared = false;
   let cleanedUp = false;
   const cleanup = async () => {
     if (cleanedUp) return;
     cleanedUp = true;
-    await stopBackend(backend);
-    if (restoreEnvLocal()) log(".env.local を復元しました");
+    await cleanupIsolatedBackend({
+      backend,
+      localConfig,
+      restoreEnv: () => envPrepared && restoreEnvLocal(),
+    });
   };
 
   const onSignal = async (signal) => {
@@ -490,8 +602,19 @@ async function main() {
   process.on("SIGTERM", () => void onSignal("SIGTERM"));
 
   try {
+    const hadBackup = backupEnvLocal();
+    envPrepared = true;
+    if (hadBackup) log("既存の .env.local を退避しました（終了時に復元）");
+    const started = startBackend(env, { envFile: localConfig.envFile });
+    backend = started.child;
+    const { getLog } = started;
     const startedAt = Date.now();
-    const { url, siteUrl } = await waitForLocalEnvFile({ timeoutMs: ENV_FILE_TIMEOUT_MS });
+    const {
+      url,
+      siteUrl,
+      env: localEnv,
+    } = await waitForLocalEnvFile({ timeoutMs: ENV_FILE_TIMEOUT_MS, ports });
+    localConfig.bind(localEnv);
 
     // 退避済み .env.local を env 未設定時のfallbackにする（ローカル `e2e:isolated` 用）
     const fallbackEnv = readBackedUpEnv();
@@ -504,13 +627,14 @@ async function main() {
       );
     }
 
-    // push前に deployment の環境変数を設定する。auth.config.ts が参照する
+    // 関数反映完了を待つ前に deployment の環境変数を設定する。auth.config.ts が参照する
     // CLERK_JWT_ISSUER_DOMAIN が無い初回pushは失敗するが、`convex dev` は
     // env vars 型の失敗後に deployment env の変更を購読して自動再pushする。
     const clerkIssuer = resolveClerkIssuer(fallbackEnv);
     const secretValues = [clerkSecretKey, process.env.E2E_CLERK_USER_PASSWORD, e2eClerkUserId];
     const cleanupSecret = await applyConvexEnv({
       env,
+      envFile: localConfig.envFile,
       secrets: secretValues,
       clerkIssuerDomain: clerkIssuer,
       e2eClerkUserId,

@@ -1,5 +1,6 @@
 import type { IncomeListEntry, SpendingEntry } from "../receipt/spendingEntry";
 import { isValidIsoDateString } from "../week/weekDates";
+import { getHistoryTrendRangeError } from "./trendRange";
 
 export type HistoryEntryType = "all" | "expense" | "income";
 
@@ -376,6 +377,11 @@ export function parseExpenseSearchFilters(
     filters.startDate > filters.endDate
   ) {
     return { ok: false, error: "開始日は終了日以前にしてください" };
+  }
+
+  const trendRangeError = getHistoryTrendRangeError(filters.startDate, filters.endDate);
+  if (trendRangeError !== null) {
+    return { ok: false, error: trendRangeError };
   }
 
   return { ok: true, filters };

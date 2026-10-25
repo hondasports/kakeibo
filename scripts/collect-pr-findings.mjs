@@ -77,7 +77,6 @@ const ISSUE_COMMENTS_PAGE_QUERY = `query($owner: String!, $name: String!, $numbe
 const COLLECTION_SCOPE =
   "inline review threads (unresolved) + non-empty submitted review bodies (all states) + PR issue comments";
 
-const HTML_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
 // CommonMark link reference definition: optional ≤3-space indent, label,
 // colon, destination (bare token or <...>), optional quoted/parenthesized
 // title, end of line. A line with trailing unquoted text (e.g.
@@ -130,6 +129,22 @@ function maskInlineCode(text) {
   }
   masked += text.slice(last);
   return { masked, saved };
+}
+
+function stripHtmlComments(text) {
+  const chunks = [];
+  let cursor = 0;
+  // 未閉鎖の開始記号ごとに残り全文を再探索しないため、正規表現は使わない。
+  for (;;) {
+    const start = text.indexOf("<!--", cursor);
+    if (start === -1) break;
+    const end = text.indexOf("-->", start + 4);
+    if (end === -1) break;
+    chunks.push(text.slice(cursor, start));
+    cursor = end + 3;
+  }
+  chunks.push(text.slice(cursor));
+  return chunks.join("");
 }
 
 /**
@@ -185,7 +200,7 @@ export function stripInvisibleMarkup(body) {
   const stripped = parts.map((part) => {
     if (part.kind === "verbatim") return part.text;
     const { masked, saved } = maskInlineCode(part.text);
-    let text = masked.replace(HTML_COMMENT_PATTERN, "");
+    let text = stripHtmlComments(masked);
     text = text
       .split("\n")
       .filter((line) => !LINK_REFERENCE_LINE_PATTERN.test(line))

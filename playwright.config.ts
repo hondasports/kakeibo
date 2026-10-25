@@ -3,9 +3,15 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 import dotenv from "dotenv";
 import { vercelBypassStatePath } from "./scripts/lib/vercel-protection";
+import { hasCustomE2EPorts, resolveE2EPorts } from "./scripts/lib/isolated-e2e-ports";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: resolve(projectRoot, ".env.local") });
+const localPorts = resolveE2EPorts();
+const isolated = process.env.E2E_ISOLATED === "true";
+const explicitLocalPorts = isolated || hasCustomE2EPorts();
+const remoteBaseURL = isolated ? undefined : process.env.E2E_BASE_URL;
+const localBaseURL = `http://localhost:${localPorts.vite}`;
 
 if (!process.env.CLERK_PUBLISHABLE_KEY && process.env.VITE_CLERK_PUBLISHABLE_KEY) {
   process.env.CLERK_PUBLISHABLE_KEY = process.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -25,7 +31,7 @@ export default defineConfig({
   },
   /* flaky テストの自動リトライは local/CI ともに 1 回に統一（#958） */
   retries: 1,
-  /* 単一のClerkテストユーザーと共有Dev DBを使うため、cleanup競合を避けて常に直列実行する */
+  /* 単一のClerkテストユーザーを使うため、認証・cleanup競合を避けて常に直列実行する */
   workers: 1,
   /* 失敗時のみスクリーンショット・trace を保存（認証情報が含まれる可能性があるため短期保持） */
   reporter: [
@@ -35,8 +41,8 @@ export default defineConfig({
     ["json", { outputFile: "e2e-results/results.json" }],
   ],
   use: {
-    /* テスト対象 URL。環境変数 E2E_BASE_URL が設定されていれば Vercel Preview を対象にする */
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173",
+    /* isolated以外でE2E_BASE_URLが設定されていればVercel Previewを対象にする */
+    baseURL: remoteBaseURL ?? localBaseURL,
     /* 失敗時のみスクリーンショット保存 */
     screenshot: "only-on-failure",
     /* 失敗時のみ trace 保存 */
@@ -68,12 +74,16 @@ export default defineConfig({
     },
   ],
   /* ローカル実行時は vite dev サーバーを自動起動 */
-  webServer: process.env.E2E_BASE_URL
+  webServer: remoteBaseURL
     ? undefined
     : {
-        command: process.env.CI ? "pnpm run dev:frontend" : "pnpm run dev",
-        url: "http://localhost:5173",
-        reuseExistingServer: !process.env.CI,
+        command: explicitLocalPorts
+          ? `pnpm run dev:frontend --port ${localPorts.vite} --strictPort`
+          : process.env.CI
+            ? "pnpm run dev:frontend"
+            : "pnpm run dev",
+        url: localBaseURL,
+        reuseExistingServer: explicitLocalPorts ? false : !process.env.CI,
         timeout: 60_000,
       },
 });

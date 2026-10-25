@@ -408,7 +408,11 @@ describe("e2e seed handlers", () => {
       request({ email: "user@example.test" }),
     );
     const invitation = await e2eSeedPendingGroupInvitationHandler(
-      ctx,
+      createActionCtx({
+        runMutation: vi
+          .fn()
+          .mockResolvedValue({ invitationId: "fixture-id", token: "fixture-token" }),
+      }),
       request({ userId: E2E_USER_ID, invitationEmail: " MEMBER@EXAMPLE.TEST " }),
     );
 
@@ -417,7 +421,10 @@ describe("e2e seed handlers", () => {
     expect(mixedTax.status).toBe(200);
     expect(conflict.status).toBe(200);
     expect(invitation.status).toBe(200);
-    await expect(responseJson(invitation)).resolves.toEqual({ invitationId: "fixture-id" });
+    await expect(responseJson(invitation)).resolves.toEqual({
+      invitationId: "fixture-id",
+      token: "fixture-token",
+    });
   });
 
   it("招待メールの欠落・形式不正を拒否する", async () => {

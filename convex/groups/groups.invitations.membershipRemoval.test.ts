@@ -50,12 +50,24 @@ async function setup(profileEmail: string | undefined = "primary@example.test") 
     t
       .withIdentity({ tokenIdentifier: ownerId })
       .mutation(api.groups.members.removeMember, { targetUserId: memberId });
-  const accept = (token: string, acceptedUserId = memberId) =>
-    t.mutation(internal.groups.invitations.acceptGroupInvitationForVerifiedEmails, {
+  const accept = async (token: string, acceptedUserId = memberId) => {
+    const activeGroupId = await t.run(
+      async (ctx) =>
+        (
+          await ctx.db
+            .query("users")
+            .withIndex("by_token_identifier", (q) => q.eq("userId", acceptedUserId))
+            .unique()
+        )?.activeGroupId,
+    );
+    return t.mutation(internal.groups.invitations.acceptGroupInvitationForVerifiedEmails, {
       token,
       acceptedUserId,
       acceptedEmails: ["primary@example.test", "secondary@example.test"],
+      switchActiveGroup: true,
+      ...(activeGroupId ? { expectedActiveGroupId: activeGroupId } : {}),
     });
+  };
   const membership = () =>
     t.run((ctx) =>
       ctx.db
@@ -305,5 +317,25 @@ describe("メンバー解除と招待の発行順", () => {
       });
     });
     await expect(accept("other-group")).resolves.toEqual(groupId);
+  });
+});
+
+describe("所属解除前の招待の確認", () => {
+  it("古い招待では宛先情報も返さず、新しい招待なら読み取りだけで確認する", async () => {
+    const { t, invite, remove, membership } = await setup();
+    await invite("before-preview-removal");
+    await remove();
+    const preview = (token: string) =>
+      t.query(internal.groups.invitations.previewGroupInvitationForVerifiedEmails, {
+        token,
+        acceptedUserId: memberId,
+        acceptedEmails: ["secondary@example.test"],
+      });
+    await expect(preview("before-preview-removal")).rejects.toThrow("新しい招待を依頼してください");
+    await invite("after-preview-removal");
+    await expect(preview("after-preview-removal")).resolves.toMatchObject({
+      isExistingMember: false,
+    });
+    expect(await membership()).toBeNull();
   });
 });
