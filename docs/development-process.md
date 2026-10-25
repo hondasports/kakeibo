@@ -233,7 +233,7 @@ pnpm run verify:prepush -- --include e2e/settings.spec.ts --include src/features
 E2Eの実行には事前条件がある。満たさない場合はE2Eを実行せずに満たしていない条件と対処方法を表示して止まる。どうしても迂回する場合は `git push --no-verify` を使い、その事実をPR本文に記載する。
 
 - Convex local backendのバイナリが取得済み、またはダウンロードできるネットワークがあること（macOS/Linuxのバイナリキャッシュは `~/.cache/convex/binaries/` 配下。制限された環境では先に `pnpm run e2e:isolated -- --probe` で取得しておく）
-- `5173`（Vite dev、`pnpm run dev` 起動中は衝突するので停止する）と `3210`/`3211`（local backend）のポートが空いていること
+- 使用するVite・Convex API・HTTP actionsのポートが空いていること（既定は `5173` / `3210` / `3211`）。別作業が使用中の場合は、そのサーバーを停止せず下記の別ポート指定を使う
 - `.env.local` に `VITE_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` / `E2E_CLERK_USER_EMAIL` があること（`docs/environment-variables.md` 参照）
 - PlaywrightのChromiumがインストール済みであること（`pnpm exec playwright install chromium`）
 
