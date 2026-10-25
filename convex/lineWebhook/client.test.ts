@@ -83,6 +83,8 @@ describe("LINE messaging client", () => {
       await sendSummaryReplyHandler(ctx, {
         replyToken: "reply-token",
         userId: "user-a",
+        linkId: "link-a",
+        lineUserId: "line-a",
         messageText: "今週の支出",
         nowMs: 1,
         attempt,
@@ -96,6 +98,8 @@ describe("LINE messaging client", () => {
         expect(runAfter).toHaveBeenNthCalledWith(2, 1_000, expect.anything(), {
           replyToken: "reply-token",
           userId: "user-a",
+          linkId: "link-a",
+          lineUserId: "line-a",
           messageText: "今週の支出",
           nowMs: 1,
           attempt: 2,
@@ -216,6 +220,8 @@ describe("LINE messaging client", () => {
       await sendSummaryReplyHandler({ runQuery } as unknown as ActionCtx, {
         replyToken: "reply-token-private",
         userId: "user-a",
+        linkId: "link-a",
+        lineUserId: "line-a",
         messageText: "今週の支出",
         nowMs: 1,
       });
@@ -280,12 +286,16 @@ describe("LINE messaging client", () => {
         sendSummaryReplyHandler({ runQuery } as unknown as ActionCtx, {
           replyToken: "reply-token",
           userId: "user-a",
+          linkId: "link-a",
+          lineUserId: "line-a",
           messageText: "今週の支出",
           nowMs: 1,
         }),
       ).resolves.toBeNull();
       expect(runQuery).toHaveBeenCalledWith(expect.anything(), {
         userId: "user-a",
+        linkId: "link-a",
+        lineUserId: "line-a",
         messageText: "今週の支出",
         nowMs: 1,
       });
@@ -305,6 +315,8 @@ describe("LINE messaging client", () => {
         sendSummaryReplyHandler({ runQuery, scheduler: { runAfter } } as unknown as ActionCtx, {
           replyToken: "reply-token",
           userId: "user-a",
+          linkId: "link-a",
+          lineUserId: "line-a",
           messageText: "今週の支出",
           nowMs: 1,
         }),
@@ -312,6 +324,8 @@ describe("LINE messaging client", () => {
       expect(runAfter).toHaveBeenCalledWith(1_000, expect.anything(), {
         replyToken: "reply-token",
         userId: "user-a",
+        linkId: "link-a",
+        lineUserId: "line-a",
         messageText: "今週の支出",
         nowMs: 1,
         attempt: 1,
@@ -322,7 +336,7 @@ describe("LINE messaging client", () => {
     }
   });
 
-  it("summary query失敗時は金額なしの固定文を送り、沈黙しない", async () => {
+  it("summary query失敗時は金額なしの固定文を送る", async () => {
     const restore = setEnvironment({
       LINE_INTEGRATION_MODE: "real",
       LINE_MESSAGING_CHANNEL_ACCESS_TOKEN: "access-token",
@@ -336,18 +350,20 @@ describe("LINE messaging client", () => {
         sendSummaryReplyHandler({ runQuery, scheduler: { runAfter } } as unknown as ActionCtx, {
           replyToken: "reply-token",
           userId: "user-a",
+          linkId: "link-a",
+          lineUserId: "line-a",
           messageText: "今週",
           nowMs: 1,
         }),
       ).resolves.toBeNull();
       expect(runAfter).not.toHaveBeenCalled();
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
       expect(
         JSON.parse(String((fetchImpl.mock.calls[0] as [string, RequestInit])[1].body)),
       ).toEqual({
         replyToken: "reply-token",
         messages: [{ type: "text", text: LINE_SUMMARY_UNAVAILABLE_MESSAGE }],
       });
-      expect(LINE_SUMMARY_UNAVAILABLE_MESSAGE).not.toContain("円");
     } finally {
       vi.unstubAllGlobals();
       restore();

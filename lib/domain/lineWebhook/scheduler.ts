@@ -8,6 +8,8 @@
 export type SummaryReplyJobArgs = {
   replyToken: string;
   userId: string;
+  linkId: string;
+  lineUserId: string;
   messageText: string;
   nowMs: number;
 };
