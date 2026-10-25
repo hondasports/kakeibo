@@ -74,7 +74,9 @@ export function useGroupInvitationAccept() {
     }
   }, [fallbackUrl, signIn]);
 
-  useEffect(() => {
+  const needsAccountSwitch = Boolean(isClerkLoaded && isSignedIn && token && clerkTicket);
+
+  const handleAccountSwitch = async () => {
     if (
       !isClerkLoaded ||
       !isSignedIn ||
@@ -86,17 +88,18 @@ export function useGroupInvitationAccept() {
     }
 
     hasStartedClerkInvitation.current = true;
-    signOut({ redirectUrl: `${window.location.pathname}${window.location.search}` }).catch(
-      (caughtError: unknown) => {
-        hasStartedClerkInvitation.current = false;
-        console.error(
-          "[GroupInvitationAcceptPage] failed to sign out current session:",
-          caughtError,
-        );
-        setError("招待リンクの認証を開始できませんでした。リンクを開き直して再度お試しください。");
-      },
-    );
-  }, [clerkTicket, isClerkLoaded, isSignedIn, signOut, token]);
+    setError("");
+    setIsCompletingInvitation(true);
+    try {
+      await signOut({ redirectUrl: `${window.location.pathname}${window.location.search}` });
+    } catch (caughtError: unknown) {
+      hasStartedClerkInvitation.current = false;
+      console.error("[GroupInvitationAcceptPage] failed to sign out current session:", caughtError);
+      setError("招待リンクの認証を開始できませんでした。リンクを開き直して再度お試しください。");
+    } finally {
+      setIsCompletingInvitation(false);
+    }
+  };
 
   useEffect(() => {
     if (
@@ -262,9 +265,11 @@ export function useGroupInvitationAccept() {
     lastName,
     missingProfileFields,
     needsProfileDetails,
+    needsAccountSwitch,
     setFirstName,
     setLastName,
     handleProfileDetailsSubmit,
+    handleAccountSwitch,
     token,
   };
 }
