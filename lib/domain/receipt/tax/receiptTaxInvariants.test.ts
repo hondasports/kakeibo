@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { interpretReceiptTax } from "./interpretReceiptTax";
 import type { ExtractedReceiptItem, ExtractedTaxSummary, ReceiptTaxInput } from "./types";
 import { receiptTaxBasisCases, receiptTaxBasisInput } from "./fixtures/receiptTaxBasisCases";
+import { EXPENSE_ENTRY_AMOUNT_MAX } from "../../expenseEntries/expenseEntryItem";
 
 function item(overrides: Partial<ExtractedReceiptItem> = {}): ExtractedReceiptItem {
   return {
@@ -45,6 +46,33 @@ function input(overrides: Partial<ReceiptTaxInput> = {}): ReceiptTaxInput {
 }
 
 describe("receiptTax invariants", () => {
+  it("範囲外の明細を含む税額は未配分に保ち、印字金額を保存する", () => {
+    const amounts = [EXPENSE_ENTRY_AMOUNT_MAX + 1, 100, -EXPENSE_ENTRY_AMOUNT_MAX - 1];
+    const result = interpretReceiptTax(
+      input({
+        amountYen: 110,
+        items: amounts.map((printedAmountYen) =>
+          item({ printedAmountYen, amountBasis: "tax_excluded", taxRatePercent: 10 }),
+        ),
+        taxSummaries: [
+          summary({
+            taxMode: "external",
+            taxableAmountBasis: "tax_excluded",
+            taxIncludedAmountYen: 110,
+          }),
+        ],
+      }),
+    );
+    expect(result.items.map((item) => item.printedAmountYen)).toEqual(amounts);
+    expect(result.items.map((item) => item.normalizedAmountYen)).toEqual(amounts);
+    expect(result.items.map((item) => item.taxAllocationStatus)).toEqual([
+      "unallocated",
+      "unallocated",
+      "unallocated",
+    ]);
+    expect(result.items.every((item) => item.allocatedTaxYen === 0)).toBe(true);
+  });
+
   it.each(receiptTaxBasisCases)(
     "基準が異なっても税額$taxYen 円と支払額$paidYen 円を保存する",
     (testCase) => {

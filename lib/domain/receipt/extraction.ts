@@ -302,6 +302,7 @@ function parseReceiptItem(value: unknown, index: number): ExtractReceiptItemResu
     item.printedAmountYen,
     `items[${index}].printedAmountYen`,
   );
+  assertExtractedAmountRange(printedAmountYen, `items[${index}].printedAmountYen`);
   const amountBasis = parseAmountBasis(item.amountBasis, `items[${index}].amountBasis`);
   const taxRatePercent = parseItemTaxRatePercent(
     item.taxRatePercent,
@@ -430,7 +431,7 @@ function parseTaxSummary(value: unknown, index: number): ExtractedTaxSummary {
   }
   const summary = value as Record<string, unknown>;
   const confidence = parseTaxSummaryConfidence(summary.confidence, field);
-  return {
+  const parsed = {
     taxRatePercent: parseTaxRatePercent(summary.taxRatePercent, `${field}.taxRatePercent`),
     taxMode: parseTaxMode(summary.taxMode, `${field}.taxMode`),
     taxableAmountYen: parseNonNegativeInteger(
@@ -449,6 +450,19 @@ function parseTaxSummary(value: unknown, index: number): ExtractedTaxSummary {
       ? summary.warnings.filter((warning): warning is string => typeof warning === "string")
       : [],
   };
+  for (const key of ["taxableAmountYen", "taxYen", "taxIncludedAmountYen"] as const) {
+    const amount = parsed[key];
+    if (amount !== undefined) assertExtractedAmountRange(amount, `${field}.${key}`);
+  }
+  return parsed;
+}
+
+function assertExtractedAmountRange(amount: number, field: string): void {
+  if (Math.abs(amount) > EXPENSE_ENTRY_AMOUNT_MAX) {
+    throw new Error(
+      `OpenAI レスポンスの ${field} は絶対値が ${EXPENSE_ENTRY_AMOUNT_MAX.toLocaleString("ja-JP")} 円以下である必要があります`,
+    );
+  }
 }
 
 function parseTaxSummaryConfidence(
