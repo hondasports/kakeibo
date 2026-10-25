@@ -31,7 +31,7 @@ describe("groups (membership)", () => {
       ],
     });
 
-    await deleteGroupMembershipsByUserHandler(ctx, { userId: "owner-user" });
+    await deleteGroupMembershipsByUserHandler(ctx, { userId: "owner-user", groupId });
 
     expect(ctx.db.patch).toHaveBeenCalledWith(
       "membership-member",

@@ -1,6 +1,7 @@
 import type { ActionCtx } from "../_generated/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { e2eCleanupHandler } from "./e2eCleanup";
+import { getFunctionName } from "convex/server";
 import {
   e2eSeedAiExpenseDraftHandler,
   e2eSeedUnallocatedTaxDraftHandler,
@@ -131,7 +132,12 @@ describe("e2eCleanupHandler", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(runQuery).toHaveBeenCalledTimes(3);
+    expect(runQuery).toHaveBeenCalledTimes(2);
+    expect(
+      runMutation.mock.calls.find(
+        ([ref]) => getFunctionName(ref) === "groups/e2e:deleteGroupMembershipsByUser",
+      )?.[1],
+    ).toEqual({ userId: "e2e-seed|group-member-test", groupId: GROUP_ID });
     expect(runMutation).toHaveBeenCalledTimes(1);
   });
 
@@ -153,6 +159,11 @@ describe("e2eCleanupHandler", () => {
 
     expect(response.status).toBe(200);
     expect(runMutation).toHaveBeenCalledTimes(1);
+    expect(
+      runMutation.mock.calls.find(
+        ([ref]) => getFunctionName(ref) === "groups/e2e:deleteGroupMembershipsByUser",
+      )?.[1],
+    ).toEqual({ userId: "e2e-seed|group-member-removed", groupId: GROUP_ID });
   });
 
   it.each([
@@ -259,6 +270,16 @@ describe("e2eCleanupHandler", () => {
       seededGroupMember: { memberUserId: "member-e2e" },
     });
     expect(runMutation).toHaveBeenCalledTimes(12);
+    expect(
+      runMutation.mock.calls.find(
+        ([ref]) => getFunctionName(ref) === "groups/e2e:setGroupMemberRoleForE2e",
+      )?.[1],
+    ).toEqual({ userId: E2E_USER_ID, groupId: GROUP_ID, role: "member" });
+    expect(
+      runMutation.mock.calls.find(
+        ([ref]) => getFunctionName(ref) === "groups/e2e:deleteGroupMembershipsByUser",
+      )?.[1],
+    ).toEqual({ userId: E2E_USER_ID, groupId: GROUP_ID });
   });
 });
 
