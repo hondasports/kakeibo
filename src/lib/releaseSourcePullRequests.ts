@@ -215,6 +215,16 @@ export function collectPullRequestDecisions(
       continue;
     }
 
+    // 親PR方式の子PRは base が統合ブランチではない。更新履歴は親PRに書くため、ここでは検証しない
+    if (!isIntegrationHeadRef(record.baseRef)) {
+      decisions.push({
+        pullRequest: ref.number,
+        outcome: "integration",
+        reason: `親ブランチ(base: ${record.baseRef})への子PRのため収集対象外。更新履歴は親PRで記入する`,
+      });
+      continue;
+    }
+
     if (unpublishedNumbers && !unpublishedNumbers.has(ref.number)) {
       decisions.push({
         pullRequest: ref.number,
