@@ -1,4 +1,5 @@
 import type { MutationCtx, QueryCtx } from "../../../../convex/_generated/server";
+import { ConvexError } from "convex/values";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import {
   invitationEmailsMatch,
@@ -6,6 +7,27 @@ import {
 } from "../../../../convex/groups/lib/groupEmailMatching";
 import { readQueryDoc, readQueryDocs } from "../../../../convex/groups/lib/groupQueryHelpers";
 import { assessGroupInvitationStaleness } from "../../../domain/groups/groupInvitation";
+
+export async function assertGroupInvitationIssuedAfterLastRemoval(
+  ctx: Pick<QueryCtx, "db">,
+  invitationId: Id<"groupInvitations">,
+  userId: string,
+) {
+  const invitation = await ctx.db.get(invitationId);
+  if (invitation === null) {
+    throw new ConvexError("招待が見つかりません");
+  }
+  const [lastRemoval] = await ctx.db
+    .query("managementAuditLogs")
+    .withIndex("by_group_id_and_target_id_and_action", (q) =>
+      q.eq("groupId", invitation.groupId).eq("targetId", userId).eq("action", "member_removed"),
+    )
+    .order("desc")
+    .take(1);
+  if (lastRemoval && invitation._creationTime <= lastRemoval._creationTime) {
+    throw new ConvexError("この招待では参加できません。オーナーに新しい招待を依頼してください。");
+  }
+}
 
 async function collectStaleGroupInvitationIdsForEmail(
   ctx: Pick<QueryCtx, "db">,

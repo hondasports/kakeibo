@@ -230,6 +230,7 @@ export default defineSchema({
     afterValue: v.optional(v.string()),
     createdAt: v.number(),
   })
+    .index("by_group_id_and_target_id_and_action", ["groupId", "targetId", "action"])
     .index("by_group_id_and_created_at", ["groupId", "createdAt"])
     .index("by_action_and_created_at", ["action", "createdAt"]),
 

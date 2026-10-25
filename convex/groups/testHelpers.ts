@@ -227,6 +227,16 @@ export function createMockDb(state: {
       const docs = filterDocs();
       return {
         collect: vi.fn(async () => docs),
+        order: vi.fn((direction: "asc" | "desc") => ({
+          take: vi.fn(async (count: number) => {
+            const sorted = [...docs].sort(
+              (a, b) =>
+                ((a as { _creationTime?: number })._creationTime ?? 0) -
+                ((b as { _creationTime?: number })._creationTime ?? 0),
+            );
+            return (direction === "desc" ? sorted.reverse() : sorted).slice(0, count);
+          }),
+        })),
         unique: vi.fn(async () => {
           if (docs.length > 1) {
             throw new Error(`Mock unique() received ${docs.length} documents`);
