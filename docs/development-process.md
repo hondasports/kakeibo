@@ -249,7 +249,7 @@ E2Eの実行には事前条件がある。満たさない場合はE2Eを実行�
 
 ### PR CI E2Eの差分判定
 
-PRのE2E workflowは、まずPRのbase/head間のchanged pathを機械的に分類する。`skills/**`、ドキュメント、`.husky/**`、および工程管理用スクリプト（`scripts/check-task-worktree.mjs`、`scripts/collect-pr-findings.mjs`）だけの変更は `runtime_relevant=false` としてbrowser E2Eを起動しない。アプリ、認証、データ、browser、E2E harness、package、workflow、環境同期に関わる変更や判定できないpathは `runtime_relevant=true` として従来どおりE2Eを実行する。判定結果と理由はworkflowのsummaryへ出力し、Agentの手動判断でskipしない。
+PRのE2E workflowは、まずPRのbase/head間のchanged pathを機械的に分類する。`skills/**`、ドキュメント、`.husky/**`、および工程管理用スクリプト（`scripts/check-task-worktree.mjs`、`scripts/collect-pr-findings.mjs`）だけの変更は `runtime_relevant=false` としてbrowser E2Eを起動しない。アプリ、認証、データ、browser、E2E harness、package、workflow、環境同期に関わる変更や判定できないpathは `runtime_relevant=true` として従来どおりE2Eを実行する。同一リポジトリの `preview` → `main` 昇格PRは、changed pathに関係なく `runtime_relevant=false`（reason: `promotion_head_verified_by_preview_push`）とする。PRのE2E jobはhead commitを検証し、それは `preview` push時に `preview-deploy.yml` の `local-e2e` が同じコマンドで検証したcommitと同じであるため。その結果は同じSHAのcheckとしてPRに表示される。判定結果と理由はworkflowのsummaryへ出力し、Agentの手動判断でskipしない。
 
 判定ロジックは [`scripts/classify-e2e-relevance.mjs`](../scripts/classify-e2e-relevance.mjs) とそのunit testで検証する。判定スクリプトやE2E workflow自身の変更はruntime-relevantとして扱い、E2Eの実行条件を弱めた変更を見逃しにくくする。
 
