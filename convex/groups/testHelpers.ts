@@ -165,6 +165,9 @@ export function createMockDb(state: {
         if (tableName === "accountDeletionRequests") {
           return indexName === "by_user_id";
         }
+        if (tableName === "systemAdminAuditLogs") {
+          return indexName === "by_source_group_id_and_target_user_id_and_action_and_result";
+        }
         return false;
       };
 

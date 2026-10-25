@@ -24,7 +24,35 @@ export async function assertGroupInvitationIssuedAfterLastRemoval(
     )
     .order("desc")
     .take(1);
-  if (lastRemoval && invitation._creationTime <= lastRemoval._creationTime) {
+  const user = await readQueryDoc(
+    ctx.db.query("users").withIndex("by_token_identifier", (q) => q.eq("userId", userId)),
+  );
+  const adminRemovals =
+    user === null
+      ? []
+      : await Promise.all(
+          (["system_admin_membership_removed", "system_admin_membership_transferred"] as const).map(
+            async (action) => {
+              const [removal] = await ctx.db
+                .query("systemAdminAuditLogs")
+                .withIndex("by_source_group_id_and_target_user_id_and_action_and_result", (q) =>
+                  q
+                    .eq("sourceGroupId", invitation.groupId)
+                    .eq("targetUserId", user._id)
+                    .eq("action", action)
+                    .eq("result", "success"),
+                )
+                .order("desc")
+                .take(1);
+              return removal;
+            },
+          ),
+        );
+  if (
+    [lastRemoval, ...adminRemovals].some(
+      (removal) => removal && invitation._creationTime <= removal._creationTime,
+    )
+  ) {
     throw new ConvexError("この招待では参加できません。オーナーに新しい招待を依頼してください。");
   }
 }
