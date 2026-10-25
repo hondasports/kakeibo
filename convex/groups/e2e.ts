@@ -27,7 +27,11 @@ async function deleteMembershipPreservingOwnerInvariant(
   await ctx.db.delete(membership._id);
 }
 
-async function deleteE2eSeededUserByEmailIfExists(ctx: MutationCtx, email: string) {
+async function deleteE2eSeededUserByEmailIfExists(
+  ctx: MutationCtx,
+  email: string,
+  groupId: Id<"groups">,
+) {
   const normalizedEmail = normalizeEmail(email);
   const existingUser = await readQueryDoc(
     ctx.db.query("users").withIndex("by_email", (q) => q.eq("email", normalizedEmail)),
@@ -41,6 +45,9 @@ async function deleteE2eSeededUserByEmailIfExists(ctx: MutationCtx, email: strin
       .query("groupMembers")
       .withIndex("by_user_id", (q) => q.eq("userId", existingUser.userId)),
   );
+  if (memberships.some((membership) => membership.groupId !== groupId)) {
+    throw new ConvexError("別のグループに所属する E2E ユーザーは置き換えできません");
+  }
   for (const membership of memberships) {
     await deleteMembershipPreservingOwnerInvariant(ctx, membership);
   }
@@ -49,15 +56,17 @@ async function deleteE2eSeededUserByEmailIfExists(ctx: MutationCtx, email: strin
 
 export async function deleteGroupMembershipsByUserHandler(
   ctx: MutationCtx,
-  args: { userId: string },
+  args: { userId: string; groupId: Id<"groups"> | null },
 ) {
-  const { userId } = args;
+  const { userId, groupId } = args;
   const membershipQuery = ctx.db
     .query("groupMembers")
     .withIndex("by_user_id", (q) => q.eq("userId", userId));
   const memberships = await readQueryDocs(membershipQuery);
+  const targetMemberships = memberships.filter((membership) => membership.groupId === groupId);
+  const remainingMemberships = memberships.filter((membership) => membership.groupId !== groupId);
 
-  for (const membership of memberships) {
+  for (const membership of targetMemberships) {
     await deleteMembershipPreservingOwnerInvariant(ctx, membership);
   }
 
@@ -65,42 +74,37 @@ export async function deleteGroupMembershipsByUserHandler(
     ctx.db.query("users").withIndex("by_token_identifier", (q) => q.eq("userId", userId)),
   );
   if (user !== null) {
-    if (userId.startsWith("e2e-seed|")) {
+    if (userId.startsWith("e2e-seed|") && remainingMemberships.length === 0) {
       await ctx.db.delete(user._id);
-    } else {
-      await ctx.db.patch(user._id, { activeGroupId: undefined, updatedAt: Date.now() });
+    } else if (user.activeGroupId === groupId) {
+      await ctx.db.patch(user._id, {
+        activeGroupId: remainingMemberships[0]?.groupId,
+        updatedAt: Date.now(),
+      });
     }
   }
 
-  return { deletedCount: memberships.length };
+  return { deletedCount: targetMemberships.length };
 }
 
 export async function setGroupMemberRoleForE2eHandler(
   ctx: MutationCtx,
-  args: { userId: string; role: "owner" | "member" },
+  args: { userId: string; groupId: Id<"groups"> | null; role: "owner" | "member" },
 ) {
-  const { userId, role } = args;
-  const user = await readQueryDoc(
-    ctx.db.query("users").withIndex("by_token_identifier", (q) => q.eq("userId", userId)),
+  const { userId, groupId, role } = args;
+  if (groupId === null) {
+    return { updated: false };
+  }
+  const membership = await readQueryDoc(
+    ctx.db
+      .query("groupMembers")
+      .withIndex("by_group_id_and_user_id", (q) => q.eq("groupId", groupId).eq("userId", userId)),
   );
-  const memberships = await readQueryDocs(
-    ctx.db.query("groupMembers").withIndex("by_user_id", (q) => q.eq("userId", userId)),
-  );
-
-  if (memberships.length === 0) {
+  if (membership === null) {
     return { updated: false };
   }
 
-  const activeMembership =
-    (user?.activeGroupId
-      ? memberships.find((membership) => membership.groupId === user.activeGroupId)
-      : undefined) ?? memberships[0];
-
-  if (!activeMembership) {
-    return { updated: false };
-  }
-
-  await ctx.db.patch(activeMembership._id, {
+  await ctx.db.patch(membership._id, {
     role,
     updatedAt: Date.now(),
   });
@@ -128,7 +132,7 @@ export async function seedGroupMemberForE2eHandler(
   ctx: MutationCtx,
   args: { groupId: Id<"groups">; displayName: string; email: string },
 ) {
-  await deleteE2eSeededUserByEmailIfExists(ctx, args.email);
+  await deleteE2eSeededUserByEmailIfExists(ctx, args.email, args.groupId);
 
   const now = Date.now();
   const memberUserId = `e2e-seed|group-member-${now}`;
@@ -213,15 +217,18 @@ export async function deleteGroupForE2eHandler(ctx: MutationCtx, args: { groupId
 }
 
 export const deleteGroupMembershipsByUser = internalMutation({
-  args: { userId: v.string() },
+  args: { userId: v.string(), groupId: v.union(v.id("groups"), v.null()) },
+  returns: v.object({ deletedCount: v.number() }),
   handler: deleteGroupMembershipsByUserHandler,
 });
 
 export const setGroupMemberRoleForE2e = internalMutation({
   args: {
     userId: v.string(),
+    groupId: v.union(v.id("groups"), v.null()),
     role: v.union(v.literal("owner"), v.literal("member")),
   },
+  returns: v.object({ updated: v.boolean() }),
   handler: setGroupMemberRoleForE2eHandler,
 });
 
