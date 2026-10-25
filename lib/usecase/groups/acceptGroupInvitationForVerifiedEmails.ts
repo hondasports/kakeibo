@@ -34,6 +34,7 @@ export async function acceptGroupInvitationForVerifiedEmails(
   if (!invitationEmailsMatchAny(args.acceptedEmails, invite.email)) {
     throw new ConvexError("招待先メールアドレスと一致しません");
   }
+  await deps.invitationCleanup.assertIssuedAfterLastRemoval(invite.id, args.acceptedUserId);
   await deps.accountDeletion.assertNotInProgress(args.acceptedUserId);
 
   const existingMembership = await deps.memberships.findByGroupAndUser(
