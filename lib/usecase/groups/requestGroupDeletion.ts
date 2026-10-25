@@ -1,6 +1,6 @@
 /**
  * グループ削除リクエストユースケース（mutation。オーナーのみ。権限確認は presentation 層で解決済み）。
- * 確認名の一致を検証して削除ジョブを開始し、要求者の activeGroupId を解除する。
+ * 指定時の対象IDと確認名を検証して削除ジョブを開始し、要求者の activeGroupId を解除する。
  */
 import { ConvexError } from "convex/values";
 import type { UsecaseGroupContext } from "../context";
@@ -11,8 +11,11 @@ import { assertGroupNotDeletedOrThrow, normalizeGroupNameOrThrow } from "./valid
 export async function requestGroupDeletion(
   ctx: UsecaseGroupContext,
   deps: Pick<GroupMutationDeps, "groups" | "deletionWorkflow" | "users">,
-  args: { confirmationGroupName: string },
+  args: { confirmationGroupName: string; expectedGroupId?: string },
 ): Promise<string> {
+  if (args.expectedGroupId !== undefined && args.expectedGroupId !== ctx.groupId) {
+    throw new ConvexError("削除対象のグループが変わりました。内容を再確認してください。");
+  }
   const group = await deps.groups.get(ctx.groupId);
   if (group === null) {
     throw new ConvexError("グループが見つかりません");
