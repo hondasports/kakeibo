@@ -1,7 +1,7 @@
 import { TRANSACTIONAL_EMAIL_TYPES, type TransactionalEmailType } from "../../email/model";
 
-export type NotificationChannel = "email" | "line";
 export const NOTIFICATION_CHANNELS = ["email", "line"] as const;
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 
 export const AI_REVIEW_REQUIRED_NOTIFICATION_TYPE =
   "ai_review_required" satisfies TransactionalEmailType;

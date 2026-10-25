@@ -1,6 +1,7 @@
 import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 
-type ReceiptTotalSource = "explicit_label" | "user_confirmed" | "ai_estimate";
+import type { ReceiptTotalSource } from "../receipt/tax/types";
+export type { ReceiptTotalSource } from "../receipt/tax/types";
 
 /** 保存済み合計候補から現在の amountYen に一致する source を採用する。3値以外は ai_estimate。 */
 export function resolveReceiptTotalSource(

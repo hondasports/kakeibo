@@ -4,6 +4,7 @@
  */
 import type { MutationCtx } from "../../../convex/_generated/server";
 import { internal } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import type { LineWebhookScheduler } from "../../domain/lineWebhook/scheduler";
 
 export function createLineWebhookScheduler(
@@ -11,7 +12,10 @@ export function createLineWebhookScheduler(
 ): LineWebhookScheduler {
   return {
     scheduleSummaryReply: async (args) => {
-      await ctx.scheduler.runAfter(0, internal.lineWebhook.actions.sendSummaryReply, args);
+      await ctx.scheduler.runAfter(0, internal.lineWebhook.actions.sendSummaryReply, {
+        ...args,
+        linkId: args.linkId as Id<"lineAccountLinks">,
+      });
     },
     scheduleUnlinkedGuide: async (args) => {
       await ctx.scheduler.runAfter(0, internal.lineWebhook.actions.sendUnlinkedGuide, args);

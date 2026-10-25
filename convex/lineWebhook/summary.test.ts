@@ -1,11 +1,13 @@
 // @vitest-environment edge-runtime
 
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { FunctionArgs } from "convex/server";
 import { internal } from "../_generated/api";
 import schema from "../schema";
+import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../lib/domain/lineWebhook/reply";
+import { LINE_SUMMARY_UNAVAILABLE_MESSAGE } from "../../lib/domain/lineSummary/reply";
 import { convexTestModules } from "../test.setup";
-import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "./client";
 import {
   LINE_HELP_MESSAGE,
   LINE_NO_GROUP_MESSAGE,
@@ -61,7 +63,7 @@ async function seedLinkedHousehold(
         updatedAt: 1,
       });
     }
-    await ctx.db.insert("lineAccountLinks", {
+    const linkId = await ctx.db.insert("lineAccountLinks", {
       userId: options.userId,
       lineUserId: options.lineUserId,
       status: "active",
@@ -161,8 +163,27 @@ async function seedLinkedHousehold(
       createdAt: 1,
       updatedAt: 1,
     });
-    return { groupId, otherGroupId, foodId };
+    return { groupId, otherGroupId, foodId, linkId };
   });
+}
+
+async function queryLinkedSummary(
+  t: ReturnType<typeof convexTest>,
+  args: { userId: string; messageText: string; nowMs: number },
+) {
+  const link = await t.run((ctx) =>
+    ctx.db
+      .query("lineAccountLinks")
+      .withIndex("by_user_id_and_status", (q) => q.eq("userId", args.userId).eq("status", "active"))
+      .unique(),
+  );
+  if (link === null) throw new Error("有効リンクのfixtureが必要です");
+  const reply = await t.query(internal.lineWebhook.summary.buildReply, {
+    ...args,
+    linkId: link._id,
+    lineUserId: link.lineUserId,
+  });
+  return reply;
 }
 
 describe("LINE readonly summary", () => {
@@ -180,7 +201,7 @@ describe("LINE readonly summary", () => {
       groupName: "B家",
     });
 
-    const reply = await t.query(internal.lineWebhook.summary.buildReply, {
+    const reply = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "今週",
       nowMs: NOW_MS,
@@ -193,15 +214,23 @@ describe("LINE readonly summary", () => {
     expect(reply.replyText).not.toContain("別グループの秘密");
   });
 
-  it("未連携相当のuserIdには案内だけを返し家計金額を出さない", async () => {
+  it("解除済みのリンクには金額を含まない未連携案内を返す", async () => {
     const t = convexTest(schema, convexTestModules);
-    const reply = await t.query(internal.lineWebhook.summary.buildReply, {
-      userId: "missing-user",
-      messageText: "今週の支出",
-      nowMs: NOW_MS,
+    const { linkId } = await seedLinkedHousehold(t, {
+      userId: "user-a",
+      lineUserId: "line-a",
+      groupName: "A家",
     });
-    expect(reply.replyText).toBe(LINE_UNLINKED_GUIDANCE_MESSAGE);
-    expect(reply.replyText).not.toContain("円");
+    await t.run((ctx) => ctx.db.patch(linkId, { status: "revoked", revokedAt: 2 }));
+    await expect(
+      t.query(internal.lineWebhook.summary.buildReply, {
+        userId: "user-a",
+        linkId,
+        lineUserId: "line-a",
+        messageText: "今週の支出",
+        nowMs: NOW_MS,
+      }),
+    ).resolves.toEqual({ replyKind: "unlinked", replyText: LINE_UNLINKED_GUIDANCE_MESSAGE });
   });
 
   it("コマンドごとに支出・収入・カテゴリ別・週別推移・食費を返す", async () => {
@@ -212,27 +241,27 @@ describe("LINE readonly summary", () => {
       groupName: "A家",
     });
 
-    const expense = await t.query(internal.lineWebhook.summary.buildReply, {
+    const expense = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "今週の支出",
       nowMs: NOW_MS,
     });
-    const income = await t.query(internal.lineWebhook.summary.buildReply, {
+    const income = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "今週の収入",
       nowMs: NOW_MS,
     });
-    const categories = await t.query(internal.lineWebhook.summary.buildReply, {
+    const categories = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "カテゴリ別",
       nowMs: NOW_MS,
     });
-    const food = await t.query(internal.lineWebhook.summary.buildReply, {
+    const food = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "食費",
       nowMs: NOW_MS,
     });
-    const trend = await t.query(internal.lineWebhook.summary.buildReply, {
+    const trend = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "週別推移",
       nowMs: NOW_MS,
@@ -257,22 +286,22 @@ describe("LINE readonly summary", () => {
       groupName: "A家",
     });
 
-    const expense = await t.query(internal.lineWebhook.summary.buildReply, {
+    const expense = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "今週いくら使った？",
       nowMs: NOW_MS,
     });
-    const food = await t.query(internal.lineWebhook.summary.buildReply, {
+    const food = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "食費どれくらい？",
       nowMs: NOW_MS,
     });
-    const hello = await t.query(internal.lineWebhook.summary.buildReply, {
+    const hello = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "こんにちは",
       nowMs: NOW_MS,
     });
-    const receipt = await t.query(internal.lineWebhook.summary.buildReply, {
+    const receipt = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "レシートを送る",
       nowMs: NOW_MS,
@@ -321,22 +350,22 @@ describe("LINE readonly summary", () => {
       extraGroup: true,
     });
 
-    const unknown = await t.query(internal.lineWebhook.summary.buildReply, {
+    const unknown = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "旅行",
       nowMs: NOW_MS,
     });
-    const help = await t.query(internal.lineWebhook.summary.buildReply, {
+    const help = await queryLinkedSummary(t, {
       userId: "user-a",
       messageText: "ヘルプ",
       nowMs: NOW_MS,
     });
-    const noGroup = await t.query(internal.lineWebhook.summary.buildReply, {
+    const noGroup = await queryLinkedSummary(t, {
       userId: "user-nogroup",
       messageText: "今週の支出",
       nowMs: NOW_MS,
     });
-    const unresolved = await t.query(internal.lineWebhook.summary.buildReply, {
+    const unresolved = await queryLinkedSummary(t, {
       userId: "user-multi",
       messageText: "今週の支出",
       nowMs: NOW_MS,
@@ -382,7 +411,7 @@ describe("LINE readonly summary", () => {
       });
     });
 
-    const reply = await t.query(internal.lineWebhook.summary.buildReply, {
+    const reply = await queryLinkedSummary(t, {
       userId: "user-empty",
       messageText: "今週",
       nowMs: NOW_MS,
@@ -466,7 +495,7 @@ describe("LINE readonly summary", () => {
       });
     });
 
-    const reply = await t.query(internal.lineWebhook.summary.buildReply, {
+    const reply = await queryLinkedSummary(t, {
       userId: "user-sunday",
       messageText: "今週",
       nowMs: sundayNowMs,
@@ -533,7 +562,7 @@ describe("LINE readonly summary", () => {
       await ctx.db.delete(groupId);
     });
 
-    const reply = await t.query(internal.lineWebhook.summary.buildReply, {
+    const reply = await queryLinkedSummary(t, {
       userId: "user-orphan",
       messageText: "今週",
       nowMs: NOW_MS,
@@ -541,5 +570,160 @@ describe("LINE readonly summary", () => {
     expect(reply.replyText).toBe(LINE_NO_GROUP_MESSAGE);
     expect(reply.replyText).not.toContain("7,777");
     expect(reply.replyText).not.toMatch(/\d+円/);
+  });
+});
+
+describe("予約時のリンクに基づくサマリー返信", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+
+  async function claimSummary(t: ReturnType<typeof convexTest>) {
+    const { linkId } = await seedLinkedHousehold(t, {
+      userId: "user-a",
+      lineUserId: "line-a",
+      groupName: "A家",
+    });
+    await t.mutation(internal.lineWebhook.internal.claimEvents, {
+      events: [
+        {
+          webhookEventId: "summary-event",
+          eventType: "text",
+          lineUserId: "line-a",
+          messageText: "今週",
+          replyToken: "reply-token",
+          eventTimestamp: NOW_MS,
+        },
+      ],
+    });
+    const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(jobs).toHaveLength(1);
+    const args = jobs[0].args[0] as FunctionArgs<
+      typeof internal.lineWebhook.actions.sendSummaryReply
+    >;
+    expect(args).toEqual({
+      userId: "user-a",
+      linkId,
+      lineUserId: "line-a",
+      replyToken: "reply-token",
+      messageText: "今週",
+      nowMs: NOW_MS,
+    });
+    return { linkId, args };
+  }
+
+  function mockReply() {
+    vi.useFakeTimers();
+    vi.stubEnv("APP_ENV", "development");
+    vi.stubEnv("LINE_INTEGRATION_MODE", "real");
+    vi.stubEnv("LINE_MESSAGING_CHANNEL_ACCESS_TOKEN", "test-access-token");
+    const fetchImpl = vi.fn().mockResolvedValue(new Response("", { status: 200 }));
+    vi.stubGlobal("fetch", fetchImpl);
+    return fetchImpl;
+  }
+
+  it.each(["有効", "解除", "別アカウントへの変更", "同じアカウントへの再連携", "所有者の変更"])(
+    "%sの場合に予約時のリンクで家計の返信可否を決める",
+    async (state) => {
+      const t = convexTest(schema, convexTestModules);
+      const fetchImpl = mockReply();
+      const { linkId, args } = await claimSummary(t);
+      if (state !== "有効") {
+        await t.run(async (ctx) => {
+          if (state === "所有者の変更") {
+            await ctx.db.patch(linkId, { userId: "user-b" });
+            return;
+          }
+          await ctx.db.patch(linkId, { status: "revoked", revokedAt: 2 });
+          if (state === "解除") return;
+          await ctx.db.insert("lineAccountLinks", {
+            userId: "user-a",
+            lineUserId: state === "同じアカウントへの再連携" ? "line-a" : "line-b",
+            status: "active",
+            linkedAt: 2,
+            createdAt: 2,
+            updatedAt: 2,
+          });
+        });
+      }
+      await expect(
+        t.action(internal.lineWebhook.actions.sendSummaryReply, args),
+      ).resolves.toBeNull();
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      if (state === "有効") {
+        expect(JSON.parse(String(fetchImpl.mock.calls[0][1].body))).toMatchObject({
+          replyToken: "reply-token",
+          messages: [{ text: expect.stringContaining("支出: 3,000円") }],
+        });
+      } else {
+        expect(JSON.parse(String(fetchImpl.mock.calls[0][1].body))).toMatchObject({
+          replyToken: "reply-token",
+          messages: [{ text: LINE_UNLINKED_GUIDANCE_MESSAGE }],
+        });
+      }
+    },
+  );
+
+  it("予約済みの旧形式は受け付け、取得失敗の固定文を返す", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const fetchImpl = mockReply();
+    const { args } = await claimSummary(t);
+    const { linkId: _linkId, lineUserId: _lineUserId, ...legacyArgs } = args;
+    await expect(
+      t.action(internal.lineWebhook.actions.sendSummaryReply, legacyArgs),
+    ).resolves.toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1].body))).toMatchObject({
+      replyToken: "reply-token",
+      messages: [{ text: LINE_SUMMARY_UNAVAILABLE_MESSAGE }],
+    });
+  });
+
+  it("再試行も予約時のリンクを保持し、解除後は未連携案内を返す", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const fetchImpl = mockReply();
+    fetchImpl.mockRejectedValueOnce(new Error("provider unavailable"));
+    const { linkId, args } = await claimSummary(t);
+    await t.action(internal.lineWebhook.actions.sendSummaryReply, args);
+    const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(jobs).toHaveLength(2);
+    const retryArgs = jobs[1].args[0] as FunctionArgs<
+      typeof internal.lineWebhook.actions.sendSummaryReply
+    >;
+    expect(retryArgs).toEqual({ ...args, attempt: 1 });
+    await t.run((ctx) => ctx.db.patch(linkId, { status: "revoked", revokedAt: 2 }));
+    await t.action(internal.lineWebhook.actions.sendSummaryReply, retryArgs);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchImpl.mock.calls[1][1].body))).toMatchObject({
+      replyToken: "reply-token",
+      messages: [{ text: LINE_UNLINKED_GUIDANCE_MESSAGE }],
+    });
+    const finalJobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(finalJobs).toHaveLength(2);
+  });
+
+  it("旧形式の再試行もリンクを補完せず取得失敗の固定文を返す", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const fetchImpl = mockReply();
+    fetchImpl.mockRejectedValueOnce(new Error("provider unavailable"));
+    const { args } = await claimSummary(t);
+    const { linkId: _linkId, lineUserId: _lineUserId, ...legacyArgs } = args;
+    await t.action(internal.lineWebhook.actions.sendSummaryReply, legacyArgs);
+    const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(jobs).toHaveLength(2);
+    const retryArgs = jobs[1].args[0] as FunctionArgs<
+      typeof internal.lineWebhook.actions.sendSummaryReply
+    >;
+    expect(retryArgs).toEqual({ ...legacyArgs, attempt: 1 });
+    await t.action(internal.lineWebhook.actions.sendSummaryReply, retryArgs);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    for (const [, request] of fetchImpl.mock.calls) {
+      expect(JSON.parse(String(request.body))).toMatchObject({
+        replyToken: "reply-token",
+        messages: [{ text: LINE_SUMMARY_UNAVAILABLE_MESSAGE }],
+      });
+    }
   });
 });

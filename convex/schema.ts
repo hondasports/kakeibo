@@ -1,3 +1,4 @@
+import { systemAdminAuditActionValidator } from "../lib/convex/systemAdmin/validators";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
@@ -10,6 +11,7 @@ import {
   amountBasisValidator,
   derivedRegistrationSnapshotValidator,
   markerDefinitionsValidator,
+  receiptItemLineTypeValidator,
   receiptItemTaxRatePercentValidator,
   receiptMarkersValidator,
   receiptInterpretationSnapshotValidator,
@@ -228,6 +230,7 @@ export default defineSchema({
     afterValue: v.optional(v.string()),
     createdAt: v.number(),
   })
+    .index("by_group_id_and_target_id_and_action", ["groupId", "targetId", "action"])
     .index("by_group_id_and_created_at", ["groupId", "createdAt"])
     .index("by_action_and_created_at", ["action", "createdAt"]),
 
@@ -247,27 +250,7 @@ export default defineSchema({
     .index("by_status", ["status"]),
 
   systemAdminAuditLogs: defineTable({
-    action: v.union(
-      v.literal("system_admin_bootstrapped"),
-      v.literal("system_admin_granted"),
-      v.literal("system_admin_revoked"),
-      v.literal("system_admin_recovered"),
-      v.literal("system_admin_user_searched"),
-      v.literal("system_admin_group_searched"),
-      v.literal("system_admin_user_viewed"),
-      v.literal("system_admin_group_viewed"),
-      v.literal("system_admin_membership_added"),
-      v.literal("system_admin_membership_removed"),
-      v.literal("system_admin_membership_transferred"),
-      v.literal("system_admin_active_group_set"),
-      v.literal("system_admin_active_group_cleared"),
-      v.literal("system_admin_group_deletion_resumed"),
-      v.literal("system_admin_ownerless_group_recovered"),
-      v.literal("system_admin_group_role_changed"),
-      v.literal("system_admin_group_owner_transferred"),
-      v.literal("system_admin_group_invitation_revoked"),
-      v.literal("system_admin_notification_setting_changed"),
-    ),
+    action: systemAdminAuditActionValidator,
     actorType: v.union(v.literal("system"), v.literal("system_admin")),
     actorUserId: v.optional(v.id("users")),
     targetKind: v.union(
@@ -307,6 +290,12 @@ export default defineSchema({
     result: v.optional(v.union(v.literal("success"), v.literal("denied"))),
     createdAt: v.number(),
   })
+    .index("by_source_group_id_and_target_user_id_and_action_and_result", [
+      "sourceGroupId",
+      "targetUserId",
+      "action",
+      "result",
+    ])
     .index("by_created_at", ["createdAt"])
     .index("by_action_and_created_at", ["action", "createdAt"])
     .index("by_actor_user_id_and_created_at", ["actorUserId", "createdAt"])
@@ -592,14 +581,7 @@ export default defineSchema({
     groupId: v.id("groups"),
     draftId: v.id("aiExpenseDrafts"),
     itemName: v.string(),
-    lineType: v.optional(
-      v.union(
-        v.literal("item"),
-        v.literal("discount"),
-        v.literal("promotion_adjustment"),
-        v.literal("unknown"),
-      ),
-    ),
+    lineType: v.optional(receiptItemLineTypeValidator),
     amountYen: v.number(),
     printedAmountYen: v.optional(v.number()),
     amountBasis: v.optional(amountBasisValidator),

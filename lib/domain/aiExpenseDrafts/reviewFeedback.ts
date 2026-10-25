@@ -1,3 +1,5 @@
+import { formatYen } from "../common/currency";
+
 const REVIEW_REASON_LABELS: Record<string, string> = {
   amount_mismatch: "金額・税内訳の確認が必要",
   ambiguous_category: "未分類あり",
@@ -85,7 +87,7 @@ export function formatReviewSaveMessage(args: {
 }): string {
   const subject = [
     args.shopName?.trim() || "レシート",
-    args.amountYen !== undefined ? `${args.amountYen.toLocaleString("ja-JP")}円` : "金額未設定",
+    args.amountYen !== undefined ? formatYen(args.amountYen) : "金額未設定",
     args.categoryName || "カテゴリ未設定",
   ].join("・");
 

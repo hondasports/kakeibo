@@ -1,5 +1,6 @@
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Box, IconButton, Stack, TextField, Typography } from "@mui/material";
+import { currencyFormatter } from "../../../../lib/domain/common/currency";
 import { CategoryGrid } from "./CategoryGrid";
 import type {
   ExpenseEntryCategory,
@@ -63,7 +64,7 @@ export function ExpenseItemRow({
           id={`item-amount-${index}`}
           label="金額"
           slotProps={{ htmlInput: { "aria-label": "金額", inputMode: "numeric" } }}
-          value={item.amountYen ? Number(item.amountYen).toLocaleString("ja-JP") : ""}
+          value={item.amountYen ? currencyFormatter.format(Number(item.amountYen)) : ""}
           onChange={(event) => {
             const digits = event.target.value.replace(/[^\d]/g, "");
             onItemChange("amountYen", digits);

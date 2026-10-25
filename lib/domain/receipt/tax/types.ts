@@ -1,11 +1,23 @@
 export type ReceiptItemTaxConfirmedField = "amountBasis" | "taxRatePercent";
 
 import type { ReceiptItemLineType } from "../discountItems";
-export type TaxRatePercent = 0 | 8 | 10;
-export type AmountBasis = "tax_included" | "tax_excluded" | "unknown";
+export const TAX_RATE_PERCENTS = [0, 8, 10] as const;
+
+export const RECEIPT_TOTAL_SOURCES = ["explicit_label", "user_confirmed", "ai_estimate"] as const;
+
+export type ReceiptTotalSource = (typeof RECEIPT_TOTAL_SOURCES)[number];
+
+export type TaxRatePercent = (typeof TAX_RATE_PERCENTS)[number];
+export const AMOUNT_BASES = ["tax_included", "tax_excluded", "unknown"] as const;
+
+export type AmountBasis = (typeof AMOUNT_BASES)[number];
 export type ResolvedAmountBasis = Exclude<AmountBasis, "unknown">;
-export type TaxMode = "external" | "included" | "mixed" | "unknown";
-export type RoundingMethod = "floor" | "round" | "ceil" | "unknown";
+export const TAX_MODES = ["external", "included", "mixed", "unknown"] as const;
+
+export type TaxMode = (typeof TAX_MODES)[number];
+export const ROUNDING_METHODS = ["floor", "round", "ceil", "unknown"] as const;
+
+export type RoundingMethod = (typeof ROUNDING_METHODS)[number];
 
 export type PriceTaxTreatment = "included" | "excluded" | "perItem" | "unknown";
 export type TaxRateComposition = "rate8" | "rate10" | "mixed" | "unknown";
@@ -135,7 +147,7 @@ export type InterpretedReceiptItem = ExtractedReceiptItem & {
 
 export type ReceiptTaxInput = {
   amountYen: number;
-  receiptTotalSource?: "explicit_label" | "user_confirmed" | "ai_estimate";
+  receiptTotalSource?: ReceiptTotalSource;
   receiptTotalConfidence?: number;
   receiptTotalSupportingCandidates?: ReceiptTotalCandidate[];
   items: ExtractedReceiptItem[];

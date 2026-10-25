@@ -10,7 +10,7 @@ license: Apache-2.0
 
 アプリの振る舞いを変えるコード変更。pure docs・READMEだけの変更は対象外（`AGENTS.md` の例外に準ずる）。
 
-`workspace-preflight`（必要なら `impact-analysis`）の後、**最初の編集の前**に読む。コミット前にもう一度使う。
+preflightの後、**最初の編集の前**に読む。コミット前にもう一度使う。exportされた関数・型の意味を変える、複数ディレクトリにまたがる、認可・永続データ・外部writeに触れる、または変更対象の識別子が分からない場合は、先に `skills/impact-analysis` で調べ、その結果を下の対応表に入れる。
 
 ## 編集前: 何を証明するかを決める
 

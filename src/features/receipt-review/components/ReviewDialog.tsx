@@ -18,7 +18,7 @@ import type {
   ReviewItemValues,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
-import type { AmountBasis } from "../../../../lib/receiptTax/types";
+import type { AmountBasis } from "../../../../lib/domain/receipt/tax/types";
 import { ReviewDialogActions } from "./ReviewDialogActions";
 import { ReviewDialogBasicsSection } from "./ReviewDialogBasicsSection";
 import { ReviewDialogItemsSection } from "./ReviewDialogItemsSection";

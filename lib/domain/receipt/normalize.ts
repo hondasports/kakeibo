@@ -1,4 +1,6 @@
 import {
+  EXPENSE_ENTRY_TITLE_MAX_LENGTH,
+  EXPENSE_ENTRY_MEMO_MAX_LENGTH,
   validateExpenseAmount,
   validateExpenseMemo,
   validateExpenseTitle,
@@ -55,7 +57,7 @@ function normalizeTitle(
     if (result.error === "empty") {
       throw new Error(requiredMessage);
     }
-    throw new Error(`${fieldName} must be 100 characters or fewer`);
+    throw new Error(`${fieldName} must be ${EXPENSE_ENTRY_TITLE_MAX_LENGTH} characters or fewer`);
   }
   return result.title;
 }
@@ -77,7 +79,7 @@ export function normalizeCreateReceiptArgs<TId>(
 
   const memoResult = validateExpenseMemo(input.memo);
   if (!memoResult.success) {
-    throw new Error("Memo must be 500 characters or less");
+    throw new Error(`Memo must be ${EXPENSE_ENTRY_MEMO_MAX_LENGTH} characters or less`);
   }
 
   let shopName: string | undefined;
@@ -127,7 +129,7 @@ export function normalizeUpdateReceiptPatch<TId>(
   if (input.shopName !== undefined) {
     const result = validateExpenseTitle(input.shopName);
     if (!result.success) {
-      throw new Error("shopName must be 100 characters or fewer");
+      throw new Error(`shopName must be ${EXPENSE_ENTRY_TITLE_MAX_LENGTH} characters or fewer`);
     }
     patch.shopName = result.title;
   }
@@ -135,7 +137,7 @@ export function normalizeUpdateReceiptPatch<TId>(
   if (input.bankName !== undefined) {
     const result = validateExpenseTitle(input.bankName);
     if (!result.success) {
-      throw new Error("bankName must be 100 characters or fewer");
+      throw new Error(`bankName must be ${EXPENSE_ENTRY_TITLE_MAX_LENGTH} characters or fewer`);
     }
     patch.bankName = result.title;
   }
@@ -150,7 +152,7 @@ export function normalizeUpdateReceiptPatch<TId>(
   if (input.memo !== undefined) {
     const result = validateExpenseMemo(input.memo);
     if (!result.success) {
-      throw new Error("Memo must be 500 characters or less");
+      throw new Error(`Memo must be ${EXPENSE_ENTRY_MEMO_MAX_LENGTH} characters or less`);
     }
     patch.memo = result.memo;
   }

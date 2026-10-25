@@ -5,6 +5,7 @@ import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
 import { isDiscountLine } from "../receipt/discountItems";
 import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
 import { matchTaxSummaryItems } from "../receipt/tax/taxAmountBasis";
+import { isVerifiedTaxSummaryStatus } from "../receipt/tax/taxSummaryConsistency";
 import type {
   ReviewBlockerCode,
   ReviewCheckStatus,
@@ -159,6 +160,16 @@ export function buildTaxRateCheck(args: {
           .map((item) => item.id),
       };
     }
+    if (summary.status !== undefined && !isVerifiedTaxSummaryStatus(summary.status))
+      return {
+        ...base,
+        status: "uncomparable" as const,
+        reason: "税内訳が未検証のため、税率別の対象額を比較できません",
+        blockerCode: "unresolved-tax" as const,
+        affectedItemIds: items
+          .filter((item) => effectiveTaxRateOf(item, items) === summary.taxRatePercent)
+          .map((item) => item.id),
+      };
     if (basis === "unknown")
       return {
         ...base,

@@ -109,6 +109,12 @@ export async function systemAdminMembershipOperation(
 
   const targetUser = await deps.users.findByDocId(args.targetUserId);
   if (!targetUser) throw new ConvexError("対象ユーザーが見つかりません");
+  if (
+    actor.docId === targetUser.docId &&
+    (args.operation === "add" || args.operation === "transfer" || args.operation === "set_active")
+  ) {
+    throw new ConvexError("自分自身の所属追加・移動・activeグループ設定はできません");
+  }
   await assertAccountDeletionNotInProgress(
     { requests: deps.accountDeletionRequests },
     targetUser.userId,

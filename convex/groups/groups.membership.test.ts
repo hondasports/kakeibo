@@ -1,6 +1,6 @@
 import type { Id } from "../_generated/dataModel";
 import { deleteGroupMembershipsByUserHandler } from "./e2e";
-import { sortGroupMembersForDisplay } from "./memberDisplay";
+import { sortGroupMembersForDisplay } from "../../lib/domain/groups/members";
 import { getGroupMembership } from "./membership";
 import { createGroupHandler, setActiveGroupHandler } from "./mutations";
 import { getGroupMembersHandler, listMyGroupsHandler } from "./queries";
@@ -31,7 +31,7 @@ describe("groups (membership)", () => {
       ],
     });
 
-    await deleteGroupMembershipsByUserHandler(ctx, { userId: "owner-user" });
+    await deleteGroupMembershipsByUserHandler(ctx, { userId: "owner-user", groupId });
 
     expect(ctx.db.patch).toHaveBeenCalledWith(
       "membership-member",

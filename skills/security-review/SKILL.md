@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: 認証・データ・入力・secret・外部書込みの境界を変更するときに使う。
+description: 認証・認可・group境界・secret・ユーザー入力・webhook検証・外部writeを変更するときに、セルフレビューへ追加する観点。独立Reviewerが必須になる条件を含む。
 license: Apache-2.0
 ---
 

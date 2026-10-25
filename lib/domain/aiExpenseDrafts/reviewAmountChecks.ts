@@ -1,5 +1,6 @@
 import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
 import { distinctTaxSummaryAmounts } from "../receipt/tax/taxAmountBasis";
+import { isVerifiedTaxSummaryStatus } from "../receipt/tax/taxSummaryConsistency";
 import type { ReviewBlockerCode, ReviewCheckStatus } from "./reviewCheckUtils";
 import {
   findBasisConflicts,
@@ -103,6 +104,22 @@ export function buildAmountCheck(args: {
   }, 0);
 
   if (external) {
+    if (
+      summaries.some(
+        (summary) => summary.status !== undefined && !isVerifiedTaxSummaryStatus(summary.status),
+      )
+    )
+      return {
+        status: "uncomparable",
+        variant,
+        paidTotalYen,
+        itemsPrintedTotalYen,
+        itemsComparableTotalYen,
+        reason: "税内訳が未検証のため、金額を比較できません",
+        blockerCode: "unresolved-tax",
+        affectedItemIds: args.items.map((item) => item.id),
+        focusTarget: "items",
+      };
     const calculationSummaries = distinctTaxSummaryAmounts(summaries);
     const printedSubtotalYen = calculationSummaries.reduce(
       (sum, summary) => sum + summary.taxableAmountYen,

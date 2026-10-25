@@ -44,6 +44,7 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
+      source_sha: ${{ steps.source.outputs.source_sha }}
       app_version: ${{ steps.version.outputs.app_version }}
       published_at: ${{ steps.version.outputs.published_at }}
     env:
@@ -94,7 +95,13 @@ jobs:
           ref: ${{ env.SOURCE_REF }}
           fetch-depth: 0
 
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - name: Resolve release commit
+        id: source
+        run: |
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
@@ -131,7 +138,7 @@ jobs:
           APP_VERSION: ${{ steps.version.outputs.app_version }}
           PUBLISHED_AT: ${{ steps.version.outputs.published_at }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SOURCE_REF: ${{ env.SOURCE_REF }}
+          SOURCE_REF: ${{ steps.source.outputs.source_sha }}
 
       - name: Build
         run: pnpm run build
@@ -149,6 +156,8 @@ jobs:
             .tmp/product-updates.current-release.json
 
       - name: Write preflight summary
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
         run: |
           {
             echo "## Production preflight"
@@ -156,6 +165,7 @@ jobs:
             echo "| Item | Value |"
             echo "| --- | --- |"
             echo "| Source ref | \`$SOURCE_REF\` |"
+            echo "| Source commit | \`$SOURCE_SHA\` |"
             echo "| Release mode | \`$RELEASE_MODE\` |"
             echo "| PREVIEW confirmed | \`$PREVIEW_CONFIRMED\` |"
             echo "| DB/schema check | \`$DB_SCHEMA_CHANGE_CHECK\` |"
@@ -176,7 +186,7 @@ jobs:
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
       CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-      SOURCE_REF: ${{ github.event_name == 'push' && github.sha || inputs.source_ref }}
+      SOURCE_REF: ${{ needs.preflight.outputs.source_sha }}
     steps:
       - name: Validate release candidate configuration
         env:
@@ -207,9 +217,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-          ref: ${{ env.SOURCE_REF }}
+          ref: ${{ needs.preflight.outputs.source_sha }}
 
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
@@ -238,7 +248,7 @@ jobs:
           export VITE_ENABLE_E2E_ROUTES=1
           pnpm exec convex deploy \
             --cmd-url-env-var-name VITE_CONVEX_URL \
-            --message "release candidate ${GITHUB_SHA}" \
+            --message "release candidate ${SOURCE_REF}" \
             --cmd 'pnpm exec vercel build --yes --target=preview --token "$VERCEL_TOKEN"'
 
       - name: Deploy Vercel release candidate
@@ -309,7 +319,7 @@ jobs:
       VITE_APP_VERSION: ${{ needs.preflight.outputs.app_version }}
       BASE_REF: ${{ github.event_name == 'push' && 'main' || inputs.source_ref }}
       RELEASE_MODE: ${{ github.event_name == 'push' && 'main_push' || 'manual' }}
-      SOURCE_REF: ${{ github.event_name == 'push' && github.sha || inputs.source_ref }}
+      SOURCE_REF: ${{ needs.preflight.outputs.source_sha }}
       DB_SCHEMA_CHANGE_CHECK: ${{ github.event_name == 'push' && 'main_push_with_production_approval' || inputs.db_schema_change_check }}
       RELEASE_NOTE: ${{ github.event_name == 'push' && format('main merge production release {0}', github.sha) || inputs.release_note }}
     steps:
@@ -329,9 +339,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-          ref: ${{ env.SOURCE_REF }}
+          ref: ${{ needs.preflight.outputs.source_sha }}
 
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 

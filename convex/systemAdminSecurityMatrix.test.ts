@@ -23,6 +23,93 @@ describe("system admin security matrix", () => {
     vi.unstubAllEnvs();
   });
 
+  it("管理者本人の所属追加を拒否し、家計集計は通常の所属グループに限定する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const ids = await t.run(async (ctx) => {
+      const admin = await ctx.db.insert("users", {
+        userId: "admin",
+        displayName: "管理者",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.insert("systemAdmins", {
+        userId: admin,
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+        grantedAt: 1,
+        grantReason: "test",
+      });
+      const groups = [];
+      for (const [name, amount] of [
+        ["所属先", 100],
+        ["別グループ", 200],
+      ] as const) {
+        const groupId = await ctx.db.insert("groups", {
+          name,
+          status: "active",
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        const categoryId = await ctx.db.insert("categories", {
+          groupId,
+          name: "食費",
+          color: "#000000",
+          isActive: true,
+          sortOrder: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        await ctx.db.insert("expenseEntries", {
+          groupId,
+          categoryId,
+          date: "2026-10-19",
+          amount,
+          title: "支出",
+          entryType: "expense",
+          source: "manual",
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        groups.push(groupId);
+      }
+      return { admin, ownGroup: groups[0], otherGroup: groups[1] };
+    });
+    const admin = t.withIdentity(identity("admin"));
+    const summaryArgs = { weekStartDate: "2026-10-19" };
+    await expect(admin.query(api.receipts.summaries.getWeekSummary, summaryArgs)).rejects.toThrow(
+      "グループに所属していません",
+    );
+    await expect(
+      admin.mutation(api.systemAdminMembership.systemAdminMembershipOperation, {
+        targetUserId: ids.admin,
+        operation: "add",
+        targetGroupId: ids.otherGroup,
+        reason: "所属を整理",
+      }),
+    ).rejects.toThrow("自分自身の所属追加・移動・activeグループ設定はできません");
+    await expect(admin.query(api.receipts.summaries.getWeekSummary, summaryArgs)).rejects.toThrow(
+      "グループに所属していません",
+    );
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("groupMembers", {
+        groupId: ids.ownGroup,
+        userId: "admin",
+        role: "member",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.patch(ids.admin, { activeGroupId: ids.ownGroup });
+    });
+    await expect(
+      admin.query(api.receipts.summaries.getWeekSummary, summaryArgs),
+    ).resolves.toMatchObject({
+      count: 1,
+      totalAmountYen: 100,
+    });
+  });
+
   it("管理APIのレスポンスと監査allowlistに家計データ・tokenを含めない", async () => {
     const t = convexTest(schema, convexTestModules);
     const ids = await t.run(async (ctx) => {

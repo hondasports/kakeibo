@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseOpenAIResponse } from "./extraction";
+import { EXPENSE_ENTRY_AMOUNT_MAX } from "../expenseEntries/expenseEntryItem";
 
 const trialExtraction = {
   documentType: "receipt",
@@ -74,6 +75,48 @@ function parse(payload: unknown) {
 }
 
 describe("parseOpenAIResponse domain", () => {
+  it.each([EXPENSE_ENTRY_AMOUNT_MAX, -EXPENSE_ENTRY_AMOUNT_MAX])(
+    "範囲内の符号付き明細金額 %s 円は保持する",
+    (amount) => {
+      const payload = structuredClone(trialExtraction);
+      payload.items[0].printedAmountYen = amount;
+      const result = parse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.extracted.items?.[0].printedAmountYen).toBe(amount);
+    },
+  );
+
+  it.each([EXPENSE_ENTRY_AMOUNT_MAX + 1, -EXPENSE_ENTRY_AMOUNT_MAX - 1, 1e100])(
+    "範囲外の明細金額 %s 円はエラー結果を返す",
+    (amount) => {
+      const payload = structuredClone(trialExtraction);
+      payload.items[0].printedAmountYen = amount;
+      expect(parse(payload).success).toBe(false);
+    },
+  );
+
+  it.each(["taxableAmountYen", "taxYen", "taxIncludedAmountYen"] as const)(
+    "範囲外の税サマリ金額 %s はエラー結果を返す",
+    (field) => {
+      const payload = structuredClone(trialExtraction);
+      payload.taxSummaries[0][field] = EXPENSE_ENTRY_AMOUNT_MAX + 1;
+      expect(parse(payload).success).toBe(false);
+    },
+  );
+
+  it.each(["taxableAmountYen", "taxYen", "taxIncludedAmountYen"] as const)(
+    "上限内の税サマリ金額 %s は保持する",
+    (field) => {
+      const payload = structuredClone(trialExtraction);
+      payload.taxSummaries[0][field] = EXPENSE_ENTRY_AMOUNT_MAX;
+      const result = parse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.extracted.taxSummaries?.[0][field]).toBe(EXPENSE_ENTRY_AMOUNT_MAX);
+      }
+    },
+  );
+
   it.each([
     { rows: [{ rawText: "26年07月24日 10:08", explicitlyPrinted: false }] },
     {

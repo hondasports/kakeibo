@@ -1,9 +1,46 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
+import { parse } from "yaml";
 
 const workflow = () => readFileSync(".github/workflows/production-release.yml", "utf8");
 
 describe("production-release workflow", () => {
+  test("preflight のコミットを候補・本番・リリースで共通利用する", () => {
+    const { jobs } = parse(workflow());
+    const preflight = jobs.preflight;
+    const checkoutIndex = preflight.steps.findIndex((step: { uses?: string }) =>
+      step.uses?.startsWith("actions/checkout@"),
+    );
+    const sourceIndex = preflight.steps.findIndex((step: { id?: string }) => step.id === "source");
+    expect(sourceIndex).toBeGreaterThan(checkoutIndex);
+    expect(sourceIndex).toBeLessThan(
+      preflight.steps.findIndex((step: { name?: string }) => step.name === "Test"),
+    );
+    expect(preflight.steps[checkoutIndex].with.ref).toBe("${{ env.SOURCE_REF }}");
+    expect(preflight.steps[sourceIndex].run).toContain("git rev-parse HEAD");
+    expect(preflight.steps[sourceIndex].run).toContain("source_sha=${SOURCE_SHA}");
+    expect(preflight.outputs.source_sha).toBe("${{ steps.source.outputs.source_sha }}");
+    expect(preflight.env.SOURCE_REF).toBe(
+      "${{ github.event_name == 'push' && github.sha || inputs.source_ref }}",
+    );
+    expect(
+      preflight.steps.find((step: { name?: string }) => step.name === "Generate product updates")
+        .env.SOURCE_REF,
+    ).toBe("${{ steps.source.outputs.source_sha }}");
+    for (const job of [jobs["release-candidate"], jobs.production]) {
+      expect(job.env.SOURCE_REF).toBe("${{ needs.preflight.outputs.source_sha }}");
+      for (const step of job.steps.filter((step: { uses?: string }) =>
+        step.uses?.startsWith("actions/checkout@"),
+      )) {
+        expect(step.with.ref).toBe("${{ needs.preflight.outputs.source_sha }}");
+      }
+    }
+    expect(
+      jobs.production.steps.find((step: { name?: string }) => step.name === "Create GitHub Release")
+        .run,
+    ).toContain('--target "${SOURCE_REF}"');
+  });
+
   test("requires manual dispatch for an approved source ref", () => {
     const yaml = workflow();
 

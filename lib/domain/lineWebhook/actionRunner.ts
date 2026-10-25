@@ -71,16 +71,16 @@ export interface LineReplySender {
 
 /** サマリ応答の組み立て（内部 query 相当）。 */
 export interface LineSummaryRunner {
-  buildReply(args: {
-    userId: string;
-    messageText: string;
-    nowMs: number;
-  }): Promise<{ replyText: string; replyKind: LineReplyKind }>;
+  buildReply(
+    args: Omit<SummaryReplyJobArgs, "replyToken">,
+  ): Promise<{ replyText: string; replyKind: LineReplyKind }>;
 }
 
 export type SendUnlinkedGuideJobArgs = { replyToken: string; attempt?: number };
 
-export type SendSummaryReplyJobArgs = SummaryReplyJobArgs & { attempt?: number };
+// 旧形式では予約時のリンクを復元できないため、現在のリンクで補完しない。
+export type SendSummaryReplyJobArgs = Omit<SummaryReplyJobArgs, "linkId" | "lineUserId"> &
+  Partial<Pick<SummaryReplyJobArgs, "linkId" | "lineUserId">> & { attempt?: number };
 
 export type ProcessLinkedImageRetryArgs = {
   replyToken: string;

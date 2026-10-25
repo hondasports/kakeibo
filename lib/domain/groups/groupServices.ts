@@ -54,6 +54,8 @@ export interface GroupOwnerTransitionGuard {
  * 再招待前の stale 掃除と、pending 招待の明示的 revoke（Clerk 招待 ID の回収）を担う。
  */
 export interface GroupInvitationCleanupService {
+  /** 対象ユーザーの最後の所属解除後に発行した招待であることを検証する。 */
+  assertIssuedAfterLastRemoval(invitationId: string, userId: string): Promise<void>;
   /** 同一メールの古い pending と所属外の accepted を revoked にする。 */
   revokeForEmail(groupId: string, email: string): Promise<void>;
   /** グループ内の pending 招待を revoked にし、対象の Clerk 招待 ID を返す。 */

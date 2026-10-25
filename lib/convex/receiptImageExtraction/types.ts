@@ -1,3 +1,15 @@
+import type {
+  TaxRatePercent,
+  AmountBasis,
+  TaxMode,
+  RoundingMethod,
+} from "../../domain/receipt/tax/types";
+export type {
+  TaxRatePercent,
+  AmountBasis,
+  TaxMode,
+  RoundingMethod,
+} from "../../domain/receipt/tax/types";
 import { MAX_IMAGE_DATA_URL_LENGTH as _MAX_IMAGE_DATA_URL_LENGTH } from "../../../lib/domain/common/imageDataUrl";
 import {
   JAPAN_TIME_ZONE as _JAPAN_TIME_ZONE,
@@ -21,11 +33,7 @@ export type ExtractionConfidence = {
   categoryName?: number;
 };
 
-export type TaxRatePercent = 0 | 8 | 10;
 export type ReceiptItemTaxRatePercent = TaxRatePercent | null;
-export type AmountBasis = "tax_included" | "tax_excluded" | "unknown";
-export type TaxMode = "external" | "included" | "mixed" | "unknown";
-export type RoundingMethod = "floor" | "round" | "ceil" | "unknown";
 
 export type ExtractReceiptItemResult = {
   itemName: string;

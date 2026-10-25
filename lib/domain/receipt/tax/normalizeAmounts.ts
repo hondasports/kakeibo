@@ -5,18 +5,46 @@ import type {
   TaxContextResolution,
 } from "./types";
 import { matchTaxSummaryItems } from "./taxAmountBasis";
+import { EXPENSE_ENTRY_AMOUNT_MAX } from "../../expenseEntries/expenseEntryItem";
 
-export function allocateTax(taxYen: number, taxableAmountYen: number, amounts: number[]) {
-  if (amounts.length === 0 || taxableAmountYen === 0) return amounts.map(() => 0);
+export function allocateTax(
+  taxYen: number,
+  taxableAmountYen: number,
+  amounts: number[],
+): number[] | undefined {
+  if (amounts.length === 0) return [];
+  if (
+    !Number.isInteger(taxYen) ||
+    taxYen < 0 ||
+    taxYen > EXPENSE_ENTRY_AMOUNT_MAX ||
+    !Number.isInteger(taxableAmountYen) ||
+    taxableAmountYen < 0 ||
+    taxableAmountYen > EXPENSE_ENTRY_AMOUNT_MAX ||
+    amounts.some(
+      (amount) => !Number.isInteger(amount) || Math.abs(amount) > EXPENSE_ENTRY_AMOUNT_MAX,
+    )
+  ) {
+    return undefined;
+  }
+  const total = BigInt(taxableAmountYen);
+  if (amounts.reduce((sum, amount) => sum + BigInt(amount), 0n) !== total) return undefined;
+  if (total === 0n) return taxYen === 0 ? amounts.map(() => 0) : undefined;
+  const tax = BigInt(taxYen);
   const shares = amounts.map((amount, index) => {
-    const exact = (amount * taxYen) / taxableAmountYen;
-    const base = Math.floor(exact);
-    return { index, base, fraction: exact - base };
+    const product = BigInt(amount) * tax;
+    const fraction = ((product % total) + total) % total;
+    const base = (product - fraction) / total;
+    return { index, base, fraction };
   });
-  let remaining = taxYen - shares.reduce((sum, share) => sum + share.base, 0);
-  const order = [...shares].sort((a, b) => b.fraction - a.fraction || a.index - b.index);
-  for (let index = 0; index < remaining; index += 1) order[index % order.length].base += 1;
-  return shares.map((share) => share.base);
+  const remaining = Number(tax - shares.reduce((sum, share) => sum + share.base, 0n));
+  if (remaining < 0 || remaining >= shares.length) return undefined;
+  const order = [...shares].sort((a, b) =>
+    a.fraction === b.fraction ? a.index - b.index : a.fraction > b.fraction ? -1 : 1,
+  );
+  for (let index = 0; index < remaining; index += 1) order[index].base += 1n;
+  const allocations = shares.map((share) => Number(share.base));
+  if (allocations.some((amount) => Math.abs(amount) > EXPENSE_ENTRY_AMOUNT_MAX)) return undefined;
+  return allocations;
 }
 
 export function normalizeAmounts(args: {
@@ -60,18 +88,29 @@ export function normalizeAmounts(args: {
       indexes.map((index) => result[index]),
     );
     if (match) {
-      allocatedRates.add(summary.taxRatePercent);
       const allocations = allocateTax(
         summary.taxYen,
         match.printedTotalYen,
         indexes.map((index) => result[index].printedAmountYen),
       );
+      if (!allocations) continue;
+      const normalizedAmounts = indexes.map(
+        (itemIndex, allocationIndex) =>
+          result[itemIndex].printedAmountYen +
+          (match.amountBasis === "tax_excluded" ? allocations[allocationIndex] : 0),
+      );
+      if (
+        normalizedAmounts.some(
+          (amount) => !Number.isSafeInteger(amount) || Math.abs(amount) > EXPENSE_ENTRY_AMOUNT_MAX,
+        )
+      ) {
+        continue;
+      }
+      allocatedRates.add(summary.taxRatePercent);
       indexes.forEach((itemIndex, allocationIndex) => {
         result[itemIndex].allocatedTaxYen = allocations[allocationIndex];
         result[itemIndex].taxAllocationStatus = "allocated";
-        result[itemIndex].normalizedAmountYen =
-          result[itemIndex].printedAmountYen +
-          (match.amountBasis === "tax_excluded" ? allocations[allocationIndex] : 0);
+        result[itemIndex].normalizedAmountYen = normalizedAmounts[allocationIndex];
       });
     }
   }

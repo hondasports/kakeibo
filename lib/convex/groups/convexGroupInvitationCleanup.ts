@@ -6,12 +6,22 @@ import type { MutationCtx } from "../../../convex/_generated/server";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { GroupInvitationCleanupService } from "../../domain/groups/groupServices";
 import { revokePendingGroupInvitationsForEmailInGroup } from "./invitationHandlers/revoke";
-import { revokeGroupInvitationsForEmailInGroup } from "./invitationHandlers/staleCleanup";
+import {
+  assertGroupInvitationIssuedAfterLastRemoval,
+  revokeGroupInvitationsForEmailInGroup,
+} from "./invitationHandlers/staleCleanup";
 
 export function createGroupInvitationCleanupService(
   ctx: MutationCtx,
 ): GroupInvitationCleanupService {
   return {
+    async assertIssuedAfterLastRemoval(invitationId, userId) {
+      await assertGroupInvitationIssuedAfterLastRemoval(
+        ctx,
+        invitationId as Id<"groupInvitations">,
+        userId,
+      );
+    },
     async revokeForEmail(groupId, email) {
       await revokeGroupInvitationsForEmailInGroup(ctx, groupId as Id<"groups">, email);
     },

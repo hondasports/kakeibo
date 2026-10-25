@@ -1,5 +1,5 @@
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
 import { GroupInvitationAcceptPage } from "./GroupInvitationAcceptPage";
@@ -310,7 +310,7 @@ describe("GroupInvitationAcceptPage", () => {
     });
   });
 
-  it("Clerk ticket 付きURLで既存セッションがあれば現在のセッションを抜けてから処理する", async () => {
+  it("Clerk ticket 付きURLでは操作するまで既存セッションを維持する", async () => {
     const signOutMock = vi.fn().mockResolvedValue(undefined);
     const invitationPath =
       "/group/invitations/accept?token=invite-token&__clerk_ticket=ticket-001&__clerk_status=sign_up";
@@ -323,6 +323,17 @@ describe("GroupInvitationAcceptPage", () => {
       "/group/invitations/accept?token=invite-token&__clerk_ticket=ticket-001&__clerk_status=sign_up",
     );
 
+    expect(
+      screen.getByText(
+        "招待先のアカウントで続けるには、現在のアカウントからサインアウトしてください。",
+      ),
+    ).toBeInTheDocument();
+    expect(signOutMock).not.toHaveBeenCalled();
+    expect(signUpTicketMock).not.toHaveBeenCalled();
+    expect(acceptGroupInvitationMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "アカウントを切り替える" }));
+
     await waitFor(() => {
       expect(signOutMock).toHaveBeenCalledWith({
         redirectUrl: invitationPath,
@@ -330,5 +341,53 @@ describe("GroupInvitationAcceptPage", () => {
     });
     expect(signUpTicketMock).not.toHaveBeenCalled();
     expect(acceptGroupInvitationMock).not.toHaveBeenCalled();
+  });
+
+  it("アカウント切り替えの処理中はボタンを無効にする", async () => {
+    let finishSignOut: () => void = () => {};
+    const signOutMock = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSignOut = resolve;
+        }),
+    );
+    useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: true });
+    useClerkMock.mockReturnValue({ signOut: signOutMock });
+    renderPage();
+
+    const button = screen.getByRole("button", { name: "アカウントを切り替える" });
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    expect(screen.getByRole("progressbar", { name: "招待を処理中" })).toBeInTheDocument();
+    fireEvent.click(button);
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finishSignOut();
+    });
+  });
+
+  it("アカウント切り替えに失敗したら説明を表示し、再操作で続行できる", async () => {
+    const failure = new Error("sign out failed");
+    const signOutMock = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(undefined);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: true });
+    useClerkMock.mockReturnValue({ signOut: signOutMock });
+    renderPage();
+
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "アカウントを切り替える" }));
+      expect(await screen.findByText(/招待リンクの認証を開始できませんでした/)).toBeInTheDocument();
+      expect(consoleError).toHaveBeenCalledWith(
+        "[GroupInvitationAcceptPage] failed to sign out current session:",
+        failure,
+      );
+      expect(signOutMock).toHaveBeenCalledTimes(1);
+      expect(signUpTicketMock).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "アカウントを切り替える" }));
+      await waitFor(() => expect(signOutMock).toHaveBeenCalledTimes(2));
+      expect(screen.queryByText(/招待リンクの認証を開始できませんでした/)).not.toBeInTheDocument();
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });

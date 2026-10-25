@@ -194,6 +194,7 @@ export const e2eCleanupHandler = httpAction(async (ctx, req) => {
   }
 
   const resolvedUserId = body.seededUserId ?? actorUserId;
+  let seededCleanupGroupId: Id<"groups"> | null = null;
   if (isSeededCleanup) {
     const actorGroupId = configuredUserId
       ? await ctx.runQuery(internal.groups.e2e.getGroupIdByUserId, {
@@ -209,9 +210,12 @@ export const e2eCleanupHandler = httpAction(async (ctx, req) => {
         headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
       });
     }
+    seededCleanupGroupId = actorGroupId;
   }
 
-  const resolvedGroupId = await resolveE2eGroupId(ctx, body, resolvedUserId);
+  const resolvedGroupId = isSeededCleanup
+    ? seededCleanupGroupId
+    : await resolveE2eGroupId(ctx, body, actorUserId);
   if (body.groupId && resolvedGroupId === null) {
     return new Response(JSON.stringify({ error: "Forbidden." }), {
       status: 403,
@@ -362,6 +366,7 @@ export const e2eCleanupHandler = httpAction(async (ctx, req) => {
     if (resolvedUserId) {
       groupMemberships = await ctx.runMutation(internal.groups.e2e.deleteGroupMembershipsByUser, {
         userId: resolvedUserId,
+        groupId: resolvedGroupId,
       });
     }
   }
@@ -370,6 +375,7 @@ export const e2eCleanupHandler = httpAction(async (ctx, req) => {
   if (body.setGroupMemberRole && resolvedUserId) {
     groupMemberRole = await ctx.runMutation(internal.groups.e2e.setGroupMemberRoleForE2e, {
       userId: resolvedUserId,
+      groupId: resolvedGroupId,
       role: body.setGroupMemberRole,
     });
   }

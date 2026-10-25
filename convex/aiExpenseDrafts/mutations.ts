@@ -7,6 +7,7 @@ import {
   aiExpenseDraftItemConfidenceValidator,
   aiExpenseRegistrationModeValidator,
   amountBasisValidator,
+  receiptItemLineTypeValidator,
   receiptItemTaxRatePercentValidator,
 } from "./model";
 import { requireGroupMembership } from "../groups/membership";
@@ -90,14 +91,7 @@ export const updateForReview = mutation({
           itemId: v.optional(v.id("aiExpenseDraftItems")),
           confirmedTaxRatePercent: v.optional(receiptItemTaxRatePercentValidator),
           itemName: v.string(),
-          lineType: v.optional(
-            v.union(
-              v.literal("item"),
-              v.literal("discount"),
-              v.literal("promotion_adjustment"),
-              v.literal("unknown"),
-            ),
-          ),
+          lineType: v.optional(receiptItemLineTypeValidator),
           amountYen: v.number(),
           categoryId: v.id("categories"),
           confidence: v.optional(aiExpenseDraftItemConfidenceValidator),
@@ -163,14 +157,7 @@ export const updateRegisteredDraft = mutation({
         v.object({
           itemId: v.optional(v.id("aiExpenseDraftItems")),
           itemName: v.string(),
-          lineType: v.optional(
-            v.union(
-              v.literal("item"),
-              v.literal("discount"),
-              v.literal("promotion_adjustment"),
-              v.literal("unknown"),
-            ),
-          ),
+          lineType: v.optional(receiptItemLineTypeValidator),
           amountYen: v.number(),
           categoryId: v.id("categories"),
           confidence: v.optional(aiExpenseDraftItemConfidenceValidator),
