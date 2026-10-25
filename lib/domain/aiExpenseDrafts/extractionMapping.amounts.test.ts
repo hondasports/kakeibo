@@ -5,8 +5,42 @@ import {
 } from "../../convex/receiptImageExtraction/fixtures/taxFixtures";
 import { mapExtractionToDraftArgs } from "./extractionMapping";
 import { foodCategory } from "./testHelpers";
+import { EXPENSE_ENTRY_AMOUNT_MAX } from "../expenseEntries/expenseEntryItem";
 
 describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
+  it("範囲外の明細は税額を配分せず、ユーザー確認へ送る", () => {
+    const product = trialExternal8Fixture.items![0];
+    const amounts = [EXPENSE_ENTRY_AMOUNT_MAX + 1, 100, -EXPENSE_ENTRY_AMOUNT_MAX - 1];
+    const mapped = mapExtractionToDraftArgs(
+      {
+        ...trialExternal8Fixture,
+        amountYen: 108,
+        items: amounts.map((amount) => ({
+          ...product,
+          itemName: amount < 0 ? "値引き" : "商品",
+          lineType: amount < 0 ? "discount" : "item",
+          amountYen: amount,
+          printedAmountYen: amount,
+          taxRatePercent: 8,
+          amountBasis: "tax_excluded",
+        })),
+        taxSummaries: [
+          {
+            ...trialExternal8Fixture.taxSummaries![0],
+            taxableAmountYen: 100,
+            taxYen: 8,
+            taxIncludedAmountYen: 108,
+          },
+        ],
+      },
+      [foodCategory],
+    );
+    expect(mapped.items?.map((item) => item.printedAmountYen)).toEqual(amounts);
+    expect(mapped.items?.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+    expect(mapped.items?.every((item) => item.allocatedTaxYen === 0)).toBe(true);
+    expect(mapped.reviewReasons).toContain("user_confirmation_required");
+  });
+
   it("不確実な負額行だけを警告付きで保持し、他の抽出項目を失わない", () => {
     const source = structuredClone(trialExternal8Fixture);
     source.shopName = "マルアイ";

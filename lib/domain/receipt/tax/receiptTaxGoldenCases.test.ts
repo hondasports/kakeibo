@@ -18,6 +18,33 @@ const availableCases = receiptTaxGoldenCaseLedger.filter(
 );
 
 describe("Issue #890 印字基準が異なるgolden cases", () => {
+  it.each([
+    {
+      amounts: [500, -111],
+      taxYen: 38,
+      paidYen: 427,
+      allocations: [49, -11],
+      normalizedAmounts: [549, -122],
+    },
+    {
+      amounts: [1, 5, 16],
+      taxYen: 2,
+      paidYen: 24,
+      allocations: [0, 1, 1],
+      normalizedAmounts: [1, 6, 17],
+    },
+  ])("印字金額 $amounts の税額を整数の端数順で配分する", (testCase) => {
+    const input = receiptTaxBasisInput(testCase);
+    input.items = input.items.map((item) => ({ ...item, taxRatePercent: 10 }));
+    input.taxSummaries = input.taxSummaries.map((summary) => ({ ...summary, taxRatePercent: 10 }));
+    const result = interpretReceiptTax(input);
+    expect(result.items.map((item) => item.allocatedTaxYen)).toEqual(testCase.allocations);
+    expect(result.items.map((item) => item.normalizedAmountYen)).toEqual(
+      testCase.normalizedAmounts,
+    );
+    expect(result.items.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+  });
+
   it.each(receiptTaxBasisCases)(
     "税込対象額$paidYen 円と税抜明細の固定期待値を再現する",
     (testCase) => {
