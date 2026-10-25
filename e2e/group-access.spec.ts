@@ -6,6 +6,8 @@ import {
   setE2eGroupMemberRole,
 } from "./helpers/cleanup";
 import { seedGroupMemberForUser, seedPendingGroupInvitationForUser } from "./helpers/seed";
+import { withInvitationTestGroups } from "./helpers/invitationGroups";
+import { invitationGroupOperationsForPage } from "./helpers/invitationGroupClient";
 
 async function expandDangerZone(page: Page) {
   const trigger = page.getByRole("button", { name: "危険な操作" });
@@ -209,6 +211,62 @@ test.describe("グループアクセス", () => {
     await expect(page.getByTestId("group-pending-invitation-list-empty")).toHaveText(
       "送信済みの招待はありません。",
     );
+  });
+
+  test("@smoke @group-access 招待URLは参加を保存せず、切替同意と受諾操作を待つ", async ({
+    page,
+  }, testInfo) => {
+    await gotoAuthenticated(page, "/", { ensureGroup: false });
+    const userId = await getCurrentClerkTokenIdentifier(page);
+    const recipientEmail = process.env.E2E_CLERK_USER_EMAIL;
+    if (!recipientEmail) throw new Error("E2E_CLERK_USER_EMAIL is not set");
+
+    const operations = await invitationGroupOperationsForPage(page, userId);
+    await withInvitationTestGroups(operations, userId, async (createGroup) => {
+      try {
+        await createGroup("招待先の家計");
+        await page.goto("/");
+        await expect(page.getByRole("heading", { name: "今週のダッシュボード" })).toBeVisible();
+        const { token } = await seedPendingGroupInvitationForUser(userId, recipientEmail);
+
+        await createGroup("切替前の家計");
+        await page.goto("/");
+        await expect(page.getByRole("heading", { name: "今週のダッシュボード" })).toBeVisible();
+        const invitationPath = `/group/invitations/accept?token=${encodeURIComponent(token)}`;
+        await page.goto(invitationPath);
+        await expect(page.getByRole("heading", { name: "招待先の家計" })).toBeVisible();
+        await expect(page.getByText(/「切替前の家計」から招待先に切り替わります/)).toBeVisible();
+        await expect(page.getByRole("button", { name: "招待を受け入れて参加する" })).toBeDisabled();
+        await page.reload();
+        await expect(page.getByRole("button", { name: "招待を受け入れて参加する" })).toBeDisabled();
+
+        await page.goto("/settings");
+        await expandGroupManagement(page);
+        await expect(page.getByRole("textbox", { name: "グループ名" })).toHaveValue("切替前の家計");
+
+        await page.goto(invitationPath);
+        await page.getByRole("checkbox", { name: "表示するグループの切り替えに同意する" }).check();
+        await page.getByRole("button", { name: "招待を受け入れて参加する" }).click();
+        await expect(page).toHaveURL("/");
+        await page.goto("/settings");
+        await expandGroupManagement(page);
+        await expect(page.getByRole("textbox", { name: "グループ名" })).toHaveValue("招待先の家計");
+        await expect(page.getByTestId("group-pending-invitation-list-empty")).toBeVisible();
+      } catch (error) {
+        try {
+          await testInfo.attach("invitation-before-cleanup", {
+            body: await page.screenshot(),
+            contentType: "image/png",
+          });
+        } catch (evidenceError) {
+          throw new AggregateError(
+            [error, evidenceError],
+            "Invitation E2E failure and screenshot failure",
+          );
+        }
+        throw error;
+      }
+    });
   });
 
   test("@smoke @group-access owner は pending 招待を確認ダイアログ経由で取り消せる", async ({

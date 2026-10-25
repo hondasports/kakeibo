@@ -282,13 +282,13 @@ export const e2eSeedPendingGroupInvitationHandler = httpAction(async (ctx, req) 
     });
   }
 
-  const invitationId = await ctx.runMutation(internal.groups.e2e.seedPendingGroupInvitationForE2e, {
+  const invitation = await ctx.runMutation(internal.groups.e2e.seedPendingGroupInvitationForE2e, {
     groupId: scope.groupId,
     email: invitationEmail,
     invitedByUserId: scope.userId,
   });
 
-  return new Response(JSON.stringify({ invitationId }), {
+  return new Response(JSON.stringify(invitation), {
     status: 200,
     headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
   });

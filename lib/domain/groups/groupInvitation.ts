@@ -52,3 +52,22 @@ export function assessGroupInvitationStaleness(invitation: {
   if (!invitation.acceptedByUserId) return "stale";
   return "check_membership";
 }
+
+export type InvitationRecipient = {
+  token: string;
+  acceptedUserId: string;
+  acceptedEmails: string[];
+};
+
+export type InvitationAcceptanceConsent = {
+  switchActiveGroup?: boolean;
+  expectedActiveGroupId?: string;
+};
+
+export type GroupInvitationPreview = {
+  groupId: string;
+  groupName: string;
+  activeGroupId: string | null;
+  activeGroupName: string | null;
+  isExistingMember: boolean;
+};

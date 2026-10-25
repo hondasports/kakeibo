@@ -180,6 +180,22 @@ describe("paginateReceiptGroups", () => {
 });
 
 describe("parseExpenseSearchFilters", () => {
+  it.each([
+    ["0100-01-01", "9999-12-31"],
+    ["2000-01-01", "2100-01-01"],
+  ])("1200か月を超える範囲 %s〜%s は拒否する", (startDate, endDate) => {
+    expect(parseExpenseSearchFilters({ startDate, endDate })).toEqual({
+      ok: false,
+      error: "期間は1200か月以内で指定してください",
+    });
+  });
+
+  it("上限ちょうどの1200か月を受け付ける", () => {
+    expect(parseExpenseSearchFilters({ startDate: "2000-01-01", endDate: "2099-12-31" }).ok).toBe(
+      true,
+    );
+  });
+
   it("正常な条件を正規化する", () => {
     expect(
       parseExpenseSearchFilters({

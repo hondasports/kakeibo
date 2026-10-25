@@ -20,7 +20,10 @@ import {
   createManagementAuditLogRecorder,
 } from "./convexManagementAuditLog";
 import { createGroupEmailNotificationQueue } from "./convexGroupEmailNotifications";
-import { createGroupInvitationCleanupService } from "./convexGroupInvitationCleanup";
+import {
+  createGroupInvitationCleanupService,
+  createGroupInvitationEligibilityGuard,
+} from "./convexGroupInvitationCleanup";
 import {
   createGroupDeletionJobReader,
   createGroupDeletionQueryService,
@@ -50,6 +53,7 @@ export function createGroupQueryDeps(ctx: Pick<QueryCtx, "db">) {
     memberships: createGroupMembershipReadRepository(ctx),
     users: createUserDirectoryRead(ctx),
     invitations: createGroupInvitationReadRepository(ctx),
+    invitationEligibility: createGroupInvitationEligibilityGuard(ctx),
     auditLogs: createManagementAuditLogReadRepository(ctx),
     deletionJobs: createGroupDeletionJobReader(ctx),
     deletionQuery: createGroupDeletionQueryService(ctx),

@@ -25,12 +25,14 @@ export {
 } from "../../lib/convex/groups/invitationHandlers/revoke";
 export { revokeGroupInvitationsForEmailInGroup } from "../../lib/convex/groups/invitationHandlers/staleCleanup";
 export {
+  previewGroupInvitationForVerifiedEmailsHandler,
   acceptGroupInvitationForVerifiedEmailsHandler,
   acceptGroupInvitationHandler,
 } from "../../lib/convex/groups/invitationHandlers/accept";
 
 import { cancelPendingGroupInvitationHandler } from "../../lib/convex/groups/invitationHandlers/revoke";
 import {
+  previewGroupInvitationForVerifiedEmailsHandler,
   acceptGroupInvitationForVerifiedEmailsHandler,
   acceptGroupInvitationHandler,
 } from "../../lib/convex/groups/invitationHandlers/accept";
@@ -101,7 +103,11 @@ export const setGroupClerkOrganizationId = internalMutation({
 });
 
 export const acceptGroupInvitation = mutation({
-  args: { token: v.string() },
+  args: {
+    token: v.string(),
+    switchActiveGroup: v.optional(v.boolean()),
+    expectedActiveGroupId: v.optional(v.id("groups")),
+  },
   returns: v.id("groups"),
   handler: acceptGroupInvitationHandler,
 });
@@ -111,6 +117,17 @@ export const acceptGroupInvitationForVerifiedEmails = internalMutation({
     token: v.string(),
     acceptedUserId: v.string(),
     acceptedEmails: v.array(v.string()),
+    switchActiveGroup: v.optional(v.boolean()),
+    expectedActiveGroupId: v.optional(v.id("groups")),
   },
   handler: acceptGroupInvitationForVerifiedEmailsHandler,
+});
+
+export const previewGroupInvitationForVerifiedEmails = internalQuery({
+  args: {
+    token: v.string(),
+    acceptedUserId: v.string(),
+    acceptedEmails: v.array(v.string()),
+  },
+  handler: previewGroupInvitationForVerifiedEmailsHandler,
 });

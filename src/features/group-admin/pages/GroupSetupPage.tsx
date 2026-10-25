@@ -58,8 +58,7 @@ export function GroupSetupPage() {
           </Box>
 
           <Alert severity="info" variant="outlined">
-            Clerk invitation で招待されたメンバーは、ログイン後にオーナーが設定画面から
-            グループへ追加します。
+            招待された方は、招待リンクからログインし、招待先と表示するグループを確認して参加できます。
           </Alert>
 
           {error ? (

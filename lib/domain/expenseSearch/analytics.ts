@@ -2,6 +2,8 @@ import { addDays, getMonthEndDate } from "../common/date";
 import { calculateWeekStartDate } from "../week/weekDates";
 import type { CategorySummary } from "../receipt/summary";
 import type { ExpenseSearchFilters, SearchableHistoryGroup } from "./filter";
+import { ExpenseSearchDomainError } from "./searchResult";
+import { getHistoryTrendRangeError } from "./trendRange";
 
 export type HistoryCategoryInfo = {
   name: string;
@@ -161,9 +163,17 @@ function getDateRange(
   groups: SearchableHistoryGroup[],
   filters: ExpenseSearchFilters,
 ): PreviousHistoryPeriod | null {
-  const dates = groups.map((group) => group.date).sort();
-  const startDate = filters.startDate ?? dates[0];
-  const endDate = filters.endDate ?? dates[dates.length - 1];
+  let firstDate: string | undefined;
+  let lastDate: string | undefined;
+  if (filters.startDate === undefined || filters.endDate === undefined) {
+    for (const group of groups) {
+      const date = group.date;
+      if (firstDate === undefined || date < firstDate) firstDate = date;
+      if (lastDate === undefined || date > lastDate) lastDate = date;
+    }
+  }
+  const startDate = filters.startDate ?? firstDate;
+  const endDate = filters.endDate ?? lastDate;
   if (startDate === undefined || endDate === undefined || startDate > endDate) {
     return null;
   }
@@ -199,7 +209,7 @@ function minDate(left: string, right: string): string {
 }
 
 function nextMonthStart(monthStartDate: string): string {
-  const nextDay = addDays(getMonthEndDate(monthStartDate), 1);
+  const nextDay = addDays(getMonthEndDate(monthStartDate), 1).padStart(10, "0");
   return `${nextDay.slice(0, 7)}-01`;
 }
 
@@ -213,7 +223,7 @@ function buildTrendBuckets(
     granularity === "day"
       ? startDate
       : granularity === "week"
-        ? calculateWeekStartDate(startDate, 1)
+        ? calculateWeekStartDate(startDate, 1).padStart(10, "0")
         : `${startDate.slice(0, 7)}-01`;
 
   while (cursor <= endDate) {
@@ -221,17 +231,20 @@ function buildTrendBuckets(
       granularity === "day"
         ? cursor
         : granularity === "week"
-          ? addDays(cursor, 6)
+          ? addDays(cursor, Math.min(6, inclusiveDayCount(cursor, endDate) - 1)).padStart(10, "0")
           : getMonthEndDate(cursor);
     buckets.push({
       startDate: maxDate(cursor, startDate),
       endDate: minDate(rawEndDate, endDate),
     });
+    if (rawEndDate >= endDate) {
+      break;
+    }
     cursor =
       granularity === "day"
-        ? addDays(cursor, 1)
+        ? addDays(cursor, 1).padStart(10, "0")
         : granularity === "week"
-          ? addDays(cursor, 7)
+          ? addDays(cursor, 7).padStart(10, "0")
           : nextMonthStart(cursor);
   }
 
@@ -247,31 +260,52 @@ export function buildHistoryTrend(
     return [];
   }
 
-  const granularity = chooseHistoryTrendGranularity(range.startDate, range.endDate);
-  return buildTrendBuckets(range.startDate, range.endDate, granularity).map((bucket) => {
-    let totalExpenseYen = 0;
-    let totalIncomeYen = 0;
-    for (const group of groups) {
-      if (group.date < bucket.startDate || group.date > bucket.endDate) {
-        continue;
-      }
-      if (group.type === "income") {
-        totalIncomeYen += group.amountYen;
-      } else {
-        totalExpenseYen += group.amountYen;
-      }
-    }
+  const trendRangeError = getHistoryTrendRangeError(range.startDate, range.endDate);
+  if (trendRangeError !== null) {
+    throw new ExpenseSearchDomainError(trendRangeError);
+  }
 
-    return {
-      key: bucket.startDate,
-      startDate: bucket.startDate,
-      endDate: bucket.endDate,
-      granularity,
-      totalExpenseYen,
-      totalIncomeYen,
-      netAmountYen: totalIncomeYen - totalExpenseYen,
-    };
-  });
+  const granularity = chooseHistoryTrendGranularity(range.startDate, range.endDate);
+  const points: HistoryTrendPoint[] = buildTrendBuckets(
+    range.startDate,
+    range.endDate,
+    granularity,
+  ).map((bucket) => ({
+    key: bucket.startDate,
+    startDate: bucket.startDate,
+    endDate: bucket.endDate,
+    granularity,
+    totalExpenseYen: 0,
+    totalIncomeYen: 0,
+    netAmountYen: 0,
+  }));
+  const bucketKey = (date: string) =>
+    granularity === "day"
+      ? date
+      : granularity === "week"
+        ? calculateWeekStartDate(date, 1).padStart(10, "0")
+        : date.slice(0, 7);
+  const pointByKey = new Map(points.map((point) => [bucketKey(point.startDate), point]));
+
+  for (const group of groups) {
+    const date = group.date;
+    if (date < range.startDate || date > range.endDate) {
+      continue;
+    }
+    const point = pointByKey.get(bucketKey(date));
+    if (point === undefined) {
+      continue;
+    }
+    if (group.type === "income") {
+      point.totalIncomeYen += group.amountYen;
+    } else {
+      point.totalExpenseYen += group.amountYen;
+    }
+  }
+  for (const point of points) {
+    point.netAmountYen = point.totalIncomeYen - point.totalExpenseYen;
+  }
+  return points;
 }
 
 export function calculatePreviousHistoryPeriod(

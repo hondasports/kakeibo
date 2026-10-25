@@ -27,7 +27,7 @@ export async function getGroupDeletionPreviewHandler(
 
 export async function requestGroupDeletionHandler(
   ctx: MutationCtx,
-  args: { confirmationGroupName: string },
+  args: { confirmationGroupName: string; expectedGroupId?: Id<"groups"> },
 ) {
   const { groupId, userId } = await requireGroupOwner(ctx);
   const jobId = await requestGroupDeletionUsecase(
@@ -45,7 +45,10 @@ export const getGroupDeletionPreview = query({
 });
 
 export const requestGroupDeletion = mutation({
-  args: { confirmationGroupName: v.string() },
+  args: {
+    confirmationGroupName: v.string(),
+    expectedGroupId: v.optional(v.id("groups")),
+  },
   returns: v.id("groupDeletionJobs"),
   handler: requestGroupDeletionHandler,
 });

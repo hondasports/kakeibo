@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyChangedFiles,
+  classifyPullRequest,
   isMetadataOnlyPath,
   isProcessOnlyPath,
   normalizeChangedPath,
@@ -116,6 +117,74 @@ describe("E2E relevance path classification", () => {
       expect(isMetadataOnlyPath(filePath), filePath).toBe(true);
     // public/ ships verbatim into the build output — a .md there is observable.
     expect(isMetadataOnlyPath("public/notes.md")).toBe(false);
+  });
+});
+
+describe("E2E relevance for preview to main promotion", () => {
+  it("skips a same-repository preview to main PR because the preview push runs the same E2E on the same commit", () => {
+    expect(
+      classifyPullRequest({
+        baseRef: "main",
+        headRef: "preview",
+        changedPaths: ["src/App.tsx", "convex/schema.ts"],
+      }),
+    ).toMatchObject({
+      runtimeRelevant: false,
+      reason: "promotion_head_verified_by_preview_push",
+      changedPaths: ["src/App.tsx", "convex/schema.ts"],
+    });
+  });
+
+  it("keeps path classification for other base and head combinations", () => {
+    expect(
+      classifyPullRequest({
+        baseRef: "main",
+        headRef: "fix/hotfix",
+        changedPaths: ["src/App.tsx"],
+      }),
+    ).toMatchObject({ runtimeRelevant: true, reason: "runtime_relevant_path_detected" });
+    expect(
+      classifyPullRequest({
+        baseRef: "preview",
+        headRef: "preview",
+        changedPaths: ["src/App.tsx"],
+      }),
+    ).toMatchObject({ runtimeRelevant: true });
+    expect(
+      classifyPullRequest({
+        baseRef: "main",
+        headRef: "release/m16",
+        changedPaths: ["src/App.tsx"],
+      }),
+    ).toMatchObject({ runtimeRelevant: true });
+  });
+
+  it("keeps path classification when the head ref is not given (fork PRs pass an empty head ref)", () => {
+    expect(
+      classifyPullRequest({ baseRef: "main", headRef: "", changedPaths: ["src/App.tsx"] }),
+    ).toMatchObject({ runtimeRelevant: true });
+    expect(classifyPullRequest({ changedPaths: ["src/App.tsx"] })).toMatchObject({
+      runtimeRelevant: true,
+    });
+  });
+
+  it("accepts optional base and head refs on the command line", () => {
+    expect(
+      parseArguments(["--base", SHA, "--head", SHA, "--base-ref", "main", "--head-ref", "preview"]),
+    ).toMatchObject({ baseRef: "main", headRef: "preview" });
+    expect(parseArguments(["--base", SHA, "--head", SHA, "--head-ref", ""])).toMatchObject({
+      headRef: "",
+    });
+  });
+
+  it("passes the head ref to the classifier only for same-repository PRs", () => {
+    const workflow = readFileSync(E2E_WORKFLOW_PATH, "utf8");
+
+    expect(workflow).toContain("BASE_REF: ${{ github.event.pull_request.base.ref }}");
+    expect(workflow).toContain(
+      "HEAD_REF: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref || '' }}",
+    );
+    expect(workflow).toContain('--base-ref "$BASE_REF" --head-ref "$HEAD_REF"');
   });
 });
 

@@ -4,6 +4,7 @@
  *
  * 使い方:
  *   node scripts/verify-prepush.mjs [--include <path> ...] [--base <sha>]
+ *   E2E_VITE_PORT=15173 E2E_CONVEX_CLOUD_PORT=13210 E2E_CONVEX_SITE_PORT=13211 pnpm run verify:prepush
  *
  * 検証順（先に失敗した時点で停止）:
  *   1. 型: tsc -b
@@ -24,6 +25,7 @@ import { createRequire } from "node:module";
 import { isMetadataOnlyPath, normalizeChangedPath } from "./classify-e2e-relevance.mjs";
 import { parseEnvFile } from "./sync-e2e-env.mjs";
 import { selectSpecs } from "./select-e2e-specs.mjs";
+import { e2ePortChecks, resolveE2EPorts } from "./lib/isolated-e2e-ports.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const E2E_SPEC_PATTERN = /^e2e\/[^/]+\.spec\.ts$/;
@@ -34,11 +36,6 @@ const E2E_ENV_VARS = [
   "CLERK_SECRET_KEY",
   "E2E_CLERK_USER_EMAIL",
   "E2E_CLERK_USER_ID",
-];
-const E2E_PORTS = [
-  { port: 5173, label: "Vite dev (pnpm run devが起動している場合は停止する)" },
-  { port: 3210, label: "Convex local backend (api)" },
-  { port: 3211, label: "Convex local backend (http actions)" },
 ];
 
 /* ------------------------------------------------------------------ git */
@@ -144,7 +141,8 @@ export function portBusy(
 /** e2e:isolated の事前条件を検査し、満たさない条件を列挙する。 */
 export async function e2ePreflight({
   cwd = repoRoot,
-  ports = E2E_PORTS,
+  env = process.env,
+  ports = e2ePortChecks(resolveE2EPorts(env)),
   requiredEnv = E2E_ENV_VARS,
   checkPort = portBusy,
   chromiumPath = defaultChromiumPath,
@@ -168,7 +166,7 @@ export async function e2ePreflight({
     ? parseEnvFile(readFileSync(envLocalPath, "utf8"))
     : new Map();
   // start-ci-convex.mjs と同じく process.env 優先、.env.local はフォールバック
-  const missing = requiredEnv.filter((key) => !process.env[key] && !fileEnv.get(key));
+  const missing = requiredEnv.filter((key) => !env[key] && !fileEnv.get(key));
   if (missing.length > 0) {
     failures.push(
       `E2E環境変数が不足: ${missing.join(", ")}（process.env または .env.local に設定。docs/environment-variables.md を参照）`,
@@ -253,12 +251,12 @@ export function sanitizeHookEnv(env = process.env) {
   return clean;
 }
 
-function defaultRunStep(command, args, cwd, logFile) {
+function defaultRunStep(command, args, cwd, logFile, env) {
   // e2e:isolated はconvexログを全部流すので既定の1MBでは溢れる
   const out = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
-    env: sanitizeHookEnv(),
+    env,
     maxBuffer: 256 * 1024 * 1024,
   });
   writeFileSync(logFile, [out.stdout, out.stderr].filter(Boolean).join("\n"));
@@ -327,6 +325,7 @@ function buildSteps({ changedFiles, selection, includes }) {
 export async function runPrepush({
   argv = [],
   cwd = repoRoot,
+  env = process.env,
   runStep = defaultRunStep,
   gitOps = {
     head: (root) => git(root, ["rev-parse", "HEAD"]),
@@ -372,6 +371,8 @@ export async function runPrepush({
   out = console.log,
 } = {}) {
   const args = parseArguments(argv);
+  const stepEnv = sanitizeHookEnv(env);
+  const ports = e2ePortChecks(resolveE2EPorts(stepEnv));
   const head = gitOps.head(cwd);
   const base = args.base ?? gitOps.base(cwd);
   if (!base) {
@@ -402,7 +403,7 @@ export async function runPrepush({
     );
   }
   if (selection.specs.length > 0) {
-    const failures = await preflight({ cwd });
+    const failures = await preflight({ cwd, env: stepEnv, ports });
     if (failures.length > 0) {
       out(
         `verify:prepush FAILED\nE2E事前条件を満たしていません:\n${failures.map((f) => `  - ${f}`).join("\n")}\n迂回が必要な場合は git push --no-verify を使い、PR本文に記載してください。`,
@@ -415,7 +416,7 @@ export async function runPrepush({
   for (const step of steps) {
     const logFile = path.join(LOG_DIR, `${step.id}.log`);
     const started = Date.now();
-    const status = runStep(step.command, step.args, cwd, logFile);
+    const status = runStep(step.command, step.args, cwd, logFile, stepEnv);
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
     if (status !== 0) {
       out(

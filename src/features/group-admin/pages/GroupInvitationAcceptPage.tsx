@@ -4,6 +4,11 @@ import { useGroupInvitationAccept } from "../hooks/useGroupInvitationAccept";
 
 export function GroupInvitationAcceptPage() {
   const {
+    invitation,
+    needsGroupSwitch,
+    switchActiveGroup,
+    setSwitchActiveGroup,
+    handleAcceptInvitation,
     error,
     firstName,
     handleProfileDetailsSubmit,
@@ -32,6 +37,11 @@ export function GroupInvitationAcceptPage() {
 
   return (
     <GroupInvitationAcceptView
+      invitation={invitation}
+      needsGroupSwitch={needsGroupSwitch}
+      switchActiveGroup={switchActiveGroup}
+      onSwitchActiveGroupChange={setSwitchActiveGroup}
+      onAcceptInvitation={handleAcceptInvitation}
       error={error}
       firstName={firstName}
       isCompletingInvitation={isCompletingInvitation}

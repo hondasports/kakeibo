@@ -60,11 +60,11 @@ export async function seedTaxSummaryConflictDraftByUser(
 export async function seedPendingGroupInvitationForUser(
   userId: string,
   invitationEmail: string,
-): Promise<{ invitationId: string }> {
+): Promise<{ invitationId: string; token: string }> {
   return (await postE2eSeed("/e2e/seed-pending-group-invitation", {
     userId,
     invitationEmail,
-  })) as { invitationId: string };
+  })) as { invitationId: string; token: string };
 }
 
 export async function seedGroupMemberForUser(
