@@ -94,13 +94,23 @@ export function normalizeAmounts(args: {
         indexes.map((index) => result[index].printedAmountYen),
       );
       if (!allocations) continue;
+      const normalizedAmounts = indexes.map(
+        (itemIndex, allocationIndex) =>
+          result[itemIndex].printedAmountYen +
+          (match.amountBasis === "tax_excluded" ? allocations[allocationIndex] : 0),
+      );
+      if (
+        normalizedAmounts.some(
+          (amount) => !Number.isSafeInteger(amount) || Math.abs(amount) > EXPENSE_ENTRY_AMOUNT_MAX,
+        )
+      ) {
+        continue;
+      }
       allocatedRates.add(summary.taxRatePercent);
       indexes.forEach((itemIndex, allocationIndex) => {
         result[itemIndex].allocatedTaxYen = allocations[allocationIndex];
         result[itemIndex].taxAllocationStatus = "allocated";
-        result[itemIndex].normalizedAmountYen =
-          result[itemIndex].printedAmountYen +
-          (match.amountBasis === "tax_excluded" ? allocations[allocationIndex] : 0);
+        result[itemIndex].normalizedAmountYen = normalizedAmounts[allocationIndex];
       });
     }
   }

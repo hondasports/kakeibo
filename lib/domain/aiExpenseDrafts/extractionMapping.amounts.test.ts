@@ -6,8 +6,50 @@ import {
 import { mapExtractionToDraftArgs } from "./extractionMapping";
 import { foodCategory } from "./testHelpers";
 import { EXPENSE_ENTRY_AMOUNT_MAX } from "../expenseEntries/expenseEntryItem";
+import { parseOpenAIResponse } from "../receipt/extraction";
 
 describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
+  it("抽出された明細の税込換算が上限を超えた場合は税率群全体を未配分で下書きに渡す", () => {
+    const amounts = [9_999_999, -9_999_899];
+    const source = {
+      ...trialExternal8Fixture,
+      amountYen: 108,
+      items: amounts.map((amount) => ({
+        ...trialExternal8Fixture.items![0],
+        itemName: amount < 0 ? "値引き" : "商品",
+        lineType: amount < 0 ? "discount" : "item",
+        amountYen: amount,
+        printedAmountYen: amount,
+      })),
+      taxSummaries: [
+        {
+          ...trialExternal8Fixture.taxSummaries![0],
+          taxableAmountYen: 100,
+          taxYen: 8,
+          taxIncludedAmountYen: 108,
+        },
+      ],
+    };
+    const parsed = parseOpenAIResponse({
+      output: [
+        { type: "message", content: [{ type: "output_text", text: JSON.stringify(source) }] },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    const mapped = mapExtractionToDraftArgs(parsed.extracted, [foodCategory]);
+    expect(mapped.amountYen).toBe(108);
+    expect(mapped.items?.map((item) => item.printedAmountYen)).toEqual(amounts);
+    expect(mapped.items?.map((item) => item.normalizedAmountYen)).toEqual(amounts);
+    expect(mapped.items?.map((item) => item.amountYen)).toEqual(amounts);
+    expect(mapped.items?.map((item) => item.allocatedTaxYen)).toEqual([0, 0]);
+    expect(mapped.items?.map((item) => item.taxAllocationStatus)).toEqual([
+      "unallocated",
+      "unallocated",
+    ]);
+    expect(mapped.reviewReasons).toContain("user_confirmation_required");
+  });
+
   it("範囲外の明細は税額を配分せず、ユーザー確認へ送る", () => {
     const product = trialExternal8Fixture.items![0];
     const amounts = [EXPENSE_ENTRY_AMOUNT_MAX + 1, 100, -EXPENSE_ENTRY_AMOUNT_MAX - 1];

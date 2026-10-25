@@ -18,6 +18,22 @@ const availableCases = receiptTaxGoldenCaseLedger.filter(
 );
 
 describe("Issue #890 印字基準が異なるgolden cases", () => {
+  it("税込換算が上限ちょうどの明細でも税合計と支払額を保持する", () => {
+    const result = interpretReceiptTax(
+      receiptTaxBasisInput({
+        amounts: [9_259_258, -9_259_158],
+        taxYen: 8,
+        paidYen: 108,
+        allocations: [740_741, -740_733],
+      }),
+    );
+    expect(result.items.map((item) => item.allocatedTaxYen)).toEqual([740_741, -740_733]);
+    expect(result.items.map((item) => item.normalizedAmountYen)).toEqual([9_999_999, -9_999_891]);
+    expect(result.items.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+    expect(result.items.reduce((sum, item) => sum + item.normalizedAmountYen, 0)).toBe(108);
+    expect(result.items.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(8);
+  });
+
   it.each([
     {
       amounts: [500, -111],

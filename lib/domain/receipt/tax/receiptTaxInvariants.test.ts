@@ -46,6 +46,45 @@ function input(overrides: Partial<ReceiptTaxInput> = {}): ReceiptTaxInput {
 }
 
 describe("receiptTax invariants", () => {
+  it.each([
+    [9_999_999, -9_999_899],
+    [9_259_259, -9_259_159],
+  ])("税込換算が上限を超える税率群は全明細を未配分に保つ: %s / %s", (...amounts) => {
+    const result = interpretReceiptTax(
+      input({
+        amountYen: 218,
+        items: [
+          ...amounts.map((printedAmountYen) =>
+            item({ printedAmountYen, amountBasis: "tax_excluded", taxRatePercent: 8 }),
+          ),
+          item({ amountBasis: "tax_excluded", taxRatePercent: 10 }),
+        ],
+        taxSummaries: [
+          summary({
+            taxRatePercent: 8,
+            taxMode: "external",
+            taxableAmountBasis: "tax_excluded",
+            taxYen: 8,
+            taxIncludedAmountYen: 108,
+          }),
+          summary({
+            taxMode: "external",
+            taxableAmountBasis: "tax_excluded",
+            taxIncludedAmountYen: 110,
+          }),
+        ],
+      }),
+    );
+    expect(result.items.map((item) => item.printedAmountYen)).toEqual([...amounts, 100]);
+    expect(result.items.map((item) => item.normalizedAmountYen)).toEqual([...amounts, 110]);
+    expect(result.items.map((item) => item.allocatedTaxYen)).toEqual([0, 0, 10]);
+    expect(result.items.map((item) => item.taxAllocationStatus)).toEqual([
+      "unallocated",
+      "unallocated",
+      "allocated",
+    ]);
+  });
+
   it("範囲外の明細を含む税額は未配分に保ち、印字金額を保存する", () => {
     const amounts = [EXPENSE_ENTRY_AMOUNT_MAX + 1, 100, -EXPENSE_ENTRY_AMOUNT_MAX - 1];
     const result = interpretReceiptTax(
