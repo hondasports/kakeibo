@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LineAccountLinkRecord } from "../../domain/lineWebhook/records";
+import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../domain/lineWebhook/reply";
 import { buildSummaryReply, type BuildSummaryReplyDeps } from "./buildSummaryReply";
 
 const originalLink: LineAccountLinkRecord = {
@@ -43,16 +44,20 @@ describe("サマリー返信のリンク確認", () => {
     ["別のアプリユーザーのリンクの場合", [{ ...originalLink, userId: "user-b" }]],
     ["有効リンクが複数の場合", [originalLink, { ...originalLink, id: "link-b" }]],
   ] satisfies [string, LineAccountLinkRecord[]][])(
-    "%sは家計を読まず返信を作らない",
+    "%sは家計を読まず未連携案内を返す",
     async (_, links) => {
       const deps = createDeps(links);
-      await expect(buildSummaryReply(deps, args)).resolves.toBeNull();
+      await expect(buildSummaryReply(deps, args)).resolves.toEqual({
+        replyKind: "unlinked",
+        replyText: LINE_UNLINKED_GUIDANCE_MESSAGE,
+      });
       expect(deps.activeGroup.resolve).not.toHaveBeenCalled();
       expect(deps.groups.get).not.toHaveBeenCalled();
       expect(deps.userSettings.resolveWeeklyStartDay).not.toHaveBeenCalled();
-      for (const read of Object.values(deps.summaryData)) {
-        expect(read).not.toHaveBeenCalled();
-      }
+      expect(deps.summaryData.getWeekSpendingEntries).not.toHaveBeenCalled();
+      expect(deps.summaryData.getWeekIncomeEntries).not.toHaveBeenCalled();
+      expect(deps.summaryData.buildCategoryInfoMap).not.toHaveBeenCalled();
+      expect(deps.summaryData.listActiveCategories).not.toHaveBeenCalled();
     },
   );
 

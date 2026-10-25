@@ -11,6 +11,7 @@ import {
   MAX_LINE_IMAGE_RAW_BYTES,
 } from "../../lib/domain/lineImage/content";
 import { sendSummaryReplyHandler, sendUnlinkedGuideHandler } from "./actions";
+import { LINE_SUMMARY_UNAVAILABLE_MESSAGE } from "../../lib/domain/lineSummary/reply";
 import { buildLineQuickReplyActions } from "../../lib/domain/lineSummary/quickReply";
 
 function setEnvironment(values: Record<string, string | undefined>) {
@@ -335,7 +336,7 @@ describe("LINE messaging client", () => {
     }
   });
 
-  it("summary queryでリンクを確認できない場合は返信しない", async () => {
+  it("summary query失敗時は金額なしの固定文を送る", async () => {
     const restore = setEnvironment({
       LINE_INTEGRATION_MODE: "real",
       LINE_MESSAGING_CHANNEL_ACCESS_TOKEN: "access-token",
@@ -356,7 +357,13 @@ describe("LINE messaging client", () => {
         }),
       ).resolves.toBeNull();
       expect(runAfter).not.toHaveBeenCalled();
-      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(
+        JSON.parse(String((fetchImpl.mock.calls[0] as [string, RequestInit])[1].body)),
+      ).toEqual({
+        replyToken: "reply-token",
+        messages: [{ type: "text", text: LINE_SUMMARY_UNAVAILABLE_MESSAGE }],
+      });
     } finally {
       vi.unstubAllGlobals();
       restore();

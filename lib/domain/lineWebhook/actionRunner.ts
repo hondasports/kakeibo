@@ -73,12 +73,12 @@ export interface LineReplySender {
 export interface LineSummaryRunner {
   buildReply(
     args: Omit<SummaryReplyJobArgs, "replyToken">,
-  ): Promise<{ replyText: string; replyKind: LineReplyKind } | null>;
+  ): Promise<{ replyText: string; replyKind: LineReplyKind }>;
 }
 
 export type SendUnlinkedGuideJobArgs = { replyToken: string; attempt?: number };
 
-// 予約済みの旧形式も受け付けるが、リンクを特定できなければ送信しない。
+// 旧形式では予約時のリンクを復元できないため、現在のリンクで補完しない。
 export type SendSummaryReplyJobArgs = Omit<SummaryReplyJobArgs, "linkId" | "lineUserId"> &
   Partial<Pick<SummaryReplyJobArgs, "linkId" | "lineUserId">> & { attempt?: number };
 
@@ -93,10 +93,7 @@ export type ProcessLinkedImageRetryArgs = {
 /** action 側リトライ予約。 */
 export interface LineActionScheduler {
   scheduleUnlinkedGuideRetry(delayMs: number, args: SendUnlinkedGuideJobArgs): Promise<void>;
-  scheduleSummaryReplyRetry(
-    delayMs: number,
-    args: SummaryReplyJobArgs & { attempt: number },
-  ): Promise<void>;
+  scheduleSummaryReplyRetry(delayMs: number, args: SendSummaryReplyJobArgs): Promise<void>;
   scheduleProcessLinkedImageRetry(
     delayMs: number,
     args: ProcessLinkedImageRetryArgs,

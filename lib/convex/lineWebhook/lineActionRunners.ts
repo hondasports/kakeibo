@@ -147,9 +147,10 @@ export function createLineActionScheduler(ctx: ActionCtx): LineActionScheduler {
       await ctx.scheduler.runAfter(delayMs, internal.lineWebhook.actions.sendUnlinkedGuide, args);
     },
     scheduleSummaryReplyRetry: async (delayMs, args) => {
+      const { linkId, ...retryArgs } = args;
       await ctx.scheduler.runAfter(delayMs, internal.lineWebhook.actions.sendSummaryReply, {
-        ...args,
-        linkId: args.linkId as Id<"lineAccountLinks">,
+        ...retryArgs,
+        ...(linkId === undefined ? {} : { linkId: linkId as Id<"lineAccountLinks"> }),
       });
     },
     scheduleProcessLinkedImageRetry: async (delayMs, args) => {

@@ -29,7 +29,7 @@ const summaryReplyValidator = v.object({
 export async function buildSummaryReplyHandler(
   ctx: QueryCtx,
   args: Omit<SummaryReplyJobArgs, "replyToken">,
-): Promise<{ replyText: string; replyKind: LineReplyKind } | null> {
+): Promise<{ replyText: string; replyKind: LineReplyKind }> {
   return await buildSummaryReply(createLineWebhookQueryDeps(ctx), args);
 }
 
@@ -41,6 +41,6 @@ export const buildReply = internalQuery({
     messageText: v.string(),
     nowMs: v.number(),
   },
-  returns: v.union(summaryReplyValidator, v.null()),
+  returns: summaryReplyValidator,
   handler: buildSummaryReplyHandler,
 });

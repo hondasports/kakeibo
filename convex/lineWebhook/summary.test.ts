@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FunctionArgs } from "convex/server";
 import { internal } from "../_generated/api";
 import schema from "../schema";
+import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../lib/domain/lineWebhook/reply";
+import { LINE_SUMMARY_UNAVAILABLE_MESSAGE } from "../../lib/domain/lineSummary/reply";
 import { convexTestModules } from "../test.setup";
 import {
   LINE_HELP_MESSAGE,
@@ -181,8 +183,6 @@ async function queryLinkedSummary(
     linkId: link._id,
     lineUserId: link.lineUserId,
   });
-  expect(reply).not.toBeNull();
-  if (reply === null) throw new Error("有効リンクには返信が必要です");
   return reply;
 }
 
@@ -214,7 +214,7 @@ describe("LINE readonly summary", () => {
     expect(reply.replyText).not.toContain("別グループの秘密");
   });
 
-  it("解除済みのリンクには返信を作らない", async () => {
+  it("解除済みのリンクには金額を含まない未連携案内を返す", async () => {
     const t = convexTest(schema, convexTestModules);
     const { linkId } = await seedLinkedHousehold(t, {
       userId: "user-a",
@@ -230,7 +230,7 @@ describe("LINE readonly summary", () => {
         messageText: "今週の支出",
         nowMs: NOW_MS,
       }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ replyKind: "unlinked", replyText: LINE_UNLINKED_GUIDANCE_MESSAGE });
   });
 
   it("コマンドごとに支出・収入・カテゴリ別・週別推移・食費を返す", async () => {
@@ -625,7 +625,7 @@ describe("予約時のリンクに基づくサマリー返信", () => {
   }
 
   it.each(["有効", "解除", "別アカウントへの変更", "同じアカウントへの再連携", "所有者の変更"])(
-    "%sの場合に予約時のリンクで返信可否を決める",
+    "%sの場合に予約時のリンクで家計の返信可否を決める",
     async (state) => {
       const t = convexTest(schema, convexTestModules);
       const fetchImpl = mockReply();
@@ -651,17 +651,22 @@ describe("予約時のリンクに基づくサマリー返信", () => {
       await expect(
         t.action(internal.lineWebhook.actions.sendSummaryReply, args),
       ).resolves.toBeNull();
-      expect(fetchImpl).toHaveBeenCalledTimes(state === "有効" ? 1 : 0);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
       if (state === "有効") {
         expect(JSON.parse(String(fetchImpl.mock.calls[0][1].body))).toMatchObject({
           replyToken: "reply-token",
           messages: [{ text: expect.stringContaining("支出: 3,000円") }],
         });
+      } else {
+        expect(JSON.parse(String(fetchImpl.mock.calls[0][1].body))).toMatchObject({
+          replyToken: "reply-token",
+          messages: [{ text: LINE_UNLINKED_GUIDANCE_MESSAGE }],
+        });
       }
     },
   );
 
-  it("予約済みの旧形式は受け付け、返信しない", async () => {
+  it("予約済みの旧形式は受け付け、取得失敗の固定文を返す", async () => {
     const t = convexTest(schema, convexTestModules);
     const fetchImpl = mockReply();
     const { args } = await claimSummary(t);
@@ -669,10 +674,14 @@ describe("予約時のリンクに基づくサマリー返信", () => {
     await expect(
       t.action(internal.lineWebhook.actions.sendSummaryReply, legacyArgs),
     ).resolves.toBeNull();
-    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1].body))).toMatchObject({
+      replyToken: "reply-token",
+      messages: [{ text: LINE_SUMMARY_UNAVAILABLE_MESSAGE }],
+    });
   });
 
-  it("再試行も予約時のリンクを保持し、解除後は返信しない", async () => {
+  it("再試行も予約時のリンクを保持し、解除後は未連携案内を返す", async () => {
     const t = convexTest(schema, convexTestModules);
     const fetchImpl = mockReply();
     fetchImpl.mockRejectedValueOnce(new Error("provider unavailable"));
@@ -686,8 +695,35 @@ describe("予約時のリンクに基づくサマリー返信", () => {
     expect(retryArgs).toEqual({ ...args, attempt: 1 });
     await t.run((ctx) => ctx.db.patch(linkId, { status: "revoked", revokedAt: 2 }));
     await t.action(internal.lineWebhook.actions.sendSummaryReply, retryArgs);
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchImpl.mock.calls[1][1].body))).toMatchObject({
+      replyToken: "reply-token",
+      messages: [{ text: LINE_UNLINKED_GUIDANCE_MESSAGE }],
+    });
     const finalJobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
     expect(finalJobs).toHaveLength(2);
+  });
+
+  it("旧形式の再試行もリンクを補完せず取得失敗の固定文を返す", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const fetchImpl = mockReply();
+    fetchImpl.mockRejectedValueOnce(new Error("provider unavailable"));
+    const { args } = await claimSummary(t);
+    const { linkId: _linkId, lineUserId: _lineUserId, ...legacyArgs } = args;
+    await t.action(internal.lineWebhook.actions.sendSummaryReply, legacyArgs);
+    const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(jobs).toHaveLength(2);
+    const retryArgs = jobs[1].args[0] as FunctionArgs<
+      typeof internal.lineWebhook.actions.sendSummaryReply
+    >;
+    expect(retryArgs).toEqual({ ...legacyArgs, attempt: 1 });
+    await t.action(internal.lineWebhook.actions.sendSummaryReply, retryArgs);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    for (const [, request] of fetchImpl.mock.calls) {
+      expect(JSON.parse(String(request.body))).toMatchObject({
+        replyToken: "reply-token",
+        messages: [{ text: LINE_SUMMARY_UNAVAILABLE_MESSAGE }],
+      });
+    }
   });
 });
