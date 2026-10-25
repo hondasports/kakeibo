@@ -62,6 +62,156 @@ async function seedFixture(t: ReturnType<typeof convexTest>) {
 }
 
 describe("system admin membership operations", () => {
+  it.each(["add", "transfer", "set_active"] as const)(
+    "管理者自身への%sは所属・activeGroupId・監査・通知を変更しない",
+    async (operation) => {
+      const t = convexTest(schema, convexTestModules);
+      const fixture = await seedFixture(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("groupMembers", {
+          groupId: fixture.groupA,
+          userId: "admin",
+          role: "member",
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        await ctx.db.patch(fixture.admin, { activeGroupId: fixture.groupA });
+        if (operation === "set_active") {
+          await ctx.db.insert("groupMembers", {
+            groupId: fixture.groupB,
+            userId: "admin",
+            role: "member",
+            createdAt: 1,
+            updatedAt: 1,
+          });
+        }
+      });
+      const readState = () =>
+        t.run(async (ctx) => ({
+          user: await ctx.db.get(fixture.admin),
+          memberships: await ctx.db.query("groupMembers").collect(),
+          audits: await ctx.db.query("systemAdminAuditLogs").collect(),
+          notifications: await ctx.db.query("systemAdminNotifications").collect(),
+        }));
+      const before = await readState();
+
+      await expect(
+        t
+          .withIdentity(identity("admin"))
+          .mutation(api.systemAdminMembership.systemAdminMembershipOperation, {
+            targetUserId: fixture.admin,
+            operation,
+            sourceGroupId: operation === "transfer" ? fixture.groupA : undefined,
+            targetGroupId: fixture.groupB,
+            reason: "所属を整理",
+          }),
+      ).rejects.toThrow("自分自身の所属追加・移動・activeグループ設定はできません");
+
+      expect(await readState()).toEqual(before);
+    },
+  );
+
+  it.each(["remove", "clear_active"] as const)(
+    "管理者自身への%sはactiveGroupIdを解除し、監査と通知を記録する",
+    async (operation) => {
+      const t = convexTest(schema, convexTestModules);
+      const fixture = await seedFixture(t);
+      const membershipId = await t.run(async (ctx) => {
+        const id = await ctx.db.insert("groupMembers", {
+          groupId: fixture.groupA,
+          userId: "admin",
+          role: "member",
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        await ctx.db.patch(fixture.admin, { activeGroupId: fixture.groupA });
+        return id;
+      });
+
+      await expect(
+        t
+          .withIdentity(identity("admin"))
+          .mutation(api.systemAdminMembership.systemAdminMembershipOperation, {
+            targetUserId: fixture.admin,
+            operation,
+            sourceGroupId: operation === "remove" ? fixture.groupA : undefined,
+            reason: "所属を整理",
+          }),
+      ).resolves.toEqual({ operation, status: "success" });
+
+      const state = await t.run(async (ctx) => ({
+        user: await ctx.db.get(fixture.admin),
+        membership: await ctx.db.get(membershipId),
+        audits: await ctx.db.query("systemAdminAuditLogs").collect(),
+        notifications: await ctx.db.query("systemAdminNotifications").collect(),
+      }));
+      expect(state.user?.activeGroupId).toBeUndefined();
+      if (operation === "remove") expect(state.membership).toBeNull();
+      else expect(state.membership?.role).toBe("member");
+      expect(state.audits).toHaveLength(1);
+      expect(state.audits[0]).toMatchObject({
+        actorUserId: fixture.admin,
+        targetUserId: fixture.admin,
+        beforeActiveGroupId: fixture.groupA,
+      });
+      expect(state.audits[0].afterActiveGroupId).toBeUndefined();
+      expect(state.notifications).toHaveLength(1);
+      expect(state.notifications[0].recipientUserId).toBe(fixture.admin);
+    },
+  );
+
+  it("管理者自身がownerの場合も所属解除を拒否し、active選択だけ解除できる", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const fixture = await seedFixture(t);
+    const membershipId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("groupMembers", {
+        groupId: fixture.groupA,
+        userId: "admin",
+        role: "owner",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.patch(fixture.admin, { activeGroupId: fixture.groupA });
+      return id;
+    });
+    const admin = t.withIdentity(identity("admin"));
+
+    await expect(
+      admin.mutation(api.systemAdminMembership.systemAdminMembershipOperation, {
+        targetUserId: fixture.admin,
+        operation: "remove",
+        sourceGroupId: fixture.groupA,
+        reason: "所属を整理",
+      }),
+    ).rejects.toThrow("ownerの所属解除はこの操作ではできません");
+    await admin.mutation(api.systemAdminMembership.systemAdminMembershipOperation, {
+      targetUserId: fixture.admin,
+      operation: "clear_active",
+      reason: "選択を解除",
+    });
+
+    expect((await t.run((ctx) => ctx.db.get(membershipId)))?.role).toBe("owner");
+    expect((await t.run((ctx) => ctx.db.get(fixture.admin)))?.activeGroupId).toBeUndefined();
+  });
+
+  it("他ユーザーの所属先をactiveグループに設定できる", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const fixture = await seedFixture(t);
+    await t.run((ctx) => ctx.db.patch(fixture.target, { activeGroupId: undefined }));
+
+    await expect(
+      t
+        .withIdentity(identity("admin"))
+        .mutation(api.systemAdminMembership.systemAdminMembershipOperation, {
+          targetUserId: fixture.target,
+          operation: "set_active",
+          targetGroupId: fixture.groupA,
+          reason: "所属先を選択",
+        }),
+    ).resolves.toEqual({ operation: "set_active", status: "success" });
+    expect((await t.run((ctx) => ctx.db.get(fixture.target)))?.activeGroupId).toBe(fixture.groupA);
+  });
+
   it("transferは所属とactiveGroupIdを原子的にAからBへ移し、監査とoutboxを記録する", async () => {
     const t = convexTest(schema, convexTestModules);
     const fixture = await seedFixture(t);
