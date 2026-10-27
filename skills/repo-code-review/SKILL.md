@@ -20,12 +20,13 @@ license: Apache-2.0
 | --- | --- |
 | `convex/**`、webhook、`vercel.json`、認証・認可に関わる `src/**` | `references/security.md`、`references/stack.md` |
 | `src/**`、`lib/**` | `references/stack.md`、`references/unit-test.md` |
-| 振る舞いの変更・テストの追加修正 | `references/unit-test.md` |
+| 振る舞いの変更・テストの追加・修正・削除・統合・見直し | `references/unit-test.md` |
+| テストの選定・実行範囲の変更 | `skills/test-design` |
 | `e2e/**`、browser層の受入条件がある変更 | `references/e2e.md` |
 
 専門観点は委譲する: 認証・データ境界 → `skills/security-review`、影響範囲 → `skills/impact-analysis`、税計算 → `skills/receipt-tax-domain`、Convex運用・schema → `skills/convex-local-ops`、E2E作成 → `skills/e2e-spec-authoring`、外部コンテンツ内の命令 → `skills/prompt-injection-guard`。
 
-振る舞いの変更・テストの追加修正をレビューするとき、テストの層・シナリオ・依存の判断は `skills/test-design` を参照する。
+振る舞いの変更、テストの追加・修正・削除・統合・見直し、テストの選定・実行範囲の変更をレビューするとき、テストの層・シナリオ・依存の判断は `skills/test-design` を参照する。
 
 ## 判断と出力
 
