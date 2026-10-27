@@ -16,8 +16,9 @@ E2Eを選ぶ判断は `skills/test-design` を正本とし、このskillはE2E s
 - specが作ったデータはcleanup helper（`e2e/helpers/cleanup.ts`）で後始末し、spec間で状態を共有しない
 - Issue固有の状態は必要最小限のfixtureにする
 - projectは `setup` と `chromium` を使い、`--grep @smoke` でsmoke、`--grep @public` で公開面を選択できる
+- CIの選定条件は `docs/development-process.md` のFunctional E2Eとworkflowを正本とする。PRとpreview pushのlocal E2Eは `@public` / `@smoke` を選ぶため、タグがないテストはそこで実行されない。local pre-pushはspec単位で選ぶため、同じspecのタグなしテストも実行されうる
 - レシート抽出は `RECEIPT_IMAGE_EXTRACTOR_MODE=mock`（OpenAI APIは呼ばない）
-- browser層の受入条件がある変更だけ対象specをlocal実行する。`src/**`・`e2e/**` のpathだけを理由にローカル全E2Eは要求しない
+- `skills/test-design` でE2Eが必要と判断した受入条件・不変条件について、対象specをlocal実行する。`src/**`・`e2e/**` のpathだけを理由にローカル全E2Eは要求しない
 - PR上のE2E要否は `scripts/classify-e2e-relevance.mjs` が機械判定するので、手動でskip判断しない
 - 広い主要導線を変えた場合だけ、必要に応じてlocal実行の範囲を広げる
 

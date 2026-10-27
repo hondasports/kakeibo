@@ -20,7 +20,7 @@ license: Apache-2.0
 | --- | --- |
 | `convex/**`、webhook、`vercel.json`、認証・認可に関わる `src/**` | `references/security.md`、`references/stack.md` |
 | `src/**`、`lib/**` | `references/stack.md`、`references/unit-test.md` |
-| 振る舞いの変更・テストの追加・修正・削除・統合・見直し | `references/unit-test.md` |
+| 振る舞いの変更・テストの追加・修正・削除・統合・見直し | `references/unit-test.md`、`skills/test-design` |
 | テストの選定・実行範囲の変更 | `skills/test-design` |
 | `e2e/**`、browser層の受入条件がある変更 | `references/e2e.md` |
 
