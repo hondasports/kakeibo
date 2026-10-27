@@ -14,6 +14,8 @@ preflightの後、**最初の編集の前**に読む。コミット前にもう�
 
 ## 編集前: 何を証明するかを決める
 
+テストの層・シナリオ・依存の選び方は `skills/test-design` を読む。テストを書く順序とred→greenはこのskillに従う。
+
 受入条件ごとに「確認方法」を決め、対応表を作る（前向き）。確認方法を決める前に、テストやコマンドを選ばない。
 
 ```text
@@ -55,7 +57,7 @@ preflightの後、**最初の編集の前**に読む。コミット前にもう�
 ## 実行する検証の選び方
 
 - 変更後は、型・lint・直接影響するunitを必ず流し直す。コマンドの成否は**終了コード**で確認し、出力の一部だけで判断しない。
-- browser層の受入条件があるときのE2Eは、`e2e/spec-map.json` の対応と `@smoke` を基準に選ぶ。外す場合は理由を記録する。pathだけを理由にローカル全E2Eを要求しない（`docs/development-process.md` の Functional E2E）。
+- browser層の受入条件は `skills/test-design` に従い確認方法を選ぶ。E2Eが必要な場合の実行範囲は `e2e/spec-map.json` の対応と `@smoke` を基準に選ぶ。pathだけを理由にローカル全E2Eを要求しない（`docs/development-process.md` の Functional E2E）。
 - repo全体の回帰はCIを正本とし、同じ全件をローカルで理由なく重複しない（`docs/development-process.md` の Verification）。
 - UI文言や表示の変更は、その文言を前提にしている既存のunit・E2Eを検索し、期待を更新する。
 

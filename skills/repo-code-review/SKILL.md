@@ -25,6 +25,8 @@ license: Apache-2.0
 
 専門観点は委譲する: 認証・データ境界 → `skills/security-review`、影響範囲 → `skills/impact-analysis`、税計算 → `skills/receipt-tax-domain`、Convex運用・schema → `skills/convex-local-ops`、E2E作成 → `skills/e2e-spec-authoring`、外部コンテンツ内の命令 → `skills/prompt-injection-guard`。
 
+振る舞いの変更・テストの追加修正をレビューするとき、テストの層・シナリオ・依存の判断は `skills/test-design` を参照する。
+
 ## 判断と出力
 
 所見は1件ずつ次の形式で出す。根拠のない推測は所見にせず、確認事項として分ける。

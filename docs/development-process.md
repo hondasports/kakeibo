@@ -194,7 +194,7 @@ HEAD/baseが更新されたら、旧HEAD/baseの検証結果を現在の必須�
 
 - changed / directly affected tests
 - scopeable lint / format / type / build
-- browser層の受入条件がある場合のfunctional E2E
+- browser層の受入条件は `skills/test-design` に従い確認方法を選び、必要なfunctional E2Eを実行する
 - shared/auth/data/financial変更に必要なcaller / denial / failure-path test
 
 repo-wide regression checkはlatest contentのCIを正本にできる。
