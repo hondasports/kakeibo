@@ -539,6 +539,76 @@ test.describe("Issue #179 AI下書きからexpenseEntriesへ登録", () => {
   });
 });
 
+test.describe("Issue #1123 AI下書き登録から週次サマリー", () => {
+  test("@smoke キューから登録した下書きが週次サマリーに金額・件数・カテゴリで反映される", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await gotoAuthenticated(page, INPUT_PATH);
+    const userId = await getCurrentClerkTokenIdentifier(page);
+    await cleanupE2eExpenseEntriesByUser(userId);
+    await cleanupAiExpenseQueueByUser(userId);
+    await cleanupTestCategoriesByUser(userId);
+    try {
+      await seedAiExpenseDraftForExpenseEntriesByUser(userId);
+      await page.reload();
+      const queue = await waitForReceiptInputQueue(page);
+      const row = queue.locator(".ai-expense-queue-item").filter({ hasText: "E2Eスーパー" });
+      await expect(row).toBeVisible({ timeout: 15_000 });
+      await expect(row).toContainText("1,500円");
+
+      // seed 下書きを確認ダイアログで開いて保存する
+      await row.getByRole("button", { name: "修正する", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "下書き確認" });
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByLabel("店名・内容")).toHaveValue("E2Eスーパー");
+      await expect(dialog.getByLabel("合計金額", { exact: true })).toHaveValue("1500");
+      await dialog.getByRole("button", { name: "下書きを保存", exact: true }).click();
+      await expect(dialog).toBeHidden();
+
+      // キューの「登録する」で支出エントリへ登録する
+      await row.getByRole("button", { name: "登録する", exact: true }).click();
+      await expect(row).toContainText("登録済み", { timeout: 20_000 });
+      await expect(row).toContainText("1,500円");
+
+      // seed 日付 2026-06-01（月曜）は既定の月曜始まりで /weeks/2026-06-01 の週に入る
+      await page.goto("/weeks/2026-06-01");
+      await expect(page).toHaveURL(/\/weeks\/2026-06-01$/);
+      await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(page.locator('[aria-label="合計支出"]')).toContainText("1,500円");
+
+      const categoryTable = page
+        .getByTestId("weekly-category-breakdown")
+        .getByRole("table", { name: "カテゴリ別内訳" });
+      const foodRow = categoryTable
+        .getByRole("row")
+        .filter({ hasText: "E2Eカテゴリ-食費-Issue322" });
+      await expect(foodRow.getByRole("cell").nth(1)).toHaveText("1,000円");
+      await expect(foodRow.getByRole("cell").nth(3)).toHaveText("1件");
+      const goodsRow = categoryTable
+        .getByRole("row")
+        .filter({ hasText: "E2Eカテゴリ-日用品-Issue322" });
+      await expect(goodsRow.getByRole("cell").nth(1)).toHaveText("500円");
+      await expect(goodsRow.getByRole("cell").nth(3)).toHaveText("1件");
+      const totalRow = categoryTable.getByRole("row").filter({ hasText: "合計" });
+      await expect(totalRow.getByRole("cell").nth(1)).toHaveText("1,500円");
+      await expect(totalRow.getByRole("cell").nth(3)).toHaveText("2件");
+
+      // 支出一覧は同じ下書き由来の1グループ・2明細になる
+      const expenseList = page.getByRole("table", { name: "週次サマリーの支出一覧" });
+      await expect(expenseList.getByTestId("receipt-group")).toHaveCount(1);
+      await expect(expenseList).toContainText("E2Eスーパー");
+      await expect(expenseList.getByTestId("receipt-row")).toHaveCount(2);
+    } finally {
+      await cleanupAiExpenseQueueByUser(userId);
+      await cleanupE2eExpenseEntriesByUser(userId);
+      await cleanupTestCategoriesByUser(userId);
+    }
+  });
+});
+
 test.describe("Issue #337 レシート入力UI改善の表示・操作回帰", () => {
   test("@smoke 一覧で状態サマリーと次の操作導線が表示される", async ({ page }) => {
     await page.setViewportSize({ width: 406, height: 687 });
