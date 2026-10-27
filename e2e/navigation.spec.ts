@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { gotoAuthenticated } from "./helpers/auth";
+import { cleanupE2eExpenseEntries } from "./helpers/cleanup";
 
 /**
  * ナビゲーション E2E テスト
@@ -15,7 +16,7 @@ import { gotoAuthenticated } from "./helpers/auth";
  *   - シナリオ N-6: PC幅でInputPageを開くと左右2ペインレイアウトになる (P1 / validation)
  *   - シナリオ N-7: SummaryPageに週次サマリーが表示される (P1 / validation)
  *   - シナリオ N-8: SummaryPageに週移動導線がある (P1 / validation)
- *   - シナリオ N-9: SPで入力フローを一通り完走できる (P0 / validation)
+ *   - シナリオ N-9: SP幅で入力タブから入力画面へ遷移しフォームとBottomNavigationが表示される (P0 / validation)
  *   - シナリオ N-10: 既存のURL構造が維持されている (P0 / regression)
  */
 
@@ -114,8 +115,7 @@ test.describe("ナビゲーション（Issue #49）", () => {
     await expect(bottomNav).not.toBeVisible();
 
     // Drawerが表示されることを確認
-    const drawer = page.getByRole("navigation").or(page.getByLabel("サイドメニュー"));
-    await expect(drawer.first()).toBeVisible();
+    await expect(page.getByLabel("サイドメニュー")).toBeVisible();
   });
 
   test("@smoke @navigation シナリオN-3: DrawerのすべてのリンクからURL遷移できる", async ({
@@ -271,11 +271,8 @@ test.describe("ナビゲーション（Issue #49）", () => {
     await gotoAuthenticated(page, `/weeks/${weekStartDate}`);
 
     // SummaryPage には WeekNavigator（前/次の週ボタン）が表示される
-    await expect(
-      page
-        .getByRole("button", { name: "前の週へ" })
-        .or(page.getByRole("link", { name: "入力を再開" })),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "前の週へ" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "次の週へ" })).toBeVisible();
   });
 
   test("@navigation シナリオN-8.1: 履歴から表示中の週の月次サマリーへ遷移できる", async ({
@@ -383,41 +380,49 @@ test.describe("ナビゲーション（Issue #49）", () => {
   });
 
   test("@smoke @navigation [Issue #136] 週別支出推移がPC/SP幅に収まる", async ({ page }) => {
-    const weekStartDate = getCurrentWeekStartDate();
-    await gotoAuthenticated(page, `/weeks/${weekStartDate}`);
+    // グラフ描画に必要な支出を今週分として保存する
+    await gotoAuthenticated(page, "/weeks/current/input");
+    await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
+    await page.getByLabel("店舗名 / 支払先").fill("週別推移用ストア");
+    await page.getByLabel("合計金額").fill("3000");
+    await page
+      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
+      .first()
+      .click();
+    await page.getByRole("button", { name: "保存して次へ" }).click();
+    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
 
-    for (const viewport of [
-      { width: 390, height: 844, expectedChartHeight: "180" },
-      { width: 1280, height: 800, expectedChartHeight: "200" },
-    ]) {
-      await page.setViewportSize(viewport);
+    try {
+      const weekStartDate = getCurrentWeekStartDate();
+      await page.goto(`/weeks/${weekStartDate}`);
+      await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
 
-      const chartOrEmpty = page
-        .getByTestId("weekly-expense-trend-chart")
-        .or(page.getByTestId("weekly-expense-trend-empty"))
-        .first();
-      await expect(chartOrEmpty).toBeVisible({ timeout: 15_000 });
+      for (const viewport of [
+        { width: 390, height: 844, expectedChartHeight: "180" },
+        { width: 1280, height: 800, expectedChartHeight: "200" },
+      ]) {
+        await page.setViewportSize(viewport);
 
-      const chart = page.getByTestId("weekly-expense-trend-chart");
-      if (await chart.isVisible()) {
+        const chart = page.getByTestId("weekly-expense-trend-chart");
+        await expect(chart).toBeVisible({ timeout: 15_000 });
         await expect(page.getByRole("img", { name: "週別支出推移グラフ" })).toHaveAttribute(
           "data-chart-height",
           viewport.expectedChartHeight,
         );
-      } else {
-        await expect(page.getByTestId("weekly-expense-trend-empty")).toContainText(
-          "週別の支出データがあると表示されます",
-        );
-      }
 
-      const noHorizontalOverflow = await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      );
-      expect(noHorizontalOverflow).toBe(true);
+        const noHorizontalOverflow = await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        );
+        expect(noHorizontalOverflow).toBe(true);
+      }
+    } finally {
+      await cleanupE2eExpenseEntries({ page });
     }
   });
 
-  test("@smoke @navigation シナリオN-9: SPで入力フローを一通り完走できる", async ({ page }) => {
+  test("@smoke @navigation シナリオN-9: SP幅で入力タブから入力画面へ遷移しフォームとBottomNavigationが表示される", async ({
+    page,
+  }) => {
     await gotoAuthenticated(page);
     await page.setViewportSize({ width: 390, height: 844 });
 

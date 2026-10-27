@@ -426,12 +426,14 @@ test.describe("[Issue #14] 入力状況パネルの表示確認（P0 / smoke）"
 
   test.beforeEach(async ({ page }) => {
     await cleanupTestReceipts();
+    await cleanupE2eExpenseEntries();
     await gotoAuthenticated(page, "/weeks/current/input");
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
   });
 
   test.afterEach(async () => {
     await cleanupTestReceipts();
+    await cleanupE2eExpenseEntries();
   });
 
   test("@smoke [Issue #14] 入力画面の主要セクションが表示される", async ({ page }) => {
@@ -447,9 +449,8 @@ test.describe("[Issue #14] 入力状況パネルの表示確認（P0 / smoke）"
     await page.getByRole("link", { name: "履歴" }).click();
     await expect(page).toHaveURL(/\/weeks\/\d{4}-\d{2}-\d{2}$/, { timeout: 10_000 });
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
-    const receiptRows = page.getByTestId("receipt-row");
-    const emptyMessage = page.getByText("まだレシートがありません").first();
-    await expect(receiptRows.or(emptyMessage).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("receipt-row")).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByText("まだレシートがありません").first()).toBeVisible();
   });
 
   test("[Issue #14] ダッシュボードに今週の支出カウンターが表示される", async ({ page }) => {
@@ -639,12 +640,10 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
   test("[Issue #308] 保存後も入力画面に直近の入力一覧を表示しない", async ({ page }) => {
     const shopName = `QA入力画面確認_${Date.now()}`;
 
-    // カテゴリ名を事前に取得
-    const firstCategoryOption = page
+    await page
       .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first();
-    const categoryName = await firstCategoryOption.textContent();
-    await firstCategoryOption.click();
+      .first()
+      .click();
 
     await page.getByLabel("店舗名 / 支払先").fill(shopName);
     await page.getByLabel("合計金額").fill("1500");
@@ -653,7 +652,7 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
     await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
 
     await expect(page.getByRole("heading", { name: "直近の入力" })).toHaveCount(0);
-    expect(categoryName).toBeTruthy();
+    await expect(page.getByText(shopName)).toHaveCount(0);
   });
 });
 
@@ -854,10 +853,12 @@ test.describe("[Issue #371] 前週差表示（P1 / regression）", () => {
 
   test.beforeEach(async () => {
     await cleanupTestReceipts();
+    await cleanupE2eExpenseEntries();
   });
 
   test.afterEach(async () => {
     await cleanupTestReceipts();
+    await cleanupE2eExpenseEntries();
   });
 
   test("週次サマリーに前週差（円）が表示される", async ({ page }) => {
@@ -893,8 +894,9 @@ test.describe("[Issue #371] 前週差表示（P1 / regression）", () => {
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
 
     // Issue #371: SummaryPageでは前週比（指数）ではなく前週差（円）を表示する
+    // 今週 6,280円 - 前週 7,000円 = -720円（formatSignedAmount のマイナスは U+2212）
     await expect(page.getByLabel("前週差")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByLabel("前週差")).toContainText(/円|比較データなし/);
+    await expect(page.getByLabel("前週差")).toContainText("−720円");
     // 前週の 7,000円 はカテゴリ別支出・支出一覧には表示されない（グラフバーラベルを除く）
     const categorySection = page.getByTestId("weekly-category-breakdown");
     // AnimatedCounter導入により「7,000」と「円」が別要素になるため、部分一致で検索
@@ -914,6 +916,7 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
 
   test.afterEach(async ({ page }) => {
     await cleanupTestReceipts({ page });
+    await cleanupE2eExpenseEntries({ page });
     await cleanupTestCategories({ page });
     await resetTestWeekSession(getCurrentWeekStartDate(), { page });
   });
@@ -929,29 +932,52 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
     });
   });
 
-  test("[Issue #232] 週別棒グラフまたは空状態が表示される @smoke", async ({ page }) => {
+  test("[Issue #232] 支出データがあると週別棒グラフが表示される @smoke", async ({ page }) => {
+    // グラフ描画に必要な支出を今週分として保存する
+    await gotoAuthenticated(page, "/weeks/current/input");
+    await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
+    await page.getByLabel("店舗名 / 支払先").fill("週別推移用ストア");
+    await page.getByLabel("合計金額").fill("3000");
+    await page
+      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
+      .first()
+      .click();
+    await page.getByRole("button", { name: "保存して次へ" }).click();
+    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+
     const weekStartDate = getCurrentWeekStartDate();
-    await gotoAuthenticated(page, `/weeks/${weekStartDate}`);
+    await page.goto(`/weeks/${weekStartDate}`);
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
 
-    // Then: グラフまたはプレースホルダーが表示されること
-    await expect(
-      page
-        .getByRole("img", { name: "週別支出推移グラフ" })
-        .or(page.getByText("週別の支出データがあると表示されます")),
-    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("img", { name: "週別支出推移グラフ" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("週別の支出データがあると表示されます")).toHaveCount(0);
   });
 
   test("[Issue #47] ダッシュボードに前週比較グラフが表示される", async ({ page }) => {
-    await gotoAuthenticated(page);
+    // 比較グラフの描画には前週の支出が必須なため、前週分を保存しておく
+    await gotoAuthenticated(page, "/weeks/current/input");
+    await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "前の週へ" }).click();
+    await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
+    await page.getByLabel("店舗名 / 支払先").fill("前週比較用ストア");
+    await page.getByLabel("合計金額").fill("7000");
+    await page
+      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
+      .first()
+      .click();
+    await page.getByRole("button", { name: "保存して次へ" }).click();
+    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+
+    await page.goto("/");
     await expect(page.getByRole("heading", { name: "今週のダッシュボード" })).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "前週との比較", level: 2 })).toBeVisible();
-    await expect(
-      page
-        .getByRole("img", { name: "前週との比較グラフ" })
-        .or(page.getByText("前週との比較データがあると表示されます")),
-    ).toBeVisible();
+    await expect(page.getByRole("img", { name: "前週との比較グラフ" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText("前週との比較データがあると表示されます")).toHaveCount(0);
     await expect(page.getByRole("img", { name: "週別支出推移グラフ" })).not.toBeVisible();
   });
 
@@ -964,36 +990,40 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
   });
 
   test("[Issue #232] 週別棒グラフに対象週の要約とTooltipが表示される", async ({ page }) => {
+    // グラフ描画に必要な支出を今週分として保存する
+    await gotoAuthenticated(page, "/weeks/current/input");
+    await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
+    await page.getByLabel("店舗名 / 支払先").fill("週別推移用ストア");
+    await page.getByLabel("合計金額").fill("3000");
+    await page
+      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
+      .first()
+      .click();
+    await page.getByRole("button", { name: "保存して次へ" }).click();
+    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+
     const weekStartDate = getCurrentWeekStartDate();
-    await gotoAuthenticated(page, `/weeks/${weekStartDate}`);
+    await page.goto(`/weeks/${weekStartDate}`);
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
 
-    // 週別棒グラフが表示される（またはプレースホルダー）
-    await expect(
-      page
-        .getByRole("img", { name: "週別支出推移グラフ" })
-        .or(page.getByText("週別の支出データがあると表示されます")),
-    ).toBeVisible({ timeout: 20_000 });
+    const graph = page.getByRole("img", { name: "週別支出推移グラフ" });
+    await expect(graph).toBeVisible({ timeout: 20_000 });
 
     // データがある場合はグラフだけでなく上部3指標も読める
-    const graph = page.getByRole("img", { name: "週別支出推移グラフ" });
-    if (await graph.isVisible().catch(() => false)) {
-      await expect(page.getByText("合計支出")).toBeVisible();
-      await expect(page.getByText("2週平均比")).toBeVisible();
-      await expectChartLabelsWithinBounds(graph);
-      const bar = graph.locator(`.${barClasses.element}`).last();
-      await expect(bar).toBeVisible();
-      await bar.hover();
-      await expect(page.getByText(/支出合計 .*円/).first()).toBeVisible();
-    }
+    await expect(page.getByText("合計支出")).toBeVisible();
+    await expect(page.getByText("2週平均比")).toBeVisible();
+    await expectChartLabelsWithinBounds(graph);
+    const bar = graph.locator(`.${barClasses.element}`).last();
+    await expect(bar).toBeVisible();
+    await bar.hover();
+    await expect(page.getByText(/支出合計 .*円/).first()).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileBar = graph.locator(`.${barClasses.element}`).last();
-    if (await mobileBar.isVisible().catch(() => false)) {
-      await expectChartLabelsWithinBounds(graph);
-      await mobileBar.click();
-      await expect(page.getByText(/支出合計 .*円/).first()).toBeVisible();
-    }
+    await expect(mobileBar).toBeVisible();
+    await expectChartLabelsWithinBounds(graph);
+    await mobileBar.click();
+    await expect(page.getByText(/支出合計 .*円/).first()).toBeVisible();
   });
 });
 
@@ -1075,23 +1105,24 @@ test.describe("入力画面リニューアル（Issue #77 受け入れ確認）"
         async () => {
           const block = page.locator(".dashboard-summary-metric").filter({ hasText: "今週の収入" });
           const text = await block.textContent();
-          const amount = Number(text?.replace(/[^\d]/g, "") ?? 0);
-          return amount >= incomeAmount;
+          return Number(text?.replace(/[^\d]/g, "") ?? 0);
         },
         { timeout: 15_000 },
       )
-      .toBe(true);
+      .toBe(incomeAmount);
 
     await page.goto(`/weeks/${weekStartDate}`);
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
     await expect(page.getByText(incomeTitle)).toBeVisible({ timeout: 15_000 });
     await expect
-      .poll(async () => {
-        const text = await page.getByLabel("合計収入").textContent();
-        const amount = Number(text?.replace(/[^\d]/g, "") ?? 0);
-        return amount >= incomeAmount;
-      })
-      .toBe(true);
+      .poll(
+        async () => {
+          const text = await page.getByLabel("合計収入").textContent();
+          return Number(text?.replace(/[^\d]/g, "") ?? 0);
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(incomeAmount);
     await expect(page.getByRole("heading", { name: /収入一覧/ })).toBeVisible();
   });
 

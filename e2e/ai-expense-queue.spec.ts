@@ -87,32 +87,16 @@ test.describe("Issue #144 読み取りUI", () => {
     await expect(queue.getByText(`ai-queue-payment-${stamp}.jpg`).first()).toBeVisible({
       timeout: 15000,
     });
-    await expect
-      .poll(
-        async () => {
-          const statusLabels = ["読み取り中", "登録できます", "確認待ち", "読み取り失敗"];
-          let total = 0;
-          for (const label of statusLabels) {
-            total += await queue.getByText(label).count();
-          }
-          return total;
-        },
-        { timeout: 15000 },
-      )
-      .toBeGreaterThanOrEqual(2);
-    const batchProgress = queue.getByText(/今回の追加 \d+\/2件が登録準備OK/).first();
-    await expect(batchProgress).toBeVisible({ timeout: 15_000 });
-    const batchRegisterButton = queue.getByRole("button", { name: /まとめて登録（\d+件）/ }).last();
-    await expect(batchRegisterButton).toBeVisible();
-    const batchProgressText = (await batchProgress.textContent()) ?? "";
-    if (batchProgressText.includes("2/2")) {
-      await expect(batchRegisterButton).toBeEnabled();
-    } else {
-      await expect(batchRegisterButton).toBeDisabled();
-    }
+    // 追加直後は2件とも解析待ち・解析中として「読み取り中」に並ぶ
     const processingSection = queue.getByRole("region", { name: "読み取り中" });
-    await expect(processingSection).toBeVisible();
+    await expect(processingSection).toBeVisible({ timeout: 15_000 });
     await expect(processingSection.getByText("2件")).toBeVisible();
+
+    // mock 抽出は確認事項なしの結果を返すため、2件とも登録準備OKへ遷移する
+    await expect(queue.getByText("今回の追加 2/2件が登録準備OK").first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(queue.getByRole("button", { name: "まとめて登録（2件）" }).last()).toBeEnabled();
 
     await expect(page.getByRole("region", { name: "画像から入力" })).toHaveCount(0);
     // Issue #181: ReceiptForm → ExpenseEntryForm に変更
@@ -563,7 +547,6 @@ test.describe("Issue #337 レシート入力UI改善の表示・操作回帰", (
       queue.getByRole("region", { name: "読み取り失敗" }).getByRole("button", { name: "再撮影" }),
     ).toBeVisible();
 
-    await page.waitForTimeout(400);
     await expectLocatorInsideViewport(queue);
     await expectLocatorInsideViewport(statusSummary);
   });
