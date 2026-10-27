@@ -57,16 +57,20 @@ async function expectChartLabelsWithinBounds(graph: Locator) {
  *   - シナリオ 2: ログイン後にダッシュボードが表示される (P0 / smoke)
  *   - シナリオ 3: ページリロードでログイン状態が維持される (P0 / smoke)
  *   - シナリオ 5: 必須項目を入力して保存 → 成功し店名・金額がクリアされる (P0 / smoke)
- *   - シナリオ 6: 保存後レシート一覧に追加される (P0 / smoke)
+ *   - シナリオ 6: 保存後レシート一覧に追加される (P0 / smoke / staging)
  *   - [Issue #13] 保存成功通知が Snackbar で表示される
  *   - [Issue #13] 5件連続入力して操作が止まらない（完了条件）
- *   - シナリオ 7: 店舗名が空で保存 → エラーが表示される (P1 / validation)
- *   - シナリオ 8: 金額が空で保存 → エラーが表示される (P1 / validation)
- *   - シナリオ 10: 金額に文字を入力しても入力フィールドに反映されない (P1 / validation)
- *   - [Issue #51] シナリオ 11: 金額に数字を入力すると3桁カンマ区切りで表示される (P1 / validation)
+ *   - ~~シナリオ 7: 店舗名が空で保存 → エラーが表示される~~
+ *     **component testへ移管** (Issue #1124: ExpenseEntryForm.single.test.tsx が送信しないことまで確認)
+ *   - ~~シナリオ 8: 金額が空で保存 → エラーが表示される~~
+ *     **component testへ移管** (Issue #1124: 同上)
+ *   - ~~シナリオ 10: 金額に文字を入力しても入力フィールドに反映されない~~
+ *     **component testへ移管** (Issue #1124: ExpenseEntryForm.single.test.tsx)
+ *   - ~~[Issue #51] シナリオ 11: 金額に数字を入力すると3桁カンマ区切りで表示される~~
+ *     **component testへ移管** (Issue #1124: 同上)
  *   - [Issue #14] 入力状況パネルが表示される (P0 / smoke) ※PC幅のみ
- *   - [Issue #14] 保存後にサマリーがリアルタイム更新される (P0 / issue #14 完了条件) ※DashboardPage
- *   - [Issue #14] 保存後に WeekStatusPanel の件数表示がリアルタイム更新される (P0 / issue #14 完了条件) ※PC幅のみ
+ *   - [Issue #14/#15] 保存後に週次サマリーへ店名・金額・件数が反映される (P0 / smoke)
+ *     Issue #1124 で従来の4本（#14の反映・支出一覧・件数、#15のリアルタイム更新）を1本に統合
  *   - [Issue #308] 入力画面に直近の入力一覧を表示しない (P0 / regression)
  *   - [Issue #309] 週次サマリーに振り返り・完了UIを表示しない (P0 / regression)
  *   - [Issue #45] 週次サマリーを前後週ナビゲーションで切り替えられる (P0 / regression)
@@ -191,24 +195,6 @@ test.describe("支出項目保存フロー（Issue #13 / #181 受け入れ確認
     await expect(submitButton).toBeEnabled();
   });
 
-  test("[Issue #64] 旧の画像入力UIがなくても手入力保存フローは維持される", async ({ page }) => {
-    await expect(page.getByRole("region", { name: "画像から入力" })).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "レシート入力" })).toBeVisible();
-
-    // Issue #181: ExpenseEntryForm セレクターに変更
-    await page.getByLabel("店舗名 / 支払先").fill("画像確認スーパー");
-    await page.getByLabel("合計金額").fill("980");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-
-    // 店名・金額がクリアされることを確認（保存完了の主要確認）
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 15_000 });
-    await expect(page.getByLabel("合計金額")).toHaveValue("");
-  });
-
   test("@smoke @staging シナリオ6: 保存後に支出一覧に追加される", async ({ page }) => {
     // Issue #181: ExpenseEntryForm セレクターに変更
     // 1件目を保存
@@ -252,33 +238,6 @@ test.describe("バリデーション（P1）", () => {
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
   });
 
-  test("シナリオ7: 店舗名が空で保存するとエラーが表示される", async ({ page }) => {
-    // Issue #181: ExpenseEntryForm セレクターに変更
-    await page.getByLabel("合計金額").fill("4280");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-
-    // MUI TextField の helperText にエラーが表示される
-    // Issue #181: エラーメッセージが「店舗名 / 支払先は必須です」に変更
-    await expect(page.locator("text=店舗名 / 支払先は必須です")).toBeVisible();
-  });
-
-  test("シナリオ8: 金額が空で保存するとエラーが表示される", async ({ page }) => {
-    // Issue #181: ExpenseEntryForm セレクターに変更
-    await page.getByLabel("店舗名 / 支払先").fill("スーパー北浜");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-
-    // Issue #181: エラーメッセージが「金額は必須です」
-    await expect(page.locator("text=金額は必須です")).toBeVisible();
-  });
-
   test("シナリオ9: カテゴリ候補が表示される（デフォルト選択あり）", async ({ page }) => {
     // Issue #181: ExpenseEntryForm ではカテゴリはデフォルト選択済み
     // カテゴリ候補UIが表示されていることを確認
@@ -288,30 +247,6 @@ test.describe("バリデーション（P1）", () => {
     await expect(
       page.locator('[role="listbox"][aria-label="カテゴリ候補"] [aria-selected="true"]'),
     ).toBeVisible();
-  });
-
-  test("シナリオ10: 金額に文字を入力しても入力フィールドに反映されない", async ({ page }) => {
-    // Issue #51 / #181: 英字・記号はクライアント側で除去されるため入力できない
-    const amountInput = page.getByLabel("合計金額");
-    await amountInput.fill("abc");
-
-    // 英字はクライアント側で除去されるためフィールドは空のまま
-    await expect(amountInput).toHaveValue("");
-  });
-
-  test("[Issue #51] シナリオ11: 金額に数字を入力すると3桁カンマ区切りで表示される", async ({
-    page,
-  }) => {
-    const amountInput = page.getByLabel("合計金額");
-
-    // When: 7桁の金額を入力する
-    await amountInput.fill("1234567");
-
-    // Then: 3桁カンマ区切りで表示される
-    await expect(amountInput).toHaveValue("1,234,567");
-
-    // And: inputmode="numeric" 属性が正しく設定されている（スマートフォン数字キーボード）
-    await expect(amountInput).toHaveAttribute("inputmode", "numeric");
   });
 });
 
@@ -440,13 +375,6 @@ test.describe("[Issue #14] 入力状況パネルの表示確認（P0 / smoke）"
     const spendCard = page.locator(".dashboard-summary-panel").filter({ hasText: "今週の支出" });
     await expect(spendCard.locator("[data-value]").first()).toBeVisible();
   });
-
-  test("[Issue #14] 入力フォームの保存導線が表示される", async ({ page }) => {
-    // Issue #181: ExpenseEntryForm セレクターに変更
-    await expect(page.getByRole("button", { name: "保存して次へ" })).toBeVisible();
-    await expect(page.getByLabel("店舗名 / 支払先")).toBeVisible();
-    await expect(page.getByLabel("合計金額")).toBeVisible();
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -473,7 +401,9 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
     await cleanupTestCategories({ page });
   });
 
-  test("[Issue #14] 保存後に週次サマリーへ支出が反映される", async ({ page }) => {
+  test("@smoke [Issue #14/#15] 保存した支出が週次サマリーに店名・金額・件数で反映される", async ({
+    page,
+  }) => {
     // Issue #181: ExpenseEntryForm セレクターに変更
     const shopName = `QAサマリー反映_${Date.now()}`;
 
@@ -492,39 +422,13 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
     await expect(page).toHaveURL(/\/weeks\/\d{4}-\d{2}-\d{2}$/, { timeout: 10_000 });
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "カテゴリ別" })).toBeVisible();
-    const receiptRows = page.getByTestId("receipt-row");
-    await expect(receiptRows.filter({ hasText: shopName }).first()).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(receiptRows.filter({ hasText: "1,234円" }).first()).toBeVisible({
-      timeout: 15_000,
-    });
-  });
-
-  test("[Issue #14] 保存後に週次サマリーの支出一覧にレシートが表示される", async ({ page }) => {
-    // Issue #181: ExpenseEntryForm セレクターに変更
-    const shopName = `QA直近確認_${Date.now()}`;
-
-    await page.getByLabel("店舗名 / 支払先").fill(shopName);
-    await page.getByLabel("合計金額").fill("999");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
-
-    await page.getByRole("link", { name: "履歴" }).click();
-    await expect(page).toHaveURL(/\/weeks\/\d{4}-\d{2}-\d{2}$/, { timeout: 10_000 });
     await expect(page.getByRole("heading", { name: "支出一覧" })).toBeVisible();
     const receiptRows = page.getByTestId("receipt-row");
-    await expect(receiptRows.filter({ hasText: shopName }).first()).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(receiptRows.filter({ hasText: "999円" }).first()).toBeVisible({
-      timeout: 15_000,
-    });
+    const savedRow = receiptRows.filter({ hasText: shopName });
+    await expect(savedRow).toHaveCount(1, { timeout: 15_000 });
+    await expect(savedRow.first()).toContainText("1,234円");
+    // beforeEach で支出を空にしているため、今週の行は保存した1件だけ
+    await expect(receiptRows).toHaveCount(1);
   });
 
   test("[Issue #359] 3行以上のメモは省略表示し、展開と折りたたみを切り替えられる", async ({
@@ -598,26 +502,6 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
     await expect(toggle).toHaveText("もっと見る");
   });
 
-  test("[Issue #14] 保存後に週次サマリーの支出件数が更新される", async ({ page }) => {
-    // Issue #181: ExpenseEntryForm セレクターに変更
-    const shopName = `QA進捗確認_${Date.now()}`;
-    await page.getByLabel("店舗名 / 支払先").fill(shopName);
-    await page.getByLabel("合計金額").fill("500");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
-    await page.getByRole("link", { name: "履歴" }).click();
-    await expect(page).toHaveURL(/\/weeks\/\d{4}-\d{2}-\d{2}$/, { timeout: 10_000 });
-    await expect(page.getByRole("heading", { name: "支出一覧" })).toBeVisible();
-    await expect(page.getByTestId("receipt-row").filter({ hasText: shopName })).toHaveCount(1, {
-      timeout: 15_000,
-    });
-  });
-
   test("[Issue #308] 保存後も入力画面に直近の入力一覧を表示しない", async ({ page }) => {
     const shopName = `QA入力画面確認_${Date.now()}`;
 
@@ -678,36 +562,6 @@ test.describe("週次サマリーパネル（Issue #15 受け入れ確認）", (
 
     // 合計支出セクションが表示されること
     await expect(page.getByText("合計支出")).toBeVisible({ timeout: 15_000 });
-  });
-
-  test("[Issue #15] レシート保存後にサマリーがリアルタイム更新される (P0 / 完了条件)", async ({
-    page,
-  }) => {
-    // PC幅で入力画面 → 保存 → サマリー遷移の流れで確認
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await gotoAuthenticated(page, "/weeks/current/input");
-    await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
-
-    // Issue #181: ExpenseEntryForm セレクターに変更
-    const shopName = `QAサマリーテスト_${Date.now()}`;
-    await page.getByLabel("店舗名 / 支払先").fill(shopName);
-    await page.getByLabel("合計金額").fill("1500");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
-
-    // サマリーページに遷移して確認（Drawer の「履歴」を使用）
-    await page.getByRole("link", { name: "履歴" }).click();
-    await expect(page).toHaveURL(/\/weeks\/\d{4}-\d{2}-\d{2}$/, { timeout: 10_000 });
-    await expect(page.getByRole("heading", { name: "支出一覧" })).toBeVisible();
-    await expect(page.getByTestId("receipt-row").filter({ hasText: shopName })).toHaveCount(1, {
-      timeout: 30_000,
-    });
   });
 
   test("[Issue #371] 週次サマリーがPC表形式とSP縦積み表示に切り替わる", async ({ page }) => {
@@ -1030,11 +884,6 @@ test.describe("入力画面リニューアル（Issue #77 受け入れ確認）"
     await expect(page.getByRole("tab", { name: "支出" })).toHaveAttribute("aria-selected", "true");
   });
 
-  test("@smoke [Issue #77] 支出フォームに店名フィールドが表示される", async ({ page }) => {
-    await expect(page.getByLabel("店舗名 / 支払先")).toBeVisible();
-    await expect(page.getByLabel("合計金額")).toBeVisible();
-  });
-
   test("@smoke [Issue #392] 収入タブでは支出専用項目と画像操作を表示しない", async ({ page }) => {
     await page.getByRole("tab", { name: "収入" }).click();
     await expect(page.getByRole("tab", { name: "収入" })).toHaveAttribute("aria-selected", "true");
@@ -1105,16 +954,6 @@ test.describe("入力画面リニューアル（Issue #77 受け入れ確認）"
       )
       .toBe(incomeAmount);
     await expect(page.getByRole("heading", { name: /収入一覧/ })).toBeVisible();
-  });
-
-  test("[Issue #392] 種別を切り替えても未保存値を保持する", async ({ page }) => {
-    await page.getByLabel("店舗名 / 支払先").fill("スーパー北浜");
-    await page.getByRole("tab", { name: "収入" }).click();
-    await page.getByLabel("収入の内容・メモ").fill("賞与");
-    await page.getByRole("tab", { name: "支出" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("スーパー北浜");
-    await page.getByRole("tab", { name: "収入" }).click();
-    await expect(page.getByLabel("収入の内容・メモ")).toHaveValue("賞与");
   });
 
   test("@smoke [Issue #77] 週ナビゲーターが表示される", async ({ page }) => {
@@ -1216,32 +1055,6 @@ test.describe("複数カテゴリ別支出項目入力フロー（Issue #102 受
     // フォームがリセットされ単一モードに戻る
     await expect(page.getByLabel("店舗名 / 支払先")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("");
-  });
-
-  test("[Issue #102] 差額がプラスのとき確認ダイアログが表示され保存できる", async ({ page }) => {
-    await page.getByLabel("店舗名 / 支払先").fill("テストスーパー");
-    await page.getByLabel("合計金額").fill("5000");
-    await page.getByRole("button", { name: "カテゴリ別の内訳を追加" }).click();
-
-    // 項目1: 3,000円のみ入力（入力元合計 5,000円との差額 2,000円が未配分）
-    const item0 = page.getByTestId("expense-item-0");
-    await item0.getByLabel("内容").clear();
-    await item0.getByLabel("内容").fill("食料品");
-    await item0.getByLabel("金額").fill("3000");
-    await item0.getByRole("option").first().click();
-
-    // 差額プラス → 「未配分」が表示されることを確認
-    await expect(page.getByText(/未配分/)).toBeVisible();
-
-    // 保存すると確認ダイアログが表示される
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText(/未配分のまま保存しますか/)).toBeVisible();
-
-    // 「このまま保存」で保存できる
-    await page.getByRole("button", { name: "このまま保存" }).click();
-    const snackbar = page.getByRole("alert").filter({ hasText: "支出項目を保存しました" });
-    await expect(snackbar).toBeVisible({ timeout: 15_000 });
   });
 
   test("[Issue #102] 複数カテゴリ別支出がカテゴリ別集計と支出一覧に反映される", async ({

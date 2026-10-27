@@ -12,9 +12,11 @@ import { getCurrentMonth, getCurrentWeekStartDate } from "./helpers/currentPerio
  *   - シナリオ N-1: SP幅でBottomNavigation 5タブが表示され、タップで各画面に遷移できる (P0 / smoke)
  *   - シナリオ N-2: PC幅でBottomNavigationが非表示になり、Drawerが表示される (P0 / smoke)
  *   - シナリオ N-3: DrawerのすべてのリンクからURL遷移できる (P0 / smoke)
- *   - シナリオ N-4: ダッシュボードにカテゴリ別内訳・前週比カードが表示されない (P1 / validation)
+ *   - ~~シナリオ N-4: ダッシュボードにカテゴリ別内訳・前週比が表示される~~
+ *     **削除** (Issue #1124: dashboard-home.spec.ts の @smoke テストが同じassertをより強く確認)
  *   - シナリオ N-5: SP幅でInputPageを開くとフォームのみが表示される (P1 / validation)
- *   - シナリオ N-6: PC幅でInputPageを開くと左右2ペインレイアウトになる (P1 / validation)
+ *   - ~~シナリオ N-6: PC幅でInputPageを開くと入力フォームとWeekNavigatorが表示される~~
+ *     **削除** (Issue #1124: フォーム表示はreceipt-formの@smokeテスト、WeekNavigatorは#77の@smokeテストが確認)
  *   - シナリオ N-7: SummaryPageに週次サマリーが表示される (P1 / validation)
  *   - シナリオ N-8: SummaryPageに週移動導線がある (P1 / validation)
  *   - シナリオ N-9: SP幅で入力タブから入力画面へ遷移しフォームとBottomNavigationが表示される (P0 / validation)
@@ -195,16 +197,6 @@ test.describe("ナビゲーション（Issue #49）", () => {
     await expect(page).toHaveURL("/settings");
   });
 
-  test("@navigation シナリオN-4: ダッシュボードにカテゴリ別内訳・前週比が表示される", async ({
-    page,
-  }) => {
-    await gotoAuthenticated(page);
-
-    await expect(page.getByRole("heading", { name: "支出カテゴリ", level: 2 })).toBeVisible();
-    await expect(page.getByLabel("前週比").first()).toBeVisible();
-    await expect(page.getByRole("heading", { name: "前週との比較", level: 2 })).toBeVisible();
-  });
-
   test("@navigation シナリオN-5: SP幅でInputPageを開くとフォームのみが表示される", async ({
     page,
   }) => {
@@ -220,22 +212,6 @@ test.describe("ナビゲーション（Issue #49）", () => {
     // サマリーがDOM上に存在しないまたは非表示であることを確認
     const summary = page.getByText("今週のサマリー");
     await expect(summary).not.toBeVisible();
-  });
-
-  test("@navigation シナリオN-6: PC幅でInputPageを開くと入力フォームとWeekNavigatorが表示される", async ({
-    page,
-  }) => {
-    await gotoAuthenticated(page, "/weeks/current/input");
-    await page.setViewportSize({ width: 1280, height: 800 });
-
-    // Issue #181: ReceiptForm → ExpenseEntryForm に変更
-    await expect(page.getByLabel("店舗名 / 支払先")).toBeVisible();
-    await expect(page.getByLabel("合計金額")).toBeVisible();
-
-    // Issue #77: ReviewMemoPanel は InputPage から SummaryPage に移動した
-    // PC幅では WeekNavigator（前の週/次の週ボタン）と入力フォームが表示される
-    await expect(page.getByRole("button", { name: /前の週/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /次の週/ })).toBeVisible();
   });
 
   test("@navigation シナリオN-7: SummaryPageに週次サマリーが表示される", async ({ page }) => {
