@@ -92,11 +92,14 @@ test.describe("Issue #144 読み取りUI", () => {
     await expect(processingSection).toBeVisible({ timeout: 15_000 });
     await expect(processingSection.getByText("2件")).toBeVisible();
 
-    // mock 抽出は確認事項なしの結果を返すため、2件とも登録準備OKへ遷移する
-    await expect(queue.getByText("今回の追加 2/2件が登録準備OK").first()).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(queue.getByRole("button", { name: "まとめて登録（2件）" }).last()).toBeEnabled();
+    // 解析直後の下書きは常に user_confirmation_required で確認待ちになるため、
+    // 2件とも「確認待ち」に並び登録準備OKは0件のまま確定する
+    const reviewSection = queue.getByRole("region", { name: "確認待ち" });
+    await expect(queue.getByText("確認待ち 2件")).toBeVisible({ timeout: 30_000 });
+    await expect(reviewSection.getByText(`ai-queue-receipt-${stamp}.jpg`).first()).toBeVisible();
+    await expect(reviewSection.getByText(`ai-queue-payment-${stamp}.jpg`).first()).toBeVisible();
+    await expect(queue.getByText("今回の追加 0/2件が登録準備OK").first()).toBeVisible();
+    await expect(queue.getByRole("button", { name: "まとめて登録（0件）" }).last()).toBeDisabled();
 
     await expect(page.getByRole("region", { name: "画像から入力" })).toHaveCount(0);
     // Issue #181: ReceiptForm → ExpenseEntryForm に変更
