@@ -23,7 +23,7 @@ async function confirmProducts(page: Page, dialog: Locator) {
 }
 
 for (const width of [1280, 320]) {
-  test(`Issue #1015 ${width}px 商品確認→自動計算→即時保存→再表示→登録が一致する`, async ({
+  test(`${width === 1280 ? "@smoke " : ""}Issue #1015 ${width}px 商品確認→自動計算→即時保存→再表示→登録が一致する`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });

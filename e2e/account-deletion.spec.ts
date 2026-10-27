@@ -8,7 +8,7 @@ async function expandDangerZone(page: Page) {
   if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
 }
 
-test("@group-access 唯一ownerは退会をブロックされ、owner譲渡後に退会確認へ進める", async ({
+test("@smoke @group-access 唯一ownerは退会をブロックされ、owner譲渡後に退会確認へ進める", async ({
   page,
 }) => {
   let currentUserId: string | undefined;

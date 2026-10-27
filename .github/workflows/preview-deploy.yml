@@ -98,7 +98,9 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          # authenticated smoke だけシステム管理系fixtureを有効化する。
           E2E_SYSTEM_ADMIN_MEMBERSHIP_FIXTURE: ${{ matrix.name == 'authenticated' }}
+          E2E_SYSTEM_ADMIN_SEARCH_FIXTURE: ${{ matrix.name == 'authenticated' }}
 
       - name: Upload test results on failure
         if: failure()

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { bypassClerkBotDetection } from "./helpers/auth";
 
+// @smoke を付けない: 同じガードを notifications.spec.ts の @smoke で確認しているため。
 test.describe("system admin route", () => {
   test("未認証の /admin 直アクセスは管理情報を表示しない", async ({ page }) => {
     await bypassClerkBotDetection(page);

@@ -13,7 +13,7 @@ const fixtureEnabled = Boolean(
 );
 
 test.describe("system admin membership operation", () => {
-  test("ユーザー詳細からA→B transferを確認し、activeGroupIdも補正する", async ({ page }) => {
+  test("@smoke ユーザー詳細からA→B transferを確認し、activeGroupIdも補正する", async ({ page }) => {
     test.skip(
       !fixtureEnabled,
       "E2E_SYSTEM_ADMIN_MEMBERSHIP_FIXTURE=trueのdevelopment/previewでのみfixtureを実行します",
