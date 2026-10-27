@@ -8,6 +8,7 @@ import {
   cleanupTestReceipts,
   resetTestWeekSession,
 } from "./helpers/cleanup";
+import { addWeeks, getCurrentWeekStartDate } from "./helpers/currentPeriod";
 
 async function expectChartLabelsWithinBounds(graph: Locator) {
   await expect
@@ -72,26 +73,6 @@ async function expectChartLabelsWithinBounds(graph: Locator) {
  *   - [Issue #45] 未来週URLは今週の週次サマリーへ正規化される (P0 / error-handling)
  *   - [Issue #46] 入力画面・週次サマリーに前週比が表示される (P1 / regression)
  */
-
-function getCurrentWeekStartDate(): string {
-  const date = new Date();
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const dayOfMonth = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${dayOfMonth}`;
-}
-
-function addWeeks(weekStartDate: string, weeks: number): string {
-  const date = new Date(`${weekStartDate}T00:00:00`);
-  date.setDate(date.getDate() + weeks * 7);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const dayOfMonth = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${dayOfMonth}`;
-}
 
 // ---------------------------------------------------------------------------
 // ダッシュボード・認証確認

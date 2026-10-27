@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { gotoAuthenticated } from "./helpers/auth";
+import { getCurrentMonth, getCurrentWeekStartDate } from "./helpers/currentPeriod";
 
 /**
  * ナビゲーション E2E テスト
@@ -18,22 +19,6 @@ import { gotoAuthenticated } from "./helpers/auth";
  *   - シナリオ N-9: SPで入力フローを一通り完走できる (P0 / validation)
  *   - シナリオ N-10: 既存のURL構造が維持されている (P0 / regression)
  */
-
-function getCurrentWeekStartDate(): string {
-  const date = new Date();
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const dayOfMonth = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${dayOfMonth}`;
-}
-
-function getCurrentMonth(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
 
 test.describe("ナビゲーション（Issue #49）", () => {
   test("@navigation シナリオN-1.1: SP幅でBottomNavigationの非選択項目と選択状態が視認できる", async ({
