@@ -26,7 +26,8 @@ test.describe("system admin membership operation", () => {
       await expect(page.getByRole("heading", { name: "ユーザー詳細" })).toBeVisible();
       await page.getByRole("button", { name: "移動元に選択" }).click();
       await page.getByLabel("追加・移動先グループを検索").fill(`${prefix}-B`);
-      await page.getByRole("button", { name: "このグループへ移動" }).click();
+      const targetRow = page.getByText(`${prefix}-B（${fixture.groupB}）`).locator("..");
+      await targetRow.getByRole("button", { name: "このグループへ移動" }).click();
       await page.getByLabel("操作理由").fill("E2E transfer確認");
       await page.getByRole("button", { name: "実行する" }).click();
       await expect(
