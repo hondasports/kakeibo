@@ -11,7 +11,7 @@
  *   （lib/domain/common/month.ts の getCurrentMonth をそのまま使う）。
  *
  * page.clock.setFixedTime には頼らない。ブラウザ時刻だけを固定しても、
- * Convex 側で週次セッションを決める時刻（UTC）や JST 基準の月計算は
+ * Convex 側で週次セッションを決める時刻（実行環境のローカル時刻）や JST 基準の月計算は
  * 変わらず、固定した瞬間とアプリの「今」の対応が実行環境依存になるため。
  */
 import { addDays } from "../../lib/domain/common/date";
