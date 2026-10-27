@@ -1,5 +1,5 @@
 import { clerk, setupClerkTestingToken } from "@clerk/testing/playwright";
-import { type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 type GotoAuthenticatedOptions = {
   ensureGroup?: boolean;
@@ -56,19 +56,30 @@ export async function gotoAuthenticated(
 }
 
 export async function getCurrentClerkTokenIdentifier(page: Page): Promise<string> {
-  const handle = await page.waitForFunction(
-    async () => {
-      const clerk = (
-        window as Window & { Clerk?: { session?: { getToken?: () => Promise<string | null> } } }
-      ).Clerk;
-      return clerk?.session?.getToken ? await clerk.session.getToken() : null;
-    },
-    undefined,
-    { timeout: 15_000 },
-  );
-  const token = (await handle.jsonValue()) as string;
+  let token: string | null = null;
+  await expect
+    .poll(
+      async () => {
+        token = (await page.evaluate(async () => {
+          const clerk = (
+            window as Window & {
+              Clerk?: { session?: { getToken?: () => Promise<string | null> } };
+            }
+          ).Clerk;
+          return clerk?.session?.getToken ? await clerk.session.getToken() : null;
+        })) as string | null;
+        return token !== null;
+      },
+      { timeout: 15_000, message: "current Clerk token is not available" },
+    )
+    .toBe(true);
 
-  const payloadPart = token.split(".")[1];
+  const resolvedToken = token as string | null;
+  if (!resolvedToken) {
+    throw new Error("current Clerk token is not available");
+  }
+
+  const payloadPart = resolvedToken.split(".")[1];
   if (!payloadPart) {
     throw new Error("invalid Clerk token");
   }
