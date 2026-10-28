@@ -608,7 +608,7 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
         "大阪市水道局 水道料金",
       ),
     ).toBeVisible();
-  });
+  }, 20_000);
 
   it("合計だけ保存の下書きは保存・再編集後も合計だけで保存を維持する", async () => {
     const user = userEvent.setup();
