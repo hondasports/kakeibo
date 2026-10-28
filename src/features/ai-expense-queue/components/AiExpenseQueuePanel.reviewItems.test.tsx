@@ -199,6 +199,92 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     expect(within(dialog).getByRole("button", { name: "下書きを保存" })).toBeEnabled();
   });
 
+  it("税率未確定の下書きは比較不能を揃えて表示し、商品の確認を案内する", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockImplementation((reference: string, args: { draftId?: string } | "skip") => {
+      if (reference !== "aiExpenseDrafts.queries.getWithItems" || args === "skip") {
+        return [];
+      }
+      return {
+        draft: {
+          _id: args.draftId,
+          status: "needs_review",
+          documentType: "convenience_payment",
+          shopName: "",
+          paymentPlace: "セブンイレブン北浜店",
+          payeeName: "大阪市水道局",
+          paymentPurpose: "",
+          date: "2026-06-01",
+          amountYen: 9120,
+          categoryId: "cat-daily",
+          reviewReasons: ["low_confidence", "missing_required_field"],
+          warnings: ["支払内容の印字が薄いため確認してください"],
+          rawObservation: {
+            source: "ai_ocr",
+            observedAt: 1,
+            lines: [
+              {
+                rawText: "大阪市水道局 水道料金",
+                amountText: "9,120円",
+                amountYen: 9120,
+                lineRoleCandidates: ["total"],
+                roleConfidence: 0.88,
+                explicitlyPrinted: true,
+                sourceLineIndex: 0,
+              },
+            ],
+          },
+        },
+        items: [
+          {
+            _id: "item-food",
+            itemName: "パン",
+            amountYen: 120,
+            categoryId: "cat-food",
+            confidence: { itemName: 0.92, amountYen: 0.95, categoryId: 0.86 },
+            warnings: [],
+          },
+          {
+            _id: "item-medical",
+            itemName: "胃薬",
+            amountYen: 980,
+            confidence: { itemName: 0.72, amountYen: 0.95, categoryName: 0.4 },
+            warnings: ["品名が不鮮明です"],
+          },
+        ],
+      };
+    });
+
+    renderWithProviders(
+      <AiExpenseQueuePanel initialItems={[queueItems[1]]} categories={categories} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "確認する" }));
+    const dialog = screen.getByRole("dialog", { name: "下書き確認" });
+
+    const guidance = within(dialog).getByRole("region", { name: "全体の確認状態" });
+    expect(within(guidance).getByText("レシート全体の確認")).toBeVisible();
+    expect(within(guidance).getByText(/特定の誤りを検出したものではありません/)).toBeVisible();
+    await user.click(within(guidance).getByRole("button", { name: "商品一覧を見比べる" }));
+
+    const checkSection = within(dialog).getByRole("region", { name: "確認結果" });
+    expect(within(checkSection).getAllByText("比較不能")).toHaveLength(2);
+    expect(
+      within(checkSection).getByText(
+        "税設定・登録額の確認が必要な明細があるため、支払額と比較できません",
+      ),
+    ).toBeVisible();
+    expect(
+      within(checkSection).getByText(/「.+」など税設定の確認が必要な明細があります/),
+    ).toBeVisible();
+    expect(
+      within(within(dialog).getByRole("region", { name: "商品一覧" })).getAllByText("未確定")
+        .length,
+    ).toBeGreaterThan(0);
+    expect(within(dialog).getByLabelText("合計金額")).toHaveValue("9120");
+    expect(within(dialog).queryByRole("radio", { name: "分からない" })).not.toBeInTheDocument();
+  });
+
   it("複数カテゴリを同じ画面で確認して下書き保存する", async () => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, args: { draftId?: string } | "skip") => {
