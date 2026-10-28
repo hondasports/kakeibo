@@ -116,7 +116,7 @@ test.describe("レスポンシブ表示（Issue #20）", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("@smoke シナリオR-4b: 406px viewport でキュー有データ時も主要要素が viewport 内に収まる", async ({
+  test("@smoke シナリオR-4b: 406px viewport でキュー有データ時も主要要素が viewport 内に収まる（/__e2e__/ fixture・サーバー保存なし）", async ({
     page,
   }) => {
     await gotoAuthenticated(page);

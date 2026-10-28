@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import { ReviewDialog } from "./ReviewDialog";
-import { mixedTaxReviewFixture } from "../../../../lib/domain/aiExpenseDrafts/reviewTaxPreviewTestHelpers";
+import {
+  legacyTaxSummaryVariants,
+  mixedTaxReviewFixture,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTaxPreviewTestHelpers";
 
 const props: ComponentProps<typeof ReviewDialog> = {
   open: true,
@@ -281,26 +284,34 @@ describe("下書きの修正導線", () => {
 });
 
 describe("Issue #892 現在の税内訳に揃えた表示", () => {
-  it("1782円の混在税は確認0件で、原文を確認でき内部値の編集はない", async () => {
-    const user = userEvent.setup();
-    const fixture = mixedTaxReviewFixture();
-    render(
-      <ReviewDialog
-        {...props}
-        selectedReviewDraft={fixture.draft}
-        reviewForm={fixture.form}
-        reviewItems={fixture.items}
-      />,
-    );
-    expect(
-      within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 0件"),
-    ).toBeVisible();
-    await user.click(screen.getByText("読み取り原文（参考）"));
-    expect(screen.getByRole("list", { name: "OCR原文" })).toHaveTextContent("合計 1,782円");
-    expect(screen.queryByRole("spinbutton", { name: "対象額" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "税内訳を確認" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "税内訳を修正" })).not.toBeInTheDocument();
-  });
+  it.each(Object.entries(legacyTaxSummaryVariants()))(
+    "1782円の混在税（旧形式 %s）も確認0件で、原文を確認でき内部値の編集はない",
+    async (_caseName, taxSummaries) => {
+      const user = userEvent.setup();
+      const fixture = mixedTaxReviewFixture();
+      render(
+        <ReviewDialog
+          {...props}
+          selectedReviewDraft={{ ...fixture.draft, taxSummaries }}
+          reviewForm={fixture.form}
+          reviewItems={fixture.items}
+        />,
+      );
+      expect(
+        within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 0件"),
+      ).toBeVisible();
+      expect(
+        within(screen.getByRole("region", { name: "全体の確認状態" })).getByText(
+          /印字額と明細の金額が一致しています/,
+        ),
+      ).toBeVisible();
+      await user.click(screen.getByText("読み取り原文（参考）"));
+      expect(screen.getByRole("list", { name: "OCR原文" })).toHaveTextContent("合計 1,782円");
+      expect(screen.queryByRole("spinbutton", { name: "対象額" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "税内訳を確認" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "税内訳を修正" })).not.toBeInTheDocument();
+    },
+  );
 
   it("保存済み全体8%外税の金額を変更しても画面の登録額は216円になる", async () => {
     const user = userEvent.setup();

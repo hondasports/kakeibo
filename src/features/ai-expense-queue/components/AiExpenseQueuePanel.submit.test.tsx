@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -5,11 +6,61 @@ import "./AiExpenseQueuePanelTestMocks";
 import { renderWithProviders } from "../../../test/render";
 import { AiExpenseQueuePanel } from "./AiExpenseQueuePanel";
 import { categories, queueItems } from "../../receipt-review/utils/testFixtures";
+import type {
+  AiExpenseDraft,
+  AiExpenseDraftItem,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
+import type { AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
 import {
   registerReadyDraftsAsExpenseEntriesMock,
   updateForReviewMock,
   useQueryMock,
 } from "./AiExpenseQueuePanelTestMocks";
+
+/**
+ * /__e2e__/ai-expense-queue と同じく、保存結果をサーバー永続化ではなく
+ * ブラウザ内の useState へ反映するハーネス。キューの再表示だけを検証する。
+ */
+function LocalQueueHarness({
+  items: initialQueueItems,
+  drafts,
+  draftItems = {},
+}: {
+  items: AiExpenseQueueItem[];
+  drafts: Record<string, AiExpenseDraft>;
+  draftItems?: Record<string, AiExpenseDraftItem[]>;
+}) {
+  const [items, setItems] = useState(initialQueueItems);
+  return (
+    <AiExpenseQueuePanel
+      categories={categories}
+      initialItems={items}
+      initialReviewDrafts={drafts}
+      initialReviewDraftItems={draftItems}
+      onReviewSubmit={(draftId, values, registerAfterUpdate) => {
+        setItems((current) =>
+          current.map((item) =>
+            item.id === draftId
+              ? {
+                  ...item,
+                  status: registerAfterUpdate ? "registered" : "ready",
+                  documentType: values.documentType,
+                  title: values.shopName,
+                  amountYen: values.amountYen,
+                  registrationMode: values.registrationMode,
+                  reviewReasons: [],
+                }
+              : item,
+          ),
+        );
+        return {
+          status: registerAfterUpdate ? "registered" : "ready",
+          reviewReasons: [],
+        };
+      }}
+    />
+  );
+}
 
 describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
   it("選択した ready 下書きだけまとめて登録する", async () => {
@@ -401,4 +452,265 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
     expect(screen.getByText(/保存しました。確認待ちに残っています。/)).toBeInTheDocument();
     expect(screen.getByText(/確認ポイント：金額・税内訳の確認が必要/)).toBeInTheDocument();
   });
+
+  it("確認待ちの下書きを保存すると登録できますへ更新内容が並び、再編集も同じ導線でできる", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <LocalQueueHarness
+        items={[queueItems[1]]}
+        drafts={{
+          "draft-review": {
+            _id: "draft-review",
+            status: "needs_review",
+            documentType: "convenience_payment",
+            shopName: "",
+            paymentPlace: "セブンイレブン北浜店",
+            payeeName: "大阪市水道局",
+            paymentPurpose: "",
+            date: "2026-06-01",
+            amountYen: 9120,
+            categoryId: "cat-daily",
+            reviewReasons: ["low_confidence", "missing_required_field"],
+            warnings: [],
+          },
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "確認する" }));
+    const dialog = screen.getByRole("dialog", { name: "下書き確認" });
+    expect(within(dialog).getByLabelText("店名・内容")).toHaveValue("大阪市水道局");
+    expect(within(dialog).getByLabelText("合計金額")).toHaveValue("9120");
+    expect(within(dialog).getByLabelText("支出日（レシート記載日）")).toHaveValue("2026-06-01");
+
+    await user.clear(within(dialog).getByLabelText("店名・内容"));
+    await user.type(within(dialog).getByLabelText("店名・内容"), "大阪市水道局 水道料金");
+    await user.clear(within(dialog).getByLabelText("合計金額"));
+    await user.type(within(dialog).getByLabelText("合計金額"), "9160");
+    await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
+
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      },
+      { timeout: 15_000 },
+    );
+    const readySection = screen.getByRole("region", { name: "登録できます" });
+    const readyItem = readySection
+      .querySelectorAll(".ai-expense-queue-item")
+      .item(0) as HTMLElement;
+    expect(within(readyItem).getByText("大阪市水道局 水道料金")).toBeVisible();
+    expect(within(readyItem).getByText(/9,160円/)).toBeVisible();
+    expect(screen.queryByRole("region", { name: "確認待ち" })).not.toBeInTheDocument();
+
+    await user.click(within(readyItem).getByRole("button", { name: "修正する" }));
+    const reopened = screen.getByRole("dialog", { name: "下書き確認" });
+    await user.clear(within(reopened).getByLabelText("店名・内容"));
+    await user.type(within(reopened).getByLabelText("店名・内容"), "大阪市水道局 6月分");
+    await user.clear(within(reopened).getByLabelText("合計金額"));
+    await user.type(within(reopened).getByLabelText("合計金額"), "9200");
+    await user.click(within(reopened).getByRole("button", { name: "下書きを保存" }));
+
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      },
+      { timeout: 15_000 },
+    );
+    const reeditedItem = screen
+      .getByRole("region", { name: "登録できます" })
+      .querySelectorAll(".ai-expense-queue-item")
+      .item(0) as HTMLElement;
+    expect(within(reeditedItem).getByText("大阪市水道局 6月分")).toBeVisible();
+    expect(within(reeditedItem).getByText(/9,200円/)).toBeVisible();
+    expect(within(reeditedItem).getByRole("button", { name: "修正する" })).toBeVisible();
+    expect(within(reeditedItem).getByRole("button", { name: "登録する" })).toBeVisible();
+  }, 20_000);
+
+  it("税率未確定の下書きは確認事項を残したまま保存して登録できますへ並ぶ", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <LocalQueueHarness
+        items={[queueItems[1]]}
+        drafts={{
+          "draft-review": {
+            _id: "draft-review",
+            status: "needs_review",
+            documentType: "convenience_payment",
+            shopName: "",
+            paymentPlace: "セブンイレブン北浜店",
+            payeeName: "大阪市水道局",
+            paymentPurpose: "",
+            date: "2026-06-01",
+            amountYen: 9120,
+            categoryId: "cat-daily",
+            reviewReasons: ["low_confidence", "missing_required_field"],
+            warnings: [],
+            rawObservation: {
+              source: "ai_ocr",
+              observedAt: 1,
+              lines: [
+                {
+                  rawText: "大阪市水道局 水道料金",
+                  amountText: "9,120円",
+                  amountYen: 9120,
+                  lineRoleCandidates: ["total"],
+                  roleConfidence: 0.88,
+                  explicitlyPrinted: true,
+                  sourceLineIndex: 0,
+                },
+              ],
+            },
+          },
+        }}
+        draftItems={{
+          "draft-review": [
+            {
+              _id: "item-food",
+              itemName: "パン",
+              amountYen: 120,
+              categoryId: "cat-food",
+              confidence: { itemName: 0.92, amountYen: 0.95, categoryId: 0.86 },
+              warnings: [],
+            },
+            {
+              _id: "item-medical",
+              itemName: "胃薬",
+              amountYen: 980,
+              confidence: { itemName: 0.72, amountYen: 0.95, categoryName: 0.4 },
+              warnings: ["品名が不鮮明です"],
+            },
+          ],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "確認する" }));
+    const dialog = screen.getByRole("dialog", { name: "下書き確認" });
+    expect(
+      within(within(dialog).getByRole("region", { name: "確認結果" })).getByText(
+        /「.+」など税設定の確認が必要な明細があります/,
+      ),
+    ).toBeVisible();
+
+    await user.clear(within(dialog).getByLabelText("店名・内容"));
+    await user.type(within(dialog).getByLabelText("店名・内容"), "大阪市水道局 水道料金");
+    await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
+
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      },
+      { timeout: 15_000 },
+    );
+    expect(
+      within(screen.getByRole("region", { name: "登録できます" })).getByText(
+        "大阪市水道局 水道料金",
+      ),
+    ).toBeVisible();
+  });
+
+  it("合計だけ保存の下書きは保存・再編集後も合計だけで保存を維持する", async () => {
+    const user = userEvent.setup();
+    const totalOnlyQueueItem: AiExpenseQueueItem = {
+      id: "draft-totalonly",
+      fileName: "review-totalonly.png",
+      status: "needs_review",
+      documentType: "receipt",
+      title: "E2E合計のみ店",
+      amountYen: 108,
+      date: "2026-07-04",
+      categoryName: "食費",
+      registrationMode: "totalOnly",
+      reviewReasons: ["user_confirmation_required"],
+    };
+    renderWithProviders(
+      <LocalQueueHarness
+        items={[totalOnlyQueueItem]}
+        drafts={{
+          "draft-totalonly": {
+            _id: "draft-totalonly",
+            status: "needs_review",
+            documentType: "receipt",
+            shopName: "E2E合計のみ店",
+            date: "2026-07-04",
+            amountYen: 108,
+            categoryId: "cat-food",
+            registrationMode: "totalOnly",
+            reviewReasons: ["user_confirmation_required"],
+            warnings: [],
+            rawObservation: {
+              source: "ai_ocr",
+              observedAt: 1,
+              lines: [
+                {
+                  rawText: "E2E合計のみ商品 108円",
+                  amountText: "108円",
+                  amountYen: 108,
+                  lineRoleCandidates: ["item"],
+                  roleConfidence: 0.95,
+                  explicitlyPrinted: true,
+                  sourceLineIndex: 0,
+                },
+              ],
+            },
+          },
+        }}
+        draftItems={{
+          "draft-totalonly": [
+            {
+              _id: "item-totalonly",
+              itemName: "E2E合計のみ商品",
+              amountYen: 108,
+              printedAmountYen: 108,
+              categoryId: "cat-food",
+              confidence: { itemName: 0.95, amountYen: 0.95, categoryId: 0.95 },
+              warnings: [],
+              taxResolutionStatus: "unresolved",
+            },
+          ],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "確認する" }));
+    const dialog = screen.getByRole("dialog", { name: "下書き確認" });
+    expect(within(dialog).getByText(/税を推測せず、レシート合計だけで保存します/)).toBeVisible();
+    await user.clear(within(dialog).getByLabelText("合計金額"));
+    await user.type(within(dialog).getByLabelText("合計金額"), "5000");
+    await user.click(within(dialog).getByRole("button", { name: "レシート合計だけ保存" }));
+
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      },
+      { timeout: 15_000 },
+    );
+    const readySection = screen.getByRole("region", { name: "登録できます" });
+    const readyItem = readySection
+      .querySelectorAll(".ai-expense-queue-item")
+      .item(0) as HTMLElement;
+    expect(within(readyItem).getByText("E2E合計のみ店")).toBeVisible();
+    expect(within(readyItem).getByText(/5,000円/)).toBeVisible();
+    expect(within(readyItem).getByText("合計だけで保存")).toBeVisible();
+    expect(within(readyItem).getByRole("button", { name: "登録する" })).toBeEnabled();
+
+    await user.click(within(readyItem).getByRole("button", { name: "修正する" }));
+    const reopened = screen.getByRole("dialog", { name: "下書き確認" });
+    expect(within(reopened).getByText(/税を推測せず、レシート合計だけで保存します/)).toBeVisible();
+    await user.click(within(reopened).getByRole("button", { name: "レシート合計だけ保存" }));
+
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      },
+      { timeout: 15_000 },
+    );
+    const reeditedItem = screen
+      .getByRole("region", { name: "登録できます" })
+      .querySelectorAll(".ai-expense-queue-item")
+      .item(0) as HTMLElement;
+    expect(within(reeditedItem).getByText("合計だけで保存")).toBeVisible();
+    expect(within(reeditedItem).getByRole("button", { name: "登録する" })).toBeEnabled();
+  }, 20_000);
 });

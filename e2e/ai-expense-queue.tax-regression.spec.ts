@@ -85,13 +85,20 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     await page.reload();
     const { queue, dialog } = await openFirstReviewDialog(page);
 
+    await expect(dialog.getByRole("heading", { name: /商品一覧/ })).toBeVisible();
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(800);
+
     // 未確認の各商品は、旧税内訳から逆算せず商品ごとに確認する。
     const expectedMixedTaxRates = { パン: "8%", 洗剤: "10%", 牛乳: "8%", ラップ: "10%" };
     const milkRow = dialog.locator('section[aria-label="商品一覧"] details').filter({
       hasText: "牛乳",
     });
     if ((await milkRow.getAttribute("open")) === null) await milkRow.locator("summary").click();
-    await milkRow.getByRole("combobox", { name: "牛乳の税率", exact: true }).click();
+    const milkTaxRate = milkRow.getByRole("combobox", { name: "牛乳の税率", exact: true });
+    await expect
+      .poll(async () => (await milkTaxRate.boundingBox())?.width ?? 0)
+      .toBeGreaterThanOrEqual(176);
+    await milkTaxRate.click();
     await page.getByRole("option", { name: "8%", exact: true }).click();
     await dialog.getByRole("combobox", { name: "牛乳の表示価格", exact: true }).click();
     await page.getByRole("option", { name: "税込", exact: true }).click();
@@ -132,69 +139,5 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     for (const [itemName, expectedRate] of Object.entries(expectedMixedTaxRates)) {
       await expectItemTaxRate(reopenedDialog, itemName, expectedRate);
     }
-  });
-
-  // totalOnly の下書きは dev バックエンドのシードに依存せず、
-  // フロントのみの __e2e__ fixture で確認する（registrationMode の表示・保存導線）。
-  test("@smoke R018 確認済みtotalOnlyの下書きは合計だけ保存モードで開ける", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1&totalOnly=1");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    const reviewSection = queue.getByRole("region", { name: "確認待ち" });
-    await expect(reviewSection.getByText("review-totalonly.png")).toBeVisible();
-    await reviewSection
-      .locator(".ai-expense-queue-item")
-      .filter({ hasText: "review-totalonly.png" })
-      .getByRole("button", { name: "確認する" })
-      .click();
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await expect(dialog).toBeVisible();
-
-    await dialog.getByLabel("合計金額", { exact: true }).fill("5000");
-    await expect(dialog.getByText(/税を推測せず、レシート合計だけで保存します/)).toBeVisible();
-    await dialog.getByRole("button", { name: "レシート合計だけ保存" }).click();
-    await expect(dialog).toBeHidden();
-
-    const readyItem = queue
-      .getByRole("region", { name: "登録できます" })
-      .locator(".ai-expense-queue-item")
-      .filter({ hasText: "E2E合計のみ店" });
-    await expect(readyItem.getByText("5,000円")).toBeVisible();
-    await expect(readyItem.getByText("合計だけで保存")).toBeVisible();
-    await expect(readyItem.getByRole("button", { name: "登録する" })).toBeEnabled();
-  });
-
-  test("@smoke totalOnlyの下書きは再編集しても合計だけ登録を維持できる", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1&totalOnly=1");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    await queue
-      .getByRole("region", { name: "確認待ち" })
-      .locator(".ai-expense-queue-item")
-      .filter({ hasText: "review-totalonly.png" })
-      .getByRole("button", { name: "確認する" })
-      .click();
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await expect(dialog).toBeVisible();
-
-    await expect(dialog.getByText(/税を推測せず、レシート合計だけで保存します/)).toBeVisible();
-    await dialog.getByRole("button", { name: "レシート合計だけ保存" }).click();
-    await expect(dialog).toBeHidden();
-
-    const readyItem = queue
-      .getByRole("region", { name: "登録できます" })
-      .locator(".ai-expense-queue-item")
-      .filter({ hasText: "E2E合計のみ店" })
-      .first();
-    await expect(readyItem.getByText("合計だけで保存")).toBeVisible();
-    await readyItem.getByRole("button", { name: "修正する" }).click();
-    await expect(dialog).toBeVisible();
-
-    await expect(dialog.getByText(/税を推測せず、レシート合計だけで保存します/)).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "レシート合計だけ保存" })).toBeEnabled();
-    await dialog.getByRole("button", { name: "レシート合計だけ保存" }).click();
-    await expect(dialog).toBeHidden();
-    await expect(readyItem.getByText("合計だけで保存")).toBeVisible();
-    await expect(readyItem.getByRole("button", { name: "登録する" })).toBeEnabled();
   });
 });
