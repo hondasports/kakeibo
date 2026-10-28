@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { gotoAuthenticated, getCurrentClerkTokenIdentifier } from "./helpers/auth";
 import { seedUnallocatedTaxDraftByUser } from "./helpers/seed";
 import { cleanupAiExpenseQueueByUser } from "./helpers/cleanup";
+import { expandDetailsIfClosed } from "./helpers/receiptQueue";
 
 test.use({ actionTimeout: 15000 });
 
@@ -47,7 +48,7 @@ test("#748 未配分の13明細を確認して税込合計・税額を保存後�
     await expect(dialog.getByRole("combobox", { name: "対象額種別", exact: true })).toHaveCount(0);
     for (const name of ["割引8", "割引9"]) {
       const item = dialog.locator("details").filter({ hasText: name }).first();
-      if ((await item.getAttribute("open")) === null) await item.locator("summary").click();
+      await expandDetailsIfClosed(item);
       await item.getByRole("combobox", { name: name + "の割引対象税率", exact: true }).click();
       await page.getByRole("option", { name: "8%対象の割引", exact: true }).click();
       await expect(

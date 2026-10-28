@@ -27,22 +27,8 @@ async function waitForStableBounds(...locators: Locator[]) {
 }
 
 /**
- * レスポンシブ表示 E2E テスト
- *
- * Issue #20「MVPレスポンシブ確認」の受け入れ確認。
- *
- * カバーするシナリオ:
- *   - ~~シナリオ R-1: 390px viewport でメイン画面の主要要素が表示される (P1 / smoke)~~
- *     **削除** (Issue #49 でダッシュボードが変更されたため)
- *   - ~~シナリオ R-2: 320px viewport でメイン画面の主要要素が表示される (P1 / smoke)~~
- *     **削除** (Issue #49 でダッシュボードが変更されたため)
- *   - シナリオ R-3: 390px viewport で設定画面の主要要素が表示される (P1 / smoke)
- *     **更新** (BottomNavigation 経由の遷移に変更)
- *   - シナリオ R-4: 406px viewport で入力画面が横スクロールせず主要要素が viewport 内に収まる (P1 / smoke)
- *     Issue #354 対応
- *
- * テストデータ・cleanup:
- *   - レシート・カテゴリを作成しないため cleanup 不要。
+ * レスポンシブ表示 E2E テスト（Issue #20「MVPレスポンシブ確認」の受け入れ確認）
+ * レシート・カテゴリを作成しないため cleanup は持たない。
  */
 
 test.describe("レスポンシブ表示（Issue #20）", () => {

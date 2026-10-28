@@ -5,12 +5,10 @@ import { clickUserMenuItem } from "./helpers/ui";
 /**
  * 認証フロー E2E テスト
  *
- * カバーするシナリオ:
- *   - シナリオ 1: 未ログイン状態でアクセス → ログイン画面が表示される (P0)
- *     ※ Clerk Testing Token 方式と構造的に非互換のためスキップ
- *     ※ global-setup の clerkSetup() が CLERK_TESTING_TOKEN を process.env にセットするため、
- *     ※ storageState を空にしても Testing Token がリクエストに付与され Clerk の初期化が不安定になる。
- *   - シナリオ 4: ログアウト → ログイン画面に戻る (P1)
+ * 未ログイン状態でアクセスするとログイン画面が表示される確認は、
+ * Clerk Testing Token 方式と構造的に非互換のため対象外。
+ * （global-setup の clerkSetup() が CLERK_TESTING_TOKEN を process.env にセットするため、
+ * storageState を空にしても Testing Token がリクエストに付与され Clerk の初期化が不安定になる。）
  */
 
 /**

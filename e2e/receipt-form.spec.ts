@@ -9,6 +9,7 @@ import {
   resetTestWeekSession,
 } from "./helpers/cleanup";
 import { addWeeks, getCurrentWeekStartDate } from "./helpers/currentPeriod";
+import { saveExpense } from "./helpers/expenseEntry";
 
 async function expectChartLabelsWithinBounds(graph: Locator) {
   await expect
@@ -33,50 +34,6 @@ async function expectChartLabelsWithinBounds(graph: Locator) {
     )
     .toEqual([]);
 }
-
-/**
- * 支出項目入力フォーム E2E テスト（QA Agent 担当）
- *
- * Issue #13「保存して次へ入力フロー」の受け入れ確認と回帰確認を含む。
- * Issue #14「今週の入力状況パネル」の受け入れ確認を含む。
- *
- * Issue #49 UIリファクタリングにより、画面構成が変更された:
- *   - ダッシュボード (/) : summary-grid（今週の支出）
- *   - 入力画面 (/weeks/current/input) : ExpenseEntryForm + WeekStatusPanel (PC only)
- *   - 週次サマリー (/weeks/YYYY-MM-DD) : WeeklySummaryPanel + WeekNavigator
- *
- * Issue #181 フォーム刷新により、ReceiptForm → ExpenseEntryForm に変更された:
- *   - 店舗名フィールド: input[name="shopName"] → getByLabel("店舗名 / 支払先")
- *   - 金額フィールド: input[name="amountYen"] → getByLabel("合計金額")
- *   - 日付: input[name="date"] → 週日選択UI（role="listbox"[aria-label="週内の日付候補"]）
- *   - Snackbar: "レシートを保存しました" → "支出項目を保存しました"
- *   - 収入タブ: ExpenseEntryForm は支出のみ対応（収入タブは廃止）
- *   - 保存後フォーカス戻り: ExpenseEntryForm では未実装
- *
- * カバーするシナリオ:
- *   - シナリオ 2: ログイン後にダッシュボードが表示される (P0 / smoke)
- *   - シナリオ 3: ページリロードでログイン状態が維持される (P0 / smoke)
- *   - シナリオ 5: 必須項目を入力して保存 → 成功し店名・金額がクリアされる (P0 / smoke)
- *   - シナリオ 6: 保存後レシート一覧に追加される (P0 / smoke / staging)
- *   - [Issue #13] 保存成功通知が Snackbar で表示される
- *   - [Issue #13] 5件連続入力して操作が止まらない（完了条件）
- *   - ~~シナリオ 7: 店舗名が空で保存 → エラーが表示される~~
- *     **component testへ移管** (Issue #1124: ExpenseEntryForm.single.test.tsx が送信しないことまで確認)
- *   - ~~シナリオ 8: 金額が空で保存 → エラーが表示される~~
- *     **component testへ移管** (Issue #1124: 同上)
- *   - ~~シナリオ 10: 金額に文字を入力しても入力フィールドに反映されない~~
- *     **component testへ移管** (Issue #1124: ExpenseEntryForm.single.test.tsx)
- *   - ~~[Issue #51] シナリオ 11: 金額に数字を入力すると3桁カンマ区切りで表示される~~
- *     **component testへ移管** (Issue #1124: 同上)
- *   - [Issue #14] 入力状況パネルが表示される (P0 / smoke) ※PC幅のみ
- *   - [Issue #14/#15] 保存後に週次サマリーへ店名・金額・件数が反映される (P0 / smoke)
- *     Issue #1124 で従来の4本（#14の反映・支出一覧・件数、#15のリアルタイム更新）を1本に統合
- *   - [Issue #308] 入力画面に直近の入力一覧を表示しない (P0 / regression)
- *   - [Issue #309] 週次サマリーに振り返り・完了UIを表示しない (P0 / regression)
- *   - [Issue #45] 週次サマリーを前後週ナビゲーションで切り替えられる (P0 / regression)
- *   - [Issue #45] 未来週URLは今週の週次サマリーへ正規化される (P0 / error-handling)
- *   - [Issue #46] 入力画面・週次サマリーに前週比が表示される (P1 / regression)
- */
 
 // ---------------------------------------------------------------------------
 // ダッシュボード・認証確認
@@ -150,16 +107,8 @@ test.describe("支出項目保存フロー（Issue #13 / #181 受け入れ確認
 
   test("[Issue #13] カテゴリが保存後も引き継がれる", async ({ page }) => {
     // Issue #181: 日付は週日選択UIに変更。カテゴリ引き継ぎのみ確認
-    await page.getByLabel("店舗名 / 支払先").fill("テスト店舗");
-    await page.getByLabel("合計金額").fill("500");
-    // 最初のカテゴリを選択して選択状態を記録
-    const firstCategory = page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first();
-    await firstCategory.click();
-
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("");
+    // 最初のカテゴリを選択して保存する
+    await saveExpense(page, "テスト店舗", "500");
 
     // カテゴリが引き継がれている（aria-selected="true" のオプションが存在する）
     await expect(
@@ -168,27 +117,13 @@ test.describe("支出項目保存フロー（Issue #13 / #181 受け入れ確認
   });
 
   test("[Issue #13] 5件連続入力して操作が止まらない", async ({ page }) => {
-    const shopNameInput = page.getByLabel("店舗名 / 支払先");
-    const amountInput = page.getByLabel("合計金額");
-    const firstCategory = page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first();
     const submitButton = page.getByRole("button", { name: "保存して次へ" });
 
     const shops = ["店舗A", "店舗B", "店舗C", "店舗D", "店舗E"];
     const amounts = ["100", "200", "300", "400", "500"];
 
     for (let i = 0; i < 5; i++) {
-      await shopNameInput.fill(shops[i]);
-      await amountInput.fill(amounts[i]);
-      // 初回のみカテゴリを選択（以降は引き継ぎ）
-      if (i === 0) {
-        await firstCategory.click();
-      }
-      await submitButton.click();
-
-      // 保存成功を確認（入力欄のクリア）
-      await expect(shopNameInput).toHaveValue("", { timeout: 10_000 });
+      await saveExpense(page, shops[i], amounts[i]);
     }
 
     // 5件入力後もフォームが使用可能であることを確認
@@ -196,22 +131,11 @@ test.describe("支出項目保存フロー（Issue #13 / #181 受け入れ確認
   });
 
   test("@smoke @staging シナリオ6: 保存後に支出一覧に追加される", async ({ page }) => {
-    // Issue #181: ExpenseEntryForm セレクターに変更
     // 1件目を保存
-    await page.getByLabel("店舗名 / 支払先").fill("スーパー北浜");
-    await page.getByLabel("合計金額").fill("4280");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, "スーパー北浜", "4280");
 
     // 2件目を保存
-    await page.getByLabel("店舗名 / 支払先").fill("ドラッグストア");
-    await page.getByLabel("合計金額").fill("1540");
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, "ドラッグストア", "1540");
 
     // Issue #77: InputPage から WeekStatusPanel（直近の入力一覧）が削除されたため、
     // SummaryPage（週次サマリー）で支出一覧を確認する
@@ -404,19 +328,9 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
   test("@smoke [Issue #14/#15] 保存した支出が週次サマリーに店名・金額・件数で反映される", async ({
     page,
   }) => {
-    // Issue #181: ExpenseEntryForm セレクターに変更
     const shopName = `QAサマリー反映_${Date.now()}`;
 
-    await page.getByLabel("店舗名 / 支払先").fill(shopName);
-    await page.getByLabel("合計金額").fill("1234");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-
-    // 保存完了（店名クリアを待機）
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, shopName, "1234");
 
     await page.getByRole("link", { name: "履歴" }).click();
     await expect(page).toHaveURL(/\/weeks\/\d{4}-\d{2}-\d{2}$/, { timeout: 10_000 });
@@ -437,16 +351,7 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
     const shopName = `QAメモ359_${Date.now()}`;
     const multiLineMemo = ["あ", "い", "う", "え", "お", "か", "き", "く", "け", "こ"].join("\n");
 
-    await page.getByLabel("店舗名 / 支払先").fill(shopName);
-    await page.getByLabel("合計金額").fill("1500");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByLabel("メモ").fill(multiLineMemo);
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, shopName, "1500", { memo: multiLineMemo });
 
     await page.getByRole("link", { name: "履歴" }).click();
     await expect(page).toHaveURL(/\/weeks\/\d{4}-\d{2}-\d{2}$/, { timeout: 10_000 });
@@ -471,16 +376,7 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
     const shopName = `QAメモ359wrap_${Date.now()}`;
     const wrappedMemo = "メモ確認用の長文テスト。".repeat(8);
 
-    await page.getByLabel("店舗名 / 支払先").fill(shopName);
-    await page.getByLabel("合計金額").fill("1600");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByLabel("メモ").fill(wrappedMemo);
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, shopName, "1600", { memo: wrappedMemo });
 
     await page.getByRole("link", { name: "履歴" }).click();
     await expect(page).toHaveURL(/\/weeks\/\d{4}-\d{2}-\d{2}$/, { timeout: 10_000 });
@@ -505,16 +401,7 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
   test("[Issue #308] 保存後も入力画面に直近の入力一覧を表示しない", async ({ page }) => {
     const shopName = `QA入力画面確認_${Date.now()}`;
 
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-
-    await page.getByLabel("店舗名 / 支払先").fill(shopName);
-    await page.getByLabel("合計金額").fill("1500");
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, shopName, "1500");
 
     await expect(page.getByRole("heading", { name: "直近の入力" })).toHaveCount(0);
     await expect(page.getByText(shopName)).toHaveCount(0);
@@ -570,15 +457,7 @@ test.describe("週次サマリーパネル（Issue #15 受け入れ確認）", (
 
     await page.setViewportSize({ width: 1280, height: 800 });
     await gotoAuthenticated(page, "/weeks/current/input");
-    await page.getByLabel("店舗名 / 支払先").fill(shopName);
-    await page.getByLabel("合計金額").fill("5280");
-    await page.getByLabel("メモ").fill(memo);
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, shopName, "5280", { memo });
 
     await page.getByRole("link", { name: "履歴" }).click();
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
@@ -699,29 +578,18 @@ test.describe("[Issue #371] 前週差表示（P1 / regression）", () => {
   test("週次サマリーに前週差（円）が表示される", async ({ page }) => {
     // Issue #181: ExpenseEntryForm の日付は週日選択UI（今週内のみ）のため、
     // 前週データは「前の週へ」ナビゲート後に保存し、今週へ戻って今週分を保存する
-    const firstCategory = page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first();
-    const submitButton = page.getByRole("button", { name: "保存して次へ" });
 
     // まず前の週に移動して保存
     await gotoAuthenticated(page, "/weeks/current/input");
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "前の週へ" }).click();
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
-    await page.getByLabel("店舗名 / 支払先").fill("前週比較用ストア");
-    await page.getByLabel("合計金額").fill("7000");
-    await firstCategory.click();
-    await submitButton.click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, "前週比較用ストア", "7000");
 
     // 今週に戻って保存
     await page.getByRole("button", { name: "次の週へ" }).click();
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
-    await page.getByLabel("店舗名 / 支払先").fill("今週比較用ストア");
-    await page.getByLabel("合計金額").fill("6280");
-    await submitButton.click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, "今週比較用ストア", "6280");
 
     // SummaryPage で前週比を確認（Issue #77: ReviewMemoPanel は InputPage から SummaryPage に移動）
     await page.getByRole("link", { name: "履歴" }).click();
@@ -771,14 +639,7 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
     // グラフ描画に必要な支出を今週分として保存する
     await gotoAuthenticated(page, "/weeks/current/input");
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
-    await page.getByLabel("店舗名 / 支払先").fill("週別推移用ストア");
-    await page.getByLabel("合計金額").fill("3000");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, "週別推移用ストア", "3000");
 
     const weekStartDate = getCurrentWeekStartDate();
     await page.goto(`/weeks/${weekStartDate}`);
@@ -796,14 +657,7 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "前の週へ" }).click();
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
-    await page.getByLabel("店舗名 / 支払先").fill("前週比較用ストア");
-    await page.getByLabel("合計金額").fill("7000");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, "前週比較用ストア", "7000");
 
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "今週のダッシュボード" })).toBeVisible();
@@ -828,14 +682,7 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
     // グラフ描画に必要な支出を今週分として保存する
     await gotoAuthenticated(page, "/weeks/current/input");
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
-    await page.getByLabel("店舗名 / 支払先").fill("週別推移用ストア");
-    await page.getByLabel("合計金額").fill("3000");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, "週別推移用ストア", "3000");
 
     const weekStartDate = getCurrentWeekStartDate();
     await page.goto(`/weeks/${weekStartDate}`);

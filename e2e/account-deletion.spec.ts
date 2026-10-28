@@ -1,12 +1,8 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { getCurrentClerkTokenIdentifier, gotoAuthenticated } from "./helpers/auth";
 import { cleanupGroupMembershipsByUser } from "./helpers/cleanup";
 import { seedGroupMemberForUser } from "./helpers/seed";
-
-async function expandDangerZone(page: Page) {
-  const trigger = page.getByRole("button", { name: "危険な操作" });
-  if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
-}
+import { expandDangerZone } from "./helpers/ui";
 
 test("@smoke @group-access 唯一ownerは退会をブロックされ、owner譲渡後に退会確認へ進める", async ({
   page,

@@ -16,32 +16,9 @@ import {
   seedTaxSummaryConflictDraftByUser,
 } from "./helpers/seed";
 import { createSyntheticReceiptImage } from "./helpers/syntheticImage";
-
-/**
- * Issue #144: 支出画像の読み取りUI
- *
- * カバーするシナリオ:
- * - 複数画像を連続追加すると、各画像が解析待ちとしてキューに表示される。
- * - SP幅でも追加ボタン、キュー状態、既存の画像入力・手入力フォームが破綻しない。
- */
+import { expandDetailsIfClosed, waitForReceiptInputQueue } from "./helpers/receiptQueue";
 
 const INPUT_PATH = "/weeks/current/input";
-
-/** 週次セッション読み込み後にレシート入力ワークベンチが表示されるまで待つ */
-async function waitForReceiptInputQueue(page: Page) {
-  await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible({
-    timeout: 20_000,
-  });
-  await expect(page.getByRole("heading", { name: "レシート入力" })).toBeVisible({
-    timeout: 20_000,
-  });
-  await expect(page.getByRole("region", { name: "レシート入力", exact: true })).toBeVisible({
-    timeout: 20_000,
-  });
-  const queue = page.locator(".input-workbench--expense");
-  await expect(queue).toBeVisible({ timeout: 20_000 });
-  return queue;
-}
 
 /** ヘッダーの ImageInputButton（空状態 CTA と区別する） */
 function getHeaderAddReceiptButton(queue: Locator) {
@@ -272,14 +249,10 @@ test.describe("下書き確認の税状態保存", () => {
   });
 
   test("明細ごとの税修正を保存すると再オープン後も維持される", async ({ page }) => {
-    const userId = process.env.E2E_CLERK_USER_ID?.trim();
-    if (!userId) {
-      test.skip();
-      return;
-    }
-
-    await seedTaxReviewDraftByUser(userId);
     await gotoAuthenticated(page, INPUT_PATH);
+    const userId = await getCurrentClerkTokenIdentifier(page);
+    await seedTaxReviewDraftByUser(userId);
+    await page.reload();
 
     const queue = await waitForReceiptInputQueue(page);
     const reviewSection = queue.getByRole("region", { name: "確認待ち" });
@@ -295,8 +268,7 @@ test.describe("下書き確認の税状態保存", () => {
       .locator('section[aria-label="商品一覧"] details')
       .filter({ hasText: "E2E税テスト商品" })
       .first();
-    if ((await taxItemRow.getAttribute("open")) === null)
-      await taxItemRow.locator("summary").click();
+    await expandDetailsIfClosed(taxItemRow);
     await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
       "税の確認待ち 1件",
     );
@@ -319,7 +291,7 @@ test.describe("下書き確認の税状態保存", () => {
       .locator('section[aria-label="商品一覧"] details')
       .filter({ hasText: "E2E税テスト商品" })
       .first();
-    if ((await itemRow.getAttribute("open")) === null) await itemRow.locator("summary").click();
+    await expandDetailsIfClosed(itemRow);
     await expect(
       dialog.getByRole("combobox", { name: "E2E税テスト商品の税率", exact: true }),
     ).toHaveText("非課税", { timeout: 10_000 });
@@ -504,13 +476,9 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
   });
 
   test("SPでレシート参照を開き、未解決のまま下書きを保存できる", async ({ page }) => {
-    const userId = process.env.E2E_CLERK_USER_ID?.trim();
-    if (!userId) {
-      test.skip();
-      return;
-    }
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoAuthenticated(page, INPUT_PATH);
+    const userId = await getCurrentClerkTokenIdentifier(page);
     await waitForReceiptInputQueue(page);
     await seedMixedTaxReviewDraftByUser(userId);
     await page.reload();
@@ -552,7 +520,7 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
       .getByRole("region", { name: "商品一覧" })
       .locator("details")
       .filter({ hasText: "E2E税率別集計商品" });
-    if ((await product.getAttribute("open")) === null) await product.locator("summary").click();
+    await expandDetailsIfClosed(product);
     await product.getByRole("combobox", { name: "E2E税率別集計商品の税率", exact: true }).click();
     await page.getByRole("option", { name: "10%", exact: true }).click();
     await expect(

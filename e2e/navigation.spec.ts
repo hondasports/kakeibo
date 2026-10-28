@@ -2,26 +2,7 @@ import { test, expect } from "@playwright/test";
 import { gotoAuthenticated } from "./helpers/auth";
 import { cleanupE2eExpenseEntries } from "./helpers/cleanup";
 import { getCurrentMonth, getCurrentWeekStartDate } from "./helpers/currentPeriod";
-
-/**
- * ナビゲーション E2E テスト
- *
- * Issue #49「UIの機能整理」の受け入れ確認。
- *
- * カバーするシナリオ:
- *   - シナリオ N-1: SP幅でBottomNavigation 5タブが表示され、タップで各画面に遷移できる (P0 / smoke)
- *   - シナリオ N-2: PC幅でBottomNavigationが非表示になり、Drawerが表示される (P0 / smoke)
- *   - シナリオ N-3: DrawerのすべてのリンクからURL遷移できる (P0 / smoke)
- *   - ~~シナリオ N-4: ダッシュボードにカテゴリ別内訳・前週比が表示される~~
- *     **削除** (Issue #1124: dashboard-home.spec.ts の @smoke テストが同じassertをより強く確認)
- *   - シナリオ N-5: SP幅でInputPageを開くとフォームのみが表示される (P1 / validation)
- *   - ~~シナリオ N-6: PC幅でInputPageを開くと入力フォームとWeekNavigatorが表示される~~
- *     **削除** (Issue #1124: フォーム表示はreceipt-formの@smokeテスト、WeekNavigatorは#77の@smokeテストが確認)
- *   - シナリオ N-7: SummaryPageに週次サマリーが表示される (P1 / validation)
- *   - シナリオ N-8: SummaryPageに週移動導線がある (P1 / validation)
- *   - シナリオ N-9: SP幅で入力タブから入力画面へ遷移しフォームとBottomNavigationが表示される (P0 / validation)
- *   - シナリオ N-10: 既存のURL構造が維持されている (P0 / regression)
- */
+import { saveExpense } from "./helpers/expenseEntry";
 
 test.describe("ナビゲーション（Issue #49）", () => {
   test("@navigation シナリオN-1.1: SP幅でBottomNavigationの非選択項目と選択状態が視認できる", async ({
@@ -344,14 +325,7 @@ test.describe("ナビゲーション（Issue #49）", () => {
     // グラフ描画に必要な支出を今週分として保存する
     await gotoAuthenticated(page, "/weeks/current/input");
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
-    await page.getByLabel("店舗名 / 支払先").fill("週別推移用ストア");
-    await page.getByLabel("合計金額").fill("3000");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, "週別推移用ストア", "3000");
 
     try {
       const weekStartDate = getCurrentWeekStartDate();
