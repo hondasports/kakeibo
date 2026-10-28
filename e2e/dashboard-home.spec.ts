@@ -1,14 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { gotoAuthenticated } from "./helpers/auth";
 
-/**
- * Issue #370 ホーム画面拡充 E2E
- *
- * カバーするシナリオ:
- *   - PC: サマリー3指標 + 前週比較 + 2カラム
- *   - SP: 要素順（入力パネルがカテゴリより上）
- */
-
 test.describe("ホーム画面拡充（Issue #370）", () => {
   test("@smoke [Issue #370] PC幅でサマリー指標と前週比較が表示される", async ({ page }) => {
     await gotoAuthenticated(page);

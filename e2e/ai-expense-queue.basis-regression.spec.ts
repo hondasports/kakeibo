@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { gotoAuthenticated, getCurrentClerkTokenIdentifier } from "./helpers/auth";
 import { seedTaxReviewDraftByUser } from "./helpers/seed";
 import { cleanupAiExpenseQueueByUser, cleanupE2eExpenseEntriesByUser } from "./helpers/cleanup";
+import { expandDetailsIfClosed } from "./helpers/receiptQueue";
 
 for (const receipt of [
   { receiptCase: "basis890", paidYen: 436, taxYen: 32, amounts: ["98", "138", "168"] },
@@ -25,7 +26,7 @@ for (const receipt of [
       const dialog = page.getByRole("dialog", { name: "下書き確認" });
       for (const name of ["商品1", "商品2", "商品3"]) {
         const detail = dialog.locator("details").filter({ hasText: name }).first();
-        if ((await detail.getAttribute("open")) === null) await detail.locator("summary").click();
+        await expandDetailsIfClosed(detail);
         await detail.getByRole("combobox", { name: name + "の表示価格", exact: true }).click();
         await page.getByRole("option", { name: "税抜", exact: true }).click();
       }
@@ -43,7 +44,7 @@ for (const receipt of [
       for (const [index, amount] of receipt.amounts.entries()) {
         const name = `商品${index + 1}`;
         const detail = dialog.locator("details").filter({ hasText: name }).first();
-        if ((await detail.getAttribute("open")) === null) await detail.locator("summary").click();
+        await expandDetailsIfClosed(detail);
         await expect(
           detail.getByRole("combobox", { name: name + "の表示価格", exact: true }),
         ).toHaveText("税抜");
@@ -61,8 +62,7 @@ for (const receipt of [
         .locator("details")
         .filter({ hasText: "読み取り原文（参考）" })
         .first();
-      if ((await reference.getAttribute("open")) === null)
-        await reference.locator("summary").click();
+      await expandDetailsIfClosed(reference);
       const taxSummary = reference.locator('[aria-label="税率別集計"]');
       await expect(taxSummary).toHaveCount(0);
       await expect(reference.getByRole("list", { name: "OCR原文" })).toContainText(
@@ -75,8 +75,7 @@ for (const receipt of [
       await expect(dialog).toBeHidden();
       await row.getByRole("button", { name: "修正する", exact: true }).click();
       await expect(matched).toBeVisible();
-      if ((await reference.getAttribute("open")) === null)
-        await reference.locator("summary").click();
+      await expandDetailsIfClosed(reference);
       await expect(taxSummary).toHaveCount(0);
       await expect(reference.getByRole("list", { name: "OCR原文" })).toContainText(
         `内消費税等8% ${receipt.taxYen}円`,

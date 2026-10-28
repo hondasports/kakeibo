@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { gotoAuthenticated } from "./helpers/auth";
 import { cleanupE2eExpenseEntries } from "./helpers/cleanup";
+import { saveExpense } from "./helpers/expenseEntry";
 
 test.describe("履歴検索（Issue #537 / #637〜#643）", () => {
   test.beforeEach(async ({ page }) => {
@@ -13,14 +14,7 @@ test.describe("履歴検索（Issue #537 / #637〜#643）", () => {
   });
 
   test("@smoke ヘッダー検索から店名で支出を見つけられる", async ({ page }) => {
-    await page.getByLabel("店舗名 / 支払先").fill("検索用スーパー北浜");
-    await page.getByLabel("合計金額").fill("3210");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 15_000 });
+    await saveExpense(page, "検索用スーパー北浜", "3210", { clearTimeout: 15_000 });
 
     await page.getByLabel("履歴を検索").fill("北浜");
     await page.getByRole("button", { name: "検索する" }).click();
@@ -32,14 +26,7 @@ test.describe("履歴検索（Issue #537 / #637〜#643）", () => {
   });
 
   test("金額条件で0件なら空メッセージを表示する", async ({ page }) => {
-    await page.getByLabel("店舗名 / 支払先").fill("金額フィルタ店");
-    await page.getByLabel("合計金額").fill("1500");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 15_000 });
+    await saveExpense(page, "金額フィルタ店", "1500", { clearTimeout: 15_000 });
 
     await page.getByLabel("履歴を検索").fill("金額フィルタ店");
     await page.getByRole("button", { name: "検索する" }).click();

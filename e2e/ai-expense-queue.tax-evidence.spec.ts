@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { getCurrentClerkTokenIdentifier, gotoAuthenticated } from "./helpers/auth";
 import { cleanupAiExpenseQueue, cleanupTestReceipts } from "./helpers/cleanup";
 import { seedTaxReviewDraftByUser } from "./helpers/seed";
+import { expandDetailsIfClosed } from "./helpers/receiptQueue";
 
 async function confirmProducts(page: Page, dialog: Locator) {
   for (let index = 1; index <= 5; index++) {
@@ -10,7 +11,7 @@ async function confirmProducts(page: Page, dialog: Locator) {
       .getByRole("region", { name: "商品一覧" })
       .locator("details")
       .filter({ hasText: name });
-    if ((await row.getAttribute("open")) === null) await row.locator("summary").click();
+    await expandDetailsIfClosed(row);
     await row.getByRole("combobox", { name: `${name}の税率`, exact: true }).click();
     await page.getByRole("option", { name: "10%", exact: true }).click();
     await expect(row.getByRole("combobox", { name: `${name}の税率`, exact: true })).toBeEnabled();
@@ -120,7 +121,7 @@ test("Issue #1015 旧下書きの初回保存前の商品と基本情報へ戻�
       .getByRole("region", { name: "商品一覧" })
       .locator("details")
       .filter({ hasText: "食品0" });
-    if ((await product.getAttribute("open")) === null) await product.locator("summary").click();
+    await expandDetailsIfClosed(product);
     await product.getByRole("textbox", { name: "明細名", exact: true }).fill("変更した商品");
     await dialog
       .getByRole("region", { name: "商品一覧" })
@@ -149,7 +150,7 @@ test("Issue #1015 旧下書きの初回保存前の商品と基本情報へ戻�
       .getByRole("region", { name: "商品一覧" })
       .locator("details")
       .filter({ hasText: "食品0" });
-    if ((await restored.getAttribute("open")) === null) await restored.locator("summary").click();
+    await expandDetailsIfClosed(restored);
     await expect(restored.getByRole("textbox", { name: "明細名", exact: true })).toHaveValue(
       "食品0",
     );
@@ -180,7 +181,7 @@ for (const reverse of [false, true]) {
       ];
       if (reverse) steps.reverse();
       for (const [index, step] of steps.entries()) {
-        if ((await item.getAttribute("open")) === null) await item.locator("summary").click();
+        await expandDetailsIfClosed(item);
         const select = item.getByRole("combobox", { name: step.label, exact: true });
         await select.click();
         await page.getByRole("option", { name: step.option, exact: true }).click();
@@ -192,7 +193,7 @@ for (const reverse of [false, true]) {
           await dialog.getByRole("button", { name: "下書きを保存", exact: true }).click();
           await expect(dialog).toBeHidden();
           await queued.getByRole("button", { name: "確認する", exact: true }).click();
-          if ((await item.getAttribute("open")) === null) await item.locator("summary").click();
+          await expandDetailsIfClosed(item);
           await expect(item.getByRole("combobox", { name: step.label, exact: true })).toHaveText(
             step.option,
           );
@@ -245,7 +246,7 @@ for (const saveBeforeRate of [false, true]) {
         .getByRole("region", { name: "商品一覧" })
         .locator("details")
         .filter({ hasText: "E2E税テスト商品" });
-      if ((await product.getAttribute("open")) === null) await product.locator("summary").click();
+      await expandDetailsIfClosed(product);
       for (const [label, option] of [
         ["税率", "8%"],
         ["表示価格", "税抜"],
@@ -275,7 +276,7 @@ for (const saveBeforeRate of [false, true]) {
           "税の確認待ち 1件",
         );
       }
-      if ((await product.getAttribute("open")) === null) await product.locator("summary").click();
+      await expandDetailsIfClosed(product);
       await expect(product.locator("summary")).toContainText("8%");
       await expect(product.locator("summary")).toContainText("税抜");
       await expect(product.locator("summary")).toContainText("確認待ち");
