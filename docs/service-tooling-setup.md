@@ -190,7 +190,7 @@ pnpm run dev
 
 ### 2.4 Node.jsとpnpmのバージョン管理
 
-Node.jsはリポジトリ直下の `mise.toml` を正本とし、現在は `24.22.1` を使う。pnpmは `package.json` の `packageManager` を正本とし、現在は `11.1.2` を使う。
+Node.jsはリポジトリ直下の `mise.toml` を正本とし、現在は `26.13.0` を使う。pnpmは `package.json` の `packageManager` を正本とし、現在は `11.1.2` を使う。
 
 新しい環境では `mise install` でNode.jsとpnpmを導入する。通常の開発シェルではmiseを有効化し、Cursorなどの非対話環境では `mise exec -- <command>` を使う。Node.jsのバージョン切り替えにnvmは使わず、pnpmはmiseで管理する。
 
