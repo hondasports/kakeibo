@@ -50,6 +50,10 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 import { parseEnvFile, deriveClerkJwtIssuerDomain } from "./sync-e2e-env.mjs";
+import {
+  ensureConvexNodeRuntime,
+  envWithConvexNodeRuntime,
+} from "./ensure-convex-node-runtime.mjs";
 import { ensureLineIntegrationMode } from "./ensure-line-integration-mode.mjs";
 import { E2E_PORT_ENV_VARS, e2ePortEnv, resolveE2EPorts } from "./lib/isolated-e2e-ports.ts";
 
@@ -579,6 +583,10 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const timeoutMs = args.timeoutSec * 1000;
   const env = backendEnv();
+  // local backend の node executor は v20/22/24 の `node` を要求するため、
+  // ツールチェーンが Node 26+ のときは executor 用ランタイムを backend 側だけに見せる
+  const convexNodeRuntime = await ensureConvexNodeRuntime({ log });
+  const backendSpawnEnv = envWithConvexNodeRuntime(env, convexNodeRuntime);
   const ports = resolveE2EPorts(env);
   const localConfig = createLocalDeploymentConfig();
   let backend;
@@ -605,7 +613,7 @@ async function main() {
     const hadBackup = backupEnvLocal();
     envPrepared = true;
     if (hadBackup) log("既存の .env.local を退避しました（終了時に復元）");
-    const started = startBackend(env, { envFile: localConfig.envFile });
+    const started = startBackend(backendSpawnEnv, { envFile: localConfig.envFile });
     backend = started.child;
     const { getLog } = started;
     const startedAt = Date.now();

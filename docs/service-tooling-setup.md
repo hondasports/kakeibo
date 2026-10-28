@@ -194,6 +194,8 @@ Node.jsはリポジトリ直下の `mise.toml` を正本とし、現在は `26.1
 
 新しい環境では `mise install` でNode.jsとpnpmを導入する。通常の開発シェルではmiseを有効化し、Cursorなどの非対話環境では `mise exec -- <command>` を使う。Node.jsのバージョン切り替えにnvmは使わず、pnpmはmiseで管理する。
 
+Convex local backend（anonymous deployment）は `"use node"` action の実行用に Node.js v20/22/24 の `node` を別途要求する（`DeploymentNotConfiguredForNodeActions`）。ツールチェーンが v24 系以外のとき、`scripts/ensure-convex-node-runtime.mjs` が executor 用の Node を `~/.cache/suzumemo/convex-node-runtime/` に自動配置し、`start-ci-convex.mjs` / `start-local-convex.mjs` が `convex dev` 系の子プロセスにだけ PATH 先頭へ追加する。`pnpm exec convex dev` などスクリプト経由でない呼び出し向けに `~/.nvm/versions/node/v24.22.1` への symlink も作成する。
+
 ### 2.5 パッケージ管理方針
 
 `kakeibo` では、JavaScript/TypeScriptのパッケージ管理に `pnpm` を使う。
