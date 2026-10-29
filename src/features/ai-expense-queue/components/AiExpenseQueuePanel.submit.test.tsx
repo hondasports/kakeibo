@@ -527,7 +527,7 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
     expect(within(reeditedItem).getByRole("button", { name: "登録する" })).toBeVisible();
   }, 20_000);
 
-  it("税率未確定の下書きは確認事項を残したまま保存して登録できますへ並ぶ", async () => {
+  it("税率未確定の下書きは税設定の確認案内が出ていても保存でき、登録できますへ並ぶ", async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <LocalQueueHarness
@@ -610,7 +610,7 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
     ).toBeVisible();
   }, 20_000);
 
-  it("合計だけ保存の下書きは保存・再編集後も合計だけで保存を維持する", async () => {
+  it("合計だけ保存の下書きを保存・再編集すると、キューに合計だけで保存と表示される", async () => {
     const user = userEvent.setup();
     const totalOnlyQueueItem: AiExpenseQueueItem = {
       id: "draft-totalonly",

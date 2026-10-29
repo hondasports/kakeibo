@@ -325,9 +325,8 @@ test.describe("ナビゲーション（Issue #49）", () => {
     // グラフ描画に必要な支出を今週分として保存する
     await gotoAuthenticated(page, "/weeks/current/input");
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();
-    await saveExpense(page, "週別推移用ストア", "3000");
-
     try {
+      await saveExpense(page, "週別推移用ストア", "3000");
       const weekStartDate = getCurrentWeekStartDate();
       await page.goto(`/weeks/${weekStartDate}`);
       await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
