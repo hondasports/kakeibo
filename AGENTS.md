@@ -24,6 +24,7 @@
 | --- | --- |
 | preflightがFAILした、task worktreeを作る | `skills/workspace-preflight` |
 | アプリの振る舞いを変える `src/**`・`lib/**`・`convex/**` の変更（最初の編集前とコミット前） | `skills/implementation` |
+| UI/UXの設計・実装・レビュー、画面レイアウト・コンポーネント・状態表示・文言の変更 | `skills/ui-design` |
 | 振る舞いの変更に伴うテスト設計、テストの追加・修正・削除・統合・見直し、テストの選定・実行範囲の変更（タグ・`e2e/spec-map.json`・`playwright.config.ts`・`vite.config.ts`のtest設定等、最初の編集前） | `skills/test-design` |
 | exportされた関数・型の意味やシグネチャを変える、複数ディレクトリにまたがる、変更対象の識別子が分からない | `skills/impact-analysis` |
 | 認証・認可・group境界・secret・ユーザー入力・webhook検証・外部writeの変更 | `skills/security-review` |
