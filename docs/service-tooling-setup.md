@@ -186,6 +186,8 @@ pnpm run dev
 
 外部Skillは新しい環境を構築するたびにセクション2.2の手順で再インストールする。
 
+`web-design-guidelines` は、UIコードを対象にしたレビュー専用の汎用Skillとして使う。Suzumemo固有のUI判断は、Git管理するCapability Skill `skills/ui-design` と `docs/ui-ux-design.md`、`docs/design-tokens.md`、`docs/suzumemo-theme.md` を正本とし、外部Skillの推奨だけで配色、フォント、MUI方針を変更しない。
+
 `skills-lock.json` はsecretを含まないスキルhash一覧である。Git管理するかどうかは、スキル再現性を重視するか、生成物を減らすかで別途判断する。
 
 ### 2.4 Node.jsとpnpmのバージョン管理
