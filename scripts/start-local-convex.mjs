@@ -12,15 +12,25 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  ensureConvexNodeRuntime,
+  envWithConvexNodeRuntime,
+} from "./ensure-convex-node-runtime.mjs";
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const convexBin = resolve(dirname(require.resolve("convex/package.json")), "bin", "main.js");
+
+// local backend の node executor は v20/22/24 の `node` を要求するため、
+// ツールチェーンが Node 26+ のときは executor 用ランタイムを子プロセスにだけ見せる
+const convexNodeRuntime = await ensureConvexNodeRuntime();
+const childEnv = envWithConvexNodeRuntime(process.env, convexNodeRuntime);
 
 function runConvex(args) {
   return spawnSync(process.execPath, [convexBin, ...args], {
     cwd: repoRoot,
     stdio: "inherit",
-    env: process.env,
+    env: childEnv,
   });
 }
 
@@ -35,7 +45,7 @@ if (selected.status !== 0) {
 const watcher = spawn(process.execPath, [convexBin, "dev", ...process.argv.slice(2)], {
   cwd: repoRoot,
   stdio: "inherit",
-  env: process.env,
+  env: childEnv,
 });
 
 watcher.on("error", (error) => {
