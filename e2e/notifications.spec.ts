@@ -118,19 +118,17 @@ test.describe("通知設定（Issue #893）", () => {
       const mandatorySwitch = mandatoryRow.getByRole("switch");
       const lineEnabledBefore = await lineSwitch.isChecked();
       const mandatoryEnabledBefore = await mandatorySwitch.isChecked();
+      const lineTransition = lineEnabledBefore ? "ON → OFF" : "OFF → ON";
 
       try {
-        if (!lineEnabledBefore) {
-          await lineSwitch.click();
-          const lineDialog = page.getByRole("dialog", { name: "通知設定の変更" });
-          await lineDialog
-            .getByRole("textbox", { name: "変更理由（必須）" })
-            .fill("E2E: LINE通知を有効化");
-          await lineDialog.getByRole("button", { name: "保存" }).click();
-          await expect(page.getByText("通知設定を更新しました")).toBeVisible({
-            timeout: 15_000,
-          });
-        }
+        // 監査ログで今回分を特定できるよう、LINE通知は現在値の反対へ必ず変更する
+        const changeStartedAt = Date.now();
+        await setAdminNotificationSwitch(
+          page,
+          lineRow,
+          !lineEnabledBefore,
+          "E2E: LINE通知を切り替えて監査ログを検証",
+        );
 
         if (mandatoryEnabledBefore) {
           await mandatorySwitch.click();
@@ -149,11 +147,40 @@ test.describe("通知設定（Issue #893）", () => {
         }
 
         await page.reload();
-        await expect(lineSwitch).toBeChecked();
+        await expect(lineSwitch).toBeChecked({ checked: !lineEnabledBefore });
         await expect(mandatorySwitch).not.toBeChecked();
 
         await page.goto("/admin/audit-logs");
-        await expect(page.getByText("通知設定変更").first()).toBeVisible();
+        // 操作種別と対象スナップショットで今回記録されるはずの行に絞る
+        await page.getByRole("combobox", { name: "操作" }).click();
+        await page.getByRole("option", { name: "通知設定変更" }).click();
+        const lineLogRow = page
+          .getByRole("button")
+          .filter({ hasText: "target: AIレビュー依頼（LINE）" })
+          .first();
+        await expect(lineLogRow).toBeVisible({ timeout: 15_000 });
+        // 一覧は新しい順のため、先頭行の記録時刻が操作開始以降なら今回の変更由来と断定できる
+        const loggedAtMatch = ((await lineLogRow.textContent()) ?? "").match(
+          /(\d{4})\/(\d{1,2})\/(\d{1,2}) (\d{1,2}):(\d{2}):(\d{2})/,
+        );
+        if (!loggedAtMatch) {
+          throw new Error("監査ログ行から記録日時を取得できません");
+        }
+        const loggedAt = new Date(
+          Number(loggedAtMatch[1]),
+          Number(loggedAtMatch[2]) - 1,
+          Number(loggedAtMatch[3]),
+          Number(loggedAtMatch[4]),
+          Number(loggedAtMatch[5]),
+          Number(loggedAtMatch[6]),
+        ).getTime();
+        expect(loggedAt).toBeGreaterThanOrEqual(changeStartedAt - 10_000);
+
+        await lineLogRow.click();
+        const detailDialog = page.getByRole("dialog", { name: "監査ログ詳細" });
+        await expect(detailDialog).toBeVisible();
+        await expect(detailDialog.getByText(/target: AIレビュー依頼（LINE）/)).toBeVisible();
+        await expect(detailDialog.getByText(`通知設定: ${lineTransition}`)).toBeVisible();
       } finally {
         await page.goto("/admin/notifications");
         await expect(page.getByRole("heading", { name: "通知設定" })).toBeVisible();

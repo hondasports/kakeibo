@@ -10,7 +10,7 @@ const fixtureEnabled = Boolean(
 );
 
 test.describe("system admin conditionless search", () => {
-  test("未入力のユーザー・グループ・管理者候補検索を実行できる", async ({ page }) => {
+  test("@smoke 未入力のユーザー・グループ・管理者候補検索を実行できる", async ({ page }) => {
     test.skip(
       !fixtureEnabled,
       "E2E_SYSTEM_ADMIN_SEARCH_FIXTURE=trueのdevelopment/previewでのみfixtureを実行します",
