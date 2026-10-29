@@ -2,6 +2,7 @@ import { Box, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import type { ReviewFormValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { documentTypeLabels, reviewDocumentTypeOptions } from "./labels";
+import { extractAmountDigits } from "../../../utils/currency";
 
 export type ReviewDialogBasicsSectionProps = {
   form: ReviewFormValues;
@@ -68,7 +69,7 @@ export function ReviewDialogBasicsSection({
             value={form.amountYen}
             slotProps={{ htmlInput: { inputMode: "numeric" } }}
             onChange={(event) =>
-              onFieldChange("amountYen", event.target.value.replace(/[^\d]/g, ""))
+              onFieldChange("amountYen", extractAmountDigits(event.target.value))
             }
           />
           <TextField

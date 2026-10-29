@@ -17,6 +17,15 @@
   "src/features/dashboard/**": ["e2e/dashboard-home.spec.ts"],
   "src/features/expense-entry/**": ["e2e/receipt-form.spec.ts"],
   "src/features/expense-search/**": ["e2e/expense-search.spec.ts"],
+  "src/utils/currency*.ts": [
+    "e2e/receipt-form.spec.ts",
+    "e2e/expense-search.spec.ts",
+    "e2e/ai-expense-queue.spec.ts",
+    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
+    "e2e/monthly-summary.spec.ts",
+    "e2e/yearly-summary.spec.ts",
+    "e2e/weekly-summary-bulk-ops.spec.ts"
+  ],
   "src/features/group-admin/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
   "src/features/monthly-summary/**": ["e2e/monthly-summary.spec.ts"],
   "src/features/receipt-review/**": [

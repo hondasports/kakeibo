@@ -2,6 +2,7 @@ import { Box, Chip, Stack, Typography } from "@mui/material";
 import { formatDateForDisplay } from "../../week";
 import { ReceiptRow, type CategoryPreview } from "./ReceiptRow";
 import type { ReceiptGroup, ReceiptItem } from "../types/types";
+import { formatYen } from "../../../../lib/domain/common/currency";
 
 export function ReceiptGroupRow({
   group,
@@ -73,7 +74,7 @@ export function ReceiptGroupRow({
           </Typography>
         </Box>
         <Typography className="receipt-row-amount" role="cell" sx={{ fontWeight: 700 }}>
-          {group.amountYen.toLocaleString()}円
+          {formatYen(group.amountYen)}
         </Typography>
         <Box className="receipt-row-memo" role="cell" />
         <Box className="receipt-row-actions" role="cell" />
