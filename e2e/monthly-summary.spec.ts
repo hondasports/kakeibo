@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { addMonths, formatMonthLabel } from "../lib/domain/common/month";
 import { gotoAuthenticated } from "./helpers/auth";
 import { cleanupE2eExpenseEntries, cleanupTestReceipts } from "./helpers/cleanup";
+import { saveExpense } from "./helpers/expenseEntry";
 
 test.describe("月次サマリー（Issue #87）", () => {
   test.beforeEach(async ({ page }) => {
@@ -81,14 +82,7 @@ test.describe("月次サマリー（Issue #87）", () => {
       .getByRole("listbox", { name: "週内の日付候補" })
       .getByRole("option", { name: /8\/12/ })
       .click();
-    await page.getByLabel("店舗名 / 支払先").fill(expenseTitle);
-    await page.getByLabel("合計金額").fill("1234");
-    await page
-      .locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]')
-      .first()
-      .click();
-    await page.getByRole("button", { name: "保存して次へ" }).click();
-    await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
+    await saveExpense(page, expenseTitle, "1234");
 
     await page.getByRole("tab", { name: "収入" }).click();
     await page.getByLabel("金額").fill("77777");

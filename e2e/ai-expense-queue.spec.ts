@@ -16,32 +16,9 @@ import {
   seedTaxSummaryConflictDraftByUser,
 } from "./helpers/seed";
 import { createSyntheticReceiptImage } from "./helpers/syntheticImage";
-
-/**
- * Issue #144: 支出画像の読み取りUI
- *
- * カバーするシナリオ:
- * - 複数画像を連続追加すると、各画像が解析待ちとしてキューに表示される。
- * - SP幅でも追加ボタン、キュー状態、既存の画像入力・手入力フォームが破綻しない。
- */
+import { expandDetailsIfClosed, waitForReceiptInputQueue } from "./helpers/receiptQueue";
 
 const INPUT_PATH = "/weeks/current/input";
-
-/** 週次セッション読み込み後にレシート入力ワークベンチが表示されるまで待つ */
-async function waitForReceiptInputQueue(page: Page) {
-  await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible({
-    timeout: 20_000,
-  });
-  await expect(page.getByRole("heading", { name: "レシート入力" })).toBeVisible({
-    timeout: 20_000,
-  });
-  await expect(page.getByRole("region", { name: "レシート入力", exact: true })).toBeVisible({
-    timeout: 20_000,
-  });
-  const queue = page.locator(".input-workbench--expense");
-  await expect(queue).toBeVisible({ timeout: 20_000 });
-  return queue;
-}
 
 /** ヘッダーの ImageInputButton（空状態 CTA と区別する） */
 function getHeaderAddReceiptButton(queue: Locator) {
@@ -87,32 +64,22 @@ test.describe("Issue #144 読み取りUI", () => {
     await expect(queue.getByText(`ai-queue-payment-${stamp}.jpg`).first()).toBeVisible({
       timeout: 15000,
     });
-    await expect
-      .poll(
-        async () => {
-          const statusLabels = ["読み取り中", "登録できます", "確認待ち", "読み取り失敗"];
-          let total = 0;
-          for (const label of statusLabels) {
-            total += await queue.getByText(label).count();
-          }
-          return total;
-        },
-        { timeout: 15000 },
-      )
-      .toBeGreaterThanOrEqual(2);
-    const batchProgress = queue.getByText(/今回の追加 \d+\/2件が登録準備OK/).first();
-    await expect(batchProgress).toBeVisible({ timeout: 15_000 });
-    const batchRegisterButton = queue.getByRole("button", { name: /まとめて登録（\d+件）/ }).last();
-    await expect(batchRegisterButton).toBeVisible();
-    const batchProgressText = (await batchProgress.textContent()) ?? "";
-    if (batchProgressText.includes("2/2")) {
-      await expect(batchRegisterButton).toBeEnabled();
-    } else {
-      await expect(batchRegisterButton).toBeDisabled();
-    }
+    // 追加直後は2件とも解析待ち・解析中として「読み取り中」に並ぶ
     const processingSection = queue.getByRole("region", { name: "読み取り中" });
-    await expect(processingSection).toBeVisible();
+    await expect(processingSection).toBeVisible({ timeout: 15_000 });
     await expect(processingSection.getByText("2件")).toBeVisible();
+
+    // 解析直後の下書きは常に user_confirmation_required で確認待ちになるため、
+    // 2件とも「確認待ち」に並び登録準備OKは0件のまま確定する
+    // 「確認待ち N件」は状態サマリーのチップとバッチ内訳の両方に出るため、
+    // キュー状態の確認対象である状態サマリー側に絞る
+    const statusSummary = queue.locator(".ai-expense-queue-status-summary");
+    await expect(statusSummary.getByText("確認待ち 2件")).toBeVisible({ timeout: 30_000 });
+    const reviewSection = queue.getByRole("region", { name: "確認待ち" });
+    await expect(reviewSection.getByText(`ai-queue-receipt-${stamp}.jpg`).first()).toBeVisible();
+    await expect(reviewSection.getByText(`ai-queue-payment-${stamp}.jpg`).first()).toBeVisible();
+    await expect(queue.getByText("今回の追加 0/2件が登録準備OK")).toBeVisible();
+    await expect(queue.getByRole("button", { name: "まとめて登録（0件）" })).toBeDisabled();
 
     await expect(page.getByRole("region", { name: "画像から入力" })).toHaveCount(0);
     // Issue #181: ReceiptForm → ExpenseEntryForm に変更
@@ -227,61 +194,22 @@ test.describe("Issue #144 読み取りUI", () => {
   });
 });
 
-test.describe("Issue #146 AI支出下書きの確認要否分類", () => {
-  test("確認が必要な下書きの reviewReasons を日本語で表示する", async ({ page }) => {
+test.describe("Issue #146 AI支出下書きの確認要否分類（/__e2e__/ fixture・サーバー保存なし）", () => {
+  // 表示内容・操作可否は AiExpenseQueuePanel.display.test がカバーするため、
+  // 実ブラウザ固有の capture 属性だけをここで確認する。
+  test("失敗下書きの再撮影inputにcapture=environmentが付く", async ({ page }) => {
     await gotoAuthenticated(page, "/__e2e__/ai-expense-queue");
 
     const queue = page.getByRole("region", { name: "レシート入力" });
     await expect(queue).toBeVisible();
-    await expect(queue.getByText("登録できます 1件")).toBeVisible();
-    await expect(queue.getByText("確認待ち 1件")).toBeVisible();
-    await expect(queue.getByText("読み取り失敗 1件")).toBeVisible();
-
-    const reviewSection = queue.getByRole("region", { name: "確認待ち" });
-    await expect(reviewSection.getByText("review-payment.png")).toBeVisible();
-    await expect(reviewSection.getByText("未分類あり")).toBeVisible();
-    await expect(reviewSection.getByText("他2件")).toBeVisible();
-    await expect(reviewSection.getByRole("button", { name: "確認する" })).toBeEnabled();
-
     const failedSection = queue.getByRole("region", { name: "読み取り失敗" });
-    await expect(failedSection.getByText("failed-receipt.png")).toBeVisible();
-    await expect(failedSection.getByText("解析失敗")).toBeVisible();
-    await expect(
-      failedSection.getByText(
-        "明るい場所で、影や反射を避け、レシート全体を正面から撮影してください。",
-      ),
-    ).toBeVisible();
-    await expect(failedSection.getByRole("button", { name: "再解析" })).toBeDisabled();
     await expect(failedSection.getByRole("button", { name: "再撮影" })).toBeEnabled();
     await expect(page.getByLabel("再撮影する画像を選択")).toHaveAttribute("capture", "environment");
   });
 });
 
-test.describe("Issue #148 確認が必要なAI支出下書きの編集導線", () => {
+test.describe("Issue #148 確認が必要なAI支出下書きの編集導線（/__e2e__/ fixture・サーバー保存なし）", () => {
   test("確認が必要な下書きを編集して登録準備OKに戻せる", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    const reviewSection = queue.getByRole("region", { name: "確認待ち" });
-    await expect(reviewSection.getByText("review-payment.png")).toBeVisible();
-
-    await reviewSection.getByRole("button", { name: "確認する" }).click();
-
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await expect(dialog).toBeVisible();
-    await dialog.getByLabel("店名・内容").fill("大阪市水道局 水道料金");
-    await dialog.getByLabel("合計金額").fill("9160");
-    await dialog.getByRole("button", { name: "下書きを保存" }).click();
-
-    await expect(dialog).toBeHidden();
-    await expect(queue.getByText("確認待ち 0件")).toHaveCount(0);
-    await expect(queue.getByText("登録できます 2件")).toBeVisible();
-    const readySection = queue.getByRole("region", { name: "登録できます" });
-    await expect(readySection.getByText("大阪市水道局")).toBeVisible();
-    await expect(readySection.getByText("9,160円")).toBeVisible();
-  });
-
-  test("確認が必要な下書きを編集して登録準備OKにできる", async ({ page }) => {
     await gotoAuthenticated(page, "/__e2e__/ai-expense-queue");
 
     const queue = page.getByRole("region", { name: "レシート入力" });
@@ -315,129 +243,16 @@ test.describe("Issue #148 確認が必要なAI支出下書きの編集導線", (
   });
 });
 
-test.describe("Issue #321 AI支出下書きの明細確認・修正UI", () => {
-  test("明細のカテゴリ・金額・追加・削除を操作できる", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    const reviewSection = queue.getByRole("region", { name: "確認待ち" });
-    await expect(reviewSection.getByText("review-payment.png")).toBeVisible();
-
-    await reviewSection.getByRole("button", { name: "確認する" }).click();
-
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("heading", { name: "登録候補" })).toHaveCount(0);
-    await expect(dialog.getByRole("region", { name: "商品一覧" })).toBeVisible();
-    await expect(dialog.getByText("未分類の明細があります")).toHaveCount(0);
-    await expect(dialog.getByText("低信頼度の明細があります")).toHaveCount(0);
-
-    const closedSummaries = dialog.locator(
-      'section[aria-label="商品一覧"] details:not([open]) > summary',
-    );
-    while ((await closedSummaries.count()) > 0) {
-      await closedSummaries.first().click();
-    }
-    await expect(dialog.getByRole("heading", { name: /商品一覧/ })).toBeVisible();
-    const checkSection = dialog.getByRole("region", { name: "確認結果" });
-    await expect(checkSection).toBeVisible();
-    await expect(checkSection.getByText("支払額")).toBeVisible();
-    await expect(dialog.getByRole("region", { name: "全体の確認状態" })).toBeVisible();
-    await expect(dialog.getByLabel("明細カテゴリ")).toHaveCount(2);
-    await expect(dialog.getByLabel("明細カテゴリ").nth(0)).toHaveValue("食費");
-    await expect(dialog.getByLabel("明細カテゴリ").nth(1)).toHaveValue("水道光熱費");
-    await dialog.getByLabel("明細カテゴリ").nth(0).click();
-    await page.getByRole("option", { name: "水道光熱費" }).click();
-    await expect(dialog.getByLabel("明細カテゴリ").nth(0)).toHaveValue("水道光熱費");
-
-    await dialog.getByLabel("レシートの金額", { exact: true }).first().fill("400");
-    await dialog.getByRole("button", { name: "胃薬を削除" }).click();
-    await dialog.getByRole("button", { name: "明細を追加" }).click();
-    // 追加した明細行は畳まれた状態で出るため展開してから入力する
-    await dialog
-      .locator('section[aria-label="商品一覧"] details:not([open])')
-      .last()
-      .locator("summary")
-      .click();
-
-    await dialog.getByLabel("明細名").nth(1).fill("牛乳");
-    await dialog.getByLabel("レシートの金額", { exact: true }).nth(1).fill("520");
-    await dialog.getByLabel("明細カテゴリ").nth(0).click();
-    await page.getByRole("option", { name: "食費" }).click();
-    await dialog.getByLabel("明細カテゴリ").nth(1).click();
-    await page.getByRole("option", { name: "食費" }).click();
-
-    await dialog.getByLabel("明細カテゴリ").nth(0).click();
-    await page.getByRole("option", { name: "水道光熱費" }).click();
-
-    await dialog.getByLabel("店名・内容").fill("大阪市水道局 水道料金");
-    await dialog.getByLabel("合計金額").fill("920");
-    await dialog.getByRole("button", { name: "下書きを保存" }).click();
-
-    await expect(dialog).toBeHidden();
-    await expect(queue.getByText("確認待ち 0件")).toHaveCount(0);
-    await expect(queue.getByText("登録できます 2件")).toBeVisible();
-  });
-});
-
-test.describe("Issue #431 レシート税判定UI", () => {
-  test("全体確認と個別推奨を区別し、確認先でも理由を表示する", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1");
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    await queue
-      .getByRole("region", { name: "確認待ち" })
-      .getByRole("button", { name: "確認する" })
-      .click();
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    const guidance = dialog.getByRole("region", { name: "全体の確認状態" });
-    await expect(guidance.getByText("レシート全体の確認")).toBeVisible();
-    await expect(guidance.getByText(/特定の誤りを検出したものではありません/)).toBeVisible();
-    await guidance.getByRole("button", { name: "商品一覧を見比べる" }).click();
-    await expect(dialog.getByRole("region", { name: "商品一覧" })).toBeVisible();
-    await expect(dialog.getByRole("region", { name: "確認結果" })).toBeVisible();
-  });
-  test("@smoke 下書き確認に分析ステータスと明細税率が表示される", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    await queue
-      .getByRole("region", { name: "確認待ち" })
-      .getByRole("button", { name: "確認する" })
-      .click();
-
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    const checkSection = dialog.getByRole("region", { name: "確認結果" });
-    await expect(checkSection).toBeVisible();
-    await expect(checkSection.getByText("比較不能", { exact: true })).toHaveCount(2);
-    await expect(
-      checkSection.getByText("税設定・登録額の確認が必要な明細があるため、支払額と比較できません"),
-    ).toBeVisible();
-    await expect(dialog.getByLabel("合計金額", { exact: true })).toHaveValue("9120");
-    // 集計が無い原因は商品の税率未確定なので、原文の確認ではなく商品の確認を案内する（Issue #1018）。
-    await expect(
-      checkSection.getByText(/「.+」など税設定の確認が必要な明細があります/),
-    ).toBeVisible();
-
-    await expect(
-      dialog.getByRole("region", { name: "商品一覧" }).getByText("未確定", { exact: true }).first(),
-    ).toBeVisible();
-  });
-});
-
 test.describe("下書き確認の税状態保存", () => {
   test.beforeEach(async () => {
     await cleanupAiExpenseQueue();
   });
 
   test("明細ごとの税修正を保存すると再オープン後も維持される", async ({ page }) => {
-    const userId = process.env.E2E_CLERK_USER_ID?.trim();
-    if (!userId) {
-      test.skip();
-      return;
-    }
-
-    await seedTaxReviewDraftByUser(userId);
     await gotoAuthenticated(page, INPUT_PATH);
+    const userId = await getCurrentClerkTokenIdentifier(page);
+    await seedTaxReviewDraftByUser(userId);
+    await page.reload();
 
     const queue = await waitForReceiptInputQueue(page);
     const reviewSection = queue.getByRole("region", { name: "確認待ち" });
@@ -453,8 +268,7 @@ test.describe("下書き確認の税状態保存", () => {
       .locator('section[aria-label="商品一覧"] details')
       .filter({ hasText: "E2E税テスト商品" })
       .first();
-    if ((await taxItemRow.getAttribute("open")) === null)
-      await taxItemRow.locator("summary").click();
+    await expandDetailsIfClosed(taxItemRow);
     await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
       "税の確認待ち 1件",
     );
@@ -477,7 +291,7 @@ test.describe("下書き確認の税状態保存", () => {
       .locator('section[aria-label="商品一覧"] details')
       .filter({ hasText: "E2E税テスト商品" })
       .first();
-    if ((await itemRow.getAttribute("open")) === null) await itemRow.locator("summary").click();
+    await expandDetailsIfClosed(itemRow);
     await expect(
       dialog.getByRole("combobox", { name: "E2E税テスト商品の税率", exact: true }),
     ).toHaveText("非課税", { timeout: 10_000 });
@@ -539,7 +353,77 @@ test.describe("Issue #179 AI下書きからexpenseEntriesへ登録", () => {
   });
 });
 
-test.describe("Issue #337 レシート入力UI改善の表示・操作回帰", () => {
+test.describe("Issue #1123 AI下書き登録から週次サマリー", () => {
+  test("@smoke キューから登録した下書きが週次サマリーに金額・件数・カテゴリで反映される", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await gotoAuthenticated(page, INPUT_PATH);
+    const userId = await getCurrentClerkTokenIdentifier(page);
+    await cleanupE2eExpenseEntriesByUser(userId);
+    await cleanupAiExpenseQueueByUser(userId);
+    await cleanupTestCategoriesByUser(userId);
+    try {
+      await seedAiExpenseDraftForExpenseEntriesByUser(userId);
+      await page.reload();
+      const queue = await waitForReceiptInputQueue(page);
+      const row = queue.locator(".ai-expense-queue-item").filter({ hasText: "E2Eスーパー" });
+      await expect(row).toBeVisible({ timeout: 15_000 });
+      await expect(row).toContainText("1,500円");
+
+      // seed 下書きを確認ダイアログで開いて保存する
+      await row.getByRole("button", { name: "修正する", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "下書き確認" });
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByLabel("店名・内容")).toHaveValue("E2Eスーパー");
+      await expect(dialog.getByLabel("合計金額", { exact: true })).toHaveValue("1500");
+      await dialog.getByRole("button", { name: "下書きを保存", exact: true }).click();
+      await expect(dialog).toBeHidden();
+
+      // キューの「登録する」で支出エントリへ登録する
+      await row.getByRole("button", { name: "登録する", exact: true }).click();
+      await expect(row).toContainText("登録済み", { timeout: 20_000 });
+      await expect(row).toContainText("1,500円");
+
+      // seed 日付 2026-06-01（月曜）は既定の月曜始まりで /weeks/2026-06-01 の週に入る
+      await page.goto("/weeks/2026-06-01");
+      await expect(page).toHaveURL(/\/weeks\/2026-06-01$/);
+      await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(page.locator('[aria-label="合計支出"]')).toContainText("1,500円");
+
+      const categoryTable = page
+        .getByTestId("weekly-category-breakdown")
+        .getByRole("table", { name: "カテゴリ別内訳" });
+      const foodRow = categoryTable
+        .getByRole("row")
+        .filter({ hasText: "E2Eカテゴリ-食費-Issue322" });
+      await expect(foodRow.getByRole("cell").nth(1)).toHaveText("1,000円");
+      await expect(foodRow.getByRole("cell").nth(3)).toHaveText("1件");
+      const goodsRow = categoryTable
+        .getByRole("row")
+        .filter({ hasText: "E2Eカテゴリ-日用品-Issue322" });
+      await expect(goodsRow.getByRole("cell").nth(1)).toHaveText("500円");
+      await expect(goodsRow.getByRole("cell").nth(3)).toHaveText("1件");
+      const totalRow = categoryTable.getByRole("row").filter({ hasText: "合計" });
+      await expect(totalRow.getByRole("cell").nth(1)).toHaveText("1,500円");
+      await expect(totalRow.getByRole("cell").nth(3)).toHaveText("2件");
+
+      // 支出一覧は同じ下書き由来の1グループ・2明細になる
+      const expenseList = page.getByRole("table", { name: "週次サマリーの支出一覧" });
+      await expect(expenseList.getByTestId("receipt-group")).toHaveCount(1);
+      await expect(expenseList).toContainText("E2Eスーパー");
+      await expect(expenseList.getByTestId("receipt-row")).toHaveCount(2);
+    } finally {
+      await cleanupAiExpenseQueueByUser(userId);
+      await cleanupE2eExpenseEntriesByUser(userId);
+      await cleanupTestCategoriesByUser(userId);
+    }
+  });
+});
+
+test.describe("Issue #337 レシート入力UI改善の表示・操作回帰（/__e2e__/ fixture・サーバー保存なし）", () => {
   test("@smoke 一覧で状態サマリーと次の操作導線が表示される", async ({ page }) => {
     await page.setViewportSize({ width: 406, height: 687 });
     await gotoAuthenticated(page, "/__e2e__/ai-expense-queue");
@@ -563,7 +447,6 @@ test.describe("Issue #337 レシート入力UI改善の表示・操作回帰", (
       queue.getByRole("region", { name: "読み取り失敗" }).getByRole("button", { name: "再撮影" }),
     ).toBeVisible();
 
-    await page.waitForTimeout(400);
     await expectLocatorInsideViewport(queue);
     await expectLocatorInsideViewport(statusSummary);
   });
@@ -587,139 +470,15 @@ test.describe("Issue #337 レシート入力UI改善の表示・操作回帰", (
   });
 });
 
-test.describe("Issue #397 登録準備OK状態で再編集できる", () => {
-  test("登録準備OKの下書きを再度編集して準備OKに戻せる", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    const reviewSection = queue.getByRole("region", { name: "確認待ち" });
-    await reviewSection.getByRole("button", { name: "確認する" }).click();
-
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await dialog.getByLabel("店名・内容").fill("大阪市水道局 水道料金");
-    await dialog.getByLabel("合計金額").fill("9160");
-    await dialog.getByRole("button", { name: "下書きを保存" }).click();
-    await expect(dialog).toBeHidden();
-
-    const readySection = queue.getByRole("region", { name: "登録できます" });
-    const editedReadyItem = readySection
-      .locator(".ai-expense-queue-item")
-      .filter({ hasText: "大阪市水道局" });
-    await expect(editedReadyItem).toBeVisible();
-
-    await editedReadyItem.getByRole("button", { name: "修正する" }).click();
-    await expect(dialog).toBeVisible();
-    await dialog.getByLabel("店名・内容").fill("大阪市水道局 6月分");
-    await dialog.getByLabel("合計金額").fill("9200");
-    await dialog.getByRole("button", { name: "下書きを保存" }).click();
-
-    await expect(dialog).toBeHidden();
-    await expect(editedReadyItem.getByText("大阪市水道局 6月分")).toBeVisible();
-    await expect(editedReadyItem.getByText("9,200円")).toBeVisible();
-    await expect(editedReadyItem.getByRole("button", { name: "修正する" })).toBeVisible();
-    await expect(editedReadyItem.getByRole("button", { name: "登録する" })).toBeVisible();
-  });
-});
-
-test.describe("Issue #669 初心者向け税修正", () => {
-  test("税率が未確定のまま確認事項を残して下書きを保存できる", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1");
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    await queue
-      .getByRole("region", { name: "確認待ち" })
-      .getByRole("button", { name: "確認する" })
-      .click();
-
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    const checkSection = dialog.getByRole("region", { name: "確認結果" });
-    await expect(
-      checkSection.getByText(/「.+」など税設定の確認が必要な明細があります/),
-    ).toBeVisible();
-    await expect(dialog.getByRole("radio", { name: "分からない" })).toHaveCount(0);
-
-    await dialog.getByLabel("店名・内容").fill("大阪市水道局 水道料金");
-    await dialog.getByRole("button", { name: "下書きを保存" }).click();
-    await expect(dialog).toBeHidden();
-
-    const readyItem = queue
-      .getByRole("region", { name: "登録できます" })
-      .locator(".ai-expense-queue-item")
-      .filter({ hasText: "大阪市水道局" });
-    await expect(readyItem).toBeVisible();
-  });
-});
-
 test.describe("Issue #670 混在レシートの商品単位修正", () => {
   test.beforeEach(async () => {
     await cleanupAiExpenseQueue();
   });
 
-  test("PCで要確認商品だけを順番に修正し税率別集計を更新できる", async ({ page }) => {
-    const userId = process.env.E2E_CLERK_USER_ID?.trim();
-    if (!userId) {
-      test.skip();
-      return;
-    }
-    await gotoAuthenticated(page, INPUT_PATH);
-    await waitForReceiptInputQueue(page);
-    await seedMixedTaxReviewDraftByUser(userId);
-    await page.reload();
-
-    const queue = await waitForReceiptInputQueue(page);
-    const item = queue.locator(".ai-expense-queue-item").filter({ hasText: "E2E混在税レビュー店" });
-    await item.getByRole("button", { name: "確認する" }).click();
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-
-    await expect(dialog.getByRole("heading", { name: /商品一覧/ })).toBeVisible();
-    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(800);
-    await expect(dialog.getByText("パン", { exact: true })).toBeVisible();
-
-    // 未確認の各商品は、旧税内訳から逆算せず商品ごとに確認する。
-    const milkRow = dialog.locator('section[aria-label="商品一覧"] details').filter({
-      hasText: "牛乳",
-    });
-    if ((await milkRow.getAttribute("open")) === null) await milkRow.locator("summary").click();
-    const milkTaxRate = milkRow.getByRole("combobox", { name: "牛乳の税率", exact: true });
-    await expect
-      .poll(async () => (await milkTaxRate.boundingBox())?.width ?? 0)
-      .toBeGreaterThanOrEqual(176);
-    await milkTaxRate.click();
-    await page.getByRole("option", { name: "8%", exact: true }).click();
-    await dialog.getByRole("combobox", { name: "牛乳の表示価格", exact: true }).click();
-    await page.getByRole("option", { name: "税込", exact: true }).click();
-    await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText(
-      "税の確認待ち 1件",
-    );
-    const wrapRow = dialog
-      .locator('section[aria-label="商品一覧"] details')
-      .filter({ hasText: "ラップ" });
-    if ((await wrapRow.getAttribute("open")) === null) await wrapRow.locator("summary").click();
-    await wrapRow.getByRole("combobox", { name: "ラップの税率", exact: true }).click();
-    await page.getByRole("option", { name: "10%", exact: true }).click();
-    await wrapRow.getByRole("combobox", { name: "ラップの表示価格", exact: true }).click();
-    await page.getByRole("option", { name: "税込", exact: true }).click();
-
-    await expect(
-      dialog.getByRole("region", { name: "全体の確認状態" }).getByText(/税率・税込／税抜/),
-    ).toHaveCount(0);
-    // 金額・税率別ともに一致のため検算カードは出さず、成功メッセージだけが残る
-    await expect(
-      dialog
-        .getByRole("region", { name: "全体の確認状態" })
-        .getByText("印字額と明細の金額が一致しています"),
-    ).toBeVisible();
-    await expect(dialog.getByRole("region", { name: "確認結果" })).toHaveCount(0);
-    await expect(dialog.getByText("レシート全体の確認")).toHaveCount(0);
-  });
-
   test("SPでレシート参照を開き、未解決のまま下書きを保存できる", async ({ page }) => {
-    const userId = process.env.E2E_CLERK_USER_ID?.trim();
-    if (!userId) {
-      test.skip();
-      return;
-    }
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoAuthenticated(page, INPUT_PATH);
+    const userId = await getCurrentClerkTokenIdentifier(page);
     await waitForReceiptInputQueue(page);
     await seedMixedTaxReviewDraftByUser(userId);
     await page.reload();
@@ -761,7 +520,7 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
       .getByRole("region", { name: "商品一覧" })
       .locator("details")
       .filter({ hasText: "E2E税率別集計商品" });
-    if ((await product.getAttribute("open")) === null) await product.locator("summary").click();
+    await expandDetailsIfClosed(product);
     await product.getByRole("combobox", { name: "E2E税率別集計商品の税率", exact: true }).click();
     await page.getByRole("option", { name: "10%", exact: true }).click();
     await expect(

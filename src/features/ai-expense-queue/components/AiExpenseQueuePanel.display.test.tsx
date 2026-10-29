@@ -110,6 +110,7 @@ describe("AiExpenseQueuePanel（表示）", () => {
 
     const failedSection = screen.getByRole("region", { name: "読み取り失敗" });
     expect(within(failedSection).getByText("failed-receipt.png")).toBeInTheDocument();
+    expect(within(failedSection).getByText("解析失敗")).toBeInTheDocument();
     expect(
       within(failedSection).getByRole("heading", { name: "読み取り失敗" }),
     ).toBeInTheDocument();
@@ -131,6 +132,33 @@ describe("AiExpenseQueuePanel（表示）", () => {
     expect(
       within(registeredSection).queryByRole("button", { name: "再撮影" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("確認理由は優先度順の1件目を表示し、残りは件数だけ出す", () => {
+    renderWithProviders(
+      <AiExpenseQueuePanel
+        initialItems={[
+          {
+            ...queueItems[1],
+            reviewReasons: ["low_confidence", "missing_required_field", "ambiguous_category"],
+          },
+        ]}
+      />,
+    );
+
+    const reviewSection = screen.getByRole("region", { name: "確認待ち" });
+    expect(within(reviewSection).getByText("未分類あり")).toBeInTheDocument();
+    expect(within(reviewSection).getByText("他2件")).toBeInTheDocument();
+    expect(within(reviewSection).queryByText("必須項目不足")).not.toBeInTheDocument();
+  });
+
+  it("合計だけ保存の下書きは一覧でも合計だけで保存バッジを表示する", () => {
+    renderWithProviders(
+      <AiExpenseQueuePanel initialItems={[{ ...queueItems[1], registrationMode: "totalOnly" }]} />,
+    );
+
+    const reviewSection = screen.getByRole("region", { name: "確認待ち" });
+    expect(within(reviewSection).getByText("合計だけで保存")).toBeInTheDocument();
   });
 
   it("セッション中の画像をサムネイルからプレビューできる", async () => {

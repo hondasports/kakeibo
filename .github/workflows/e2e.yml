@@ -184,8 +184,9 @@ jobs:
           # E2E テストユーザー認証情報（ログ出力禁止）
           E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          # authenticated smoke だけ管理者通知設定fixtureを有効化する。
+          # authenticated smoke だけシステム管理系fixtureを有効化する。
           E2E_SYSTEM_ADMIN_MEMBERSHIP_FIXTURE: ${{ matrix.name == 'authenticated' }}
+          E2E_SYSTEM_ADMIN_SEARCH_FIXTURE: ${{ matrix.name == 'authenticated' }}
 
       # 失敗時のみ artifact を保存（認証情報が含まれる可能性があるため短期保存）
       - name: Upload test results on failure

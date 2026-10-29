@@ -8,13 +8,7 @@ import {
 import { seedGroupMemberForUser, seedPendingGroupInvitationForUser } from "./helpers/seed";
 import { withInvitationTestGroups } from "./helpers/invitationGroups";
 import { invitationGroupOperationsForPage } from "./helpers/invitationGroupClient";
-
-async function expandDangerZone(page: Page) {
-  const trigger = page.getByRole("button", { name: "危険な操作" });
-  if ((await trigger.getAttribute("aria-expanded")) !== "true") {
-    await trigger.click();
-  }
-}
+import { expandDangerZone } from "./helpers/ui";
 
 async function expandGroupManagement(page: Page) {
   const trigger = page.getByRole("button", { name: "管理する" });
