@@ -761,6 +761,65 @@ test.describe("入力画面リニューアル（Issue #77 受け入れ確認）"
     await expect(page.getByRole("tab", { name: "収入" })).toHaveAttribute("aria-selected", "true");
   });
 
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`@smoke [SSoT #1055] 収入の入力・上限エラー・履歴編集が一致する（${viewport.width}px）`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize(viewport);
+      await page.getByRole("tab", { name: "収入" }).click();
+      const amount = page.getByLabel("金額", { exact: true });
+      const title = page.getByLabel("収入の内容・メモ");
+      const saveButton = page.getByRole("button", { name: "保存して次へ" });
+      const incomeTitle = `給与_${Date.now()}`.padEnd(100, "給");
+      await amount.fill("-320,000");
+      await expect(amount).toHaveValue("320,000");
+      await title.fill(`${incomeTitle}超`);
+      await saveButton.click();
+      await expect(title).toHaveAttribute("aria-invalid", "true");
+      await expect(page.getByText("内容は 100 文字以内です")).toBeVisible();
+      await amount.fill("10000000");
+      await title.fill(incomeTitle);
+      await saveButton.click();
+      await expect(amount).toHaveAttribute("aria-invalid", "true");
+      await expect(page.getByText("金額は 9,999,999 円以下です")).toBeVisible();
+      await expect(title).toHaveAttribute("aria-invalid", "false");
+      await expectNoHorizontalOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath("income-limit-error.png"),
+        fullPage: true,
+      });
+
+      await amount.fill("9999999");
+      await amount.press("Tab");
+      await expect(title).toBeFocused();
+      await title.press("Tab");
+      await expect(saveButton).toBeFocused();
+      await saveButton.press("Enter");
+      await expect(page.getByRole("alert").filter({ hasText: "収入を保存しました" })).toBeVisible();
+      await expect(amount).toHaveValue("");
+      await expect(title).toHaveValue("");
+
+      await page.goto(`/weeks/${getCurrentWeekStartDate()}`);
+      const row = page.getByTestId("receipt-row").filter({ hasText: incomeTitle });
+      await expect(row).toContainText("9,999,999円");
+      await row.getByRole("button", { name: /を編集$/ }).click();
+      const dialog = page.getByRole("dialog");
+      const editAmount = dialog.getByLabel("金額", { exact: true });
+      await editAmount.fill("10000000");
+      await dialog.getByRole("button", { name: "保存", exact: true }).click();
+      await expect(editAmount).toHaveAttribute("aria-invalid", "true");
+      await expect(dialog.getByText("金額は 9,999,999 円以下です")).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+      await editAmount.fill("9999998");
+      await dialog.getByRole("button", { name: "保存", exact: true }).click();
+      await expect(dialog).not.toBeVisible();
+      await expect(row).toContainText("9,999,998円");
+    });
+  }
+
   test("@smoke [Issue #378/#395] 収入保存後にダッシュボードと週次サマリーへ反映される", async ({
     page,
   }) => {

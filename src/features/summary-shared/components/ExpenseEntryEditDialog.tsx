@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { ReceiptItem } from "../types/types";
+import { extractAmountDigits } from "../../../utils/currency";
 import { useExpenseEntryEditDialogState } from "../hooks/useExpenseEntryEditDialogState";
 import {
   DraftItemsEditor,
@@ -62,6 +63,10 @@ export function ExpenseEntryEditDialog({
     draftItemsLoading,
     setDraftItemsLoading,
     error,
+    amountError,
+    setAmountError,
+    titleError,
+    setTitleError,
     saving,
     handleSave,
     isDraftItemsLoading,
@@ -98,7 +103,12 @@ export function ExpenseEntryEditDialog({
           <TextField
             fullWidth
             label="金額"
-            onChange={(event) => setAmountYen(event.target.value.replace(/[^\d]/g, ""))}
+            error={Boolean(amountError)}
+            helperText={amountError}
+            onChange={(event) => {
+              setAmountYen(extractAmountDigits(event.target.value));
+              setAmountError("");
+            }}
             slotProps={{ htmlInput: { inputMode: "numeric" } }}
             value={amountYen}
           />
@@ -148,7 +158,12 @@ export function ExpenseEntryEditDialog({
           <TextField
             fullWidth
             label={receipt?.type === "income" ? "内容" : "タイトル"}
-            onChange={(event) => setTitle(event.target.value)}
+            error={Boolean(titleError)}
+            helperText={titleError}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              setTitleError("");
+            }}
             value={title}
           />
           <TextField

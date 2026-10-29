@@ -98,7 +98,7 @@ describe("ExpenseEntryForm（typeSwitch）", () => {
       await user.click(screen.getByRole("button", { name: "保存して次へ" }));
 
       expect(await screen.findByText("保存に失敗しました")).toBeInTheDocument();
-      expect(screen.getByLabelText("金額")).toHaveValue("50000");
+      expect(screen.getByLabelText("金額")).toHaveValue("50,000");
       expect(screen.getByLabelText("収入の内容・メモ")).toHaveValue("立替精算");
     });
   });
