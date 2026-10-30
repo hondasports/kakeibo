@@ -93,12 +93,12 @@ describe("validateTaxInterpretationEligibility", () => {
     });
     expect(r.success).toBe(true);
   });
-  it("文言が既存と一致する", () => {
+  it("不存在と他グループは同じ文言になる", () => {
     expect(getTaxInterpretationEligibilityErrorMessage("not_found")).toBe(
       "AI expense draft not found",
     );
     expect(getTaxInterpretationEligibilityErrorMessage("wrong_group")).toBe(
-      "AI expense draft does not belong to the current group",
+      "AI expense draft not found",
     );
     expect(getTaxInterpretationEligibilityErrorMessage("missing_amount_or_summaries")).toBe(
       "Tax reinterpretation requires draft amount and tax summaries",

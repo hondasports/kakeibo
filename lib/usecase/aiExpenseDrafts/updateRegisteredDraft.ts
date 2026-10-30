@@ -25,6 +25,7 @@ import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import type { AiExpenseDraftDeps } from "./deps";
 import { assertActiveCategoryForDraft } from "./assertActiveCategoryForDraft";
+import { loadDraftInGroup } from "./loadDraftInGroup";
 
 export type UpdateRegisteredDraftUsecaseArgs = {
   draftId: string;
@@ -51,14 +52,8 @@ export async function updateRegisteredAiExpenseDraft(
   >,
   args: UpdateRegisteredDraftUsecaseArgs,
 ): Promise<{ draftId: string; expenseEntryIds: string[] }> {
-  const fields = await deps.drafts.findById(args.draftId);
-  if (fields === null) {
-    throw new ConvexError("AI expense draft not found");
-  }
+  const fields = await loadDraftInGroup(deps.drafts, ctx.groupId, args.draftId);
   const draft = AiExpenseDraft.fromPersisted(fields);
-  if (!draft.belongsToGroup(ctx.groupId)) {
-    throw new ConvexError("AI expense draft does not belong to the current group");
-  }
   try {
     draft.assertEditableFromHistory();
   } catch (err) {

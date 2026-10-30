@@ -49,3 +49,6 @@ export type AiExpenseDraftConfidence = {
   amountYen?: number;
   categoryId?: number;
 };
+
+/** 不存在と他グループの下書きを区別せずに返すエラー文言。 */
+export const AI_EXPENSE_DRAFT_NOT_FOUND_MESSAGE = "AI expense draft not found";

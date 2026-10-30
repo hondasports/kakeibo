@@ -108,7 +108,8 @@ describe("createExpenseEntriesFromDraftHandler", () => {
         draftId: draftReadyId,
         items: [{ itemName: "テスト", amountYen: 1000, categoryId: catFoodId }],
       }),
-    ).rejects.toThrow(ConvexError);
+    ).rejects.toMatchObject({ data: "AI expense draft not found" });
+    expect(ctx.db.insert).not.toHaveBeenCalled();
   });
 
   it("存在しない下書きIDの場合、ConvexErrorを投げる", async () => {
@@ -121,7 +122,8 @@ describe("createExpenseEntriesFromDraftHandler", () => {
         draftId: draftReadyId,
         items: [{ itemName: "テスト", amountYen: 1000, categoryId: catFoodId }],
       }),
-    ).rejects.toThrow(ConvexError);
+    ).rejects.toMatchObject({ data: "AI expense draft not found" });
+    expect(ctx.db.insert).not.toHaveBeenCalled();
   });
 
   it("ready 以外の下書きからは expenseEntries を作成できない", async () => {
