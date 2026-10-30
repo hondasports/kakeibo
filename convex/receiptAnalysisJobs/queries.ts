@@ -74,19 +74,6 @@ export async function listJobsByDraftIdsHandler(
 }
 
 export const listBatches = query({ args: {}, handler: listBatchesHandler });
-// Convexを先にデプロイするため、旧タブが移行するまで少なくとも1リリースは残す（削除は #1092）。
-export const listJobs = query({
-  args: {},
-  returns: v.array(jobDocumentValidator),
-  handler: async (ctx) => {
-    const { groupId } = await requireGroupMembership(ctx);
-    return ctx.db
-      .query("receiptAnalysisImageJobs")
-      .withIndex("by_group_id_and_created_at", (q) => q.eq("groupId", groupId))
-      .order("desc")
-      .take(100);
-  },
-});
 export const listActiveJobs = query({ args: {}, handler: listActiveJobsHandler });
 export const listJobsByBatch = query({
   args: { batchId: v.id("receiptAnalysisBatches") },

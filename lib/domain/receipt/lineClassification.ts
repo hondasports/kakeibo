@@ -403,7 +403,3 @@ export function classifyReceiptLines(
   resolveCompetingTotalCandidates(ordered, results);
   return results;
 }
-
-export function normalizeReceiptLineMatchText(value: string): string {
-  return normalizeText(value).replace(/[+\-*()（）\d]/g, "");
-}

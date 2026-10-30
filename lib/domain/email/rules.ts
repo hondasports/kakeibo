@@ -1,10 +1,10 @@
+import type { EmailProviderError } from "../../email/model";
+import { calculateRetryDelayMs, isMaxRetryAttemptsReached } from "../common/retry";
 import type {
-  EmailProviderError,
   EmailWebhookEventType,
   TransactionalEmailJobStatus,
   TransactionalEmailType,
-} from "../../email/model";
-import { getRetryDelayMs, isMaxAttemptsReached } from "../../email/retryPolicy";
+} from "./model";
 import type { TransactionalEmailJobRecord } from "./records";
 
 export const EMAIL_PROVIDER_NAME = "resend";
@@ -86,10 +86,10 @@ export function planSendFailure(
   nextAttempt: number,
   now: number,
 ): SendFailurePlan {
-  if (!error.retryable || isMaxAttemptsReached(nextAttempt)) {
+  if (!error.retryable || isMaxRetryAttemptsReached(nextAttempt)) {
     return { kind: "failed" };
   }
-  const delay = getRetryDelayMs(nextAttempt);
+  const delay = calculateRetryDelayMs(nextAttempt);
   if (delay === null) {
     return { kind: "failed" };
   }

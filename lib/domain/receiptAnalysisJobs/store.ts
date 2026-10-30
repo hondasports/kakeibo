@@ -1,6 +1,5 @@
 import type {
   ReceiptAnalysisBatchRecord,
-  ReceiptAnalysisBatchStatus,
   ReceiptAnalysisJobRecord,
   ReceiptAnalysisJobStatus,
 } from "./records";
@@ -56,11 +55,3 @@ export interface ReceiptAnalysisStore extends ReceiptAnalysisReader {
 export interface ReceiptAnalysisScheduler {
   scheduleAiReviewCheck(delayMs: number, batchId: string): Promise<void>;
 }
-
-export type UpdateJobFields = {
-  status: ReceiptAnalysisJobStatus;
-  draftId?: string;
-  error?: string;
-};
-
-export type BatchStatus = ReceiptAnalysisBatchStatus;
