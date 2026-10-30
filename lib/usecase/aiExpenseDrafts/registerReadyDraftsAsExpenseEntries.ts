@@ -1,8 +1,5 @@
 import { ConvexError } from "convex/values";
-import {
-  AiExpenseDraft,
-  type AiExpenseDraftFields,
-} from "../../domain/aiExpenseDrafts/aiExpenseDraft";
+import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import {
   buildRegistrationPatchFields,
   dedupeDraftIds,
@@ -17,6 +14,7 @@ import {
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import type { AiExpenseDraftDeps } from "./deps";
+import { loadDraftInGroup } from "./loadDraftInGroup";
 
 export type RegisterReadyDraftsAsExpenseEntriesResult = {
   registeredDraftIds: string[];
@@ -41,14 +39,7 @@ export async function registerReadyDraftsAsExpenseEntries(
 
   const drafts = await Promise.all(
     uniqueDraftIds.map(async (draftId) => {
-      const fields = await deps.drafts.findById(draftId);
-      if (fields === null) {
-        throw new ConvexError("AI expense draft not found");
-      }
-      const draft = AiExpenseDraft.fromPersisted(fields);
-      if (!draft.belongsToGroup(ctx.groupId)) {
-        throw new ConvexError("AI expense draft does not belong to the current group");
-      }
+      const fields = await loadDraftInGroup(deps.drafts, ctx.groupId, draftId);
       return fields;
     }),
   );

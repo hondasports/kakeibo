@@ -40,6 +40,7 @@ import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import type { AiExpenseDraftDeps } from "./deps";
 import { assertActiveCategoryForDraft } from "./assertActiveCategoryForDraft";
+import { loadDraftInGroup } from "./loadDraftInGroup";
 
 const REVIEW_OVERRIDE_FIELDS = [
   "documentType",
@@ -87,14 +88,8 @@ export async function updateAiExpenseDraftForReview(
   >,
   args: UpdateForReviewUsecaseArgs,
 ): Promise<AiExpenseDraftFields> {
-  const fields = await deps.drafts.findById(args.draftId);
-  if (fields === null) {
-    throw new ConvexError("AI expense draft not found");
-  }
+  const fields = await loadDraftInGroup(deps.drafts, ctx.groupId, args.draftId);
   const draft = AiExpenseDraft.fromPersisted(fields);
-  if (!draft.belongsToGroup(ctx.groupId)) {
-    throw new ConvexError("AI expense draft does not belong to the current group");
-  }
   const wasRegistered = draft.isRegistered();
   const registrationMode = resolveReviewRegistrationMode(args, fields);
   try {
