@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getDraftTitle } from "./title";
+import { resolveReceiptShopNameFromDraft } from "./shopName";
 
 describe("getDraftTitle", () => {
   it("レシートは店名を優先する", () => {
@@ -25,6 +26,30 @@ describe("getDraftTitle", () => {
         shopName: "コンビニ払込",
       }),
     ).toBe("コンビニ払込");
+  });
+
+  it.each([
+    [
+      {
+        payeeName: "電力会社",
+        paymentPurpose: "電気代",
+        paymentPlace: "ファミマ",
+        shopName: "ローソン",
+      },
+      "電力会社 電気代",
+    ],
+    [{ payeeName: "電力会社" }, "電力会社"],
+    [{ paymentPurpose: "電気代" }, "電気代"],
+    [
+      { payeeName: "  ", paymentPurpose: " ", paymentPlace: "ファミマ", shopName: "ローソン" },
+      "ファミマ",
+    ],
+    [{ shopName: "ローソン" }, "ローソン"],
+    [{}, "不明"],
+  ])("払込票の表示と登録店名が一致する", (fields, expected) => {
+    const draft = { documentType: "convenience_payment" as const, ...fields };
+    expect(getDraftTitle(draft, "不明")).toBe(expected);
+    expect(resolveReceiptShopNameFromDraft(draft)).toBe(expected);
   });
 
   it("店名の前後空白は除去される", () => {
