@@ -1097,7 +1097,7 @@ AI支出下書き一覧の画像プレビューは、画像送信時にクライ
 リサイズ済みData URLを利用する。画像本体は `aiExpenseDrafts`、`receiptAnalysisImageJobs`、
 Convex Storageへ保存しないため、ページ更新・別端末・別セッションではプレビューできない。
 同時に選択または撮影した画像群は、クライアントの `sessionBatches` に `batchId`、対象ジョブID、
-ファイル名だけを保持し、`listJobs` の `jobId` / `draftId` と結合して同一バッチの進捗を表示する。
+ファイル名だけを保持し、`listJobsByBatch` で取得したジョブの `jobId` / `draftId` と結合して同一バッチの進捗を表示する。
 バッチ情報も永続化せず、複数バッチの登録対象を混在させない。
 失敗ジョブの「再解析」は同じセッションの画像を再送し、「再撮影」はカメラまたはファイルから
 新しい画像を選んで同じジョブを再試行する。保存済みの `needs_review` ジョブも同じ再解析導線を
@@ -1320,7 +1320,6 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 
 - `receiptAnalysisJobs.mutations.createBatch(input)`
 - `receiptAnalysisJobs.queries.listBatches()`
-- `receiptAnalysisJobs.queries.listJobs()`
 - `receiptAnalysisJobs.queries.listJobsByBatch(batchId)`
 - `receiptAnalysisJobs.queries.getJobByDraftId(draftId)`
 - `receiptAnalysisJobs.actions.analyzeImageJob(jobId, imageDataUrl)`
