@@ -1,8 +1,8 @@
-import { ConvexError } from "convex/values";
 import { AiExpenseDraft } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import type { AiExpenseDraftDeps } from "./deps";
+import { findDraftInGroup } from "./loadDraftInGroup";
 
 /** AI 下書きを明細ごと削除する。registered は削除不可。存在しない場合は deleted:false を返す。 */
 export async function deleteAiExpenseDraft(
@@ -10,14 +10,11 @@ export async function deleteAiExpenseDraft(
   deps: Pick<AiExpenseDraftDeps, "drafts" | "draftItems">,
   args: { draftId: string },
 ): Promise<{ deleted: boolean }> {
-  const fields = await deps.drafts.findById(args.draftId);
+  const fields = await findDraftInGroup(deps.drafts, ctx.groupId, args.draftId);
   if (fields === null) {
     return { deleted: false };
   }
   const draft = AiExpenseDraft.fromPersisted(fields);
-  if (!draft.belongsToGroup(ctx.groupId)) {
-    throw new ConvexError("AI expense draft does not belong to the current group");
-  }
   try {
     draft.assertDeletableFromQueue();
   } catch (err) {

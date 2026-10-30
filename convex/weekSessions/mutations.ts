@@ -1,3 +1,4 @@
+import { getTodayDateStringInJapan } from "../../lib/domain/common/date";
 import { mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
@@ -5,7 +6,7 @@ import { ConvexError } from "convex/values";
 import { requireGroupMembership } from "../groups/membership";
 import { calculateWeekStartDate } from "../lib/weekDates";
 import { getWeeklyStartDayForUser } from "../users/weeklySettings";
-import { formatLocalDate, WeekSessionDomainError } from "../../lib/domain/weekSessions/rules";
+import { WeekSessionDomainError } from "../../lib/domain/weekSessions/rules";
 import {
   createWeekSessionStore,
   weekSessionRecordToDoc,
@@ -25,7 +26,7 @@ function convexError(error: unknown): never {
 /** getOrCreateCurrentWeekSession mutation の handler ロジック（テスト用に export） */
 export async function getOrCreateCurrentWeekSessionHandler(ctx: MutationCtx) {
   const { userId } = await requireGroupMembership(ctx);
-  const todayStr = formatLocalDate(Date.now());
+  const todayStr = getTodayDateStringInJapan(Date.now());
   const weekStartDay = await getWeeklyStartDayForUser(ctx, userId);
   const weekStartDate = calculateWeekStartDate(todayStr, weekStartDay);
 

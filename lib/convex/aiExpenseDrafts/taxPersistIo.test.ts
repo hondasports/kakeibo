@@ -3,7 +3,11 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { GROUP_ID, DRAFT_ID, CAT_ID, createInMemoryMutationCtx } from "./testHelpers";
 import { updateDraftItemTaxOverridesHandler } from "./updateItemTaxOverrides";
 import { persistDraftTaxInterpretation } from "./persistTaxInterpretation";
-import { updateForReviewHandler } from "../../../convex/aiExpenseDrafts/mutations";
+import {
+  applyReceiptTaxSettingsMutationHandler,
+  updateDraftItemTaxOverridesMutationHandler,
+  updateForReviewHandler,
+} from "../../../convex/aiExpenseDrafts/mutations";
 
 const draftSeed = {
   _id: DRAFT_ID,
@@ -77,6 +81,47 @@ function patchIds(ctx: { db: { patch: unknown } }) {
 }
 
 describe("税再解釈系mutationのDatabase I/O", () => {
+  it.each(["missing", "other"])(
+    "税設定の入口は %s の下書きを同じエラーで拒否する",
+    async (kind) => {
+      for (const invoke of [
+        (ctx: Parameters<typeof applyReceiptTaxSettingsMutationHandler>[0]) =>
+          applyReceiptTaxSettingsMutationHandler(ctx, { draftId: DRAFT_ID }),
+        (ctx: Parameters<typeof updateDraftItemTaxOverridesMutationHandler>[0]) =>
+          updateDraftItemTaxOverridesMutationHandler(ctx, {
+            draftId: DRAFT_ID,
+            itemId: "item-1" as Id<"aiExpenseDraftItems">,
+            taxRatePercent: 10,
+          }),
+      ]) {
+        const { ctx } = createInMemoryMutationCtx({
+          draft: { ...draftSeed, groupId: kind === "other" ? "other-group" : GROUP_ID },
+          items: itemSeeds,
+        });
+        if (kind === "missing") vi.mocked(ctx.db.get).mockResolvedValue(null);
+        await expect(invoke(ctx)).rejects.toMatchObject({ data: "AI expense draft not found" });
+        expect(itemReadCalls(ctx)).toHaveLength(0);
+        expect(ctx.db.patch).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it.each(["missing", "other"])(
+    "%s の下書きは同じエラーで拒否し、明細取得・書き込みしない",
+    async (kind) => {
+      const { ctx } = createInMemoryMutationCtx({
+        draft: { ...draftSeed, groupId: kind === "other" ? "other-group" : GROUP_ID },
+        items: itemSeeds,
+      });
+      if (kind === "missing") vi.mocked(ctx.db.get).mockResolvedValue(null);
+      await expect(
+        persistDraftTaxInterpretation(ctx, { draftId: DRAFT_ID, groupId: GROUP_ID }),
+      ).rejects.toMatchObject({ data: "AI expense draft not found" });
+      expect(itemReadCalls(ctx)).toHaveLength(0);
+      expect(ctx.db.patch).not.toHaveBeenCalled();
+    },
+  );
+
   it("updateDraftItemTaxOverrides は下書きを1回・明細一覧を1回だけ読む", async () => {
     const { ctx, getItems } = createInMemoryMutationCtx({
       draft: { ...draftSeed },

@@ -48,6 +48,18 @@ describe("aiExpenseDrafts (queries)", () => {
     expect((ctx.db as any).delete as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("draft-owned");
   });
 
+  it.each([null, { ...ownedDraft, _id: "draft-target", groupId: OTHER_GROUP_ID }])(
+    "存在しない下書きと他グループの下書きは削除せず同じ結果を返す",
+    async (draft) => {
+      const ctx = createMutationCtx(createIdentity(), { getDocById: { "draft-target": draft } });
+      await expect(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        deleteDraftHandler(ctx, { draftId: "draft-target" as any }),
+      ).resolves.toEqual({ deleted: false });
+      expect(ctx.db.delete).not.toHaveBeenCalled();
+    },
+  );
+
   it("登録済み下書きはキューから削除できない", async () => {
     const ctx = createMutationCtx(createIdentity(), {
       getDocById: {
@@ -241,7 +253,7 @@ describe("aiExpenseDrafts (queries)", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         draftId: "draft-other" as any,
       }),
-    ).rejects.toMatchObject({ data: "AI expense draft does not belong to the current group" });
+    ).resolves.toBeNull();
   });
 
   // ---------------------------------------------------------------------------

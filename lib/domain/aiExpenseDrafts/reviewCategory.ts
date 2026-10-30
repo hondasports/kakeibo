@@ -1,3 +1,5 @@
+import { checkCategoryUsability } from "../categories/usability";
+
 /**
  * レビュー済み下書きに利用できるカテゴリかを判定する純粋ルール。
  * usecase / infra の双方から利用し、判定ロジックを一箇所に集約する。
@@ -21,11 +23,7 @@ export function validateReviewCategory(
   category: { groupId: string; isActive: boolean } | null,
   groupId: string,
 ): { success: true } | { success: false; error: ReviewCategoryError } {
-  if (category === null || category.groupId !== groupId) {
-    return { success: false, error: "not_in_group" };
-  }
-  if (!category.isActive) {
-    return { success: false, error: "inactive" };
-  }
-  return { success: true };
+  const result = checkCategoryUsability(category, groupId);
+  if (result.usable) return { success: true };
+  return { success: false, error: result.error === "inactive" ? "inactive" : "not_in_group" };
 }

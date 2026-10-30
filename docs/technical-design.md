@@ -634,7 +634,7 @@ E2E reset・取得）も4層へ移行済み。週の日付計算は既存 `lib/d
 を再利用する。
 
 - **純粋関数**（`lib/domain/weekSessions/`）: `store.ts`（`WeekSessionRecord`・
-  `WeekSessionStore` ポート）と `rules.ts`（ローカル日付 YYYY-MM-DD 生成、
+  `WeekSessionStore` ポート）と `rules.ts`（
   新規 draft フィールド構築、complete patch（reviewMemo は指定時のみキー含有）、
   reset patch（reviewMemo を undefined で明示クリア）、not found / retrieve 失敗検証）。
 - **ユースケース**（`lib/usecase/weekSessions/`）: getOrCreate（既存返却・無ければ

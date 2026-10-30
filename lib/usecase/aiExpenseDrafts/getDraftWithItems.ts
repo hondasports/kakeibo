@@ -1,15 +1,12 @@
-import { ConvexError } from "convex/values";
-import {
-  AiExpenseDraft,
-  type AiExpenseDraftFields,
-} from "../../domain/aiExpenseDrafts/aiExpenseDraft";
+import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftRepository";
 import type { AiExpenseDraftItemReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftItemRepository";
 import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
 import type { UsecaseGroupContext } from "../context";
+import { findDraftInGroup } from "./loadDraftInGroup";
 
-/** 下書きと明細を取得する。存在しなければ null、他グループなら拒否する。 */
+/** 下書きと明細を取得する。存在しないか他グループなら null を返す。 */
 export async function getAiExpenseDraftWithItems(
   ctx: Pick<UsecaseGroupContext, "groupId">,
   deps: {
@@ -18,13 +15,9 @@ export async function getAiExpenseDraftWithItems(
   },
   args: { draftId: string },
 ): Promise<{ draft: AiExpenseDraftFields; items: AiExpenseDraftItemFields[] } | null> {
-  const fields = await deps.drafts.findById(args.draftId);
+  const fields = await findDraftInGroup(deps.drafts, ctx.groupId, args.draftId);
   if (fields === null) {
     return null;
-  }
-  const draft = AiExpenseDraft.fromPersisted(fields);
-  if (!draft.belongsToGroup(ctx.groupId)) {
-    throw new ConvexError("AI expense draft does not belong to the current group");
   }
   const items = await deps.draftItems.listByDraftAsc(
     ctx.groupId,
