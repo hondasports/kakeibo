@@ -1,3 +1,4 @@
+import { normalizeSystemAdminReason } from "../../../../lib/domain/systemAdmin/reason";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -38,11 +39,12 @@ export function useSystemAdminGroupDeletion() {
   };
 
   const submit = async () => {
-    if (!selected || reason.trim().length < 1 || reason.trim().length > 500) return;
+    const reasonResult = normalizeSystemAdminReason(reason);
+    if (!selected || !reasonResult.success) return;
     setSaving(true);
     setError("");
     try {
-      await resume({ jobId: selected.jobId, reason: reason.trim() });
+      await resume({ jobId: selected.jobId, reason: reasonResult.reason });
       closeDialog();
       setSuccess("削除ジョブの再開を受け付けました。監査ログに記録しました。");
     } catch (err) {

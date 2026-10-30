@@ -1,3 +1,4 @@
+import { normalizeSystemAdminReason } from "../../../../lib/domain/systemAdmin/reason";
 import { api } from "../../../../convex/_generated/api";
 import { useCallback, useEffect, useState } from "react";
 import { useAction, useMutation } from "convex/react";
@@ -215,15 +216,15 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
 
   const executeRecovery = async () => {
     if (!groupId || !recoveryTarget?.userDocumentId) return;
-    const reason = recoveryReason.trim();
-    if (reason.length < 1 || reason.length > 500) return;
+    const reasonResult = normalizeSystemAdminReason(recoveryReason);
+    if (!reasonResult.success) return;
     setRecovering(true);
     setRecoveryError("");
     try {
       await recoverOwnerless({
         groupId: groupId as Id<"groups">,
         targetUserId: recoveryTarget.userDocumentId as Id<"users">,
-        reason,
+        reason: reasonResult.reason,
       });
       setRecoveryTarget(null);
       setRecoveryReason("");

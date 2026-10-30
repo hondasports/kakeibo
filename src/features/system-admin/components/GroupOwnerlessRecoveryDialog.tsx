@@ -1,4 +1,9 @@
 import {
+  getNormalizeReasonErrorMessage,
+  MAX_REASON_LENGTH,
+  normalizeSystemAdminReason,
+} from "../../../../lib/domain/systemAdmin/reason";
+import {
   Alert,
   Button,
   Dialog,
@@ -35,10 +40,10 @@ export function GroupOwnerlessRecoveryDialog({
   onConfirm,
 }: GroupOwnerlessRecoveryDialogProps) {
   const trimmed = reason.trim();
-  const reasonError =
-    trimmed.length > 500 || (reason.length > 0 && trimmed.length === 0)
-      ? "理由は1〜500文字で入力してください"
-      : "";
+  const reasonResult = normalizeSystemAdminReason(reason);
+  const reasonError = reasonResult.success
+    ? ""
+    : getNormalizeReasonErrorMessage(reasonResult.error);
 
   return (
     <Dialog fullWidth maxWidth="sm" onClose={recovering ? undefined : onCancel} open={open}>
@@ -54,7 +59,7 @@ export function GroupOwnerlessRecoveryDialog({
           <Typography color="error">owner 0人を確認し、このmemberをownerへ昇格します。</Typography>
           <TextField
             error={Boolean(reasonError)}
-            helperText={`${trimmed.length}/500文字（必須）`}
+            helperText={reasonError || `${trimmed.length}/${MAX_REASON_LENGTH}文字（必須）`}
             label="復旧理由"
             multiline
             minRows={3}
@@ -74,9 +79,7 @@ export function GroupOwnerlessRecoveryDialog({
           キャンセル
         </Button>
         <Button
-          disabled={
-            recovering || trimmed.length < 1 || trimmed.length > 500 || !target?.userDocumentId
-          }
+          disabled={recovering || !reasonResult.success || !target?.userDocumentId}
           onClick={() => void onConfirm()}
           variant="contained"
         >
