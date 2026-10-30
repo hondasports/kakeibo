@@ -183,6 +183,18 @@ describe("paginateHistoryGroups", () => {
     const paged = paginateHistoryGroups(groups, { numItems: 2, cursor: "not-a-number" });
     expect(paged.page.map((group) => group.shopName)).toEqual(["B店", "A店"]);
   });
+
+  it("v1形式でない数値のcursorはオフセットとして読まず先頭から始める", () => {
+    const groups = groupSpendingEntries([
+      entry({ _id: "old", date: "2026-01-01", receiptGroupId: "g-old", receiptShopName: "旧" }),
+      entry({ _id: "new", date: "2026-08-01", receiptGroupId: "g-new", receiptShopName: "新" }),
+      entry({ _id: "mid", date: "2026-04-01", receiptGroupId: "g-mid", receiptShopName: "中" }),
+    ]);
+
+    const paged = paginateHistoryGroups(groups, { numItems: 2, cursor: "2" });
+    expect(paged.page.map((group) => group.shopName)).toEqual(["新", "中"]);
+    expect(paged.isDone).toBe(false);
+  });
 });
 
 describe("parseExpenseSearchFilters", () => {
