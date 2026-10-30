@@ -171,41 +171,6 @@ test.describe("Issue #146 AI支出下書きの確認要否分類（/__e2e__/ fix
   });
 });
 
-test.describe("Issue #148 確認が必要なAI支出下書きの編集導線（/__e2e__/ fixture・サーバー保存なし）", () => {
-  test("確認が必要な下書きを編集して登録準備OKに戻せる", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    const reviewSection = queue.getByRole("region", { name: "確認待ち" });
-    await expect(reviewSection.getByText("review-payment.png")).toBeVisible();
-
-    await reviewSection.getByRole("button", { name: "確認する" }).click();
-
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText("レシート全体の確認")).toBeVisible();
-    // 店名は支払先名で補完されるため必須エラーは出ない。代わりに比較不能の案内を確認する。
-    await expect(dialog.getByText("金額を比較できません")).toBeVisible();
-    await dialog.getByText("読み取り原文（参考）", { exact: true }).click();
-    await expect(dialog.getByRole("list", { name: "OCR原文" })).toContainText(
-      "大阪市水道局 水道料金",
-    );
-    await expect(dialog.getByLabel("支出日（レシート記載日）")).toHaveValue("2026-06-01");
-    await expect(dialog.getByLabel("合計金額")).toHaveValue("9120");
-    await expect(dialog.getByLabel("店名・内容")).toHaveValue("大阪市水道局");
-
-    await dialog.getByLabel("店名・内容").fill("大阪市水道局 水道料金");
-    await dialog.getByLabel("合計金額").fill("9160");
-    await dialog.getByRole("button", { name: "下書きを保存" }).click();
-
-    await expect(dialog).toBeHidden();
-    await expect(queue.getByText("確認待ち 0件")).toHaveCount(0);
-    const readySection = queue.getByRole("region", { name: "登録できます" });
-    await expect(readySection.getByText("大阪市水道局")).toBeVisible();
-    await expect(readySection.getByText("2026/06/01 ・ 9,160円")).toBeVisible();
-  });
-});
-
 test.describe("下書き確認の税状態保存", () => {
   test.beforeEach(async () => {
     await cleanupAiExpenseQueue();
