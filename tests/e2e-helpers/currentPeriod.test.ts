@@ -21,19 +21,22 @@ afterEach(() => {
 const JST_MONDAY_EARLY_MORNING = "2026-10-25T15:30:00Z";
 
 describe("getCurrentWeekStartDate", () => {
-  it.each([
-    // ブラウザのローカル日付が日曜→月曜へ変わる境目で、ローカル時刻ベースの
-    // アプリの「今週」（weekNavigation.getCurrentWeekStartDate）と同じ週を返す
-    ["UTC", "2026-10-19"],
-    ["Asia/Tokyo", "2026-10-26"],
-    ["America/Los_Angeles", "2026-10-19"],
-  ])("TZ=%s で JST 月曜朝の瞬間でもアプリと同じ週開始日を返す", (tz, expected) => {
+  it.each(
+    ["UTC", "Asia/Tokyo", "America/Los_Angeles"].flatMap((tz) =>
+      [
+        ["2026-10-25T14:59:59Z", "2026-10-19"],
+        ["2026-10-25T15:00:00Z", "2026-10-26"],
+        ["2023-12-31T14:59:59Z", "2023-12-25"],
+        ["2023-12-31T15:00:00Z", "2024-01-01"],
+        ["2026-05-31T15:00:00Z", "2026-06-01"],
+      ].map(([instant, expected]) => [tz, instant, expected]),
+    ),
+  )("TZ=%s の固定時刻 %s で JST 週開始日をアプリと共有する", (tz, instant, expected) => {
     process.env.TZ = tz;
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(JST_MONDAY_EARLY_MORNING));
-
+    vi.setSystemTime(new Date(instant));
     expect(getCurrentWeekStartDate()).toBe(expected);
-    expect(getCurrentWeekStartDate()).toBe(getAppCurrentWeekStartDate(1));
+    expect(getAppCurrentWeekStartDate(1)).toBe(expected);
   });
 
   it("月曜の瞬間はその日自身を週開始日にする", () => {

@@ -3,6 +3,8 @@
  * UI / Convex の両方から利用できる純粋関数のみを含む。
  */
 
+import { addDays } from "../common/date";
+
 /** 既定の週開始曜日（月曜日）。曜日は JavaScript の Date と同じく 0=日〜6=土。 */
 export const DEFAULT_WEEK_START_DAY = 1;
 
@@ -44,11 +46,7 @@ export function calculateWeekStartDate(
   const date = new Date(dateStr + "T00:00:00Z");
   const day = date.getUTCDay();
   const diff = (day - normalizeWeekStartDay(weekStartDay) + 7) % 7;
-  date.setUTCDate(date.getUTCDate() - diff);
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(date.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return addDays(dateStr, -diff);
 }
 
 /**
@@ -56,12 +54,7 @@ export function calculateWeekStartDate(
  * 例: "2024-01-08" → "2024-01-14"
  */
 export function calculateWeekEndDate(weekStartDate: string): string {
-  const date = new Date(weekStartDate + "T00:00:00Z");
-  date.setDate(date.getDate() + 6);
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return addDays(weekStartDate, 6);
 }
 
 /**
@@ -69,12 +62,7 @@ export function calculateWeekEndDate(weekStartDate: string): string {
  * 例: ("2024-01-08", -1) → "2024-01-01"
  */
 export function calculateRelativeWeekStartDate(weekStartDate: string, weeks: number): string {
-  const date = new Date(weekStartDate + "T00:00:00Z");
-  date.setDate(date.getDate() + weeks * 7);
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return addDays(weekStartDate, weeks * 7);
 }
 
 /** YYYY-MM-DD 形式かつ実在する日付かを検証する */

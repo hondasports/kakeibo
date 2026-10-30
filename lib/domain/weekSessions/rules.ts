@@ -10,15 +10,6 @@ import type { NewWeekSessionFields, WeekSessionPatch, WeekSessionRecord } from "
  */
 export class WeekSessionDomainError extends Error {}
 
-/** 実行環境のローカル時刻で YYYY-MM-DD を生成する。 */
-export function formatLocalDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 export function buildNewWeekSessionFields(args: {
   groupId: string;
   weekStartDate: string;
