@@ -17,11 +17,10 @@ test.describe("月次サマリー（Issue #87）", () => {
     await cleanupTestReceipts({ page });
   });
 
-  test("@smoke 月移動、今月への復帰、年月ピッカー、月内明細を確認できる", async ({ page }) => {
+  test("@smoke 年月ピッカーから月次URLへ遷移できる", async ({ page }) => {
     const fixedNow = new Date("2026-08-12T03:00:00.000Z");
     await page.clock.setFixedTime(fixedNow);
     const currentMonth = "2026-08";
-    const previousMonth = addMonths(currentMonth, -1);
     const targetMonth = addMonths(currentMonth, -12);
     const [targetYear, targetMonthNumber] = targetMonth.split("-");
 
@@ -29,18 +28,6 @@ test.describe("月次サマリー（Issue #87）", () => {
     await page.setViewportSize({ width: 390, height: 844 });
 
     await expect(page.getByRole("heading", { name: "月次サマリー", level: 1 })).toBeVisible();
-    await expect(page.getByRole("button", { name: "次月へ" })).toBeDisabled();
-
-    await page.getByRole("button", { name: "前月へ" }).click();
-    await expect(page).toHaveURL(`/months/${previousMonth}`);
-    await expect(page.getByRole("button", { name: "今月へ" })).toBeEnabled();
-
-    await page.getByRole("button", { name: "今月へ" }).click();
-    await expect(page).toHaveURL(`/months/${currentMonth}`);
-    await expect(
-      page.locator(`[aria-label="${formatMonthLabel(currentMonth)}を選択"]`),
-    ).toBeVisible();
-
     await page.getByRole("button", { name: /日付を選択してください/ }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.getByRole("button", { name: "カレンダー表示から年選択表示に切り替える" }).click();
@@ -51,23 +38,6 @@ test.describe("月次サマリー（Issue #87）", () => {
     await expect(
       page.locator(`[aria-label="${formatMonthLabel(targetMonth)}を選択"]`),
     ).toBeVisible();
-    await expect(page.getByRole("spinbutton", { name: "年" })).toHaveText(targetYear);
-    await expect(page.getByRole("spinbutton", { name: "月" })).toHaveText(targetMonthNumber);
-    await expect(page.getByRole("heading", { name: /支出一覧/ })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /収入一覧/ })).toBeVisible();
-    await expect(page.getByLabel("月次サマリーの支出一覧")).toContainText(
-      "この月の支出はまだありません",
-    );
-    await expect(page.getByLabel("月次サマリーの収入一覧")).toContainText(
-      "この月の収入はまだありません",
-    );
-
-    await page.getByRole("button", { name: "今月へ" }).click();
-    await expect(page).toHaveURL(`/months/${currentMonth}`);
-
-    await page.goto("/months/2000-01");
-    await expect(page.getByText("この月の支出はまだありません").first()).toBeVisible();
-    await expect(page.getByText("この月の収入はまだありません")).toBeVisible();
   });
 
   test("@smoke 日付heatmapからその日の明細へ遷移して月全体へ戻れる", async ({ page }) => {

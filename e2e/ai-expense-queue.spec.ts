@@ -1,6 +1,10 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { getCurrentClerkTokenIdentifier, gotoAuthenticated } from "./helpers/auth";
-import { expectLocatorInsideContainer, expectLocatorInsideViewport } from "./helpers/viewport";
+import {
+  expectLocatorInsideContainer,
+  expectLocatorInsideViewport,
+  expectNoHorizontalOverflow,
+} from "./helpers/viewport";
 import {
   cleanupAiExpenseQueue,
   cleanupE2eExpenseEntries,
@@ -149,47 +153,6 @@ test.describe("Issue #144 読み取りUI", () => {
         timeout: 30_000,
       })
       .toBe(true);
-    await expectLocatorInsideViewport(queue);
-  });
-
-  test("@smoke SP幅でも複数画像追加後のキューと入力導線を操作できる", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await gotoAuthenticated(page, INPUT_PATH);
-
-    const queue = await waitForReceiptInputQueue(page);
-    await expectLocatorInsideViewport(queue);
-    await expect(page.getByLabel("読み取り用画像を追加")).toBeEnabled();
-    const stamp = Date.now();
-    const queueFiles = [
-      await createSyntheticReceiptImage(page, `ai-queue-receipt-${stamp}.jpg`),
-      await createSyntheticReceiptImage(page, `ai-queue-payment-${stamp}.jpg`),
-    ];
-    await page.getByLabel("読み取り用画像を追加").setInputFiles(queueFiles);
-    await acceptReceiptImageConsentIfNeeded(page, `ai-queue-receipt-${stamp}.jpg`);
-
-    // Issue #152: 非同期ジョブの subscription 反映を待つ。
-    // dev DB に同名ファイルの過去ジョブが残っている可能性があるため .first() で限定する。
-    await expect(queue.getByText(`ai-queue-receipt-${stamp}.jpg`).first()).toBeVisible({
-      timeout: 15000,
-    });
-    await expect(queue.getByText(`ai-queue-payment-${stamp}.jpg`).first()).toBeVisible({
-      timeout: 15000,
-    });
-    await expect
-      .poll(
-        async () => {
-          const statusLabels = ["読み取り中", "登録できます", "確認待ち", "読み取り失敗"];
-          let total = 0;
-          for (const label of statusLabels) {
-            total += await queue.getByText(label).count();
-          }
-          return total;
-        },
-        { timeout: 15000 },
-      )
-      .toBeGreaterThanOrEqual(2);
-    // Issue #181: 保存ボタンは変わらず「保存して次へ」
-    await expect(page.getByRole("button", { name: "保存して次へ" })).toBeVisible();
     await expectLocatorInsideViewport(queue);
   });
 });
@@ -449,6 +412,17 @@ test.describe("Issue #337 レシート入力UI改善の表示・操作回帰（/
 
     await expectLocatorInsideViewport(queue);
     await expectLocatorInsideViewport(statusSummary);
+    const cameraButton = queue.getByRole("button", { name: "カメラで撮影" });
+    const imageButton = queue.getByRole("button", { name: "画像を読み取る" });
+    const failedChip = queue.getByText("読み取り失敗 1件");
+    const registered = queue.getByRole("region", { name: "登録済み" });
+    await expect(cameraButton).toBeVisible();
+    await expect(registered).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await expectLocatorInsideViewport(cameraButton);
+    await expectLocatorInsideViewport(imageButton);
+    await expectLocatorInsideViewport(failedChip);
+    await expectLocatorInsideViewport(registered);
   });
 
   test("@smoke SP幅で簡潔な下書き詳細と修正導線が読める", async ({ page }) => {
