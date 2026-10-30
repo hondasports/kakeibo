@@ -236,21 +236,15 @@ export function paginateHistoryGroups(
   const pageSize = Math.min(Math.max(requestedSize, 1), 100);
   let startIndex = 0;
 
-  if (paginationOpts.cursor) {
-    const keysetCursor = decodeSearchCursor(paginationOpts.cursor);
-    if (keysetCursor !== null) {
-      startIndex = ordered.findIndex(
-        (group) =>
-          group.date < keysetCursor.date ||
-          (group.date === keysetCursor.date && group.id < keysetCursor.id),
-      );
-      if (startIndex < 0) {
-        startIndex = ordered.length;
-      }
-    } else {
-      // Keep cursors issued by the previous release readable during rollout.
-      const legacyOffset = Number.parseInt(paginationOpts.cursor, 10);
-      startIndex = Number.isFinite(legacyOffset) && legacyOffset > 0 ? legacyOffset : 0;
+  const keysetCursor = paginationOpts.cursor ? decodeSearchCursor(paginationOpts.cursor) : null;
+  if (keysetCursor !== null) {
+    startIndex = ordered.findIndex(
+      (group) =>
+        group.date < keysetCursor.date ||
+        (group.date === keysetCursor.date && group.id < keysetCursor.id),
+    );
+    if (startIndex < 0) {
+      startIndex = ordered.length;
     }
   }
 
