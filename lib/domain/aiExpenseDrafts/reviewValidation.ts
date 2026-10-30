@@ -1,5 +1,9 @@
 import { parseExpenseAmountString } from "../expenseEntries/expenseEntryItem";
-import { isValidSignedLineItemAmount, type ReceiptItemLineType } from "../receipt/discountItems";
+import {
+  isDiscountLine,
+  isValidSignedLineItemAmount,
+  type ReceiptItemLineType,
+} from "../receipt/discountItems";
 import { isValidIsoDateString } from "../week/weekDates";
 import type { AiExpenseDraftDocumentType } from "./constants";
 import type { AiExpenseRegistrationMode } from "./receiptDataContract";
@@ -38,48 +42,89 @@ function computeCategoryAmountTotals(items: ReviewItemInput[]): ReviewCategoryAm
   return [...totals.entries()].map(([categoryId, amountYen]) => ({ categoryId, amountYen }));
 }
 
-/** 書類種別入力エラーをユーザー向けメッセージに変換する。 */
+export type ReviewValidationIssue = {
+  code:
+    | "document"
+    | "shopName"
+    | "date"
+    | "amount"
+    | "category"
+    | "itemName"
+    | "itemAmount"
+    | "itemCategory"
+    | "discountTarget"
+    | "aggregate";
+  field: string;
+  itemIndex?: number;
+  required: boolean;
+};
+
+export function validateReviewInput(
+  form: ReviewFormInput,
+  items: ReviewItemInput[],
+): ReviewValidationIssue[] {
+  const issues: ReviewValidationIssue[] = [];
+  const add = (
+    code: ReviewValidationIssue["code"],
+    field: string,
+    required = true,
+    itemIndex?: number,
+  ) => issues.push({ code, field, required, ...(itemIndex === undefined ? {} : { itemIndex }) });
+  if (form.documentType === "unknown") add("document", "document");
+  if (!form.shopName.trim()) add("shopName", "shopName");
+  if (!isValidIsoDateString(form.date)) add("date", "date");
+  if (!parseExpenseAmountString(form.amountYen).success) add("amount", "amountYen");
+  if (!form.categoryId) add("category", "categoryId");
+  if (form.registrationMode !== "totalOnly") {
+    items.forEach((item, index) => {
+      if (isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId)
+        add("discountTarget", "discountTargetItemId", false, index);
+      if (!item.itemName.trim()) add("itemName", "itemName", true, index);
+      else if (!isValidSignedLineItemAmount(item.itemName, Number(item.amountYen), item.lineType))
+        add("itemAmount", "amountYen", true, index);
+      else if (!item.categoryId) add("itemCategory", "categoryId", true, index);
+    });
+    if (
+      !issues.some((issue) => issue.itemIndex !== undefined && issue.required) &&
+      computeCategoryAmountTotals(items).some((aggregate) => aggregate.amountYen <= 0)
+    )
+      add("aggregate", "items");
+  }
+  return issues;
+}
+
+const validForm: ReviewFormInput = {
+  documentType: "receipt",
+  shopName: "x",
+  date: "2026-01-01",
+  amountYen: "1",
+  categoryId: "x",
+};
+
 export function getReviewDocumentTypeErrorMessage(
   documentType: AiExpenseDraftDocumentType,
 ): string | null {
-  if (documentType === "unknown") {
-    return "書類種別を選択してください。";
-  }
-  return null;
+  return validateReviewInput({ ...validForm, documentType }, []).some(
+    (issue) => issue.code === "document",
+  )
+    ? "書類種別を選択してください。"
+    : null;
 }
 
-/** レビューフォーム入力エラーをユーザー向けメッセージに変換する。 */
-export function getReviewFormErrorMessage(reviewForm: ReviewFormInput): string | null {
-  const amountResult = parseExpenseAmountString(reviewForm.amountYen);
-  if (
-    !reviewForm.shopName.trim() ||
-    !isValidIsoDateString(reviewForm.date) ||
-    !amountResult.success ||
-    !reviewForm.categoryId
-  ) {
-    return "店名・内容、支出日、金額、カテゴリを確認してください。";
-  }
-  return null;
+export function getReviewFormErrorMessage(form: ReviewFormInput): string | null {
+  return validateReviewInput(form, []).some((issue) =>
+    ["shopName", "date", "amount", "category"].includes(issue.code),
+  )
+    ? "店名・内容、支出日、金額、カテゴリを確認してください。"
+    : null;
 }
 
-/**
- * レビュー明細入力エラーをユーザー向けメッセージに変換する。
- * 割引対象の未確定は明細自体の入力エラーではなく確認項目のため、ここでは扱わない
- * （税率別集計の比較不能として案内し、確認事項を残したまま下書きを保存できる）。
- */
-export function getReviewItemsErrorMessage(reviewItems: ReviewItemInput[]): string | null {
-  const invalidItem = reviewItems.find((item) => {
-    const itemAmount = Number(item.amountYen);
-    return (
-      !item.itemName.trim() ||
-      !isValidSignedLineItemAmount(item.itemName, itemAmount, item.lineType) ||
-      !item.categoryId
-    );
-  });
-  if (invalidItem) {
-    return "明細名、明細金額、カテゴリを確認してください。";
-  }
-  return null;
+export function getReviewItemsErrorMessage(items: ReviewItemInput[]): string | null {
+  return validateReviewInput(validForm, items).some(
+    (issue) => issue.itemIndex !== undefined && issue.required,
+  )
+    ? "明細名、明細金額、カテゴリを確認してください。"
+    : null;
 }
 
 /** レビュー明細のカテゴリ別合計金額エラーをユーザー向けメッセージに変換する。 */
@@ -97,13 +142,13 @@ export function getReviewSubmitErrorMessage(
   reviewForm: ReviewFormInput,
   reviewItems: ReviewItemInput[],
 ): string | null {
-  const formError =
-    getReviewDocumentTypeErrorMessage(reviewForm.documentType) ??
-    getReviewFormErrorMessage(reviewForm);
-  if (formError || reviewForm.registrationMode === "totalOnly") {
-    return formError;
-  }
-  return (
-    getReviewItemsErrorMessage(reviewItems) ?? getReviewCategoryAggregateErrorMessage(reviewItems)
-  );
+  const issues = validateReviewInput(reviewForm, reviewItems);
+  if (issues.some((issue) => issue.code === "document")) return "書類種別を選択してください。";
+  if (issues.some((issue) => ["shopName", "date", "amount", "category"].includes(issue.code)))
+    return "店名・内容、支出日、金額、カテゴリを確認してください。";
+  if (issues.some((issue) => issue.itemIndex !== undefined && issue.required))
+    return "明細名、明細金額、カテゴリを確認してください。";
+  return issues.some((issue) => issue.code === "aggregate")
+    ? "割引後のカテゴリ金額は1円以上にしてください。"
+    : null;
 }
