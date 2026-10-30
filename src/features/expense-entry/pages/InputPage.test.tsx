@@ -39,6 +39,17 @@ describe("InputPage", () => {
     useQueryMock.mockReset();
   });
 
+  it("保存済みの入力一覧を表示しない", () => {
+    useQueryMock.mockReturnValueOnce([]).mockReturnValueOnce({
+      count: 1,
+      receipts: [{ shopName: "テスト店舗" }],
+    });
+    render(<InputPage />);
+    expect(screen.getByTestId("week-status")).toHaveTextContent("1");
+    expect(screen.queryByText("テスト店舗")).not.toBeInTheDocument();
+    expect(screen.queryByText("直近の入力")).not.toBeInTheDocument();
+  });
+
   it("週集計の読み込み中は0件と表示しない", () => {
     useQueryMock.mockReturnValueOnce([]).mockReturnValueOnce(undefined);
 

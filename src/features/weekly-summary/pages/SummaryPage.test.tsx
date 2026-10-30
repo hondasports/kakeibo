@@ -165,6 +165,19 @@ describe("SummaryPage", () => {
     );
   });
 
+  it("未来週URLは現在週へ正規化する", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-17T03:00:00Z"));
+    try {
+      useParamsMock.mockReturnValue({ weekStartDate: "2999-01-04" });
+      renderSummaryPage();
+      expect(navigateMock).toHaveBeenCalledWith("/weeks/2026-06-15", { replace: true });
+      expect(screen.getByRole("button", { name: "次の週へ" })).toBeDisabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("週ナビゲーションから前後の週へ遷移する", () => {
     renderSummaryPage();
 
