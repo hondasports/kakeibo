@@ -14,10 +14,6 @@ export function dedupeIds<T extends string>(ids: T[]): T[] {
   return Array.from(new Set(ids));
 }
 
-export function countBulkSpendingIds(args: BulkSpendingIdSets): number {
-  return dedupeIds(args.expenseEntryIds).length + dedupeIds(args.receiptIds).length;
-}
-
 export function isExpenseReceiptType(type: "expense" | "income" | undefined): boolean {
   return type === undefined || type === "expense";
 }

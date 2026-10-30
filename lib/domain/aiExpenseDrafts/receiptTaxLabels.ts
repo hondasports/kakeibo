@@ -2,7 +2,6 @@ import type {
   AmountBasis,
   TaxResolutionSource,
   TaxSummaryConsistencyReason,
-  TaxSummaryConsistencyStatus,
 } from "../receipt/tax/types";
 import { formatYen } from "../common/currency";
 
@@ -44,15 +43,6 @@ export const TAX_SUMMARY_CONFLICT_LABELS: Record<TaxSummaryConsistencyReason, st
   unresolved_tax_summary: "税率別集計の読み取り内容を確認してください",
 };
 
-export const TAX_SUMMARY_STATUS_LABELS: Record<TaxSummaryConsistencyStatus, string> = {
-  verified: "確認済み",
-  ambiguous: "確認が必要",
-  contradictory: "矛盾あり",
-  coherent: "確認済み",
-  reconcilable: "再解釈可能",
-  conflicting: "確認が必要",
-};
-
 export function getReviewReasonLabel(reason: string): string {
   return TAX_REVIEW_REASON_LABELS[reason] ?? "分析結果に確認が必要な項目があります";
 }
@@ -67,10 +57,6 @@ export function getAmountBasisLabel(amountBasis: AmountBasis): string {
 
 export function getTaxSummaryConflictLabel(reason: TaxSummaryConsistencyReason): string {
   return TAX_SUMMARY_CONFLICT_LABELS[reason];
-}
-
-export function getTaxSummaryStatusLabel(status: TaxSummaryConsistencyStatus): string {
-  return TAX_SUMMARY_STATUS_LABELS[status];
 }
 
 export function formatTaxRateLabel(taxRatePercent: 0 | 8 | 10 | null | undefined): string {

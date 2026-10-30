@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SpendingEntry } from "../receipt/spendingEntry";
 import {
-  filterReceiptGroups,
+  filterHistoryGroups,
   groupSpendingEntries,
-  paginateReceiptGroups,
+  paginateHistoryGroups,
   parseExpenseSearchFilters,
 } from "./filter";
 
@@ -59,7 +59,7 @@ describe("groupSpendingEntries", () => {
   });
 });
 
-describe("filterReceiptGroups", () => {
+describe("filterHistoryGroups", () => {
   const groups = groupSpendingEntries([
     entry({ _id: "e1", date: "2026-07-18", itemName: "牛乳" }),
     entry({
@@ -85,22 +85,22 @@ describe("filterReceiptGroups", () => {
   ]);
 
   it("店名の部分一致で絞り込む（大文字小文字を無視）", () => {
-    const filtered = filterReceiptGroups(groups, { shopQuery: "セブン" });
+    const filtered = filterHistoryGroups(groups, { entryType: "expense", shopQuery: "セブン" });
     expect(filtered.map((group) => group.shopName)).toEqual(["セブンイレブン"]);
   });
 
-  it("互換ラッパーでは入力の種別を上書きして支出だけを扱う", () => {
-    const filtered = filterReceiptGroups(groups, { entryType: "income" });
-    expect(filtered).toHaveLength(3);
+  it("種別フィルタは一致しないグループを除外する", () => {
+    const filtered = filterHistoryGroups(groups, { entryType: "income" });
+    expect(filtered).toHaveLength(0);
   });
 
   it("明細の商品名でも店名クエリにヒットする", () => {
-    const filtered = filterReceiptGroups(groups, { shopQuery: "牛乳" });
+    const filtered = filterHistoryGroups(groups, { entryType: "expense", shopQuery: "牛乳" });
     expect(filtered.map((group) => group.id)).toEqual(["sourceDocument:doc-1"]);
   });
 
   it("前後空白だけの店名クエリは条件なしとして扱う", () => {
-    const filtered = filterReceiptGroups(groups, { shopQuery: "   " });
+    const filtered = filterHistoryGroups(groups, { entryType: "expense", shopQuery: "   " });
     expect(filtered).toHaveLength(3);
   });
 
@@ -109,18 +109,23 @@ describe("filterReceiptGroups", () => {
       entry({ _id: "m1", categoryId: "cat-food", itemName: "パン" }),
       entry({ _id: "m2", categoryId: "cat-daily", itemName: "洗剤", amountYen: 2800 }),
     ]);
-    const filtered = filterReceiptGroups(mixed, { categoryId: "cat-daily" });
+    const filtered = filterHistoryGroups(mixed, { entryType: "expense", categoryId: "cat-daily" });
     expect(filtered).toHaveLength(1);
     expect(filtered[0]?.items.map((item) => item.categoryId)).toEqual(["cat-food", "cat-daily"]);
   });
 
   it("レシート合計金額の下限・上限で絞り込む", () => {
-    const filtered = filterReceiptGroups(groups, { minAmountYen: 500, maxAmountYen: 4000 });
+    const filtered = filterHistoryGroups(groups, {
+      entryType: "expense",
+      minAmountYen: 500,
+      maxAmountYen: 4000,
+    });
     expect(filtered.map((group) => group.shopName)).toEqual(["スーパー北浜", "セブンイレブン"]);
   });
 
   it("日付範囲で絞り込む", () => {
-    const filtered = filterReceiptGroups(groups, {
+    const filtered = filterHistoryGroups(groups, {
+      entryType: "expense",
       startDate: "2026-06-01",
       endDate: "2026-07-31",
     });
@@ -128,7 +133,8 @@ describe("filterReceiptGroups", () => {
   });
 
   it("複数条件はANDで適用する", () => {
-    const filtered = filterReceiptGroups(groups, {
+    const filtered = filterHistoryGroups(groups, {
+      entryType: "expense",
       shopQuery: "イオン",
       categoryId: "cat-food",
       minAmountYen: 10000,
@@ -139,7 +145,7 @@ describe("filterReceiptGroups", () => {
   });
 });
 
-describe("paginateReceiptGroups", () => {
+describe("paginateHistoryGroups", () => {
   it("日付の新しい順でページングする", () => {
     const groups = groupSpendingEntries([
       entry({ _id: "old", date: "2026-01-01", receiptGroupId: "g-old", receiptShopName: "旧" }),
@@ -147,11 +153,11 @@ describe("paginateReceiptGroups", () => {
       entry({ _id: "mid", date: "2026-04-01", receiptGroupId: "g-mid", receiptShopName: "中" }),
     ]);
 
-    const first = paginateReceiptGroups(groups, { numItems: 2, cursor: null });
+    const first = paginateHistoryGroups(groups, { numItems: 2, cursor: null });
     expect(first.page.map((group) => group.shopName)).toEqual(["新", "中"]);
     expect(first.isDone).toBe(false);
 
-    const second = paginateReceiptGroups(groups, {
+    const second = paginateHistoryGroups(groups, {
       numItems: 2,
       cursor: first.continueCursor,
     });
@@ -174,7 +180,7 @@ describe("paginateReceiptGroups", () => {
         receiptShopName: "B店",
       }),
     ]);
-    const paged = paginateReceiptGroups(groups, { numItems: 2, cursor: "not-a-number" });
+    const paged = paginateHistoryGroups(groups, { numItems: 2, cursor: "not-a-number" });
     expect(paged.page.map((group) => group.shopName)).toEqual(["B店", "A店"]);
   });
 });

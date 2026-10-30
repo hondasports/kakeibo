@@ -186,19 +186,6 @@ export function filterHistoryGroups(
   });
 }
 
-export function filterReceiptGroups(
-  groups: SearchableReceiptGroup[],
-  filters: Omit<ExpenseSearchFilters, "entryType"> | ExpenseSearchFilters,
-): SearchableReceiptGroup[] {
-  return filterHistoryGroups(
-    groups.map((group) => ({ ...group, type: "expense" as const })),
-    {
-      ...filters,
-      entryType: "expense",
-    },
-  ).filter((group): group is SearchableReceiptGroup => group.type === "expense");
-}
-
 function compareHistoryGroups(left: SearchableHistoryGroup, right: SearchableHistoryGroup): number {
   const dateOrder = right.date.localeCompare(left.date);
   if (dateOrder !== 0) {
@@ -278,24 +265,6 @@ export function paginateHistoryGroups(
         ? encodeSearchCursor(page[page.length - 1]!)
         : (paginationOpts.cursor ?? "v1.empty"),
     isDone,
-  };
-}
-
-export function paginateReceiptGroups(
-  groups: SearchableReceiptGroup[],
-  paginationOpts: { numItems: number; cursor: string | null },
-): {
-  page: SearchableReceiptGroup[];
-  continueCursor: string;
-  isDone: boolean;
-} {
-  return paginateHistoryGroups(
-    groups.map((group) => ({ ...group, type: "expense" as const })),
-    paginationOpts,
-  ) as {
-    page: SearchableReceiptGroup[];
-    continueCursor: string;
-    isDone: boolean;
   };
 }
 
