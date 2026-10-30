@@ -9,6 +9,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import {
+  getNormalizeReasonErrorMessage,
+  MAX_REASON_LENGTH,
+  normalizeSystemAdminReason,
+} from "../../../../lib/domain/systemAdmin/reason";
 
 type GroupDeletionResumeDialogProps = {
   open: boolean;
@@ -31,6 +36,11 @@ export function GroupDeletionResumeDialog({
   onClose,
   onConfirm,
 }: GroupDeletionResumeDialogProps) {
+  const reasonResult = normalizeSystemAdminReason(reason);
+  const reasonError =
+    reasonResult.success || reason.length === 0
+      ? ""
+      : getNormalizeReasonErrorMessage(reasonResult.error);
   return (
     <Dialog fullWidth maxWidth="sm" onClose={onClose} open={open}>
       <DialogTitle>削除処理を再開</DialogTitle>
@@ -42,8 +52,8 @@ export function GroupDeletionResumeDialog({
           </Typography>
           <TextField
             autoFocus
-            error={reason.trim().length > 500 || (reason.length > 0 && reason.trim().length === 0)}
-            helperText={`${reason.trim().length}/500文字（必須）`}
+            error={Boolean(reasonError)}
+            helperText={reasonError || `${reason.trim().length}/${MAX_REASON_LENGTH}文字（必須）`}
             label="再開理由"
             minRows={3}
             multiline
@@ -63,7 +73,7 @@ export function GroupDeletionResumeDialog({
           キャンセル
         </Button>
         <Button
-          disabled={saving || reason.trim().length < 1 || reason.trim().length > 500}
+          disabled={saving || !reasonResult.success}
           onClick={() => void onConfirm()}
           variant="contained"
         >

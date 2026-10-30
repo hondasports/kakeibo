@@ -56,6 +56,24 @@ const props: ComponentProps<typeof ReviewDialog> = {
 };
 
 describe("下書きの修正導線", () => {
+  it.each([{ categoryId: "" }, { amountYen: "oops" }])(
+    "割引対象が未選択でも必須エラーから割引行へ移動する",
+    async (invalid) => {
+      const onSubmit = vi.fn();
+      render(
+        <ReviewDialog
+          {...props}
+          onSubmit={onSubmit}
+          reviewItems={[props.reviewItems[0], { ...props.reviewItems[1], ...invalid }]}
+        />,
+      );
+      expect(screen.getByRole("status")).toHaveTextContent("保存前に修正が必要");
+      await userEvent.click(screen.getByRole("button", { name: "修正が必要な項目へ" }));
+      const discountRow = screen.getByText("割引", { exact: true }).closest("details")!;
+      expect(discountRow).toHaveAttribute("open");
+      expect(onSubmit).not.toHaveBeenCalled();
+    },
+  );
   it("選択済みの未確認明細は理由と確認操作を表示し、読み取り失敗と決めつけない", async () => {
     const user = userEvent.setup();
     const onConfirmItemTax = vi.fn();
