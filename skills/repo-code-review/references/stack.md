@@ -23,13 +23,13 @@
 
 ## 入力検証・日付・金額
 
-- フォームや外部入力の検証は valibot で、既存スキーマ（`src/features/receipt/validation/` 等）と揃っているか
+- フォームの入力検証を画面側に独自に書かず、`lib/domain/` の検証関数・上限定数（例: `lib/domain/expenseEntries/expenseEntryItem.ts`）を使っているか。サーバー側の検証と同じ契約になっているか
 - 日付はJST前提。`lib/domain/common/date.ts` の `JAPAN_TIME_ZONE` やヘルパーを使い、週・月の境界がずれないか
 - 金額は円の整数で扱っているか。税計算・按分は `skills/receipt-tax-domain` に委譲する
 
 ## メール
 
-- Resend・react-emailの変更は `lib/email/` のテンプレート定義と整合しているか
+- Resend・react-emailの変更は `lib/email/` のテンプレート定義と整合しているか。payload の検証は既存の valibot スキーマ（`lib/email/templateDefinitions.ts`）に揃っているか
 
 ## lint・型
 
