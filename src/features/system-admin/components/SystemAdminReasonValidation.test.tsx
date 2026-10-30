@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -8,7 +9,6 @@ import { SystemAdminMembershipChangeDialog } from "./SystemAdminMembershipChange
 import { SystemAdminInvitationRevokeDialog } from "./SystemAdminInvitationRevokeDialog";
 import { GroupDeletionResumeDialog } from "./GroupDeletionResumeDialog";
 import { GroupOwnerlessRecoveryDialog } from "./GroupOwnerlessRecoveryDialog";
-import { useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
 function Controlled({ kind }: { kind: "deletion" | "recovery" }) {
@@ -85,7 +85,7 @@ describe("管理操作の理由の境界", () => {
                 ? "再開する"
                 : "復旧する",
       });
-      for (const value of ["", "   ", `  ${"a".repeat(500)}  `, `  ${"a".repeat(501)}  `]) {
+      for (const value of ["", "   ", `  ${"a".repeat(500)}  `, `  ${"a".repeat(501)}  `, ""]) {
         fireEvent.change(input, { target: { value } });
         const result = normalizeSystemAdminReason(value);
         if (result.success) {
@@ -93,10 +93,17 @@ describe("管理操作の理由の境界", () => {
           expect(input).not.toHaveAttribute("aria-invalid", "true");
         } else {
           expect(button).toBeDisabled();
-          expect(input).toHaveAttribute("aria-invalid", "true");
-          expect(
-            screen.getByText(getNormalizeReasonErrorMessage(result.error)),
-          ).toBeInTheDocument();
+          if (value === "" && (kind === "deletion" || kind === "recovery")) {
+            expect(input).not.toHaveAttribute("aria-invalid", "true");
+            expect(
+              screen.queryByText(getNormalizeReasonErrorMessage(result.error)),
+            ).not.toBeInTheDocument();
+          } else {
+            expect(input).toHaveAttribute("aria-invalid", "true");
+            expect(
+              screen.getByText(getNormalizeReasonErrorMessage(result.error)),
+            ).toBeInTheDocument();
+          }
         }
       }
     },

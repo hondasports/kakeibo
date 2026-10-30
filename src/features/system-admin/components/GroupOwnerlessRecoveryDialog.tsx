@@ -1,9 +1,4 @@
 import {
-  getNormalizeReasonErrorMessage,
-  MAX_REASON_LENGTH,
-  normalizeSystemAdminReason,
-} from "../../../../lib/domain/systemAdmin/reason";
-import {
   Alert,
   Button,
   Dialog,
@@ -14,6 +9,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import {
+  getNormalizeReasonErrorMessage,
+  MAX_REASON_LENGTH,
+  normalizeSystemAdminReason,
+} from "../../../../lib/domain/systemAdmin/reason";
 import type { GroupDetailMember } from "../hooks/useSystemAdminGroupDetail";
 
 type GroupOwnerlessRecoveryDialogProps = {
@@ -41,9 +41,10 @@ export function GroupOwnerlessRecoveryDialog({
 }: GroupOwnerlessRecoveryDialogProps) {
   const trimmed = reason.trim();
   const reasonResult = normalizeSystemAdminReason(reason);
-  const reasonError = reasonResult.success
-    ? ""
-    : getNormalizeReasonErrorMessage(reasonResult.error);
+  const reasonError =
+    reasonResult.success || reason.length === 0
+      ? ""
+      : getNormalizeReasonErrorMessage(reasonResult.error);
 
   return (
     <Dialog fullWidth maxWidth="sm" onClose={recovering ? undefined : onCancel} open={open}>

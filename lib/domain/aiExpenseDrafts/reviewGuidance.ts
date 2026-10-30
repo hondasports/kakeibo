@@ -4,7 +4,7 @@ import type {
   ReviewFormValues,
   ReviewItemValues,
 } from "./reviewTypes";
-import { validateReviewInput } from "./reviewValidation";
+import { REVIEW_VALIDATION_MESSAGES, validateReviewInput } from "./reviewValidation";
 import {
   buildTaxContextFromReviewItem,
   getReviewItemTaxConfirmation,
@@ -49,18 +49,10 @@ export function getReviewGuidance(
     { ...form, registrationMode: effectiveReviewMode(form) },
     items,
   );
-  const messages = {
-    document: ["document", "書類種別を選択してください。"],
-    shopName: ["shopName", "店名・内容を入力してください。"],
-    date: ["date", "支出日を確認してください。"],
-    amount: ["amount", "合計金額を1円以上で入力してください。"],
-    category: ["category", "レシート全体のカテゴリを選択してください。"],
-  } as const;
   for (const issue of validation) {
-    if (issue.code in messages) {
-      const [id, message] = messages[issue.code as keyof typeof messages];
-      add(id, message, issue.field, issue.required);
-    }
+    const message = REVIEW_VALIDATION_MESSAGES[issue.code].guidance;
+    if (issue.itemIndex === undefined && issue.code !== "aggregate" && message)
+      add(issue.code, message, issue.field, issue.required);
   }
   if (effectiveReviewMode(form) === "detailed") {
     const taxCheck = buildTaxRateCheck({
@@ -146,7 +138,7 @@ export function getReviewGuidance(
             false,
           );
         if (issue.code === "itemName")
-          add("name-" + item.id, "明細名を入力してください。", item.id, true);
+          add("name-" + item.id, REVIEW_VALIDATION_MESSAGES.itemName.guidance, item.id, true);
         if (issue.code === "itemAmount")
           add("amount-" + item.id, "「" + name + "」：明細金額を確認してください。", item.id, true);
         if (issue.code === "itemCategory")
@@ -167,7 +159,7 @@ export function getReviewGuidance(
       }
     }
     if (validation.some((issue) => issue.code === "aggregate"))
-      add("aggregate", "割引後のカテゴリ金額は1円以上にしてください。", "items", true);
+      add("aggregate", REVIEW_VALIDATION_MESSAGES.aggregate.guidance, "items", true);
   }
   if (
     draft?.reviewReasons.some((reason) =>

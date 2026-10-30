@@ -1,9 +1,4 @@
 import {
-  getNormalizeReasonErrorMessage,
-  MAX_REASON_LENGTH,
-  normalizeSystemAdminReason,
-} from "../../../../lib/domain/systemAdmin/reason";
-import {
   Alert,
   Button,
   Dialog,
@@ -14,6 +9,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import {
+  getNormalizeReasonErrorMessage,
+  MAX_REASON_LENGTH,
+  normalizeSystemAdminReason,
+} from "../../../../lib/domain/systemAdmin/reason";
 
 type GroupDeletionResumeDialogProps = {
   open: boolean;
@@ -37,9 +37,10 @@ export function GroupDeletionResumeDialog({
   onConfirm,
 }: GroupDeletionResumeDialogProps) {
   const reasonResult = normalizeSystemAdminReason(reason);
-  const reasonError = reasonResult.success
-    ? ""
-    : getNormalizeReasonErrorMessage(reasonResult.error);
+  const reasonError =
+    reasonResult.success || reason.length === 0
+      ? ""
+      : getNormalizeReasonErrorMessage(reasonResult.error);
   return (
     <Dialog fullWidth maxWidth="sm" onClose={onClose} open={open}>
       <DialogTitle>削除処理を再開</DialogTitle>

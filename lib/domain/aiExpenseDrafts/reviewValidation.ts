@@ -42,113 +42,127 @@ function computeCategoryAmountTotals(items: ReviewItemInput[]): ReviewCategoryAm
   return [...totals.entries()].map(([categoryId, amountYen]) => ({ categoryId, amountYen }));
 }
 
+const FORM_CODES = ["shopName", "date", "amount", "category"] as const;
+const REVIEW_CODES = [
+  "document",
+  ...FORM_CODES,
+  "itemName",
+  "itemAmount",
+  "itemCategory",
+  "discountTarget",
+  "aggregate",
+] as const;
+type ReviewValidationCode = (typeof REVIEW_CODES)[number];
+
+const FORM_ERROR = "店名・内容、支出日、金額、カテゴリを確認してください。";
+const DOCUMENT_ERROR = "書類種別を選択してください。";
+const AGGREGATE_ERROR = "割引後のカテゴリ金額は1円以上にしてください。";
+const ITEM_ERROR = "明細名、明細金額、カテゴリを確認してください。";
+export const REVIEW_VALIDATION_MESSAGES = {
+  document: { guidance: DOCUMENT_ERROR, submit: DOCUMENT_ERROR },
+  shopName: { guidance: "店名・内容を入力してください。", submit: FORM_ERROR },
+  date: { guidance: "支出日を確認してください。", submit: FORM_ERROR },
+  amount: { guidance: "合計金額を1円以上で入力してください。", submit: FORM_ERROR },
+  category: { guidance: "レシート全体のカテゴリを選択してください。", submit: FORM_ERROR },
+  itemName: { guidance: "明細名を入力してください。", submit: ITEM_ERROR },
+  itemAmount: { guidance: null, submit: ITEM_ERROR },
+  itemCategory: { guidance: null, submit: ITEM_ERROR },
+  discountTarget: { guidance: null, submit: null },
+  aggregate: { guidance: AGGREGATE_ERROR, submit: AGGREGATE_ERROR },
+} as const satisfies Record<
+  ReviewValidationCode,
+  { guidance: string | null; submit: string | null }
+>;
+
 export type ReviewValidationIssue = {
-  code:
-    | "document"
-    | "shopName"
-    | "date"
-    | "amount"
-    | "category"
-    | "itemName"
-    | "itemAmount"
-    | "itemCategory"
-    | "discountTarget"
-    | "aggregate";
+  code: ReviewValidationCode;
   field: string;
   itemIndex?: number;
   required: boolean;
 };
 
+function validateDocumentType(documentType: AiExpenseDraftDocumentType): ReviewValidationIssue[] {
+  return documentType === "unknown"
+    ? [{ code: "document", field: "document", required: true }]
+    : [];
+}
+
+function validateForm(form: ReviewFormInput): ReviewValidationIssue[] {
+  const issues: ReviewValidationIssue[] = [];
+  if (!form.shopName.trim()) issues.push({ code: "shopName", field: "shopName", required: true });
+  if (!isValidIsoDateString(form.date))
+    issues.push({ code: "date", field: "date", required: true });
+  if (!parseExpenseAmountString(form.amountYen).success)
+    issues.push({ code: "amount", field: "amountYen", required: true });
+  if (!form.categoryId) issues.push({ code: "category", field: "categoryId", required: true });
+  return issues;
+}
+
+function validateItems(items: ReviewItemInput[]): ReviewValidationIssue[] {
+  const issues: ReviewValidationIssue[] = [];
+  items.forEach((item, itemIndex) => {
+    const add = (code: ReviewValidationCode, field: string, required = true) =>
+      issues.push({ code, field, required, itemIndex });
+    // 割引対象は確認推奨であり、未確定でも下書き保存を妨げない。
+    if (isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId)
+      add("discountTarget", "discountTargetItemId", false);
+    if (!item.itemName.trim()) add("itemName", "itemName");
+    else if (!isValidSignedLineItemAmount(item.itemName, Number(item.amountYen), item.lineType))
+      add("itemAmount", "amountYen");
+    else if (!item.categoryId) add("itemCategory", "categoryId");
+  });
+  return issues;
+}
+
+function validateAggregate(items: ReviewItemInput[]): ReviewValidationIssue[] {
+  return computeCategoryAmountTotals(items).some((aggregate) => aggregate.amountYen <= 0)
+    ? [{ code: "aggregate", field: "items", required: true }]
+    : [];
+}
+
 export function validateReviewInput(
   form: ReviewFormInput,
   items: ReviewItemInput[],
 ): ReviewValidationIssue[] {
-  const issues: ReviewValidationIssue[] = [];
-  const add = (
-    code: ReviewValidationIssue["code"],
-    field: string,
-    required = true,
-    itemIndex?: number,
-  ) => issues.push({ code, field, required, ...(itemIndex === undefined ? {} : { itemIndex }) });
-  if (form.documentType === "unknown") add("document", "document");
-  if (!form.shopName.trim()) add("shopName", "shopName");
-  if (!isValidIsoDateString(form.date)) add("date", "date");
-  if (!parseExpenseAmountString(form.amountYen).success) add("amount", "amountYen");
-  if (!form.categoryId) add("category", "categoryId");
+  const issues = [...validateDocumentType(form.documentType), ...validateForm(form)];
   if (form.registrationMode !== "totalOnly") {
-    items.forEach((item, index) => {
-      if (isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId)
-        add("discountTarget", "discountTargetItemId", false, index);
-      if (!item.itemName.trim()) add("itemName", "itemName", true, index);
-      else if (!isValidSignedLineItemAmount(item.itemName, Number(item.amountYen), item.lineType))
-        add("itemAmount", "amountYen", true, index);
-      else if (!item.categoryId) add("itemCategory", "categoryId", true, index);
-    });
-    if (
-      !issues.some((issue) => issue.itemIndex !== undefined && issue.required) &&
-      computeCategoryAmountTotals(items).some((aggregate) => aggregate.amountYen <= 0)
-    )
-      add("aggregate", "items");
+    const itemIssues = validateItems(items);
+    issues.push(...itemIssues);
+    if (!itemIssues.some((issue) => issue.required)) issues.push(...validateAggregate(items));
   }
   return issues;
 }
 
-const validForm: ReviewFormInput = {
-  documentType: "receipt",
-  shopName: "x",
-  date: "2026-01-01",
-  amountYen: "1",
-  categoryId: "x",
-};
-
 export function getReviewDocumentTypeErrorMessage(
   documentType: AiExpenseDraftDocumentType,
 ): string | null {
-  return validateReviewInput({ ...validForm, documentType }, []).some(
-    (issue) => issue.code === "document",
-  )
-    ? "書類種別を選択してください。"
+  return validateDocumentType(documentType).length
+    ? REVIEW_VALIDATION_MESSAGES.document.submit
     : null;
+}
+
+function isFormCode(code: ReviewValidationCode): boolean {
+  return (FORM_CODES as readonly ReviewValidationCode[]).includes(code);
 }
 
 export function getReviewFormErrorMessage(form: ReviewFormInput): string | null {
-  return validateReviewInput(form, []).some((issue) =>
-    ["shopName", "date", "amount", "category"].includes(issue.code),
-  )
-    ? "店名・内容、支出日、金額、カテゴリを確認してください。"
-    : null;
+  const issue = validateForm(form).find((entry) => isFormCode(entry.code));
+  return issue ? REVIEW_VALIDATION_MESSAGES[issue.code].submit : null;
 }
 
 export function getReviewItemsErrorMessage(items: ReviewItemInput[]): string | null {
-  return validateReviewInput(validForm, items).some(
-    (issue) => issue.itemIndex !== undefined && issue.required,
-  )
-    ? "明細名、明細金額、カテゴリを確認してください。"
-    : null;
+  const issue = validateItems(items).find((entry) => entry.required);
+  return issue ? REVIEW_VALIDATION_MESSAGES[issue.code].submit : null;
 }
 
-/** レビュー明細のカテゴリ別合計金額エラーをユーザー向けメッセージに変換する。 */
-export function getReviewCategoryAggregateErrorMessage(
-  reviewItems: ReviewItemInput[],
-): string | null {
-  if (computeCategoryAmountTotals(reviewItems).some((aggregate) => aggregate.amountYen <= 0)) {
-    return "割引後のカテゴリ金額は1円以上にしてください。";
-  }
-  return null;
+export function getReviewCategoryAggregateErrorMessage(items: ReviewItemInput[]): string | null {
+  return validateAggregate(items).length ? REVIEW_VALIDATION_MESSAGES.aggregate.submit : null;
 }
 
-/** レビュー送信前の総合エラーをユーザー向けメッセージに変換する。 */
 export function getReviewSubmitErrorMessage(
-  reviewForm: ReviewFormInput,
-  reviewItems: ReviewItemInput[],
+  form: ReviewFormInput,
+  items: ReviewItemInput[],
 ): string | null {
-  const issues = validateReviewInput(reviewForm, reviewItems);
-  if (issues.some((issue) => issue.code === "document")) return "書類種別を選択してください。";
-  if (issues.some((issue) => ["shopName", "date", "amount", "category"].includes(issue.code)))
-    return "店名・内容、支出日、金額、カテゴリを確認してください。";
-  if (issues.some((issue) => issue.itemIndex !== undefined && issue.required))
-    return "明細名、明細金額、カテゴリを確認してください。";
-  return issues.some((issue) => issue.code === "aggregate")
-    ? "割引後のカテゴリ金額は1円以上にしてください。"
-    : null;
+  const issue = validateReviewInput(form, items).find((entry) => entry.required);
+  return issue ? REVIEW_VALIDATION_MESSAGES[issue.code].submit : null;
 }

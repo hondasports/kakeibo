@@ -1,8 +1,3 @@
-import {
-  getNormalizeReasonErrorMessage,
-  MAX_REASON_LENGTH,
-  normalizeSystemAdminReason,
-} from "../../../../lib/domain/systemAdmin/reason";
 import { useState } from "react";
 import {
   Button,
@@ -15,6 +10,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import {
+  getNormalizeReasonErrorMessage,
+  MAX_REASON_LENGTH,
+  normalizeSystemAdminReason,
+} from "../../../../lib/domain/systemAdmin/reason";
 
 type Props = {
   open: boolean;
