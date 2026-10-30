@@ -4,7 +4,7 @@ import type {
   TaxContextResolution,
   TaxResolutionSource,
 } from "../receipt/tax/types";
-import type { AiExpenseDraftItem, ReviewItemValues } from "./reviewTypes";
+import type { ReviewItemValues } from "./reviewTypes";
 import { ITEM_IDENTITY_CHANGED } from "../receipt/tax/itemTaxConfirmation";
 import {
   formatTaxRateLabel,
@@ -61,10 +61,6 @@ function buildTaxContext(item: TaxContextSourceItem): TaxContextResolution {
 }
 
 export function buildTaxContextFromReviewItem(item: ReviewItemValues): TaxContextResolution {
-  return buildTaxContext(item);
-}
-
-export function buildTaxContextFromDraftItem(item: AiExpenseDraftItem): TaxContextResolution {
   return buildTaxContext(item);
 }
 

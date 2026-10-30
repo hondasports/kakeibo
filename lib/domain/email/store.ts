@@ -1,4 +1,4 @@
-import type { EmailSuppressionReason } from "../../email/model";
+import type { EmailSuppressionReason } from "./model";
 import type {
   EmailSuppressionRecord,
   EmailWebhookEventRecord,

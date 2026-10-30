@@ -3,7 +3,7 @@ import type {
   EmailWebhookEventType,
   TransactionalEmailJobStatus,
   TransactionalEmailType,
-} from "../../email/model";
+} from "./model";
 
 export type TransactionalEmailJobRecord = {
   id: string;
