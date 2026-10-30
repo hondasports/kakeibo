@@ -1,4 +1,11 @@
 import {
+  addDays as addDomainDays,
+  getTodayDateStringInJapan,
+} from "../../../../lib/domain/common/date";
+import {
+  calculateRelativeWeekStartDate,
+  calculateWeekEndDate,
+  calculateWeekStartDate,
   DEFAULT_WEEK_START_DAY,
   getWeekEndDay,
   normalizeWeekStartDay,
@@ -38,10 +45,7 @@ export function normalizeWeekStartDate(
     return null;
   }
 
-  const day = date.getUTCDay();
-  const diff = (day - normalizeWeekStartDay(weekStartDay) + 7) % 7;
-  date.setUTCDate(date.getUTCDate() - diff);
-  return toIsoDate(date);
+  return calculateWeekStartDate(dateStr, weekStartDay);
 }
 
 export function addDays(dateStr: string, days: number): string {
@@ -50,8 +54,7 @@ export function addDays(dateStr: string, days: number): string {
     throw new Error(`Invalid date: ${dateStr}`);
   }
 
-  date.setUTCDate(date.getUTCDate() + days);
-  return toIsoDate(date);
+  return addDomainDays(dateStr, days);
 }
 
 export function addWeeks(weekStartDate: string, weeks: number): string {
@@ -60,8 +63,7 @@ export function addWeeks(weekStartDate: string, weeks: number): string {
     throw new Error(`Invalid weekStartDate: ${weekStartDate}`);
   }
 
-  date.setUTCDate(date.getUTCDate() + weeks * 7);
-  return toIsoDate(date);
+  return calculateRelativeWeekStartDate(weekStartDate, weeks);
 }
 
 export function getWeekEndDate(weekStartDate: string): string {
@@ -70,21 +72,16 @@ export function getWeekEndDate(weekStartDate: string): string {
     throw new Error(`Invalid weekStartDate: ${weekStartDate}`);
   }
 
-  date.setUTCDate(date.getUTCDate() + 6);
-  return toIsoDate(date);
+  return calculateWeekEndDate(weekStartDate);
 }
 
 export function isFutureWeek(weekStartDate: string, currentWeekStartDate: string): boolean {
   return weekStartDate > currentWeekStartDate;
 }
 
-/**
- * 現在日付（ローカルタイム）から指定曜日始まりの週開始日を計算する。
- */
+/** JST の現在日付から指定曜日始まりの週開始日を計算する。 */
 export function getCurrentWeekStartDate(weekStartDay: number = DEFAULT_WEEK_START_DAY): string {
-  const now = new Date();
-  const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  return normalizeWeekStartDate(iso, weekStartDay) ?? iso;
+  return calculateWeekStartDate(getTodayDateStringInJapan(), weekStartDay);
 }
 
 /**

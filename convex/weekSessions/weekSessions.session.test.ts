@@ -16,6 +16,28 @@ import {
 } from "./testHelpers";
 
 describe("getOrCreateCurrentWeekSession", () => {
+  it.each([
+    ["2026-10-18T14:59:59Z", "2026-10-12", "2026-10-18"],
+    ["2026-10-18T15:00:00Z", "2026-10-19", "2026-10-25"],
+    ["2023-12-31T15:00:00Z", "2024-01-01", "2024-01-07"],
+  ])("JST の固定時刻 %s で現在週のセッションを作る", async (instant, start, end) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(instant));
+    try {
+      const ctx = createMutationCtx(createIdentity(), {
+        uniqueDoc: null,
+        insertedDoc: sampleSession,
+      });
+      await getOrCreateCurrentWeekSessionHandler(ctx);
+      expect(ctx.db.insert).toHaveBeenCalledWith(
+        "weekSessions",
+        expect.objectContaining({ weekStartDate: start, weekEndDate: end }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("新規セッションが draft 状態で作成される", async () => {
     const identity = createIdentity();
     const createdSession: WeekSessionDoc = {

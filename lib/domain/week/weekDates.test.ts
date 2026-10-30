@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   calculateWeekEndDate,
   calculateWeekStartDate,
@@ -9,6 +9,22 @@ import {
   normalizeWeekStartDay,
   validateWeekDay,
 } from "./weekDates";
+
+const ORIGINAL_TZ = process.env.TZ;
+
+afterEach(() => {
+  if (ORIGINAL_TZ === undefined) delete process.env.TZ;
+  else process.env.TZ = ORIGINAL_TZ;
+});
+
+it.each(["UTC", "Asia/Tokyo", "America/Los_Angeles"])(
+  "TZ=%s でも週末と前週を正しく計算する",
+  (tz) => {
+    process.env.TZ = tz;
+    expect(calculateWeekEndDate("2024-01-08")).toBe("2024-01-14");
+    expect(calculateRelativeWeekStartDate("2024-01-08", -1)).toBe("2024-01-01");
+  },
+);
 
 describe("DEFAULT_WEEK_START_DAY", () => {
   it("月曜日（1）が既定値", () => {
@@ -109,5 +125,14 @@ describe("isValidIsoDateString", () => {
     expect(isValidIsoDateString("")).toBe(false);
     expect(isValidIsoDateString("2026/06/21")).toBe(false);
     expect(isValidIsoDateString("2026-02-30")).toBe(false);
+  });
+});
+
+describe("週日付の年・月境界", () => {
+  it("週開始・終了・相対移動を環境のタイムゾーンによらず計算する", () => {
+    expect(calculateWeekStartDate("2024-01-01")).toBe("2024-01-01");
+    expect(calculateWeekEndDate("2023-12-25")).toBe("2023-12-31");
+    expect(calculateWeekEndDate("2024-01-29")).toBe("2024-02-04");
+    expect(calculateRelativeWeekStartDate("2024-01-01", -1)).toBe("2023-12-25");
   });
 });

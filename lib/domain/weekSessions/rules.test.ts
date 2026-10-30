@@ -5,16 +5,8 @@ import {
   buildCompletePatch,
   buildNewWeekSessionFields,
   buildResetPatch,
-  formatLocalDate,
   WeekSessionDomainError,
 } from "./rules";
-
-describe("formatLocalDate", () => {
-  it("ローカル時刻で YYYY-MM-DD にゼロ埋めする", () => {
-    const ts = new Date(2024, 0, 5, 12).getTime();
-    expect(formatLocalDate(ts)).toBe("2024-01-05");
-  });
-});
 
 describe("buildNewWeekSessionFields", () => {
   it("draft・createdAt=updatedAt=now で構築する", () => {

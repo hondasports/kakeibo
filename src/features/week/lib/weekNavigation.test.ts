@@ -10,6 +10,13 @@ import {
   normalizeWeekStartDate,
 } from "./weekNavigation";
 
+const ORIGINAL_TZ = process.env.TZ;
+
+afterEach(() => {
+  if (ORIGINAL_TZ === undefined) delete process.env.TZ;
+  else process.env.TZ = ORIGINAL_TZ;
+});
+
 describe("weekNavigation", () => {
   it("日付文字列を月曜始まりの週開始日に正規化する", () => {
     expect(normalizeWeekStartDate("2026-05-20")).toBe("2026-05-18");
@@ -88,30 +95,42 @@ describe("getCurrentWeekStartDate", () => {
     vi.useRealTimers();
   });
 
+  it.each(
+    ["UTC", "Asia/Tokyo", "America/Los_Angeles"].flatMap((tz) => [
+      [tz, "2026-10-18T14:59:59Z", "2026-10-12"],
+      [tz, "2026-10-18T15:00:00Z", "2026-10-19"],
+    ]),
+  )("TZ=%s の %s で JST の週開始日を返す", (tz, instant, expected) => {
+    process.env.TZ = tz;
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(instant));
+    expect(getCurrentWeekStartDate()).toBe(expected);
+  });
+
   it("月曜日のとき、その日が週開始日になる", () => {
     // 2026-05-18 は月曜日
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-18T12:00:00"));
+    vi.setSystemTime(new Date("2026-05-18T03:00:00Z"));
     expect(getCurrentWeekStartDate()).toBe("2026-05-18");
   });
 
   it("水曜日のとき、直前の月曜日が週開始日になる", () => {
     // 2026-05-20 は水曜日
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-20T12:00:00"));
+    vi.setSystemTime(new Date("2026-05-20T03:00:00Z"));
     expect(getCurrentWeekStartDate()).toBe("2026-05-18");
   });
 
   it("日曜日のとき、直前の月曜日が週開始日になる", () => {
     // 2026-05-24 は日曜日
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-24T12:00:00"));
+    vi.setSystemTime(new Date("2026-05-24T03:00:00Z"));
     expect(getCurrentWeekStartDate()).toBe("2026-05-18");
   });
 
   it("週開始曜日を変更すると現在週も追従する", () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-20T12:00:00"));
+    vi.setSystemTime(new Date("2026-05-20T03:00:00Z"));
     expect(getCurrentWeekStartDate(3)).toBe("2026-05-20");
   });
 });
