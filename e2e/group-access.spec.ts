@@ -120,6 +120,9 @@ test.describe("グループアクセス", () => {
     await expect(page.getByRole("heading", { name: "グループ情報", level: 3 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "メンバー管理", level: 3 })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "グループ名" })).toHaveValue("佐藤家");
+    await expect(page.getByTestId("group-management-audit-log-list-empty")).toHaveText(
+      "管理操作の履歴はまだありません。",
+    );
   });
 
   test("@smoke @group-access owner はグループ名を変更できる", async ({ page }) => {
@@ -150,28 +153,6 @@ test.describe("グループアクセス", () => {
     await expect(page.getByText("佐藤家 → 鈴木家")).toBeVisible({ timeout: 15_000 });
   });
 
-  test("@smoke @group-access owner は管理操作ログの空状態を表示する", async ({ page }) => {
-    await gotoAuthenticated(page, "/", { ensureGroup: false });
-
-    const currentUserId = await getCurrentClerkTokenIdentifier(page);
-    currentUserIdForCleanup = currentUserId;
-    await page.goto("about:blank");
-    await cleanupGroupMembershipsByUser(currentUserId);
-
-    await waitForGroupSetupRedirect(page);
-
-    await page.getByRole("textbox", { name: "グループ名" }).fill("監査ログ空状態テスト");
-    await page.getByRole("button", { name: "グループを作成" }).click();
-    await expect(page).toHaveURL("/");
-
-    await page.goto("/settings");
-    await expandGroupManagement(page);
-    await expect(page.getByRole("heading", { name: "管理操作ログ", level: 3 })).toBeVisible();
-    await expect(page.getByTestId("group-management-audit-log-list-empty")).toHaveText(
-      "管理操作の履歴はまだありません。",
-    );
-  });
-
   test("@smoke @group-access member ロールでは招待管理と危険な操作を表示しない", async ({
     page,
   }) => {
@@ -192,19 +173,9 @@ test.describe("グループアクセス", () => {
     await expect(page.getByRole("heading", { name: "危険な操作", level: 2 })).toHaveCount(0);
     await expect(page.getByText("招待と削除はオーナーのみ操作できます。")).toBeVisible();
     await expect(page.getByRole("textbox", { name: "招待するメールアドレス" })).toHaveCount(0);
-  });
-
-  test("@smoke @group-access owner は pending 招待一覧の空状態を表示する", async ({ page }) => {
-    await gotoAuthenticated(page, "/settings");
-
-    const currentUserId = await getCurrentClerkTokenIdentifier(page);
-    currentUserIdForCleanup = currentUserId;
-
-    await expandGroupManagement(page);
-    await expect(page.getByRole("heading", { name: "招待管理", level: 3 })).toBeVisible();
-    await expect(page.getByTestId("group-pending-invitation-list-empty")).toHaveText(
-      "送信済みの招待はありません。",
-    );
+    await expect(page.getByRole("textbox", { name: "グループ名" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /をグループから外す/ })).toHaveCount(0);
+    await expect(page.getByTestId("group-pending-invitation-list")).toHaveCount(0);
   });
 
   test("@smoke @group-access 招待URLは参加を保存せず、切替同意と受諾操作を待つ", async ({
@@ -286,24 +257,6 @@ test.describe("グループアクセス", () => {
     await expect(page.getByTestId("group-pending-invitation-list-empty")).toHaveText(
       "送信済みの招待はありません。",
     );
-  });
-
-  test("@smoke @group-access member ロールではグループ名入力とメンバー解除ボタンを表示しない", async ({
-    page,
-  }) => {
-    await gotoAuthenticated(page, "/settings");
-
-    const currentUserId = await getCurrentClerkTokenIdentifier(page);
-    currentUserIdForCleanup = currentUserId;
-    await page.goto("about:blank");
-    await setE2eGroupMemberRole(currentUserId, "member");
-
-    await page.goto("/settings");
-    await expect(page.getByRole("heading", { name: "グループ", level: 2 })).toBeVisible();
-    await expandGroupManagement(page);
-    await expect(page.getByRole("textbox", { name: "グループ名" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /をグループから外す/ })).toHaveCount(0);
-    await expect(page.getByTestId("group-pending-invitation-list")).toHaveCount(0);
   });
 
   test("@smoke @group-access owner はメンバー解除を確認ダイアログ経由で実行できる", async ({

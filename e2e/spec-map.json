@@ -46,7 +46,7 @@
   ],
   "src/features/system-admin/**": [
     "e2e/system-admin-membership.spec.ts",
-    "e2e/system-admin-route.spec.ts",
+    "e2e/notifications.spec.ts",
     "e2e/system-admin-search.spec.ts"
   ],
   "src/features/ui/**": ["e2e/responsive.spec.ts", "e2e/navigation.spec.ts"],
