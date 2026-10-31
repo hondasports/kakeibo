@@ -1,3 +1,5 @@
+import { normalizeEmail } from "./email";
+
 export type ClerkEmailAddress = {
   id: string;
   emailAddress: string;
@@ -15,8 +17,8 @@ export type ClerkUserWithEmails = {
 export function getVerifiedClerkEmailAddresses(user: ClerkUserWithEmails): string[] {
   return (user.emailAddresses ?? [])
     .filter((email) => email.verification?.status === "verified")
-    .map((email) => email.emailAddress.trim().toLowerCase())
-    .filter(Boolean);
+    .map((email) => normalizeEmail(email.emailAddress))
+    .filter((email): email is string => email !== undefined);
 }
 
 export function getClerkUserDisplayName(user: ClerkUserWithEmails, fallbackEmail?: string): string {
@@ -33,11 +35,9 @@ export function getPrimaryVerifiedClerkEmailAddress(user: ClerkUserWithEmails): 
   const primaryEmail = (user.emailAddresses ?? []).find(
     (email) => email.id === user.primaryEmailAddressId,
   );
-  if (
-    primaryEmail?.verification?.status === "verified" &&
-    primaryEmail.emailAddress.trim().length > 0
-  ) {
-    return primaryEmail.emailAddress.trim().toLowerCase();
+  const normalizedPrimaryEmail = normalizeEmail(primaryEmail?.emailAddress);
+  if (primaryEmail?.verification?.status === "verified" && normalizedPrimaryEmail !== undefined) {
+    return normalizedPrimaryEmail;
   }
   return verifiedEmails[0];
 }
