@@ -599,6 +599,172 @@ describe("getMyAccountDeletionStatus", () => {
   });
 });
 
+describe("requestAccountDeletion / getAccountDeletionPreview（唯一ownerブロック）", () => {
+  // requestAccountDeletion が登録する Node 専用 action を edge-runtime の teardown 後に実行しない。
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const BLOCKED_USER = "https://clerk.example.test|account-delete-blocked";
+  const blockedIdentity = {
+    tokenIdentifier: BLOCKED_USER,
+    subject: "clerk-account-delete-blocked",
+  };
+
+  async function seedBlockedState(t: ReturnType<typeof convexTest>) {
+    return await t.run(async (ctx) => {
+      const userDbId = await ctx.db.insert("users", {
+        userId: BLOCKED_USER,
+        displayName: "ブロック退会テスト",
+        email: "blocked@example.test",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      // 唯一ownerかつ他メンバーが残るグループが退会ブロック対象になる。
+      const blockedGroupId = await ctx.db.insert("groups", {
+        name: "宮本家",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.insert("groupMembers", {
+        groupId: blockedGroupId,
+        userId: BLOCKED_USER,
+        role: "owner",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.insert("groupMembers", {
+        groupId: blockedGroupId,
+        userId: "member-001",
+        role: "member",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      // 他ownerがいる共有グループは離脱対象。
+      const sharedGroupId = await ctx.db.insert("groups", {
+        name: "実家",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.insert("groupMembers", {
+        groupId: sharedGroupId,
+        userId: "other-owner",
+        role: "owner",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.insert("groupMembers", {
+        groupId: sharedGroupId,
+        userId: BLOCKED_USER,
+        role: "member",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      // メンバーが自分だけのグループは削除対象。
+      const soloGroupId = await ctx.db.insert("groups", {
+        name: "自分だけ",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.insert("groupMembers", {
+        groupId: soloGroupId,
+        userId: BLOCKED_USER,
+        role: "owner",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      // 削除済みグループへの孤立membership。拒否されても回収されないことを見る。
+      const deletedGroupId = await ctx.db.insert("groups", {
+        name: "削除済み",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.delete(deletedGroupId);
+      const orphanMembershipId = await ctx.db.insert("groupMembers", {
+        groupId: deletedGroupId,
+        userId: BLOCKED_USER,
+        role: "owner",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.patch(userDbId, { activeGroupId: blockedGroupId });
+      return { blockedGroupId, sharedGroupId, soloGroupId, orphanMembershipId };
+    });
+  }
+
+  it("唯一ownerかつ他メンバーがいるグループがあるとき ACCOUNT_DELETION_BLOCKED で拒否し副作用を残さない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const { blockedGroupId, orphanMembershipId } = await seedBlockedState(t);
+
+    await expect(
+      t
+        .withIdentity(blockedIdentity)
+        .mutation(api.accountDeletion.requestAccountDeletion, { confirmationText: "削除" }),
+    ).rejects.toMatchObject({
+      data: {
+        code: "ACCOUNT_DELETION_BLOCKED",
+        blockingGroups: [
+          {
+            groupId: blockedGroupId,
+            groupName: "宮本家",
+            memberCount: 2,
+            reason: "sole_owner_with_other_members",
+          },
+        ],
+      },
+    });
+
+    const state = await t.run(async (ctx) => ({
+      requests: await ctx.db.query("accountDeletionRequests").take(10),
+      memberships: await ctx.db
+        .query("groupMembers")
+        .withIndex("by_user_id", (q) => q.eq("userId", BLOCKED_USER))
+        .take(10),
+      user: await ctx.db
+        .query("users")
+        .withIndex("by_token_identifier", (q) => q.eq("userId", BLOCKED_USER))
+        .unique(),
+      groups: await ctx.db.query("groups").take(10),
+      scheduled: await ctx.db.system.query("_scheduled_functions").collect(),
+    }));
+    // 拒否は全副作用の前に起きる: リクエスト作成・孤立membership回収・
+    // activeGroup解除・準備バッチ予約のどれも残らない。
+    expect(state.requests).toHaveLength(0);
+    expect(state.memberships).toHaveLength(4);
+    expect(state.memberships.map((membership) => membership._id)).toContain(orphanMembershipId);
+    expect(state.user?.activeGroupId).toBe(blockedGroupId);
+    expect(state.groups.every((group) => group.status === "active")).toBe(true);
+    expect(state.scheduled).toHaveLength(0);
+  });
+
+  it("getAccountDeletionPreview が同じ前提で blockingGroups と canDelete=false を返す", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const { blockedGroupId, sharedGroupId, soloGroupId } = await seedBlockedState(t);
+
+    const preview = await t
+      .withIdentity(blockedIdentity)
+      .query(api.accountDeletion.getAccountDeletionPreview, {});
+
+    expect(preview.canDelete).toBe(false);
+    expect(preview.errorCode).toBeNull();
+    expect(preview.blockingGroups).toEqual([
+      {
+        groupId: blockedGroupId,
+        groupName: "宮本家",
+        memberCount: 2,
+        reason: "sole_owner_with_other_members",
+      },
+    ]);
+    expect(preview.groupsToLeave).toMatchObject([
+      { groupId: sharedGroupId, groupName: "実家", role: "member" },
+    ]);
+    expect(preview.groupsToDelete).toMatchObject([{ groupId: soloGroupId, groupName: "自分だけ" }]);
+  });
+});
+
 describe("recoverStrandedRequests（Clerk削除済みfailedの自動復旧）", () => {
   const DAY = 24 * 60 * 60 * 1000;
   // scheduleProcess が登録する Node 専用 action を teardown 後に実行しない。

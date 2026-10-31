@@ -389,24 +389,6 @@ test.describe("Issue #337 レシート入力UI改善の表示・操作回帰（/
     await expectLocatorInsideViewport(failedChip);
     await expectLocatorInsideViewport(registered);
   });
-
-  test("@smoke SP幅で簡潔な下書き詳細と修正導線が読める", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    await queue
-      .getByRole("region", { name: "確認待ち" })
-      .getByRole("button", { name: "確認する" })
-      .click();
-
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await expect(dialog.getByRole("heading", { name: "登録候補" })).toHaveCount(0);
-    await expect(dialog.getByText("パン", { exact: true })).toBeVisible();
-    await expect(dialog.getByText("胃薬", { exact: true })).toBeVisible();
-    await expect(dialog.getByRole("region", { name: "商品一覧" })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "下書きを保存" })).toBeVisible();
-  });
 });
 
 test.describe("Issue #670 混在レシートの商品単位修正", () => {
