@@ -55,6 +55,7 @@ import {
 } from "./email/model";
 import {
   lineLinkAuditActionValidator,
+  lineLinkAuditResultValidator,
   lineLinkRequestStatusValidator,
   lineLinkStatusValidator,
 } from "./lineLink/model";
@@ -132,7 +133,7 @@ export default defineSchema({
   lineLinkAuditLogs: defineTable({
     userId: v.string(),
     action: lineLinkAuditActionValidator,
-    result: v.union(v.literal("success"), v.literal("failure")),
+    result: lineLinkAuditResultValidator,
     reasonCode: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_user_id", ["userId"]),

@@ -92,7 +92,6 @@
   "lib/convex/receiptImageExtraction/**": ["e2e/ai-expense-queue.spec.ts"],
   "convex/categories/**": ["e2e/settings.spec.ts", "e2e/receipt-form.spec.ts"],
   "convex/e2eHttp/**": ["e2e/*.spec.ts"],
-  "convex/lib/**": ["e2e/*.spec.ts"],
   "convex/crons.ts": [
     "e2e/monthly-summary.spec.ts",
     "e2e/yearly-summary.spec.ts",

@@ -1,6 +1,24 @@
+/** LINE 連携フィードバックの結果の全値。 */
+export const LINE_LINK_FEEDBACK_RESULTS = ["success", "failure"] as const;
+
+/** LINE 連携フィードバックの結果。 */
+export type LineLinkFeedbackResult = (typeof LINE_LINK_FEEDBACK_RESULTS)[number];
+
+/** LINE 連携フィードバックのコードの全値。 */
+export const LINE_LINK_FEEDBACK_CODES = [
+  "success",
+  "expired",
+  "invalid",
+  "conflict",
+  "failed",
+] as const;
+
+/** LINE 連携フィードバックのコード。 */
+export type LineLinkFeedbackCode = (typeof LINE_LINK_FEEDBACK_CODES)[number];
+
 export type LineLinkFeedback = {
-  result: "success" | "failure";
-  code: "success" | "expired" | "invalid" | "conflict" | "failed";
+  result: LineLinkFeedbackResult;
+  code: LineLinkFeedbackCode;
 };
 
 export function getLineLinkFeedback(reason: string): LineLinkFeedback {

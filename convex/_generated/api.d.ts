@@ -83,8 +83,6 @@ import type * as groups_testHelpers from "../groups/testHelpers.js";
 import type * as groups_validators from "../groups/validators.js";
 import type * as http from "../http.js";
 import type * as legacyGroupDeletionAuditMigration from "../legacyGroupDeletionAuditMigration.js";
-import type * as lib_discountItems from "../lib/discountItems.js";
-import type * as lib_weekDates from "../lib/weekDates.js";
 import type * as lineLink_actions from "../lineLink/actions.js";
 import type * as lineLink_internal from "../lineLink/internal.js";
 import type * as lineLink_model from "../lineLink/model.js";
@@ -220,8 +218,6 @@ declare const fullApi: ApiFromModules<{
   "groups/validators": typeof groups_validators;
   http: typeof http;
   legacyGroupDeletionAuditMigration: typeof legacyGroupDeletionAuditMigration;
-  "lib/discountItems": typeof lib_discountItems;
-  "lib/weekDates": typeof lib_weekDates;
   "lineLink/actions": typeof lineLink_actions;
   "lineLink/internal": typeof lineLink_internal;
   "lineLink/model": typeof lineLink_model;

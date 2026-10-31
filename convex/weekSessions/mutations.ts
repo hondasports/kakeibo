@@ -4,7 +4,7 @@ import type { MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { requireGroupMembership } from "../groups/membership";
-import { calculateWeekStartDate } from "../lib/weekDates";
+import { calculateWeekStartDate } from "../../lib/domain/week/weekDates";
 import { getWeeklyStartDayForUser } from "../users/weeklySettings";
 import { WeekSessionDomainError } from "../../lib/domain/weekSessions/rules";
 import {
