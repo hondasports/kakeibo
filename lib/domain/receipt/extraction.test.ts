@@ -67,6 +67,43 @@ function parse(payload: unknown) {
   return parseExtractionPayload(payload);
 }
 
+describe("parseExtractionPayload markers/taxMarker 互換", () => {
+  it("markers 欠損かつ taxMarker 非空の旧入力は markers に畳み込む", () => {
+    const payload = structuredClone(trialExtraction);
+    delete (payload.items[0] as Record<string, unknown>).markers;
+    payload.items[0].taxMarker = "※";
+    const result = parse(payload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.extracted.items?.[0].markers).toEqual(["※"]);
+      expect(result.extracted.items?.[0]).not.toHaveProperty("taxMarker");
+    }
+  });
+
+  it("markers 空配列かつ taxMarker 非空の旧入力も markers に畳み込む", () => {
+    const payload = structuredClone(trialExtraction);
+    payload.items[0].markers = [];
+    payload.items[0].taxMarker = "※";
+    const result = parse(payload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.extracted.items?.[0].markers).toEqual(["※"]);
+      expect(result.extracted.items?.[0]).not.toHaveProperty("taxMarker");
+    }
+  });
+
+  it("markers 非空なら taxMarker より markers を優先する", () => {
+    const payload = structuredClone(trialExtraction);
+    payload.items[0].markers = ["#"];
+    payload.items[0].taxMarker = "※";
+    const result = parse(payload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.extracted.items?.[0].markers).toEqual(["#"]);
+    }
+  });
+});
+
 describe("parseExtractionPayload domain", () => {
   it.each([EXPENSE_ENTRY_AMOUNT_MAX, -EXPENSE_ENTRY_AMOUNT_MAX])(
     "範囲内の符号付き明細金額 %s 円は保持する",

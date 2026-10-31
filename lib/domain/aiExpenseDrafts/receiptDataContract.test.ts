@@ -145,6 +145,31 @@ describe("snapshotReceiptDraftValues", () => {
     expect(result.items[0].warnings).toEqual(["w1"]);
     expect(result.receiptLineClassifications).toEqual([{ kind: "item" }]);
   });
+
+  it.each([undefined, []] as const)(
+    "markers %s かつ taxMarker 非空の既存明細は markers に畳み込み taxMarker を書かない",
+    (markers) => {
+      const result = snapshotReceiptDraftValues(
+        {
+          status: "needs_review",
+          documentType: "receipt",
+          confidence: {},
+        },
+        [
+          {
+            itemName: "商品A",
+            amountYen: 500,
+            markers,
+            taxMarker: "※",
+            confidence: {},
+            warnings: [],
+          },
+        ],
+      );
+      expect(result.items[0].markers).toEqual(["※"]);
+      expect(result.items[0]).not.toHaveProperty("taxMarker");
+    },
+  );
 });
 
 describe("buildReceiptUserOverride", () => {

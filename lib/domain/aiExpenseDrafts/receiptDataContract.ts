@@ -210,8 +210,11 @@ export function snapshotReceiptDraftValues<TCategoryId>(
       printedAmountYen: item.printedAmountYen,
       amountBasis: item.amountBasis,
       taxRatePercent: item.taxRatePercent,
-      markers: item.markers,
-      taxMarker: item.taxMarker,
+      markers: item.markers?.length
+        ? item.markers
+        : item.taxMarker
+          ? [item.taxMarker]
+          : item.markers,
       allocatedTaxYen: item.allocatedTaxYen,
       taxAllocationStatus: item.taxAllocationStatus,
       normalizedAmountYen: item.normalizedAmountYen,
