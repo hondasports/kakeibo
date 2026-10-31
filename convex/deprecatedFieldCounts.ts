@@ -1,9 +1,17 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalQuery } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 
 // Issue #1183: deprecated フィールド撤去の判断材料となる件数だけを返す。
 // 戻り値は件数のみで、ユーザー識別子・ドキュメント値は含めない。
+//
+// 使い方（convex run、cursor と carry は常にセットで渡す）:
+//   1. `convex run deprecatedFieldCounts:<table> '{}'`
+//   2. `continueCursor` が null になるまで
+//      `'{"cursor":"<前回のcontinueCursor>","carry":<前回のtotals>}'` で継続
+//   3. 最後の呼び出しの `totals` が全件の合算。`isDone: true` を確認する
+// cursor だけを渡すと途中ページの件数が消えて totals が最終 page のみに
+// なるため、片方だけの指定はエラーにする（fail-closed）。
 //
 // 各呼び出しは1 page 分だけを読む独立したトランザクションなので、
 // 走査の途中で書き込まれた行はカーソル位置によって計上されたり
@@ -18,6 +26,16 @@ const paged = (cursor: string | undefined) => ({
   cursor: cursor ?? null,
   numItems: BATCH_SIZE,
 });
+
+// cursor だけ継続に渡すと carry が未指定になり totals が最終 page の
+// 件数だけになる。先頭からやり直せば安全なので、片方欠落は拒否する。
+const assertCursorCarryPair = (cursor: string | undefined, carry: unknown) => {
+  if ((cursor === undefined) !== (carry === undefined)) {
+    throw new ConvexError(
+      "cursor と carry は両方指定するか両方省略すること（先頭から走査し直せば安全）",
+    );
+  }
+};
 
 // markers の read fallback は2種類ある:
 // - `markers ?? (taxMarker ? [taxMarker] : [])`（undefined のみ）
@@ -101,6 +119,7 @@ export const aiExpenseDraftItems = internalQuery({
     totals: v.object(itemTableCounts),
   }),
   handler: async (ctx: ReadCtx, args) => {
+    assertCursorCarryPair(args.cursor, args.carry);
     const page = await ctx.db.query("aiExpenseDraftItems").paginate(paged(args.cursor));
     const counts: ItemTableCounts = { scanned: 0, ...emptyItemCounts() };
     for (const item of page.page) {
@@ -147,6 +166,7 @@ export const aiExpenseDrafts = internalQuery({
     totals: v.object(draftCounts),
   }),
   handler: async (ctx: ReadCtx, args) => {
+    assertCursorCarryPair(args.cursor, args.carry);
     const page = await ctx.db.query("aiExpenseDrafts").paginate(paged(args.cursor));
     const counts: DraftCounts = {
       scanned: 0,
@@ -208,6 +228,7 @@ export const groupDeletionAuditMigrationRecords = internalQuery({
     totals: v.object(recordCounts),
   }),
   handler: async (ctx: ReadCtx, args) => {
+    assertCursorCarryPair(args.cursor, args.carry);
     const page = await ctx.db
       .query("groupDeletionAuditMigrationRecords")
       .paginate(paged(args.cursor));

@@ -264,4 +264,55 @@ describe("deprecatedFieldCounts", () => {
       failed: 1,
     });
   });
+
+  it("cursor と carry の片方だけの指定を拒否する（fail-closed）", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await insertGroup(t);
+    const draftId = await insertDraft(t, groupId, {});
+    await insertItem(t, groupId, draftId, { taxMarker: "※" });
+
+    const first = await t.query(internal.deprecatedFieldCounts.aiExpenseDraftItems, {});
+    // cursor だけの継続呼び出しは totals が最終 page だけになるため拒否する
+    await expect(
+      t.query(internal.deprecatedFieldCounts.aiExpenseDraftItems, {
+        cursor: first.continueCursor ?? "dummy-cursor",
+      }),
+    ).rejects.toThrow("cursor と carry は両方指定するか両方省略すること");
+    // 初回呼び出しに carry だけを渡すのも拒否する
+    await expect(
+      t.query(internal.deprecatedFieldCounts.aiExpenseDraftItems, {
+        carry: first.totals,
+      }),
+    ).rejects.toThrow("cursor と carry は両方指定するか両方省略すること");
+    await expect(
+      t.query(internal.deprecatedFieldCounts.aiExpenseDrafts, {
+        carry: {
+          scanned: 1,
+          missingReceiptDataContractVersion: 0,
+          withTaxSummaryCorrections: 0,
+          interpretation: {
+            missingPrintedAmountYen: 0,
+            missingLineType: 0,
+            missingMarkers: 0,
+            emptyMarkers: 0,
+            markersAbsentOrEmptyWithTaxMarker: 0,
+            withTaxMarker: 0,
+          },
+          userOverride: {
+            missingPrintedAmountYen: 0,
+            missingLineType: 0,
+            missingMarkers: 0,
+            emptyMarkers: 0,
+            markersAbsentOrEmptyWithTaxMarker: 0,
+            withTaxMarker: 0,
+          },
+        },
+      }),
+    ).rejects.toThrow("cursor と carry は両方指定するか両方省略すること");
+    await expect(
+      t.query(internal.deprecatedFieldCounts.groupDeletionAuditMigrationRecords, {
+        cursor: "dummy-cursor",
+      }),
+    ).rejects.toThrow("cursor と carry は両方指定するか両方省略すること");
+  });
 });
