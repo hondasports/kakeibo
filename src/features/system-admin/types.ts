@@ -4,6 +4,7 @@ import type {
   SystemAdminAuditActorType,
   SystemAdminAuditResult,
 } from "../../../lib/domain/systemAdmin/auditLog";
+import type { GroupLifecycleStatus } from "../../../lib/domain/groups/lifecycle";
 import type { SystemAdminStatus } from "../../../lib/domain/systemAdmin/systemAdminStore";
 import type { GroupMembershipStatus } from "../../../lib/domain/groups/role";
 export type { AppEnvironment, SystemAdminAuditAction, SystemAdminStatus };
@@ -21,7 +22,7 @@ export type UserSearchItem = {
 export type GroupSearchItem = {
   id: string;
   name: string;
-  status: "active" | "deleting" | "deleted" | "archived";
+  status: GroupLifecycleStatus;
   createdAt: number;
   updatedAt: number;
 };
