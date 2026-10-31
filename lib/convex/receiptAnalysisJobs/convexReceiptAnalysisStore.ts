@@ -1,9 +1,11 @@
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../../convex/_generated/server";
 import { deleteDraftAndItems } from "../aiExpenseDrafts/draftRepository";
+import { persistFailedDraft } from "../aiExpenseDrafts/createFromExtraction";
 import type {
   ReceiptAnalysisBatchRecord,
   ReceiptAnalysisJobRecord,
+  ReceiptAnalysisJobStatus,
 } from "../../domain/receiptAnalysisJobs/records";
 import type {
   ReceiptAnalysisReader,
@@ -103,6 +105,21 @@ async function listActiveJobsByGroup(
     .map(toJobRecord);
 }
 
+async function listJobsByStatusUpdatedBefore(
+  ctx: Pick<QueryCtx, "db">,
+  status: ReceiptAnalysisJobStatus,
+  updatedBefore: number,
+  limit: number,
+): Promise<ReceiptAnalysisJobRecord[]> {
+  const docs = await ctx.db
+    .query("receiptAnalysisImageJobs")
+    .withIndex("by_status_and_updated_at", (q) =>
+      q.eq("status", status).lt("updatedAt", updatedBefore),
+    )
+    .take(limit);
+  return docs.map(toJobRecord);
+}
+
 export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): ReceiptAnalysisStore {
   return {
     async getBatch(id) {
@@ -185,6 +202,8 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
       return docs.map(toJobRecord);
     },
     listActiveJobsByGroup: (groupId, limit) => listActiveJobsByGroup(ctx, groupId, limit),
+    listJobsByStatusUpdatedBefore: (status, updatedBefore, limit) =>
+      listJobsByStatusUpdatedBefore(ctx, status, updatedBefore, limit),
     async findJobByDraftId(draftId) {
       const doc = await ctx.db
         .query("receiptAnalysisImageJobs")
@@ -205,6 +224,19 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
     async getDraft(id) {
       const doc = await ctx.db.get(id as Id<"aiExpenseDrafts">);
       return doc === null ? null : { id: doc._id, status: doc.status, updatedAt: doc.updatedAt };
+    },
+    async insertFailedAnalysisDraft({ groupId, createdByUserId, imageFileName, warning }) {
+      const draft = await persistFailedDraft(
+        ctx,
+        {
+          // createdByUserId の無い旧 batch 由来の job でも失敗 draft は作る。
+          // 空文字は実ユーザーの tokenIdentifier と衝突しない。
+          userId: createdByUserId ?? "",
+          groupId: groupId as Id<"groups">,
+        },
+        { warning, imageFileName },
+      );
+      return draft._id;
     },
     deleteDraftAndItems: (draftId, groupId) =>
       deleteDraftAndItems(
@@ -242,6 +274,8 @@ export function createReceiptAnalysisReader(ctx: Pick<QueryCtx, "db">): ReceiptA
       return docs.map(toJobRecord);
     },
     listActiveJobsByGroup: (groupId, limit) => listActiveJobsByGroup(ctx, groupId, limit),
+    listJobsByStatusUpdatedBefore: (status, updatedBefore, limit) =>
+      listJobsByStatusUpdatedBefore(ctx, status, updatedBefore, limit),
     async findJobByDraftId(draftId) {
       const doc = await ctx.db
         .query("receiptAnalysisImageJobs")

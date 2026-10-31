@@ -98,8 +98,8 @@ async function persistExtractedDraft(
   return created;
 }
 
-async function persistFailedDraft(
-  ctx: MutationCtx,
+export async function persistFailedDraft(
+  ctx: Pick<MutationCtx, "db">,
   actor: ResolvedActor,
   args: CreateFailedDraftFromImageAnalysisArgs,
 ) {

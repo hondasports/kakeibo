@@ -1353,7 +1353,8 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `receiptAnalysisJobs.mutations.createBatch(input)`
 - `receiptAnalysisJobs.queries.listBatches()`
 - `receiptAnalysisJobs.queries.listJobsByBatch(batchId)`
-- `receiptAnalysisJobs.queries.getJobByDraftId(draftId)`
+- `receiptAnalysisJobs.queries.listActiveJobs()`
+- `receiptAnalysisJobs.queries.listJobsByDraftIds(draftIds)`
 - `receiptAnalysisJobs.actions.analyzeImageJob(jobId, imageDataUrl)`
 - `receiptAnalysisJobs.mutations.retryImageJob(jobId)`
 - `receiptAnalysisJobs.mutations.cancelImageJob(jobId)`
@@ -1372,6 +1373,30 @@ job の現状態を検査する。`retryImageJob` が `failed` / `needs_review` 
 
 `createBatch` は1回につき10枚まで受け付ける。上限は `lib/domain/receiptAnalysisJobs/rules.ts` の
 `MAX_RECEIPT_ANALYSIS_BATCH_FILES` で定義し、超過時は batch・job を作成せず拒否する。
+
+`running` または `queued` のまま `updatedAt` が `RECEIPT_ANALYSIS_STALE_JOB_MS`（45分）を
+超えた job は、起動元の action が実行上限（Convex runtime の action は30分）で既に
+止まっているか、action の呼び出し自体が届いていないとみなし、cron の
+`recoverStaleReceiptAnalysisJobs`（5分間隔）が `failed` に確定する。
+`queued` の待機は通常数秒で `startAttempt` が `running` へ進めるため、45分経っても
+`queued` の job は呼び出し不達または action 開始前の停止として安全に確定できる。
+1回の実行あたり最大 `RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE`（100件）まで処理し、
+`failed` への遷移は通常の `updateJobStatus` と同じ経路（終端通知の予約を含む）で行う。
+
+回復時は通常の解析失敗と同じ最終状態にそろえる。初回解析で止まった job（draftId なし）
+には失敗 draft を作成して job に紐づけ、再解析で止まった job（draftId あり）は既存
+draft をそのまま維持する。これにより回復した job はキュー一覧に「失敗」の項目として
+残り、既存の再試行導線（draft 項目から `useRetry` 経由）で処理できる。画像 dataUrl は
+クライアントのセッション状態にしかないため、セッションに残っていなければ再試行時に
+利用者が画像を選び直す。
+
+回復後に遅れて届いた解析結果は `finalizeAnalysisAttempt` が `running` 以外の job への
+書き込みを受理しないため破棄され、job は `failed` のまま利用者が再試行できる。
+
+既知の制限: action が draft 作成後・`finalizeAnalysisAttempt` 前に止まると、job に
+紐づかない結果 draft が残り得る（draft 側に起動元の jobId を持たないため検出できない）。
+再解析 job で起きると、回復→再試行の後に同じレシートの下書きが2件並び得る。
+根本対応は draft に起動元 jobId を持たせる schema 変更で、この変更の範囲外。
 
 `createBatch` 時に `receiptAnalysisBatches.createdByUserId` に実行ユーザーの `tokenIdentifier` を保存する。
 ジョブが `needs_review` など terminal 状態に更新されると、`updateJobStatus` は `aiReviewNotificationScheduledAt` を記録し、

@@ -606,7 +606,8 @@ export default defineSchema({
     .index("by_batch_id", ["batchId"])
     .index("by_group_id_and_status", ["groupId", "status", "createdAt"])
     .index("by_group_id_and_created_at", ["groupId", "createdAt"])
-    .index("by_draft_id", ["draftId"]),
+    .index("by_draft_id", ["draftId"])
+    .index("by_status_and_updated_at", ["status", "updatedAt"]),
 
   transactionalEmailJobs: defineTable({
     templateType: transactionalEmailTypeValidator,

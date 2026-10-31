@@ -40,6 +40,13 @@ crons.interval(
 );
 
 crons.interval(
+  "recover stale receipt analysis jobs",
+  { minutes: 5 },
+  internal.receiptAnalysisJobs.internal.recoverStaleReceiptAnalysisJobs,
+  {},
+);
+
+crons.interval(
   "cleanup LINE notification jobs",
   { hours: 24 },
   internal.notifications.cleanup.cleanupOldLineNotificationJobs,

@@ -17,6 +17,7 @@ import {
   finalizeReceiptAnalysisAttempt,
   finalizeReceiptAnalysisBatchStatus,
   incrementReceiptAnalysisBatchProcessedCount,
+  recoverStaleReceiptAnalysisJobs as recoverStaleJobs,
   scheduleAiReviewNotificationIfNeeded as scheduleNotification,
   updateReceiptAnalysisJobStatus,
 } from "../../lib/usecase/receiptAnalysisJobs/operations";
@@ -128,6 +129,10 @@ export async function deleteReceiptAnalysisDataByUserBatchHandler(
   return deleteUserDataBatch(createReceiptAnalysisMutationDeps(ctx).store, args);
 }
 
+export async function recoverStaleReceiptAnalysisJobsHandler(ctx: MutationCtx) {
+  return await recoverStaleJobs(createReceiptAnalysisMutationDeps(ctx));
+}
+
 const jobStatusValidator = v.union(
   ...RECEIPT_ANALYSIS_JOB_STATUSES.map((status) => v.literal(status)),
 );
@@ -188,4 +193,9 @@ export const deleteReceiptAnalysisDataByUserBatch = internalMutation({
     limit: v.optional(v.number()),
   },
   handler: deleteReceiptAnalysisDataByUserBatchHandler,
+});
+
+export const recoverStaleReceiptAnalysisJobs = internalMutation({
+  args: {},
+  handler: recoverStaleReceiptAnalysisJobsHandler,
 });
