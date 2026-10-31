@@ -1,17 +1,21 @@
-export type ReceiptAnalysisBatchStatus =
-  | "queued"
-  | "running"
-  | "partially_failed"
-  | "completed"
-  | "failed";
+export const RECEIPT_ANALYSIS_BATCH_STATUSES = [
+  "queued",
+  "running",
+  "partially_failed",
+  "completed",
+  "failed",
+] as const;
+export type ReceiptAnalysisBatchStatus = (typeof RECEIPT_ANALYSIS_BATCH_STATUSES)[number];
 
-export type ReceiptAnalysisJobStatus =
-  | "queued"
-  | "running"
-  | "ready"
-  | "needs_review"
-  | "failed"
-  | "cancelled";
+export const RECEIPT_ANALYSIS_JOB_STATUSES = [
+  "queued",
+  "running",
+  "ready",
+  "needs_review",
+  "failed",
+  "cancelled",
+] as const;
+export type ReceiptAnalysisJobStatus = (typeof RECEIPT_ANALYSIS_JOB_STATUSES)[number];
 
 export type ReceiptAnalysisBatchRecord = {
   id: string;

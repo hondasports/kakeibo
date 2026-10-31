@@ -1,13 +1,9 @@
-export const accountDeletionActiveStatuses = [
-  "requested",
-  "preparing_groups",
-  "purging_groups",
-  "deleting_identity",
-  "retry_wait",
-  "identity_deleted",
-  "finalization_retry_wait",
-  "failed",
-] as const;
+import { ACCOUNT_DELETION_REQUEST_STATUSES, type AccountDeletionRequestStatus } from "./request";
+
+export const accountDeletionActiveStatuses: readonly Exclude<
+  AccountDeletionRequestStatus,
+  "completed"
+>[] = ACCOUNT_DELETION_REQUEST_STATUSES.filter((status) => status !== "completed");
 
 export type AccountDeletionActiveStatus = (typeof accountDeletionActiveStatuses)[number];
 

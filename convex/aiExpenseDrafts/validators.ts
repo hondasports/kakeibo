@@ -284,7 +284,7 @@ export const receiptLineClassificationValidator = v.object({
   ),
 });
 
-export const receiptDraftItemSnapshotValidator = v.object({
+export const receiptDraftItemFields = {
   itemName: v.string(),
   lineType: v.optional(receiptItemLineTypeValidator),
   amountYen: v.number(),
@@ -299,13 +299,17 @@ export const receiptDraftItemSnapshotValidator = v.object({
   taxResolutionStatus: v.optional(taxResolutionStatusValidator),
   taxResolutionSource: v.optional(taxResolutionSourceValidator),
   taxReviewReasons: v.optional(v.array(v.string())),
-  taxConfirmedFields: v.optional(taxConfirmedFieldsValidator),
   quantity: v.optional(v.number()),
   unitPriceYen: v.optional(v.number()),
   categoryName: v.optional(v.string()),
   categoryId: v.optional(v.id("categories")),
   confidence: aiExpenseDraftItemConfidenceValidator,
   warnings: v.optional(v.array(v.string())),
+};
+
+export const receiptDraftItemSnapshotValidator = v.object({
+  ...receiptDraftItemFields,
+  taxConfirmedFields: v.optional(taxConfirmedFieldsValidator),
 });
 
 export const receiptDraftValueSnapshotValidator = v.object({

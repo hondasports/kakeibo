@@ -3,12 +3,28 @@ import { isValidAccountDeletionConfirmation } from "./confirmation";
 import { getAccountDeletionErrorCategory } from "./errorCategory";
 import { getAccountDeletionRetryDelay } from "./retry";
 import { resolveAccountDeletionResumeStatus } from "./resume";
-import { isActiveAccountDeletionStatus, isAccountDeletionFinalizableStatus } from "./status";
+import {
+  accountDeletionActiveStatuses,
+  isActiveAccountDeletionStatus,
+  isAccountDeletionFinalizableStatus,
+} from "./status";
 
 describe("isActiveAccountDeletionStatus", () => {
-  it("active なステータスを判定する", () => {
-    expect(isActiveAccountDeletionStatus("requested")).toBe(true);
-    expect(isActiveAccountDeletionStatus("failed")).toBe(true);
+  it("完了以外の各状態を active として列挙する", () => {
+    expect(accountDeletionActiveStatuses).toEqual([
+      "requested",
+      "preparing_groups",
+      "purging_groups",
+      "deleting_identity",
+      "retry_wait",
+      "identity_deleted",
+      "finalization_retry_wait",
+      "failed",
+    ]);
+    for (const status of accountDeletionActiveStatuses) {
+      expect(isActiveAccountDeletionStatus(status)).toBe(true);
+    }
+    expect(isActiveAccountDeletionStatus("unknown")).toBe(false);
   });
 
   it("完了は active でない", () => {

@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { RECEIPT_ANALYSIS_JOB_STATUSES } from "../../lib/domain/receiptAnalysisJobs/records";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
@@ -124,12 +125,7 @@ export async function deleteReceiptAnalysisDataByUserBatchHandler(
 }
 
 const jobStatusValidator = v.union(
-  v.literal("queued"),
-  v.literal("running"),
-  v.literal("ready"),
-  v.literal("needs_review"),
-  v.literal("failed"),
-  v.literal("cancelled"),
+  ...RECEIPT_ANALYSIS_JOB_STATUSES.map((status) => v.literal(status)),
 );
 
 export const updateJobStatus = internalMutation({
