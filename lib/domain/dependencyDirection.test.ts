@@ -13,6 +13,7 @@ const DOMAIN_ROOT = join(REPO_ROOT, "lib", "domain");
 const CONVEX_DIRS = [join(REPO_ROOT, "convex"), join(REPO_ROOT, "lib", "convex")];
 
 const TEST_ONLY_FILE = /(?:\.test\.|testHelpers\.ts$|\/fixtures\/)/;
+const SCANNED_FILE = /\.(?:ts|tsx|mts|cts)$/;
 const IMPORT_SPECIFIER =
   /from\s+["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)|import\s+["']([^"']+)["']/g;
 
@@ -26,7 +27,7 @@ function isConvexReference(filePath: string, specifier: string): boolean {
 function collectViolations(): string[] {
   const violations: string[] = [];
   for (const entry of readdirSync(DOMAIN_ROOT, { recursive: true })) {
-    if (!entry.endsWith(".ts") || TEST_ONLY_FILE.test(entry)) continue;
+    if (!SCANNED_FILE.test(entry) || TEST_ONLY_FILE.test(entry)) continue;
     const filePath = join(DOMAIN_ROOT, entry);
     if (!statSync(filePath).isFile()) continue;
     for (const match of readFileSync(filePath, "utf8").matchAll(IMPORT_SPECIFIER)) {
