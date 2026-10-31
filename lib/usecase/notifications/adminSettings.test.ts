@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { listNotificationSettings, updateNotificationSetting } from "./adminSettings";
+import type { SystemAdminStatus } from "../../domain/systemAdmin/systemAdminStore";
 
 const ADMIN_TOKEN = "admin-token";
 
@@ -7,7 +8,7 @@ function makeDeps({
   adminStatus = "active",
   settings = [],
 }: {
-  adminStatus?: "active" | "revoked" | null;
+  adminStatus?: SystemAdminStatus | null;
   settings?: {
     id: string;
     type: string;

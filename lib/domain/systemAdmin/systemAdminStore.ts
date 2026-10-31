@@ -6,7 +6,11 @@ import type { PaginatedResult, PaginationOpts } from "../pagination";
 
 export type { PaginatedResult, PaginationOpts } from "../pagination";
 
-export type SystemAdminStatus = "active" | "revoked";
+/** systemAdmins.status の全値。schema・API validator はこの並び（active → revoked）に合わせる。 */
+export const SYSTEM_ADMIN_STATUSES = ["active", "revoked"] as const;
+
+/** systemAdmins レコードの状態。 */
+export type SystemAdminStatus = (typeof SYSTEM_ADMIN_STATUSES)[number];
 
 /** systemAdmins ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
 export type SystemAdminFields = {

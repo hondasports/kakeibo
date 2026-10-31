@@ -8,7 +8,14 @@ import { GROUP_LIFECYCLE_STATUSES } from "../lib/domain/groups/lifecycle";
 import { GROUP_INVITATION_STATUSES } from "../lib/domain/groups/groupInvitation";
 import { GROUP_MEMBERSHIP_STATUSES, GROUP_ROLES } from "../lib/domain/groups/role";
 import { LINE_NOTIFICATION_EVENT_OUTCOMES } from "../lib/domain/notifications/records";
-import { systemAdminAuditActionValidator } from "../lib/convex/systemAdmin/validators";
+import {
+  systemAdminAuditActionValidator,
+  systemAdminAuditActorTypeValidator,
+  systemAdminAuditResultValidator,
+  systemAdminAuditTargetKindValidator,
+  systemAdminNotificationActionValidator,
+  systemAdminStatusValidator,
+} from "../lib/convex/systemAdmin/validators";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
@@ -228,7 +235,7 @@ export default defineSchema({
 
   systemAdmins: defineTable({
     userId: v.id("users"),
-    status: v.union(v.literal("active"), v.literal("revoked")),
+    status: systemAdminStatusValidator,
     createdAt: v.number(),
     updatedAt: v.number(),
     grantedAt: v.number(),
@@ -243,15 +250,9 @@ export default defineSchema({
 
   systemAdminAuditLogs: defineTable({
     action: systemAdminAuditActionValidator,
-    actorType: v.union(v.literal("system"), v.literal("system_admin")),
+    actorType: systemAdminAuditActorTypeValidator,
     actorUserId: v.optional(v.id("users")),
-    targetKind: v.union(
-      v.literal("system_admin"),
-      v.literal("user"),
-      v.literal("group"),
-      v.literal("invitation"),
-      v.literal("notification_setting"),
-    ),
+    targetKind: systemAdminAuditTargetKindValidator,
     targetUserId: v.optional(v.id("users")),
     targetDisplayNameSnapshot: v.optional(v.string()),
     sourceUserId: v.optional(v.id("users")),
@@ -261,8 +262,8 @@ export default defineSchema({
     queryType: v.optional(v.string()),
     queryHash: v.optional(v.string()),
     resultCount: v.optional(v.number()),
-    previousStatus: v.optional(v.union(v.literal("active"), v.literal("revoked"))),
-    newStatus: v.optional(v.union(v.literal("active"), v.literal("revoked"))),
+    previousStatus: v.optional(systemAdminStatusValidator),
+    newStatus: v.optional(systemAdminStatusValidator),
     sourceGroupId: v.optional(v.id("groups")),
     sourceGroupNameSnapshot: v.optional(v.string()),
     targetGroupId: v.optional(v.id("groups")),
@@ -279,7 +280,7 @@ export default defineSchema({
     afterOwnerCount: v.optional(v.number()),
     beforeNotificationEnabled: v.optional(v.boolean()),
     afterNotificationEnabled: v.optional(v.boolean()),
-    result: v.optional(v.union(v.literal("success"), v.literal("denied"))),
+    result: v.optional(systemAdminAuditResultValidator),
     createdAt: v.number(),
   })
     .index("by_source_group_id_and_target_user_id_and_action_and_result", [
@@ -308,15 +309,7 @@ export default defineSchema({
     .index("by_target_kind_and_target_id_and_created_at", ["targetKind", "targetId", "createdAt"]),
 
   systemAdminNotifications: defineTable({
-    action: v.union(
-      v.literal("system_admin_granted"),
-      v.literal("system_admin_revoked"),
-      v.literal("system_admin_recovered"),
-      v.literal("system_admin_bootstrapped"),
-      v.literal("system_admin_membership_changed"),
-      v.literal("system_admin_ownerless_group_recovered"),
-      v.literal("system_admin_group_invitation_revoked"),
-    ),
+    action: systemAdminNotificationActionValidator,
     recipientUserId: v.optional(v.id("users")),
     recipientEmail: v.optional(v.string()),
     targetUserId: v.optional(v.id("users")),
