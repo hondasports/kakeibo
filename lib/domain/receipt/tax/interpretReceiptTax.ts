@@ -9,13 +9,8 @@ import type { ExtractedTaxSummary, ReceiptTaxInput, ReceiptTaxInterpretation } f
 import { validateConsistency } from "./validateConsistency";
 
 export function interpretReceiptTax(input: ReceiptTaxInput): ReceiptTaxInterpretation {
-  const normalizedInput = {
-    ...input,
-    items: input.items.map((item) => ({
-      ...item,
-      markers: item.markers.length > 0 ? item.markers : item.taxMarker ? [item.taxMarker] : [],
-    })),
-  };
+  // markers への旧形式畳み込みは入力側（parser・永続 read の fold）で済むためここでは正規化しない
+  const normalizedInput = { ...input };
   const reconciliation = reconcileTaxSummaries(normalizedInput);
   const receiptTotalResolution = resolveReceiptTotal({
     amountYen: input.amountYen,

@@ -114,8 +114,6 @@ export type ExtractedReceiptItem = {
   taxRatePercent: TaxRatePercent | null;
   amountBasis: AmountBasis;
   markers: string[];
-  /** @deprecated 既存の抽出・保存形式との互換用。 */
-  taxMarker?: string;
   categoryName?: string;
   quantity?: number;
   unitPriceYen?: number;
