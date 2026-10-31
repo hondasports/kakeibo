@@ -7,8 +7,10 @@ export const MAX_SEARCH_QUERY_LENGTH = 200;
 export const MAX_SEARCH_PAGE_SIZE = 100;
 export const DETAIL_LIST_LIMIT = 50;
 
-export type UserSearchType = "displayName" | "email" | "userId";
-export type GroupSearchType = "name" | "groupId";
+export const USER_SEARCH_TYPES = ["displayName", "email", "userId"] as const;
+export const GROUP_SEARCH_TYPES = ["name", "groupId"] as const;
+export type UserSearchType = (typeof USER_SEARCH_TYPES)[number];
+export type GroupSearchType = (typeof GROUP_SEARCH_TYPES)[number];
 export type SearchAuditQueryType =
   | "user_display_name"
   | "user_email"

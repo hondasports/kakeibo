@@ -1,5 +1,6 @@
 import type { AppEnvironment } from "../../../lib/domain/systemAdmin/environment";
 import type { SystemAdminAuditAction } from "../../../lib/domain/systemAdmin/auditLog";
+import type { GroupLifecycleStatus } from "../../../lib/domain/groups/lifecycle";
 import type { GroupMembershipStatus } from "../../../lib/domain/groups/role";
 export type { AppEnvironment, SystemAdminAuditAction };
 
@@ -16,7 +17,7 @@ export type UserSearchItem = {
 export type GroupSearchItem = {
   id: string;
   name: string;
-  status: "active" | "deleting" | "deleted" | "archived";
+  status: GroupLifecycleStatus;
   createdAt: number;
   updatedAt: number;
 };

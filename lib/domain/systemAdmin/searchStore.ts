@@ -9,9 +9,6 @@ import type { GroupMemberRecord } from "../groups/groupMember";
 import type { GroupRecord } from "../groups/group";
 import type { GroupInvitationRecord } from "../groups/groupInvitation";
 
-export type UserSearchType = "displayName" | "email" | "userId";
-export type GroupSearchType = "name" | "groupId";
-
 export interface SystemAdminSearchStore {
   /** users を createdAt 降順でページネーションする（検索語なし）。 */
   paginateUsersByCreatedAt(opts: PaginationOpts): Promise<PaginatedResult<GroupUserRecord>>;

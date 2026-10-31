@@ -3,9 +3,9 @@ import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { SystemAdminAction } from "../components/SystemAdminActionDialog";
 import type { SystemAdminListItem, UserSearchItem } from "../types";
+import type { UserSearchType } from "../../../../lib/domain/systemAdmin/searchQuery";
 
 export type StatusFilter = "active" | "revoked";
-export type SearchType = "displayName" | "email" | "userId";
 
 type ManagementContext = {
   status: string;
@@ -17,7 +17,7 @@ export function useSystemAdminManagement() {
   const context = useQuery(api.systemAdmins.getMySystemAdminContext, {}) as ManagementContext;
   const [statusFilter, setStatusFilterState] = useState<StatusFilter>("active");
   const [cursor, setCursor] = useState<string | null>(null);
-  const [searchType, setSearchType] = useState<SearchType>("displayName");
+  const [searchType, setSearchType] = useState<UserSearchType>("displayName");
   const [searchQuery, setSearchQuery] = useState("");
   const [candidates, setCandidates] = useState<UserSearchItem[]>([]);
   const [hasSearched, setHasSearched] = useState(false);

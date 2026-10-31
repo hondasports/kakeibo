@@ -16,18 +16,9 @@ import {
   normalizeSystemAdminReason,
 } from "../../../../lib/domain/systemAdmin/reason";
 import type { GroupRole } from "../../../../lib/domain/groups/role";
+import type { MembershipOperation } from "../../../../lib/domain/systemAdmin/membershipOperation";
 
-export type SystemAdminMembershipOperation =
-  | "add"
-  | "remove"
-  | "transfer"
-  | "set_active"
-  | "clear_active";
-
-export type SystemAdminRoleOperation =
-  | SystemAdminMembershipOperation
-  | "role_change"
-  | "owner_transfer";
+export type SystemAdminRoleOperation = MembershipOperation | "role_change" | "owner_transfer";
 
 export type MembershipDialogGroup = { id: string; name: string; status?: string };
 
