@@ -1,4 +1,3 @@
-import { ConvexError } from "convex/values";
 import { api, internal } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { ActionCtx } from "../../../convex/_generated/server";
@@ -136,9 +135,4 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
       });
     },
   };
-}
-
-export function asConvexError(error: unknown): never {
-  if (error instanceof ConvexError) throw error;
-  throw new ConvexError(error instanceof Error ? error.message : "Unknown error");
 }

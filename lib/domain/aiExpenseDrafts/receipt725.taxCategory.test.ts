@@ -5,7 +5,7 @@ import { mapExtractionToDraftArgs } from "./extractionMapping";
 import { prepareReceiptItemEvidence } from "./receiptItemEvidence";
 import { categories, item, Row, observations, map, check } from "./testHelpers";
 
-describe("725 production receipt regressions (tax and categories)", () => {
+describe("税サマリの補完とカテゴリ・連結名の扱いは観測された証拠に従う（receipt 725）", () => {
   it("recovers a missing tax rate without duplicating or overwriting supplied tax summaries", () => {
     const rawObservations = observations([
       ["食品 ¥100", 100, "¥100"],
@@ -83,7 +83,7 @@ describe("725 production receipt regressions (tax and categories)", () => {
     expect(result.rawObservationLines![1].lineRoleCandidates).toEqual(["unknown"]);
   });
 
-  it("715 keeps six products, not a merged seventh candidate", () => {
+  it("連結候補を外し、観測行の6商品を保持する（item 715）", () => {
     const names = [
       "コカ・コーラゼロカフェ",
       "内ヒキャメル・メンソール・2コ×単530",

@@ -105,9 +105,11 @@ describe("デフォルトカテゴリのseedバージョン", () => {
 
   it("seedが途中で失敗したらバージョンを更新しない", async () => {
     const ctx = createSeedCtx();
-    vi.mocked(ctx.db.insert).mockRejectedValueOnce(new Error("seed failed"));
+    const seedError = new Error("seed failed");
+    vi.mocked(ctx.db.insert).mockRejectedValueOnce(seedError);
 
-    await expect(seedDefaultCategoriesHandler(ctx)).rejects.toMatchObject({ data: "seed failed" });
+    // 予期しないエラーは ConvexError に包まれず再送出される
+    await expect(seedDefaultCategoriesHandler(ctx)).rejects.toBe(seedError);
 
     expect(ctx.db.patch).not.toHaveBeenCalled();
   });

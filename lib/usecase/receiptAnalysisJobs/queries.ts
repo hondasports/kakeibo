@@ -1,4 +1,5 @@
 import type { ReceiptAnalysisReader } from "../../domain/receiptAnalysisJobs/store";
+import { ReceiptAnalysisJobDomainError } from "../../domain/receiptAnalysisJobs/rules";
 
 export const listReceiptAnalysisBatches = (reader: ReceiptAnalysisReader, groupId: string) =>
   reader.listBatchesByGroup(groupId, 50);
@@ -12,7 +13,8 @@ export async function listReceiptAnalysisJobsByBatch(
   batchId: string,
 ) {
   const batch = await reader.getBatch(batchId);
-  if (!batch || batch.groupId !== groupId) throw new Error("Batch not found");
+  if (!batch || batch.groupId !== groupId)
+    throw new ReceiptAnalysisJobDomainError("Batch not found");
   return reader.listJobsByBatch(batchId);
 }
 

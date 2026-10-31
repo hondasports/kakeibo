@@ -13,6 +13,7 @@ import {
 } from "./internal";
 import { cancelImageJobHandler, createBatchHandler, retryImageJobHandler } from "./mutations";
 import { listBatchesHandler, listJobsByBatchHandler } from "./queries";
+import { MAX_RECEIPT_ANALYSIS_BATCH_FILES } from "../../lib/domain/receiptAnalysisJobs/rules";
 import {
   GROUP_ID,
   createIdentity,
@@ -52,6 +53,42 @@ describe("createBatchHandler", () => {
       "receiptAnalysisBatches",
       expect.objectContaining({ createdByUserId: identity.tokenIdentifier }),
     );
+  });
+
+  it("上限10件の fileNames は batch と jobs を全件作成する", async () => {
+    const insertedIds = [
+      "new-batch-id",
+      ...Array.from(
+        { length: MAX_RECEIPT_ANALYSIS_BATCH_FILES },
+        (_, index) => `new-job-id-${index}`,
+      ),
+    ];
+    const docs = Object.fromEntries(insertedIds.map((id) => [id, { _id: id, groupId: GROUP_ID }]));
+    const ctx = createMutationCtx(createIdentity(), { insertedIds, docs });
+
+    const result = await createBatchHandler(ctx, {
+      fileNames: Array.from(
+        { length: MAX_RECEIPT_ANALYSIS_BATCH_FILES },
+        (_, index) => `receipt-${index}.png`,
+      ),
+    });
+
+    expect(result.jobs).toHaveLength(MAX_RECEIPT_ANALYSIS_BATCH_FILES);
+    expect(ctx.db.insert).toHaveBeenCalledTimes(MAX_RECEIPT_ANALYSIS_BATCH_FILES + 1);
+  });
+
+  it("上限を超える11件はドメインエラーとして ConvexError で拒否し何も作らない", async () => {
+    const ctx = createMutationCtx(createIdentity());
+
+    await expect(
+      createBatchHandler(ctx, {
+        fileNames: Array.from(
+          { length: MAX_RECEIPT_ANALYSIS_BATCH_FILES + 1 },
+          (_, index) => `receipt-${index}.png`,
+        ),
+      }),
+    ).rejects.toMatchObject({ data: "一度に解析できるのは10枚までです" });
+    expect(ctx.db.insert).not.toHaveBeenCalled();
   });
 });
 
@@ -153,6 +190,30 @@ describe("retryImageJobHandler", () => {
       retryImageJobHandler(ctx, { jobId: "job-1" as Id<"receiptAnalysisImageJobs"> }),
     ).rejects.toThrow("Only failed or needs_review jobs can be retried");
     expect(ctx.db.patch).not.toHaveBeenCalled();
+  });
+
+  it("retry 不可の拒否はドメインエラーとして ConvexError で返す", async () => {
+    const ctx = createMutationCtx(createIdentity(), {
+      docs: {
+        "job-1": { groupId: GROUP_ID, status: "ready" },
+      },
+    });
+
+    await expect(
+      retryImageJobHandler(ctx, { jobId: "job-1" as Id<"receiptAnalysisImageJobs"> }),
+    ).rejects.toMatchObject({
+      data: "Only failed or needs_review jobs can be retried",
+    });
+  });
+
+  it("予期しないエラーは ConvexError に包まず再送出する", async () => {
+    const unexpected = new TypeError("db connection lost");
+    const ctx = createMutationCtx(createIdentity());
+    vi.mocked(ctx.db.get).mockResolvedValueOnce(null).mockRejectedValueOnce(unexpected);
+
+    await expect(
+      retryImageJobHandler(ctx, { jobId: "job-1" as Id<"receiptAnalysisImageJobs"> }),
+    ).rejects.toBe(unexpected);
   });
 });
 
@@ -353,6 +414,31 @@ describe("updateJobStatusHandler", () => {
     expect(result).toEqual({ applied: false });
     expect(ctx.db.patch).not.toHaveBeenCalled();
   });
+
+  it.each(["ready", "running", "failed", "needs_review", "cancelled"] as const)(
+    "status:%s の job は running に戻さない",
+    async (status) => {
+      const ctx = createMutationCtx(createIdentity(), {
+        docs: {
+          "job-1": {
+            _id: "job-1",
+            groupId: GROUP_ID,
+            batchId: "batch-1",
+            status,
+          },
+        },
+      });
+
+      const result = await updateJobStatusHandler(ctx, {
+        jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
+        status: "running",
+        expectedDraftId: null,
+      });
+
+      expect(result).toEqual({ applied: false });
+      expect(ctx.db.patch).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("finalizeAnalysisAttemptHandler", () => {

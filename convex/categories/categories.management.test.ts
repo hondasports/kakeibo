@@ -167,6 +167,36 @@ describe("category management", () => {
     ).rejects.toMatchObject({ data: "Category description must be 200 characters or fewer" });
   });
 
+  it("createCategory は不正な名前を ConvexError で拒否する", async () => {
+    const ctx = createMutationCtx(identityOwner, [activeCategory], groupMemberOwner);
+
+    await expect(
+      createCategoryHandler(ctx, {
+        name: "   ",
+        color: "#AAB7C4",
+      }),
+    ).rejects.toMatchObject({ data: "Category name is required" });
+  });
+
+  it("createCategory は予期しないエラーを ConvexError に包まず再送出する", async () => {
+    const unexpected = new TypeError("db connection lost");
+    const ctx = createMutationCtx(identityOwner, [activeCategory], groupMemberOwner);
+    const originalQuery = vi.mocked(ctx.db.query).getMockImplementation();
+    vi.mocked(ctx.db.query)
+      .mockImplementationOnce(originalQuery)
+      .mockImplementationOnce(originalQuery)
+      .mockImplementationOnce(() => {
+        throw unexpected;
+      });
+
+    await expect(
+      createCategoryHandler(ctx, {
+        name: "ペット用品",
+        color: "#AAB7C4",
+      }),
+    ).rejects.toBe(unexpected);
+  });
+
   it("createCategory はカテゴリが100件以上ある場合は拒否する", async () => {
     const existingDocs: CategoryDoc[] = Array.from({ length: 100 }, (_, index) => ({
       ...activeCategory,

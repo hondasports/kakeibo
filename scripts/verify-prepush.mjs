@@ -9,7 +9,7 @@
  * 検証順（先に失敗した時点で停止）:
  *   1. 型: tsc -b
  *   2. lint / format: pnpm run lint / pnpm run format:check
- *   3. unit: vitest related --run <変更ファイル> と --include のunitテスト
+ *   3. unit: vitest related --run <変更ファイル + unit-related-map.json で引いたfs依存テスト> と --include のunitテスト
  *   4. E2E: pnpm run e2e:isolated -- <select-e2e-specsの選定spec + --include>
  *
  * これはマージ判定材料ではない（判定はCIのcheckが正本）。
@@ -24,7 +24,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { isMetadataOnlyPath, normalizeChangedPath } from "./classify-e2e-relevance.mjs";
 import { parseEnvFile } from "./sync-e2e-env.mjs";
-import { selectSpecs } from "./select-e2e-specs.mjs";
+import { globToRegExp, selectSpecs } from "./select-e2e-specs.mjs";
 import { e2ePortChecks, resolveE2EPorts } from "./lib/isolated-e2e-ports.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -109,6 +109,37 @@ export function unitRelatedTargets(
         !file.endsWith(".json") &&
         exists(file),
     );
+}
+
+const UNIT_RELATED_MAP_PATH = "scripts/unit-related-map.json";
+
+/**
+ * unit関連mapを読む。テストがimportせずfsで読むrepo内ファイルを、それを検査する
+ * テストへ対応づける。無ければ空map（mapは任意の追加知識）。
+ */
+export function loadUnitRelatedMap(cwd = repoRoot) {
+  const mapPath = path.join(cwd, UNIT_RELATED_MAP_PATH);
+  return existsSync(mapPath) ? JSON.parse(readFileSync(mapPath, "utf8")) : {};
+}
+
+/**
+ * unit関連mapに当たる変更ファイルから、importグラフに乗らない依存テストを引く。
+ * .md/.json等 unitRelatedTargets から外れる変更でもmapヒットすれば対象にする。
+ */
+export function unitMappedTests(changedFiles, map) {
+  const tests = new Set();
+  const compiled = Object.keys(map)
+    .filter((key) => !key.startsWith("$"))
+    .map((pattern) => [globToRegExp(pattern), pattern]);
+  for (const file of changedFiles) {
+    const normalized = normalizeChangedPath(file);
+    for (const [re, pattern] of compiled) {
+      if (re.test(normalized)) {
+        for (const test of map[pattern]) tests.add(test);
+      }
+    }
+  }
+  return [...tests].sort();
 }
 
 /* -------------------------------------------------------------- preflight */
@@ -263,7 +294,7 @@ function defaultRunStep(command, args, cwd, logFile, env) {
   return out.status ?? 1;
 }
 
-function buildSteps({ changedFiles, selection, includes }) {
+function buildSteps({ changedFiles, selection, includes, cwd = repoRoot, unitMap = {} }) {
   const steps = [
     {
       id: "typecheck",
@@ -287,14 +318,18 @@ function buildSteps({ changedFiles, selection, includes }) {
       rerun: "pnpm run format:check",
     },
   ];
-  const related = unitRelatedTargets(changedFiles);
-  if (related.length > 0) {
+  const exists = (p) => existsSync(path.join(cwd, p));
+  const related = unitRelatedTargets(changedFiles, { exists });
+  // importグラフに乗らないfs依存はmap経由でテスト自身をrelated対象に加える
+  const mapped = unitMappedTests(changedFiles, unitMap).filter(exists);
+  const unitTargets = [...new Set([...related, ...mapped])];
+  if (unitTargets.length > 0) {
     steps.push({
       id: "unit-related",
-      label: `unit (vitest related, ${related.length} files)`,
+      label: `unit (vitest related, ${unitTargets.length} files)`,
       command: "pnpm",
-      args: ["exec", "vitest", "related", "--run", "--passWithNoTests", ...related],
-      rerun: `pnpm exec vitest related --run --passWithNoTests ${related.join(" ")}`,
+      args: ["exec", "vitest", "related", "--run", "--passWithNoTests", ...unitTargets],
+      rerun: `pnpm exec vitest related --run --passWithNoTests ${unitTargets.join(" ")}`,
     });
   }
   if (includes.unitTests.length > 0) {
@@ -395,7 +430,13 @@ export async function runPrepush({
     includeSpecs: includes.e2eSpecs,
     cwd,
   });
-  const steps = buildSteps({ changedFiles, selection, includes });
+  const steps = buildSteps({
+    changedFiles,
+    selection,
+    includes,
+    cwd,
+    unitMap: loadUnitRelatedMap(cwd),
+  });
   // unmappedはE2E実行前に必ず出す（step失敗時にも情報が残るように）
   if (selection.unmapped.length > 0) {
     out(

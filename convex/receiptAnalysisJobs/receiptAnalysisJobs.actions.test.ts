@@ -176,7 +176,7 @@ describe("analyzeImageJobHandler", () => {
         _id: "job-retry",
         groupId: GROUP_ID,
         batchId: "batch-1",
-        status: "failed",
+        status: "queued",
         draftId: "draft-old",
       } as Doc<"receiptAnalysisImageJobs">;
       const oldDraft = {
@@ -232,7 +232,7 @@ describe("analyzeImageJobHandler", () => {
         _id: "job-retry",
         groupId: GROUP_ID,
         batchId: "batch-1",
-        status: "failed",
+        status: "queued",
         draftId: "draft-old",
       } as Doc<"receiptAnalysisImageJobs">;
       const oldDraft = {
@@ -293,7 +293,7 @@ describe("analyzeImageJobHandler", () => {
         _id: "job-retry",
         groupId: GROUP_ID,
         batchId: "batch-1",
-        status: "failed",
+        status: "queued",
         draftId: "draft-old",
       } as Doc<"receiptAnalysisImageJobs">;
       const oldDraft = {
@@ -364,6 +364,71 @@ describe("analyzeImageJobHandler", () => {
       ).rejects.toThrow("Job not found");
 
       expect(ctx.runMutation).not.toHaveBeenCalled();
+    });
+  });
+
+  it.each(["ready", "running", "failed", "needs_review", "cancelled"] as const)(
+    "status:%s の job は解析せず終了する",
+    async (status) => {
+      await withEnv({ RECEIPT_IMAGE_EXTRACTOR_MODE: "mock", APP_ENV: "development" }, async () => {
+        const jobDoc = {
+          _id: "job-1",
+          groupId: GROUP_ID,
+          batchId: "batch-1",
+          status,
+        } as Doc<"receiptAnalysisImageJobs">;
+        const ctx = createActionCtx(createIdentity());
+        ctx.runQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ hasAcceptedExternalApiConsent: true })
+          .mockResolvedValueOnce({ _id: GROUP_ID })
+          .mockResolvedValueOnce(jobDoc);
+        ctx.runMutation = vi.fn();
+
+        await analyzeImageJobHandler(ctx, {
+          jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
+          imageDataUrl: VALID_IMAGE_DATA_URL,
+        });
+
+        expect(ctx.runMutation).not.toHaveBeenCalled();
+      });
+    },
+  );
+
+  it("存在しない jobId は Job not found を返す", async () => {
+    await withEnv({ RECEIPT_IMAGE_EXTRACTOR_MODE: "mock", APP_ENV: "development" }, async () => {
+      const ctx = createActionCtx(createIdentity());
+      ctx.runQuery = vi
+        .fn()
+        .mockResolvedValueOnce({ hasAcceptedExternalApiConsent: true })
+        .mockResolvedValueOnce({ _id: GROUP_ID })
+        .mockRejectedValueOnce(new ConvexError("Job not found"));
+
+      await expect(
+        analyzeImageJobHandler(ctx, {
+          jobId: "missing" as Id<"receiptAnalysisImageJobs">,
+          imageDataUrl: VALID_IMAGE_DATA_URL,
+        }),
+      ).rejects.toMatchObject({ data: "Job not found" });
+    });
+  });
+
+  it("予期しないエラーは ConvexError に包まず再送出する", async () => {
+    await withEnv({ RECEIPT_IMAGE_EXTRACTOR_MODE: "mock", APP_ENV: "development" }, async () => {
+      const unexpected = new TypeError("Cannot read properties of null");
+      const ctx = createActionCtx(createIdentity());
+      ctx.runQuery = vi
+        .fn()
+        .mockResolvedValueOnce({ hasAcceptedExternalApiConsent: true })
+        .mockResolvedValueOnce({ _id: GROUP_ID })
+        .mockRejectedValueOnce(unexpected);
+
+      await expect(
+        analyzeImageJobHandler(ctx, {
+          jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
+          imageDataUrl: VALID_IMAGE_DATA_URL,
+        }),
+      ).rejects.toBe(unexpected);
     });
   });
 });

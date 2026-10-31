@@ -9,6 +9,7 @@ import {
   portBusy,
   runPrepush,
   sanitizeHookEnv,
+  unitMappedTests,
   unitRelatedTargets,
 } from "./verify-prepush.mjs";
 
@@ -89,6 +90,23 @@ describe("unitRelatedTargets", () => {
   });
 });
 
+describe("unitMappedTests", () => {
+  const map = {
+    $comment: "map説明は対象外",
+    "docs/line/*.png": ["lib/a.test.ts", "convex/b.test.ts"],
+    "assets/**": ["lib/a.test.ts"],
+  };
+  test("globに当たる変更ファイルから対応テストを引く（$キー無視・重複排除・ソート）", () => {
+    expect(unitMappedTests(["docs/line/menu.png", "assets/x.png"], map)).toEqual([
+      "convex/b.test.ts",
+      "lib/a.test.ts",
+    ]);
+  });
+  test("当たらない変更は空", () => {
+    expect(unitMappedTests(["src/app.ts"], map)).toEqual([]);
+  });
+});
+
 describe("runPrepush", () => {
   test("rejects invalid ports before preflight or commands", async () => {
     let called = false;
@@ -143,7 +161,7 @@ describe("runPrepush", () => {
       expect(call.env.GIT_DIR).toBeUndefined();
     }
   });
-  test("AC2: docsのみなら unit/e2eなしで数秒（3ステップのみ）", async () => {
+  test("AC2: docsのみならe2eなし。unitはfs依存mapに当たるテストだけ", async () => {
     const { lines, out } = collectOut();
     const calls = [];
     const code = await runPrepush({
@@ -159,8 +177,10 @@ describe("runPrepush", () => {
       out,
     });
     expect(code).toBe(0);
-    expect(calls.length).toBe(3); // typecheck, lint, format
-    expect(calls.map((c) => c.args[1] ?? c.args[0])).not.toContain("vitest");
+    expect(calls.some((c) => c.args.includes("e2e:isolated"))).toBe(false);
+    const unitCalls = calls.filter((c) => c.args.includes("vitest")).map((c) => c.args.join(" "));
+    expect(unitCalls).toHaveLength(1);
+    expect(unitCalls[0]).toContain("skills/skills.test.mjs");
     expect(lines.join("\n")).toContain("PASS");
   });
 
@@ -321,6 +341,77 @@ describe("runPrepush", () => {
       out: () => {},
     });
     expect(code3).toBe(1);
+  });
+
+  test("fsで読むファイルの変更はmap経由でそのテストをrelated対象にする", async () => {
+    const calls = [];
+    const code = await runPrepush({
+      argv: [],
+      cwd: repoRoot,
+      changedFilesOverride: ["docs/line/rich-menu-readonly-summary.png"],
+      runStep: (cmd, args, cwd, log) => {
+        calls.push(args.join(" "));
+        writeFileSync(log, "x");
+        return 0;
+      },
+      preflight: async () => [],
+      gitOps: gitOpsFor(),
+      out: () => {},
+    });
+    expect(code).toBe(0);
+    const unitCall = calls.find((c) => c.includes("vitest related"));
+    expect(unitCall).toContain("docs/line/rich-menu-readonly-summary.png");
+    expect(unitCall).toContain("lib/domain/lineSummary/richMenu.test.ts");
+    expect(unitCall).toContain("convex/lineWebhook/richMenuClient.test.ts");
+  });
+
+  test(".mdのみの変更でもmapに当たればunit stepが走る", async () => {
+    const calls = [];
+    const code = await runPrepush({
+      argv: [],
+      cwd: repoRoot,
+      changedFilesOverride: ["AGENTS.md"],
+      runStep: (cmd, args, cwd, log) => {
+        calls.push(args.join(" "));
+        writeFileSync(log, "x");
+        return 0;
+      },
+      gitOps: gitOpsFor(),
+      out: () => {},
+    });
+    expect(code).toBe(0);
+    expect(calls.length).toBe(4); // typecheck/lint/format/unit-related
+    const unitCall = calls.find((c) => c.includes("vitest related"));
+    expect(unitCall).toContain("skills/skills.test.mjs");
+    expect(unitCall).not.toContain("AGENTS.md");
+  });
+
+  test("mapにあって存在しないテストは対象外にする", async () => {
+    const dir = tmpdirFixture();
+    mkdirSync(path.join(dir, "scripts"), { recursive: true });
+    writeFileSync(
+      path.join(dir, "scripts", "unit-related-map.json"),
+      JSON.stringify({ "assets/*.png": ["x.test.ts", "ghost.test.ts"] }),
+    );
+    writeFileSync(path.join(dir, "x.test.ts"), "// test");
+    const calls = [];
+    const code = await runPrepush({
+      argv: [],
+      cwd: dir,
+      changedFilesOverride: ["assets/a.png"],
+      runStep: (cmd, args, cwd2, log) => {
+        calls.push(args.join(" "));
+        writeFileSync(log, "x");
+        return 0;
+      },
+      preflight: async () => [],
+      gitOps: gitOpsFor(),
+      out: () => {},
+    });
+    expect(code).toBe(0);
+    const unitCall = calls.find((c) => c.includes("vitest related"));
+    expect(unitCall).toContain("x.test.ts");
+    expect(unitCall).not.toContain("ghost.test.ts");
   });
 });
 

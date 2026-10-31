@@ -8,9 +8,12 @@ import type {
   ReceiptAnalysisJobStatus,
 } from "../../domain/receiptAnalysisJobs/records";
 import {
+  canAnalyzeReceiptAnalysisJob,
   canCancelReceiptAnalysisJob,
   canRetryReceiptAnalysisJob,
   clampReceiptAnalysisCleanupLimit,
+  MAX_RECEIPT_ANALYSIS_BATCH_FILES,
+  ReceiptAnalysisJobDomainError,
   resolveReceiptAnalysisBatchStatus,
   shouldScheduleAiReviewNotification,
 } from "../../domain/receiptAnalysisJobs/rules";
@@ -39,7 +42,12 @@ export async function createReceiptAnalysisBatch(
   fileNames: string[],
   now = Date.now(),
 ): Promise<{ batch: ReceiptAnalysisBatchRecord; jobs: ReceiptAnalysisJobRecord[] }> {
-  if (fileNames.length === 0) throw new Error("At least one image file is required");
+  if (fileNames.length === 0)
+    throw new ReceiptAnalysisJobDomainError("At least one image file is required");
+  if (fileNames.length > MAX_RECEIPT_ANALYSIS_BATCH_FILES)
+    throw new ReceiptAnalysisJobDomainError(
+      `一度に解析できるのは${MAX_RECEIPT_ANALYSIS_BATCH_FILES}枚までです`,
+    );
   const batchId = await store.insertBatch({
     groupId,
     createdByUserId: userId,
@@ -75,9 +83,9 @@ export async function retryReceiptAnalysisJob(
   now = Date.now(),
 ): Promise<void> {
   const job = await store.getJob(jobId);
-  if (!job || job.groupId !== groupId) throw new Error("Job not found");
+  if (!job || job.groupId !== groupId) throw new ReceiptAnalysisJobDomainError("Job not found");
   if (!canRetryReceiptAnalysisJob(job.status)) {
-    throw new Error("Only failed or needs_review jobs can be retried");
+    throw new ReceiptAnalysisJobDomainError("Only failed or needs_review jobs can be retried");
   }
   await store.clearJobFields(jobId, { status: "queued", clearError: true, updatedAt: now });
 }
@@ -89,9 +97,9 @@ export async function cancelReceiptAnalysisJob(
   now = Date.now(),
 ): Promise<void> {
   const job = await store.getJob(jobId);
-  if (!job || job.groupId !== groupId) throw new Error("Job not found");
+  if (!job || job.groupId !== groupId) throw new ReceiptAnalysisJobDomainError("Job not found");
   if (!canCancelReceiptAnalysisJob(job.status)) {
-    throw new Error("Ready jobs must be removed from the draft queue");
+    throw new ReceiptAnalysisJobDomainError("Ready jobs must be removed from the draft queue");
   }
   if (job.draftId !== undefined) await store.deleteDraftAndItems(job.draftId, job.groupId);
   await store.clearJobFields(jobId, {
@@ -116,7 +124,7 @@ export async function updateReceiptAnalysisJobStatus(
   const job = await deps.store.getJob(args.jobId);
   if (!job) {
     if (args.expectedDraftId !== undefined) return { applied: false };
-    throw new Error("Job not found");
+    throw new ReceiptAnalysisJobDomainError("Job not found");
   }
   if (args.expectedDraftId !== undefined && (job.draftId ?? null) !== args.expectedDraftId)
     return { applied: false };
@@ -124,6 +132,9 @@ export async function updateReceiptAnalysisJobStatus(
     if (args.draftId !== undefined) await deps.store.deleteDraftAndItems(args.draftId, job.groupId);
     return { applied: false };
   }
+  // running への遷移は有料解析の開始なので、queued 以外からは適用しない
+  if (args.status === "running" && !canAnalyzeReceiptAnalysisJob(job.status))
+    return { applied: false };
   await deps.store.patchJob(args.jobId, {
     status: args.status,
     ...(args.draftId === undefined ? {} : { draftId: args.draftId }),
@@ -158,7 +169,8 @@ export async function finalizeReceiptAnalysisAttempt(
     }
     return { applied: false };
   }
-  if (args.groupId !== undefined && job.groupId !== args.groupId) throw new Error("Job not found");
+  if (args.groupId !== undefined && job.groupId !== args.groupId)
+    throw new ReceiptAnalysisJobDomainError("Job not found");
   const isStale = (job.draftId ?? null) !== args.expectedDraftId;
   if (job.status === "cancelled" || isStale) {
     if (job.draftId !== args.newDraftId)
