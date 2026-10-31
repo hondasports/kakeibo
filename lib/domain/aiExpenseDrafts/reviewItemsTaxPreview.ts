@@ -62,6 +62,43 @@ type ReviewTaxPreviewArgs = {
   taxRateComposition?: TaxRateComposition;
 };
 
+/** 税プレビューの証拠欄として draft から取り出すフィールドの最小形状。AiExpenseDraft と Convex Doc の両方を受けられる。 */
+type ReviewTaxEvidenceSource = Pick<
+  AiExpenseDraft,
+  | "taxSummaries"
+  | "receiptInterpretation"
+  | "markerDefinitions"
+  | "rawObservation"
+  | "receiptTotalResolution"
+  | "receiptUserOverride"
+>;
+
+/** buildReviewTaxPreview へ渡す証拠欄。支払額・全体税設定の上書きは呼び出し側が合成する。 */
+export type ReviewTaxEvidence = Pick<
+  ReviewTaxPreviewArgs,
+  | "taxSummaries"
+  | "sourceTaxSummaries"
+  | "markerDefinitions"
+  | "rawObservation"
+  | "receiptLineClassifications"
+  | "receiptTotalResolution"
+  | "receiptUserOverride"
+>;
+
+export function buildReviewTaxEvidence(
+  draft: ReviewTaxEvidenceSource | null | undefined,
+): ReviewTaxEvidence {
+  return {
+    taxSummaries: draft?.taxSummaries,
+    sourceTaxSummaries: draft?.receiptInterpretation?.values.taxSummaries,
+    markerDefinitions: draft?.markerDefinitions,
+    rawObservation: draft?.rawObservation,
+    receiptLineClassifications: draft?.receiptInterpretation?.values.receiptLineClassifications,
+    receiptTotalResolution: draft?.receiptTotalResolution,
+    receiptUserOverride: draft?.receiptUserOverride,
+  };
+}
+
 export function buildReviewTaxPreview(
   items: ReviewItemValues[],
   args: ReviewTaxPreviewArgs,

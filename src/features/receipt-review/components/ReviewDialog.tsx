@@ -37,7 +37,10 @@ import {
 import { buildTaxContextFromReviewItem } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
-import { buildReviewTaxPreview } from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
+import {
+  buildReviewTaxEvidence,
+  buildReviewTaxPreview,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
 
 export type ReviewDialogProps = {
   open: boolean;
@@ -94,30 +97,12 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const preview = useMemo(
     () =>
       buildReviewTaxPreview(sourceItems, {
+        ...buildReviewTaxEvidence(sourceDraft),
         paidTotalYen,
-        taxSummaries: sourceDraft?.taxSummaries,
-        sourceTaxSummaries: sourceDraft?.receiptInterpretation?.values.taxSummaries,
-        markerDefinitions: sourceDraft?.markerDefinitions,
-        rawObservation: sourceDraft?.rawObservation,
-        receiptLineClassifications:
-          sourceDraft?.receiptInterpretation?.values.receiptLineClassifications,
-        receiptTotalResolution: sourceDraft?.receiptTotalResolution,
-        receiptUserOverride: sourceDraft?.receiptUserOverride,
         priceTaxTreatment: form.priceTaxTreatment,
         taxRateComposition: form.taxRateComposition,
       }),
-    [
-      sourceItems,
-      paidTotalYen,
-      sourceDraft?.taxSummaries,
-      sourceDraft?.markerDefinitions,
-      sourceDraft?.rawObservation,
-      sourceDraft?.receiptInterpretation,
-      sourceDraft?.receiptUserOverride,
-      sourceDraft?.receiptTotalResolution,
-      form.priceTaxTreatment,
-      form.taxRateComposition,
-    ],
+    [sourceItems, paidTotalYen, sourceDraft, form.priceTaxTreatment, form.taxRateComposition],
   );
   // 税サマリのない応答では、個別修正で確定した登録額を再描画だけで上書きしない。
   const items = sourceDraft?.taxSummaries?.length ? preview.items : sourceItems;
