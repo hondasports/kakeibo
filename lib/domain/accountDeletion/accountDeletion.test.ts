@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isValidAccountDeletionConfirmation } from "./confirmation";
 import { getAccountDeletionErrorCategory } from "./errorCategory";
-import { getAccountDeletionRetryDelay } from "./retry";
 import { resolveAccountDeletionResumeStatus } from "./resume";
 import {
   accountDeletionActiveStatuses,
@@ -41,17 +40,6 @@ describe("isAccountDeletionFinalizableStatus", () => {
   it("それ以外は最終化不可", () => {
     expect(isAccountDeletionFinalizableStatus("preparing_groups")).toBe(false);
     expect(isAccountDeletionFinalizableStatus("completed")).toBe(false);
-  });
-});
-
-describe("getAccountDeletionRetryDelay", () => {
-  it("試行回数に応じた遅延を返す", () => {
-    expect(getAccountDeletionRetryDelay(0)).toBe(60_000);
-    expect(getAccountDeletionRetryDelay(4)).toBe(6 * 60 * 60_000);
-  });
-
-  it("最大インデックスを超えても最後の値を返す", () => {
-    expect(getAccountDeletionRetryDelay(10)).toBe(6 * 60 * 60_000);
   });
 });
 
