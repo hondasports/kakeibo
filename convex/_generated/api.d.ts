@@ -27,6 +27,7 @@ import type * as categories_normalize from "../categories/normalize.js";
 import type * as categories_queries from "../categories/queries.js";
 import type * as categories_testHelpers from "../categories/testHelpers.js";
 import type * as crons from "../crons.js";
+import type * as deprecatedFieldCounts from "../deprecatedFieldCounts.js";
 import type * as e2eHttp_e2eAuth from "../e2eHttp/e2eAuth.js";
 import type * as e2eHttp_e2eCleanup from "../e2eHttp/e2eCleanup.js";
 import type * as e2eHttp_e2eSeedDraft from "../e2eHttp/e2eSeedDraft.js";
@@ -162,6 +163,7 @@ declare const fullApi: ApiFromModules<{
   "categories/queries": typeof categories_queries;
   "categories/testHelpers": typeof categories_testHelpers;
   crons: typeof crons;
+  deprecatedFieldCounts: typeof deprecatedFieldCounts;
   "e2eHttp/e2eAuth": typeof e2eHttp_e2eAuth;
   "e2eHttp/e2eCleanup": typeof e2eHttp_e2eCleanup;
   "e2eHttp/e2eSeedDraft": typeof e2eHttp_e2eSeedDraft;

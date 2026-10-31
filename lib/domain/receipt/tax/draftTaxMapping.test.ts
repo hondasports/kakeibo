@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapDraftItemToTaxFields } from "./draftTaxMapping";
+import { draftItemToExtractedReceiptItem, mapDraftItemToTaxFields } from "./draftTaxMapping";
 
 describe("mapDraftItemToTaxFields", () => {
   it("printedAmountYen がなければ amountYen を fallback する", () => {
@@ -68,5 +68,32 @@ describe("mapDraftItemToTaxFields", () => {
       taxResolutionSource: "single_summary",
       taxReviewReasons: [],
     });
+  });
+});
+
+describe("draftItemToExtractedReceiptItem taxMarker 正規化", () => {
+  it.each([undefined, []] as const)(
+    "markers %s かつ taxMarker 非空は markers に畳み込み taxMarker を出力しない",
+    (markers) => {
+      const result = draftItemToExtractedReceiptItem({
+        itemName: "商品",
+        printedAmountYen: 100,
+        markers,
+        taxMarker: "※",
+      });
+      expect(result.markers).toEqual(["※"]);
+      expect(result).not.toHaveProperty("taxMarker");
+    },
+  );
+
+  it("markers 非空なら taxMarker より markers を優先する", () => {
+    const result = draftItemToExtractedReceiptItem({
+      itemName: "商品",
+      printedAmountYen: 100,
+      markers: ["#"],
+      taxMarker: "※",
+    });
+    expect(result.markers).toEqual(["#"]);
+    expect(result).not.toHaveProperty("taxMarker");
   });
 });

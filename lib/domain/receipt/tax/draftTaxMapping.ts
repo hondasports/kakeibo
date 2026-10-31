@@ -169,8 +169,11 @@ export function draftItemToExtractedReceiptItem(item: DraftItemTaxFields): Extra
     printedAmountYen: item.printedAmountYen ?? 0,
     amountBasis: item.amountBasis ?? "unknown",
     taxRatePercent: item.taxRatePercent ?? null,
-    markers: item.markers ?? (item.taxMarker ? [item.taxMarker] : []),
-    taxMarker: item.taxMarker,
+    markers: item.markers?.length
+      ? item.markers
+      : item.taxMarker
+        ? [item.taxMarker]
+        : (item.markers ?? []),
     categoryName: item.categoryName,
     quantity: item.quantity,
     unitPriceYen: item.unitPriceYen,

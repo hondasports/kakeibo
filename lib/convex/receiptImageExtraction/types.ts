@@ -28,6 +28,25 @@ export type {
   ReceiptItemTaxRatePercent,
   ReceiptMarkerDefinition,
 } from "../../../lib/domain/receiptImageExtraction/extractionResult";
+import type {
+  ExtractReceiptFieldsResult,
+  ExtractReceiptItemResult,
+} from "../../../lib/domain/receiptImageExtraction/extractionResult";
+
+/**
+ * 公開 action `api.receiptImageExtraction.extractReceiptFields` の応答 item 型。
+ * 内部結果契約から外した非推奨フィールドを、応答境界でだけ再構成した形。
+ */
+export type PublicExtractReceiptItemResult = ExtractReceiptItemResult & {
+  /** @deprecated printedAmountYen を使用する。公開応答の旧クライアント互換のため残置。 */
+  amountYen: number;
+  /** @deprecated markers を使用する。公開応答の旧クライアント互換のため残置。 */
+  taxMarker: string;
+};
+
+export type PublicExtractReceiptFieldsResult = Omit<ExtractReceiptFieldsResult, "items"> & {
+  items?: PublicExtractReceiptItemResult[];
+};
 
 export type OpenAIResponsesApiResponse = {
   status?: string;

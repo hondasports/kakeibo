@@ -293,12 +293,11 @@ function parseReceiptItem(value: unknown, index: number): ExtractReceiptItemResu
   return {
     itemName: item.itemName,
     lineType,
-    amountYen: printedAmountYen,
     printedAmountYen,
     amountBasis,
     taxRatePercent,
-    markers: markers ?? (taxMarker ? [taxMarker] : []),
-    taxMarker: taxMarker ?? markers?.[0] ?? "",
+    // markers が無い・空の旧形式の保存応答だけ taxMarker から復元する（parse 入力側の互換）
+    markers: markers?.length ? markers : taxMarker ? [taxMarker] : (markers ?? []),
     quantity: parseOptionalInteger(item.quantity, `items[${index}].quantity`),
     unitPriceYen: parseOptionalInteger(item.unitPriceYen, `items[${index}].unitPriceYen`),
     categoryName: parseOptionalString(item.categoryName, `items[${index}].categoryName`),

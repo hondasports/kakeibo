@@ -43,15 +43,10 @@ export type ExtractReceiptItemResult = {
   itemName: string;
   /** 明細の意味。旧応答との移行期間は optional。 */
   lineType?: ReceiptItemLineType;
-  /** @deprecated 税対応の抽出結果では printedAmountYen を使用する。 */
-  amountYen: number;
-  /** #411/#412 の schema・parse 移行完了までは既存レスポンスとの互換用に optional。 */
-  printedAmountYen?: number;
+  printedAmountYen: number;
   amountBasis?: AmountBasis;
   taxRatePercent?: ReceiptItemTaxRatePercent;
   markers?: string[];
-  /** @deprecated markers を使用する。 */
-  taxMarker?: string;
   quantity?: number;
   unitPriceYen?: number;
   categoryName?: string;

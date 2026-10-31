@@ -91,7 +91,7 @@ export function prepareReceiptItemEvidence(items: Item[], raw: ReceiptRawObserva
             supportIndexes.has(line.sourceLineIndex) &&
             receiptItemMatchName(withoutReceiptAmount(line)) ===
               receiptItemMatchName(item.itemName) &&
-            line.amountYen === (item.printedAmountYen ?? item.amountYen),
+            line.amountYen === item.printedAmountYen,
         ),
     )
     .flatMap((item) => {
@@ -104,9 +104,7 @@ export function prepareReceiptItemEvidence(items: Item[], raw: ReceiptRawObserva
         (line) => containedText.includes(line) && line.lineRoleCandidates.includes("item"),
       );
       // A merged AI name spanning multiple printed products belongs only to its priced row.
-      const priced = contained.filter(
-        (line) => line.amountYen === (item.printedAmountYen ?? item.amountYen),
-      );
+      const priced = contained.filter((line) => line.amountYen === item.printedAmountYen);
       if (
         new Set(containedText.map((line) => receiptItemMatchName(withoutReceiptAmount(line))))
           .size > 1 &&
@@ -119,7 +117,7 @@ export function prepareReceiptItemEvidence(items: Item[], raw: ReceiptRawObserva
               other !== item &&
               receiptItemMatchName(other.itemName) ===
                 receiptItemMatchName(withoutReceiptAmount(priced[0])) &&
-              (other.printedAmountYen ?? other.amountYen) === priced[0].amountYen,
+              other.printedAmountYen === priced[0].amountYen,
           )
         )
           return [];

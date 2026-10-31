@@ -43,6 +43,7 @@ export type ExtractedDraftItemInput<TCategoryId extends string = string> = {
   amountBasis?: AmountBasis;
   taxRatePercent?: TaxRatePercent | null;
   markers?: string[];
+  /** @deprecated 永続済み旧形式の読み取り互換用。書き込み時は markers に畳み込む。 */
   taxMarker?: string;
   allocatedTaxYen?: number;
   taxAllocationStatus?: TaxAllocationStatus;
@@ -190,8 +191,7 @@ export function buildExtractedDraftItemFields<
     printedAmountYen: item.printedAmountYen,
     amountBasis: item.amountBasis,
     taxRatePercent: item.taxRatePercent,
-    markers: item.markers,
-    taxMarker: item.taxMarker,
+    markers: item.markers?.length ? item.markers : item.taxMarker ? [item.taxMarker] : item.markers,
     allocatedTaxYen: item.allocatedTaxYen,
     taxAllocationStatus: item.taxAllocationStatus,
     normalizedAmountYen: item.normalizedAmountYen,

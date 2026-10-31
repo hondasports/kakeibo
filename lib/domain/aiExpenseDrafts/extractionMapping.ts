@@ -118,7 +118,7 @@ function classificationForExtractedItem(
   excludedSourceLineIndexes: ReadonlySet<number> = new Set(),
 ) {
   const itemText = receiptItemMatchName(item.itemName);
-  const printedAmountYen = item.printedAmountYen ?? item.amountYen;
+  const printedAmountYen = item.printedAmountYen;
   const candidates = classifications.flatMap((classification) => {
     if (excludedSourceLineIndexes.has(classification.sourceLineIndex)) return [];
     const line = rawLines.find(
@@ -157,7 +157,7 @@ function classificationForExtractedItem(
 function isNonMonetaryPromotion(
   item: NonNullable<ExtractReceiptFieldsResult["items"]>[number],
 ): boolean {
-  const amount = item.printedAmountYen ?? item.amountYen;
+  const amount = item.printedAmountYen;
   return (
     amount === 0 &&
     /(?:ポイント.*(?:倍|発行|付与|特典)|会員.*特典)/.test(item.itemName.normalize("NFKC"))
@@ -169,11 +169,10 @@ function normalizeExtractedItemForTax(
 ): ExtractedReceiptItem {
   return {
     itemName: item.itemName,
-    printedAmountYen: item.printedAmountYen ?? item.amountYen,
+    printedAmountYen: item.printedAmountYen,
     taxRatePercent: item.taxRatePercent ?? null,
     amountBasis: item.amountBasis ?? "unknown",
-    markers: item.markers ?? (item.taxMarker ? [item.taxMarker] : []),
-    taxMarker: item.taxMarker,
+    markers: item.markers ?? [],
     categoryName: item.categoryName,
     quantity: item.quantity,
     unitPriceYen: item.unitPriceYen,
@@ -223,8 +222,8 @@ export function mapExtractionToDraftArgs<TId>(
       [
         {
           rawText: item.itemName,
-          amountText: String(item.printedAmountYen ?? item.amountYen),
-          amountYen: item.printedAmountYen ?? item.amountYen,
+          amountText: String(item.printedAmountYen),
+          amountYen: item.printedAmountYen,
           lineRoleCandidates: ["item"],
           roleConfidence: item.confidence.itemName ?? 0.5,
           explicitlyPrinted: true,
@@ -240,11 +239,7 @@ export function mapExtractionToDraftArgs<TId>(
       const rawAmount = evidence.lines.find(
         (line) => line.sourceLineIndex === fromRaw.sourceLineIndex,
       )?.amountYen;
-      if (
-        rawAmount !== undefined &&
-        rawAmount !== null &&
-        rawAmount !== (item.printedAmountYen ?? item.amountYen)
-      ) {
+      if (rawAmount !== undefined && rawAmount !== null && rawAmount !== item.printedAmountYen) {
         ambiguousExtractedItemIndexes.push(index);
       }
     }
@@ -381,7 +376,7 @@ export function mapExtractionToDraftArgs<TId>(
     return {
       itemName: item.itemName,
       lineType: item.lineType,
-      amountYen: normalized?.normalizedAmountYen ?? item.amountYen,
+      amountYen: normalized?.normalizedAmountYen ?? item.printedAmountYen,
       printedAmountYen: taxFields?.printedAmountYen ?? item.printedAmountYen,
       amountBasis: taxFields?.amountBasis ?? item.amountBasis,
       taxRatePercent:
@@ -391,7 +386,6 @@ export function mapExtractionToDraftArgs<TId>(
             ? (taxFields.taxRatePercent ?? null)
             : item.taxRatePercent,
       markers: normalized?.markers ?? item.markers,
-      taxMarker: normalized?.taxMarker ?? item.taxMarker,
       allocatedTaxYen: taxFields?.allocatedTaxYen,
       taxAllocationStatus: taxFields?.taxAllocationStatus,
       normalizedAmountYen: taxFields?.normalizedAmountYen,
@@ -427,8 +421,7 @@ export function mapExtractionToDraftArgs<TId>(
     ambiguousExtractedItemIndexes.length > 0 ||
     effectiveItems.some(
       (item) =>
-        (item.printedAmountYen ?? item.amountYen) < 0 &&
-        (item.lineType === "unknown" || item.lineType === "item"),
+        item.printedAmountYen < 0 && (item.lineType === "unknown" || item.lineType === "item"),
     )
       ? (["user_confirmation_required"] as const)
       : []),

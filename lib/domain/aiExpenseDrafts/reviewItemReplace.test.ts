@@ -122,6 +122,29 @@ describe("buildReplacementDraftItemFields", () => {
     });
   });
 
+  it("markers 空かつ taxMarker のみの既存明細は markers に畳み込み taxMarker を書かない", () => {
+    const previous: AiExpenseDraftItemFields = {
+      groupId: "g1",
+      draftId: "d1",
+      itemName: "旧",
+      amountYen: 200,
+      markers: [],
+      taxMarker: "※",
+      confidence: {},
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const result = buildReplacementDraftItemFields({
+      ...base,
+      item: { itemId: "x", itemName: "旧", amountYen: 200, categoryId: "c1" },
+      previous,
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.fields.markers).toEqual(["※"]);
+    expect(result.fields).not.toHaveProperty("taxMarker");
+  });
+
   it("item.confidence / warnings 指定時はそれを優先する", () => {
     const result = buildReplacementDraftItemFields({
       ...base,
