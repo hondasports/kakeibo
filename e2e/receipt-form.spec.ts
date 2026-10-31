@@ -667,14 +667,18 @@ test.describe("複数カテゴリ別支出項目入力フロー（Issue #102 受
     await expect(page).toHaveURL(/\/weeks\/\d{4}-\d{2}-\d{2}$/, { timeout: 10_000 });
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
 
-    // カテゴリ別集計: カテゴリごとの行がカテゴリ名と金額の両方で一致する
+    // カテゴリ別集計: 行内の金額・割合・件数セルが完全一致する（toContainText だと 13,000円・11件 などに部分一致してしまう）
     const breakdown = page.getByTestId("weekly-category-breakdown");
-    await expect(breakdown.getByRole("row").filter({ hasText: "食費" })).toContainText("3,000円", {
+    const foodCategoryRow = breakdown.getByRole("row").filter({ hasText: "食費" });
+    const dailyCategoryRow = breakdown.getByRole("row").filter({ hasText: "日用品" });
+    await expect(foodCategoryRow.getByRole("cell").nth(1)).toHaveText("3,000円", {
       timeout: 15_000,
     });
-    await expect(breakdown.getByRole("row").filter({ hasText: "日用品" })).toContainText("2,000円");
-    await expect(breakdown.getByRole("row").filter({ hasText: "食費" })).toContainText("1件");
-    await expect(breakdown.getByRole("row").filter({ hasText: "日用品" })).toContainText("1件");
+    await expect(foodCategoryRow.getByRole("cell").nth(2)).toHaveText("60%");
+    await expect(foodCategoryRow.getByRole("cell").nth(3)).toHaveText("1件");
+    await expect(dailyCategoryRow.getByRole("cell").nth(1)).toHaveText("2,000円");
+    await expect(dailyCategoryRow.getByRole("cell").nth(2)).toHaveText("40%");
+    await expect(dailyCategoryRow.getByRole("cell").nth(3)).toHaveText("1件");
 
     // 支出一覧: 各項目行が項目名とカテゴリ名を表示する
     const receiptGroup = page.getByTestId("receipt-group").filter({ hasText: "テストスーパー" });
