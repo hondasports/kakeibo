@@ -17,6 +17,7 @@ import {
   assertCategoryLimit,
   assertOwnedCategory,
   buildSeedPatch,
+  CategoryDomainError,
   nextSortOrder,
 } from "../../domain/categories/rules";
 import type {
@@ -32,7 +33,7 @@ export async function seedDefaultCategories(
 ): Promise<{ created: number; skipped: number }> {
   const group = await store.getGroupSeedState(groupId);
   if (group === null) {
-    throw new Error("グループが見つかりません");
+    throw new CategoryDomainError("グループが見つかりません");
   }
   if (group.defaultCategoriesSeedVersion === DEFAULT_CATEGORIES_SEED_VERSION) {
     return { created: 0, skipped: DEFAULT_CATEGORIES.length };
