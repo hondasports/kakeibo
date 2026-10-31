@@ -33,7 +33,7 @@ AIが裏で解析
 最初に作成したモックは、AIが抽出した結果を確認し、必要に応じて編集して登録する画面である。
 この画面では、`コンビニ払込`、`自動車税`、`東京都`、`税金` のように、コンビニで支払った税金を通常のコンビニ支出として扱わず、支払内容と支払先を分けて登録する方向性を示している。
 
-次に、`内訳を編集` と `詳細を編集` を展開したモックを作成した。現行実装では `ReviewDialog`（`components/review/`）がこの役割を担う。
+次に、`内訳を編集` と `詳細を編集` を展開したモックを作成した。現行実装では `ReviewDialog`（`src/features/receipt-review/components/`）がこの役割を担う。
 
 このモックでは、役割を次のように分けている。
 
@@ -163,7 +163,7 @@ AIの結果は、最初から確定値として扱うのではなく、信頼度
 - `convex/categories/`
   - グループ単位のカテゴリ管理
 - `src/features/ai-expense-queue/components/AiExpenseQueuePanel.tsx`
-  - AI 下書きキュー UI（見出し「レシート入力」）。内部は `components/queue/`・`components/review/`・`hooks/review/` に分割
+  - AI 下書きキュー UI（見出し「レシート入力」）。キュー表示は `components/queue/`・`hooks/`・`context/` に分割し、レビュー関連は `src/features/receipt-review/`（`components/`・`hooks/`）に分離済み
 - `src/features/expense-entry/components/ExpenseEntryForm.tsx`
   - 手入力 UI（`expenseEntries` 保存）。フィールド群は `SingleEntryFields` / `MultiEntryFields`、送信は `useExpenseEntrySubmit`
 

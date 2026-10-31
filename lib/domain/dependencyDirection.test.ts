@@ -5,14 +5,14 @@ import { describe, expect, it } from "vitest";
 /**
  * lib/domain の production モジュールが Convex adapter（convex/・lib/convex/）や
  * convex パッケージへ依存しないことを検査する。
- * *.test.*・fixtures/・*testHelpers.ts は test-only の adapter fixture 参照を
- * 含みうるため対象外（#1143 では testHelpers.ts の adapter 参照を別課題として切り分け）。
+ * *.test.* は adapter 参照を含みうるため対象外。testHelpers.ts・fixtures/ は
+ * 共有 fixture を domain 側へ移したため検査対象に含める。
  */
 const REPO_ROOT = process.cwd();
 const DOMAIN_ROOT = join(REPO_ROOT, "lib", "domain");
 const CONVEX_DIRS = [join(REPO_ROOT, "convex"), join(REPO_ROOT, "lib", "convex")];
 
-const TEST_ONLY_FILE = /(?:\.test\.|testHelpers\.ts$|\/fixtures\/)/;
+const TEST_ONLY_FILE = /\.test\./;
 const SCANNED_FILE = /\.(?:ts|tsx|mts|cts)$/;
 const IMPORT_SPECIFIER =
   /from\s+["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)|import\s+["']([^"']+)["']/g;
