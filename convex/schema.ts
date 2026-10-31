@@ -6,6 +6,7 @@ import {
 } from "../lib/domain/receiptAnalysisJobs/records";
 import { GROUP_LIFECYCLE_STATUSES } from "../lib/domain/groups/lifecycle";
 import { GROUP_INVITATION_STATUSES } from "../lib/domain/groups/groupInvitation";
+import { GROUP_MEMBERSHIP_STATUSES, GROUP_ROLES } from "../lib/domain/groups/role";
 import { LINE_NOTIFICATION_EVENT_OUTCOMES } from "../lib/domain/notifications/records";
 import { systemAdminAuditActionValidator } from "../lib/convex/systemAdmin/validators";
 import { defineSchema, defineTable } from "convex/server";
@@ -181,7 +182,7 @@ export default defineSchema({
     groupId: v.id("groups"),
     // userId には Clerk の tokenIdentifier を格納する。
     userId: v.string(),
-    role: v.union(v.literal("owner"), v.literal("member")),
+    role: v.union(...GROUP_ROLES.map((value) => v.literal(value))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -267,10 +268,10 @@ export default defineSchema({
     targetGroupId: v.optional(v.id("groups")),
     targetGroupNameSnapshot: v.optional(v.string()),
     beforeMembershipStatus: v.optional(
-      v.union(v.literal("none"), v.literal("member"), v.literal("owner")),
+      v.union(...GROUP_MEMBERSHIP_STATUSES.map((value) => v.literal(value))),
     ),
     afterMembershipStatus: v.optional(
-      v.union(v.literal("none"), v.literal("member"), v.literal("owner")),
+      v.union(...GROUP_MEMBERSHIP_STATUSES.map((value) => v.literal(value))),
     ),
     beforeActiveGroupId: v.optional(v.id("groups")),
     afterActiveGroupId: v.optional(v.id("groups")),

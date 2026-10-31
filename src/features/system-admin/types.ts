@@ -1,5 +1,6 @@
 import type { AppEnvironment } from "../../../lib/domain/systemAdmin/environment";
 import type { SystemAdminAuditAction } from "../../../lib/domain/systemAdmin/auditLog";
+import type { GroupMembershipStatus } from "../../../lib/domain/groups/role";
 export type { AppEnvironment, SystemAdminAuditAction };
 
 export type UserSearchItem = {
@@ -67,8 +68,8 @@ export type SystemAdminAuditItem = {
   sourceGroupNameSnapshot?: string;
   targetGroupId?: string;
   targetGroupNameSnapshot?: string;
-  beforeMembershipStatus?: "none" | "member" | "owner";
-  afterMembershipStatus?: "none" | "member" | "owner";
+  beforeMembershipStatus?: GroupMembershipStatus;
+  afterMembershipStatus?: GroupMembershipStatus;
   beforeActiveGroupId?: string;
   afterActiveGroupId?: string;
   beforeOwnerCount?: number;

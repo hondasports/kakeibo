@@ -1,6 +1,8 @@
+import type { GroupRole } from "./role";
+
 export type GroupMemberLike = {
   userId: string;
-  role: "owner" | "member";
+  role: GroupRole;
   displayName: string;
   email?: string | null;
   createdAt: number;

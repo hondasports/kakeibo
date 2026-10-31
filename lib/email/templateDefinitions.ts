@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import { type TransactionalEmailPayload, type TransactionalEmailType } from "./model";
+import { GROUP_ROLES } from "../domain/groups/role";
 
 export type TemplateMetadata = {
   type: TransactionalEmailType;
@@ -53,8 +54,8 @@ export const groupMembershipRemovedPayloadSchema = v.object({
 export const groupRoleChangedPayloadSchema = v.pipe(
   v.object({
     groupName: v.pipe(v.string(), v.trim(), v.minLength(1, "groupName is required")),
-    previousRole: v.union([v.literal("owner"), v.literal("member")]),
-    newRole: v.union([v.literal("owner"), v.literal("member")]),
+    previousRole: v.union(GROUP_ROLES.map((role) => v.literal(role))),
+    newRole: v.union(GROUP_ROLES.map((role) => v.literal(role))),
   }),
   v.check(
     (input) => input.previousRole !== input.newRole,

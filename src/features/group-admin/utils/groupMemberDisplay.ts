@@ -1,6 +1,8 @@
+import type { GroupRole } from "../../../../lib/domain/groups/role";
+
 export type GroupMemberListItem = {
   userId: string;
-  role: "owner" | "member";
+  role: GroupRole;
   displayName: string;
   email: string | null;
   createdAt: number;

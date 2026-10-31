@@ -1,5 +1,5 @@
 import { api } from "../../../../convex/_generated/api";
-import { formatGroupRoleLabel } from "../../../../lib/domain/groups/role";
+import { formatGroupRoleLabel, type GroupRole } from "../../../../lib/domain/groups/role";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation } from "convex/react";
 import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
@@ -10,7 +10,7 @@ import { SuzumemoLoadingState } from "../../ui";
 type MyGroup = {
   _id: string;
   name: string;
-  role: "owner" | "member";
+  role: GroupRole;
   createdAt: number;
   isActive: boolean;
 };

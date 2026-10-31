@@ -1,19 +1,17 @@
 import { useState } from "react";
 import type { GroupMemberListItem } from "../utils/groupMemberDisplay";
+import type { GroupRole } from "../../../../lib/domain/groups/role";
 import { getGroupSettingsErrorMessage } from "./useGroupSettingsFeedback";
 
 type PendingRoleChange = {
   userId: string;
   displayLabel: string;
-  currentRole: "owner" | "member";
-  newRole: "owner" | "member";
+  currentRole: GroupRole;
+  newRole: GroupRole;
 };
 
 type UseGroupRoleManagementArgs = {
-  changeMemberRole: (args: {
-    targetUserId: string;
-    newRole: "owner" | "member";
-  }) => Promise<unknown>;
+  changeMemberRole: (args: { targetUserId: string; newRole: GroupRole }) => Promise<unknown>;
   setError: (error: string) => void;
   setSavingTarget: (target: string | null) => void;
   setSnackbar: (message: string) => void;
@@ -31,7 +29,7 @@ export function useGroupRoleManagement({
 
   const handleRequestRoleChange = (
     member: GroupMemberListItem,
-    newRole: "owner" | "member",
+    newRole: GroupRole,
     displayLabel: string,
   ) => {
     setPendingRoleChange({

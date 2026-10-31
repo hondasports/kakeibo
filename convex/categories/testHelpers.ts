@@ -2,6 +2,7 @@ import type { UserIdentity } from "convex/server";
 import { vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import type { GroupRole } from "../../lib/domain/groups/role";
 
 // ---------------------------------------------------------------------------
 // テスト用ヘルパー
@@ -34,7 +35,7 @@ export type GroupMemberDoc = {
   _creationTime: number;
   groupId: Id<"groups">;
   userId: string;
-  role: "owner" | "member";
+  role: GroupRole;
 };
 
 /**

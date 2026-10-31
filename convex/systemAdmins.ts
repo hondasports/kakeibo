@@ -1,4 +1,7 @@
-import { systemAdminAuditActionValidator } from "../lib/convex/systemAdmin/validators";
+import {
+  groupMembershipStatusValidator,
+  systemAdminAuditActionValidator,
+} from "../lib/convex/systemAdmin/validators";
 import { ConvexError, v } from "convex/values";
 import type { Infer } from "convex/values";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
@@ -72,12 +75,8 @@ const systemAdminAuditItemValidator = v.object({
   sourceGroupNameSnapshot: v.optional(v.string()),
   targetGroupId: v.optional(v.id("groups")),
   targetGroupNameSnapshot: v.optional(v.string()),
-  beforeMembershipStatus: v.optional(
-    v.union(v.literal("none"), v.literal("member"), v.literal("owner")),
-  ),
-  afterMembershipStatus: v.optional(
-    v.union(v.literal("none"), v.literal("member"), v.literal("owner")),
-  ),
+  beforeMembershipStatus: v.optional(groupMembershipStatusValidator),
+  afterMembershipStatus: v.optional(groupMembershipStatusValidator),
   beforeActiveGroupId: v.optional(v.id("groups")),
   afterActiveGroupId: v.optional(v.id("groups")),
   beforeOwnerCount: v.optional(v.number()),

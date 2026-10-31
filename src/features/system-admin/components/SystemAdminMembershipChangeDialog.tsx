@@ -15,6 +15,7 @@ import {
   MAX_REASON_LENGTH,
   normalizeSystemAdminReason,
 } from "../../../../lib/domain/systemAdmin/reason";
+import type { GroupRole } from "../../../../lib/domain/groups/role";
 
 export type SystemAdminMembershipOperation =
   | "add"
@@ -46,8 +47,8 @@ type Props = {
   error?: string;
   onCancel: () => void;
   onConfirm: (reason: string) => void;
-  currentRole?: "owner" | "member";
-  newRole?: "owner" | "member";
+  currentRole?: GroupRole;
+  newRole?: GroupRole;
   sourceUser?: { id: string; displayName: string; email: string | null };
 };
 

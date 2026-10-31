@@ -27,6 +27,7 @@
 
 import type { Page } from "@playwright/test";
 import { getCurrentClerkTokenIdentifier } from "./auth";
+import type { GroupRole } from "../../lib/domain/groups/role";
 
 export type CleanupOptions = {
   page?: Page;
@@ -238,10 +239,7 @@ export async function cleanupGroupInvitationsByUser(userId?: string): Promise<vo
 /**
  * E2E テスト用: 指定ユーザーのアクティブグループにおけるロールを変更する。
  */
-export async function setE2eGroupMemberRole(
-  userId: string,
-  role: "owner" | "member",
-): Promise<void> {
+export async function setE2eGroupMemberRole(userId: string, role: GroupRole): Promise<void> {
   await callCleanupEndpoint({
     userId,
     setGroupMemberRole: role,
@@ -325,7 +323,7 @@ async function callCleanupEndpoint(body: {
   clearGroupInvitations?: boolean;
   clearLineLink?: boolean;
   clearNotificationData?: boolean;
-  setGroupMemberRole?: "owner" | "member";
+  setGroupMemberRole?: GroupRole;
 }): Promise<void> {
   const siteUrl = process.env.VITE_CONVEX_SITE_URL;
   const secret = process.env.E2E_CLEANUP_SECRET;
