@@ -8,7 +8,7 @@ import {
   requireE2eSecret,
   requireE2eUserId,
 } from "./e2eAuth";
-import type { GroupRole } from "../../lib/domain/groups/role";
+import { GROUP_ROLES, type GroupRole } from "../../lib/domain/groups/role";
 
 type E2eCleanupBody = {
   userId?: string;
@@ -65,10 +65,7 @@ function validateCleanupBody(body: E2eCleanupBody) {
       return `Invalid ${field}.`;
     }
   }
-  if (
-    body.setGroupMemberRole !== undefined &&
-    !["owner", "member"].includes(body.setGroupMemberRole)
-  ) {
+  if (body.setGroupMemberRole !== undefined && !GROUP_ROLES.includes(body.setGroupMemberRole)) {
     return "Invalid setGroupMemberRole.";
   }
   if (body.seedGroupMember !== undefined) {
