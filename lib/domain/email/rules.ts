@@ -1,5 +1,9 @@
 import type { EmailProviderError } from "../../email/model";
-import { calculateRetryDelayMs, isMaxRetryAttemptsReached } from "../common/retry";
+import {
+  DEFAULT_MAX_RETRY_ATTEMPTS,
+  calculateRetryDelayMs,
+  isMaxRetryAttemptsReached,
+} from "../common/retry";
 import type {
   EmailWebhookEventType,
   TransactionalEmailJobStatus,
@@ -8,8 +12,6 @@ import type {
 import type { TransactionalEmailJobRecord } from "./records";
 
 export const EMAIL_PROVIDER_NAME = "resend";
-
-export const EMAIL_JOB_MAX_ATTEMPTS = 6;
 
 export const TERMINAL_EMAIL_JOB_STATUSES = [
   "sent",
@@ -71,7 +73,7 @@ export function buildNewEmailJobFields(args: {
     provider: EMAIL_PROVIDER_NAME,
     status: "queued",
     attemptCount: 0,
-    maxAttempts: EMAIL_JOB_MAX_ATTEMPTS,
+    maxAttempts: DEFAULT_MAX_RETRY_ATTEMPTS,
     createdAt: args.now,
     updatedAt: args.now,
   };

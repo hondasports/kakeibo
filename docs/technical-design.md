@@ -407,9 +407,9 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   の `readQueryDoc(s)` 経由に統一し、インメモリテストモックのフォールバック
   （`collect` → `take` → `unique`）を維持する。
 - **削除オーケストレーション**（`convex/groups/lib/groupDeletion*.ts` 群）も
-  4層へ移行済み。ステージ順序・遷移判定・リトライ計画・影響集計の純粋関数は
-  `lib/domain/groupDeletion/`（`stages`・`jobTransitions`・`counts`・`impact`・
-  `retry`）、オーケストレーションは `lib/usecase/groupDeletion/`（`startGroupDeletion`・
+  4層へ移行済み。ステージ順序・遷移判定・影響集計の純粋関数は
+  `lib/domain/groupDeletion/`（`stages`・`jobTransitions`・`counts`・`impact`）、
+  リトライ計画は `lib/domain/common/`（`retry`）、オーケストレーションは `lib/usecase/groupDeletion/`（`startGroupDeletion`・
   `resumeGroupDeletion`・`processGroupDeletionBatch`・
   `processRecipientNotificationBatch`・`processGroupDeletionFailureNotification`・
   `recordBatchRetry`・`runPurgeStage`・`countGroupDeletionImpact`・
@@ -425,8 +425,9 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 `accountDeletion` も同じハイブリッド方針で 4 層へ移行済み。
 
 - **既存純粋関数の維持**: `classification`・`confirmation`・`errorCategory`・
-  `resume`・`retry`・`status` は既に `lib/domain/accountDeletion/` に存在するため
+  `resume`・`status` は既に `lib/domain/accountDeletion/` に存在するため
   そのまま利用し、Clerk 削除エラー分類（`clerkError`）を追加した。
+  リトライ計画の純粋関数は `lib/domain/common/`（`retry`）に集約する。
 - **ポート**: `AccountDeletionRequestStore`（Reader 分離）・
   `AccountDeletionGroupPurgeStore`・`AccountDeletionUserDataPurgeStore`・
   `AccountDeletionScheduler`、および汎用 `TransactionalEmailQueue`
