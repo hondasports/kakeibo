@@ -12,8 +12,10 @@ import type {
   ReceiptTaxInput,
   ReceiptTaxInterpretation,
   TaxContextResolution,
+  TaxAllocationStatus,
   TaxRatePercent,
   TaxResolutionSource,
+  TaxResolutionStatus,
 } from "./types";
 
 export type DraftItemTaxFields = {
@@ -25,13 +27,13 @@ export type DraftItemTaxFields = {
   markers?: string[];
   taxMarker?: string;
   allocatedTaxYen?: number;
-  taxAllocationStatus?: "allocated" | "unallocated";
+  taxAllocationStatus?: TaxAllocationStatus;
   normalizedAmountYen?: number;
   quantity?: number;
   unitPriceYen?: number;
   categoryName?: string;
   warnings?: string[];
-  taxResolutionStatus?: "resolved" | "unresolved";
+  taxResolutionStatus?: TaxResolutionStatus;
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
   taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
@@ -50,7 +52,7 @@ export type DraftItemTaxFieldsSource = {
   quantity?: number | null;
   unitPriceYen?: number | null;
   warnings?: string[];
-  taxResolutionStatus?: "resolved" | "unresolved";
+  taxResolutionStatus?: TaxResolutionStatus;
   taxResolutionSource?: TaxResolutionSource | null;
   taxReviewReasons?: string[];
   taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
@@ -81,7 +83,7 @@ export function mapDraftItemToTaxFields(item: DraftItemTaxFieldsSource): DraftIt
 }
 
 export function taxContextToDraftFields(taxContext: TaxContextResolution): {
-  taxResolutionStatus: "resolved" | "unresolved";
+  taxResolutionStatus: TaxResolutionStatus;
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
   taxRatePercent: TaxRatePercent | null;

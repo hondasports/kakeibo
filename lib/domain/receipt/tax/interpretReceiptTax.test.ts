@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { interpretReceiptTax as interpretReceiptTaxRaw, type ReceiptTaxInput } from "./index";
+import { interpretReceiptTax as interpretReceiptTaxRaw } from "./interpretReceiptTax";
+import type { ReceiptTaxInput } from "./types";
 
 function interpretReceiptTax(input: ReceiptTaxInput) {
   return interpretReceiptTaxRaw({

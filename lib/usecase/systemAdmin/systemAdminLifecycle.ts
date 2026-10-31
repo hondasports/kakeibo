@@ -10,6 +10,7 @@ import {
 } from "../../domain/systemAdmin/reason";
 import type { PaginationOpts } from "../../domain/pagination";
 import type { SystemAdminNotificationAction } from "../../domain/systemAdmin/notificationStore";
+import type { SystemAdminStatus } from "../../domain/systemAdmin/systemAdminStore";
 import type { SystemAdminAuditAction } from "../../domain/systemAdmin/auditLog";
 import type { AppEnvironment } from "../../domain/systemAdmin/environment";
 import type { SystemAdminMutationDeps, SystemAdminQueryDeps } from "./deps";
@@ -83,7 +84,7 @@ export async function listSystemAdmins(
   args: {
     tokenIdentifier: string;
     paginationOpts: PaginationOpts;
-    status?: "active" | "revoked";
+    status?: SystemAdminStatus;
   },
 ) {
   const actor = await requireSystemAdminActor(deps, args.tokenIdentifier);

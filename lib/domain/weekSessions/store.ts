@@ -3,7 +3,9 @@
  * 実装は infrastructure 層（lib/convex）が提供する。
  */
 
-export type WeekSessionStatus = "draft" | "completed";
+export const WEEK_SESSION_STATUSES = ["draft", "completed"] as const;
+
+export type WeekSessionStatus = (typeof WEEK_SESSION_STATUSES)[number];
 
 /** endpoint 操作で往復する週次セッションの完全形状。 */
 export type WeekSessionRecord = {

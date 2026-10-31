@@ -14,6 +14,7 @@ import type {
 } from "../receipt/tax/types";
 import type { ReceiptItemLineType } from "../receipt/discountItems";
 import type { ReceiptRawObservationLine } from "../receipt/observations";
+import type { AiExpenseDraftDocumentType } from "../aiExpenseDrafts/constants";
 
 export type {
   TaxRatePercent,
@@ -91,7 +92,7 @@ export type ExtractReceiptFieldsResult = {
   shopName: string;
   date: string;
   amountYen: number | null;
-  documentType: "receipt" | "convenience_payment" | "unknown";
+  documentType: AiExpenseDraftDocumentType;
   paymentPlace?: string;
   payeeName?: string;
   paymentPurpose?: string;

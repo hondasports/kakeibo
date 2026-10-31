@@ -193,9 +193,6 @@ convex/
   http.ts                      # HTTP router（route 登録のみ）
   e2eHttp/                     # E2E 専用 httpAction ハンドラ
   e2ePurge.ts                  # E2E テストデータ・孤児グループの purge（internal 関数群）
-  lib/
-    discountItems.ts
-    weekDates.ts
   users/
     auth.ts
     mutations.ts
@@ -1423,7 +1420,7 @@ Convexにも引数validatorがあるため、Valibotだけに依存しない。�
 ### 12.1 週計算
 
 - 週の開始曜日は `users.weeklyStartDay` から決まり、未設定は月曜日
-- `convex/lib/weekDates.calculateWeekStartDate(date, weekStartDay)` で対象日の週開始日を求める
+- `lib/domain/week/weekDates.calculateWeekStartDate(date, weekStartDay)` で対象日の週開始日を求める
 - `calculateWeekEndDate(weekStartDate)` / `getWeekEndDay(weekStartDay)` で週終了日・終了曜日を求める
 - 日付は `YYYY-MM-DD` 文字列として扱う
 

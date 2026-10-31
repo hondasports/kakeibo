@@ -1,3 +1,9 @@
+import type {
+  AiExpenseRegistrationMode,
+  DerivedRegistrationSnapshot,
+  RegistrationDestination,
+} from "./receiptDataContract";
+
 export type ReadyDraftForRegistration = {
   status: string;
   date?: string;
@@ -63,24 +69,13 @@ export function getReadyDraftRegistrationErrorMessage(error: ValidateReadyDraftE
  * totalOnly の場合は税内訳を持たないことを null で明示する。
  */
 export function buildDerivedRegistration(args: {
-  destination: "receipt" | "expense_entries";
-  registrationMode: "detailed" | "totalOnly";
+  destination: RegistrationDestination;
+  registrationMode: AiExpenseRegistrationMode;
   amountYen: number;
   date: string;
   categoryIds: string[];
   registeredAt: number;
-}): {
-  source: "derived";
-  destination: "receipt" | "expense_entries";
-  registrationMode?: "detailed" | "totalOnly";
-  taxRatePercent?: 0 | 8 | 10 | null;
-  taxableAmountYen?: number | null;
-  taxYen?: number | null;
-  amountYen: number;
-  date: string;
-  categoryIds: string[];
-  registeredAt: number;
-} {
+}): DerivedRegistrationSnapshot {
   return {
     source: "derived",
     destination: args.destination,
@@ -116,8 +111,8 @@ export function resolveRegisteredAt(
  * 同じ値にしないと一覧の末尾に沈むため、ここでしか作らない。
  */
 export function buildRegistrationPatchFields(args: {
-  destination: "receipt" | "expense_entries";
-  registrationMode: "detailed" | "totalOnly";
+  destination: RegistrationDestination;
+  registrationMode: AiExpenseRegistrationMode;
   amountYen: number;
   date: string;
   categoryIds: string[];

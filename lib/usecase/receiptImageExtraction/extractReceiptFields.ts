@@ -30,7 +30,6 @@ export async function extractReceiptFields<TResult>(
     imageDataUrl: args.imageDataUrl,
     apiKey: plan.apiKey,
     telemetryId: args.telemetryId,
-    categoryNames: args.categoryNames ?? [],
     categories: args.categories,
   });
 }

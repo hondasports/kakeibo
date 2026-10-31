@@ -26,6 +26,7 @@ describe("isValidSignedLineItemAmount", () => {
     ["食料品", -1000, false],
     ["割引", -1000, true],
     ["割引", 0, false],
+    ["不明な明細", 0, false],
     ["割引", 1.5, false],
   ])("%s / %s -> %s", (itemName, amountYen, expected) => {
     expect(isValidSignedLineItemAmount(itemName, amountYen)).toBe(expected);

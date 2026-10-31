@@ -5,11 +5,17 @@ import type {
 } from "./records";
 import { isTerminalImageJobStatus } from "./status";
 
-import { AI_EXPENSE_DRAFT_LIST_LIMIT } from "../aiExpenseDrafts/constants";
+import {
+  AI_EXPENSE_DRAFT_LIST_LIMIT,
+  type AiExpenseDraftStatus,
+} from "../aiExpenseDrafts/constants";
 
 export class ReceiptAnalysisJobDomainError extends Error {}
 
-export const RECEIPT_ANALYSIS_RETRY_DRAFT_STATUSES = ["needs_review", "failed"] as const;
+export const RECEIPT_ANALYSIS_RETRY_DRAFT_STATUSES = [
+  "needs_review",
+  "failed",
+] as const satisfies readonly AiExpenseDraftStatus[];
 export const MAX_RECEIPT_ANALYSIS_DRAFT_IDS =
   AI_EXPENSE_DRAFT_LIST_LIMIT * RECEIPT_ANALYSIS_RETRY_DRAFT_STATUSES.length;
 

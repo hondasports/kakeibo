@@ -34,7 +34,7 @@ describe("extractReceiptFields", () => {
     expect(deps.extractReal).not.toHaveBeenCalled();
   });
 
-  it("real plan は apiKey・categoryNames ?? []・categories を渡す", async () => {
+  it("real plan は apiKey・categories を渡す", async () => {
     const deps = makeDeps({ appEnv: "production", extractorMode: "real", openAiApiKey: "sk" });
     const categories = [{ name: "食費", description: "d" }];
     expect(
@@ -44,7 +44,6 @@ describe("extractReceiptFields", () => {
       imageDataUrl: VALID,
       apiKey: "sk",
       telemetryId: "t1",
-      categoryNames: [],
       categories,
     });
   });

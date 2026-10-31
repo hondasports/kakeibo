@@ -21,13 +21,12 @@ import {
   SystemAdminPageFrame,
 } from "./SystemAdminPageFrame";
 import type { PageResult, UserSearchItem } from "../types";
-
-type UserQueryType = "displayName" | "email" | "userId";
+import type { UserSearchType } from "../../../../lib/domain/systemAdmin/searchQuery";
 
 export function SystemAdminUserSearchPage() {
   const searchUsers = useAction(api.systemAdminSearch.searchUsers);
   const [query, setQuery] = useState("");
-  const [queryType, setQueryType] = useState<UserQueryType>("displayName");
+  const [queryType, setQueryType] = useState<UserSearchType>("displayName");
   const [result, setResult] = useState<PageResult<UserSearchItem> | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -77,7 +76,7 @@ export function SystemAdminUserSearchPage() {
               label="検索対象"
               labelId="system-admin-user-query-type-label"
               value={queryType}
-              onChange={(event) => setQueryType(event.target.value as UserQueryType)}
+              onChange={(event) => setQueryType(event.target.value as UserSearchType)}
             >
               <MenuItem value="displayName">表示名</MenuItem>
               <MenuItem value="email">メールアドレス</MenuItem>

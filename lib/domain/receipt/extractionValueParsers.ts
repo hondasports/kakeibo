@@ -1,11 +1,24 @@
-import type { AmountBasis, RoundingMethod, TaxMode, TaxRatePercent } from "./tax/types";
+import {
+  AMOUNT_BASES,
+  ROUNDING_METHODS,
+  TAX_MODES,
+  TAX_RATE_PERCENTS,
+  type AmountBasis,
+  type RoundingMethod,
+  type TaxMode,
+  type TaxRatePercent,
+} from "./tax/types";
+import {
+  AI_EXPENSE_DRAFT_DOCUMENT_TYPES,
+  type AiExpenseDraftDocumentType,
+} from "../aiExpenseDrafts/constants";
 import type {
   ExtractionConfidence,
   ReceiptItemTaxRatePercent,
 } from "../receiptImageExtraction/extractionResult";
 
 export function parseTaxRatePercent(value: unknown, field: string): TaxRatePercent {
-  if (value === 0 || value === 8 || value === 10) return value;
+  if ((TAX_RATE_PERCENTS as readonly unknown[]).includes(value)) return value as TaxRatePercent;
   throw new Error(`OpenAI レスポンスの ${field} は 0, 8, 10 のいずれかである必要があります`);
 }
 
@@ -15,21 +28,17 @@ export function parseItemTaxRatePercent(value: unknown, field: string): ReceiptI
 }
 
 export function parseAmountBasis(value: unknown, field: string): AmountBasis {
-  if (value === "tax_included" || value === "tax_excluded" || value === "unknown") return value;
+  if ((AMOUNT_BASES as readonly unknown[]).includes(value)) return value as AmountBasis;
   throw new Error(`OpenAI レスポンスの ${field} が不正です`);
 }
 
 export function parseTaxMode(value: unknown, field: string): TaxMode {
-  if (value === "external" || value === "included" || value === "mixed" || value === "unknown") {
-    return value;
-  }
+  if ((TAX_MODES as readonly unknown[]).includes(value)) return value as TaxMode;
   throw new Error(`OpenAI レスポンスの ${field} が不正です`);
 }
 
 export function parseRoundingMethod(value: unknown, field: string): RoundingMethod {
-  if (value === "floor" || value === "round" || value === "ceil" || value === "unknown") {
-    return value;
-  }
+  if ((ROUNDING_METHODS as readonly unknown[]).includes(value)) return value as RoundingMethod;
   throw new Error(`OpenAI レスポンスの ${field} が不正です`);
 }
 
@@ -70,18 +79,16 @@ export function parseOptionalString(value: unknown, fieldName: string): string |
   return value;
 }
 
-export function parseOptionalDocumentType(
-  value: unknown,
-): "receipt" | "convenience_payment" | "unknown" {
+export function parseOptionalDocumentType(value: unknown): AiExpenseDraftDocumentType {
   if (value === undefined || value === null) {
     return "unknown";
   }
-  if (value !== "receipt" && value !== "convenience_payment" && value !== "unknown") {
+  if (!(AI_EXPENSE_DRAFT_DOCUMENT_TYPES as readonly unknown[]).includes(value)) {
     throw new Error(
       'OpenAI レスポンスの documentType は "receipt", "convenience_payment", "unknown" のいずれかである必要があります',
     );
   }
-  return value;
+  return value as AiExpenseDraftDocumentType;
 }
 
 export function parseConfidence(value: unknown): ExtractionConfidence {
