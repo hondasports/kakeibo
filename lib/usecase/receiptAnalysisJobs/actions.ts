@@ -1,4 +1,8 @@
 import type { ReceiptAnalysisActionRunner } from "../../domain/receiptAnalysisJobs/actionRunner";
+import {
+  canAnalyzeReceiptAnalysisJob,
+  ReceiptAnalysisJobDomainError,
+} from "../../domain/receiptAnalysisJobs/rules";
 
 export async function analyzeReceiptImageJob(
   runner: ReceiptAnalysisActionRunner,
@@ -6,9 +10,12 @@ export async function analyzeReceiptImageJob(
 ): Promise<void> {
   await runner.assertConsent();
   const group = await runner.getMyGroup();
-  if (!group) throw new Error("グループを選択してください");
+  if (!group) throw new ReceiptAnalysisJobDomainError("グループを選択してください");
   const job = await runner.getJob(args.jobId);
-  if (job.groupId !== group.id) throw new Error("Job not found");
+  if (job.groupId !== group.id) throw new ReceiptAnalysisJobDomainError("Job not found");
+  // 有料解析の前に job の状態を確認する。upload/retry 経路では必ず queued になっており、
+  // それ以外の重複・遅延呼び出しは解析せず終了する（クライアントへエラーは返さない）。
+  if (!canAnalyzeReceiptAnalysisJob(job.status)) return;
   const startResult = await runner.startAttempt(args.jobId, job.draftId ?? null);
   if (startResult?.applied === false) return;
   await runner.waitForMockExtractor();

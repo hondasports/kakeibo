@@ -7,6 +7,8 @@ import { shouldRefreshLegacyDefaultCategoryColor, type DefaultCategory } from ".
 /** E2E テスト用カテゴリ名の prefix。presentation 層から再 export される。 */
 export const E2E_CATEGORY_NAME_PREFIX = "E2Eカテゴリ-";
 
+export class CategoryDomainError extends Error {}
+
 type ExistingSeedCategory = {
   name: string;
   description?: string;
@@ -45,7 +47,7 @@ export function buildSeedPatch(
 /** グループあたりのカテゴリ上限を検証する。 */
 export function assertCategoryLimit(count: number, max: number): void {
   if (count >= max) {
-    throw new Error("Category limit reached");
+    throw new CategoryDomainError("Category limit reached");
   }
 }
 
@@ -63,10 +65,10 @@ export function assertOwnedCategory<T extends { groupId: string }>(
   groupId: string,
 ): T {
   if (category === null) {
-    throw new Error("Category not found");
+    throw new CategoryDomainError("Category not found");
   }
   if (category.groupId !== groupId) {
-    throw new Error("Category does not belong to the current group");
+    throw new CategoryDomainError("Category does not belong to the current group");
   }
   return category;
 }
@@ -74,6 +76,6 @@ export function assertOwnedCategory<T extends { groupId: string }>(
 /** E2E 用カテゴリ名が必須 prefix を持つか検証する。 */
 export function assertE2eCategoryName(name: string): void {
   if (!name.startsWith(E2E_CATEGORY_NAME_PREFIX)) {
-    throw new Error("E2E category name must start with the E2E prefix");
+    throw new CategoryDomainError("E2E category name must start with the E2E prefix");
   }
 }

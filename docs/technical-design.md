@@ -1368,6 +1368,14 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 バッチ画像解析は `receiptAnalysisBatches` / `receiptAnalysisImageJobs` テーブルで管理する。
 各ジョブは `analyzeImageJob` action で非同期に処理され、完了時に internal の `finalizeBatchStatus` でバッチ状態を更新する。
 
+`analyzeImageJob` は job が `queued` のときだけ画像解析を実行し、それ以外の状態では解析せずに終了する。
+有料の解析呼び出しを不正な状態で開始しないよう、`updateJobStatus` も `running` への遷移時に
+job の現状態を検査する。`retryImageJob` が `failed` / `needs_review` を `queued` へ戻してから
+`analyzeImageJob` を呼ぶため、再試行も同じ経路で実行される。
+
+`createBatch` は1回につき10枚まで受け付ける。上限は `lib/domain/receiptAnalysisJobs/rules.ts` の
+`MAX_RECEIPT_ANALYSIS_BATCH_FILES` で定義し、超過時は batch・job を作成せず拒否する。
+
 `createBatch` 時に `receiptAnalysisBatches.createdByUserId` に実行ユーザーの `tokenIdentifier` を保存する。
 ジョブが `needs_review` など terminal 状態に更新されると、`updateJobStatus` は `aiReviewNotificationScheduledAt` を記録し、
 60 分後に `checkAiReviewRequired` をスケジュールする。60 分後に `needs_review` ジョブが残っていれば、
