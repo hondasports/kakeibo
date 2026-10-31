@@ -337,7 +337,11 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 
 ### 5.2 Convex モジュール分割方針
 
-- **公開 API**（`query` / `mutation` / `action` / `internal*`）は `convex/<domain>/` に置く。
+- **公開 API**（`query` / `mutation` / `action` / `internal*`）は、新しく作るものは `convex/<domain>/` に置く。
+  既存モジュールの一部は `convex/` 直下にある（上記ツリーの `systemAdmins.ts`・`systemAdmin*.ts`・
+  `accountDeletion*.ts`・`expenseSearch.ts`・`e2ePurge.ts`・`notificationSettings.ts`・`crons.ts`・
+  migration 系など）。`convex/<domain>/` へ移すと `api.<module>.<function>` のパスが変わり
+  既存クライアント・`internal.*` 参照と互換しなくなるため、直下の既存モジュールは移動せず維持する。
 - **純粋ヘルパー**（バリデーション、集計、外部 API 呼び出し本体、登録ロジック等）は `lib/convex/<domain>/` に置き、`convex/` から import する。
   `convex/` 配下の `.ts` は Convex が `api.d.ts` に載せるため、ヘルパーを増やしすぎると型推論が深くなりビルドが失敗しうる。
 - **HTTP** は `convex/http.ts` が router のみを担当し、E2E 用 handler は `convex/e2eHttp/` に分離する。
