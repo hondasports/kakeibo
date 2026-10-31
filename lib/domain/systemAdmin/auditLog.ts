@@ -3,6 +3,7 @@
  */
 import type { PaginatedResult, PaginationOpts } from "../pagination";
 import type { GroupMembershipStatus } from "../groups/role";
+import type { SystemAdminStatus } from "./systemAdminStore";
 
 export const SYSTEM_ADMIN_AUDIT_ACTIONS = [
   "system_admin_bootstrapped",
@@ -28,14 +29,26 @@ export const SYSTEM_ADMIN_AUDIT_ACTIONS = [
 
 export type SystemAdminAuditAction = (typeof SYSTEM_ADMIN_AUDIT_ACTIONS)[number];
 
-export type SystemAdminAuditActorType = "system" | "system_admin";
-export type SystemAdminAuditTargetKind =
-  | "system_admin"
-  | "user"
-  | "group"
-  | "invitation"
-  | "notification_setting";
-export type SystemAdminAuditResult = "success" | "denied";
+/** systemAdminAuditLogs.actorType の全値。schema・API validator はこの並びに合わせる。 */
+export const SYSTEM_ADMIN_AUDIT_ACTOR_TYPES = ["system", "system_admin"] as const;
+
+export type SystemAdminAuditActorType = (typeof SYSTEM_ADMIN_AUDIT_ACTOR_TYPES)[number];
+
+/** systemAdminAuditLogs.targetKind の全値。schema・API validator はこの並びに合わせる。 */
+export const SYSTEM_ADMIN_AUDIT_TARGET_KINDS = [
+  "system_admin",
+  "user",
+  "group",
+  "invitation",
+  "notification_setting",
+] as const;
+
+export type SystemAdminAuditTargetKind = (typeof SYSTEM_ADMIN_AUDIT_TARGET_KINDS)[number];
+
+/** systemAdminAuditLogs.result の全値。schema・API validator はこの並びに合わせる。 */
+export const SYSTEM_ADMIN_AUDIT_RESULTS = ["success", "denied"] as const;
+
+export type SystemAdminAuditResult = (typeof SYSTEM_ADMIN_AUDIT_RESULTS)[number];
 
 /** systemAdminAuditLogs ドキュメントのフィールド（書き込み用）。 */
 export type SystemAdminAuditLogFields = {
@@ -52,8 +65,8 @@ export type SystemAdminAuditLogFields = {
   queryType?: string;
   queryHash?: string;
   resultCount?: number;
-  previousStatus?: "active" | "revoked";
-  newStatus?: "active" | "revoked";
+  previousStatus?: SystemAdminStatus;
+  newStatus?: SystemAdminStatus;
   sourceGroupId?: string;
   sourceGroupNameSnapshot?: string;
   targetGroupId?: string;
