@@ -65,7 +65,11 @@ export type ExtractReceiptItemResult = {
   warnings: string[];
 };
 
-export type ExtractedTaxSummary = {
+/**
+ * 解釈前の抽出値としての税サマリ。`status`・`reasons` 等を持つ解釈後契約の
+ * ExtractedTaxSummary（lib/domain/receipt/tax/types.ts）とは同名を避けるため別名にする。
+ */
+export type ExtractedReceiptTaxSummary = {
   taxRatePercent: TaxRatePercent;
   taxMode: TaxMode;
   taxableAmountYen: number;
@@ -93,7 +97,7 @@ export type ExtractReceiptFieldsResult = {
   paymentPurpose?: string;
   categoryName?: string;
   items?: ExtractReceiptItemResult[];
-  taxSummaries?: ExtractedTaxSummary[];
+  taxSummaries?: ExtractedReceiptTaxSummary[];
   markerDefinitions?: ReceiptMarkerDefinition[];
   rawObservations?: ReceiptRawObservationLine[];
   confidence: ExtractionConfidence;

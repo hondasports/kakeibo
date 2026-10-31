@@ -22,7 +22,7 @@ export type { ReceiptRawObservationLine } from "../../../lib/domain/receipt/obse
 export type {
   ExtractionConfidence,
   ExtractedFields,
-  ExtractedTaxSummary,
+  ExtractedReceiptTaxSummary,
   ExtractReceiptFieldsResult,
   ExtractReceiptItemResult,
   ReceiptItemTaxRatePercent,

@@ -661,9 +661,12 @@ OpenAI 応答 envelope の取り出し・mock 結果は `lib/convex/receiptImage
   `buildReceiptExtractionPrompt`、JSONスキーマ `buildReceiptExtractionJsonSchema`、
   リクエストボディ `buildOpenAIReceiptExtractionRequestBody`）、
   `extractionResult.ts`（抽出結果の業務契約の正本: `ExtractReceiptFieldsResult`・
-  `ExtractReceiptItemResult`・`ExtractedTaxSummary`・`ExtractionConfidence`・
-  `ReceiptItemTaxRatePercent` 等。税率・amountBasis・行種別・観測行・マーカー定義は
-  `lib/domain/receipt/**` の正本を参照し、同じ型は複製しない）。
+  `ExtractReceiptItemResult`・`ExtractedReceiptTaxSummary`・`ExtractionConfidence`・
+  `ReceiptItemTaxRatePercent` 等。`ExtractedReceiptTaxSummary` は解釈前の抽出値で、
+  `status`/`reasons` 等を持つ解釈後契約の `ExtractedTaxSummary`
+  （`lib/domain/receipt/tax/types.ts`）とは別名にして区別する。税率・amountBasis・
+  行種別・観測行・マーカー定義は `lib/domain/receipt/**` の正本を参照し、
+  同じ型は複製しない）。
   OpenAI モデルは `RECEIPT_EXTRACTION_OPENAI_MODEL`（現在 `gpt-6-luna`）、
   reasoning 設定は `RECEIPT_EXTRACTION_REASONING`（`effort: "none"` 固定）の
   定数で一元管理し、環境変数では切り替えない。

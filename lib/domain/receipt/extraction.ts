@@ -12,7 +12,7 @@ import {
 import { normalizeReceiptDate } from "./receiptDate";
 import type {
   ExtractedFields,
-  ExtractedTaxSummary,
+  ExtractedReceiptTaxSummary,
   ExtractReceiptItemResult,
 } from "../receiptImageExtraction/extractionResult";
 import type { ReceiptMarkerDefinition } from "./tax/types";
@@ -402,7 +402,7 @@ function parseItemConfidence(
   };
 }
 
-function parseOptionalTaxSummaries(value: unknown): ExtractedTaxSummary[] | undefined {
+function parseOptionalTaxSummaries(value: unknown): ExtractedReceiptTaxSummary[] | undefined {
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value)) {
     throw new Error("OpenAI レスポンスの taxSummaries が配列ではありません");
@@ -410,7 +410,7 @@ function parseOptionalTaxSummaries(value: unknown): ExtractedTaxSummary[] | unde
   return value.map((summary, index) => parseTaxSummary(summary, index));
 }
 
-function parseTaxSummary(value: unknown, index: number): ExtractedTaxSummary {
+function parseTaxSummary(value: unknown, index: number): ExtractedReceiptTaxSummary {
   const field = `taxSummaries[${index}]`;
   if (typeof value !== "object" || value === null) {
     throw new Error(`OpenAI レスポンスの ${field} がオブジェクトではありません`);
@@ -454,7 +454,7 @@ function assertExtractedAmountRange(amount: number, field: string): void {
 function parseTaxSummaryConfidence(
   value: unknown,
   field: string,
-): ExtractedTaxSummary["confidence"] {
+): ExtractedReceiptTaxSummary["confidence"] {
   if (typeof value !== "object" || value === null) {
     throw new Error(`OpenAI レスポンスの ${field}.confidence がオブジェクトではありません`);
   }

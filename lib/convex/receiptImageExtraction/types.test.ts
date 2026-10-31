@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type {
   AmountBasis,
-  ExtractedTaxSummary,
+  ExtractedReceiptTaxSummary,
   ExtractReceiptFieldsResult,
   ExtractReceiptItemResult,
   ReceiptRawObservationLine,
@@ -39,7 +39,7 @@ describe("receipt extraction tax types", () => {
     expectTypeOf<ExtractReceiptItemResult["quantity"]>().toEqualTypeOf<number | undefined>();
     expectTypeOf<ExtractReceiptItemResult["unitPriceYen"]>().toEqualTypeOf<number | undefined>();
     expectTypeOf<ExtractReceiptFieldsResult["taxSummaries"]>().toEqualTypeOf<
-      ExtractedTaxSummary[] | undefined
+      ExtractedReceiptTaxSummary[] | undefined
     >();
   });
 });
