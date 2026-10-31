@@ -1,11 +1,13 @@
 import type { SpendingEntry } from "./spendingEntry";
+import type { EntryKind } from "../common/entryKind";
+import type { AiExpenseRegistrationMode } from "../aiExpenseDrafts/receiptDataContract";
 
 export type CategoryInfoMap = Map<string, { name: string; color: string }>;
 
 export type SummaryReceiptEntry = {
   _id: string;
   date: string;
-  type?: "expense" | "income";
+  type?: EntryKind;
   shopName?: string;
   bankName?: string;
   amountYen: number;
@@ -19,7 +21,7 @@ export type SummaryReceiptEntry = {
   receiptShopName?: string;
   receiptTotalAmountYen?: number;
   aiExpenseDraftId?: string;
-  registrationMode?: "detailed" | "totalOnly";
+  registrationMode?: AiExpenseRegistrationMode;
 };
 
 /** 支出エントリをサマリ応答項目へ変換する。カテゴリ情報が無い場合はフォールバックを使う。 */

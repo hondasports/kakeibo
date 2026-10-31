@@ -1,4 +1,6 @@
-export type ReceiptItemTaxConfirmedField = "amountBasis" | "taxRatePercent";
+export const RECEIPT_ITEM_TAX_CONFIRMED_FIELDS = ["amountBasis", "taxRatePercent"] as const;
+
+export type ReceiptItemTaxConfirmedField = (typeof RECEIPT_ITEM_TAX_CONFIRMED_FIELDS)[number];
 
 import type { ReceiptItemLineType } from "../discountItems";
 export const TAX_RATE_PERCENTS = [0, 8, 10] as const;
@@ -19,15 +21,22 @@ export const ROUNDING_METHODS = ["floor", "round", "ceil", "unknown"] as const;
 
 export type RoundingMethod = (typeof ROUNDING_METHODS)[number];
 
-export type PriceTaxTreatment = "included" | "excluded" | "perItem" | "unknown";
-export type TaxRateComposition = "rate8" | "rate10" | "mixed" | "unknown";
-export type ReceiptTaxDecisionSource =
-  | "user"
-  | "explicitLabel"
-  | "marker"
-  | "position"
-  | "reconciliation"
-  | "ai";
+export const PRICE_TAX_TREATMENTS = ["included", "excluded", "perItem", "unknown"] as const;
+
+export type PriceTaxTreatment = (typeof PRICE_TAX_TREATMENTS)[number];
+export const TAX_RATE_COMPOSITIONS = ["rate8", "rate10", "mixed", "unknown"] as const;
+
+export type TaxRateComposition = (typeof TAX_RATE_COMPOSITIONS)[number];
+export const RECEIPT_TAX_DECISION_SOURCES = [
+  "user",
+  "explicitLabel",
+  "marker",
+  "position",
+  "reconciliation",
+  "ai",
+] as const;
+
+export type ReceiptTaxDecisionSource = (typeof RECEIPT_TAX_DECISION_SOURCES)[number];
 
 export type ReceiptTaxDecisionCandidate = {
   priceTaxTreatment: PriceTaxTreatment;
@@ -43,7 +52,7 @@ export type ReceiptTaxAmountDecision = {
   printedTaxYen?: number;
   estimatedTaxYen?: number;
   roundingMethod: RoundingMethod;
-  source: "printed" | "estimated" | "unknown" | "user";
+  source: ReceiptTaxAmountDecisionSource;
 };
 
 export type ReceiptTaxDecision = ReceiptTaxDecisionCandidate & {
@@ -51,22 +60,45 @@ export type ReceiptTaxDecision = ReceiptTaxDecisionCandidate & {
   taxAmount: ReceiptTaxAmountDecision;
 };
 
-export type TaxSummaryDecisionStatus = "verified" | "ambiguous" | "contradictory";
-export type LegacyTaxSummaryConsistencyStatus = "coherent" | "reconcilable" | "conflicting";
-/** Legacy values remain readable until the observation contract migration in #667. */
-export type TaxSummaryConsistencyStatus =
-  | TaxSummaryDecisionStatus
-  | LegacyTaxSummaryConsistencyStatus;
+export const RECEIPT_TAX_AMOUNT_DECISION_SOURCES = [
+  "printed",
+  "estimated",
+  "unknown",
+  "user",
+] as const;
 
-export type TaxSummaryConsistencyReason =
-  | "included_mode_with_tax_excluded_basis"
-  | "external_mode_with_tax_included_basis"
-  | "tax_summary_amount_mismatch"
-  | "tax_included_amount_mismatch"
-  | "reconciled_to_included"
-  | "reconciled_to_external"
-  | "mixed_tax_mode"
-  | "unresolved_tax_summary";
+export type ReceiptTaxAmountDecisionSource = (typeof RECEIPT_TAX_AMOUNT_DECISION_SOURCES)[number];
+export const TAX_SUMMARY_DECISION_STATUSES = ["verified", "ambiguous", "contradictory"] as const;
+
+export type TaxSummaryDecisionStatus = (typeof TAX_SUMMARY_DECISION_STATUSES)[number];
+export const LEGACY_TAX_SUMMARY_CONSISTENCY_STATUSES = [
+  "coherent",
+  "reconcilable",
+  "conflicting",
+] as const;
+
+export type LegacyTaxSummaryConsistencyStatus =
+  (typeof LEGACY_TAX_SUMMARY_CONSISTENCY_STATUSES)[number];
+/** Legacy values remain readable until the observation contract migration in #667. */
+export const TAX_SUMMARY_CONSISTENCY_STATUSES = [
+  ...TAX_SUMMARY_DECISION_STATUSES,
+  ...LEGACY_TAX_SUMMARY_CONSISTENCY_STATUSES,
+] as const;
+
+export type TaxSummaryConsistencyStatus = (typeof TAX_SUMMARY_CONSISTENCY_STATUSES)[number];
+
+export const TAX_SUMMARY_CONSISTENCY_REASONS = [
+  "included_mode_with_tax_excluded_basis",
+  "external_mode_with_tax_included_basis",
+  "tax_summary_amount_mismatch",
+  "tax_included_amount_mismatch",
+  "reconciled_to_included",
+  "reconciled_to_external",
+  "mixed_tax_mode",
+  "unresolved_tax_summary",
+] as const;
+
+export type TaxSummaryConsistencyReason = (typeof TAX_SUMMARY_CONSISTENCY_REASONS)[number];
 
 export type TaxSummaryConsistency = {
   status: TaxSummaryDecisionStatus;
@@ -90,19 +122,26 @@ export type ExtractedReceiptItem = {
   warnings: string[];
 };
 
-export type TaxSummaryUserEditedField =
-  | "taxRatePercent"
-  | "taxMode"
-  | "taxableAmountYen"
-  | "taxableAmountBasis"
-  | "taxYen"
-  | "taxIncludedAmountYen";
+export const TAX_SUMMARY_USER_EDITED_FIELDS = [
+  "taxRatePercent",
+  "taxMode",
+  "taxableAmountYen",
+  "taxableAmountBasis",
+  "taxYen",
+  "taxIncludedAmountYen",
+] as const;
+
+export type TaxSummaryUserEditedField = (typeof TAX_SUMMARY_USER_EDITED_FIELDS)[number];
+
+export const TAX_SUMMARY_VALUE_ORIGIN_SOURCES = ["items", "user", "unknown"] as const;
+
+export type TaxSummaryValueOriginSource = (typeof TAX_SUMMARY_VALUE_ORIGIN_SOURCES)[number];
 
 export type ExtractedTaxSummary = {
   /** 対象額の出所とは別に、個別フィールドの手修正を保持する。 */
   userEditedFields?: TaxSummaryUserEditedField[];
   /** 未設定の旧データは出所不明として扱う。原文は別に保持する。 */
-  valueOrigin?: { source: "items" | "user" | "unknown"; previousTaxableAmountYen?: number };
+  valueOrigin?: { source: TaxSummaryValueOriginSource; previousTaxableAmountYen?: number };
   taxRatePercent: TaxRatePercent;
   taxMode: TaxMode;
   taxableAmountYen: number;
@@ -116,13 +155,24 @@ export type ExtractedTaxSummary = {
   reasons?: TaxSummaryConsistencyReason[];
 };
 
-export type TaxResolutionSource =
-  | "item_explicit"
-  | "single_summary"
-  | "summary_reconciliation"
-  | "remaining_summary"
-  | "marker_reconciled"
-  | "paid_total_reconciliation";
+export const TAX_RESOLUTION_SOURCES = [
+  "item_explicit",
+  "single_summary",
+  "summary_reconciliation",
+  "remaining_summary",
+  "marker_reconciled",
+  "paid_total_reconciliation",
+] as const;
+
+export type TaxResolutionSource = (typeof TAX_RESOLUTION_SOURCES)[number];
+
+export const TAX_RESOLUTION_STATUSES = ["resolved", "unresolved"] as const;
+
+export type TaxResolutionStatus = (typeof TAX_RESOLUTION_STATUSES)[number];
+
+export const TAX_ALLOCATION_STATUSES = ["allocated", "unallocated"] as const;
+
+export type TaxAllocationStatus = (typeof TAX_ALLOCATION_STATUSES)[number];
 
 export type TaxContextResolution =
   | {
@@ -141,7 +191,7 @@ export type TaxContextResolution =
 export type InterpretedReceiptItem = ExtractedReceiptItem & {
   taxContext: TaxContextResolution;
   allocatedTaxYen: number;
-  taxAllocationStatus?: "allocated" | "unallocated";
+  taxAllocationStatus?: TaxAllocationStatus;
   normalizedAmountYen: number;
 };
 
@@ -169,15 +219,18 @@ export type ReceiptTaxInterpretation = {
   warnings: string[];
 };
 
+export const RECEIPT_TOTAL_CANDIDATE_SOURCES = [
+  ...RECEIPT_TOTAL_SOURCES,
+  "payment_change",
+  "tax_summary_total",
+  "tax_arithmetic",
+] as const;
+
+export type ReceiptTotalCandidateSource = (typeof RECEIPT_TOTAL_CANDIDATE_SOURCES)[number];
+
 export type ReceiptTotalCandidate = {
   amountYen: number;
-  source:
-    | "explicit_label"
-    | "user_confirmed"
-    | "ai_estimate"
-    | "payment_change"
-    | "tax_summary_total"
-    | "tax_arithmetic";
+  source: ReceiptTotalCandidateSource;
   evidence: string;
 };
 

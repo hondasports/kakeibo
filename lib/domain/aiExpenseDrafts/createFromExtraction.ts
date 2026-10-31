@@ -12,8 +12,10 @@ import type {
   ReceiptMarkerDefinition,
   ReceiptTaxDecision,
   ReceiptTotalResolution,
+  TaxAllocationStatus,
   TaxRatePercent,
   TaxResolutionSource,
+  TaxResolutionStatus,
 } from "../receipt/tax/types";
 import { classifyCreatedDraft, type CreatedDraftClassificationInput } from "./classification";
 import type {
@@ -23,6 +25,7 @@ import type {
 } from "./constants";
 import {
   applyReceiptUserOverride,
+  RECEIPT_DATA_CONTRACT_VERSION,
   type ReceiptDraftValueSnapshot,
   type ReceiptUserOverrideSnapshot,
 } from "./receiptDataContract";
@@ -42,9 +45,9 @@ export type ExtractedDraftItemInput<TCategoryId extends string = string> = {
   markers?: string[];
   taxMarker?: string;
   allocatedTaxYen?: number;
-  taxAllocationStatus?: "allocated" | "unallocated";
+  taxAllocationStatus?: TaxAllocationStatus;
   normalizedAmountYen?: number;
-  taxResolutionStatus?: "resolved" | "unresolved";
+  taxResolutionStatus?: TaxResolutionStatus;
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
   taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
@@ -154,7 +157,7 @@ export function buildExtractedDraftFields<TCategoryId extends string, TGroupId e
       taxSummaries: values.taxSummaries,
       receiptTotalResolution: values.receiptTotalResolution,
       receiptTaxDecision: values.receiptTaxDecision,
-      receiptDataContractVersion: 1 as const,
+      receiptDataContractVersion: RECEIPT_DATA_CONTRACT_VERSION,
       markerDefinitions: values.markerDefinitions,
       categoryId: values.categoryId,
       confidence: values.confidence,

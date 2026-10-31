@@ -1,7 +1,10 @@
+import type { EntryKind } from "../common/entryKind";
+import type { AiExpenseRegistrationMode } from "../aiExpenseDrafts/receiptDataContract";
+
 export type SpendingEntry = {
   _id: string;
   date: string;
-  type?: "expense" | "income";
+  type?: EntryKind;
   shopName?: string;
   bankName?: string;
   amountYen: number;
@@ -13,7 +16,7 @@ export type SpendingEntry = {
   receiptShopName?: string;
   receiptTotalAmountYen?: number;
   aiExpenseDraftId?: string;
-  registrationMode?: "detailed" | "totalOnly";
+  registrationMode?: AiExpenseRegistrationMode;
 };
 
 export type IncomeListEntry = {
@@ -29,7 +32,7 @@ export type IncomeListEntry = {
 export type ReceiptForSpending = {
   _id: string;
   date: string;
-  type?: "expense" | "income";
+  type?: EntryKind;
   shopName?: string;
   bankName?: string;
   amountYen: number;
@@ -58,7 +61,7 @@ export type ExpenseEntryForSpending = {
   categoryId?: string | null | undefined;
   title?: string;
   memo?: string;
-  entryType: "expense" | "income";
+  entryType: EntryKind;
   sourceDocumentId?: string;
   aiExpenseDraftId?: string;
 };
@@ -152,7 +155,7 @@ export type EnrichSpendingEntryAiExpenseDraft = {
   shopName?: string;
   payeeName?: string;
   amountYen?: number;
-  registrationMode?: "detailed" | "totalOnly";
+  registrationMode?: AiExpenseRegistrationMode;
 };
 
 export type EnrichSpendingEntryAiExpenseDraftItem = {

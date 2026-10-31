@@ -4,10 +4,9 @@
  */
 import type { ExtractionEnvironment } from "./rules";
 
-export type ReceiptCategoryHint = {
-  name: string;
-  description?: string;
-};
+// 抽出リクエスト構築側（extractionRequest）が値の正本を持つため、ここでは再定義しない。
+export type { ReceiptCategoryHint } from "./extractionRequest";
+import type { ReceiptCategoryHint } from "./extractionRequest";
 
 export type ExtractReceiptFieldsInput = {
   imageDataUrl: string;

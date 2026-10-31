@@ -2,7 +2,9 @@ import type {
   AmountBasis,
   ExtractedTaxSummary,
   TaxContextResolution,
+  TaxRatePercent,
   TaxResolutionSource,
+  TaxResolutionStatus,
 } from "../receipt/tax/types";
 import type { ReviewItemValues } from "./reviewTypes";
 import { ITEM_IDENTITY_CHANGED } from "../receipt/tax/itemTaxConfirmation";
@@ -21,7 +23,7 @@ export type ReceiptItemTaxViewModel = {
   taxRateLabel: string;
   amountBasisLabel: string;
   allocatedTaxLabel: string;
-  status: "resolved" | "unresolved";
+  status: TaxResolutionStatus;
   resolutionReasonLabel?: string;
   reviewReasonLabels: string[];
   markerLabels: string[];
@@ -29,9 +31,9 @@ export type ReceiptItemTaxViewModel = {
 };
 
 type TaxContextSourceItem = {
-  taxResolutionStatus?: "resolved" | "unresolved";
+  taxResolutionStatus?: TaxResolutionStatus;
   taxResolutionSource?: TaxResolutionSource;
-  taxRatePercent?: 0 | 8 | 10 | null;
+  taxRatePercent?: TaxRatePercent | null;
   amountBasis?: AmountBasis;
   taxReviewReasons?: string[];
 };

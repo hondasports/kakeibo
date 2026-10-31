@@ -13,6 +13,7 @@ import type {
 import type {
   AiExpenseRegistrationMode,
   DerivedRegistrationSnapshot,
+  ReceiptDataContractVersion,
   ReceiptInterpretationSnapshot,
   ReceiptUserOverrideSnapshot,
 } from "./receiptDataContract";
@@ -44,7 +45,7 @@ export type AiExpenseDraftFields = {
   taxSummaries?: ExtractedTaxSummary[];
   receiptTotalResolution?: ReceiptTotalResolution;
   receiptTaxDecision?: ReceiptTaxDecision;
-  receiptDataContractVersion?: 1;
+  receiptDataContractVersion?: ReceiptDataContractVersion;
   rawObservation?: ReceiptRawObservation;
   receiptInterpretation?: ReceiptInterpretationSnapshot;
   receiptUserOverride?: ReceiptUserOverrideSnapshot;
