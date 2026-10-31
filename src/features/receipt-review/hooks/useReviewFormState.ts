@@ -25,7 +25,10 @@ import {
   prepareReviewItemsForSubmit,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewItemCategories";
 import { isDiscountItemName, isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
-import { applyReviewItemsTaxPreview } from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
+import {
+  applyReviewItemsTaxPreview,
+  buildReviewTaxEvidence,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
 import { reconcileNegativeLineWarnings } from "../utils/negativeLineWarnings";
 
 export function useReviewFormState({
@@ -59,15 +62,8 @@ export function useReviewFormState({
     setReviewForm({ ...mappedForm, categoryId: categoryState.receiptCategoryId });
     setReviewItems(
       applyReviewItemsTaxPreview(categoryState.items, {
+        ...buildReviewTaxEvidence(selectedReviewDraft),
         paidTotalYen: Number(mappedForm.amountYen),
-        taxSummaries: selectedReviewDraft.taxSummaries,
-        sourceTaxSummaries: selectedReviewDraft.receiptInterpretation?.values.taxSummaries,
-        markerDefinitions: selectedReviewDraft.markerDefinitions,
-        rawObservation: selectedReviewDraft.rawObservation,
-        receiptLineClassifications:
-          selectedReviewDraft.receiptInterpretation?.values.receiptLineClassifications,
-        receiptTotalResolution: selectedReviewDraft.receiptTotalResolution,
-        receiptUserOverride: selectedReviewDraft.receiptUserOverride,
         priceTaxTreatment: mappedForm.priceTaxTreatment,
         taxRateComposition: mappedForm.taxRateComposition,
       }),
@@ -111,15 +107,8 @@ export function useReviewFormState({
             return { ...confirmItemTaxRate(item, rate), confirmedTaxRatePercent: rate };
           }),
           {
+            ...buildReviewTaxEvidence(selectedReviewDraft),
             paidTotalYen: Number(reviewForm.amountYen),
-            taxSummaries: selectedReviewDraft?.taxSummaries,
-            sourceTaxSummaries: selectedReviewDraft?.receiptInterpretation?.values.taxSummaries,
-            markerDefinitions: selectedReviewDraft?.markerDefinitions,
-            rawObservation: selectedReviewDraft?.rawObservation,
-            receiptLineClassifications:
-              selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
-            receiptTotalResolution: selectedReviewDraft?.receiptTotalResolution,
-            receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
             priceTaxTreatment: nextPriceTaxTreatment as ReviewFormValues["priceTaxTreatment"],
             taxRateComposition: nextTaxRateComposition as ReviewFormValues["taxRateComposition"],
           },
@@ -129,15 +118,8 @@ export function useReviewFormState({
     if (field === "amountYen") {
       setReviewItems((current) =>
         applyReviewItemsTaxPreview(current, {
+          ...buildReviewTaxEvidence(selectedReviewDraft),
           paidTotalYen: Number(value),
-          taxSummaries: selectedReviewDraft?.taxSummaries,
-          sourceTaxSummaries: selectedReviewDraft?.receiptInterpretation?.values.taxSummaries,
-          markerDefinitions: selectedReviewDraft?.markerDefinitions,
-          rawObservation: selectedReviewDraft?.rawObservation,
-          receiptLineClassifications:
-            selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
-          receiptTotalResolution: selectedReviewDraft?.receiptTotalResolution,
-          receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
           priceTaxTreatment: reviewForm.priceTaxTreatment,
           taxRateComposition: reviewForm.taxRateComposition,
         }),
@@ -260,15 +242,8 @@ export function useReviewFormState({
 
       const paidTotalYen = Number(reviewForm.amountYen);
       return applyReviewItemsTaxPreview(updated, {
+        ...buildReviewTaxEvidence(selectedReviewDraft),
         paidTotalYen: Number.isFinite(paidTotalYen) ? paidTotalYen : undefined,
-        taxSummaries: selectedReviewDraft?.taxSummaries,
-        sourceTaxSummaries: selectedReviewDraft?.receiptInterpretation?.values.taxSummaries,
-        markerDefinitions: selectedReviewDraft?.markerDefinitions,
-        rawObservation: selectedReviewDraft?.rawObservation,
-        receiptLineClassifications:
-          selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
-        receiptTotalResolution: selectedReviewDraft?.receiptTotalResolution,
-        receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
         priceTaxTreatment: reviewForm.priceTaxTreatment,
         taxRateComposition: reviewForm.taxRateComposition,
       });
@@ -316,15 +291,8 @@ export function useReviewFormState({
           (selectedBasis === undefined || item.amountBasis === selectedBasis),
       );
       return applyReviewItemsTaxPreview(remaining, {
+        ...buildReviewTaxEvidence(selectedReviewDraft),
         paidTotalYen: Number(reviewForm.amountYen),
-        taxSummaries: selectedReviewDraft?.taxSummaries,
-        sourceTaxSummaries: selectedReviewDraft?.receiptInterpretation?.values.taxSummaries,
-        markerDefinitions: selectedReviewDraft?.markerDefinitions,
-        rawObservation: selectedReviewDraft?.rawObservation,
-        receiptLineClassifications:
-          selectedReviewDraft?.receiptInterpretation?.values.receiptLineClassifications,
-        receiptTotalResolution: selectedReviewDraft?.receiptTotalResolution,
-        receiptUserOverride: selectedReviewDraft?.receiptUserOverride,
         ...(preserveReceiptChoice
           ? {
               priceTaxTreatment: reviewForm.priceTaxTreatment,

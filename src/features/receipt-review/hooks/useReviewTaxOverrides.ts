@@ -1,5 +1,8 @@
 import { api } from "../../../../convex/_generated/api";
-import { applyReviewItemsTaxPreview } from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
+import {
+  applyReviewItemsTaxPreview,
+  buildReviewTaxEvidence,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
 import type { Dispatch, SetStateAction } from "react";
 import { mergeReviewTaxItems } from "../utils/reviewTaxItemMerge";
 import { useMutation } from "convex/react";
@@ -73,15 +76,8 @@ export function useReviewTaxOverrides({
             rateConfirmation ? [rateConfirmation] : undefined,
           ),
           {
+            ...buildReviewTaxEvidence(result.draft),
             paidTotalYen: result.draft.amountYen,
-            taxSummaries: result.draft.taxSummaries,
-            sourceTaxSummaries: result.draft.receiptInterpretation?.values.taxSummaries,
-            markerDefinitions: result.draft.markerDefinitions,
-            rawObservation: result.draft.rawObservation,
-            receiptLineClassifications:
-              result.draft.receiptInterpretation?.values.receiptLineClassifications,
-            receiptTotalResolution: result.draft.receiptTotalResolution,
-            receiptUserOverride: result.draft.receiptUserOverride,
           },
         ),
       );
@@ -127,15 +123,8 @@ export function useReviewTaxOverrides({
             }),
           ),
           {
+            ...buildReviewTaxEvidence(result.draft),
             paidTotalYen: result.draft.amountYen,
-            taxSummaries: result.draft.taxSummaries,
-            sourceTaxSummaries: result.draft.receiptInterpretation?.values.taxSummaries,
-            markerDefinitions: result.draft.markerDefinitions,
-            rawObservation: result.draft.rawObservation,
-            receiptLineClassifications:
-              result.draft.receiptInterpretation?.values.receiptLineClassifications,
-            receiptTotalResolution: result.draft.receiptTotalResolution,
-            receiptUserOverride: result.draft.receiptUserOverride,
           },
         ),
       );

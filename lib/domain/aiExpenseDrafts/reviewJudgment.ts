@@ -1,7 +1,11 @@
 import { buildReviewChecks } from "./reviewChecks";
 import { getReviewGuidance } from "./reviewGuidance";
 import { initializeReviewCategoryState } from "./reviewItemCategories";
-import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
+import {
+  applyReviewItemsTaxPreview,
+  buildReviewTaxEvidence,
+  buildReviewTaxPreview,
+} from "./reviewItemsTaxPreview";
 import { mapDraftItemsToReviewItems, mapDraftToReviewForm } from "./reviewDraftMapping";
 import type { AiExpenseDraftJudgmentInput } from "./reviewTypes";
 
@@ -36,14 +40,8 @@ export function isAmountAndTaxResolved(draft: AiExpenseDraftJudgmentInput): bool
   );
   const form = { ...mappedForm, categoryId: categoryState.receiptCategoryId };
   const previewArgs = {
+    ...buildReviewTaxEvidence(draft),
     paidTotalYen,
-    taxSummaries: draft.taxSummaries,
-    sourceTaxSummaries: draft.receiptInterpretation?.values.taxSummaries,
-    markerDefinitions: draft.markerDefinitions,
-    rawObservation: draft.rawObservation,
-    receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
-    receiptTotalResolution: draft.receiptTotalResolution,
-    receiptUserOverride: draft.receiptUserOverride,
     priceTaxTreatment: form.priceTaxTreatment,
     taxRateComposition: form.taxRateComposition,
   };
