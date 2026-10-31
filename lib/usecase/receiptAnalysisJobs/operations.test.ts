@@ -1,13 +1,77 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ReceiptAnalysisJobRecord } from "../../domain/receiptAnalysisJobs/records";
-import { ReceiptAnalysisJobDomainError } from "../../domain/receiptAnalysisJobs/rules";
+import {
+  MAX_RECEIPT_ANALYSIS_BATCH_FILES,
+  ReceiptAnalysisJobDomainError,
+} from "../../domain/receiptAnalysisJobs/rules";
 import type { ReceiptAnalysisStore } from "../../domain/receiptAnalysisJobs/store";
 import {
+  createReceiptAnalysisBatch,
   finalizeReceiptAnalysisAttempt,
   deleteReceiptAnalysisDataByUserBatch,
   retryReceiptAnalysisJob,
   updateReceiptAnalysisJobStatus,
 } from "./operations";
+
+describe("createReceiptAnalysisBatch", () => {
+  const fileNames = (count: number) =>
+    Array.from({ length: count }, (_, index) => `receipt-${index}.png`);
+
+  it("上限10件はbatchとjobを全件作成する", async () => {
+    const jobs = new Map<string, ReceiptAnalysisJobRecord>();
+    const store = {
+      insertBatch: vi.fn().mockResolvedValue("batch-1"),
+      insertJob: vi.fn().mockImplementation(async (fields: { imageIndex: number }) => {
+        const id = `job-${fields.imageIndex}`;
+        jobs.set(id, { id, ...fields } as ReceiptAnalysisJobRecord);
+        return id;
+      }),
+      getJob: vi.fn().mockImplementation(async (id: string) => jobs.get(id) ?? null),
+      getBatch: vi
+        .fn()
+        .mockResolvedValue({ id: "batch-1", totalCount: MAX_RECEIPT_ANALYSIS_BATCH_FILES }),
+    } as unknown as ReceiptAnalysisStore;
+
+    const result = await createReceiptAnalysisBatch(
+      store,
+      "group-1",
+      "user-1",
+      fileNames(MAX_RECEIPT_ANALYSIS_BATCH_FILES),
+    );
+
+    expect(result.jobs).toHaveLength(MAX_RECEIPT_ANALYSIS_BATCH_FILES);
+    expect(store.insertBatch).toHaveBeenCalledTimes(1);
+    expect(store.insertJob).toHaveBeenCalledTimes(MAX_RECEIPT_ANALYSIS_BATCH_FILES);
+  });
+
+  it("上限を超える11件はドメインエラーで拒否しbatchもjobも作らない", async () => {
+    const store = {
+      insertBatch: vi.fn(),
+      insertJob: vi.fn(),
+      getJob: vi.fn(),
+      getBatch: vi.fn(),
+    } as unknown as ReceiptAnalysisStore;
+
+    await expect(
+      createReceiptAnalysisBatch(
+        store,
+        "group-1",
+        "user-1",
+        fileNames(MAX_RECEIPT_ANALYSIS_BATCH_FILES + 1),
+      ),
+    ).rejects.toBeInstanceOf(ReceiptAnalysisJobDomainError);
+    await expect(
+      createReceiptAnalysisBatch(
+        store,
+        "group-1",
+        "user-1",
+        fileNames(MAX_RECEIPT_ANALYSIS_BATCH_FILES + 1),
+      ),
+    ).rejects.toThrow("一度に解析できるのは10枚までです");
+    expect(store.insertBatch).not.toHaveBeenCalled();
+    expect(store.insertJob).not.toHaveBeenCalled();
+  });
+});
 
 describe("updateReceiptAnalysisJobStatus", () => {
   const deps = (store: Partial<ReceiptAnalysisStore>) => ({

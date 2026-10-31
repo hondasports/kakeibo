@@ -13,6 +13,9 @@ export const RECEIPT_ANALYSIS_RETRY_DRAFT_STATUSES = ["needs_review", "failed"] 
 export const MAX_RECEIPT_ANALYSIS_DRAFT_IDS =
   AI_EXPENSE_DRAFT_LIST_LIMIT * RECEIPT_ANALYSIS_RETRY_DRAFT_STATUSES.length;
 
+// 1回の画像解析バッチで受け付ける最大枚数。有料の解析呼び出し件数をサーバー側で制限する
+export const MAX_RECEIPT_ANALYSIS_BATCH_FILES = 10;
+
 export function canRetryReceiptAnalysisJob(status: ReceiptAnalysisJobStatus): boolean {
   return status === "failed" || status === "needs_review";
 }

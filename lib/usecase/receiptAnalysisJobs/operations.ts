@@ -12,6 +12,7 @@ import {
   canCancelReceiptAnalysisJob,
   canRetryReceiptAnalysisJob,
   clampReceiptAnalysisCleanupLimit,
+  MAX_RECEIPT_ANALYSIS_BATCH_FILES,
   ReceiptAnalysisJobDomainError,
   resolveReceiptAnalysisBatchStatus,
   shouldScheduleAiReviewNotification,
@@ -43,6 +44,10 @@ export async function createReceiptAnalysisBatch(
 ): Promise<{ batch: ReceiptAnalysisBatchRecord; jobs: ReceiptAnalysisJobRecord[] }> {
   if (fileNames.length === 0)
     throw new ReceiptAnalysisJobDomainError("At least one image file is required");
+  if (fileNames.length > MAX_RECEIPT_ANALYSIS_BATCH_FILES)
+    throw new ReceiptAnalysisJobDomainError(
+      `一度に解析できるのは${MAX_RECEIPT_ANALYSIS_BATCH_FILES}枚までです`,
+    );
   const batchId = await store.insertBatch({
     groupId,
     createdByUserId: userId,
