@@ -12,8 +12,6 @@ export type ExtractReceiptFieldsInput = {
   imageDataUrl: string;
   telemetryId?: string;
   categories?: ReceiptCategoryHint[];
-  /** @deprecated Use categories so descriptions reach the extractor. */
-  categoryNames?: string[];
 };
 
 /** 抽出結果の型は infra の OpenAI schema 由来のため、ここでは総称型で扱う。 */
