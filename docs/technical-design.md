@@ -1373,6 +1373,14 @@ job の現状態を検査する。`retryImageJob` が `failed` / `needs_review` 
 `createBatch` は1回につき10枚まで受け付ける。上限は `lib/domain/receiptAnalysisJobs/rules.ts` の
 `MAX_RECEIPT_ANALYSIS_BATCH_FILES` で定義し、超過時は batch・job を作成せず拒否する。
 
+`running` のまま `updatedAt` が `RECEIPT_ANALYSIS_STALE_JOB_MS`（45分）を超えた job は、
+起動元の action が実行上限（Convex runtime の action は30分）で既に止まっているとみなし、
+cron の `recoverStaleReceiptAnalysisJobs`（5分間隔）が `failed` に確定する。
+1回の実行あたり最大 `RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE`（100件）まで処理し、
+`failed` への遷移は通常の `updateJobStatus` と同じ経路（終端通知の予約を含む）で行う。
+回復後に遅れて届いた解析結果は `finalizeAnalysisAttempt` が `running` 以外の job への
+書き込みを受理しないため破棄され、job は `failed` のまま利用者が再試行できる。
+
 `createBatch` 時に `receiptAnalysisBatches.createdByUserId` に実行ユーザーの `tokenIdentifier` を保存する。
 ジョブが `needs_review` など terminal 状態に更新されると、`updateJobStatus` は `aiReviewNotificationScheduledAt` を記録し、
 60 分後に `checkAiReviewRequired` をスケジュールする。60 分後に `needs_review` ジョブが残っていれば、

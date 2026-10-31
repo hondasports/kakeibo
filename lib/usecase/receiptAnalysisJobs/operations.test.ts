@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { ReceiptAnalysisJobRecord } from "../../domain/receiptAnalysisJobs/records";
 import {
   MAX_RECEIPT_ANALYSIS_BATCH_FILES,
+  RECEIPT_ANALYSIS_STALE_JOB_ERROR,
+  RECEIPT_ANALYSIS_STALE_JOB_MS,
+  RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
   ReceiptAnalysisJobDomainError,
 } from "../../domain/receiptAnalysisJobs/rules";
 import type { ReceiptAnalysisStore } from "../../domain/receiptAnalysisJobs/store";
@@ -9,6 +12,7 @@ import {
   createReceiptAnalysisBatch,
   finalizeReceiptAnalysisAttempt,
   deleteReceiptAnalysisDataByUserBatch,
+  recoverStaleReceiptAnalysisJobs,
   retryReceiptAnalysisJob,
   updateReceiptAnalysisJobStatus,
 } from "./operations";
@@ -297,4 +301,140 @@ it("旧actionのjobが消失してgroupも不明なら推測でdraftを削除し
     ),
   ).resolves.toEqual({ applied: false });
   expect(store.deleteDraftAndItems).not.toHaveBeenCalled();
+});
+
+describe("recoverStaleReceiptAnalysisJobs", () => {
+  const staleRunningJob = (overrides: Partial<ReceiptAnalysisJobRecord> = {}) =>
+    ({
+      id: "job-stale",
+      creationTime: 1,
+      batchId: "batch-1",
+      groupId: "group-1",
+      imageIndex: 0,
+      fileName: "receipt.png",
+      status: "running",
+      createdAt: 1,
+      updatedAt: 1,
+      ...overrides,
+    }) as ReceiptAnalysisJobRecord;
+
+  const deps = (store: Partial<ReceiptAnalysisStore>) => ({
+    store: store as ReceiptAnalysisStore,
+    scheduler: { scheduleAiReviewCheck: vi.fn() },
+  });
+
+  it("古い running job を failed に確定し、利用者向けの日本語エラーと通知予約を既存遷移で行う", async () => {
+    const now = 10 * RECEIPT_ANALYSIS_STALE_JOB_MS;
+    const job = staleRunningJob({ updatedAt: now - RECEIPT_ANALYSIS_STALE_JOB_MS - 1 });
+    const d = deps({
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([job]),
+      getJob: vi.fn().mockResolvedValue(job),
+      getBatch: vi.fn().mockResolvedValue({ id: "batch-1" }),
+      patchJob: vi.fn(),
+      patchBatch: vi.fn(),
+    });
+    const result = await recoverStaleReceiptAnalysisJobs(d, now);
+
+    expect(d.store.listJobsByStatusUpdatedBefore).toHaveBeenCalledWith(
+      "running",
+      now - RECEIPT_ANALYSIS_STALE_JOB_MS,
+      RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
+    );
+    expect(d.store.patchJob).toHaveBeenCalledWith(
+      "job-stale",
+      expect.objectContaining({ status: "failed", error: RECEIPT_ANALYSIS_STALE_JOB_ERROR }),
+    );
+    expect(d.store.patchBatch).toHaveBeenCalledWith(
+      "batch-1",
+      expect.objectContaining({ aiReviewNotificationScheduledAt: now }),
+    );
+    expect(d.scheduler.scheduleAiReviewCheck).toHaveBeenCalledWith(60 * 60 * 1000, "batch-1");
+    expect(result).toEqual({ recoveredCount: 1 });
+  });
+
+  it("running 以外の job が返ってきても状態を変えない", async () => {
+    const store = {
+      listJobsByStatusUpdatedBefore: vi
+        .fn()
+        .mockResolvedValue([staleRunningJob({ status: "ready" })]),
+      getJob: vi.fn().mockResolvedValue(staleRunningJob({ status: "ready" })),
+      patchJob: vi.fn(),
+    } as unknown as ReceiptAnalysisStore;
+    const result = await recoverStaleReceiptAnalysisJobs(deps(store), 1000);
+
+    expect(store.patchJob).not.toHaveBeenCalled();
+    expect(result).toEqual({ recoveredCount: 0 });
+  });
+
+  it("一覧が空なら何もしない", async () => {
+    const store = {
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([]),
+      getJob: vi.fn(),
+      patchJob: vi.fn(),
+    } as unknown as ReceiptAnalysisStore;
+    const result = await recoverStaleReceiptAnalysisJobs(deps(store), 1000);
+
+    expect(store.getJob).not.toHaveBeenCalled();
+    expect(store.patchJob).not.toHaveBeenCalled();
+    expect(result).toEqual({ recoveredCount: 0 });
+  });
+});
+
+describe("回復と遅れて終わる解析の競合", () => {
+  it("failed 確定後に届く finalize は新しい draft だけ破棄して状態を維持する", async () => {
+    const store = {
+      getJob: vi.fn().mockResolvedValue({
+        id: "job-1",
+        batchId: "batch-1",
+        groupId: "group-1",
+        status: "failed",
+      }),
+      deleteDraftAndItems: vi.fn(),
+      clearJobFields: vi.fn(),
+      patchJob: vi.fn(),
+    } as unknown as ReceiptAnalysisStore;
+    const result = await finalizeReceiptAnalysisAttempt(
+      { store, scheduler: { scheduleAiReviewCheck: vi.fn() } },
+      {
+        jobId: "job-1",
+        groupId: "group-1",
+        expectedDraftId: null,
+        newDraftId: "draft-late",
+        status: "ready",
+      },
+    );
+
+    expect(result).toEqual({ applied: false });
+    expect(store.deleteDraftAndItems).toHaveBeenCalledWith("draft-late", "group-1");
+    expect(store.clearJobFields).not.toHaveBeenCalled();
+    expect(store.patchJob).not.toHaveBeenCalled();
+  });
+
+  it("ready 確定後に届く重複 finalize も新しい draft だけ破棄して状態を維持する", async () => {
+    const store = {
+      getJob: vi.fn().mockResolvedValue({
+        id: "job-1",
+        batchId: "batch-1",
+        groupId: "group-1",
+        status: "ready",
+        draftId: "draft-won",
+      }),
+      deleteDraftAndItems: vi.fn(),
+      clearJobFields: vi.fn(),
+    } as unknown as ReceiptAnalysisStore;
+    const result = await finalizeReceiptAnalysisAttempt(
+      { store, scheduler: { scheduleAiReviewCheck: vi.fn() } },
+      {
+        jobId: "job-1",
+        groupId: "group-1",
+        expectedDraftId: "draft-won",
+        newDraftId: "draft-late",
+        status: "ready",
+      },
+    );
+
+    expect(result).toEqual({ applied: false });
+    expect(store.deleteDraftAndItems).toHaveBeenCalledWith("draft-late", "group-1");
+    expect(store.clearJobFields).not.toHaveBeenCalled();
+  });
 });

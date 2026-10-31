@@ -8,6 +8,7 @@ import {
   getBatchByIdHandler,
   getJobByIdHandler,
   incrementBatchProcessedCountHandler,
+  recoverStaleReceiptAnalysisJobsHandler,
   scheduleAiReviewNotificationIfNeeded,
   updateJobStatusHandler,
 } from "./internal";
@@ -772,5 +773,100 @@ describe("listJobsByDraftIdsHandler", () => {
     const queriedTables = vi.mocked(ctx.db.query).mock.calls.map(([table]) => table);
     expect(queriedTables.filter((table) => table === "groupMembers")).toHaveLength(1);
     expect(queriedTables.filter((table) => table === "receiptAnalysisImageJobs")).toHaveLength(2);
+  });
+});
+
+describe("recoverStaleReceiptAnalysisJobsHandler", () => {
+  it("古い running job を failed に確定し、終端遷移として通知も予約する", async () => {
+    const staleJob = {
+      _id: "job-stale",
+      batchId: "batch-1",
+      groupId: GROUP_ID,
+      status: "running",
+      updatedAt: 1,
+    };
+    const ctx = createInternalCtx({
+      docs: {
+        "job-stale": staleJob,
+        "batch-1": { _id: "batch-1" },
+      },
+      jobs: [staleJob],
+    });
+
+    await expect(recoverStaleReceiptAnalysisJobsHandler(ctx)).resolves.toEqual({
+      recoveredCount: 1,
+    });
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "job-stale",
+      expect.objectContaining({ status: "failed", error: expect.any(String) }),
+    );
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "batch-1",
+      expect.objectContaining({ aiReviewNotificationScheduledAt: expect.any(Number) }),
+    );
+    expect(ctx.scheduler.runAfter).toHaveBeenCalledTimes(1);
+  });
+
+  it("回復で failed にした job への遅着 finalize は新しい draft を破棄して failed を維持する", async () => {
+    const docs = new Map<string, Record<string, unknown>>([
+      [
+        "job-1",
+        {
+          _id: "job-1",
+          batchId: "batch-1",
+          groupId: GROUP_ID,
+          status: "running",
+          updatedAt: 1,
+        },
+      ],
+      ["batch-1", { _id: "batch-1" }],
+      ["draft-late", { _id: "draft-late", groupId: GROUP_ID, status: "ready" }],
+    ]);
+    const staleRows = [docs.get("job-1")];
+    const removed: string[] = [];
+    const ctx = {
+      db: {
+        get: vi.fn(async (id: string) => docs.get(id) ?? null),
+        patch: vi.fn(async (id: string, values: Record<string, unknown>) => {
+          docs.set(id, { ...(docs.get(id) ?? {}), ...values });
+        }),
+        delete: vi.fn(async (id: string) => {
+          removed.push(id);
+          docs.delete(id);
+        }),
+        query: vi.fn((tableName: string) => ({
+          withIndex: vi.fn((_indexName: string, builder?: (q: unknown) => unknown) => {
+            const q = {
+              eq: vi.fn().mockImplementation(() => q),
+              lt: vi.fn().mockImplementation(() => q),
+            };
+            builder?.(q);
+            return {
+              take: vi.fn(async () => (tableName === "receiptAnalysisImageJobs" ? staleRows : [])),
+              collect: vi.fn(async () => []),
+              unique: vi.fn(async () => null),
+            };
+          }),
+        })),
+      },
+      scheduler: { runAfter: vi.fn() },
+    } as unknown as MutationCtx;
+
+    await expect(recoverStaleReceiptAnalysisJobsHandler(ctx)).resolves.toEqual({
+      recoveredCount: 1,
+    });
+    expect(docs.get("job-1")).toMatchObject({ status: "failed", error: expect.any(String) });
+
+    const late = await finalizeAnalysisAttemptHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
+      jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
+      expectedDraftId: null,
+      newDraftId: "draft-late" as Id<"aiExpenseDrafts">,
+      status: "ready",
+    });
+
+    expect(late).toEqual({ applied: false });
+    expect(docs.get("job-1")).toMatchObject({ status: "failed", error: expect.any(String) });
+    expect(removed).toContain("draft-late");
   });
 });

@@ -47,5 +47,45 @@ describe.each([createReceiptAnalysisReader, createReceiptAnalysisStore])(
         },
       ]);
     });
+
+    it("stale 検索は by_status_and_updated_at index で絞り、件数上限を付ける", async () => {
+      const calls: Array<{ index: string; ops: unknown[][] }> = [];
+      const taken: number[] = [];
+      const query = vi.fn(() => ({
+        withIndex: (index: string, range: (q: unknown) => unknown) => {
+          const ops: unknown[][] = [];
+          const q = {
+            eq: (...args: unknown[]) => {
+              ops.push(["eq", ...args]);
+              return q;
+            },
+            lt: (...args: unknown[]) => {
+              ops.push(["lt", ...args]);
+              return q;
+            },
+          };
+          range(q);
+          calls.push({ index, ops });
+          return {
+            take: vi.fn(async (limit: number) => {
+              taken.push(limit);
+              return [];
+            }),
+          };
+        },
+      }));
+      const store = createStore({ db: { query } } as unknown as QueryCtx);
+      await store.listJobsByStatusUpdatedBefore("running", 12345, 100);
+      expect(calls).toEqual([
+        {
+          index: "by_status_and_updated_at",
+          ops: [
+            ["eq", "status", "running"],
+            ["lt", "updatedAt", 12345],
+          ],
+        },
+      ]);
+      expect(taken).toEqual([100]);
+    });
   },
 );

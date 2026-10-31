@@ -4,6 +4,7 @@ import { deleteDraftAndItems } from "../aiExpenseDrafts/draftRepository";
 import type {
   ReceiptAnalysisBatchRecord,
   ReceiptAnalysisJobRecord,
+  ReceiptAnalysisJobStatus,
 } from "../../domain/receiptAnalysisJobs/records";
 import type {
   ReceiptAnalysisReader,
@@ -103,6 +104,21 @@ async function listActiveJobsByGroup(
     .map(toJobRecord);
 }
 
+async function listJobsByStatusUpdatedBefore(
+  ctx: Pick<QueryCtx, "db">,
+  status: ReceiptAnalysisJobStatus,
+  updatedBefore: number,
+  limit: number,
+): Promise<ReceiptAnalysisJobRecord[]> {
+  const docs = await ctx.db
+    .query("receiptAnalysisImageJobs")
+    .withIndex("by_status_and_updated_at", (q) =>
+      q.eq("status", status).lt("updatedAt", updatedBefore),
+    )
+    .take(limit);
+  return docs.map(toJobRecord);
+}
+
 export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): ReceiptAnalysisStore {
   return {
     async getBatch(id) {
@@ -185,6 +201,8 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
       return docs.map(toJobRecord);
     },
     listActiveJobsByGroup: (groupId, limit) => listActiveJobsByGroup(ctx, groupId, limit),
+    listJobsByStatusUpdatedBefore: (status, updatedBefore, limit) =>
+      listJobsByStatusUpdatedBefore(ctx, status, updatedBefore, limit),
     async findJobByDraftId(draftId) {
       const doc = await ctx.db
         .query("receiptAnalysisImageJobs")
@@ -242,6 +260,8 @@ export function createReceiptAnalysisReader(ctx: Pick<QueryCtx, "db">): ReceiptA
       return docs.map(toJobRecord);
     },
     listActiveJobsByGroup: (groupId, limit) => listActiveJobsByGroup(ctx, groupId, limit),
+    listJobsByStatusUpdatedBefore: (status, updatedBefore, limit) =>
+      listJobsByStatusUpdatedBefore(ctx, status, updatedBefore, limit),
     async findJobByDraftId(draftId) {
       const doc = await ctx.db
         .query("receiptAnalysisImageJobs")

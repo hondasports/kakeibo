@@ -217,6 +217,10 @@ export function createInternalCtx({
       .mockImplementation((_indexName: string, builder?: (q: unknown) => unknown) => {
         const q = {
           eq: vi.fn().mockImplementation(() => q),
+          lt: vi.fn().mockImplementation(() => q),
+          lte: vi.fn().mockImplementation(() => q),
+          gt: vi.fn().mockImplementation(() => q),
+          gte: vi.fn().mockImplementation(() => q),
         };
         builder?.(q);
         const rows = tableName === "receiptAnalysisBatches" ? batches : jobs;

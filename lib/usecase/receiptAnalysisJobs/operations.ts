@@ -13,6 +13,9 @@ import {
   canRetryReceiptAnalysisJob,
   clampReceiptAnalysisCleanupLimit,
   MAX_RECEIPT_ANALYSIS_BATCH_FILES,
+  RECEIPT_ANALYSIS_STALE_JOB_ERROR,
+  RECEIPT_ANALYSIS_STALE_JOB_MS,
+  RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
   ReceiptAnalysisJobDomainError,
   resolveReceiptAnalysisBatchStatus,
   shouldScheduleAiReviewNotification,
@@ -141,7 +144,7 @@ export async function updateReceiptAnalysisJobStatus(
     ...(args.error === undefined ? {} : { error: args.error }),
     updatedAt: now,
   });
-  await scheduleAiReviewNotificationIfNeeded(deps, job.batchId, args.status);
+  await scheduleAiReviewNotificationIfNeeded(deps, job.batchId, args.status, now);
   return { applied: true };
 }
 
@@ -172,7 +175,10 @@ export async function finalizeReceiptAnalysisAttempt(
   if (args.groupId !== undefined && job.groupId !== args.groupId)
     throw new ReceiptAnalysisJobDomainError("Job not found");
   const isStale = (job.draftId ?? null) !== args.expectedDraftId;
-  if (job.status === "cancelled" || isStale) {
+  // 完了の書き込みを受理するのは実行中の attempt のみ。回復で failed に確定した job や、
+  // cancel・別 attempt で既に終端へ進んだ job への遅着は、届いた新規 draft を破棄して
+  // 現在の状態を維持する
+  if (job.status !== "running" || isStale) {
     if (job.draftId !== args.newDraftId)
       await deps.store.deleteDraftAndItems(args.newDraftId, job.groupId);
     return { applied: false };
@@ -258,6 +264,34 @@ export async function finalizeReceiptAnalysisBatchStatus(
   const jobs = batch.processedCount < batch.totalCount ? [] : await store.listJobsByBatch(batchId);
   const status = resolveReceiptAnalysisBatchStatus(batch.processedCount, batch.totalCount, jobs);
   if (status) await store.patchBatch(batchId, { status, updatedAt: now });
+}
+
+export async function recoverStaleReceiptAnalysisJobs(
+  deps: { store: ReceiptAnalysisStore; scheduler: ReceiptAnalysisScheduler },
+  now = Date.now(),
+): Promise<{ recoveredCount: number }> {
+  const cutoff = now - RECEIPT_ANALYSIS_STALE_JOB_MS;
+  const staleJobs = await deps.store.listJobsByStatusUpdatedBefore(
+    "running",
+    cutoff,
+    RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
+  );
+  let recoveredCount = 0;
+  for (const job of staleJobs) {
+    if (job.status !== "running") continue;
+    const result = await updateReceiptAnalysisJobStatus(
+      deps,
+      {
+        jobId: job.id,
+        status: "failed",
+        error: RECEIPT_ANALYSIS_STALE_JOB_ERROR,
+        expectedDraftId: job.draftId ?? null,
+      },
+      now,
+    );
+    if (result.applied) recoveredCount += 1;
+  }
+  return { recoveredCount };
 }
 
 export async function deleteReceiptAnalysisDataByUserBatch(
