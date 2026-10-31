@@ -4,20 +4,14 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import {
   aiExpenseDraftConfidenceValidator,
   aiExpenseDraftDocumentTypeValidator,
-  aiExpenseDraftItemConfidenceValidator,
   aiExpenseDraftReviewReasonValidator,
-  amountBasisValidator,
   markerDefinitionsValidator,
-  receiptItemLineTypeValidator,
-  receiptItemTaxRatePercentValidator,
-  receiptMarkersValidator,
+  receiptDraftItemFields,
   receiptRawObservationLineValidator,
   receiptLineClassificationValidator,
   receiptTotalResolutionValidator,
   receiptTaxDecisionValidator,
   receiptUserOverrideSnapshotValidator,
-  taxResolutionSourceValidator,
-  taxResolutionStatusValidator,
   taxSummaryValidator,
 } from "./validators";
 import {
@@ -70,28 +64,7 @@ export const createFailedDraftFromImageAnalysis = internalMutation({
   handler: createFailedDraftFromImageAnalysisHandler,
 });
 
-const extractedDraftItemValidator = v.object({
-  itemName: v.string(),
-  lineType: v.optional(receiptItemLineTypeValidator),
-  amountYen: v.number(),
-  printedAmountYen: v.optional(v.number()),
-  amountBasis: v.optional(amountBasisValidator),
-  taxRatePercent: v.optional(receiptItemTaxRatePercentValidator),
-  markers: v.optional(receiptMarkersValidator),
-  taxMarker: v.optional(v.string()),
-  allocatedTaxYen: v.optional(v.number()),
-  taxAllocationStatus: v.optional(v.union(v.literal("allocated"), v.literal("unallocated"))),
-  normalizedAmountYen: v.optional(v.number()),
-  taxResolutionStatus: v.optional(taxResolutionStatusValidator),
-  taxResolutionSource: v.optional(taxResolutionSourceValidator),
-  taxReviewReasons: v.optional(v.array(v.string())),
-  quantity: v.optional(v.number()),
-  unitPriceYen: v.optional(v.number()),
-  categoryName: v.optional(v.string()),
-  categoryId: v.optional(v.id("categories")),
-  confidence: aiExpenseDraftItemConfidenceValidator,
-  warnings: v.optional(v.array(v.string())),
-});
+const extractedDraftItemValidator = v.object(receiptDraftItemFields);
 
 const extractedDraftArgs = {
   documentType: aiExpenseDraftDocumentTypeValidator,
