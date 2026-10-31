@@ -107,8 +107,8 @@
     "e2e/ai-expense-queue.spec.ts"
   ],
   "convex/groups/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
-  "convex/lineLink/**": ["e2e/settings.spec.ts"],
-  "convex/lineWebhook/**": ["e2e/settings.spec.ts"],
+  "convex/lineLink/**": ["e2e/notifications.spec.ts"],
+  "convex/lineWebhook/**": ["e2e/notifications.spec.ts"],
   "convex/notifications/**": ["e2e/notifications.spec.ts"],
   "convex/notificationSettings.ts": ["e2e/notifications.spec.ts"],
   "convex/receiptAnalysisJobs/**": ["e2e/ai-expense-queue.spec.ts"],

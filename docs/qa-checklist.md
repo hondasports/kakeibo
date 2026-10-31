@@ -63,12 +63,11 @@ cloud dev deploymentへ同期する必要がある場合だけ、`pnpm run conve
 - ナビゲーション（`e2e/navigation.spec.ts`）: 主要画面間の遷移
 - 設定（`e2e/settings.spec.ts`）: カテゴリ・週設定の保存
 - レスポンシブ（`e2e/responsive.spec.ts`）: SP/PC 幅でのレイアウト崩れがないこと
-- レシート画像抽出（`e2e/receipt-image-extraction.spec.ts`）: 画像解析フローの疎通
-- ダッシュボード（`e2e/dashboard-home.spec.ts`）: ホーム画面の集計・導線
+- ダッシュボード（`e2e/receipt-form.spec.ts`・`e2e/navigation.spec.ts`）: 保存後のホーム集計と主要画面への導線
 - レシートフォーム（`e2e/receipt-form.spec.ts`）: 手入力フォームの保存
 - LINE画像intake（Convex test）: 連携済みimageの mock content 取得、未連携では取得しない、同意/グループ不足、fetch失敗、`needs_review` 下書き作成、自動登録しないこと。実LINE / 実OpenAI をCIで呼ばない。実LINE E2Eは必須にしない
 - アカウント削除（`e2e/account-deletion.spec.ts`）: `/settings/account/delete` からの非同期削除リクエストと status 確認
-- システム管理者（`e2e/system-admin-route.spec.ts`、`e2e/system-admin-search.spec.ts`、`e2e/system-admin-membership.spec.ts`）: `/admin` ルート制御、ユーザー・グループ検索、メンバー・権限操作
+- システム管理者（`e2e/notifications.spec.ts`、`e2e/system-admin-search.spec.ts`、`e2e/system-admin-membership.spec.ts`）: 未認証での `/admin` ルート制御、ユーザー・グループ検索、メンバー・権限操作
 - 月収入関連 spec は #79 の UI 削除に伴い除去済み
 
 ## Clerk Restricted mode + Invitation 手動 QA
