@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { trialExternal8Fixture } from "../../../convex/receiptImageExtraction/fixtures/taxFixtures";
+import { trialExternal8Fixture } from "../../receiptImageExtraction/fixtures/taxFixtures";
 import { reinterpretDraftTax } from "./reinterpretDraftTax";
 
 describe("reinterpretDraftTax (user choice and overrides)", () => {

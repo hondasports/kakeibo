@@ -1,4 +1,4 @@
-import type { ExtractReceiptFieldsResult, ExtractReceiptItemResult } from "../types";
+import type { ExtractReceiptFieldsResult, ExtractReceiptItemResult } from "../extractionResult";
 
 function item(
   itemName: string,
