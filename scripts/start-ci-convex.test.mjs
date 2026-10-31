@@ -7,21 +7,20 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   backendEnv,
-  backupEnvLocal,
   buildChildEnv,
-  cleanupIsolatedBackend,
   createLocalDeploymentConfig,
   generateCleanupSecret,
-  parseArgs,
-  readBackedUpEnv,
   redact,
-  restoreEnvLocal,
   runConvexCli,
-  startBackend,
+} from "./lib/ci-convex-env-boundary.mjs";
+import { backupEnvLocal, readBackedUpEnv, restoreEnvLocal } from "./lib/ci-convex-checkout-env.mjs";
+import { cleanupIsolatedBackend, startBackend } from "./lib/ci-convex-backend.mjs";
+import {
   waitForCleanupAuth,
   waitForFunctionsReady,
   waitForLocalEnvFile,
-} from "./start-ci-convex.mjs";
+} from "./lib/ci-convex-readiness.mjs";
+import { parseArgs } from "./start-ci-convex.mjs";
 
 const LOCAL_ENV_CONTENT = [
   "CONVEX_DEPLOYMENT=local:anonymous-test",
