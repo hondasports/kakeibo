@@ -288,7 +288,7 @@ CIで実行するbackendは共有cloud devではなく、ジョブごとの `CON
 - `.github/workflows/preview-deploy.yml`
 - `.github/workflows/production-release.yml`
 
-各workflowのNode.jsは `jdx/mise-action@v4` でリポジトリの `mise.toml` から導入する。pnpmは `package.json` の `packageManager` に合わせて `pnpm/action-setup` で導入し、ローカルとCIでNode.jsの選択元を分けない。
+各workflowのNode.jsは `jdx/mise-action`（SHA固定。現行 `v5.2.3`）でリポジトリの `mise.toml` から導入する。pnpmは `package.json` の `packageManager` に合わせて `pnpm/action-setup` で導入し、ローカルとCIでNode.jsの選択元を分けない。
 
 通常CIの主なcheck:
 
