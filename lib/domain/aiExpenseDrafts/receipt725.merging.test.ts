@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { prepareReceiptItemEvidence } from "./receiptItemEvidence";
 import { item, Row, observations, map, check } from "./testHelpers";
 
-describe("725 production receipt regressions (merged candidate handling)", () => {
-  it("716 remains two included items", () => {
+describe("連結候補は個別商品の証拠があれば外し、真の重複商品は潰さない（receipt 725）", () => {
+  it("2つの個別商品を連結せず、それぞれのカテゴリを保持する（item 716）", () => {
     const result = map(
       [{ ...item("inタブレット塩分+", 204), categoryName: "医療" }, item("ルヴァン黒糖", 193)],
       [
