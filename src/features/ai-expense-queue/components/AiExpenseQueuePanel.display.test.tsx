@@ -298,6 +298,14 @@ describe("AiExpenseQueuePanel（表示）", () => {
               confidence: { itemName: 0.9, amountYen: 0.95, categoryId: 0.8 },
               warnings: [],
             },
+            {
+              _id: "item-medicine",
+              itemName: "胃薬",
+              amountYen: 1230,
+              categoryId: "cat-daily",
+              confidence: { itemName: 0.9, amountYen: 0.95, categoryId: 0.8 },
+              warnings: [],
+            },
           ],
         };
       });
@@ -311,6 +319,8 @@ describe("AiExpenseQueuePanel（表示）", () => {
       const dialog = screen.getByRole("dialog", { name: "下書き確認" });
       expect(within(dialog).queryByRole("heading", { name: "登録候補" })).not.toBeInTheDocument();
       expect(within(dialog).queryByText("食費 150円")).not.toBeInTheDocument();
+      expect(within(dialog).getByText("パン")).toBeVisible();
+      expect(within(dialog).getByText("胃薬")).toBeVisible();
       expect(within(dialog).getByRole("region", { name: "商品一覧" })).toBeVisible();
       expect(within(dialog).getByRole("button", { name: "下書きを保存" })).toBeEnabled();
     });

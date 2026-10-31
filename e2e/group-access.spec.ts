@@ -88,7 +88,8 @@ test.describe("グループアクセス", () => {
     }
   });
 
-  test("@smoke @group-access 未所属ユーザーは /group/setup に誘導され、グループ作成後に設定画面へ進める", async ({
+  // グループ作成直後に続けて名称変更まで確認し、未所属→作成の重いセットアップを共有する（#1159）。
+  test("@smoke @group-access 未所属ユーザーは /group/setup に誘導され、グループ作成・設定・名称変更まで進める", async ({
     page,
   }) => {
     await gotoAuthenticated(page, "/", { ensureGroup: false });
@@ -119,28 +120,11 @@ test.describe("グループアクセス", () => {
     await expandGroupManagement(page);
     await expect(page.getByRole("heading", { name: "グループ情報", level: 3 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "メンバー管理", level: 3 })).toBeVisible();
-    await expect(page.getByRole("textbox", { name: "グループ名" })).toHaveValue("佐藤家");
     await expect(page.getByTestId("group-management-audit-log-list-empty")).toHaveText(
       "管理操作の履歴はまだありません。",
     );
-  });
 
-  test("@smoke @group-access owner はグループ名を変更できる", async ({ page }) => {
-    await gotoAuthenticated(page, "/", { ensureGroup: false });
-
-    const currentUserId = await getCurrentClerkTokenIdentifier(page);
-    currentUserIdForCleanup = currentUserId;
-    await page.goto("about:blank");
-    await cleanupGroupMembershipsByUser(currentUserId);
-
-    await waitForGroupSetupRedirect(page);
-
-    await page.getByRole("textbox", { name: "グループ名" }).fill("佐藤家");
-    await page.getByRole("button", { name: "グループを作成" }).click();
-    await expect(page).toHaveURL("/");
-
-    await page.goto("/settings");
-    await expandGroupManagement(page);
+    // 続けて owner としてグループ名を変更し、監査ログへ記録されることを確認する。
     const nameInput = page.getByRole("textbox", { name: "グループ名" });
     await expect(nameInput).toHaveValue("佐藤家");
     await nameInput.fill("鈴木家");

@@ -507,64 +507,61 @@ test.describe("入力画面リニューアル（Issue #77 受け入れ確認）"
     await cleanupTestReceipts({ page });
   });
 
-  for (const viewport of [
-    { width: 1280, height: 900 },
-    { width: 390, height: 844 },
-  ]) {
-    test(`@smoke [SSoT #1055] 収入の入力・上限エラー・履歴編集が一致する（${viewport.width}px）`, async ({
-      page,
-    }, testInfo) => {
-      await page.setViewportSize(viewport);
-      await page.getByRole("tab", { name: "収入" }).click();
-      const amount = page.getByLabel("金額", { exact: true });
-      const title = page.getByLabel("収入の内容・メモ");
-      const saveButton = page.getByRole("button", { name: "保存して次へ" });
-      const incomeTitle = `給与_${Date.now()}`.padEnd(100, "給");
-      await amount.fill("-320,000");
-      await expect(amount).toHaveValue("320,000");
-      await title.fill(`${incomeTitle}超`);
-      await saveButton.click();
-      await expect(title).toHaveAttribute("aria-invalid", "true");
-      await expect(page.getByText("内容は 100 文字以内です")).toBeVisible();
-      await amount.fill("10000000");
-      await title.fill(incomeTitle);
-      await saveButton.click();
-      await expect(amount).toHaveAttribute("aria-invalid", "true");
-      await expect(page.getByText("金額は 9,999,999 円以下です")).toBeVisible();
-      await expect(title).toHaveAttribute("aria-invalid", "false");
-      await expectNoHorizontalOverflow(page);
-      await page.screenshot({
-        path: testInfo.outputPath("income-limit-error.png"),
-        fullPage: true,
-      });
-
-      await amount.fill("9999999");
-      await amount.press("Tab");
-      await expect(title).toBeFocused();
-      await title.press("Tab");
-      await expect(saveButton).toBeFocused();
-      await saveButton.press("Enter");
-      await expect(page.getByRole("alert").filter({ hasText: "収入を保存しました" })).toBeVisible();
-      await expect(amount).toHaveValue("");
-      await expect(title).toHaveValue("");
-
-      await page.goto(`/weeks/${getCurrentWeekStartDate()}`);
-      const row = page.getByTestId("receipt-row").filter({ hasText: incomeTitle });
-      await expect(row).toContainText("9,999,999円");
-      await row.getByRole("button", { name: /を編集$/ }).click();
-      const dialog = page.getByRole("dialog");
-      const editAmount = dialog.getByLabel("金額", { exact: true });
-      await editAmount.fill("10000000");
-      await dialog.getByRole("button", { name: "保存", exact: true }).click();
-      await expect(editAmount).toHaveAttribute("aria-invalid", "true");
-      await expect(dialog.getByText("金額は 9,999,999 円以下です")).toBeVisible();
-      await expectNoHorizontalOverflow(page);
-      await editAmount.fill("9999998");
-      await dialog.getByRole("button", { name: "保存", exact: true }).click();
-      await expect(dialog).not.toBeVisible();
-      await expect(row).toContainText("9,999,998円");
+  // バリデーションと編集導線はviewport非依存のDOM挙動なので下位層テストで担保し、
+  // E2Eでは横方向オーバーフローが実害になるSP幅だけで確認する（#1159）。
+  test("@smoke [SSoT #1055] 収入の入力・上限エラー・履歴編集が一致する（390px）", async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("tab", { name: "収入" }).click();
+    const amount = page.getByLabel("金額", { exact: true });
+    const title = page.getByLabel("収入の内容・メモ");
+    const saveButton = page.getByRole("button", { name: "保存して次へ" });
+    const incomeTitle = `給与_${Date.now()}`.padEnd(100, "給");
+    await amount.fill("-320,000");
+    await expect(amount).toHaveValue("320,000");
+    await title.fill(`${incomeTitle}超`);
+    await saveButton.click();
+    await expect(title).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByText("内容は 100 文字以内です")).toBeVisible();
+    await amount.fill("10000000");
+    await title.fill(incomeTitle);
+    await saveButton.click();
+    await expect(amount).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByText("金額は 9,999,999 円以下です")).toBeVisible();
+    await expect(title).toHaveAttribute("aria-invalid", "false");
+    await expectNoHorizontalOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath("income-limit-error.png"),
+      fullPage: true,
     });
-  }
+
+    await amount.fill("9999999");
+    await amount.press("Tab");
+    await expect(title).toBeFocused();
+    await title.press("Tab");
+    await expect(saveButton).toBeFocused();
+    await saveButton.press("Enter");
+    await expect(page.getByRole("alert").filter({ hasText: "収入を保存しました" })).toBeVisible();
+    await expect(amount).toHaveValue("");
+    await expect(title).toHaveValue("");
+
+    await page.goto(`/weeks/${getCurrentWeekStartDate()}`);
+    const row = page.getByTestId("receipt-row").filter({ hasText: incomeTitle });
+    await expect(row).toContainText("9,999,999円");
+    await row.getByRole("button", { name: /を編集$/ }).click();
+    const dialog = page.getByRole("dialog");
+    const editAmount = dialog.getByLabel("金額", { exact: true });
+    await editAmount.fill("10000000");
+    await dialog.getByRole("button", { name: "保存", exact: true }).click();
+    await expect(editAmount).toHaveAttribute("aria-invalid", "true");
+    await expect(dialog.getByText("金額は 9,999,999 円以下です")).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await editAmount.fill("9999998");
+    await dialog.getByRole("button", { name: "保存", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(row).toContainText("9,999,998円");
+  });
 
   test("@smoke [Issue #378/#395] 収入保存後にダッシュボードと週次サマリーへ反映される", async ({
     page,
@@ -651,19 +648,14 @@ test.describe("複数カテゴリ別支出項目入力フロー（Issue #102 受
     await item0.getByLabel("内容").clear();
     await item0.getByLabel("内容").fill("食料品");
     await item0.getByLabel("金額").fill("3000");
-    await item0.getByRole("option").first().click();
+    await item0.getByRole("option", { name: "食費" }).click();
 
     await page.getByRole("button", { name: "項目を追加" }).click();
 
     const item1 = page.getByTestId("expense-item-1");
     await item1.getByLabel("内容").fill("日用品");
     await item1.getByLabel("金額").fill("2000");
-    const item1Options = item1.getByRole("option");
-    if ((await item1Options.count()) >= 2) {
-      await item1Options.nth(1).click();
-    } else {
-      await item1Options.first().click();
-    }
+    await item1.getByRole("option", { name: "日用品" }).click();
 
     await page.getByRole("button", { name: "保存して次へ" }).click();
 
@@ -675,27 +667,26 @@ test.describe("複数カテゴリ別支出項目入力フロー（Issue #102 受
     await expect(page).toHaveURL(/\/weeks\/\d{4}-\d{2}-\d{2}$/, { timeout: 10_000 });
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
 
-    // カテゴリ別集計セクションが表示される（expenseEntries ベースの集計確認）
-    await expect(page.getByRole("heading", { name: "カテゴリ別" })).toBeVisible({
+    // カテゴリ別集計: カテゴリごとの行がカテゴリ名と金額の両方で一致する
+    const breakdown = page.getByTestId("weekly-category-breakdown");
+    await expect(breakdown.getByRole("row").filter({ hasText: "食費" })).toContainText("3,000円", {
       timeout: 15_000,
     });
+    await expect(breakdown.getByRole("row").filter({ hasText: "日用品" })).toContainText("2,000円");
+    await expect(breakdown.getByRole("row").filter({ hasText: "食費" })).toContainText("1件");
+    await expect(breakdown.getByRole("row").filter({ hasText: "日用品" })).toContainText("1件");
 
-    // 支出一覧に複数項目が個別エントリとして反映される
+    // 支出一覧: 各項目行が項目名とカテゴリ名を表示する
     const receiptGroup = page.getByTestId("receipt-group").filter({ hasText: "テストスーパー" });
     await expect(receiptGroup).toHaveCount(1, { timeout: 15_000 });
     await expect(receiptGroup.getByText("内訳: 食料品、日用品")).toBeVisible();
     const receiptRows = receiptGroup.getByTestId("receipt-row");
-    await expect(receiptRows.filter({ hasText: "食料品" }).first()).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(receiptRows.filter({ hasText: "日用品" }).first()).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(
-      receiptRows.filter({ hasText: "食料品" }).first().locator(".receipt-row-category"),
-    ).toBeVisible();
-    await expect(
-      receiptRows.filter({ hasText: "日用品" }).first().locator(".receipt-row-category"),
-    ).toBeVisible();
+    await expect(receiptRows).toHaveCount(2);
+    const foodRow = receiptRows.filter({ hasText: "食料品" });
+    await expect(foodRow).toHaveCount(1);
+    await expect(foodRow.getByRole("group")).toHaveText("食費");
+    const dailyRow = receiptRows.filter({ hasText: "日用品" });
+    await expect(dailyRow).toHaveCount(1);
+    await expect(dailyRow.getByRole("group")).toHaveText("日用品");
   });
 });
