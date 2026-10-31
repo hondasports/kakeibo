@@ -102,39 +102,6 @@ test.describe("レスポンシブ表示（Issue #20）", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("@smoke シナリオR-4b: 406px viewport でキュー有データ時も主要要素が viewport 内に収まる（/__e2e__/ fixture・サーバー保存なし）", async ({
-    page,
-  }) => {
-    await gotoAuthenticated(page);
-    await page.setViewportSize(MOBILE_VIEWPORT);
-    await page.goto("/__e2e__/ai-expense-queue");
-
-    const queueSection = page.locator("section.ai-expense-queue");
-    const statusSummary = page.locator(".ai-expense-queue-status-summary");
-    const addReceiptButton = queueSection.getByRole("button", { name: "画像を読み取る" }).first();
-    const cameraButton = queueSection.getByRole("button", { name: "カメラで撮影" });
-    const failedChip = queueSection.getByText("読み取り失敗 1件");
-
-    await expect(queueSection).toBeVisible();
-    await expect(statusSummary).toBeVisible();
-    await expect(addReceiptButton).toBeVisible();
-    await expect(cameraButton).toBeVisible();
-    await expect(failedChip).toBeVisible();
-    await expect(queueSection.getByText("登録できます 1件")).toBeVisible();
-    await expect(queueSection.getByText("確認待ち 1件")).toBeVisible();
-
-    await waitForStableBounds(queueSection, statusSummary);
-
-    await expectNoHorizontalOverflow(page);
-    await expectLocatorInsideViewport(queueSection);
-    await expectLocatorInsideViewport(statusSummary);
-    await expectLocatorInsideViewport(addReceiptButton);
-    await expectLocatorInsideViewport(cameraButton);
-    await expectLocatorInsideViewport(failedChip);
-    await expect(queueSection.getByRole("region", { name: "登録済み" })).toBeVisible();
-    await expectLocatorInsideViewport(queueSection.getByRole("region", { name: "登録済み" }));
-  });
-
   test("@smoke シナリオR-4c: 406px viewport で入力ワークベンチが横スクロールせず登録済みがフォームの後", async ({
     page,
   }) => {

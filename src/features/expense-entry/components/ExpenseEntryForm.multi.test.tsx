@@ -62,6 +62,7 @@ describe("ExpenseEntryForm（multi）", () => {
 
       // 差額0円を確認して保存
       expect(screen.getByLabelText("差額")).toBeInTheDocument();
+      expect(screen.getByText("配分完了")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "保存して次へ" }));
 
       await waitFor(() => {

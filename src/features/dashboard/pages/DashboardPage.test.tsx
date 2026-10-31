@@ -150,6 +150,14 @@ describe("DashboardPage", () => {
 
     expect(screen.getByRole("heading", { name: "今週" })).toBeInTheDocument();
     expect(screen.getByText(/集計期間：6\/15（月）〜6\/21（日）/)).toBeInTheDocument();
+    const inputPanel = screen
+      .getByRole("link", { name: "入力を再開" })
+      .closest(".dashboard-input-panel--compact");
+    const categoryHeading = screen.getByRole("heading", { name: "支出カテゴリ" });
+    expect(inputPanel).not.toBeNull();
+    expect(
+      inputPanel!.compareDocumentPosition(categoryHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.getByRole("link", { name: /^今月の月次サマリーを見る/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^今年の年次サマリーを見る/ })).toBeInTheDocument();
   });

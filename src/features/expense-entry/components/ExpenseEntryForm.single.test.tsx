@@ -20,6 +20,7 @@ describe("ExpenseEntryForm（single）", () => {
       expect(screen.getByLabelText("合計金額")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "保存して次へ" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /食費/ })).toHaveAttribute("aria-selected", "true");
     });
 
     it("店舗名・金額・カテゴリを入力して単一項目を保存できる", async () => {
@@ -125,6 +126,10 @@ describe("ExpenseEntryForm（single）", () => {
 
       await waitFor(() => {
         expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("");
+        expect(screen.getByRole("option", { name: /食費/ })).toHaveAttribute(
+          "aria-selected",
+          "true",
+        );
         // 金額はクリア後に "" になる
         const amountInput = screen.getByLabelText("合計金額") as HTMLInputElement;
         expect(amountInput.value).toBe("");

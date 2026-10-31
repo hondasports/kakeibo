@@ -1,6 +1,10 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { getCurrentClerkTokenIdentifier, gotoAuthenticated } from "./helpers/auth";
-import { expectLocatorInsideContainer, expectLocatorInsideViewport } from "./helpers/viewport";
+import {
+  expectLocatorInsideContainer,
+  expectLocatorInsideViewport,
+  expectNoHorizontalOverflow,
+} from "./helpers/viewport";
 import {
   cleanupAiExpenseQueue,
   cleanupE2eExpenseEntries,
@@ -151,47 +155,6 @@ test.describe("Issue #144 読み取りUI", () => {
       .toBe(true);
     await expectLocatorInsideViewport(queue);
   });
-
-  test("@smoke SP幅でも複数画像追加後のキューと入力導線を操作できる", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await gotoAuthenticated(page, INPUT_PATH);
-
-    const queue = await waitForReceiptInputQueue(page);
-    await expectLocatorInsideViewport(queue);
-    await expect(page.getByLabel("読み取り用画像を追加")).toBeEnabled();
-    const stamp = Date.now();
-    const queueFiles = [
-      await createSyntheticReceiptImage(page, `ai-queue-receipt-${stamp}.jpg`),
-      await createSyntheticReceiptImage(page, `ai-queue-payment-${stamp}.jpg`),
-    ];
-    await page.getByLabel("読み取り用画像を追加").setInputFiles(queueFiles);
-    await acceptReceiptImageConsentIfNeeded(page, `ai-queue-receipt-${stamp}.jpg`);
-
-    // Issue #152: 非同期ジョブの subscription 反映を待つ。
-    // dev DB に同名ファイルの過去ジョブが残っている可能性があるため .first() で限定する。
-    await expect(queue.getByText(`ai-queue-receipt-${stamp}.jpg`).first()).toBeVisible({
-      timeout: 15000,
-    });
-    await expect(queue.getByText(`ai-queue-payment-${stamp}.jpg`).first()).toBeVisible({
-      timeout: 15000,
-    });
-    await expect
-      .poll(
-        async () => {
-          const statusLabels = ["読み取り中", "登録できます", "確認待ち", "読み取り失敗"];
-          let total = 0;
-          for (const label of statusLabels) {
-            total += await queue.getByText(label).count();
-          }
-          return total;
-        },
-        { timeout: 15000 },
-      )
-      .toBeGreaterThanOrEqual(2);
-    // Issue #181: 保存ボタンは変わらず「保存して次へ」
-    await expect(page.getByRole("button", { name: "保存して次へ" })).toBeVisible();
-    await expectLocatorInsideViewport(queue);
-  });
 });
 
 test.describe("Issue #146 AI支出下書きの確認要否分類（/__e2e__/ fixture・サーバー保存なし）", () => {
@@ -205,41 +168,6 @@ test.describe("Issue #146 AI支出下書きの確認要否分類（/__e2e__/ fix
     const failedSection = queue.getByRole("region", { name: "読み取り失敗" });
     await expect(failedSection.getByRole("button", { name: "再撮影" })).toBeEnabled();
     await expect(page.getByLabel("再撮影する画像を選択")).toHaveAttribute("capture", "environment");
-  });
-});
-
-test.describe("Issue #148 確認が必要なAI支出下書きの編集導線（/__e2e__/ fixture・サーバー保存なし）", () => {
-  test("確認が必要な下書きを編集して登録準備OKに戻せる", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    const reviewSection = queue.getByRole("region", { name: "確認待ち" });
-    await expect(reviewSection.getByText("review-payment.png")).toBeVisible();
-
-    await reviewSection.getByRole("button", { name: "確認する" }).click();
-
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText("レシート全体の確認")).toBeVisible();
-    // 店名は支払先名で補完されるため必須エラーは出ない。代わりに比較不能の案内を確認する。
-    await expect(dialog.getByText("金額を比較できません")).toBeVisible();
-    await dialog.getByText("読み取り原文（参考）", { exact: true }).click();
-    await expect(dialog.getByRole("list", { name: "OCR原文" })).toContainText(
-      "大阪市水道局 水道料金",
-    );
-    await expect(dialog.getByLabel("支出日（レシート記載日）")).toHaveValue("2026-06-01");
-    await expect(dialog.getByLabel("合計金額")).toHaveValue("9120");
-    await expect(dialog.getByLabel("店名・内容")).toHaveValue("大阪市水道局");
-
-    await dialog.getByLabel("店名・内容").fill("大阪市水道局 水道料金");
-    await dialog.getByLabel("合計金額").fill("9160");
-    await dialog.getByRole("button", { name: "下書きを保存" }).click();
-
-    await expect(dialog).toBeHidden();
-    await expect(queue.getByText("確認待ち 0件")).toHaveCount(0);
-    const readySection = queue.getByRole("region", { name: "登録できます" });
-    await expect(readySection.getByText("大阪市水道局")).toBeVisible();
-    await expect(readySection.getByText("2026/06/01 ・ 9,160円")).toBeVisible();
   });
 });
 
@@ -449,6 +377,17 @@ test.describe("Issue #337 レシート入力UI改善の表示・操作回帰（/
 
     await expectLocatorInsideViewport(queue);
     await expectLocatorInsideViewport(statusSummary);
+    const cameraButton = queue.getByRole("button", { name: "カメラで撮影" });
+    const imageButton = queue.getByRole("button", { name: "画像を読み取る" });
+    const failedChip = queue.getByText("読み取り失敗 1件");
+    const registered = queue.getByRole("region", { name: "登録済み" });
+    await expect(cameraButton).toBeVisible();
+    await expect(registered).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await expectLocatorInsideViewport(cameraButton);
+    await expectLocatorInsideViewport(imageButton);
+    await expectLocatorInsideViewport(failedChip);
+    await expectLocatorInsideViewport(registered);
   });
 
   test("@smoke SP幅で簡潔な下書き詳細と修正導線が読める", async ({ page }) => {

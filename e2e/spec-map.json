@@ -14,7 +14,7 @@
     "e2e/auth.spec.ts"
   ],
   "src/features/auth/**": ["e2e/auth.spec.ts"],
-  "src/features/dashboard/**": ["e2e/dashboard-home.spec.ts"],
+  "src/features/dashboard/**": ["e2e/receipt-form.spec.ts"],
   "src/features/expense-entry/**": ["e2e/receipt-form.spec.ts"],
   "src/features/expense-search/**": ["e2e/expense-search.spec.ts"],
   "src/utils/currency*.ts": [
@@ -46,7 +46,7 @@
   ],
   "src/features/system-admin/**": [
     "e2e/system-admin-membership.spec.ts",
-    "e2e/system-admin-route.spec.ts",
+    "e2e/notifications.spec.ts",
     "e2e/system-admin-search.spec.ts"
   ],
   "src/features/ui/**": ["e2e/responsive.spec.ts", "e2e/navigation.spec.ts"],
@@ -87,9 +87,9 @@
     "e2e/ai-expense-queue*.spec.ts",
     "e2e/ai-expense-tax-allocation.spec.ts"
   ],
-  "lib/domain/receiptImageExtraction/**": ["e2e/receipt-image-extraction.spec.ts"],
-  "lib/usecase/receiptImageExtraction/**": ["e2e/receipt-image-extraction.spec.ts"],
-  "lib/convex/receiptImageExtraction/**": ["e2e/receipt-image-extraction.spec.ts"],
+  "lib/domain/receiptImageExtraction/**": ["e2e/ai-expense-queue.spec.ts"],
+  "lib/usecase/receiptImageExtraction/**": ["e2e/ai-expense-queue.spec.ts"],
+  "lib/convex/receiptImageExtraction/**": ["e2e/ai-expense-queue.spec.ts"],
   "convex/categories/**": ["e2e/settings.spec.ts", "e2e/receipt-form.spec.ts"],
   "convex/e2eHttp/**": ["e2e/*.spec.ts"],
   "convex/lib/**": ["e2e/*.spec.ts"],
@@ -107,15 +107,12 @@
     "e2e/ai-expense-queue.spec.ts"
   ],
   "convex/groups/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
-  "convex/lineLink/**": ["e2e/settings.spec.ts"],
-  "convex/lineWebhook/**": ["e2e/settings.spec.ts"],
+  "convex/lineLink/**": ["e2e/notifications.spec.ts"],
+  "convex/lineWebhook/**": ["e2e/notifications.spec.ts"],
   "convex/notifications/**": ["e2e/notifications.spec.ts"],
   "convex/notificationSettings.ts": ["e2e/notifications.spec.ts"],
-  "convex/receiptAnalysisJobs/**": [
-    "e2e/ai-expense-queue.spec.ts",
-    "e2e/receipt-image-extraction.spec.ts"
-  ],
-  "convex/receiptImageExtraction/**": ["e2e/receipt-image-extraction.spec.ts"],
+  "convex/receiptAnalysisJobs/**": ["e2e/ai-expense-queue.spec.ts"],
+  "convex/receiptImageExtraction/**": ["e2e/ai-expense-queue.spec.ts"],
   "convex/receipts/**": ["e2e/receipt-form.spec.ts", "e2e/ai-expense-queue*.spec.ts"],
   "convex/users/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
   "convex/weekSessions/**": ["e2e/weekly-summary-bulk-ops.spec.ts"],

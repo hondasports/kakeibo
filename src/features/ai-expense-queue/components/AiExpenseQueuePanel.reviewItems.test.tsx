@@ -48,7 +48,10 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     );
   });
 
-  it("OCR原文を確認し、ユーザー補正を明示操作でAI判定へ戻せる", async () => {
+  it.each([
+    ["ai", "AI判定へ戻す"],
+    ["legacy_projection", "修正前の内容へ戻す"],
+  ] as const)("OCR原文から%sのユーザー補正を戻せる", async (source, resetLabel) => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, args: { draftId?: string } | "skip") => {
       if (reference !== "aiExpenseDrafts.queries.getWithItems" || args === "skip") {
@@ -79,7 +82,7 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
               },
             ],
           },
-          receiptInterpretation: { source: "ai", interpretedAt: 1, values: {} },
+          receiptInterpretation: { source, interpretedAt: 1, values: {} },
           receiptUserOverride: {
             source: "user",
             updatedAt: 2,
@@ -101,7 +104,7 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     expect(within(dialog).getByRole("list", { name: "OCR原文" })).toHaveTextContent(
       "合計 ￥８０３",
     );
-    await user.click(within(dialog).getByRole("button", { name: "AI判定へ戻す" }));
+    await user.click(within(dialog).getByRole("button", { name: resetLabel }));
 
     expect(resetReceiptToAiInterpretationMock).toHaveBeenCalledWith({ draftId: "draft-review" });
   });

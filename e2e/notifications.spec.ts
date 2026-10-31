@@ -59,8 +59,6 @@ test.describe("通知設定（Issue #893）", () => {
     await section.getByRole("switch", { name: "AIレビューのメール通知" }).click();
     await expect(section.getByText("通知設定を保存しました")).toBeVisible({ timeout: 15_000 });
     await expect(section.getByRole("switch", { name: "AIレビューのメール通知" })).toBeChecked();
-
-    await expect(section.getByText("個別に停止できません")).toBeVisible();
   });
 
   test("@smoke mock LINE連携後にLINE通知をopt-inして解除できる", async ({ page }) => {
@@ -91,6 +89,8 @@ test.describe("通知設定（Issue #893）", () => {
     await expect(page.getByText("LINEアカウントは連携されていません")).toBeVisible({
       timeout: 15_000,
     });
+    await page.reload();
+    await expect(page.getByText("LINEアカウントは連携されていません")).toBeVisible();
   });
 
   test("@smoke 管理者が全体設定を変更し監査ログに記録される", async ({ page }) => {

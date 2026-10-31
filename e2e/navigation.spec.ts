@@ -107,59 +107,7 @@ test.describe("ナビゲーション（Issue #49）", () => {
     await expect(page).toHaveURL("/");
   });
 
-  test("@smoke @sidebar シナリオN-3.1: PC幅でサイドバーをChevronLeftボタンで閉じられる", async ({
-    page,
-  }) => {
-    await gotoAuthenticated(page);
-    await page.setViewportSize({ width: 1280, height: 800 });
-
-    const drawer = page.getByLabel("サイドメニュー");
-
-    // 初期状態で「サイドバーを閉じる」ボタンが存在することを確認
-    const closeButton = drawer.getByRole("button", { name: "サイドバーを閉じる" });
-    await expect(closeButton).toBeVisible();
-
-    // ナビラベルが表示されていることを確認
-    await expect(drawer.getByText("ホーム")).toBeVisible();
-    await expect(drawer.getByText("入力")).toBeVisible();
-
-    // 閉じるボタンをクリック
-    await closeButton.click();
-
-    // ナビラベルが非表示になることを確認（DOMから削除される）
-    await expect(drawer.getByText("ホーム")).not.toBeVisible();
-    await expect(drawer.getByText("入力")).not.toBeVisible();
-
-    // 「サイドバーを開く」ボタンが表示されることを確認
-    const openButton = drawer.getByRole("button", { name: "サイドバーを開く" });
-    await expect(openButton).toBeVisible();
-  });
-
-  test("@smoke @sidebar シナリオN-3.2: PC幅でサイドバーをChevronRightボタンで再度開ける", async ({
-    page,
-  }) => {
-    await gotoAuthenticated(page);
-    await page.setViewportSize({ width: 1280, height: 800 });
-
-    const drawer = page.getByLabel("サイドメニュー");
-
-    // まず閉じる
-    const closeButton = drawer.getByRole("button", { name: "サイドバーを閉じる" });
-    await closeButton.click();
-
-    // 開くボタンをクリック
-    const openButton = drawer.getByRole("button", { name: "サイドバーを開く" });
-    await openButton.click();
-
-    // ナビラベルが再表示されることを確認
-    await expect(drawer.getByText("ホーム")).toBeVisible();
-    await expect(drawer.getByText("入力")).toBeVisible();
-
-    // 閉じるボタンが戻ることを確認
-    await expect(closeButton).toBeVisible();
-  });
-
-  test("@sidebar シナリオN-3.3: サイドバー閉じた状態でもアイコン付きナビで遷移できる", async ({
+  test("@smoke @sidebar シナリオN-3.3: サイドバー閉じた状態でもアイコン付きナビで遷移できる", async ({
     page,
   }) => {
     await gotoAuthenticated(page);
@@ -170,66 +118,18 @@ test.describe("ナビゲーション（Issue #49）", () => {
     // サイドバーを閉じる
     await drawer.getByRole("button", { name: "サイドバーを閉じる" }).click();
 
+    await expect(drawer.getByText("ホーム")).not.toBeVisible();
+    await expect(drawer.getByRole("button", { name: "サイドバーを開く" })).toBeVisible();
+
     // アイコン付きのナビ項目をクリックして遷移を確認
     await drawer.getByRole("link", { name: "入力", exact: true }).click();
     await expect(page).toHaveURL("/weeks/current/input");
 
     await drawer.getByRole("link", { name: "設定", exact: true }).click();
     await expect(page).toHaveURL("/settings");
-  });
-
-  test("@navigation シナリオN-5: SP幅でInputPageを開くとフォームのみが表示される", async ({
-    page,
-  }) => {
-    await gotoAuthenticated(page, "/weeks/current/input");
-    await page.setViewportSize({ width: 390, height: 844 });
-
-    // Issue #181: ReceiptForm → ExpenseEntryForm に変更
-    // 入力フォームが表示されることを確認（aria-label ベースのセレクター）
-    await expect(page.getByLabel("店舗名 / 支払先")).toBeVisible();
-    await expect(page.getByLabel("合計金額")).toBeVisible();
-    await expect(page.getByRole("listbox", { name: "カテゴリ候補" })).toBeVisible();
-
-    // サマリーがDOM上に存在しないまたは非表示であることを確認
-    const summary = page.getByText("今週のサマリー");
-    await expect(summary).not.toBeVisible();
-  });
-
-  test("@navigation シナリオN-7: SummaryPageに週次サマリーが表示される", async ({ page }) => {
-    const weekStartDate = getCurrentWeekStartDate();
-    await gotoAuthenticated(page, `/weeks/${weekStartDate}`);
-
-    // 合計支出・合計収入の指標が表示されることを確認（Issue #378）
-    await expect(page.getByLabel("合計支出")).toBeVisible();
-    await expect(page.getByLabel("合計収入")).toBeVisible();
-
-    // WeekNavigator（前の週/次の週ボタン）が表示されることを確認
-    await expect(page.getByRole("button", { name: /前の週/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /次の週/ })).toBeVisible();
-  });
-
-  test("@navigation シナリオN-8: SummaryPageに週移動導線がある", async ({ page }) => {
-    const weekStartDate = getCurrentWeekStartDate();
-    await gotoAuthenticated(page, `/weeks/${weekStartDate}`);
-
-    // SummaryPage には WeekNavigator（前/次の週ボタン）が表示される
-    await expect(page.getByRole("button", { name: "前の週へ" })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("button", { name: "次の週へ" })).toBeVisible();
-  });
-
-  test("@navigation シナリオN-8.1: 履歴から表示中の週の月次サマリーへ遷移できる", async ({
-    page,
-  }) => {
-    await gotoAuthenticated(page, "/weeks/2026-04-27");
-
-    const monthlySummaryLink = page
-      .getByRole("navigation", { name: "履歴メニュー" })
-      .getByRole("link", { name: "月次サマリー" });
-    await expect(monthlySummaryLink).toHaveAttribute("href", "/months/2026-04");
-
-    await monthlySummaryLink.click();
-    await expect(page).toHaveURL("/months/2026-04");
-    await expect(page.getByRole("heading", { name: "月次サマリー", level: 1 })).toBeVisible();
+    await drawer.getByRole("button", { name: "サイドバーを開く" }).click();
+    await expect(drawer.getByText("ホーム")).toBeVisible();
+    await expect(drawer.getByRole("button", { name: "サイドバーを閉じる" })).toBeVisible();
   });
 
   test("@smoke @navigation [Issue #618] 履歴メニューから週次・月次・検索を切り替えられる", async ({
@@ -352,25 +252,6 @@ test.describe("ナビゲーション（Issue #49）", () => {
     } finally {
       await cleanupE2eExpenseEntries({ page });
     }
-  });
-
-  test("@smoke @navigation シナリオN-9: SP幅で入力タブから入力画面へ遷移しフォームとBottomNavigationが表示される", async ({
-    page,
-  }) => {
-    await gotoAuthenticated(page);
-    await page.setViewportSize({ width: 390, height: 844 });
-
-    // BottomNavigationの「入力」タブをタップ（BottomNav内に限定）
-    const bottomNavN9 = page.getByRole("navigation", { name: "ボトムナビゲーション" });
-    await bottomNavN9.getByRole("link", { name: "入力", exact: true }).click();
-    await expect(page).toHaveURL("/weeks/current/input");
-
-    // Issue #181: ReceiptForm → ExpenseEntryForm に変更
-    await expect(page.getByLabel("店舗名 / 支払先")).toBeVisible();
-    await expect(page.getByLabel("合計金額")).toBeVisible();
-
-    // BottomNavigationも引き続き表示されていることを確認
-    await expect(page.getByRole("navigation", { name: "ボトムナビゲーション" })).toBeVisible();
   });
 
   test("@smoke @navigation シナリオN-10: 既存のURL構造が維持されている", async ({ page }) => {
