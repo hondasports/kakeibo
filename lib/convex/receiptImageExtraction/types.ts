@@ -1,106 +1,33 @@
-import type {
-  TaxRatePercent,
-  AmountBasis,
-  TaxMode,
-  RoundingMethod,
-} from "../../domain/receipt/tax/types";
+/**
+ * レシート画像抽出の adapter 固有型。
+ * 業務用の抽出結果契約の正本は lib/domain/receiptImageExtraction/extractionResult.ts にある。
+ * ここでは provider 応答と extractor 引数だけを所有し、業務型は domain 正本を再exportする。
+ */
+import type { ReceiptCategoryHint } from "../../../lib/domain/receiptImageExtraction/extractionRequest";
+import { MAX_IMAGE_DATA_URL_LENGTH as _MAX_IMAGE_DATA_URL_LENGTH } from "../../../lib/domain/common/imageDataUrl";
+import {
+  JAPAN_TIME_ZONE as _JAPAN_TIME_ZONE,
+  MAX_EXTRACTED_LINE_ITEMS as _MAX_EXTRACTED_LINE_ITEMS,
+} from "../../../lib/domain/receipt/extraction";
+
 export type {
   TaxRatePercent,
   AmountBasis,
   TaxMode,
   RoundingMethod,
 } from "../../domain/receipt/tax/types";
-import { MAX_IMAGE_DATA_URL_LENGTH as _MAX_IMAGE_DATA_URL_LENGTH } from "../../../lib/domain/common/imageDataUrl";
-import {
-  JAPAN_TIME_ZONE as _JAPAN_TIME_ZONE,
-  MAX_EXTRACTED_LINE_ITEMS as _MAX_EXTRACTED_LINE_ITEMS,
-} from "../../../lib/domain/receipt/extraction";
-import type { ReceiptRawObservationLine } from "../../../lib/domain/receipt/observations";
-import type { ReceiptItemLineType } from "../../../lib/domain/receipt/discountItems";
-import type { ReceiptCategoryHint } from "../../../lib/domain/receiptImageExtraction/extractionRequest";
-export type { ReceiptItemLineType } from "../../../lib/domain/receipt/discountItems";
 export type { ReceiptCategoryHint } from "../../../lib/domain/receiptImageExtraction/extractionRequest";
+export type { ReceiptItemLineType } from "../../../lib/domain/receipt/discountItems";
 export type { ReceiptRawObservationLine } from "../../../lib/domain/receipt/observations";
-
-export type ExtractionConfidence = {
-  shopName: number;
-  date: number;
-  amountYen: number;
-  documentType?: number;
-  paymentPlace?: number;
-  payeeName?: number;
-  paymentPurpose?: number;
-  categoryName?: number;
-};
-
-export type ReceiptItemTaxRatePercent = TaxRatePercent | null;
-
-export type ExtractReceiptItemResult = {
-  itemName: string;
-  /** 明細の意味。旧応答との移行期間は optional。 */
-  lineType?: ReceiptItemLineType;
-  /** @deprecated 税対応の抽出結果では printedAmountYen を使用する。 */
-  amountYen: number;
-  /** #411/#412 の schema・parse 移行完了までは既存レスポンスとの互換用に optional。 */
-  printedAmountYen?: number;
-  amountBasis?: AmountBasis;
-  taxRatePercent?: ReceiptItemTaxRatePercent;
-  markers?: string[];
-  /** @deprecated markers を使用する。 */
-  taxMarker?: string;
-  quantity?: number;
-  unitPriceYen?: number;
-  categoryName?: string;
-  confidence: {
-    itemName?: number;
-    amountYen?: number;
-    printedAmountYen?: number;
-    amountBasis?: number;
-    taxRatePercent?: number;
-    categoryName?: number;
-  };
-  warnings: string[];
-};
-
-export type ReceiptMarkerDefinition = {
-  marker: string;
-  description: string;
-};
-
-export type ExtractedTaxSummary = {
-  taxRatePercent: TaxRatePercent;
-  taxMode: TaxMode;
-  taxableAmountYen: number;
-  taxableAmountBasis: AmountBasis;
-  taxYen: number;
-  taxIncludedAmountYen?: number;
-  roundingMethod: RoundingMethod;
-  confidence: {
-    taxRatePercent?: number;
-    taxMode?: number;
-    taxableAmountYen?: number;
-    taxableAmountBasis?: number;
-    taxYen?: number;
-  };
-  warnings: string[];
-};
-
-export type ExtractReceiptFieldsResult = {
-  shopName: string;
-  date: string;
-  amountYen: number | null;
-  documentType: "receipt" | "convenience_payment" | "unknown";
-  paymentPlace?: string;
-  payeeName?: string;
-  paymentPurpose?: string;
-  categoryName?: string;
-  items?: ExtractReceiptItemResult[];
-  taxSummaries?: ExtractedTaxSummary[];
-  markerDefinitions?: ReceiptMarkerDefinition[];
-  rawObservations?: ReceiptRawObservationLine[];
-  confidence: ExtractionConfidence;
-  warnings: string[];
-};
+export type {
+  ExtractionConfidence,
+  ExtractedFields,
+  ExtractedTaxSummary,
+  ExtractReceiptFieldsResult,
+  ExtractReceiptItemResult,
+  ReceiptItemTaxRatePercent,
+  ReceiptMarkerDefinition,
+} from "../../../lib/domain/receiptImageExtraction/extractionResult";
 
 export type OpenAIResponsesApiResponse = {
   status?: string;
@@ -118,8 +45,6 @@ export type OpenAIResponsesApiResponse = {
     }>;
   }>;
 };
-
-export type ExtractedFields = ExtractReceiptFieldsResult;
 
 export type ExtractReceiptFieldsArgs = {
   imageDataUrl: string;

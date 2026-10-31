@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseOpenAIResponse } from "./extraction";
+import { parseExtractionPayload } from "./extraction";
 import { EXPENSE_ENTRY_AMOUNT_MAX } from "../expenseEntries/expenseEntryItem";
 
 const trialExtraction = {
@@ -64,17 +64,10 @@ const trialExtraction = {
 };
 
 function parse(payload: unknown) {
-  return parseOpenAIResponse({
-    output: [
-      {
-        type: "message",
-        content: [{ type: "output_text", text: JSON.stringify(payload) }],
-      },
-    ],
-  });
+  return parseExtractionPayload(payload);
 }
 
-describe("parseOpenAIResponse domain", () => {
+describe("parseExtractionPayload domain", () => {
   it.each([EXPENSE_ENTRY_AMOUNT_MAX, -EXPENSE_ENTRY_AMOUNT_MAX])(
     "範囲内の符号付き明細金額 %s 円は保持する",
     (amount) => {

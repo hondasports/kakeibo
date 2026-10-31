@@ -14,10 +14,9 @@ import type {
   ExtractedFields,
   ExtractedTaxSummary,
   ExtractReceiptItemResult,
-  OpenAIResponsesApiResponse,
-  ReceiptMarkerDefinition,
-  ReceiptRawObservationLine,
-} from "../../convex/receiptImageExtraction/types";
+} from "../receiptImageExtraction/extractionResult";
+import type { ReceiptMarkerDefinition } from "./tax/types";
+import type { ReceiptRawObservationLine } from "./observations";
 import {
   parseTaxRatePercent,
   parseItemTaxRatePercent,
@@ -36,30 +35,17 @@ import {
 export { JAPAN_TIME_ZONE } from "../common/date";
 export const MAX_EXTRACTED_LINE_ITEMS = 100;
 
-export type ParseOpenAIResponseResult =
+export type ParseExtractionPayloadResult =
   | { success: true; extracted: ExtractedFields }
   | { success: false; error: string };
 
-/** OpenAI Responses API のレスポンスから抽出結果を取り出す */
-export function parseOpenAIResponse(data: OpenAIResponsesApiResponse): ParseOpenAIResponseResult {
+/** provider 応答から取り出した抽出 payload を検証し、業務用の抽出結果へ正規化する */
+export function parseExtractionPayload(payload: unknown): ParseExtractionPayloadResult {
   try {
-    const message = data.output?.find((o) => o.type === "message");
-    const textContent = message?.content?.find((c) => c.type === "output_text");
-    if (!textContent?.text) {
-      throw new Error("OpenAI からのレスポンスに期待するテキストコンテンツが含まれていません");
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(textContent.text);
-    } catch {
-      throw new Error("OpenAI からのレスポンスを JSON としてパースできませんでした");
-    }
-
-    if (typeof parsed !== "object" || parsed === null) {
+    if (typeof payload !== "object" || payload === null) {
       throw new Error("OpenAI レスポンスが期待する形式ではありません");
     }
-    const obj = parsed as Record<string, unknown>;
+    const obj = payload as Record<string, unknown>;
 
     if (typeof obj.shopName !== "string") {
       throw new Error("OpenAI レスポンスの shopName が文字列ではありません");

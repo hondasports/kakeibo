@@ -1,4 +1,4 @@
-import type { ExtractReceiptFieldsResult } from "../../convex/receiptImageExtraction/types";
+import type { ExtractReceiptFieldsResult } from "../receiptImageExtraction/extractionResult";
 import type { ReceiptRawObservationLine } from "../receipt/observations";
 import { classifyReceiptLines } from "../receipt/lineClassification";
 

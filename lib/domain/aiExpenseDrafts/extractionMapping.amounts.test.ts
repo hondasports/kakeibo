@@ -6,7 +6,7 @@ import {
 import { mapExtractionToDraftArgs } from "./extractionMapping";
 import { foodCategory } from "./testHelpers";
 import { EXPENSE_ENTRY_AMOUNT_MAX } from "../expenseEntries/expenseEntryItem";
-import { parseOpenAIResponse } from "../receipt/extraction";
+import { parseExtractionPayload } from "../receipt/extraction";
 
 describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
   it("抽出された明細の税込換算が上限を超えた場合は税率群全体を未配分で下書きに渡す", () => {
@@ -30,11 +30,7 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
         },
       ],
     };
-    const parsed = parseOpenAIResponse({
-      output: [
-        { type: "message", content: [{ type: "output_text", text: JSON.stringify(source) }] },
-      ],
-    });
+    const parsed = parseExtractionPayload(source);
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
     const mapped = mapExtractionToDraftArgs(parsed.extracted, [foodCategory]);
