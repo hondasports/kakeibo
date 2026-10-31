@@ -19,12 +19,8 @@ export async function callOpenAIReceiptExtractor({
   apiKey,
   telemetryId,
   categories,
-  categoryNames = [],
 }: OpenAIReceiptExtractorArgs): Promise<ExtractReceiptFieldsResult> {
-  const requestBody = buildOpenAIReceiptExtractionRequestBody(
-    imageDataUrl,
-    categories ?? categoryNames,
-  );
+  const requestBody = buildOpenAIReceiptExtractionRequestBody(imageDataUrl, categories ?? []);
 
   let response: Response;
   const httpStartedAt = Date.now();

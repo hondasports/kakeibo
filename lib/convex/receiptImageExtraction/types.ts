@@ -50,8 +50,6 @@ export type ExtractReceiptFieldsArgs = {
   imageDataUrl: string;
   telemetryId?: string;
   categories?: ReceiptCategoryHint[];
-  /** @deprecated Use categories so descriptions reach the extractor. */
-  categoryNames?: string[];
 };
 
 export type OpenAIReceiptExtractorArgs = {
@@ -59,8 +57,6 @@ export type OpenAIReceiptExtractorArgs = {
   apiKey: string;
   telemetryId?: string;
   categories?: ReceiptCategoryHint[];
-  /** @deprecated Use categories so descriptions reach the extractor. */
-  categoryNames?: string[];
 };
 
 /** Convex string value の 1MB 制限を下回る imageDataUrl の最大長 */
