@@ -76,6 +76,9 @@ src/
   designTokens.ts              # MUI sx 用デザイントークン（feature 横断）
   designTokens.test.ts
   index.css
+  assets/                      # Vite 同梱の静的アセット（hero.png 等）
+  content/                     # Product Update 原稿データ（product-updates.ts）
+  generated/                   # 生成物（product-updates.json）
   utils/                       # feature 横断ユーティリティ（例: imageDataUrl）
   lib/                         # 横断ユーティリティ（例: weekComparison）
   routing/                     # E2E 専用ルート（e2eRoutes.tsx, e2eFixtures.ts）
@@ -96,7 +99,6 @@ src/
     receipt-review/              # AI下書きレビュー（単票レビューダイアログ・税補正）
       components/                # ReviewDialog, ReviewItemCard, ReviewCheckCards, ...
       hooks/                     # useReviewDialog, useReviewSubmit, useReviewTaxOverrides, ...
-      types/
       utils/                     # mappers, taxWarnings, negativeLineWarnings, ...
                                #   （確認結果の判定は lib/domain/aiExpenseDrafts の reviewChecks 等）
     monthly-summary/           # 月次サマリページ
@@ -182,7 +184,7 @@ src/
       components/
       hooks/
       pages/
-      types/
+      types.ts
       index.ts
 
 convex/
@@ -190,6 +192,7 @@ convex/
   schema.ts
   http.ts                      # HTTP router（route 登録のみ）
   e2eHttp/                     # E2E 専用 httpAction ハンドラ
+  e2ePurge.ts                  # E2E テストデータ・孤児グループの purge（internal 関数群）
   lib/
     discountItems.ts
     weekDates.ts
@@ -226,6 +229,7 @@ convex/
     mutations.ts
     internal.ts
     expenseEntries.test.ts
+  expenseSearch.ts             # 支出検索 query（searchExpenses）
   weekSessions/
     queries.ts
     mutations.ts
@@ -236,7 +240,8 @@ convex/
     actions.ts
     model.ts
     internal.ts
-    extractionMapping.ts
+    validators.ts              # v.* validator 宣言
+    e2eDraftFixtures.ts        # E2E seed 用フィクスチャ
   receiptAnalysisJobs/
     queries.ts
     mutations.ts
@@ -253,8 +258,13 @@ convex/
     jobs.ts
     suppressions.ts
     model.ts
-    lib/providers.ts
-    webhooks/processResendEvent.ts
+    webhooks/
+      processResendEvent.ts
+      resendWebhook.ts
+  lineLink/                   # LINE アカウント連携（link/unlink・監査）
+  lineWebhook/                # LINE Messaging API webhook（署名検証・summary 応答・リッチメニュー）
+  notifications/              # 通知の enqueue・LINE 通知ジョブ配信
+  notificationSettings.ts     # 通知設定 query/mutation
   crons.ts                    # 定期 cleanup ジョブ
   systemAdmins.ts             # システム管理者認可・管理 API
   systemAdminSearch.ts
@@ -280,6 +290,7 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
     receiptImageExtraction/    # analyzeReceiptImageCore, openaiClient, parse, validators, ...
     receipts/                  # insert, queries, summaryLib, spendingEntries.ts
   domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
+  email/                       # メール provider・template 定義（convex/email から利用）
 
 tests/
   workflow/                    # CI workflow・デプロイ設定などの検証系テスト（Vitest）
@@ -318,7 +329,7 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 | --- | --- | --- |
 | `app-shell` | `week`, `auth`, `ui`, `expense-search` | レイアウト・ナビ・ユーザー表示・検索ボックス |
 | `settings` | `group-admin` | グループ設定パネル |
-| `receipt`, `expense-entry` | `ai-expense-queue`, `ui`, `week` | AI キュー UI・共通 UI・週選択 |
+| `expense-entry` | `ai-expense-queue`, `ui`, `week` | AI キュー UI・共通 UI・週選択 |
 | `ai-expense-queue` | `receipt-review`, `src/types` | レビューダイアログ・受け渡し型 |
 | `weekly-summary`, `monthly-summary`, `yearly-summary`, `dashboard`, `expense-search` | `summary-shared`, `week`, `ui` | 集計表示部品・週ユーティリティ |
 

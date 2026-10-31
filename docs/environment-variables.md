@@ -143,6 +143,16 @@ publishable keyから得たissuerとユーザーIDを組み合わせて`E2E_CLER
 | `POST /e2e/seed-ai-expense-draft` | AI 下書きのシード（認証なし疎通確認） |
 | `POST /e2e/seed-pending-group-invitation` | pending 招待のシード（`group-access` E2E 用） |
 
+### アプリ動作フラグ関連
+
+| 変数名 | 用途 | Local | DEV/PR Preview | PREVIEW RC | PROD | Secret扱い | 設定場所 |
+| ------------------------------ | --------------------------------------------------------------------- | ----- | -------------- | ---------- | ---- | ---------- | ---------------- |
+| `VITE_APP_MAINTENANCE_MODE` | メンテナンスモード切替。`"true"` で全ページをメンテナンス表示に切替（`/privacy`・`/terms`・`/maintenance` は除外。`src/features/app-shell/lib/maintenanceMode.ts`） | 任意 | 任意 | 任意 | 任意 | ❌ | .env.local / Vercel Env |
+| `VITE_ENABLE_E2E_ROUTES` | 本番相当ビルドで `/__e2e__/*` ルートを有効化（`"1"` のみ有効。`src/routing/e2eRoutes.tsx`） | 不要（`import.meta.env.DEV` で常時有効） | ❌ | `production-release.yml` がビルド時に `=1` を export | ❌ | ❌ | workflow のみ（手動設定しない） |
+
+`VITE_ENABLE_E2E_ROUTES` は CI 専用の内部変数で、`.env.example` にはコメントのみ記載し
+`.env.local` の設定対象にしない（リリース候補ビルドでだけ必要になるため）。
+
 ## 環境ごとの設定方針
 
 ### Local開発環境
