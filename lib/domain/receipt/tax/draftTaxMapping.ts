@@ -112,7 +112,6 @@ export function interpretedItemToDraftFields(item: InterpretedReceiptItem) {
     amountBasis: taxFields.amountBasis,
     taxRatePercent: taxFields.taxRatePercent,
     markers: item.markers,
-    taxMarker: item.taxMarker,
     allocatedTaxYen: item.allocatedTaxYen,
     taxAllocationStatus: item.taxAllocationStatus,
     normalizedAmountYen: item.normalizedAmountYen,

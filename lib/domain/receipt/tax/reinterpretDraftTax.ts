@@ -116,7 +116,6 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
             : decisionAdjusted.amountBasis,
         taxRatePercent: null,
         markers: [],
-        taxMarker: undefined,
       };
     }
     if (input.override?.itemIndex === index) {
