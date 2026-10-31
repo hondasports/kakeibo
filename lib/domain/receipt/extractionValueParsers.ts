@@ -1,11 +1,8 @@
+import type { AmountBasis, RoundingMethod, TaxMode, TaxRatePercent } from "./tax/types";
 import type {
-  AmountBasis,
   ExtractionConfidence,
   ReceiptItemTaxRatePercent,
-  RoundingMethod,
-  TaxMode,
-  TaxRatePercent,
-} from "../../convex/receiptImageExtraction/types";
+} from "../receiptImageExtraction/extractionResult";
 
 export function parseTaxRatePercent(value: unknown, field: string): TaxRatePercent {
   if (value === 0 || value === 8 || value === 10) return value;

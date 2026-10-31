@@ -10,7 +10,7 @@ import type {
   TaxRatePercent,
   TaxResolutionSource,
 } from "../receipt/tax/types";
-import type { ExtractReceiptFieldsResult } from "../../convex/receiptImageExtraction/types";
+import type { ExtractReceiptFieldsResult } from "../receiptImageExtraction/extractionResult";
 import type { ReceiptItemLineType } from "../receipt/discountItems";
 import type {
   ReceiptLineClassification,

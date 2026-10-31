@@ -649,8 +649,9 @@ E2E reset・取得）も4層へ移行済み。週の日付計算は既存 `lib/d
   endpoint名、args/returns、エラー文言、Doc 返却形状、patch キー構成は不変とする。
 
 `receiptImageExtraction`（レシート画像抽出 action）も4層へ移行済み。OpenAI client・
-parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を再利用し、リクエスト構築
-（プロンプト・JSONスキーマ・カテゴリ正規化）は `lib/domain/receiptImageExtraction/` へ統合済み。
+OpenAI 応答 envelope の取り出し・mock 結果は `lib/convex/receiptImageExtraction/` にあり、
+リクエスト構築（プロンプト・JSONスキーマ・カテゴリ正規化）と抽出結果の業務契約は
+`lib/domain/receiptImageExtraction/` へ統合済み。
 
 - **純粋関数**（`lib/domain/receiptImageExtraction/`）: 既存 `mode.ts` に加え、
   `rules.ts`（imageDataUrl 検証、抽出計画解決: mode → real は production 限定 →
@@ -659,10 +660,28 @@ parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を再利�
   `extractionRequest.ts`（抽出リクエスト構築: `ReceiptCategoryHint`/`CategoryInput` 型、
   BiDi制御文字 sanitize・重複排除 `normalizeCategories`、プロンプト構築
   `buildReceiptExtractionPrompt`、JSONスキーマ `buildReceiptExtractionJsonSchema`、
-  リクエストボディ `buildOpenAIReceiptExtractionRequestBody`）。
+  リクエストボディ `buildOpenAIReceiptExtractionRequestBody`）、
+  `extractionResult.ts`（抽出結果の業務契約の正本: `ExtractReceiptFieldsResult`・
+  `ExtractReceiptItemResult`・`ExtractedReceiptTaxSummary`・`ExtractionConfidence`・
+  `ReceiptItemTaxRatePercent` 等。`ExtractedReceiptTaxSummary` は解釈前の抽出値で、
+  `status`/`reasons` 等を持つ解釈後契約の `ExtractedTaxSummary`
+  （`lib/domain/receipt/tax/types.ts`）とは別名にして区別する。税率・amountBasis・
+  行種別・観測行・マーカー定義は `lib/domain/receipt/**` の正本を参照し、
+  同じ型は複製しない）。
   OpenAI モデルは `RECEIPT_EXTRACTION_OPENAI_MODEL`（現在 `gpt-6-luna`）、
   reasoning 設定は `RECEIPT_EXTRACTION_REASONING`（`effort: "none"` 固定）の
   定数で一元管理し、環境変数では切り替えない。
+- **応答境界**: OpenAI Responses API の envelope（`output → message → output_text`
+  の取り出しと JSON.parse）は infra の
+  `lib/convex/receiptImageExtraction/parseExtraction.ts` が担い、業務 payload の
+  検証・日付補正・明細正規化は `lib/domain/receipt/extraction.ts` の
+  `parseExtractionPayload` が担う。`parseOpenAIResponse` wrapper の成功・失敗契約
+  （ConvexError への変換と文言・判定順序）は不変。
+  `lib/convex/receiptImageExtraction/types.ts` は `OpenAIResponsesApiResponse`・
+  extractor 引数（`ExtractReceiptFieldsArgs`・`OpenAIReceiptExtractorArgs`）などの
+  adapter 固有型のみを所有し、業務型は domain 正本を再exportする。
+  `lib/domain/dependencyDirection.test.ts` が lib/domain → convex 参照の
+  逆依存再導入を検査する。
 - **ユースケース**（`lib/usecase/receiptImageExtraction/`）: `extractReceiptFields`
   （検証 → 計画 → mock/real）と `extractReceiptFieldsForCurrentGroup`
   （group → consent+categories 並列取得 → 抽出）。
