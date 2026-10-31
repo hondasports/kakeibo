@@ -59,7 +59,12 @@ const valueSnapshot = (items: ItemCompatFields[]) => ({
   confidence: {},
   warnings: [],
   reviewReasons: [],
-  items: items.map((item) => ({ itemName: "品物", amountYen: 100, confidence: {}, ...item })),
+  items: items.map((item) => ({
+    itemName: "品物",
+    amountYen: 100,
+    confidence: {},
+    ...item,
+  })),
 });
 
 const taxSummary = {
@@ -93,28 +98,20 @@ const insertDraft = (
       }),
   );
 
-const collectPages = async <T extends { isDone: boolean; continueCursor: string | null }>(
-  run: (cursor?: string) => Promise<T>,
-) => {
-  const pages: T[] = [];
-  let cursor: string | undefined;
-  for (;;) {
-    const page = await run(cursor);
-    pages.push(page);
-    if (page.isDone) return pages;
-    cursor = page.continueCursor ?? undefined;
-  }
-};
-
-const sumField = <K extends string>(pages: Record<K, number>[], key: K) =>
-  pages.reduce((acc, page) => acc + page[key], 0);
-
 describe("deprecatedFieldCounts", () => {
-  it("aiExpenseDraftItems の旧形式フィールドを件数だけ数える", async () => {
+  it("aiExpenseDraftItems の旧形式フィールドを件数だけ数える（空 markers + taxMarker を含む）", async () => {
     const t = convexTest(schema, convexTestModules);
     const groupId = await insertGroup(t);
     const draftId = await insertDraft(t, groupId, {});
+    // markers 未設定 + taxMarker: `markers ?? [taxMarker]` fallback が効く旧行
     await insertItem(t, groupId, draftId, { taxMarker: "※" });
+    // markers 空配列 + taxMarker: interpretReceiptTax の fallback だけが効く行
+    await insertItem(t, groupId, draftId, {
+      printedAmountYen: 100,
+      lineType: "item",
+      markers: [],
+      taxMarker: "※",
+    });
     await insertItem(t, groupId, draftId, {
       printedAmountYen: 100,
       lineType: "item",
@@ -127,17 +124,17 @@ describe("deprecatedFieldCounts", () => {
       markers: [],
     });
 
-    const pages = await collectPages((cursor) =>
-      t.query(internal.deprecatedFieldCounts.aiExpenseDraftItems, { cursor }),
-    );
-    expect(pages).toHaveLength(1);
-    expect(pages[0]).toMatchObject({
-      scanned: 3,
+    const result = await t.query(internal.deprecatedFieldCounts.aiExpenseDraftItems, {});
+    expect(result.isDone).toBe(true);
+    expect(result.page).toEqual(result.totals);
+    expect(result.totals).toMatchObject({
+      scanned: 4,
       missingPrintedAmountYen: 1,
       missingLineType: 1,
       missingMarkers: 1,
-      missingMarkersWithTaxMarker: 1,
-      withTaxMarker: 2,
+      emptyMarkers: 2,
+      markersAbsentOrEmptyWithTaxMarker: 2,
+      withTaxMarker: 3,
     });
   });
 
@@ -145,7 +142,17 @@ describe("deprecatedFieldCounts", () => {
     const t = convexTest(schema, convexTestModules);
     const groupId = await insertGroup(t);
     const legacyItem = { taxMarker: "※" };
-    const modernItem = { printedAmountYen: 100, lineType: "item", markers: [] as string[] };
+    const emptyMarkersWithTax = {
+      printedAmountYen: 100,
+      lineType: "item" as const,
+      markers: [] as string[],
+      taxMarker: "※",
+    };
+    const modernItem = {
+      printedAmountYen: 100,
+      lineType: "item" as const,
+      markers: [] as string[],
+    };
     await insertDraft(t, groupId, {
       receiptInterpretation: {
         source: "ai",
@@ -157,7 +164,7 @@ describe("deprecatedFieldCounts", () => {
         updatedAt: 1,
         fields: ["amountYen"],
         taxSummaryCorrections: [taxSummary],
-        values: valueSnapshot([legacyItem]),
+        values: valueSnapshot([legacyItem, emptyMarkersWithTax]),
       },
     });
     await insertDraft(t, groupId, {
@@ -176,11 +183,8 @@ describe("deprecatedFieldCounts", () => {
     });
     await insertDraft(t, groupId, {});
 
-    const pages = await collectPages((cursor) =>
-      t.query(internal.deprecatedFieldCounts.aiExpenseDrafts, { cursor }),
-    );
-    expect(pages).toHaveLength(1);
-    expect(pages[0]).toMatchObject({
+    const result = await t.query(internal.deprecatedFieldCounts.aiExpenseDrafts, {});
+    expect(result.totals).toMatchObject({
       scanned: 3,
       missingReceiptDataContractVersion: 2,
       withTaxSummaryCorrections: 1,
@@ -188,18 +192,22 @@ describe("deprecatedFieldCounts", () => {
         missingPrintedAmountYen: 1,
         missingLineType: 1,
         missingMarkers: 1,
-        missingMarkersWithTaxMarker: 1,
+        emptyMarkers: 2,
+        markersAbsentOrEmptyWithTaxMarker: 1,
+        withTaxMarker: 1,
       },
       userOverride: {
         missingPrintedAmountYen: 1,
         missingLineType: 1,
         missingMarkers: 1,
-        missingMarkersWithTaxMarker: 1,
+        emptyMarkers: 1,
+        markersAbsentOrEmptyWithTaxMarker: 2,
+        withTaxMarker: 2,
       },
     });
   });
 
-  it("groupDeletionAuditMigrationRecords を status 別に数え、cursor で継続する", async () => {
+  it("carry に前回 totals を渡すと cursor をまたいで累計される", async () => {
     const t = convexTest(schema, convexTestModules);
     const counts = {
       receiptAnalysisImageJobs: 0,
@@ -238,15 +246,22 @@ describe("deprecatedFieldCounts", () => {
       });
     }
 
-    const pages = await collectPages((cursor) =>
-      t.query(internal.deprecatedFieldCounts.groupDeletionAuditMigrationRecords, {
-        cursor,
-      }),
+    const first = await t.query(
+      internal.deprecatedFieldCounts.groupDeletionAuditMigrationRecords,
+      {},
     );
-    expect(pages.length).toBeGreaterThanOrEqual(2);
-    expect(sumField(pages, "scanned")).toBe(26);
-    expect(sumField(pages, "migrated")).toBe(24);
-    expect(sumField(pages, "skipped")).toBe(1);
-    expect(sumField(pages, "failed")).toBe(1);
+    expect(first.isDone).toBe(false);
+    expect(first.page.scanned).toBe(25);
+    const second = await t.query(
+      internal.deprecatedFieldCounts.groupDeletionAuditMigrationRecords,
+      { cursor: first.continueCursor ?? undefined, carry: first.totals },
+    );
+    expect(second.isDone).toBe(true);
+    expect(second.totals).toMatchObject({
+      scanned: 26,
+      migrated: 24,
+      skipped: 1,
+      failed: 1,
+    });
   });
 });
