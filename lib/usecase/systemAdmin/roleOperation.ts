@@ -6,6 +6,7 @@ import {
   getNormalizeReasonErrorMessage,
   normalizeSystemAdminReason,
 } from "../../domain/systemAdmin/reason";
+import type { GroupRole } from "../../domain/groups/role";
 import { assertAccountDeletionNotInProgress } from "../accountDeletion/classification";
 import type { SystemAdminMutationDeps } from "./deps";
 import { requireSystemAdminActor } from "./actor";
@@ -68,7 +69,7 @@ export async function systemAdminRoleOperation(
     groupId: string;
     targetUserId: string;
     sourceOwnerUserId?: string;
-    newRole?: "owner" | "member";
+    newRole?: GroupRole;
     reason: string;
   },
 ): Promise<null> {

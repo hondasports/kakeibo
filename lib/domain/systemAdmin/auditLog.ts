@@ -2,6 +2,7 @@
  * systemAdminAuditLogs のドメイン型とストア・ポート（domain interface）。
  */
 import type { PaginatedResult, PaginationOpts } from "../pagination";
+import type { GroupMembershipStatus } from "../groups/role";
 
 export const SYSTEM_ADMIN_AUDIT_ACTIONS = [
   "system_admin_bootstrapped",
@@ -57,8 +58,8 @@ export type SystemAdminAuditLogFields = {
   sourceGroupNameSnapshot?: string;
   targetGroupId?: string;
   targetGroupNameSnapshot?: string;
-  beforeMembershipStatus?: "none" | "member" | "owner";
-  afterMembershipStatus?: "none" | "member" | "owner";
+  beforeMembershipStatus?: GroupMembershipStatus;
+  afterMembershipStatus?: GroupMembershipStatus;
   beforeActiveGroupId?: string;
   afterActiveGroupId?: string;
   beforeOwnerCount?: number;

@@ -10,6 +10,7 @@ export type {
   EmailSuppressionReason,
   EmailWebhookEventType,
 } from "../domain/email/model";
+import type { GroupRole } from "../domain/groups/role";
 
 export type EmailDeliveryTestPayload = {
   to: string;
@@ -22,8 +23,8 @@ export type GroupMembershipRemovedPayload = {
 
 export type GroupRoleChangedPayload = {
   groupName: string;
-  previousRole: "owner" | "member";
-  newRole: "owner" | "member";
+  previousRole: GroupRole;
+  newRole: GroupRole;
 };
 
 export type GroupOwnershipReceivedPayload = {

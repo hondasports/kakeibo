@@ -6,6 +6,8 @@ import { deleteAllGroupScopedData } from "./lib/deleteGroupPhysically";
 import { normalizeEmail } from "./lib/groupEmailMatching";
 import { readQueryDoc, readQueryDocs } from "./lib/groupQueryHelpers";
 import { isGroupDeleted } from "../../lib/domain/groups/lifecycle";
+import type { GroupRole } from "../../lib/domain/groups/role";
+import { groupRoleValidator } from "./validators";
 
 async function deleteMembershipPreservingOwnerInvariant(
   ctx: MutationCtx,
@@ -98,7 +100,7 @@ export async function deleteGroupMembershipsByUserHandler(
 
 export async function setGroupMemberRoleForE2eHandler(
   ctx: MutationCtx,
-  args: { userId: string; groupId: Id<"groups"> | null; role: "owner" | "member" },
+  args: { userId: string; groupId: Id<"groups"> | null; role: GroupRole },
 ) {
   const { userId, groupId, role } = args;
   if (groupId === null) {
@@ -237,7 +239,7 @@ export const setGroupMemberRoleForE2e = internalMutation({
   args: {
     userId: v.string(),
     groupId: v.union(v.id("groups"), v.null()),
-    role: v.union(v.literal("owner"), v.literal("member")),
+    role: groupRoleValidator,
   },
   returns: v.object({ updated: v.boolean() }),
   handler: setGroupMemberRoleForE2eHandler,

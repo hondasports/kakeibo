@@ -3,6 +3,7 @@ import { changeMemberRoleHandler, transferGroupOwnershipHandler } from "./member
 import { describe, expect, it, vi } from "vitest";
 import { createIdentity, createMockDb } from "./testHelpers";
 import { MAX_OWNED_GROUPS_PER_USER } from "../../lib/domain/groups/groupInvitation";
+import type { GroupRole } from "../../lib/domain/groups/role";
 
 const ownerId = "https://issuer.example|owner";
 const targetUserId = "https://issuer.example|target";
@@ -10,7 +11,7 @@ const targetUserId = "https://issuer.example|target";
 /** group-001 の owner(actor) と member(target)。target は他グループの owner を otherOwnedCount 個持つ。 */
 function createCtx(
   otherOwnedCount: number,
-  targetRoleInGroup: "member" | "owner" = "member",
+  targetRoleInGroup: GroupRole = "member",
   otherMemberCount = 0,
 ) {
   const ctx = createMockDb({

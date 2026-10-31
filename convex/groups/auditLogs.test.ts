@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { recordManagementAuditLog } from "./lib/managementAuditLog";
+import type { GroupRole } from "../../lib/domain/groups/role";
 import { listManagementAuditLogsHandler, MANAGEMENT_AUDIT_LOG_LIST_LIMIT } from "./auditLogs";
 
 type ManagementAuditLogDoc = {
@@ -44,7 +45,7 @@ type GroupMemberDoc = {
   _id: Id<"groupMembers">;
   groupId: Id<"groups">;
   userId: string;
-  role: "owner" | "member";
+  role: GroupRole;
   createdAt: number;
   updatedAt: number;
 };

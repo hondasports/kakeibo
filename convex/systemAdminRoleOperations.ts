@@ -2,9 +2,9 @@ import { ConvexError, v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { createSystemAdminMutationDeps } from "../lib/convex/systemAdmin/systemAdminDeps";
 import { systemAdminRoleOperation as systemAdminRoleOperationUsecase } from "../lib/usecase/systemAdmin";
+import { groupRoleValidator } from "./groups/validators";
 
 const operationValidator = v.union(v.literal("change_role"), v.literal("transfer_owner"));
-const roleValidator = v.union(v.literal("owner"), v.literal("member"));
 
 export const systemAdminRoleOperation = mutation({
   args: {
@@ -12,7 +12,7 @@ export const systemAdminRoleOperation = mutation({
     groupId: v.id("groups"),
     targetUserId: v.id("users"),
     sourceOwnerUserId: v.optional(v.id("users")),
-    newRole: v.optional(roleValidator),
+    newRole: v.optional(groupRoleValidator),
     reason: v.string(),
   },
   returns: v.null(),

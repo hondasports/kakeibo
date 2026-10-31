@@ -1,10 +1,11 @@
 import type { Id } from "../../_generated/dataModel";
+import type { GroupRole } from "../../../lib/domain/groups/role";
 
 export type GroupMembership = {
   membershipId: Id<"groupMembers">;
   groupId: Id<"groups">;
   userId: string;
-  role: "owner" | "member";
+  role: GroupRole;
 };
 
 export type GroupDoc = {
@@ -24,7 +25,7 @@ export type UserDoc = {
 
 export type GroupMemberListItem = {
   userId: string;
-  role: "owner" | "member";
+  role: GroupRole;
   displayName: string;
   email: string | null;
   isActiveGroup: boolean;

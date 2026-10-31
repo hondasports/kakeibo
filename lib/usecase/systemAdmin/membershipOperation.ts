@@ -13,11 +13,10 @@ import {
   normalizeSystemAdminReason,
 } from "../../domain/systemAdmin/reason";
 import type { SystemAdminAuditAction } from "../../domain/systemAdmin/auditLog";
+import type { GroupMembershipStatus } from "../../domain/groups/role";
 import { assertAccountDeletionNotInProgress } from "../accountDeletion/classification";
 import type { SystemAdminMutationDeps } from "./deps";
 import { requireSystemAdminActor } from "./actor";
-
-type MembershipStatus = "none" | "member" | "owner";
 
 type Deps = Pick<
   SystemAdminMutationDeps,
@@ -154,8 +153,8 @@ export async function systemAdminMembershipOperation(
   }
   const beforeActiveGroupId = targetUser.activeGroupId;
   let afterActiveGroupId = beforeActiveGroupId;
-  let beforeMembershipStatus: MembershipStatus = "none";
-  let afterMembershipStatus: MembershipStatus = "none";
+  let beforeMembershipStatus: GroupMembershipStatus = "none";
+  let afterMembershipStatus: GroupMembershipStatus = "none";
   let action: SystemAdminAuditAction;
   let notificationGroupIds: Array<string | undefined> = [];
 

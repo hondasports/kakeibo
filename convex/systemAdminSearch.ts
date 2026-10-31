@@ -5,6 +5,7 @@ import type { Infer } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalMutation } from "./_generated/server";
 import { createSystemAdminMutationDeps } from "../lib/convex/systemAdmin/systemAdminDeps";
+import { groupRoleValidator } from "./groups/validators";
 import {
   getGroupDetailData as getGroupDetailDataUsecase,
   getUserDetailData as getUserDetailDataUsecase,
@@ -54,7 +55,7 @@ const groupSearchResultValidator = v.object({
 const userMembershipValidator = v.object({
   groupId: v.id("groups"),
   groupName: v.string(),
-  role: v.union(v.literal("owner"), v.literal("member")),
+  role: groupRoleValidator,
   createdAt: v.number(),
   updatedAt: v.number(),
 });
@@ -84,7 +85,7 @@ const groupMemberValidator = v.object({
   userId: v.string(),
   displayName: v.union(v.string(), v.null()),
   email: v.union(v.string(), v.null()),
-  role: v.union(v.literal("owner"), v.literal("member")),
+  role: groupRoleValidator,
   createdAt: v.number(),
   updatedAt: v.number(),
 });

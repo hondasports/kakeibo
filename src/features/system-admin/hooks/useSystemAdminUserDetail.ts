@@ -2,6 +2,7 @@ import { api } from "../../../../convex/_generated/api";
 import { useCallback, useEffect, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import type { GroupRole } from "../../../../lib/domain/groups/role";
 import type {
   MembershipDialogGroup,
   SystemAdminMembershipOperation,
@@ -14,7 +15,7 @@ export type UserDetail = {
   email: string | null;
   activeGroupId: string | null;
   environment: string;
-  memberships: { groupId: string; groupName: string; role: "owner" | "member" }[];
+  memberships: { groupId: string; groupName: string; role: GroupRole }[];
   invitations: { groupId: string; groupName: string; status: string }[];
   membershipsTruncated?: boolean;
   invitationsTruncated?: boolean;

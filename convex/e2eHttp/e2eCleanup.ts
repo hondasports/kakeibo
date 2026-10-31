@@ -8,6 +8,7 @@ import {
   requireE2eSecret,
   requireE2eUserId,
 } from "./e2eAuth";
+import type { GroupRole } from "../../lib/domain/groups/role";
 
 type E2eCleanupBody = {
   userId?: string;
@@ -24,7 +25,7 @@ type E2eCleanupBody = {
   clearGroupInvitations?: boolean;
   clearLineLink?: boolean;
   clearNotificationData?: boolean;
-  setGroupMemberRole?: "owner" | "member";
+  setGroupMemberRole?: GroupRole;
   seedGroupMember?: { displayName: string; email: string };
 };
 

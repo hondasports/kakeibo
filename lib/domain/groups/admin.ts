@@ -1,4 +1,4 @@
-export type GroupAdminRole = "owner" | "member";
+import type { GroupRole } from "./role";
 
 export type GroupAdminErrorKey =
   | "owner_only"
@@ -19,7 +19,7 @@ export function getGroupAdminErrorMessage(error: GroupAdminErrorKey): string {
 }
 
 export function validateGroupOwnerRole(
-  role: GroupAdminRole,
+  role: GroupRole,
 ): { success: true } | { success: false; error: GroupAdminErrorKey } {
   if (role !== "owner") {
     return { success: false, error: "owner_only" };
@@ -48,7 +48,7 @@ export function validateNotSelfOperator(
 }
 
 export function validateRemovableGroupMemberRole(
-  role: GroupAdminRole,
+  role: GroupRole,
 ): { success: true } | { success: false; error: GroupAdminErrorKey } {
   if (role === "owner") {
     return { success: false, error: "owner_member_not_removable" };

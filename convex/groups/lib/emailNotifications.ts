@@ -1,5 +1,6 @@
 import type { MutationCtx } from "../../_generated/server";
 import { createGroupEmailNotificationQueue } from "../../../lib/convex/groups/convexGroupEmailNotifications";
+import type { GroupRole } from "../../../lib/domain/groups/role";
 
 export async function enqueueGroupMembershipRemovedEmail(
   ctx: MutationCtx,
@@ -12,8 +13,8 @@ export async function enqueueGroupMembershipRemovedEmail(
 export async function enqueueGroupRoleChangedEmail(
   ctx: MutationCtx,
   groupName: string,
-  previousRole: "owner" | "member",
-  newRole: "owner" | "member",
+  previousRole: GroupRole,
+  newRole: GroupRole,
   recipientEmail: string | undefined,
 ): Promise<void> {
   await createGroupEmailNotificationQueue(ctx).roleChanged({
