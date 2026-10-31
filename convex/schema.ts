@@ -1,3 +1,12 @@
+import { ACCOUNT_DELETION_REQUEST_STATUSES } from "../lib/domain/accountDeletion/request";
+import { ACCOUNT_DELETION_GROUP_PURGE_STATUSES } from "../lib/domain/accountDeletion/groupPurgeStore";
+import {
+  RECEIPT_ANALYSIS_BATCH_STATUSES,
+  RECEIPT_ANALYSIS_JOB_STATUSES,
+} from "../lib/domain/receiptAnalysisJobs/records";
+import { GROUP_LIFECYCLE_STATUSES } from "../lib/domain/groups/lifecycle";
+import { GROUP_INVITATION_STATUSES } from "../lib/domain/groups/groupInvitation";
+import { LINE_NOTIFICATION_EVENT_OUTCOMES } from "../lib/domain/notifications/records";
 import { systemAdminAuditActionValidator } from "../lib/convex/systemAdmin/validators";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
@@ -159,14 +168,7 @@ export default defineSchema({
     name: v.string(),
     clerkOrganizationId: v.optional(v.string()),
     defaultCategoriesSeedVersion: v.optional(v.number()),
-    status: v.optional(
-      v.union(
-        v.literal("active"),
-        v.literal("deleting"),
-        v.literal("deleted"),
-        v.literal("archived"),
-      ),
-    ),
+    status: v.optional(v.union(...GROUP_LIFECYCLE_STATUSES.map((value) => v.literal(value)))),
     deletedAt: v.optional(v.number()),
     archivedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -194,12 +196,7 @@ export default defineSchema({
     groupId: v.id("groups"),
     email: v.string(),
     token: v.string(),
-    status: v.union(
-      v.literal("pending"),
-      v.literal("accepted"),
-      v.literal("revoked"),
-      v.literal("expired"),
-    ),
+    status: v.union(...GROUP_INVITATION_STATUSES.map((value) => v.literal(value))),
     invitedByUserId: v.string(),
     clerkInvitationId: v.optional(v.string()),
     acceptedByUserId: v.optional(v.string()),
@@ -587,13 +584,7 @@ export default defineSchema({
     createdByUserId: v.optional(v.string()),
     totalCount: v.number(),
     processedCount: v.number(),
-    status: v.union(
-      v.literal("queued"),
-      v.literal("running"),
-      v.literal("partially_failed"),
-      v.literal("completed"),
-      v.literal("failed"),
-    ),
+    status: v.union(...RECEIPT_ANALYSIS_BATCH_STATUSES.map((value) => v.literal(value))),
     aiReviewNotificationScheduledAt: v.optional(v.number()),
     aiReviewLineNotificationConsumedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -608,14 +599,7 @@ export default defineSchema({
     groupId: v.id("groups"),
     imageIndex: v.number(),
     fileName: v.string(),
-    status: v.union(
-      v.literal("queued"),
-      v.literal("running"),
-      v.literal("ready"),
-      v.literal("needs_review"),
-      v.literal("failed"),
-      v.literal("cancelled"),
-    ),
+    status: v.union(...RECEIPT_ANALYSIS_JOB_STATUSES.map((value) => v.literal(value))),
     draftId: v.optional(v.id("aiExpenseDrafts")),
     error: v.optional(v.string()),
     createdAt: v.number(),
@@ -693,7 +677,7 @@ export default defineSchema({
     batchId: v.id("receiptAnalysisBatches"),
     type: v.literal("ai_review_required"),
     dedupeKey: v.string(),
-    outcome: v.union(v.literal("queued"), v.literal("skipped")),
+    outcome: v.union(...LINE_NOTIFICATION_EVENT_OUTCOMES.map((value) => v.literal(value))),
     reason: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -733,17 +717,7 @@ export default defineSchema({
     userId: v.string(),
     clerkUserId: v.string(),
     recipientEmailSnapshot: v.optional(v.string()),
-    status: v.union(
-      v.literal("requested"),
-      v.literal("preparing_groups"),
-      v.literal("purging_groups"),
-      v.literal("deleting_identity"),
-      v.literal("retry_wait"),
-      v.literal("identity_deleted"),
-      v.literal("finalization_retry_wait"),
-      v.literal("completed"),
-      v.literal("failed"),
-    ),
+    status: v.union(...ACCOUNT_DELETION_REQUEST_STATUSES.map((value) => v.literal(value))),
     leftGroupCount: v.number(),
     deletedGroupCount: v.number(),
     attemptCount: v.number(),
@@ -768,12 +742,7 @@ export default defineSchema({
     groupDeletionJobId: v.id("groupDeletionJobs"),
     targetGroupIdSnapshot: v.string(),
     targetGroupNameSnapshot: v.string(),
-    status: v.union(
-      v.literal("pending"),
-      v.literal("running"),
-      v.literal("failed"),
-      v.literal("completed"),
-    ),
+    status: v.union(...ACCOUNT_DELETION_GROUP_PURGE_STATUSES.map((value) => v.literal(value))),
     lastErrorCode: v.optional(v.string()),
     lastErrorMessage: v.optional(v.string()),
     createdAt: v.number(),

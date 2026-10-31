@@ -2,16 +2,19 @@
  * accountDeletionRequests のドメイン型（domain interface）。
  * Convex の generated 型には依存せず、ID は string として扱う。
  */
-export type AccountDeletionRequestStatus =
-  | "requested"
-  | "preparing_groups"
-  | "purging_groups"
-  | "deleting_identity"
-  | "retry_wait"
-  | "identity_deleted"
-  | "finalization_retry_wait"
-  | "completed"
-  | "failed";
+export const ACCOUNT_DELETION_REQUEST_STATUSES = [
+  "requested",
+  "preparing_groups",
+  "purging_groups",
+  "deleting_identity",
+  "retry_wait",
+  "identity_deleted",
+  "finalization_retry_wait",
+  "completed",
+  "failed",
+] as const;
+
+export type AccountDeletionRequestStatus = (typeof ACCOUNT_DELETION_REQUEST_STATUSES)[number];
 
 /** accountDeletionRequests ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
 export type AccountDeletionRequestFields = {

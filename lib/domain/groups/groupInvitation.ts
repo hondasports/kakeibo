@@ -2,7 +2,8 @@
  * groupInvitations のドメイン型。
  * Convex の generated 型には依存せず、ID は string として扱う。
  */
-export type GroupInvitationStatus = "pending" | "accepted" | "revoked" | "expired";
+export const GROUP_INVITATION_STATUSES = ["pending", "accepted", "revoked", "expired"] as const;
+export type GroupInvitationStatus = (typeof GROUP_INVITATION_STATUSES)[number];
 
 /**
  * 1 グループが同時に持てる pending 招待の上限。
