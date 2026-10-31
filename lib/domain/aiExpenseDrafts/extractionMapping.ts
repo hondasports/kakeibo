@@ -7,8 +7,10 @@ import type {
   ReceiptTaxDecision,
   ReceiptTotalResolution,
   ReceiptTaxInput,
+  TaxAllocationStatus,
   TaxRatePercent,
   TaxResolutionSource,
+  TaxResolutionStatus,
 } from "../receipt/tax/types";
 import type { ExtractReceiptFieldsResult } from "../receiptImageExtraction/extractionResult";
 import type { ReceiptItemLineType } from "../receipt/discountItems";
@@ -48,9 +50,9 @@ export type DraftItem<TId = string> = {
   markers?: string[];
   taxMarker?: string;
   allocatedTaxYen?: number;
-  taxAllocationStatus?: "allocated" | "unallocated";
+  taxAllocationStatus?: TaxAllocationStatus;
   normalizedAmountYen?: number;
-  taxResolutionStatus?: "resolved" | "unresolved";
+  taxResolutionStatus?: TaxResolutionStatus;
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
   quantity?: number;

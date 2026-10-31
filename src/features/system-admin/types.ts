@@ -1,8 +1,13 @@
 import type { AppEnvironment } from "../../../lib/domain/systemAdmin/environment";
-import type { SystemAdminAuditAction } from "../../../lib/domain/systemAdmin/auditLog";
+import type {
+  SystemAdminAuditAction,
+  SystemAdminAuditActorType,
+  SystemAdminAuditResult,
+} from "../../../lib/domain/systemAdmin/auditLog";
 import type { GroupLifecycleStatus } from "../../../lib/domain/groups/lifecycle";
+import type { SystemAdminStatus } from "../../../lib/domain/systemAdmin/systemAdminStore";
 import type { GroupMembershipStatus } from "../../../lib/domain/groups/role";
-export type { AppEnvironment, SystemAdminAuditAction };
+export type { AppEnvironment, SystemAdminAuditAction, SystemAdminStatus };
 
 export type UserSearchItem = {
   id: string;
@@ -29,8 +34,6 @@ export type PageResult<T> = {
   continueCursor: string;
 };
 
-export type SystemAdminStatus = "active" | "revoked";
-
 export type SystemAdminListItem = {
   id: string;
   targetUserId: string;
@@ -51,7 +54,7 @@ export type SystemAdminListResult = PageResult<SystemAdminListItem> & {
 export type SystemAdminAuditItem = {
   id: string;
   action: SystemAdminAuditAction;
-  actorType: "system" | "system_admin";
+  actorType: SystemAdminAuditActorType;
   actorUserId?: string;
   actorDisplayName: string | null;
   targetUserId?: string;
@@ -59,7 +62,7 @@ export type SystemAdminAuditItem = {
   targetDisplayName?: string;
   sourceUserId?: string;
   sourceUserDisplayName?: string;
-  result: "success" | "denied";
+  result: SystemAdminAuditResult;
   queryHash?: string;
   resultCount?: number;
   reason?: string;

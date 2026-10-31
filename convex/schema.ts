@@ -1,3 +1,11 @@
+import { RECEIPT_DATA_CONTRACT_VERSION } from "../lib/domain/aiExpenseDrafts/receiptDataContract";
+import { ENTRY_KINDS } from "../lib/domain/common/entryKind";
+import { EXPENSE_ENTRY_SOURCES } from "../lib/domain/expenseEntries/expenseEntry";
+import {
+  SOURCE_DOCUMENT_SOURCE_TYPES,
+  SOURCE_DOCUMENT_STATUSES,
+} from "../lib/domain/sourceDocuments/sourceDocument";
+import { WEEK_SESSION_STATUSES } from "../lib/domain/weekSessions/store";
 import { ACCOUNT_DELETION_REQUEST_STATUSES } from "../lib/domain/accountDeletion/request";
 import { ACCOUNT_DELETION_GROUP_PURGE_STATUSES } from "../lib/domain/accountDeletion/groupPurgeStore";
 import {
@@ -8,7 +16,14 @@ import { GROUP_LIFECYCLE_STATUSES } from "../lib/domain/groups/lifecycle";
 import { GROUP_INVITATION_STATUSES } from "../lib/domain/groups/groupInvitation";
 import { GROUP_MEMBERSHIP_STATUSES, GROUP_ROLES } from "../lib/domain/groups/role";
 import { LINE_NOTIFICATION_EVENT_OUTCOMES } from "../lib/domain/notifications/records";
-import { systemAdminAuditActionValidator } from "../lib/convex/systemAdmin/validators";
+import {
+  systemAdminAuditActionValidator,
+  systemAdminAuditActorTypeValidator,
+  systemAdminAuditResultValidator,
+  systemAdminAuditTargetKindValidator,
+  systemAdminNotificationActionValidator,
+  systemAdminStatusValidator,
+} from "../lib/convex/systemAdmin/validators";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
@@ -17,6 +32,7 @@ import {
   aiExpenseDraftReviewReasonValidator,
   aiExpenseDraftSourceTypeValidator,
   aiExpenseDraftStatusValidator,
+  aiExpenseRegistrationModeValidator,
   derivedRegistrationSnapshotValidator,
   markerDefinitionsValidator,
   receiptDraftItemFields,
@@ -46,6 +62,7 @@ import {
 } from "./email/model";
 import {
   lineLinkAuditActionValidator,
+  lineLinkAuditResultValidator,
   lineLinkRequestStatusValidator,
   lineLinkStatusValidator,
 } from "./lineLink/model";
@@ -123,7 +140,7 @@ export default defineSchema({
   lineLinkAuditLogs: defineTable({
     userId: v.string(),
     action: lineLinkAuditActionValidator,
-    result: v.union(v.literal("success"), v.literal("failure")),
+    result: lineLinkAuditResultValidator,
     reasonCode: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_user_id", ["userId"]),
@@ -228,7 +245,7 @@ export default defineSchema({
 
   systemAdmins: defineTable({
     userId: v.id("users"),
-    status: v.union(v.literal("active"), v.literal("revoked")),
+    status: systemAdminStatusValidator,
     createdAt: v.number(),
     updatedAt: v.number(),
     grantedAt: v.number(),
@@ -243,15 +260,9 @@ export default defineSchema({
 
   systemAdminAuditLogs: defineTable({
     action: systemAdminAuditActionValidator,
-    actorType: v.union(v.literal("system"), v.literal("system_admin")),
+    actorType: systemAdminAuditActorTypeValidator,
     actorUserId: v.optional(v.id("users")),
-    targetKind: v.union(
-      v.literal("system_admin"),
-      v.literal("user"),
-      v.literal("group"),
-      v.literal("invitation"),
-      v.literal("notification_setting"),
-    ),
+    targetKind: systemAdminAuditTargetKindValidator,
     targetUserId: v.optional(v.id("users")),
     targetDisplayNameSnapshot: v.optional(v.string()),
     sourceUserId: v.optional(v.id("users")),
@@ -261,8 +272,8 @@ export default defineSchema({
     queryType: v.optional(v.string()),
     queryHash: v.optional(v.string()),
     resultCount: v.optional(v.number()),
-    previousStatus: v.optional(v.union(v.literal("active"), v.literal("revoked"))),
-    newStatus: v.optional(v.union(v.literal("active"), v.literal("revoked"))),
+    previousStatus: v.optional(systemAdminStatusValidator),
+    newStatus: v.optional(systemAdminStatusValidator),
     sourceGroupId: v.optional(v.id("groups")),
     sourceGroupNameSnapshot: v.optional(v.string()),
     targetGroupId: v.optional(v.id("groups")),
@@ -279,7 +290,7 @@ export default defineSchema({
     afterOwnerCount: v.optional(v.number()),
     beforeNotificationEnabled: v.optional(v.boolean()),
     afterNotificationEnabled: v.optional(v.boolean()),
-    result: v.optional(v.union(v.literal("success"), v.literal("denied"))),
+    result: v.optional(systemAdminAuditResultValidator),
     createdAt: v.number(),
   })
     .index("by_source_group_id_and_target_user_id_and_action_and_result", [
@@ -308,15 +319,7 @@ export default defineSchema({
     .index("by_target_kind_and_target_id_and_created_at", ["targetKind", "targetId", "createdAt"]),
 
   systemAdminNotifications: defineTable({
-    action: v.union(
-      v.literal("system_admin_granted"),
-      v.literal("system_admin_revoked"),
-      v.literal("system_admin_recovered"),
-      v.literal("system_admin_bootstrapped"),
-      v.literal("system_admin_membership_changed"),
-      v.literal("system_admin_ownerless_group_recovered"),
-      v.literal("system_admin_group_invitation_revoked"),
-    ),
+    action: systemAdminNotificationActionValidator,
     recipientUserId: v.optional(v.id("users")),
     recipientEmail: v.optional(v.string()),
     targetUserId: v.optional(v.id("users")),
@@ -413,14 +416,8 @@ export default defineSchema({
 
   sourceDocuments: defineTable({
     groupId: v.id("groups"),
-    sourceType: v.union(
-      v.literal("manual"),
-      v.literal("receipt"),
-      v.literal("convenience_payment"),
-      v.literal("invoice"),
-      v.literal("unknown"),
-    ),
-    status: v.union(v.literal("draft"), v.literal("ready"), v.literal("finalized")),
+    sourceType: v.union(...SOURCE_DOCUMENT_SOURCE_TYPES.map((value) => v.literal(value))),
+    status: v.union(...SOURCE_DOCUMENT_STATUSES.map((value) => v.literal(value))),
     date: v.optional(v.string()),
     totalAmount: v.optional(v.number()),
     shopName: v.optional(v.string()),
@@ -447,8 +444,8 @@ export default defineSchema({
     categoryId: v.optional(v.id("categories")),
     title: v.string(),
     memo: v.optional(v.string()),
-    entryType: v.union(v.literal("expense"), v.literal("income")),
-    source: v.union(v.literal("manual"), v.literal("ai_suggested"), v.literal("imported")),
+    entryType: v.union(...ENTRY_KINDS.map((value) => v.literal(value))),
+    source: v.union(...EXPENSE_ENTRY_SOURCES.map((value) => v.literal(value))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -464,7 +461,7 @@ export default defineSchema({
     createdByUserId: v.optional(v.string()),
     date: v.string(),
     // type は支出(expense) / 収入(income) を区別する。既存レコードとの後方互換のため optional とする。
-    type: v.optional(v.union(v.literal("expense"), v.literal("income"))),
+    type: v.optional(v.union(...ENTRY_KINDS.map((value) => v.literal(value)))),
     // shopName は支出の場合に使用する。後方互換のため optional とする。
     shopName: v.optional(v.string()),
     // bankName は収入の場合に使用する。
@@ -488,7 +485,7 @@ export default defineSchema({
     weekEndDate: v.string(),
     // reviewMemo は週次セッション完了時のみ入力するため optional とする。
     reviewMemo: v.optional(v.string()),
-    status: v.union(v.literal("draft"), v.literal("completed")),
+    status: v.union(...WEEK_SESSION_STATUSES.map((value) => v.literal(value))),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_group_id_and_week_start_date", ["groupId", "weekStartDate"]),
@@ -525,12 +522,12 @@ export default defineSchema({
     receiptTotalResolution: v.optional(receiptTotalResolutionValidator),
     receiptTaxDecision: v.optional(receiptTaxDecisionValidator),
     // v1以前の下書きを読み続けるためoptional。新規解析だけがv1をdual-writeする。
-    receiptDataContractVersion: v.optional(v.literal(1)),
+    receiptDataContractVersion: v.optional(v.literal(RECEIPT_DATA_CONTRACT_VERSION)),
     rawObservation: v.optional(receiptRawObservationValidator),
     receiptInterpretation: v.optional(receiptInterpretationSnapshotValidator),
     receiptUserOverride: v.optional(receiptUserOverrideSnapshotValidator),
     // 未設定の既存下書きは detailed として扱う。
-    registrationMode: v.optional(v.union(v.literal("detailed"), v.literal("totalOnly"))),
+    registrationMode: v.optional(aiExpenseRegistrationModeValidator),
     derivedRegistration: v.optional(derivedRegistrationSnapshotValidator),
     markerDefinitions: v.optional(markerDefinitionsValidator),
     categoryId: v.optional(v.id("categories")),

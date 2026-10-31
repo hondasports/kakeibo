@@ -2,10 +2,10 @@ import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { SystemAdminAction } from "../components/SystemAdminActionDialog";
-import type { SystemAdminListItem, UserSearchItem } from "../types";
+import type { SystemAdminListItem, SystemAdminStatus, UserSearchItem } from "../types";
 import type { UserSearchType } from "../../../../lib/domain/systemAdmin/searchQuery";
 
-export type StatusFilter = "active" | "revoked";
+export type StatusFilter = SystemAdminStatus;
 
 type ManagementContext = {
   status: string;

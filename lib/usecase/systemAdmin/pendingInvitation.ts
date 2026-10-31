@@ -7,6 +7,7 @@ import {
   getNormalizeReasonErrorMessage,
   normalizeSystemAdminReason,
 } from "../../domain/systemAdmin/reason";
+import type { SystemAdminAuditResult } from "../../domain/systemAdmin/auditLog";
 import type { SystemAdminMutationDeps, SystemAdminQueryDeps } from "./deps";
 import { requireSystemAdminActor } from "./actor";
 
@@ -115,7 +116,7 @@ async function insertAudit(
     invitationId: string;
     email: string;
     reason: string;
-    result: "success" | "denied";
+    result: SystemAdminAuditResult;
   },
 ) {
   return await deps.auditLogs.insert({

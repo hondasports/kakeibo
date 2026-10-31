@@ -76,6 +76,9 @@ src/
   designTokens.ts              # MUI sx 用デザイントークン（feature 横断）
   designTokens.test.ts
   index.css
+  assets/                      # Vite 同梱の静的アセット（hero.png 等）
+  content/                     # Product Update 原稿データ（product-updates.ts）
+  generated/                   # 生成物（product-updates.json）
   utils/                       # feature 横断ユーティリティ（例: imageDataUrl）
   lib/                         # 横断ユーティリティ（例: weekComparison）
   routing/                     # E2E 専用ルート（e2eRoutes.tsx, e2eFixtures.ts）
@@ -96,7 +99,6 @@ src/
     receipt-review/              # AI下書きレビュー（単票レビューダイアログ・税補正）
       components/                # ReviewDialog, ReviewItemCard, ReviewCheckCards, ...
       hooks/                     # useReviewDialog, useReviewSubmit, useReviewTaxOverrides, ...
-      types/
       utils/                     # mappers, taxWarnings, negativeLineWarnings, ...
                                #   （確認結果の判定は lib/domain/aiExpenseDrafts の reviewChecks 等）
     monthly-summary/           # 月次サマリページ
@@ -182,7 +184,7 @@ src/
       components/
       hooks/
       pages/
-      types/
+      types.ts
       index.ts
 
 convex/
@@ -190,9 +192,7 @@ convex/
   schema.ts
   http.ts                      # HTTP router（route 登録のみ）
   e2eHttp/                     # E2E 専用 httpAction ハンドラ
-  lib/
-    discountItems.ts
-    weekDates.ts
+  e2ePurge.ts                  # E2E テストデータ・孤児グループの purge（internal 関数群）
   users/
     auth.ts
     mutations.ts
@@ -226,6 +226,7 @@ convex/
     mutations.ts
     internal.ts
     expenseEntries.test.ts
+  expenseSearch.ts             # 支出検索 query（searchExpenses）
   weekSessions/
     queries.ts
     mutations.ts
@@ -236,7 +237,8 @@ convex/
     actions.ts
     model.ts
     internal.ts
-    extractionMapping.ts
+    validators.ts              # v.* validator 宣言
+    e2eDraftFixtures.ts        # E2E seed 用フィクスチャ
   receiptAnalysisJobs/
     queries.ts
     mutations.ts
@@ -253,8 +255,13 @@ convex/
     jobs.ts
     suppressions.ts
     model.ts
-    lib/providers.ts
-    webhooks/processResendEvent.ts
+    webhooks/
+      processResendEvent.ts
+      resendWebhook.ts
+  lineLink/                   # LINE アカウント連携（link/unlink・監査）
+  lineWebhook/                # LINE Messaging API webhook（署名検証・summary 応答・リッチメニュー）
+  notifications/              # 通知の enqueue・LINE 通知ジョブ配信
+  notificationSettings.ts     # 通知設定 query/mutation
   crons.ts                    # 定期 cleanup ジョブ
   systemAdmins.ts             # システム管理者認可・管理 API
   systemAdminSearch.ts
@@ -280,6 +287,7 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
     receiptImageExtraction/    # analyzeReceiptImageCore, openaiClient, parse, validators, ...
     receipts/                  # insert, queries, summaryLib, spendingEntries.ts
   domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
+  email/                       # メール provider・template 定義（convex/email から利用）
 
 tests/
   workflow/                    # CI workflow・デプロイ設定などの検証系テスト（Vitest）
@@ -318,7 +326,7 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 | --- | --- | --- |
 | `app-shell` | `week`, `auth`, `ui`, `expense-search` | レイアウト・ナビ・ユーザー表示・検索ボックス |
 | `settings` | `group-admin` | グループ設定パネル |
-| `receipt`, `expense-entry` | `ai-expense-queue`, `ui`, `week` | AI キュー UI・共通 UI・週選択 |
+| `expense-entry` | `ai-expense-queue`, `ui`, `week` | AI キュー UI・共通 UI・週選択 |
 | `ai-expense-queue` | `receipt-review`, `src/types` | レビューダイアログ・受け渡し型 |
 | `weekly-summary`, `monthly-summary`, `yearly-summary`, `dashboard`, `expense-search` | `summary-shared`, `week`, `ui` | 集計表示部品・週ユーティリティ |
 
@@ -326,7 +334,11 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 
 ### 5.2 Convex モジュール分割方針
 
-- **公開 API**（`query` / `mutation` / `action` / `internal*`）は `convex/<domain>/` に置く。
+- **公開 API**（`query` / `mutation` / `action` / `internal*`）は、新しく作るものは `convex/<domain>/` に置く。
+  既存モジュールの一部は `convex/` 直下にある（上記ツリーの `systemAdmins.ts`・`systemAdmin*.ts`・
+  `accountDeletion*.ts`・`expenseSearch.ts`・`e2ePurge.ts`・`notificationSettings.ts`・`crons.ts`・
+  migration 系など）。`convex/<domain>/` へ移すと `api.<module>.<function>` のパスが変わり
+  既存クライアント・`internal.*` 参照と互換しなくなるため、直下の既存モジュールは移動せず維持する。
 - **純粋ヘルパー**（バリデーション、集計、外部 API 呼び出し本体、登録ロジック等）は `lib/convex/<domain>/` に置き、`convex/` から import する。
   `convex/` 配下の `.ts` は Convex が `api.d.ts` に載せるため、ヘルパーを増やしすぎると型推論が深くなりビルドが失敗しうる。
 - **HTTP** は `convex/http.ts` が router のみを担当し、E2E 用 handler は `convex/e2eHttp/` に分離する。
@@ -1400,7 +1412,7 @@ Convexにも引数validatorがあるため、Valibotだけに依存しない。�
 ### 12.1 週計算
 
 - 週の開始曜日は `users.weeklyStartDay` から決まり、未設定は月曜日
-- `convex/lib/weekDates.calculateWeekStartDate(date, weekStartDay)` で対象日の週開始日を求める
+- `lib/domain/week/weekDates.calculateWeekStartDate(date, weekStartDay)` で対象日の週開始日を求める
 - `calculateWeekEndDate(weekStartDate)` / `getWeekEndDay(weekStartDay)` で週終了日・終了曜日を求める
 - 日付は `YYYY-MM-DD` 文字列として扱う
 

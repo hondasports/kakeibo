@@ -1,3 +1,9 @@
+import { AI_EXPENSE_DRAFT_DOCUMENT_TYPES } from "../aiExpenseDrafts/constants";
+import { RECEIPT_ITEM_LINE_TYPES } from "../receipt/discountItems";
+import { MAX_EXTRACTED_LINE_ITEMS } from "../receipt/extraction";
+import { RECEIPT_LINE_ROLES } from "../receipt/observations";
+import { AMOUNT_BASES, ROUNDING_METHODS, TAX_MODES, TAX_RATE_PERCENTS } from "../receipt/tax/types";
+
 export type ReceiptCategoryHint = {
   name: string;
   description?: string;
@@ -37,7 +43,7 @@ export const RECEIPT_EXTRACTION_JSON_SCHEMA = {
   properties: {
     documentType: {
       type: "string",
-      enum: ["receipt", "convenience_payment", "unknown"],
+      enum: [...AI_EXPENSE_DRAFT_DOCUMENT_TYPES],
     },
     shopName: { type: "string" },
     paymentPlace: { type: "string" },
@@ -54,16 +60,16 @@ export const RECEIPT_EXTRACTION_JSON_SCHEMA = {
           itemName: { type: "string" },
           lineType: {
             type: "string",
-            enum: ["item", "discount", "promotion_adjustment", "unknown"],
+            enum: [...RECEIPT_ITEM_LINE_TYPES],
           },
           printedAmountYen: { type: "integer" },
           amountBasis: {
             type: "string",
-            enum: ["tax_included", "tax_excluded", "unknown"],
+            enum: [...AMOUNT_BASES],
           },
           taxRatePercent: {
             type: ["integer", "null"],
-            enum: [0, 8, 10, null],
+            enum: [...TAX_RATE_PERCENTS, null],
           },
           markers: { type: "array", items: { type: "string" } },
           quantity: { type: ["integer", "null"] },
@@ -104,28 +110,28 @@ export const RECEIPT_EXTRACTION_JSON_SCHEMA = {
         ],
         additionalProperties: false,
       },
-      maxItems: 100,
+      maxItems: MAX_EXTRACTED_LINE_ITEMS,
     },
     taxSummaries: {
       type: "array",
       items: {
         type: "object",
         properties: {
-          taxRatePercent: { type: "integer", enum: [0, 8, 10] },
+          taxRatePercent: { type: "integer", enum: [...TAX_RATE_PERCENTS] },
           taxMode: {
             type: "string",
-            enum: ["external", "included", "mixed", "unknown"],
+            enum: [...TAX_MODES],
           },
           taxableAmountYen: { type: "integer", minimum: 0 },
           taxableAmountBasis: {
             type: "string",
-            enum: ["tax_included", "tax_excluded", "unknown"],
+            enum: [...AMOUNT_BASES],
           },
           taxYen: { type: "integer", minimum: 0 },
           taxIncludedAmountYen: { type: ["integer", "null"], minimum: 0 },
           roundingMethod: {
             type: "string",
-            enum: ["floor", "round", "ceil", "unknown"],
+            enum: [...ROUNDING_METHODS],
           },
           confidence: {
             type: "object",
@@ -175,7 +181,7 @@ export const RECEIPT_EXTRACTION_JSON_SCHEMA = {
     },
     rawObservations: {
       type: "array",
-      maxItems: 100,
+      maxItems: MAX_EXTRACTED_LINE_ITEMS,
       items: {
         type: "object",
         properties: {
@@ -187,16 +193,7 @@ export const RECEIPT_EXTRACTION_JSON_SCHEMA = {
             maxItems: 2,
             items: {
               type: "string",
-              enum: [
-                "item",
-                "discount",
-                "tax",
-                "subtotal",
-                "total",
-                "payment",
-                "change",
-                "unknown",
-              ],
+              enum: [...RECEIPT_LINE_ROLES],
             },
           },
           roleConfidence: { type: "number", minimum: 0, maximum: 1 },

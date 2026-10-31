@@ -2,6 +2,7 @@
  * 支出一括操作（expenseEntries / receipts の横断選択）に関するドメインルール。
  * 選択数上限・ID 正規化・収入除外の知識を集約する。
  */
+import type { EntryKind } from "../common/entryKind";
 
 export const MAX_BULK_SPENDING_SELECTION = 100;
 
@@ -14,7 +15,7 @@ export function dedupeIds<T extends string>(ids: T[]): T[] {
   return Array.from(new Set(ids));
 }
 
-export function isExpenseReceiptType(type: "expense" | "income" | undefined): boolean {
+export function isExpenseReceiptType(type: EntryKind | undefined): boolean {
   return type === undefined || type === "expense";
 }
 

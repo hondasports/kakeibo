@@ -7,7 +7,9 @@ import {
 } from "../expenseEntries/expenseEntryItem";
 import { isValidIsoDateString } from "../week/weekDates";
 
-export type ReceiptType = "expense" | "income";
+import type { EntryKind } from "../common/entryKind";
+
+export type ReceiptType = EntryKind;
 
 export type CreateReceiptInput<TId = string> = {
   type?: ReceiptType;

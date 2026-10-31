@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   conveniencePaymentFixture,
   trialExternal8Fixture,
-} from "../../convex/receiptImageExtraction/fixtures/taxFixtures";
+} from "../receiptImageExtraction/fixtures/taxFixtures";
 import { mapExtractionToDraftArgs } from "./extractionMapping";
 import { foodCategory } from "./testHelpers";
 import { EXPENSE_ENTRY_AMOUNT_MAX } from "../expenseEntries/expenseEntryItem";

@@ -1,17 +1,22 @@
 import type { ReceiptItemTaxConfirmedField } from "../receipt/tax/types";
 import type {
+  AmountBasis,
   ExtractedTaxSummary,
   PriceTaxTreatment,
   ReceiptTaxDecision,
   ReceiptTotalResolution,
+  TaxAllocationStatus,
   TaxRateComposition,
+  TaxRatePercent,
   TaxResolutionSource,
+  TaxResolutionStatus,
 } from "../receipt/tax/types";
 import type { ReceiptRawObservation } from "../receipt/observations";
 import type { ItemSummary } from "./reviewItems";
 import type {
   AiExpenseRegistrationMode,
   DerivedRegistrationSnapshot,
+  ReceiptDataContractVersion,
   ReceiptInterpretationSnapshot,
   ReceiptUserOverrideSnapshot,
 } from "./receiptDataContract";
@@ -46,7 +51,7 @@ export type AiExpenseDraft = {
   taxSummaries?: Array<Omit<ExtractedTaxSummary, "confidence">>;
   receiptTotalResolution?: ReceiptTotalResolution;
   receiptTaxDecision?: ReceiptTaxDecision;
-  receiptDataContractVersion?: 1;
+  receiptDataContractVersion?: ReceiptDataContractVersion;
   rawObservation?: ReceiptRawObservation;
   receiptInterpretation?: ReceiptInterpretationSnapshot;
   receiptUserOverride?: ReceiptUserOverrideSnapshot;
@@ -81,14 +86,14 @@ export type AiExpenseDraftJudgmentInput = Omit<AiExpenseDraft, "_id" | "status">
 
 export type AiExpenseItemTaxDetails = {
   printedAmountYen?: number;
-  amountBasis?: "tax_included" | "tax_excluded" | "unknown";
-  taxRatePercent?: 0 | 8 | 10 | null;
+  amountBasis?: AmountBasis;
+  taxRatePercent?: TaxRatePercent | null;
   markers?: string[];
   taxMarker?: string;
   allocatedTaxYen?: number;
-  taxAllocationStatus?: "allocated" | "unallocated";
+  taxAllocationStatus?: TaxAllocationStatus;
   normalizedAmountYen?: number;
-  taxResolutionStatus?: "resolved" | "unresolved";
+  taxResolutionStatus?: TaxResolutionStatus;
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
   taxConfirmedFields?: ReceiptItemTaxConfirmedField[];

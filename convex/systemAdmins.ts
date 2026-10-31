@@ -1,6 +1,9 @@
 import {
   groupMembershipStatusValidator,
   systemAdminAuditActionValidator,
+  systemAdminAuditActorTypeValidator,
+  systemAdminAuditResultValidator,
+  systemAdminStatusValidator,
 } from "../lib/convex/systemAdmin/validators";
 import { ConvexError, v } from "convex/values";
 import type { Infer } from "convex/values";
@@ -36,7 +39,6 @@ function getAppEnvironment(expected?: string): AppEnvironment {
   return result.environment;
 }
 
-const systemAdminStatusValidator = v.union(v.literal("active"), v.literal("revoked"));
 const systemAdminContextValidator = v.union(
   v.object({ status: v.literal("active"), environment: v.string(), userId: v.id("users") }),
   v.object({ status: v.literal("revoked"), environment: v.string() }),
@@ -57,7 +59,7 @@ const systemAdminListItemValidator = v.object({
 const systemAdminAuditItemValidator = v.object({
   id: v.id("systemAdminAuditLogs"),
   action: systemAdminAuditActionValidator,
-  actorType: v.union(v.literal("system"), v.literal("system_admin")),
+  actorType: systemAdminAuditActorTypeValidator,
   actorUserId: v.optional(v.id("users")),
   actorDisplayName: v.union(v.string(), v.null()),
   targetUserId: v.optional(v.id("users")),
@@ -68,7 +70,7 @@ const systemAdminAuditItemValidator = v.object({
   reason: v.optional(v.string()),
   queryHash: v.optional(v.string()),
   resultCount: v.optional(v.number()),
-  result: v.union(v.literal("success"), v.literal("denied")),
+  result: systemAdminAuditResultValidator,
   previousStatus: v.optional(systemAdminStatusValidator),
   newStatus: v.optional(systemAdminStatusValidator),
   sourceGroupId: v.optional(v.id("groups")),
@@ -136,7 +138,7 @@ export const getMySystemAdminContext = query({
 export const listSystemAdmins = query({
   args: {
     paginationOpts: paginationOptsValidator,
-    status: v.optional(v.union(v.literal("active"), v.literal("revoked"))),
+    status: v.optional(systemAdminStatusValidator),
   },
   returns: listSystemAdminsResultValidator,
   handler: async (ctx, args) => {

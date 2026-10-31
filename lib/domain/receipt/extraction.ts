@@ -16,7 +16,7 @@ import type {
   ExtractReceiptItemResult,
 } from "../receiptImageExtraction/extractionResult";
 import type { ReceiptMarkerDefinition } from "./tax/types";
-import type { ReceiptRawObservationLine } from "./observations";
+import { RECEIPT_LINE_ROLES, type ReceiptRawObservationLine } from "./observations";
 import {
   parseTaxRatePercent,
   parseItemTaxRatePercent,
@@ -192,15 +192,7 @@ function parseRawObservation(value: unknown, index: number): ReceiptRawObservati
   if (
     !Array.isArray(line.lineRoleCandidates) ||
     line.lineRoleCandidates.some(
-      (role) =>
-        role !== "item" &&
-        role !== "discount" &&
-        role !== "tax" &&
-        role !== "subtotal" &&
-        role !== "total" &&
-        role !== "payment" &&
-        role !== "change" &&
-        role !== "unknown",
+      (role) => !(RECEIPT_LINE_ROLES as readonly unknown[]).includes(role),
     )
   ) {
     throw new Error(`OpenAI レスポンスの ${field}.lineRoleCandidates が不正です`);
