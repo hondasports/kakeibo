@@ -304,7 +304,7 @@ it("旧actionのjobが消失してgroupも不明なら推測でdraftを削除し
 });
 
 describe("recoverStaleReceiptAnalysisJobs", () => {
-  const staleRunningJob = (overrides: Partial<ReceiptAnalysisJobRecord> = {}) =>
+  const staleJob = (overrides: Partial<ReceiptAnalysisJobRecord> = {}) =>
     ({
       id: "job-stale",
       creationTime: 1,
@@ -323,26 +323,52 @@ describe("recoverStaleReceiptAnalysisJobs", () => {
     scheduler: { scheduleAiReviewCheck: vi.fn() },
   });
 
-  it("古い running job を failed に確定し、利用者向けの日本語エラーと通知予約を既存遷移で行う", async () => {
+  it("running / queued の両方を status+updatedAt の index で検索し、1回あたりの件数に上限を付ける", async () => {
     const now = 10 * RECEIPT_ANALYSIS_STALE_JOB_MS;
-    const job = staleRunningJob({ updatedAt: now - RECEIPT_ANALYSIS_STALE_JOB_MS - 1 });
     const d = deps({
-      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([job]),
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([]),
+    });
+    await recoverStaleReceiptAnalysisJobs(d, now);
+
+    const cutoff = now - RECEIPT_ANALYSIS_STALE_JOB_MS;
+    expect(d.store.listJobsByStatusUpdatedBefore).toHaveBeenCalledWith(
+      "running",
+      cutoff,
+      RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
+    );
+    expect(d.store.listJobsByStatusUpdatedBefore).toHaveBeenCalledWith(
+      "queued",
+      cutoff,
+      RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
+    );
+  });
+
+  it("初回解析で止まった古い running job は失敗 draft を作って job に紐づけ、日本語エラーと通知予約を既存遷移で行う", async () => {
+    const now = 10 * RECEIPT_ANALYSIS_STALE_JOB_MS;
+    const job = staleJob({ updatedAt: now - RECEIPT_ANALYSIS_STALE_JOB_MS - 1 });
+    const d = deps({
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValueOnce([job]).mockResolvedValue([]),
       getJob: vi.fn().mockResolvedValue(job),
-      getBatch: vi.fn().mockResolvedValue({ id: "batch-1" }),
+      getBatch: vi.fn().mockResolvedValue({ id: "batch-1", createdByUserId: "user-1" }),
+      insertFailedAnalysisDraft: vi.fn().mockResolvedValue("draft-fail"),
       patchJob: vi.fn(),
       patchBatch: vi.fn(),
     });
     const result = await recoverStaleReceiptAnalysisJobs(d, now);
 
-    expect(d.store.listJobsByStatusUpdatedBefore).toHaveBeenCalledWith(
-      "running",
-      now - RECEIPT_ANALYSIS_STALE_JOB_MS,
-      RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
-    );
+    expect(d.store.insertFailedAnalysisDraft).toHaveBeenCalledWith({
+      groupId: "group-1",
+      createdByUserId: "user-1",
+      imageFileName: "receipt.png",
+      warning: RECEIPT_ANALYSIS_STALE_JOB_ERROR,
+    });
     expect(d.store.patchJob).toHaveBeenCalledWith(
       "job-stale",
-      expect.objectContaining({ status: "failed", error: RECEIPT_ANALYSIS_STALE_JOB_ERROR }),
+      expect.objectContaining({
+        status: "failed",
+        draftId: "draft-fail",
+        error: RECEIPT_ANALYSIS_STALE_JOB_ERROR,
+      }),
     );
     expect(d.store.patchBatch).toHaveBeenCalledWith(
       "batch-1",
@@ -352,17 +378,101 @@ describe("recoverStaleReceiptAnalysisJobs", () => {
     expect(result).toEqual({ recoveredCount: 1 });
   });
 
-  it("running 以外の job が返ってきても状態を変えない", async () => {
+  it("古い queued job も失敗 draft を紐づけて failed に確定する", async () => {
+    const now = 10 * RECEIPT_ANALYSIS_STALE_JOB_MS;
+    const job = staleJob({
+      status: "queued",
+      updatedAt: now - RECEIPT_ANALYSIS_STALE_JOB_MS - 1,
+    });
+    const d = deps({
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([job]),
+      getJob: vi.fn().mockResolvedValue(job),
+      getBatch: vi.fn().mockResolvedValue({ id: "batch-1", createdByUserId: "user-1" }),
+      insertFailedAnalysisDraft: vi.fn().mockResolvedValue("draft-fail"),
+      patchJob: vi.fn(),
+      patchBatch: vi.fn(),
+    });
+    const result = await recoverStaleReceiptAnalysisJobs(d, now);
+
+    expect(d.store.patchJob).toHaveBeenCalledWith(
+      "job-stale",
+      expect.objectContaining({ status: "failed", draftId: "draft-fail" }),
+    );
+    expect(result).toEqual({ recoveredCount: 1 });
+  });
+
+  it("再解析で止まった job は新しい draft を作らず既存 draft を維持して failed にする", async () => {
+    const now = 10 * RECEIPT_ANALYSIS_STALE_JOB_MS;
+    const job = staleJob({
+      draftId: "draft-old",
+      updatedAt: now - RECEIPT_ANALYSIS_STALE_JOB_MS - 1,
+    });
+    const d = deps({
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValueOnce([job]).mockResolvedValue([]),
+      getJob: vi.fn().mockResolvedValue(job),
+      getBatch: vi.fn().mockResolvedValue({ id: "batch-1" }),
+      insertFailedAnalysisDraft: vi.fn(),
+      deleteDraftAndItems: vi.fn(),
+      patchJob: vi.fn(),
+      patchBatch: vi.fn(),
+    });
+    const result = await recoverStaleReceiptAnalysisJobs(d, now);
+
+    expect(d.store.insertFailedAnalysisDraft).not.toHaveBeenCalled();
+    expect(d.store.deleteDraftAndItems).not.toHaveBeenCalledWith("draft-old", "group-1");
+    expect(d.store.patchJob).toHaveBeenCalledWith(
+      "job-stale",
+      expect.objectContaining({ status: "failed", error: RECEIPT_ANALYSIS_STALE_JOB_ERROR }),
+    );
+    expect(vi.mocked(d.store.patchJob).mock.calls[0][1]).not.toHaveProperty("draftId");
+    expect(result).toEqual({ recoveredCount: 1 });
+  });
+
+  it("まだ新しい running / queued job は触らない", async () => {
+    const now = 10 * RECEIPT_ANALYSIS_STALE_JOB_MS;
+    const fresh = staleJob({ status: "running", updatedAt: now });
+    const d = deps({
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([fresh]),
+      getJob: vi.fn().mockResolvedValue(fresh),
+      insertFailedAnalysisDraft: vi.fn(),
+      patchJob: vi.fn(),
+    });
+    const result = await recoverStaleReceiptAnalysisJobs(d, now);
+
+    expect(d.store.patchJob).not.toHaveBeenCalled();
+    expect(d.store.insertFailedAnalysisDraft).not.toHaveBeenCalled();
+    expect(result).toEqual({ recoveredCount: 0 });
+  });
+
+  it("running / queued 以外の job が返ってきても状態を変えない", async () => {
     const store = {
-      listJobsByStatusUpdatedBefore: vi
-        .fn()
-        .mockResolvedValue([staleRunningJob({ status: "ready" })]),
-      getJob: vi.fn().mockResolvedValue(staleRunningJob({ status: "ready" })),
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([staleJob({ status: "ready" })]),
+      getJob: vi.fn().mockResolvedValue(staleJob({ status: "ready" })),
+      insertFailedAnalysisDraft: vi.fn(),
       patchJob: vi.fn(),
     } as unknown as ReceiptAnalysisStore;
     const result = await recoverStaleReceiptAnalysisJobs(deps(store), 1000);
 
     expect(store.patchJob).not.toHaveBeenCalled();
+    expect(store.insertFailedAnalysisDraft).not.toHaveBeenCalled();
+    expect(result).toEqual({ recoveredCount: 0 });
+  });
+
+  it("failed への遷移が適用されなければ作った失敗 draft を破棄する", async () => {
+    const now = 10 * RECEIPT_ANALYSIS_STALE_JOB_MS;
+    const listed = staleJob({ updatedAt: now - RECEIPT_ANALYSIS_STALE_JOB_MS - 1 });
+    const d = deps({
+      listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValueOnce([listed]).mockResolvedValue([]),
+      getJob: vi.fn().mockResolvedValue(staleJob({ status: "cancelled" })),
+      getBatch: vi.fn().mockResolvedValue({ id: "batch-1" }),
+      insertFailedAnalysisDraft: vi.fn().mockResolvedValue("draft-fail"),
+      deleteDraftAndItems: vi.fn(),
+      patchJob: vi.fn(),
+      patchBatch: vi.fn(),
+    });
+    const result = await recoverStaleReceiptAnalysisJobs(d, now);
+
+    expect(d.store.deleteDraftAndItems).toHaveBeenCalledWith("draft-fail", "group-1");
     expect(result).toEqual({ recoveredCount: 0 });
   });
 
@@ -370,11 +480,13 @@ describe("recoverStaleReceiptAnalysisJobs", () => {
     const store = {
       listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValue([]),
       getJob: vi.fn(),
+      insertFailedAnalysisDraft: vi.fn(),
       patchJob: vi.fn(),
     } as unknown as ReceiptAnalysisStore;
     const result = await recoverStaleReceiptAnalysisJobs(deps(store), 1000);
 
     expect(store.getJob).not.toHaveBeenCalled();
+    expect(store.insertFailedAnalysisDraft).not.toHaveBeenCalled();
     expect(store.patchJob).not.toHaveBeenCalled();
     expect(result).toEqual({ recoveredCount: 0 });
   });

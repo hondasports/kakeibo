@@ -89,3 +89,43 @@ describe.each([createReceiptAnalysisReader, createReceiptAnalysisStore])(
     });
   },
 );
+
+describe("失敗 draft の作成", () => {
+  it("insertFailedAnalysisDraft は通常の解析失敗と同じ内容の draft を作成して id を返す", async () => {
+    const inserted: Array<{ table: string; fields: Record<string, unknown> }> = [];
+    const ctx = {
+      db: {
+        insert: vi.fn(async (table: string, fields: Record<string, unknown>) => {
+          inserted.push({ table, fields });
+          return "draft-new";
+        }),
+        get: vi.fn(async () => ({ _id: "draft-new", status: "failed" })),
+      },
+    } as unknown as QueryCtx;
+    const store = createReceiptAnalysisStore(ctx);
+
+    const id = await store.insertFailedAnalysisDraft({
+      groupId: "group-1",
+      createdByUserId: "user-1",
+      imageFileName: "receipt.png",
+      warning: "解析が完了しませんでした。もう一度お試しください",
+    });
+
+    expect(id).toBe("draft-new");
+    expect(inserted).toEqual([
+      {
+        table: "aiExpenseDrafts",
+        fields: expect.objectContaining({
+          groupId: "group-1",
+          createdByUserId: "user-1",
+          sourceType: "image_upload",
+          status: "failed",
+          documentType: "unknown",
+          imageFileName: "receipt.png",
+          warnings: ["解析が完了しませんでした。もう一度お試しください"],
+          reviewReasons: ["parse_failed"],
+        }),
+      },
+    ]);
+  });
+});

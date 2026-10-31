@@ -271,25 +271,52 @@ export async function recoverStaleReceiptAnalysisJobs(
   now = Date.now(),
 ): Promise<{ recoveredCount: number }> {
   const cutoff = now - RECEIPT_ANALYSIS_STALE_JOB_MS;
-  const staleJobs = await deps.store.listJobsByStatusUpdatedBefore(
-    "running",
-    cutoff,
-    RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
-  );
+  const jobsById = new Map<string, ReceiptAnalysisJobRecord>();
+  for (const status of ["running", "queued"] as const) {
+    for (const job of await deps.store.listJobsByStatusUpdatedBefore(
+      status,
+      cutoff,
+      RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
+    )) {
+      jobsById.set(job.id, job);
+    }
+  }
+  const staleJobs = [...jobsById.values()]
+    .sort((a, b) => a.updatedAt - b.updatedAt)
+    .slice(0, RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE);
   let recoveredCount = 0;
   for (const job of staleJobs) {
-    if (job.status !== "running") continue;
+    if ((job.status !== "running" && job.status !== "queued") || job.updatedAt >= cutoff) continue;
+    // 通常の解析失敗と同じ最終状態にする。初回解析（draftId なし）は失敗 draft を作って
+    // job に紐づけ、再解析（draftId あり）は既存 draft をそのまま維持する
+    let newDraftId: string | undefined;
+    if (job.draftId === undefined) {
+      const batch = await deps.store.getBatch(job.batchId);
+      newDraftId = await deps.store.insertFailedAnalysisDraft({
+        groupId: job.groupId,
+        ...(batch?.createdByUserId === undefined ? {} : { createdByUserId: batch.createdByUserId }),
+        imageFileName: job.fileName,
+        warning: RECEIPT_ANALYSIS_STALE_JOB_ERROR,
+      });
+    }
     const result = await updateReceiptAnalysisJobStatus(
       deps,
       {
         jobId: job.id,
         status: "failed",
         error: RECEIPT_ANALYSIS_STALE_JOB_ERROR,
+        ...(newDraftId === undefined ? {} : { draftId: newDraftId }),
         expectedDraftId: job.draftId ?? null,
       },
       now,
     );
-    if (result.applied) recoveredCount += 1;
+    if (!result.applied) {
+      if (newDraftId !== undefined) {
+        await deps.store.deleteDraftAndItems(newDraftId, job.groupId);
+      }
+      continue;
+    }
+    recoveredCount += 1;
   }
   return { recoveredCount };
 }

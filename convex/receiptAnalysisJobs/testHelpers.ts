@@ -210,6 +210,14 @@ export function createInternalCtx({
   const get = vi.fn().mockImplementation(async (id: string) => docs[id] ?? null);
   const patch = vi.fn().mockResolvedValue(undefined);
   const remove = vi.fn().mockResolvedValue(undefined);
+  let insertCount = 0;
+  const insert = vi
+    .fn()
+    .mockImplementation(async (_table: string, fields: Record<string, unknown>) => {
+      const id = `inserted-${insertCount++}`;
+      docs[id] = { _id: id, ...fields };
+      return id;
+    });
   const runAfter = vi.fn().mockResolvedValue(undefined);
   const query = vi.fn().mockImplementation((tableName: string) => ({
     withIndex: vi
@@ -237,7 +245,7 @@ export function createInternalCtx({
   }));
 
   return {
-    db: { get, patch, delete: remove, query },
+    db: { get, patch, delete: remove, insert, query },
     scheduler: { runAfter },
   } as unknown as MutationCtx & QueryCtx;
 }

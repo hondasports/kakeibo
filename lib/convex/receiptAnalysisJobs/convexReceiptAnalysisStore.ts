@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../../convex/_generated/server";
 import { deleteDraftAndItems } from "../aiExpenseDrafts/draftRepository";
+import { persistFailedDraft } from "../aiExpenseDrafts/createFromExtraction";
 import type {
   ReceiptAnalysisBatchRecord,
   ReceiptAnalysisJobRecord,
@@ -223,6 +224,19 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
     async getDraft(id) {
       const doc = await ctx.db.get(id as Id<"aiExpenseDrafts">);
       return doc === null ? null : { id: doc._id, status: doc.status, updatedAt: doc.updatedAt };
+    },
+    async insertFailedAnalysisDraft({ groupId, createdByUserId, imageFileName, warning }) {
+      const draft = await persistFailedDraft(
+        ctx,
+        {
+          // createdByUserId の無い旧 batch 由来の job でも失敗 draft は作る。
+          // 空文字は実ユーザーの tokenIdentifier と衝突しない。
+          userId: createdByUserId ?? "",
+          groupId: groupId as Id<"groups">,
+        },
+        { warning, imageFileName },
+      );
+      return draft._id;
     },
     deleteDraftAndItems: (draftId, groupId) =>
       deleteDraftAndItems(
