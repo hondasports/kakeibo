@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ReceiptAnalysisJobRecord } from "./records";
 import {
+  canAnalyzeReceiptAnalysisJob,
   canCancelReceiptAnalysisJob,
   canRetryReceiptAnalysisJob,
   clampReceiptAnalysisCleanupLimit,
@@ -31,6 +32,15 @@ describe("job operations", () => {
     expect(canCancelReceiptAnalysisJob("ready")).toBe(false);
     expect(canCancelReceiptAnalysisJob("needs_review")).toBe(false);
     expect(canCancelReceiptAnalysisJob("running")).toBe(true);
+  });
+
+  it("queued だけ解析を開始できる", () => {
+    expect(canAnalyzeReceiptAnalysisJob("queued")).toBe(true);
+    expect(canAnalyzeReceiptAnalysisJob("running")).toBe(false);
+    expect(canAnalyzeReceiptAnalysisJob("ready")).toBe(false);
+    expect(canAnalyzeReceiptAnalysisJob("needs_review")).toBe(false);
+    expect(canAnalyzeReceiptAnalysisJob("failed")).toBe(false);
+    expect(canAnalyzeReceiptAnalysisJob("cancelled")).toBe(false);
   });
 });
 

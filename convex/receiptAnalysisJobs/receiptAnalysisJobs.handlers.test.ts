@@ -154,6 +154,30 @@ describe("retryImageJobHandler", () => {
     ).rejects.toThrow("Only failed or needs_review jobs can be retried");
     expect(ctx.db.patch).not.toHaveBeenCalled();
   });
+
+  it("retry 不可の拒否はドメインエラーとして ConvexError で返す", async () => {
+    const ctx = createMutationCtx(createIdentity(), {
+      docs: {
+        "job-1": { groupId: GROUP_ID, status: "ready" },
+      },
+    });
+
+    await expect(
+      retryImageJobHandler(ctx, { jobId: "job-1" as Id<"receiptAnalysisImageJobs"> }),
+    ).rejects.toMatchObject({
+      data: "Only failed or needs_review jobs can be retried",
+    });
+  });
+
+  it("予期しないエラーは ConvexError に包まず再送出する", async () => {
+    const unexpected = new TypeError("db connection lost");
+    const ctx = createMutationCtx(createIdentity());
+    vi.mocked(ctx.db.get).mockResolvedValueOnce(null).mockRejectedValueOnce(unexpected);
+
+    await expect(
+      retryImageJobHandler(ctx, { jobId: "job-1" as Id<"receiptAnalysisImageJobs"> }),
+    ).rejects.toBe(unexpected);
+  });
 });
 
 describe("cancelImageJobHandler", () => {
@@ -353,6 +377,31 @@ describe("updateJobStatusHandler", () => {
     expect(result).toEqual({ applied: false });
     expect(ctx.db.patch).not.toHaveBeenCalled();
   });
+
+  it.each(["ready", "running", "failed", "needs_review", "cancelled"] as const)(
+    "status:%s の job は running に戻さない",
+    async (status) => {
+      const ctx = createMutationCtx(createIdentity(), {
+        docs: {
+          "job-1": {
+            _id: "job-1",
+            groupId: GROUP_ID,
+            batchId: "batch-1",
+            status,
+          },
+        },
+      });
+
+      const result = await updateJobStatusHandler(ctx, {
+        jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
+        status: "running",
+        expectedDraftId: null,
+      });
+
+      expect(result).toEqual({ applied: false });
+      expect(ctx.db.patch).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("finalizeAnalysisAttemptHandler", () => {

@@ -1,5 +1,8 @@
 import schema from "../schema";
-import { MAX_RECEIPT_ANALYSIS_DRAFT_IDS } from "../../lib/domain/receiptAnalysisJobs/rules";
+import {
+  MAX_RECEIPT_ANALYSIS_DRAFT_IDS,
+  ReceiptAnalysisJobDomainError,
+} from "../../lib/domain/receiptAnalysisJobs/rules";
 import { ConvexError, v } from "convex/values";
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
@@ -22,6 +25,14 @@ const jobDocumentValidator = v.object({
   _id: v.id("receiptAnalysisImageJobs"),
   _creationTime: v.number(),
 });
+
+function convexError(error: unknown): never {
+  if (error instanceof ConvexError) throw error;
+  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
+  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
+  if (error instanceof ReceiptAnalysisJobDomainError) throw new ConvexError(error.message);
+  throw error;
+}
 
 export async function listBatchesHandler(ctx: QueryCtx) {
   const { groupId } = await requireGroupMembership(ctx);
@@ -51,8 +62,7 @@ export async function listJobsByBatchHandler(
       )
     ).map(jobRecordToDoc);
   } catch (error) {
-    if (error instanceof ConvexError) throw error;
-    throw new ConvexError(error instanceof Error ? error.message : "Unknown error");
+    convexError(error);
   }
 }
 
