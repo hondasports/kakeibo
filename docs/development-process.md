@@ -211,7 +211,7 @@ required checksがPASSした後は、content change / material failure / unresol
 
 ### Functional E2E
 
-push前の検証は `.husky/pre-push` から走る `pnpm run verify:prepush` に一本化する。内容は型（`tsc -b`）→ lint/format → `vitest related`（差分に関係するunit）→ 対象E2E（`e2e:isolated`）。E2Eの対象specは `e2e/spec-map.json` の変更パスglobで選び、`@smoke` のspecを最低ラインとして必ず合流させる。mapにないパスを変更した場合は安全側に `@smoke` + `@public` 全件を選び、map追記を促すファイル名を表示する。ローカル実行はマージ判定材料ではない（判定はCIのcheckが正本）。
+push前の検証は `.husky/pre-push` から走る `pnpm run verify:prepush` に一本化する。内容は型（`tsc -b`）→ lint/format → `vitest related`（差分に関係するunit）→ 対象E2E（`e2e:isolated`）。unitのrelated対象は `scripts/unit-related-map.json` の変更パスglobで、import グラフに乗らない fs 読み込み依存のテストも合流させる（テストがrepo内ファイルを `readFileSync` 等で読む構造を追加したらmapへ追記する）。E2Eの対象specは `e2e/spec-map.json` の変更パスglobで選び、`@smoke` のspecを最低ラインとして必ず合流させる。mapにないパスを変更した場合は安全側に `@smoke` + `@public` 全件を選び、map追記を促すファイル名を表示する。ローカル実行はマージ判定材料ではない（判定はCIのcheckが正本）。
 
 E2Eをどのbackendで実行するかは次の通り。cloudのConvexはDatabase I/OをFree枠のteam合算で消費するため、全件を流さない。
 
