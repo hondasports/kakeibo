@@ -1,3 +1,11 @@
+import { RECEIPT_DATA_CONTRACT_VERSION } from "../lib/domain/aiExpenseDrafts/receiptDataContract";
+import { ENTRY_KINDS } from "../lib/domain/common/entryKind";
+import { EXPENSE_ENTRY_SOURCES } from "../lib/domain/expenseEntries/expenseEntry";
+import {
+  SOURCE_DOCUMENT_SOURCE_TYPES,
+  SOURCE_DOCUMENT_STATUSES,
+} from "../lib/domain/sourceDocuments/sourceDocument";
+import { WEEK_SESSION_STATUSES } from "../lib/domain/weekSessions/store";
 import { ACCOUNT_DELETION_REQUEST_STATUSES } from "../lib/domain/accountDeletion/request";
 import { ACCOUNT_DELETION_GROUP_PURGE_STATUSES } from "../lib/domain/accountDeletion/groupPurgeStore";
 import {
@@ -17,6 +25,7 @@ import {
   aiExpenseDraftReviewReasonValidator,
   aiExpenseDraftSourceTypeValidator,
   aiExpenseDraftStatusValidator,
+  aiExpenseRegistrationModeValidator,
   derivedRegistrationSnapshotValidator,
   markerDefinitionsValidator,
   receiptDraftItemFields,
@@ -413,14 +422,8 @@ export default defineSchema({
 
   sourceDocuments: defineTable({
     groupId: v.id("groups"),
-    sourceType: v.union(
-      v.literal("manual"),
-      v.literal("receipt"),
-      v.literal("convenience_payment"),
-      v.literal("invoice"),
-      v.literal("unknown"),
-    ),
-    status: v.union(v.literal("draft"), v.literal("ready"), v.literal("finalized")),
+    sourceType: v.union(...SOURCE_DOCUMENT_SOURCE_TYPES.map((value) => v.literal(value))),
+    status: v.union(...SOURCE_DOCUMENT_STATUSES.map((value) => v.literal(value))),
     date: v.optional(v.string()),
     totalAmount: v.optional(v.number()),
     shopName: v.optional(v.string()),
@@ -447,8 +450,8 @@ export default defineSchema({
     categoryId: v.optional(v.id("categories")),
     title: v.string(),
     memo: v.optional(v.string()),
-    entryType: v.union(v.literal("expense"), v.literal("income")),
-    source: v.union(v.literal("manual"), v.literal("ai_suggested"), v.literal("imported")),
+    entryType: v.union(...ENTRY_KINDS.map((value) => v.literal(value))),
+    source: v.union(...EXPENSE_ENTRY_SOURCES.map((value) => v.literal(value))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -464,7 +467,7 @@ export default defineSchema({
     createdByUserId: v.optional(v.string()),
     date: v.string(),
     // type は支出(expense) / 収入(income) を区別する。既存レコードとの後方互換のため optional とする。
-    type: v.optional(v.union(v.literal("expense"), v.literal("income"))),
+    type: v.optional(v.union(...ENTRY_KINDS.map((value) => v.literal(value)))),
     // shopName は支出の場合に使用する。後方互換のため optional とする。
     shopName: v.optional(v.string()),
     // bankName は収入の場合に使用する。
@@ -488,7 +491,7 @@ export default defineSchema({
     weekEndDate: v.string(),
     // reviewMemo は週次セッション完了時のみ入力するため optional とする。
     reviewMemo: v.optional(v.string()),
-    status: v.union(v.literal("draft"), v.literal("completed")),
+    status: v.union(...WEEK_SESSION_STATUSES.map((value) => v.literal(value))),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_group_id_and_week_start_date", ["groupId", "weekStartDate"]),
@@ -525,12 +528,12 @@ export default defineSchema({
     receiptTotalResolution: v.optional(receiptTotalResolutionValidator),
     receiptTaxDecision: v.optional(receiptTaxDecisionValidator),
     // v1以前の下書きを読み続けるためoptional。新規解析だけがv1をdual-writeする。
-    receiptDataContractVersion: v.optional(v.literal(1)),
+    receiptDataContractVersion: v.optional(v.literal(RECEIPT_DATA_CONTRACT_VERSION)),
     rawObservation: v.optional(receiptRawObservationValidator),
     receiptInterpretation: v.optional(receiptInterpretationSnapshotValidator),
     receiptUserOverride: v.optional(receiptUserOverrideSnapshotValidator),
     // 未設定の既存下書きは detailed として扱う。
-    registrationMode: v.optional(v.union(v.literal("detailed"), v.literal("totalOnly"))),
+    registrationMode: v.optional(aiExpenseRegistrationModeValidator),
     derivedRegistration: v.optional(derivedRegistrationSnapshotValidator),
     markerDefinitions: v.optional(markerDefinitionsValidator),
     categoryId: v.optional(v.id("categories")),

@@ -6,14 +6,35 @@ import {
   AI_EXPENSE_DRAFT_REVIEW_REASONS,
 } from "../../lib/domain/aiExpenseDrafts/constants";
 import {
+  AI_EXPENSE_REGISTRATION_MODES,
+  RECEIPT_INTERPRETATION_SOURCES,
+  REGISTRATION_DESTINATIONS,
+} from "../../lib/domain/aiExpenseDrafts/receiptDataContract";
+import {
   AMOUNT_BASES,
   TAX_RATE_PERCENTS,
   TAX_MODES,
   ROUNDING_METHODS,
+  PRICE_TAX_TREATMENTS,
+  TAX_RATE_COMPOSITIONS,
+  RECEIPT_TAX_DECISION_SOURCES,
+  RECEIPT_TAX_AMOUNT_DECISION_SOURCES,
+  RECEIPT_ITEM_TAX_CONFIRMED_FIELDS,
+  RECEIPT_TOTAL_CANDIDATE_SOURCES,
+  TAX_ALLOCATION_STATUSES,
+  TAX_RESOLUTION_SOURCES,
+  TAX_RESOLUTION_STATUSES,
+  TAX_SUMMARY_CONSISTENCY_REASONS,
+  TAX_SUMMARY_CONSISTENCY_STATUSES,
+  TAX_SUMMARY_DECISION_STATUSES,
+  TAX_SUMMARY_USER_EDITED_FIELDS,
+  TAX_SUMMARY_VALUE_ORIGIN_SOURCES,
 } from "../../lib/domain/receipt/tax/types";
 import { RECEIPT_ITEM_LINE_TYPES } from "../../lib/domain/receipt/discountItems";
 import {
+  RECEIPT_LINE_CLASSIFICATION_STATUSES,
   RECEIPT_LINE_ROLES,
+  RECEIPT_RAW_OBSERVATION_SOURCES,
   RECEIPT_STRUCTURAL_LINE_ROLES,
 } from "../../lib/domain/receipt/observations";
 export const roundingMethodValidator = v.union(
@@ -52,6 +73,10 @@ export const aiExpenseDraftReviewReasonValidator = v.union(
   ...AI_EXPENSE_DRAFT_REVIEW_REASONS.map((value) => v.literal(value)),
 );
 
+export const aiExpenseRegistrationModeValidator = v.union(
+  ...AI_EXPENSE_REGISTRATION_MODES.map((value) => v.literal(value)),
+);
+
 export const amountBasisValidator = v.union(...AMOUNT_BASES.map((value) => v.literal(value)));
 export const taxSummaryTaxRatePercentValidator = v.union(
   ...TAX_RATE_PERCENTS.map((value) => v.literal(value)),
@@ -62,18 +87,21 @@ export const receiptItemTaxRatePercentValidator = v.union(
   v.null(),
 );
 export const receiptMarkersValidator = v.array(v.string());
-export const taxResolutionStatusValidator = v.union(v.literal("resolved"), v.literal("unresolved"));
+export const taxResolutionStatusValidator = v.union(
+  ...TAX_RESOLUTION_STATUSES.map((value) => v.literal(value)),
+);
+export const taxAllocationStatusValidator = v.union(
+  ...TAX_ALLOCATION_STATUSES.map((value) => v.literal(value)),
+);
+export const taxSummaryDecisionStatusValidator = v.union(
+  ...TAX_SUMMARY_DECISION_STATUSES.map((value) => v.literal(value)),
+);
 export const taxConfirmedFieldsValidator = v.array(
-  v.union(v.literal("amountBasis"), v.literal("taxRatePercent")),
+  v.union(...RECEIPT_ITEM_TAX_CONFIRMED_FIELDS.map((value) => v.literal(value))),
 );
 
 export const taxResolutionSourceValidator = v.union(
-  v.literal("item_explicit"),
-  v.literal("single_summary"),
-  v.literal("summary_reconciliation"),
-  v.literal("remaining_summary"),
-  v.literal("marker_reconciled"),
-  v.literal("paid_total_reconciliation"),
+  ...TAX_RESOLUTION_SOURCES.map((value) => v.literal(value)),
 );
 export const receiptMarkerDefinitionValidator = v.object({
   marker: v.string(),
@@ -82,20 +110,11 @@ export const receiptMarkerDefinitionValidator = v.object({
 export const markerDefinitionsValidator = v.array(receiptMarkerDefinitionValidator);
 export const taxSummaryValidator = v.object({
   userEditedFields: v.optional(
-    v.array(
-      v.union(
-        v.literal("taxRatePercent"),
-        v.literal("taxMode"),
-        v.literal("taxableAmountYen"),
-        v.literal("taxableAmountBasis"),
-        v.literal("taxYen"),
-        v.literal("taxIncludedAmountYen"),
-      ),
-    ),
+    v.array(v.union(...TAX_SUMMARY_USER_EDITED_FIELDS.map((value) => v.literal(value)))),
   ),
   valueOrigin: v.optional(
     v.object({
-      source: v.union(v.literal("items"), v.literal("user"), v.literal("unknown")),
+      source: v.union(...TAX_SUMMARY_VALUE_ORIGIN_SOURCES.map((value) => v.literal(value))),
       previousTaxableAmountYen: v.optional(v.number()),
     }),
   ),
@@ -114,42 +133,17 @@ export const taxSummaryValidator = v.object({
     taxYen: v.optional(v.number()),
   }),
   warnings: v.array(v.string()),
-  status: v.optional(
-    v.union(
-      v.literal("verified"),
-      v.literal("ambiguous"),
-      v.literal("contradictory"),
-      v.literal("coherent"),
-      v.literal("reconcilable"),
-      v.literal("conflicting"),
-    ),
-  ),
+  status: v.optional(v.union(...TAX_SUMMARY_CONSISTENCY_STATUSES.map((value) => v.literal(value)))),
   reasons: v.optional(
-    v.array(
-      v.union(
-        v.literal("included_mode_with_tax_excluded_basis"),
-        v.literal("external_mode_with_tax_included_basis"),
-        v.literal("tax_summary_amount_mismatch"),
-        v.literal("tax_included_amount_mismatch"),
-        v.literal("reconciled_to_included"),
-        v.literal("reconciled_to_external"),
-        v.literal("mixed_tax_mode"),
-        v.literal("unresolved_tax_summary"),
-      ),
-    ),
+    v.array(v.union(...TAX_SUMMARY_CONSISTENCY_REASONS.map((value) => v.literal(value)))),
   ),
 });
 
 export const receiptTotalCandidateSourceValidator = v.union(
-  v.literal("explicit_label"),
-  v.literal("user_confirmed"),
-  v.literal("ai_estimate"),
-  v.literal("payment_change"),
-  v.literal("tax_summary_total"),
-  v.literal("tax_arithmetic"),
+  ...RECEIPT_TOTAL_CANDIDATE_SOURCES.map((value) => v.literal(value)),
 );
 export const receiptTotalResolutionValidator = v.object({
-  status: v.union(v.literal("verified"), v.literal("ambiguous"), v.literal("contradictory")),
+  status: taxSummaryDecisionStatusValidator,
   protectedAmountYen: v.union(v.number(), v.null()),
   candidates: v.array(
     v.object({
@@ -162,33 +156,18 @@ export const receiptTotalResolutionValidator = v.object({
 });
 
 export const priceTaxTreatmentValidator = v.union(
-  v.literal("included"),
-  v.literal("excluded"),
-  v.literal("perItem"),
-  v.literal("unknown"),
+  ...PRICE_TAX_TREATMENTS.map((value) => v.literal(value)),
 );
 export const taxRateCompositionValidator = v.union(
-  v.literal("rate8"),
-  v.literal("rate10"),
-  v.literal("mixed"),
-  v.literal("unknown"),
+  ...TAX_RATE_COMPOSITIONS.map((value) => v.literal(value)),
 );
 export const receiptTaxDecisionSourceValidator = v.union(
-  v.literal("user"),
-  v.literal("explicitLabel"),
-  v.literal("marker"),
-  v.literal("position"),
-  v.literal("reconciliation"),
-  v.literal("ai"),
+  ...RECEIPT_TAX_DECISION_SOURCES.map((value) => v.literal(value)),
 );
 const receiptTaxDecisionCandidateValidator = v.object({
   priceTaxTreatment: priceTaxTreatmentValidator,
   taxRateComposition: taxRateCompositionValidator,
-  resolutionStatus: v.union(
-    v.literal("verified"),
-    v.literal("ambiguous"),
-    v.literal("contradictory"),
-  ),
+  resolutionStatus: taxSummaryDecisionStatusValidator,
   resolutionSource: receiptTaxDecisionSourceValidator,
   evidence: v.array(v.string()),
   reasons: v.array(v.string()),
@@ -196,11 +175,7 @@ const receiptTaxDecisionCandidateValidator = v.object({
 export const receiptTaxDecisionValidator = v.object({
   priceTaxTreatment: priceTaxTreatmentValidator,
   taxRateComposition: taxRateCompositionValidator,
-  resolutionStatus: v.union(
-    v.literal("verified"),
-    v.literal("ambiguous"),
-    v.literal("contradictory"),
-  ),
+  resolutionStatus: taxSummaryDecisionStatusValidator,
   resolutionSource: receiptTaxDecisionSourceValidator,
   evidence: v.array(v.string()),
   reasons: v.array(v.string()),
@@ -210,12 +185,7 @@ export const receiptTaxDecisionValidator = v.object({
     printedTaxYen: v.optional(v.number()),
     estimatedTaxYen: v.optional(v.number()),
     roundingMethod: roundingMethodValidator,
-    source: v.union(
-      v.literal("printed"),
-      v.literal("estimated"),
-      v.literal("unknown"),
-      v.literal("user"),
-    ),
+    source: v.union(...RECEIPT_TAX_AMOUNT_DECISION_SOURCES.map((value) => v.literal(value))),
   }),
 });
 
@@ -263,7 +233,7 @@ export const receiptRawObservationLineValidator = v.object({
 });
 
 export const receiptRawObservationValidator = v.object({
-  source: v.union(v.literal("ai_ocr"), v.literal("legacy_projection")),
+  source: v.union(...RECEIPT_RAW_OBSERVATION_SOURCES.map((value) => v.literal(value))),
   observedAt: v.number(),
   lines: v.array(receiptRawObservationLineValidator),
 });
@@ -274,7 +244,7 @@ export const receiptStructuralLineRoleValidator = v.union(
 
 export const receiptLineClassificationValidator = v.object({
   sourceLineIndex: v.number(),
-  status: v.union(v.literal("classified"), v.literal("ambiguous")),
+  status: v.union(...RECEIPT_LINE_CLASSIFICATION_STATUSES.map((value) => v.literal(value))),
   candidates: v.array(
     v.object({
       role: receiptStructuralLineRoleValidator,
@@ -294,7 +264,7 @@ export const receiptDraftItemFields = {
   markers: v.optional(receiptMarkersValidator),
   taxMarker: v.optional(v.string()),
   allocatedTaxYen: v.optional(v.number()),
-  taxAllocationStatus: v.optional(v.union(v.literal("allocated"), v.literal("unallocated"))),
+  taxAllocationStatus: v.optional(taxAllocationStatusValidator),
   normalizedAmountYen: v.optional(v.number()),
   taxResolutionStatus: v.optional(taxResolutionStatusValidator),
   taxResolutionSource: v.optional(taxResolutionSourceValidator),
@@ -321,7 +291,7 @@ export const receiptDraftValueSnapshotValidator = v.object({
   paymentPurpose: v.optional(v.string()),
   date: v.optional(v.string()),
   amountYen: v.optional(v.number()),
-  registrationMode: v.optional(v.union(v.literal("detailed"), v.literal("totalOnly"))),
+  registrationMode: v.optional(aiExpenseRegistrationModeValidator),
   taxSummaries: v.optional(v.array(taxSummaryValidator)),
   receiptTotalResolution: v.optional(receiptTotalResolutionValidator),
   receiptTaxDecision: v.optional(receiptTaxDecisionValidator),
@@ -335,7 +305,7 @@ export const receiptDraftValueSnapshotValidator = v.object({
 });
 
 export const receiptInterpretationSnapshotValidator = v.object({
-  source: v.union(v.literal("ai"), v.literal("legacy_projection")),
+  source: v.union(...RECEIPT_INTERPRETATION_SOURCES.map((value) => v.literal(value))),
   interpretedAt: v.number(),
   values: receiptDraftValueSnapshotValidator,
 });
@@ -350,8 +320,8 @@ export const receiptUserOverrideSnapshotValidator = v.object({
 
 export const derivedRegistrationSnapshotValidator = v.object({
   source: v.literal("derived"),
-  destination: v.union(v.literal("receipt"), v.literal("expense_entries")),
-  registrationMode: v.optional(v.union(v.literal("detailed"), v.literal("totalOnly"))),
+  destination: v.union(...REGISTRATION_DESTINATIONS.map((value) => v.literal(value))),
+  registrationMode: v.optional(aiExpenseRegistrationModeValidator),
   taxRatePercent: v.optional(receiptItemTaxRatePercentValidator),
   taxableAmountYen: v.optional(v.union(v.number(), v.null())),
   taxYen: v.optional(v.union(v.number(), v.null())),
@@ -360,8 +330,3 @@ export const derivedRegistrationSnapshotValidator = v.object({
   categoryIds: v.array(v.id("categories")),
   registeredAt: v.number(),
 });
-
-export const aiExpenseRegistrationModeValidator = v.union(
-  v.literal("detailed"),
-  v.literal("totalOnly"),
-);

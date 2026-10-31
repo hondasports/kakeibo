@@ -1,4 +1,6 @@
 /** 候補として返すカテゴリの最大件数 */
+import type { AiExpenseDraftDocumentType } from "../aiExpenseDrafts/constants";
+
 export const CATEGORY_CANDIDATE_MAX = 20;
 
 export type CategoryLike<TId = string> = {
@@ -6,7 +8,7 @@ export type CategoryLike<TId = string> = {
   name: string;
 };
 
-type DocumentType = "receipt" | "convenience_payment" | "unknown";
+type DocumentType = AiExpenseDraftDocumentType;
 
 type BuildCategoryCandidatesInput<TId = string> = {
   documentType: DocumentType;

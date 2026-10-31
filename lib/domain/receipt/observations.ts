@@ -29,8 +29,12 @@ export type ReceiptRawObservationLine = {
   boundingBox?: ReceiptObservationBoundingBox;
 };
 
+export const RECEIPT_RAW_OBSERVATION_SOURCES = ["ai_ocr", "legacy_projection"] as const;
+
+export type ReceiptRawObservationSource = (typeof RECEIPT_RAW_OBSERVATION_SOURCES)[number];
+
 export type ReceiptRawObservation = {
-  source: "ai_ocr" | "legacy_projection";
+  source: ReceiptRawObservationSource;
   observedAt: number;
   lines: ReceiptRawObservationLine[];
 };
@@ -83,8 +87,12 @@ export type ReceiptLineClassificationCandidate = {
   evidence: string[];
 };
 
+export const RECEIPT_LINE_CLASSIFICATION_STATUSES = ["classified", "ambiguous"] as const;
+
+export type ReceiptLineClassificationStatus = (typeof RECEIPT_LINE_CLASSIFICATION_STATUSES)[number];
+
 export type ReceiptLineClassification = {
   sourceLineIndex: number;
-  status: "classified" | "ambiguous";
+  status: ReceiptLineClassificationStatus;
   candidates: ReceiptLineClassificationCandidate[];
 };

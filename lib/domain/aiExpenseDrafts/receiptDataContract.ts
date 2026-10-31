@@ -11,8 +11,10 @@ import type {
   ReceiptMarkerDefinition,
   ReceiptTaxDecision,
   ReceiptTotalResolution,
+  TaxAllocationStatus,
   TaxRatePercent,
   TaxResolutionSource,
+  TaxResolutionStatus,
 } from "../receipt/tax/types";
 import type { ReceiptLineClassification } from "../receipt/observations";
 import type { ReceiptItemLineType } from "../receipt/discountItems";
@@ -27,9 +29,9 @@ export type ReceiptDraftItemSnapshot<TCategoryId = string> = {
   markers?: string[];
   taxMarker?: string;
   allocatedTaxYen?: number;
-  taxAllocationStatus?: "allocated" | "unallocated";
+  taxAllocationStatus?: TaxAllocationStatus;
   normalizedAmountYen?: number;
-  taxResolutionStatus?: "resolved" | "unresolved";
+  taxResolutionStatus?: TaxResolutionStatus;
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
   taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
@@ -68,8 +70,12 @@ export type ReceiptDraftValueSnapshot<TCategoryId = string> = {
   items: ReceiptDraftItemSnapshot<TCategoryId>[];
 };
 
+export const RECEIPT_INTERPRETATION_SOURCES = ["ai", "legacy_projection"] as const;
+
+export type ReceiptInterpretationSource = (typeof RECEIPT_INTERPRETATION_SOURCES)[number];
+
 export type ReceiptInterpretationSnapshot<TCategoryId = string> = {
-  source: "ai" | "legacy_projection";
+  source: ReceiptInterpretationSource;
   interpretedAt: number;
   values: ReceiptDraftValueSnapshot<TCategoryId>;
 };
@@ -89,13 +95,24 @@ export const RECEIPT_TAX_CHOICE_FIELDS = {
   taxRateComposition: "receiptTaxDecision.taxRateComposition",
 } as const;
 
-export type AiExpenseRegistrationMode = "detailed" | "totalOnly";
+export const AI_EXPENSE_REGISTRATION_MODES = ["detailed", "totalOnly"] as const;
+
+export type AiExpenseRegistrationMode = (typeof AI_EXPENSE_REGISTRATION_MODES)[number];
+
+export const REGISTRATION_DESTINATIONS = ["receipt", "expense_entries"] as const;
+
+export type RegistrationDestination = (typeof REGISTRATION_DESTINATIONS)[number];
+
+/** receiptDataContractVersion の現在値。新規解析だけがこの値を dual-write する。 */
+export const RECEIPT_DATA_CONTRACT_VERSION = 1 as const;
+
+export type ReceiptDataContractVersion = typeof RECEIPT_DATA_CONTRACT_VERSION;
 
 export type DerivedRegistrationSnapshot<TCategoryId = string> = {
   source: "derived";
-  destination: "receipt" | "expense_entries";
+  destination: RegistrationDestination;
   registrationMode?: AiExpenseRegistrationMode;
-  taxRatePercent?: 0 | 8 | 10 | null;
+  taxRatePercent?: TaxRatePercent | null;
   taxableAmountYen?: number | null;
   taxYen?: number | null;
   amountYen: number;
