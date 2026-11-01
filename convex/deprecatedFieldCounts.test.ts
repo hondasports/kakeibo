@@ -13,6 +13,16 @@ type ItemCompatFields = {
   lineType?: "item" | "discount" | "promotion_adjustment" | "unknown";
   markers?: string[];
   taxMarker?: string;
+  normalizedAmountYen?: number;
+  amountBasis?: "tax_included" | "tax_excluded" | "unknown";
+  taxRatePercent?: 0 | 8 | 10 | null;
+  allocatedTaxYen?: number;
+  taxAllocationStatus?: "unallocated" | "allocated";
+  taxResolutionStatus?: "unresolved" | "resolved";
+  taxResolutionSource?: "ai" | "user" | "inferred";
+  taxReviewReasons?: string[];
+  createdAt?: number;
+  updatedAt?: number;
 };
 
 type DraftCompatFields = Partial<
@@ -38,8 +48,9 @@ const insertItem = (
   groupId: Id<"groups">,
   draftId: Id<"aiExpenseDrafts">,
   fields: ItemCompatFields,
-) =>
-  t.run(
+) => {
+  const { createdAt = 1, updatedAt = 1, ...rest } = fields;
+  return t.run(
     async (ctx) =>
       await ctx.db.insert("aiExpenseDraftItems", {
         groupId,
@@ -47,11 +58,12 @@ const insertItem = (
         itemName: "品物",
         amountYen: 100,
         confidence: {},
-        createdAt: 1,
-        updatedAt: 1,
-        ...fields,
+        createdAt,
+        updatedAt,
+        ...rest,
       }),
   );
+};
 
 const valueSnapshot = (items: ItemCompatFields[]) => ({
   status: "ready" as const,
@@ -136,6 +148,52 @@ describe("deprecatedFieldCounts", () => {
       markersAbsentOrEmptyWithTaxMarker: 2,
       withTaxMarker: 3,
     });
+  });
+
+  it("printedAmountYen 欠落行を分類する（追加調査候補は同値証明ではない）", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await insertGroup(t);
+    const draftId = await insertDraft(t, groupId, {});
+    // 何もない欠落行 → 追加調査候補
+    await insertItem(t, groupId, draftId, {});
+    // normalized 保持の欠落行（表示フォールバックで amountYen とズレうる）
+    await insertItem(t, groupId, draftId, { normalizedAmountYen: 108 });
+    // 税パイプラインフィールド保持の欠落行
+    await insertItem(t, groupId, draftId, { amountBasis: "tax_excluded" });
+    // 挿入後に更新痕跡のある欠落行（updatedAt は手がかりであり証明ではない）
+    await insertItem(t, groupId, draftId, { createdAt: 1, updatedAt: 2 });
+    // printedAmountYen あり → 分類対象外
+    await insertItem(t, groupId, draftId, { printedAmountYen: 100, lineType: "item" });
+
+    const result = await t.query(internal.deprecatedFieldCounts.aiExpenseDraftItems, {});
+    expect(result.totals).toMatchObject({
+      scanned: 5,
+      missingPrintedAmountYen: 4,
+      missingPrintedAmountYenWithNormalized: 1,
+      missingPrintedAmountYenWithTaxFields: 1,
+      missingPrintedAmountYenModifiedAfterInsert: 1,
+      missingPrintedAmountYenInvestigationCandidates: 1,
+    });
+  });
+
+  it("埋め込み snapshot の items には分類カウンタを適用しない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await insertGroup(t);
+    await insertDraft(t, groupId, {
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([{ normalizedAmountYen: 108 }]),
+      },
+    });
+    const result = await t.query(internal.deprecatedFieldCounts.aiExpenseDrafts, {});
+    // 埋め込み items は missingPrintedAmountYen だけ数え、分類カウンタは持たない
+    expect(result.totals.interpretation).toMatchObject({
+      missingPrintedAmountYen: 1,
+    });
+    expect(result.totals.interpretation).not.toHaveProperty(
+      "missingPrintedAmountYenInvestigationCandidates",
+    );
   });
 
   it("aiExpenseDrafts の version・taxSummaryCorrections・埋め込み明細を数える", async () => {

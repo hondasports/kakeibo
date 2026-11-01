@@ -46,6 +46,20 @@ const ITEM_COUNTERS = [
   "withTaxMarker",
 ];
 
+// printedAmountYen 欠落行の分類カウンタ（aiExpenseDraftItems テーブル行のみ。
+// 埋め込み snapshot には createdAt/updatedAt が無いので埋め込みには適用しない）。
+// 「追加調査候補」は同値証明・backfill 許可ではなく、行レベルの証拠集めの
+// 対象切り分けにのみ使う。旧 deploy・ダッシュボード編集・一発 mutation・
+// import 等の来歴はこの件数では分からない。
+const ITEM_ROW_EXTRA_COUNTERS = [
+  "missingPrintedAmountYenWithNormalized",
+  "missingPrintedAmountYenWithTaxFields",
+  "missingPrintedAmountYenModifiedAfterInsert",
+  "missingPrintedAmountYenInvestigationCandidates",
+];
+
+const ITEM_TABLE_COUNTERS = [...ITEM_COUNTERS, ...ITEM_ROW_EXTRA_COUNTERS];
+
 const DRAFT_COUNTERS = [
   "scanned",
   "missingReceiptDataContractVersion",
@@ -69,12 +83,34 @@ const h = item.taxMarker !== undefined && item.taxMarker !== "";
 if ((item.markers === undefined || me) && h) out.markersAbsentOrEmptyWithTaxMarker += 1;
 if (h) out.withTaxMarker += 1;`;
 
+// aiExpenseDraftItems テーブル行限定の分類。埋め込み snapshot には適用しない
+// （createdAt/updatedAt が無く modifiedAfterInsert が判定不能なため）。
+const ITEM_ROW_PRINTED_CLASSIFY_JS = `
+if (item.printedAmountYen === undefined) {
+  const hn = item.normalizedAmountYen !== undefined;
+  const ht = item.amountBasis !== undefined
+    || item.taxRatePercent !== undefined
+    || item.allocatedTaxYen !== undefined
+    || item.taxAllocationStatus !== undefined
+    || item.taxResolutionStatus !== undefined
+    || item.taxResolutionSource !== undefined
+    || (item.taxReviewReasons !== undefined && item.taxReviewReasons.length > 0)
+    || (item.taxConfirmedFields !== undefined && item.taxConfirmedFields.length > 0)
+    || (item.taxMarker !== undefined && item.taxMarker !== "");
+  const md = item.updatedAt !== item.createdAt;
+  if (hn) out.missingPrintedAmountYenWithNormalized += 1;
+  if (ht) out.missingPrintedAmountYenWithTaxFields += 1;
+  if (md) out.missingPrintedAmountYenModifiedAfterInsert += 1;
+  if (!hn && !ht && !md) out.missingPrintedAmountYenInvestigationCandidates += 1;
+}`;
+
 const ZERO_ITEM = `{${ITEM_COUNTERS.map((k) => `${k}:0`).join(",")}}`;
+const ZERO_ITEM_TABLE = `{${ITEM_TABLE_COUNTERS.map((k) => `${k}:0`).join(",")}}`;
 
 // 各テーブルの1ページ分 inline query ソースを組み立てる。
 // cursor は JSON.stringify 済みリテラル（初回は "null"）。
 function itemsPageJs(cursorLiteral, numItems) {
-  return `const out = ${ZERO_ITEM}; const r = await ctx.db.query("aiExpenseDraftItems").paginate({cursor: ${cursorLiteral}, numItems: ${numItems}}); for (const item of r.page) { ${ITEM_FIELD_COUNT_JS} } return {page: out, isDone: r.isDone, continueCursor: r.continueCursor};`;
+  return `const out = ${ZERO_ITEM_TABLE}; const r = await ctx.db.query("aiExpenseDraftItems").paginate({cursor: ${cursorLiteral}, numItems: ${numItems}}); for (const item of r.page) { ${ITEM_FIELD_COUNT_JS} ${ITEM_ROW_PRINTED_CLASSIFY_JS} } return {page: out, isDone: r.isDone, continueCursor: r.continueCursor};`;
 }
 
 function draftsPageJs(cursorLiteral, numItems) {
@@ -87,7 +123,7 @@ function recordsPageJs(cursorLiteral, numItems) {
 }
 
 export const TABLE_SPECS = {
-  aiExpenseDraftItems: { counters: ITEM_COUNTERS, pageJs: itemsPageJs },
+  aiExpenseDraftItems: { counters: ITEM_TABLE_COUNTERS, pageJs: itemsPageJs },
   aiExpenseDrafts: {
     counters: DRAFT_COUNTERS,
     nested: { interpretation: ITEM_COUNTERS, userOverride: ITEM_COUNTERS },
