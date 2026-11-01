@@ -17,8 +17,11 @@
  *   node scripts/count-deprecated-fields.mjs --deployment <ref>
  *   node scripts/count-deprecated-fields.mjs --dev        # 既定 deployment（.env.local）
  *   node scripts/count-deprecated-fields.mjs --env-file <path>
- *   追加: --tables <csv> --num-items <n> --max-pages <n>
- *   --tables の有効値: aiExpenseDraftItems,aiExpenseDrafts,groupDeletionAuditMigrationRecords,auditVerify
+ *   追加: --tables <csv> --num-items <n> --max-pages <n> --cutoff-ts <epochMs>
+ *   --tables の有効値: aiExpenseDraftItems,aiExpenseDrafts,groupDeletionAuditMigrationRecords,printedAmountJoinEvidence,auditVerify
+ *   --cutoff-ts: printedAmountJoinEvidence の createdAt below/above 分類に使う
+ *   閾値。deploy 実績時刻は外部ログから人間が供給する（repo では証明不能）。
+ *   全ページ同一リテラルとして埋め込むためページ間の混在は構造的に起きない。
  */
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -64,8 +67,47 @@ const DRAFT_COUNTERS = [
   "scanned",
   "missingReceiptDataContractVersion",
   "withTaxSummaryCorrections",
+  "taxSummaryCorrectionsPresent",
+  "taxSummaryCorrectionsPresentEmpty",
+  "interpretationSourceAi",
+  "interpretationSourceLegacyProjection",
+  "interpretationAbsent",
   "interpretationMalformed",
   "userOverrideMalformed",
+];
+
+// printedAmountYen 欠落行と親 draft の receiptInterpretation 埋め込み items の
+// 突合結果カウンタ（convex/deprecatedFieldCounts.printedAmountJoinEvidence と同期）。
+// 欠落行は必ず1つの終端バケット（parentDraftMissing/parentDraftGroupMismatch/
+// interpretationAbsent/interpretationNonAi/interpretationItemsMalformed/
+// siblingsTruncated/rowMissingFromSiblingIndex/ambiguousNameJoinTableSide/
+// noNameOverlap/ambiguousNameJoin/uniqueNameJoin* 3種）に入り、
+// その合計 === missingPrintedRows。
+// hasUserOverride・siblingCountDiffers・createdAt* は終端と併存する副次フラグ、
+// uniqueNameJoinPositionConsistent は uniqueNameJoin* 3種に内包される副カウント。
+// 一意一致は埋め込み側・兄弟行側の両方で一意な場合のみ。
+// 一致系は「値が矛盾しない」程度の整合信号で、backfill 許可・行同一性の証明ではない。
+const JOIN_EVIDENCE_COUNTERS = [
+  "scanned",
+  "missingPrintedRows",
+  "createdAtBelowCutoff",
+  "createdAtAtOrAboveCutoff",
+  "parentDraftMissing",
+  "parentDraftGroupMismatch",
+  "hasUserOverride",
+  "interpretationAbsent",
+  "interpretationNonAi",
+  "interpretationItemsMalformed",
+  "siblingsTruncated",
+  "rowMissingFromSiblingIndex",
+  "siblingCountDiffers",
+  "ambiguousNameJoinTableSide",
+  "noNameOverlap",
+  "ambiguousNameJoin",
+  "uniqueNameJoinEmbeddedPrintedMissing",
+  "uniqueNameJoinPrintedEqualsAmount",
+  "uniqueNameJoinPrintedDiffers",
+  "uniqueNameJoinPositionConsistent",
 ];
 
 const RECORD_COUNTERS = ["scanned", "migrated", "skipped", "failed"];
@@ -115,7 +157,18 @@ function itemsPageJs(cursorLiteral, numItems) {
 
 function draftsPageJs(cursorLiteral, numItems) {
   // values.items が配列でない保存形状は items 0件と見なさず、malformed カウンタで可視化する
-  return `const out = {scanned:0, missingReceiptDataContractVersion:0, withTaxSummaryCorrections:0, interpretationMalformed:0, userOverrideMalformed:0, interpretation:${ZERO_ITEM}, userOverride:${ZERO_ITEM}}; const count = (item, c) => { const out = c; ${ITEM_FIELD_COUNT_JS} }; const nested = (v, c, key) => { if (v === undefined) return; const items = v?.values?.items; if (!Array.isArray(items)) { out[key] += 1; return; } for (const item of items) count(item, c); }; const r = await ctx.db.query("aiExpenseDrafts").paginate({cursor: ${cursorLiteral}, numItems: ${numItems}}); for (const d of r.page) { out.scanned += 1; if (d.receiptDataContractVersion === undefined) out.missingReceiptDataContractVersion += 1; const corr = d.receiptUserOverride?.taxSummaryCorrections; if (corr !== undefined && corr.length > 0) out.withTaxSummaryCorrections += 1; nested(d.receiptInterpretation, out.interpretation, "interpretationMalformed"); nested(d.receiptUserOverride, out.userOverride, "userOverrideMalformed"); } return {page: out, isDone: r.isDone, continueCursor: r.continueCursor};`;
+  return `const out = {scanned:0, missingReceiptDataContractVersion:0, withTaxSummaryCorrections:0, taxSummaryCorrectionsPresent:0, taxSummaryCorrectionsPresentEmpty:0, interpretationSourceAi:0, interpretationSourceLegacyProjection:0, interpretationAbsent:0, interpretationMalformed:0, userOverrideMalformed:0, interpretation:${ZERO_ITEM}, userOverride:${ZERO_ITEM}}; const count = (item, c) => { const out = c; ${ITEM_FIELD_COUNT_JS} }; const nested = (v, c, key) => { if (v === undefined) return; const items = v?.values?.items; if (!Array.isArray(items)) { out[key] += 1; return; } for (const item of items) count(item, c); }; const r = await ctx.db.query("aiExpenseDrafts").paginate({cursor: ${cursorLiteral}, numItems: ${numItems}}); for (const d of r.page) { out.scanned += 1; if (d.receiptDataContractVersion === undefined) out.missingReceiptDataContractVersion += 1; const corr = d.receiptUserOverride?.taxSummaryCorrections; if (corr !== undefined && corr.length > 0) out.withTaxSummaryCorrections += 1; if (corr !== undefined) { out.taxSummaryCorrectionsPresent += 1; if (corr.length === 0) out.taxSummaryCorrectionsPresentEmpty += 1; } const src = d.receiptInterpretation?.source; if (src === "ai") out.interpretationSourceAi += 1; else if (src === "legacy_projection") out.interpretationSourceLegacyProjection += 1; else out.interpretationAbsent += 1; nested(d.receiptInterpretation, out.interpretation, "interpretationMalformed"); nested(d.receiptUserOverride, out.userOverride, "userOverrideMalformed"); } return {page: out, isDone: r.isDone, continueCursor: r.continueCursor};`;
+}
+
+// printedAmountJoinEvidence の inline 版。siblings は .take(101) で打ち切り、
+// 上限到達（101件）は完全列挙不能として siblingsTruncated で打ち止める
+// （位置・件数比較が信頼できないため join には進まない）。一意一致は
+// 埋め込み側・兄弟行側の両方で一意な場合のみ。items 非配列・itemName 非文字列・
+// 親 draft の group 不一致は「不明」として join しない。
+// cutoffLiteral は JSON.stringify 済み（省略時は "undefined"）。
+// 同一スキャン内では全ページに同じリテラルを埋め込むので cutoff 混在しない。
+function joinEvidencePageJs(cursorLiteral, numItems, cutoffLiteral) {
+  return `const out = {${JOIN_EVIDENCE_COUNTERS.map((k) => `${k}:0`).join(",")}}; const r = await ctx.db.query("aiExpenseDraftItems").paginate({cursor: ${cursorLiteral}, numItems: ${numItems}}); const cutoff = ${cutoffLiteral}; for (const item of r.page) { out.scanned += 1; if (item.printedAmountYen !== undefined) continue; out.missingPrintedRows += 1; if (cutoff !== undefined) { if (item.createdAt < cutoff) out.createdAtBelowCutoff += 1; else out.createdAtAtOrAboveCutoff += 1; } const draft = await ctx.db.get(item.draftId); if (draft === null) { out.parentDraftMissing += 1; continue; } if (draft.groupId !== item.groupId) { out.parentDraftGroupMismatch += 1; continue; } if (draft.receiptUserOverride !== undefined) out.hasUserOverride += 1; const interp = draft.receiptInterpretation; if (interp === undefined) { out.interpretationAbsent += 1; continue; } if (interp.source !== "ai") { out.interpretationNonAi += 1; continue; } const er = interp.values?.items; if (!Array.isArray(er) || er.some(e => typeof e !== "object" || e === null || typeof e.itemName !== "string")) { out.interpretationItemsMalformed += 1; continue; } const siblings = await ctx.db.query("aiExpenseDraftItems").withIndex("by_group_id_and_draft_id", q => q.eq("groupId", item.groupId).eq("draftId", item.draftId)).take(101); if (siblings.length >= 101) { out.siblingsTruncated += 1; continue; } const rowIndex = siblings.findIndex(s => s._id === item._id); if (rowIndex === -1) { out.rowMissingFromSiblingIndex += 1; continue; } const embedded = er; if (embedded.length !== siblings.length) out.siblingCountDiffers += 1; if (siblings.filter(s => s.itemName === item.itemName).length > 1) { out.ambiguousNameJoinTableSide += 1; continue; } const matches = embedded.map((e, i) => ({e, i})).filter(({e}) => e.itemName === item.itemName); if (matches.length === 0) { out.noNameOverlap += 1; continue; } if (matches.length > 1) { out.ambiguousNameJoin += 1; continue; } const {e, i} = matches[0]; if (i === rowIndex) out.uniqueNameJoinPositionConsistent += 1; if (e.printedAmountYen === undefined) out.uniqueNameJoinEmbeddedPrintedMissing += 1; else if (e.printedAmountYen === item.amountYen) out.uniqueNameJoinPrintedEqualsAmount += 1; else out.uniqueNameJoinPrintedDiffers += 1; } return {page: out, isDone: r.isDone, continueCursor: r.continueCursor};`;
 }
 
 function recordsPageJs(cursorLiteral, numItems) {
@@ -132,6 +185,10 @@ export const TABLE_SPECS = {
   groupDeletionAuditMigrationRecords: {
     counters: RECORD_COUNTERS,
     pageJs: recordsPageJs,
+  },
+  printedAmountJoinEvidence: {
+    counters: JOIN_EVIDENCE_COUNTERS,
+    pageJs: joinEvidencePageJs,
   },
 };
 
@@ -216,18 +273,26 @@ function runCli(exec, args, label) {
   return parseJsonResult(result.stdout);
 }
 
-export function scanTable(spec, { targetArgs, numItems, maxPages, exec = defaultExec }) {
+export function scanTable(spec, { targetArgs, numItems, maxPages, cutoffTs, exec = defaultExec }) {
   const totals = emptyTotals(spec);
   const seenCursors = new Set();
   let cursor = null;
   let pages = 0;
+  // cutoffTs は全ページで同一リテラルを埋め込む（ページごとに値が変わらない
+  // ことを構造で保証する。手動 convex run 側は carry に束縛して拒否）。
+  const cutoffLiteral = cutoffTs === undefined ? "undefined" : JSON.stringify(cutoffTs);
   for (;;) {
     if (pages >= maxPages) {
       throw new Error(`ページ上限 ${maxPages} を超過しました（走査を中止）`);
     }
     const result = runCli(
       exec,
-      ["run", ...targetArgs, "--inline-query", spec.pageJs(JSON.stringify(cursor), numItems)],
+      [
+        "run",
+        ...targetArgs,
+        "--inline-query",
+        spec.pageJs(JSON.stringify(cursor), numItems, cutoffLiteral),
+      ],
       "inline query",
     );
     const page = validatePage(spec, result);
@@ -294,6 +359,11 @@ export function parseCliArgs(argv) {
       if (!Number.isInteger(opts.maxPages) || opts.maxPages <= 0) {
         throw new Error("--max-pages は正の整数が必要です");
       }
+    } else if (arg === "--cutoff-ts") {
+      opts.cutoffTs = Number(argv[++i]);
+      if (!Number.isFinite(opts.cutoffTs)) {
+        throw new Error("--cutoff-ts は数値（epoch ms）が必要です");
+      }
     } else if (arg === "--tables") {
       opts.tables = String(argv[++i] ?? "")
         .split(",")
@@ -336,6 +406,7 @@ async function main() {
       targetArgs,
       numItems: opts.numItems,
       maxPages: opts.maxPages,
+      cutoffTs: opts.cutoffTs,
     });
   }
   if (tables.includes(AUDIT_VERIFY_NAME)) {

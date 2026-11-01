@@ -229,10 +229,298 @@ export const aiExpenseDraftItems = internalQuery({
   },
 });
 
+// printedAmountYen 欠落行に対し、親 draft の receiptInterpretation
+// 埋め込み items との突合結果を件数だけで分類する調査クエリ。
+//
+// 注意（読み方）:
+// - source: "ai" の埋め込み items は mapExtractionToDraftArgs の税解釈・
+//   分類を通った args.items の投影で、レシート印字原本そのものではない。
+//   テーブル行とは別 write 経路の「もう一つの記録」であり、独立した原本
+//   証拠としては扱わない。
+// - source: "legacy_projection" はテーブル行からの再投影（循環）なので
+//   印字額の根拠には使えない。
+// - itemName の一意一致・配列 index 一致は行同一性の証明にならない
+//   （削除・並べ替え・重複名・再抽出・編集で崩れうる）。一致系カウンタは
+//   「値が矛盾しない」程度の整合信号であって、自動 backfill の十分条件に
+//   しない。embedded printed 値を埋める場合も行単位の確認が要る。
+// - createdAt 閾値（cutoffTs）は deploy 実績時刻を外部ログから人間が供給
+//   する前提のパラメータで、repo 内から deploy 時刻は証明できない。
+//
+// カウンタの重なり（合計の読み方）:
+// - 欠落行は必ず1つの終端バケットに入る: parentDraftMissing /
+//   parentDraftGroupMismatch / interpretationAbsent / interpretationNonAi /
+//   interpretationItemsMalformed / siblingsTruncated /
+//   rowMissingFromSiblingIndex / ambiguousNameJoinTableSide /
+//   noNameOverlap / ambiguousNameJoin / uniqueNameJoin* 3種。
+//   これらの合計 === missingPrintedRows。
+// - hasUserOverride・siblingCountDiffers・createdAt* は終端バケットと
+//   併存する副次フラグ（独立して足し合わせない）。
+// - uniqueNameJoinPositionConsistent は uniqueNameJoin* 3種のいずれかに
+//   内包される副カウント（3種の合計とは別に読む）。
+// - itemName 一致は「埋め込み側が一意」かつ「兄弟行側も一意」の両方が
+//   揃ったときだけ uniqueNameJoin とする。片方でも複数一致なら曖昧。
+//   embedded item の itemName 欠落・items が配列でない等の malformed は
+//   interpretationItemsMalformed、draft の groupId が行と違う場合は
+//   parentDraftGroupMismatch で、いずれも「不明」として join しない。
+// - cutoffTs は carry に束縛する。ページ継続で異なる cutoffTs を渡すと
+//   累計が混ざるため ConvexError で拒否する（runner は全ページ同一値を
+//   JS リテラルへ埋め込むため混在しない）。
+const JOIN_EVIDENCE_SIBLING_LIMIT = 101; // DRAFT_JUDGMENT_ITEM_LIMIT(100)+1 で打ち切り検出
+
+const joinEvidenceCounts = {
+  scanned: v.number(),
+  missingPrintedRows: v.number(),
+  createdAtBelowCutoff: v.number(),
+  createdAtAtOrAboveCutoff: v.number(),
+  parentDraftMissing: v.number(),
+  parentDraftGroupMismatch: v.number(),
+  hasUserOverride: v.number(),
+  interpretationAbsent: v.number(),
+  interpretationNonAi: v.number(),
+  interpretationItemsMalformed: v.number(),
+  siblingsTruncated: v.number(),
+  rowMissingFromSiblingIndex: v.number(),
+  siblingCountDiffers: v.number(),
+  ambiguousNameJoinTableSide: v.number(),
+  noNameOverlap: v.number(),
+  ambiguousNameJoin: v.number(),
+  uniqueNameJoinEmbeddedPrintedMissing: v.number(),
+  uniqueNameJoinPrintedEqualsAmount: v.number(),
+  uniqueNameJoinPrintedDiffers: v.number(),
+  uniqueNameJoinPositionConsistent: v.number(),
+};
+
+type JoinEvidenceCounts = {
+  scanned: number;
+  missingPrintedRows: number;
+  createdAtBelowCutoff: number;
+  createdAtAtOrAboveCutoff: number;
+  parentDraftMissing: number;
+  parentDraftGroupMismatch: number;
+  hasUserOverride: number;
+  interpretationAbsent: number;
+  interpretationNonAi: number;
+  interpretationItemsMalformed: number;
+  siblingsTruncated: number;
+  rowMissingFromSiblingIndex: number;
+  siblingCountDiffers: number;
+  ambiguousNameJoinTableSide: number;
+  noNameOverlap: number;
+  ambiguousNameJoin: number;
+  uniqueNameJoinEmbeddedPrintedMissing: number;
+  uniqueNameJoinPrintedEqualsAmount: number;
+  uniqueNameJoinPrintedDiffers: number;
+  uniqueNameJoinPositionConsistent: number;
+};
+
+const emptyJoinEvidenceCounts = (): JoinEvidenceCounts => ({
+  scanned: 0,
+  missingPrintedRows: 0,
+  createdAtBelowCutoff: 0,
+  createdAtAtOrAboveCutoff: 0,
+  parentDraftMissing: 0,
+  parentDraftGroupMismatch: 0,
+  hasUserOverride: 0,
+  interpretationAbsent: 0,
+  interpretationNonAi: 0,
+  interpretationItemsMalformed: 0,
+  siblingsTruncated: 0,
+  rowMissingFromSiblingIndex: 0,
+  siblingCountDiffers: 0,
+  ambiguousNameJoinTableSide: 0,
+  noNameOverlap: 0,
+  ambiguousNameJoin: 0,
+  uniqueNameJoinEmbeddedPrintedMissing: 0,
+  uniqueNameJoinPrintedEqualsAmount: 0,
+  uniqueNameJoinPrintedDiffers: 0,
+  uniqueNameJoinPositionConsistent: 0,
+});
+
+// carry は合計 counts に加えて最初のページで使った cutoffTs を束縛する。
+// 継続呼び出しで cutoffTs が変わると below/above の累計が混ざるので拒否する。
+const joinEvidenceCarry = v.object({
+  counts: v.object(joinEvidenceCounts),
+  cutoffTs: v.optional(v.number()),
+});
+
+// schema では malformed な埋め込み（itemName 非文字列等）を再現できないため、
+// テストが直接呼べるよう export する。本クエリの判定ロジックはここに集約。
+export function classifyJoinEvidence(
+  item: {
+    _id: string;
+    groupId: string;
+    draftId: string;
+    itemName: string;
+    amountYen: number;
+    createdAt: number;
+  },
+  draft: {
+    groupId: string;
+    receiptUserOverride?: unknown;
+    receiptInterpretation?: {
+      source: string;
+      values?: { items?: unknown };
+    };
+  } | null,
+  // siblings は null のとき打ち切り（上限超過で完全な列挙が取れていない）。
+  siblings: { _id: string; itemName?: unknown }[] | null,
+  cutoffTs: number | undefined,
+  counts: JoinEvidenceCounts,
+) {
+  counts.missingPrintedRows += 1;
+  if (cutoffTs !== undefined) {
+    if (item.createdAt < cutoffTs) counts.createdAtBelowCutoff += 1;
+    else counts.createdAtAtOrAboveCutoff += 1;
+  }
+  if (draft === null) {
+    counts.parentDraftMissing += 1;
+    return;
+  }
+  // 親 draft の groupId が行と違う場合は参照先を信用できない（不明扱い）。
+  if (draft.groupId !== item.groupId) {
+    counts.parentDraftGroupMismatch += 1;
+    return;
+  }
+  if (draft.receiptUserOverride !== undefined) counts.hasUserOverride += 1;
+  const interpretation = draft.receiptInterpretation;
+  if (interpretation === undefined) {
+    counts.interpretationAbsent += 1;
+    return;
+  }
+  if (interpretation.source !== "ai") {
+    counts.interpretationNonAi += 1;
+    return;
+  }
+  // items が配列でない・要素がオブジェクトでない・itemName が文字列でない
+  // 埋め込みは「名前での対応付け自体が不確か」なので join しない。
+  const embeddedRaw = interpretation.values?.items;
+  if (
+    !Array.isArray(embeddedRaw) ||
+    embeddedRaw.some(
+      (e) =>
+        typeof e !== "object" ||
+        e === null ||
+        typeof (e as { itemName?: unknown }).itemName !== "string",
+    )
+  ) {
+    counts.interpretationItemsMalformed += 1;
+    return;
+  }
+  const embedded = embeddedRaw as { itemName: string; printedAmountYen?: number }[];
+  if (siblings === null) {
+    counts.siblingsTruncated += 1;
+    return;
+  }
+  const rowIndex = siblings.findIndex((s) => s._id === item._id);
+  if (rowIndex === -1) {
+    counts.rowMissingFromSiblingIndex += 1;
+    return;
+  }
+  if (embedded.length !== siblings.length) counts.siblingCountDiffers += 1;
+  // 行の特定は両側で一意なことが条件。兄弟側に同名が複数あれば、
+  // 埋め込み側が1件でも複数行が同じ snapshot item を指してしまう。
+  const sameNameSiblings = siblings.filter((s) => s.itemName === item.itemName);
+  if (sameNameSiblings.length > 1) {
+    counts.ambiguousNameJoinTableSide += 1;
+    return;
+  }
+  const nameMatches = embedded
+    .map((e, i) => ({ e, i }))
+    .filter(({ e }) => e.itemName === item.itemName);
+  if (nameMatches.length === 0) {
+    counts.noNameOverlap += 1;
+    return;
+  }
+  if (nameMatches.length > 1) {
+    counts.ambiguousNameJoin += 1;
+    return;
+  }
+  const [{ e, i }] = nameMatches;
+  if (i === rowIndex) counts.uniqueNameJoinPositionConsistent += 1;
+  if (e.printedAmountYen === undefined) {
+    counts.uniqueNameJoinEmbeddedPrintedMissing += 1;
+  } else if (e.printedAmountYen === item.amountYen) {
+    counts.uniqueNameJoinPrintedEqualsAmount += 1;
+  } else {
+    counts.uniqueNameJoinPrintedDiffers += 1;
+  }
+}
+
+export const printedAmountJoinEvidence = internalQuery({
+  args: {
+    cursor: v.optional(v.string()),
+    carry: v.optional(joinEvidenceCarry),
+    cutoffTs: v.optional(v.number()),
+  },
+  returns: v.object({
+    isDone: v.boolean(),
+    continueCursor: v.union(v.string(), v.null()),
+    page: v.object(joinEvidenceCounts),
+    totals: v.object(joinEvidenceCounts),
+  }),
+  handler: async (ctx: ReadCtx, args) => {
+    assertCursorCarryPair(args.cursor, args.carry);
+    if (args.carry !== undefined && args.carry.cutoffTs !== args.cutoffTs) {
+      throw new ConvexError(
+        "継続ページで cutoffTs が変わっています。below/above の累計が混ざるため、全ページ同一値を指定してください",
+      );
+    }
+    const page = await ctx.db.query("aiExpenseDraftItems").paginate(paged(args.cursor));
+    const counts = emptyJoinEvidenceCounts();
+    for (const item of page.page) {
+      counts.scanned += 1;
+      if (item.printedAmountYen !== undefined) continue;
+      const draft = await ctx.db.get(item.draftId);
+      // draft が無い・別 group・source が "ai" でない行は sibling 列挙が
+      // 不要なので、先に draft だけ見てから取得要否を決める（読み取り量を抑える）。
+      const needsSiblings =
+        draft !== null &&
+        draft.groupId === item.groupId &&
+        draft.receiptInterpretation?.source === "ai";
+      const siblings = needsSiblings
+        ? await ctx.db
+            .query("aiExpenseDraftItems")
+            .withIndex("by_group_id_and_draft_id", (q) =>
+              q.eq("groupId", item.groupId).eq("draftId", item.draftId),
+            )
+            .take(JOIN_EVIDENCE_SIBLING_LIMIT)
+        : null;
+      classifyJoinEvidence(
+        item,
+        draft,
+        siblings !== null && siblings.length >= JOIN_EVIDENCE_SIBLING_LIMIT ? null : siblings,
+        args.cutoffTs,
+        counts,
+      );
+    }
+    const totals = emptyJoinEvidenceCounts();
+    const carryCounts: JoinEvidenceCounts | undefined = args.carry?.counts;
+    for (const key of Object.keys(totals) as (keyof JoinEvidenceCounts)[]) {
+      totals[key] = (carryCounts?.[key] ?? 0) + counts[key];
+    }
+    return {
+      isDone: page.isDone,
+      continueCursor: page.isDone ? null : page.continueCursor,
+      page: counts,
+      totals,
+    };
+  },
+});
+
 const draftCounts = {
   scanned: v.number(),
   missingReceiptDataContractVersion: v.number(),
   withTaxSummaryCorrections: v.number(),
+  // taxSummaryCorrections は現行 writer が非空のときだけ書く
+  // （buildReceiptUserOverride の `?.length` 条件）。存在して空なら
+  // ダッシュボード編集・import・旧コード等の未確認 writer の手がかり。
+  // resolveReceiptTaxCorrections は「存在」で早期 return するため、
+  // 空配列は派生訂正を抑制する点で欠落と意味が違う。
+  taxSummaryCorrectionsPresent: v.number(),
+  taxSummaryCorrectionsPresentEmpty: v.number(),
+  interpretationSourceAi: v.number(),
+  interpretationSourceLegacyProjection: v.number(),
+  interpretationAbsent: v.number(),
   interpretation: v.object(itemCompatCounts),
   userOverride: v.object(itemCompatCounts),
 };
@@ -241,6 +529,11 @@ type DraftCounts = {
   scanned: number;
   missingReceiptDataContractVersion: number;
   withTaxSummaryCorrections: number;
+  taxSummaryCorrectionsPresent: number;
+  taxSummaryCorrectionsPresentEmpty: number;
+  interpretationSourceAi: number;
+  interpretationSourceLegacyProjection: number;
+  interpretationAbsent: number;
   interpretation: ItemCompatCounts;
   userOverride: ItemCompatCounts;
 };
@@ -263,6 +556,11 @@ export const aiExpenseDrafts = internalQuery({
       scanned: 0,
       missingReceiptDataContractVersion: 0,
       withTaxSummaryCorrections: 0,
+      taxSummaryCorrectionsPresent: 0,
+      taxSummaryCorrectionsPresentEmpty: 0,
+      interpretationSourceAi: 0,
+      interpretationSourceLegacyProjection: 0,
+      interpretationAbsent: 0,
       interpretation: emptyItemCounts(),
       userOverride: emptyItemCounts(),
     };
@@ -275,6 +573,15 @@ export const aiExpenseDrafts = internalQuery({
       if (corrections !== undefined && corrections.length > 0) {
         counts.withTaxSummaryCorrections += 1;
       }
+      if (corrections !== undefined) {
+        counts.taxSummaryCorrectionsPresent += 1;
+        if (corrections.length === 0) counts.taxSummaryCorrectionsPresentEmpty += 1;
+      }
+      const source = draft.receiptInterpretation?.source;
+      if (source === "ai") counts.interpretationSourceAi += 1;
+      else if (source === "legacy_projection") {
+        counts.interpretationSourceLegacyProjection += 1;
+      } else counts.interpretationAbsent += 1;
       for (const item of draft.receiptInterpretation?.values.items ?? []) {
         countMissingItemFields(item, counts.interpretation);
       }
@@ -293,6 +600,17 @@ export const aiExpenseDrafts = internalQuery({
           counts.missingReceiptDataContractVersion,
         withTaxSummaryCorrections:
           (args.carry?.withTaxSummaryCorrections ?? 0) + counts.withTaxSummaryCorrections,
+        taxSummaryCorrectionsPresent:
+          (args.carry?.taxSummaryCorrectionsPresent ?? 0) + counts.taxSummaryCorrectionsPresent,
+        taxSummaryCorrectionsPresentEmpty:
+          (args.carry?.taxSummaryCorrectionsPresentEmpty ?? 0) +
+          counts.taxSummaryCorrectionsPresentEmpty,
+        interpretationSourceAi:
+          (args.carry?.interpretationSourceAi ?? 0) + counts.interpretationSourceAi,
+        interpretationSourceLegacyProjection:
+          (args.carry?.interpretationSourceLegacyProjection ?? 0) +
+          counts.interpretationSourceLegacyProjection,
+        interpretationAbsent: (args.carry?.interpretationAbsent ?? 0) + counts.interpretationAbsent,
         interpretation: mergeItemCounts(args.carry?.interpretation, counts.interpretation),
         userOverride: mergeItemCounts(args.carry?.userOverride, counts.userOverride),
       },
