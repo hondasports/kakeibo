@@ -103,9 +103,83 @@ function countMissingItemFields(
   if (hasTaxMarker) counts.withTaxMarker += 1;
 }
 
-const itemTableCounts = { scanned: v.number(), ...itemCompatCounts };
+// printedAmountYen 欠落行の分類カウンタ（テーブル行のみ。埋め込み snapshot は
+// createdAt/updatedAt を持たないため対象外）。
+// 目的は欠落行を「さらに行レベルの証拠が要るもの」と「追加調査候補」に分ける
+// ことであり、同値証明・backfill 許可ではない。特に
+// missingPrintedAmountYenInvestigationCandidates は「normalized・税パイプライン
+// 由来フィールド・更新痕跡が見当たらない行」であって、amountYen が印字額と
+// 同値であることの証明ではない（旧 deploy・ダッシュボード編集・一発 mutation・
+// import 等の来歴はこの件数では分からない）。
+const printedInvestigationCounts = {
+  missingPrintedAmountYenWithNormalized: v.number(),
+  missingPrintedAmountYenWithTaxFields: v.number(),
+  missingPrintedAmountYenModifiedAfterInsert: v.number(),
+  missingPrintedAmountYenInvestigationCandidates: v.number(),
+};
 
-type ItemTableCounts = ItemCompatCounts & { scanned: number };
+type PrintedInvestigationCounts = {
+  missingPrintedAmountYenWithNormalized: number;
+  missingPrintedAmountYenWithTaxFields: number;
+  missingPrintedAmountYenModifiedAfterInsert: number;
+  missingPrintedAmountYenInvestigationCandidates: number;
+};
+
+const emptyPrintedInvestigationCounts = (): PrintedInvestigationCounts => ({
+  missingPrintedAmountYenWithNormalized: 0,
+  missingPrintedAmountYenWithTaxFields: 0,
+  missingPrintedAmountYenModifiedAfterInsert: 0,
+  missingPrintedAmountYenInvestigationCandidates: 0,
+});
+
+function classifyMissingPrintedRow(
+  item: {
+    printedAmountYen?: number;
+    normalizedAmountYen?: number;
+    amountBasis?: string;
+    taxRatePercent?: number | null;
+    allocatedTaxYen?: number;
+    taxAllocationStatus?: string;
+    taxResolutionStatus?: string;
+    taxResolutionSource?: string;
+    taxReviewReasons?: string[];
+    taxConfirmedFields?: string[];
+    taxMarker?: string;
+    createdAt: number;
+    updatedAt: number;
+  },
+  counts: PrintedInvestigationCounts,
+) {
+  if (item.printedAmountYen !== undefined) return;
+  const hasNormalized = item.normalizedAmountYen !== undefined;
+  const hasTaxFields =
+    item.amountBasis !== undefined ||
+    item.taxRatePercent !== undefined ||
+    item.allocatedTaxYen !== undefined ||
+    item.taxAllocationStatus !== undefined ||
+    item.taxResolutionStatus !== undefined ||
+    item.taxResolutionSource !== undefined ||
+    (item.taxReviewReasons?.length ?? 0) > 0 ||
+    (item.taxConfirmedFields?.length ?? 0) > 0 ||
+    (item.taxMarker !== undefined && item.taxMarker !== "");
+  // updatedAt === createdAt は「既知の writer が updatedAt を更新する」前提の
+  // 手がかりにすぎず、コード履歴外の書き込みは検出できない。
+  const modifiedAfterInsert = item.updatedAt !== item.createdAt;
+  if (hasNormalized) counts.missingPrintedAmountYenWithNormalized += 1;
+  if (hasTaxFields) counts.missingPrintedAmountYenWithTaxFields += 1;
+  if (modifiedAfterInsert) counts.missingPrintedAmountYenModifiedAfterInsert += 1;
+  if (!hasNormalized && !hasTaxFields && !modifiedAfterInsert) {
+    counts.missingPrintedAmountYenInvestigationCandidates += 1;
+  }
+}
+
+const itemTableCounts = {
+  scanned: v.number(),
+  ...itemCompatCounts,
+  ...printedInvestigationCounts,
+};
+
+type ItemTableCounts = ItemCompatCounts & PrintedInvestigationCounts & { scanned: number };
 
 export const aiExpenseDraftItems = internalQuery({
   args: {
@@ -121,10 +195,15 @@ export const aiExpenseDraftItems = internalQuery({
   handler: async (ctx: ReadCtx, args) => {
     assertCursorCarryPair(args.cursor, args.carry);
     const page = await ctx.db.query("aiExpenseDraftItems").paginate(paged(args.cursor));
-    const counts: ItemTableCounts = { scanned: 0, ...emptyItemCounts() };
+    const counts: ItemTableCounts = {
+      scanned: 0,
+      ...emptyItemCounts(),
+      ...emptyPrintedInvestigationCounts(),
+    };
     for (const item of page.page) {
       counts.scanned += 1;
       countMissingItemFields(item, counts);
+      classifyMissingPrintedRow(item, counts);
     }
     return {
       isDone: page.isDone,
@@ -133,6 +212,18 @@ export const aiExpenseDraftItems = internalQuery({
       totals: {
         scanned: (args.carry?.scanned ?? 0) + counts.scanned,
         ...mergeItemCounts(args.carry, counts),
+        missingPrintedAmountYenWithNormalized:
+          (args.carry?.missingPrintedAmountYenWithNormalized ?? 0) +
+          counts.missingPrintedAmountYenWithNormalized,
+        missingPrintedAmountYenWithTaxFields:
+          (args.carry?.missingPrintedAmountYenWithTaxFields ?? 0) +
+          counts.missingPrintedAmountYenWithTaxFields,
+        missingPrintedAmountYenModifiedAfterInsert:
+          (args.carry?.missingPrintedAmountYenModifiedAfterInsert ?? 0) +
+          counts.missingPrintedAmountYenModifiedAfterInsert,
+        missingPrintedAmountYenInvestigationCandidates:
+          (args.carry?.missingPrintedAmountYenInvestigationCandidates ?? 0) +
+          counts.missingPrintedAmountYenInvestigationCandidates,
       },
     };
   },

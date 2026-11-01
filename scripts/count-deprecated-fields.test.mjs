@@ -16,6 +16,10 @@ const itemPage = (overrides = {}) => ({
   emptyMarkers: 1,
   markersAbsentOrEmptyWithTaxMarker: 1,
   withTaxMarker: 1,
+  missingPrintedAmountYenWithNormalized: 0,
+  missingPrintedAmountYenWithTaxFields: 0,
+  missingPrintedAmountYenModifiedAfterInsert: 0,
+  missingPrintedAmountYenInvestigationCandidates: 1,
   ...overrides,
 });
 
