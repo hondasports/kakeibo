@@ -25,16 +25,15 @@ describe("receipt extraction tax types", () => {
     expectTypeOf<ExtractReceiptFieldsResult["rawObservations"]>().toEqualTypeOf<
       ReceiptRawObservationLine[] | undefined
     >();
-    expectTypeOf<ExtractReceiptItemResult["printedAmountYen"]>().toEqualTypeOf<
-      number | undefined
-    >();
+    expectTypeOf<ExtractReceiptItemResult["printedAmountYen"]>().toEqualTypeOf<number>();
     expectTypeOf<ExtractReceiptItemResult["amountBasis"]>().toEqualTypeOf<
       AmountBasis | undefined
     >();
     expectTypeOf<ExtractReceiptItemResult["taxRatePercent"]>().toEqualTypeOf<
       ReceiptItemTaxRatePercent | undefined
     >();
-    expectTypeOf<ExtractReceiptItemResult["taxMarker"]>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<ExtractReceiptItemResult>().not.toHaveProperty("taxMarker");
+    expectTypeOf<ExtractReceiptItemResult>().not.toHaveProperty("amountYen");
     expectTypeOf<ExtractReceiptItemResult["markers"]>().toEqualTypeOf<string[] | undefined>();
     expectTypeOf<ExtractReceiptItemResult["quantity"]>().toEqualTypeOf<number | undefined>();
     expectTypeOf<ExtractReceiptItemResult["unitPriceYen"]>().toEqualTypeOf<number | undefined>();
