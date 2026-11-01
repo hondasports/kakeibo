@@ -7,7 +7,11 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
-import { classifyJoinEvidence } from "./deprecatedFieldCounts";
+import {
+  classifyJoinEvidence,
+  countDraftProfileAttributes,
+  emptyProfileCounts,
+} from "./deprecatedFieldCounts";
 
 type ItemCompatFields = {
   itemName?: string;
@@ -30,7 +34,19 @@ type ItemCompatFields = {
 type DraftCompatFields = Partial<
   Pick<
     Doc<"aiExpenseDrafts">,
-    "receiptInterpretation" | "receiptUserOverride" | "receiptDataContractVersion"
+    | "receiptInterpretation"
+    | "receiptUserOverride"
+    | "receiptDataContractVersion"
+    | "status"
+    | "documentType"
+    | "sourceType"
+    | "createdByUserId"
+    | "imageFileName"
+    | "registeredReceiptId"
+    | "reviewReasons"
+    | "warnings"
+    | "createdAt"
+    | "updatedAt"
   >
 >;
 
@@ -743,5 +759,236 @@ describe("deprecatedFieldCounts", () => {
         deployWindowEndTs: 160,
       }),
     ).rejects.toThrow("deployWindowStartTs と同時に");
+  });
+
+  it("missingPrintedDraftProfile は欠落明細を含む draft ごとに属性を1回計上する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await insertGroup(t);
+    const d1 = await insertDraft(t, groupId, {
+      status: "failed",
+      documentType: "convenience_payment",
+      createdAt: 100,
+    });
+    await insertItem(t, groupId, d1, {});
+    await insertItem(t, groupId, d1, { printedAmountYen: 100 });
+    const d2 = await insertDraft(t, groupId, {
+      status: "registered",
+      createdByUserId: "user-1",
+      imageFileName: "r.jpg",
+      receiptDataContractVersion: 1,
+      reviewReasons: ["low_confidence"],
+      warnings: ["w"],
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([]),
+      },
+      receiptUserOverride: {
+        source: "user",
+        updatedAt: 1,
+        fields: [],
+        values: valueSnapshot([]),
+      },
+      createdAt: 155,
+    });
+    await insertItem(t, groupId, d2, {});
+    const d3 = await insertDraft(t, groupId, {
+      status: "needs_review",
+      documentType: "unknown",
+      createdAt: 300,
+    });
+    await insertItem(t, groupId, d3, {});
+    // 欠落なし draft は属性集計の対象外（scanned には入る）
+    const d4 = await insertDraft(t, groupId, { status: "ready" });
+    await insertItem(t, groupId, d4, { printedAmountYen: 100 });
+
+    const result = await t.query(internal.deprecatedFieldCounts.missingPrintedDraftProfile, {
+      draftCreatedWindowStartTs: 150,
+      draftCreatedWindowEndTs: 160,
+    });
+    expect(result.totals).toMatchObject({
+      scanned: 4,
+      draftsWithConfirmedMissingItems: 3,
+      draftItemScanTruncated: 0,
+      draftsWithUnconfirmedMissing: 0,
+      // draft 件数ではなく欠落明細の合計（行件数との照合用）
+      missingPrintedItemsInProfiledDrafts: 3,
+      parentStatusFailed: 1,
+      parentStatusRegistered: 1,
+      parentStatusNeedsReview: 1,
+      parentStatusReady: 0,
+      parentDocumentTypeConveniencePayment: 1,
+      parentDocumentTypeReceipt: 1,
+      parentDocumentTypeUnknown: 1,
+      parentSourceTypeImageUpload: 3,
+      parentCreatedByUserIdPresent: 1,
+      parentImageFileNamePresent: 1,
+      parentReceiptDataContractVersionPresent: 1,
+      parentRegisteredReceiptIdPresent: 0,
+      parentReviewReasonsNonEmpty: 1,
+      parentWarningsNonEmpty: 1,
+      parentReceiptUserOverridePresent: 1,
+      parentInterpretationAbsent: 2,
+      parentInterpretationSourceAi: 1,
+      draftCreatedBeforeWindowStart: 1,
+      draftCreatedInWindow: 1,
+      draftCreatedAtOrAfterWindowEnd: 1,
+    });
+    // 属性は draft 件数に対する分布であり、行数・ID ではない
+    expect(Object.values(result.totals).every((value) => typeof value === "number")).toBe(true);
+  });
+
+  it("missingPrintedDraftProfile は明細走査の打ち切りを分離する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await insertGroup(t);
+    const dTruncatedMissing = await insertDraft(t, groupId, { status: "failed" });
+    const dTruncatedClean = await insertDraft(t, groupId, { status: "ready" });
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 101; i += 1) {
+        await ctx.db.insert("aiExpenseDraftItems", {
+          groupId,
+          draftId: dTruncatedMissing,
+          itemName: `品物${i}`,
+          amountYen: 100,
+          confidence: {},
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        await ctx.db.insert("aiExpenseDraftItems", {
+          groupId,
+          draftId: dTruncatedClean,
+          itemName: `品物${i}`,
+          amountYen: 100,
+          printedAmountYen: 100,
+          confidence: {},
+          createdAt: 1,
+          updatedAt: 1,
+        });
+      }
+    });
+    const result = await t.query(internal.deprecatedFieldCounts.missingPrintedDraftProfile, {});
+    expect(result.totals).toMatchObject({
+      scanned: 2,
+      draftItemScanTruncated: 2,
+      // 打ち切りで欠落が見えた draft は確認済みとして profile される
+      draftsWithConfirmedMissingItems: 1,
+      missingPrintedItemsInProfiledDrafts: 101,
+      parentStatusFailed: 1,
+      // 打ち切りで欠落0件の draft は範囲外欠落を否定できず属性集計に進めない
+      draftsWithUnconfirmedMissing: 1,
+      parentStatusReady: 0,
+    });
+  });
+
+  it("countDraftProfileAttributes は schema 生成不能な値を Unrecognized に分類する", () => {
+    const counts = emptyProfileCounts();
+    countDraftProfileAttributes(
+      {
+        status: "archived",
+        documentType: "invoice",
+        sourceType: "manual_entry",
+        registeredReceiptId: "receipt-id",
+        receiptInterpretation: { source: "unknown_source" },
+        createdAt: 155,
+      },
+      2,
+      150,
+      160,
+      counts,
+    );
+    expect(counts).toMatchObject({
+      draftsWithConfirmedMissingItems: 1,
+      missingPrintedItemsInProfiledDrafts: 2,
+      parentStatusUnrecognized: 1,
+      parentDocumentTypeUnrecognized: 1,
+      parentSourceTypeUnrecognized: 1,
+      parentRegisteredReceiptIdPresent: 1,
+      parentInterpretationSourceUnrecognized: 1,
+      draftCreatedInWindow: 1,
+    });
+    // legacy_projection と窓境界
+    const c2 = emptyProfileCounts();
+    countDraftProfileAttributes(
+      { receiptInterpretation: { source: "legacy_projection" }, createdAt: 150 },
+      1,
+      150,
+      160,
+      c2,
+    );
+    expect(c2.parentInterpretationSourceLegacyProjection).toBe(1);
+    expect(c2.draftCreatedInWindow).toBe(1);
+    const c3 = emptyProfileCounts();
+    countDraftProfileAttributes({ createdAt: 149 }, 1, 150, 160, c3);
+    expect(c3.draftCreatedBeforeWindowStart).toBe(1);
+    expect(c3.parentInterpretationAbsent).toBe(1);
+    // 窓なし・createdAt 非数値では日付バケットは動かない
+    const c4 = emptyProfileCounts();
+    countDraftProfileAttributes({}, 1, undefined, undefined, c4);
+    expect(c4.draftCreatedBeforeWindowStart).toBe(0);
+    expect(c4.draftCreatedInWindow).toBe(0);
+    expect(c4.draftCreatedAtOrAfterWindowEnd).toBe(0);
+  });
+
+  it("missingPrintedDraftProfile は継続ページで draftCreatedWindow の変化を拒否する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await insertGroup(t);
+    const draftId = await insertDraft(t, groupId, {});
+    await insertItem(t, groupId, draftId, {});
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 25; i += 1) {
+        await ctx.db.insert("aiExpenseDrafts", {
+          groupId,
+          sourceType: "image_upload",
+          status: "ready",
+          documentType: "receipt",
+          confidence: {},
+          reviewReasons: [],
+          createdAt: 1,
+          updatedAt: 1,
+        });
+      }
+    });
+    const first = await t.query(internal.deprecatedFieldCounts.missingPrintedDraftProfile, {
+      draftCreatedWindowStartTs: 150,
+      draftCreatedWindowEndTs: 160,
+    });
+    expect(first.isDone).toBe(false);
+    const second = await t.query(internal.deprecatedFieldCounts.missingPrintedDraftProfile, {
+      cursor: first.continueCursor ?? undefined,
+      carry: {
+        counts: first.totals,
+        draftCreatedWindowStartTs: 150,
+        draftCreatedWindowEndTs: 160,
+      },
+      draftCreatedWindowStartTs: 150,
+      draftCreatedWindowEndTs: 160,
+    });
+    expect(second.isDone).toBe(true);
+    expect(second.totals.scanned).toBe(26);
+    // 異なる窓で継続 → 拒否（draft 側バケットの累計混入を防ぐ）
+    await expect(
+      t.query(internal.deprecatedFieldCounts.missingPrintedDraftProfile, {
+        cursor: first.continueCursor ?? undefined,
+        carry: {
+          counts: first.totals,
+          draftCreatedWindowStartTs: 150,
+          draftCreatedWindowEndTs: 160,
+        },
+        draftCreatedWindowStartTs: 999,
+        draftCreatedWindowEndTs: 1000,
+      }),
+    ).rejects.toThrow("draftCreatedWindow の境界が変わっています");
+    // end 単独・end < start は初回呼び出し時点で拒否
+    await expect(
+      t.query(internal.deprecatedFieldCounts.missingPrintedDraftProfile, {
+        draftCreatedWindowEndTs: 160,
+      }),
+    ).rejects.toThrow("draftCreatedWindowStartTs と同時に");
+    await expect(
+      t.query(internal.deprecatedFieldCounts.missingPrintedDraftProfile, {
+        draftCreatedWindowStartTs: 200,
+        draftCreatedWindowEndTs: 160,
+      }),
+    ).rejects.toThrow("draftCreatedWindowStartTs と同時に");
   });
 });
