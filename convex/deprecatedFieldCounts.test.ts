@@ -360,6 +360,8 @@ describe("deprecatedFieldCounts", () => {
           interpretationSourceAi: 0,
           interpretationSourceLegacyProjection: 0,
           interpretationAbsent: 0,
+          interpretationMalformed: 0,
+          userOverrideMalformed: 0,
           interpretation: {
             missingPrintedAmountYen: 0,
             missingLineType: 0,

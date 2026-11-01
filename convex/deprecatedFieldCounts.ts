@@ -521,6 +521,10 @@ const draftCounts = {
   interpretationSourceAi: v.number(),
   interpretationSourceLegacyProjection: v.number(),
   interpretationAbsent: v.number(),
+  // values.items が配列でない保存形状は items 0件と見なさず malformed で
+  // 可視化する（runner inline query の nested() と同じ判定）。
+  interpretationMalformed: v.number(),
+  userOverrideMalformed: v.number(),
   interpretation: v.object(itemCompatCounts),
   userOverride: v.object(itemCompatCounts),
 };
@@ -534,8 +538,30 @@ type DraftCounts = {
   interpretationSourceAi: number;
   interpretationSourceLegacyProjection: number;
   interpretationAbsent: number;
+  interpretationMalformed: number;
+  userOverrideMalformed: number;
   interpretation: ItemCompatCounts;
   userOverride: ItemCompatCounts;
+};
+
+// container === undefined → "absent"（欠落は malformed と区別する）。
+// container が null・非オブジェクト・values.items が配列でない → "malformed"。
+const embeddedItemsOf = (container: unknown): unknown[] | "absent" | "malformed" => {
+  if (container === undefined) return "absent";
+  const items = (container as { values?: { items?: unknown } } | null)?.values?.items;
+  return Array.isArray(items) ? items : "malformed";
+};
+
+const countEmbeddedItems = (
+  items: unknown[] | "absent" | "malformed",
+  counts: ItemCompatCounts,
+): "absent" | "malformed" | "counted" => {
+  if (items === "absent") return "absent";
+  if (items === "malformed") return "malformed";
+  for (const item of items) {
+    countMissingItemFields(item as Parameters<typeof countMissingItemFields>[0], counts);
+  }
+  return "counted";
 };
 
 export const aiExpenseDrafts = internalQuery({
@@ -561,6 +587,8 @@ export const aiExpenseDrafts = internalQuery({
       interpretationSourceAi: 0,
       interpretationSourceLegacyProjection: 0,
       interpretationAbsent: 0,
+      interpretationMalformed: 0,
+      userOverrideMalformed: 0,
       interpretation: emptyItemCounts(),
       userOverride: emptyItemCounts(),
     };
@@ -582,11 +610,17 @@ export const aiExpenseDrafts = internalQuery({
       else if (source === "legacy_projection") {
         counts.interpretationSourceLegacyProjection += 1;
       } else counts.interpretationAbsent += 1;
-      for (const item of draft.receiptInterpretation?.values.items ?? []) {
-        countMissingItemFields(item, counts.interpretation);
+      if (
+        countEmbeddedItems(embeddedItemsOf(draft.receiptInterpretation), counts.interpretation) ===
+        "malformed"
+      ) {
+        counts.interpretationMalformed += 1;
       }
-      for (const item of draft.receiptUserOverride?.values.items ?? []) {
-        countMissingItemFields(item, counts.userOverride);
+      if (
+        countEmbeddedItems(embeddedItemsOf(draft.receiptUserOverride), counts.userOverride) ===
+        "malformed"
+      ) {
+        counts.userOverrideMalformed += 1;
       }
     }
     return {
@@ -611,6 +645,10 @@ export const aiExpenseDrafts = internalQuery({
           (args.carry?.interpretationSourceLegacyProjection ?? 0) +
           counts.interpretationSourceLegacyProjection,
         interpretationAbsent: (args.carry?.interpretationAbsent ?? 0) + counts.interpretationAbsent,
+        interpretationMalformed:
+          (args.carry?.interpretationMalformed ?? 0) + counts.interpretationMalformed,
+        userOverrideMalformed:
+          (args.carry?.userOverrideMalformed ?? 0) + counts.userOverrideMalformed,
         interpretation: mergeItemCounts(args.carry?.interpretation, counts.interpretation),
         userOverride: mergeItemCounts(args.carry?.userOverride, counts.userOverride),
       },
