@@ -262,8 +262,10 @@ export const aiExpenseDraftItems = internalQuery({
 //   （削除・並べ替え・重複名・再抽出・編集で崩れうる）。一致系カウンタは
 //   「値が矛盾しない」程度の整合信号であって、自動 backfill の十分条件に
 //   しない。embedded printed 値を埋める場合も行単位の確認が要る。
-// - createdAt 閾値（cutoffTs）は deploy 実績時刻を外部ログから人間が供給
-//   する前提のパラメータで、repo 内から deploy 時刻は証明できない。
+// - deployWindowStartTs/EndTs は「候補 deploy job の開始〜終了」を外部の
+//   CI/deploy 記録から人間が供給する前提のパラメータ。日付バケットは
+//   候補 job の時刻に対する位置関係を数えるだけで、本番導入前後や
+//   writer 経路を証明しない（workflow 外の反映は未検証）。
 //
 // カウンタの重なり（合計の読み方）:
 // - 欠落行は必ず1つの終端バケットに入る: parentDraftMissing /
@@ -281,16 +283,21 @@ export const aiExpenseDraftItems = internalQuery({
 //   embedded item の itemName 欠落・items が配列でない等の malformed は
 //   interpretationItemsMalformed、draft の groupId が行と違う場合は
 //   parentDraftGroupMismatch で、いずれも「不明」として join しない。
-// - cutoffTs は carry に束縛する。ページ継続で異なる cutoffTs を渡すと
-//   累計が混ざるため ConvexError で拒否する（runner は全ページ同一値を
-//   JS リテラルへ埋め込むため混在しない）。
+// - deployWindowStartTs/deployWindowEndTs は carry に束縛する。ページ継続で
+//   値が変わると累計が混ざるため ConvexError で拒否する（runner は全ページ
+//   同一値を JS リテラルへ埋め込むため混在しない）。
+// - 日付バケットは「候補 deploy job の窓」に対する位置であって、本番導入前後の
+//   証明ではない。beforeStart = 候補 job の開始より前に作られた行で、
+//   workflow 外の deploy・以前の反映経路が無かったことはこの件数では分からない。
+//   inWindow = job 開始〜終了の間（deploy 前後どちらとも不明）。
 const JOIN_EVIDENCE_SIBLING_LIMIT = 101; // DRAFT_JUDGMENT_ITEM_LIMIT(100)+1 で打ち切り検出
 
 const joinEvidenceCounts = {
   scanned: v.number(),
   missingPrintedRows: v.number(),
-  createdAtBelowCutoff: v.number(),
-  createdAtAtOrAboveCutoff: v.number(),
+  createdAtBeforeDeployWindowStart: v.number(),
+  createdAtInDeployWindow: v.number(),
+  createdAtAtOrAfterDeployWindowEnd: v.number(),
   parentDraftMissing: v.number(),
   parentDraftGroupMismatch: v.number(),
   hasUserOverride: v.number(),
@@ -312,8 +319,9 @@ const joinEvidenceCounts = {
 type JoinEvidenceCounts = {
   scanned: number;
   missingPrintedRows: number;
-  createdAtBelowCutoff: number;
-  createdAtAtOrAboveCutoff: number;
+  createdAtBeforeDeployWindowStart: number;
+  createdAtInDeployWindow: number;
+  createdAtAtOrAfterDeployWindowEnd: number;
   parentDraftMissing: number;
   parentDraftGroupMismatch: number;
   hasUserOverride: number;
@@ -335,8 +343,9 @@ type JoinEvidenceCounts = {
 const emptyJoinEvidenceCounts = (): JoinEvidenceCounts => ({
   scanned: 0,
   missingPrintedRows: 0,
-  createdAtBelowCutoff: 0,
-  createdAtAtOrAboveCutoff: 0,
+  createdAtBeforeDeployWindowStart: 0,
+  createdAtInDeployWindow: 0,
+  createdAtAtOrAfterDeployWindowEnd: 0,
   parentDraftMissing: 0,
   parentDraftGroupMismatch: 0,
   hasUserOverride: 0,
@@ -355,11 +364,12 @@ const emptyJoinEvidenceCounts = (): JoinEvidenceCounts => ({
   uniqueNameJoinPositionConsistent: 0,
 });
 
-// carry は合計 counts に加えて最初のページで使った cutoffTs を束縛する。
-// 継続呼び出しで cutoffTs が変わると below/above の累計が混ざるので拒否する。
+// carry は合計 counts に加えて最初のページで使った deployWindow 境界を束縛
+// する。継続呼び出しで値が変わると日付バケットの累計が混ざるので拒否する。
 const joinEvidenceCarry = v.object({
   counts: v.object(joinEvidenceCounts),
-  cutoffTs: v.optional(v.number()),
+  deployWindowStartTs: v.optional(v.number()),
+  deployWindowEndTs: v.optional(v.number()),
 });
 
 // schema では malformed な埋め込み（itemName 非文字列等）を再現できないため、
@@ -383,13 +393,22 @@ export function classifyJoinEvidence(
   } | null,
   // siblings は null のとき打ち切り（上限超過で完全な列挙が取れていない）。
   siblings: { _id: string; itemName?: unknown }[] | null,
-  cutoffTs: number | undefined,
+  // deployWindowEndTs 未指定時は [start, start) の空窓として扱い、
+  // inWindow=0・start 以降は全て atOrAfterEnd に入る。
+  deployWindowStartTs: number | undefined,
+  deployWindowEndTs: number | undefined,
   counts: JoinEvidenceCounts,
 ) {
   counts.missingPrintedRows += 1;
-  if (cutoffTs !== undefined) {
-    if (item.createdAt < cutoffTs) counts.createdAtBelowCutoff += 1;
-    else counts.createdAtAtOrAboveCutoff += 1;
+  if (deployWindowStartTs !== undefined) {
+    const windowEnd = deployWindowEndTs ?? deployWindowStartTs;
+    if (item.createdAt < deployWindowStartTs) {
+      counts.createdAtBeforeDeployWindowStart += 1;
+    } else if (item.createdAt < windowEnd) {
+      counts.createdAtInDeployWindow += 1;
+    } else {
+      counts.createdAtAtOrAfterDeployWindowEnd += 1;
+    }
   }
   if (draft === null) {
     counts.parentDraftMissing += 1;
@@ -469,7 +488,8 @@ export const printedAmountJoinEvidence = internalQuery({
   args: {
     cursor: v.optional(v.string()),
     carry: v.optional(joinEvidenceCarry),
-    cutoffTs: v.optional(v.number()),
+    deployWindowStartTs: v.optional(v.number()),
+    deployWindowEndTs: v.optional(v.number()),
   },
   returns: v.object({
     isDone: v.boolean(),
@@ -479,9 +499,23 @@ export const printedAmountJoinEvidence = internalQuery({
   }),
   handler: async (ctx: ReadCtx, args) => {
     assertCursorCarryPair(args.cursor, args.carry);
-    if (args.carry !== undefined && args.carry.cutoffTs !== args.cutoffTs) {
+    if (args.deployWindowEndTs !== undefined) {
+      if (
+        args.deployWindowStartTs === undefined ||
+        args.deployWindowEndTs < args.deployWindowStartTs
+      ) {
+        throw new ConvexError(
+          "deployWindowEndTs は deployWindowStartTs と同時に、それ以降の値で指定してください",
+        );
+      }
+    }
+    if (
+      args.carry !== undefined &&
+      (args.carry.deployWindowStartTs !== args.deployWindowStartTs ||
+        args.carry.deployWindowEndTs !== args.deployWindowEndTs)
+    ) {
       throw new ConvexError(
-        "継続ページで cutoffTs が変わっています。below/above の累計が混ざるため、全ページ同一値を指定してください",
+        "継続ページで deployWindow の境界が変わっています。日付バケットの累計が混ざるため、全ページ同一値を指定してください",
       );
     }
     const page = await ctx.db.query("aiExpenseDraftItems").paginate(paged(args.cursor));
@@ -508,7 +542,8 @@ export const printedAmountJoinEvidence = internalQuery({
         item,
         draft,
         siblings !== null && siblings.length >= JOIN_EVIDENCE_SIBLING_LIMIT ? null : siblings,
-        args.cutoffTs,
+        args.deployWindowStartTs,
+        args.deployWindowEndTs,
         counts,
       );
     }
