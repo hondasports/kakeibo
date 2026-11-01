@@ -122,6 +122,27 @@ describe("buildReplacementDraftItemFields", () => {
     });
   });
 
+  it("lineType 未設定の既存明細は欠落を維持し値を捏造しない", () => {
+    // lineType 導入前の保存済み行を review で置換しても値を推測しない
+    const previous: AiExpenseDraftItemFields = {
+      groupId: "g1",
+      draftId: "d1",
+      itemName: "旧",
+      amountYen: 200,
+      confidence: { itemName: 0.5 },
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const result = buildReplacementDraftItemFields({
+      ...base,
+      item: { itemId: "x", itemName: "旧", amountYen: 200, categoryId: "c1" },
+      previous,
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.fields.lineType).toBeUndefined();
+  });
+
   it("markers 空かつ taxMarker のみの既存明細は markers に畳み込み taxMarker を書かない", () => {
     const previous: AiExpenseDraftItemFields = {
       groupId: "g1",
