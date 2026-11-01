@@ -19,13 +19,15 @@
  *   node scripts/count-deprecated-fields.mjs --env-file <path>
  *   追加: --tables <csv> --num-items <n> --max-pages <n>
  *        --deploy-window-start-ts <epochMs> --deploy-window-end-ts <epochMs>
- *   --tables の有効値: aiExpenseDraftItems,aiExpenseDrafts,groupDeletionAuditMigrationRecords,printedAmountJoinEvidence,auditVerify
- *   --deploy-window-*-ts: printedAmountJoinEvidence の createdAt 日付バケット
- *   分類に使う「候補 deploy job の開始〜終了」境界。本番導入前後の証明ではなく、
- *   beforeStart=候補 job 開始前・inWindow=job 実行中の不明領域・
- *   atOrAfterEnd=job 終了以降。実 job 時刻は CI/deploy ログから人間が供給する。
- *   end 省略時は [start,start) の空窓。全ページ同一リテラルとして埋め込むため
- *   ページ間の混在は構造的に起きない。
+ *        --draft-created-window-start-ts <epochMs> --draft-created-window-end-ts <epochMs>
+ *   --tables の有効値: aiExpenseDraftItems,aiExpenseDrafts,groupDeletionAuditMigrationRecords,printedAmountJoinEvidence,missingPrintedDraftProfile,auditVerify
+ *   --deploy-window-*-ts: printedAmountJoinEvidence の明細 createdAt 日付
+ *   バケットに使う「候補 deploy job の開始〜終了」境界。
+ *   --draft-created-window-*-ts: missingPrintedDraftProfile の draft
+ *   createdAt バケットに使う「候補証拠窓」境界（例: snapshot 導入の
+ *   候補 deploy job）。いずれも本番導入前後の証明ではなく、実 job 時刻は
+ *   CI/deploy ログから人間が供給する。end 省略時は [start,start) の空窓。
+ *   全ページ同一リテラルとして埋め込むためページ間の混在は構造的に起きない。
  */
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -117,6 +119,48 @@ const JOIN_EVIDENCE_COUNTERS = [
   "uniqueNameJoinPositionConsistent",
 ];
 
+// missingPrintedDraftProfile: 「printedAmountYen 欠落明細を含む draft」ごとの
+// 属性集計（convex/deprecatedFieldCounts.missingPrintedDraftProfile と同期）。
+// draft 自体をページ走査するため dedup は構造的に不要・親 ID は出力に含まれない。
+// 明細は .take(101) で打ち切り、欠落が確認できない打ち切り draft は
+// draftsWithUnconfirmedMissing に分離して属性集計へ進めない。
+// draftCreated* バケットは「運用者が供給する候補証拠窓」への位置
+// （本番導入前後の証明ではない）。
+const PROFILE_COUNTERS = [
+  "scanned",
+  "draftsWithConfirmedMissingItems",
+  "draftItemScanTruncated",
+  "draftsWithUnconfirmedMissing",
+  "missingPrintedItemsInProfiledDrafts",
+  "parentStatusQueued",
+  "parentStatusAnalyzing",
+  "parentStatusReady",
+  "parentStatusNeedsReview",
+  "parentStatusFailed",
+  "parentStatusRegistered",
+  "parentStatusUnrecognized",
+  "parentDocumentTypeReceipt",
+  "parentDocumentTypeConveniencePayment",
+  "parentDocumentTypeUnknown",
+  "parentDocumentTypeUnrecognized",
+  "parentSourceTypeImageUpload",
+  "parentSourceTypeUnrecognized",
+  "parentCreatedByUserIdPresent",
+  "parentImageFileNamePresent",
+  "parentReceiptDataContractVersionPresent",
+  "parentRegisteredReceiptIdPresent",
+  "parentReviewReasonsNonEmpty",
+  "parentWarningsNonEmpty",
+  "parentReceiptUserOverridePresent",
+  "parentInterpretationAbsent",
+  "parentInterpretationSourceAi",
+  "parentInterpretationSourceLegacyProjection",
+  "parentInterpretationSourceUnrecognized",
+  "draftCreatedBeforeWindowStart",
+  "draftCreatedInWindow",
+  "draftCreatedAtOrAfterWindowEnd",
+];
+
 const RECORD_COUNTERS = ["scanned", "migrated", "skipped", "failed"];
 
 const VERIFY_COUNTERS = ["remainingOrphaned", "unmigrated", "skipped"];
@@ -180,6 +224,13 @@ function joinEvidencePageJs(cursorLiteral, numItems, startLiteral, endLiteral) {
   return `const out = {${JOIN_EVIDENCE_COUNTERS.map((k) => `${k}:0`).join(",")}}; const r = await ctx.db.query("aiExpenseDraftItems").paginate({cursor: ${cursorLiteral}, numItems: ${numItems}}); const ws = ${startLiteral}; const we = ${endLiteral}; const wEnd = we === undefined ? ws : we; for (const item of r.page) { out.scanned += 1; if (item.printedAmountYen !== undefined) continue; out.missingPrintedRows += 1; if (ws !== undefined) { if (item.createdAt < ws) out.createdAtBeforeDeployWindowStart += 1; else if (item.createdAt < wEnd) out.createdAtInDeployWindow += 1; else out.createdAtAtOrAfterDeployWindowEnd += 1; } const draft = await ctx.db.get(item.draftId); if (draft === null) { out.parentDraftMissing += 1; continue; } if (draft.groupId !== item.groupId) { out.parentDraftGroupMismatch += 1; continue; } if (draft.receiptUserOverride !== undefined) out.hasUserOverride += 1; const interp = draft.receiptInterpretation; if (interp === undefined) { out.interpretationAbsent += 1; continue; } if (interp.source !== "ai") { out.interpretationNonAi += 1; continue; } const er = interp.values?.items; if (!Array.isArray(er) || er.some(e => typeof e !== "object" || e === null || typeof e.itemName !== "string")) { out.interpretationItemsMalformed += 1; continue; } const siblings = await ctx.db.query("aiExpenseDraftItems").withIndex("by_group_id_and_draft_id", q => q.eq("groupId", item.groupId).eq("draftId", item.draftId)).take(101); if (siblings.length >= 101) { out.siblingsTruncated += 1; continue; } const rowIndex = siblings.findIndex(s => s._id === item._id); if (rowIndex === -1) { out.rowMissingFromSiblingIndex += 1; continue; } const embedded = er; if (embedded.length !== siblings.length) out.siblingCountDiffers += 1; if (siblings.filter(s => s.itemName === item.itemName).length > 1) { out.ambiguousNameJoinTableSide += 1; continue; } const matches = embedded.map((e, i) => ({e, i})).filter(({e}) => e.itemName === item.itemName); if (matches.length === 0) { out.noNameOverlap += 1; continue; } if (matches.length > 1) { out.ambiguousNameJoin += 1; continue; } const {e, i} = matches[0]; if (i === rowIndex) out.uniqueNameJoinPositionConsistent += 1; if (e.printedAmountYen === undefined) out.uniqueNameJoinEmbeddedPrintedMissing += 1; else if (e.printedAmountYen === item.amountYen) out.uniqueNameJoinPrintedEqualsAmount += 1; else out.uniqueNameJoinPrintedDiffers += 1; } return {page: out, isDone: r.isDone, continueCursor: r.continueCursor};`;
 }
 
+// missingPrintedDraftProfile の inline 版（module query と同じ判定）。
+// startLiteral/endLiteral は draftCreatedWindow の境界（JSON.stringify 済み・
+// 省略時 "undefined"）。全ページ同一リテラルなので窓境界は混在しない。
+function profilePageJs(cursorLiteral, numItems, startLiteral, endLiteral) {
+  return `const out = {${PROFILE_COUNTERS.map((k) => `${k}:0`).join(",")}}; const ws = ${startLiteral}; const we = ${endLiteral}; const wEnd = we === undefined ? ws : we; const r = await ctx.db.query("aiExpenseDrafts").paginate({cursor: ${cursorLiteral}, numItems: ${numItems}}); for (const d of r.page) { out.scanned += 1; const items = await ctx.db.query("aiExpenseDraftItems").withIndex("by_group_id_and_draft_id", q => q.eq("groupId", d.groupId).eq("draftId", d._id)).take(101); const tr = items.length >= 101; if (tr) out.draftItemScanTruncated += 1; const mc = items.reduce((a, i) => a + (i.printedAmountYen === undefined ? 1 : 0), 0); if (mc === 0) { if (tr) out.draftsWithUnconfirmedMissing += 1; continue; } out.draftsWithConfirmedMissingItems += 1; out.missingPrintedItemsInProfiledDrafts += mc; switch (d.status) { case "queued": out.parentStatusQueued += 1; break; case "analyzing": out.parentStatusAnalyzing += 1; break; case "ready": out.parentStatusReady += 1; break; case "needs_review": out.parentStatusNeedsReview += 1; break; case "failed": out.parentStatusFailed += 1; break; case "registered": out.parentStatusRegistered += 1; break; default: out.parentStatusUnrecognized += 1; } switch (d.documentType) { case "receipt": out.parentDocumentTypeReceipt += 1; break; case "convenience_payment": out.parentDocumentTypeConveniencePayment += 1; break; case "unknown": out.parentDocumentTypeUnknown += 1; break; default: out.parentDocumentTypeUnrecognized += 1; } if (d.sourceType === "image_upload") out.parentSourceTypeImageUpload += 1; else out.parentSourceTypeUnrecognized += 1; if (d.createdByUserId !== undefined) out.parentCreatedByUserIdPresent += 1; if (d.imageFileName !== undefined) out.parentImageFileNamePresent += 1; if (d.receiptDataContractVersion !== undefined) out.parentReceiptDataContractVersionPresent += 1; if (d.registeredReceiptId !== undefined) out.parentRegisteredReceiptIdPresent += 1; if (Array.isArray(d.reviewReasons) && d.reviewReasons.length > 0) out.parentReviewReasonsNonEmpty += 1; if (Array.isArray(d.warnings) && d.warnings.length > 0) out.parentWarningsNonEmpty += 1; if (d.receiptUserOverride !== undefined) out.parentReceiptUserOverridePresent += 1; const isrc = d.receiptInterpretation?.source; if (d.receiptInterpretation === undefined) out.parentInterpretationAbsent += 1; else if (isrc === "ai") out.parentInterpretationSourceAi += 1; else if (isrc === "legacy_projection") out.parentInterpretationSourceLegacyProjection += 1; else out.parentInterpretationSourceUnrecognized += 1; if (ws !== undefined && typeof d.createdAt === "number") { if (d.createdAt < ws) out.draftCreatedBeforeWindowStart += 1; else if (d.createdAt < wEnd) out.draftCreatedInWindow += 1; else out.draftCreatedAtOrAfterWindowEnd += 1; } } return {page: out, isDone: r.isDone, continueCursor: r.continueCursor};`;
+}
+
 function recordsPageJs(cursorLiteral, numItems) {
   return `const out = {scanned:0, migrated:0, skipped:0, failed:0}; const r = await ctx.db.query("groupDeletionAuditMigrationRecords").paginate({cursor: ${cursorLiteral}, numItems: ${numItems}}); for (const rec of r.page) { out.scanned += 1; if (rec.status === "migrated") out.migrated += 1; else if (rec.status === "skipped") out.skipped += 1; else if (rec.status === "failed") out.failed += 1; } return {page: out, isDone: r.isDone, continueCursor: r.continueCursor};`;
 }
@@ -198,6 +249,10 @@ export const TABLE_SPECS = {
   printedAmountJoinEvidence: {
     counters: JOIN_EVIDENCE_COUNTERS,
     pageJs: joinEvidencePageJs,
+  },
+  missingPrintedDraftProfile: {
+    counters: PROFILE_COUNTERS,
+    pageJs: profilePageJs,
   },
 };
 
@@ -284,18 +339,16 @@ function runCli(exec, args, label) {
 
 export function scanTable(
   spec,
-  { targetArgs, numItems, maxPages, deployWindowStartTs, deployWindowEndTs, exec = defaultExec },
+  { targetArgs, numItems, maxPages, windowStartTs, windowEndTs, exec = defaultExec },
 ) {
   const totals = emptyTotals(spec);
   const seenCursors = new Set();
   let cursor = null;
   let pages = 0;
-  // deployWindow 境界は全ページで同一リテラルを埋め込む（ページごとに値が
-  // 変わらないことを構造で保証する。module query 側は carry に束縛して拒否）。
-  const startLiteral =
-    deployWindowStartTs === undefined ? "undefined" : JSON.stringify(deployWindowStartTs);
-  const endLiteral =
-    deployWindowEndTs === undefined ? "undefined" : JSON.stringify(deployWindowEndTs);
+  // 窓境界は全ページで同一リテラルを埋め込む（ページごとに値が変わらない
+  // ことを構造で保証する。module query 側は carry に束縛して拒否）。
+  const startLiteral = windowStartTs === undefined ? "undefined" : JSON.stringify(windowStartTs);
+  const endLiteral = windowEndTs === undefined ? "undefined" : JSON.stringify(windowEndTs);
   for (;;) {
     if (pages >= maxPages) {
       throw new Error(`ページ上限 ${maxPages} を超過しました（走査を中止）`);
@@ -384,6 +437,16 @@ export function parseCliArgs(argv) {
       if (!Number.isFinite(opts.deployWindowEndTs)) {
         throw new Error("--deploy-window-end-ts は数値（epoch ms）が必要です");
       }
+    } else if (arg === "--draft-created-window-start-ts") {
+      opts.draftCreatedWindowStartTs = Number(argv[++i]);
+      if (!Number.isFinite(opts.draftCreatedWindowStartTs)) {
+        throw new Error("--draft-created-window-start-ts は数値（epoch ms）が必要です");
+      }
+    } else if (arg === "--draft-created-window-end-ts") {
+      opts.draftCreatedWindowEndTs = Number(argv[++i]);
+      if (!Number.isFinite(opts.draftCreatedWindowEndTs)) {
+        throw new Error("--draft-created-window-end-ts は数値（epoch ms）が必要です");
+      }
     } else if (arg === "--tables") {
       opts.tables = String(argv[++i] ?? "")
         .split(",")
@@ -413,6 +476,16 @@ export function parseCliArgs(argv) {
       );
     }
   }
+  if (opts.draftCreatedWindowEndTs !== undefined) {
+    if (
+      opts.draftCreatedWindowStartTs === undefined ||
+      opts.draftCreatedWindowEndTs < opts.draftCreatedWindowStartTs
+    ) {
+      throw new Error(
+        "--draft-created-window-end-ts は --draft-created-window-start-ts と同時に、それ以降の値で指定してください",
+      );
+    }
+  }
   if (opts.tables) {
     for (const table of opts.tables) {
       if (table !== AUDIT_VERIFY_NAME && !TABLE_SPECS[table]) {
@@ -432,12 +505,20 @@ async function main() {
   for (const table of tables) {
     if (table === AUDIT_VERIFY_NAME) continue;
     process.stderr.write(`[count] ${table} を走査中...\n`);
+    // 窓の意味は spec ごとに異なる: join evidence は明細 createdAt に対する
+    // 候補 deploy job 窓、profile は draft createdAt に対する候補証拠窓。
+    const window =
+      table === "missingPrintedDraftProfile"
+        ? {
+            windowStartTs: opts.draftCreatedWindowStartTs,
+            windowEndTs: opts.draftCreatedWindowEndTs,
+          }
+        : { windowStartTs: opts.deployWindowStartTs, windowEndTs: opts.deployWindowEndTs };
     output[table] = scanTable(TABLE_SPECS[table], {
       targetArgs,
       numItems: opts.numItems,
       maxPages: opts.maxPages,
-      deployWindowStartTs: opts.deployWindowStartTs,
-      deployWindowEndTs: opts.deployWindowEndTs,
+      ...window,
     });
   }
   if (tables.includes(AUDIT_VERIFY_NAME)) {

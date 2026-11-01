@@ -48,6 +48,42 @@ const joinPage = (overrides = {}) => ({
   ...overrides,
 });
 
+const profilePage = (overrides = {}) => ({
+  scanned: 1,
+  draftsWithConfirmedMissingItems: 1,
+  draftItemScanTruncated: 0,
+  draftsWithUnconfirmedMissing: 0,
+  missingPrintedItemsInProfiledDrafts: 1,
+  parentStatusQueued: 0,
+  parentStatusAnalyzing: 0,
+  parentStatusReady: 0,
+  parentStatusNeedsReview: 0,
+  parentStatusFailed: 1,
+  parentStatusRegistered: 0,
+  parentStatusUnrecognized: 0,
+  parentDocumentTypeReceipt: 0,
+  parentDocumentTypeConveniencePayment: 0,
+  parentDocumentTypeUnknown: 1,
+  parentDocumentTypeUnrecognized: 0,
+  parentSourceTypeImageUpload: 1,
+  parentSourceTypeUnrecognized: 0,
+  parentCreatedByUserIdPresent: 0,
+  parentImageFileNamePresent: 0,
+  parentReceiptDataContractVersionPresent: 0,
+  parentRegisteredReceiptIdPresent: 0,
+  parentReviewReasonsNonEmpty: 0,
+  parentWarningsNonEmpty: 0,
+  parentReceiptUserOverridePresent: 0,
+  parentInterpretationAbsent: 1,
+  parentInterpretationSourceAi: 0,
+  parentInterpretationSourceLegacyProjection: 0,
+  parentInterpretationSourceUnrecognized: 0,
+  draftCreatedBeforeWindowStart: 0,
+  draftCreatedInWindow: 1,
+  draftCreatedAtOrAfterWindowEnd: 0,
+  ...overrides,
+});
+
 const ok = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: "" });
 const fail = (stderr) => ({ status: 1, stdout: "", stderr });
 
@@ -174,8 +210,8 @@ describe("scanTable printedAmountJoinEvidence", () => {
       targetArgs: [],
       numItems: 10,
       maxPages: 5,
-      deployWindowStartTs: 150,
-      deployWindowEndTs: 160,
+      windowStartTs: 150,
+      windowEndTs: 160,
       exec,
     });
     expect(result.totals.uniqueNameJoinPrintedEqualsAmount).toBe(1);
@@ -202,7 +238,7 @@ describe("scanTable printedAmountJoinEvidence", () => {
       targetArgs: [],
       numItems: 10,
       maxPages: 5,
-      deployWindowStartTs: 150,
+      windowStartTs: 150,
       exec: (args) => {
         calls.push(args.at(-1));
         return ok({ page: joinPage(), isDone: true, continueCursor: null });
@@ -210,6 +246,48 @@ describe("scanTable printedAmountJoinEvidence", () => {
     });
     expect(calls[2]).toContain("const ws = 150;");
     expect(calls[2]).toContain("const we = undefined;");
+  });
+});
+
+describe("scanTable missingPrintedDraftProfile", () => {
+  const profileSpec = TABLE_SPECS.missingPrintedDraftProfile;
+
+  it("profile spec が counter 欠落を拒否し、窓境界・take 上限・ID 不使用を JS に埋め込む", () => {
+    expect(() =>
+      validatePage(profileSpec, { page: { scanned: 1 }, isDone: true, continueCursor: null }),
+    ).toThrow("非負の数値ではありません");
+    const calls = [];
+    const result = scanTable(profileSpec, {
+      targetArgs: [],
+      numItems: 10,
+      maxPages: 5,
+      windowStartTs: 150,
+      windowEndTs: 160,
+      exec: (args) => {
+        calls.push(args.at(-1));
+        return ok({ page: profilePage(), isDone: true, continueCursor: null });
+      },
+    });
+    expect(result.totals.draftsWithConfirmedMissingItems).toBe(1);
+    expect(calls[0]).toContain("const ws = 150;");
+    expect(calls[0]).toContain("const we = 160;");
+    expect(calls[0]).toContain(".take(101)");
+    expect(calls[0]).toContain("draftsWithUnconfirmedMissing");
+    expect(calls[0]).toContain("aiExpenseDrafts");
+    // 出力カウンタに identity を入れない（draft._id は index 参照でサーバ内完結）
+    expect(calls[0]).not.toMatch(/out\.(draftId|draftIds)\b/);
+    // 窓省略時は undefined が埋め込まれ日付バケットはカウントされない
+    scanTable(profileSpec, {
+      targetArgs: [],
+      numItems: 10,
+      maxPages: 5,
+      exec: (args) => {
+        calls.push(args.at(-1));
+        return ok({ page: profilePage(), isDone: true, continueCursor: null });
+      },
+    });
+    expect(calls[1]).toContain("const ws = undefined;");
+    expect(calls[1]).toContain("const we = undefined;");
   });
 });
 
@@ -252,5 +330,29 @@ describe("parseCliArgs", () => {
     ).toEqual(["auditVerify", "aiExpenseDraftItems"]);
     expect(() => parseCliArgs(["--prod", "--tables", "unknownTable"])).toThrow("不明なテーブル");
     expect(() => parseCliArgs(["--prod", "--num-items", "0"])).toThrow("--num-items");
+    // draft 側プロファイル窓: end 単独・end < start は拒否
+    const profileWindow = parseCliArgs([
+      "--prod",
+      "--tables",
+      "missingPrintedDraftProfile",
+      "--draft-created-window-start-ts",
+      "1788057594000",
+      "--draft-created-window-end-ts",
+      "1788057654000",
+    ]);
+    expect(profileWindow.opts.draftCreatedWindowStartTs).toBe(1788057594000);
+    expect(profileWindow.opts.draftCreatedWindowEndTs).toBe(1788057654000);
+    expect(() => parseCliArgs(["--prod", "--draft-created-window-end-ts", "100"])).toThrow(
+      "--draft-created-window-start-ts と同時に",
+    );
+    expect(() =>
+      parseCliArgs([
+        "--prod",
+        "--draft-created-window-start-ts",
+        "200",
+        "--draft-created-window-end-ts",
+        "100",
+      ]),
+    ).toThrow("--draft-created-window-start-ts と同時に");
   });
 });

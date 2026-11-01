@@ -711,6 +711,308 @@ export const aiExpenseDrafts = internalQuery({
   },
 });
 
+// missingPrintedDraftProfile は「printedAmountYen 欠落明細を含む draft」
+// ごとの属性を件数で集計する。draft 自体をページ走査するため dedup は
+// 構造的に不要で、親 draft の ID は carry・返却値・CLI 引数に一切載せない。
+// 件数は「欠落明細を含む draft の属性分布」であり、行単位の件数とは別物。
+// 明細は sibling index から上限付き take で読み、上限到達は打ち切りとして
+// 「欠落の有無を確認不能」に分類して属性集計に進めない。
+const PROFILE_ITEM_SCAN_LIMIT = 101; // DRAFT_JUDGMENT_ITEM_LIMIT(100)+1 で打ち切り検出
+
+const missingPrintedProfileCounts = {
+  scanned: v.number(),
+  // 確認できた欠落明細を持つ draft 数（属性集計の分母）。
+  draftsWithConfirmedMissingItems: v.number(),
+  // 明細走査が take 上限に達した draft 数（副次フラグ・他と重複しうる）。
+  draftItemScanTruncated: v.number(),
+  // 打ち切りかつ範囲内欠落0件: 範囲外に欠落があるか判断できない
+  // （属性集計から外す terminal 相当バケット）。
+  draftsWithUnconfirmedMissing: v.number(),
+  // 確認できた欠落明細の合計（aiExpenseDraftItems 側走査の
+  // missingPrintedRows との照合用。孤児明細・未確認 draft 分は含まない）。
+  missingPrintedItemsInProfiledDrafts: v.number(),
+  // 以降は profiled draft ごとの属性（各 draft につきいずれか1系統ずつ）。
+  parentStatusQueued: v.number(),
+  parentStatusAnalyzing: v.number(),
+  parentStatusReady: v.number(),
+  parentStatusNeedsReview: v.number(),
+  parentStatusFailed: v.number(),
+  parentStatusRegistered: v.number(),
+  parentStatusUnrecognized: v.number(),
+  parentDocumentTypeReceipt: v.number(),
+  parentDocumentTypeConveniencePayment: v.number(),
+  parentDocumentTypeUnknown: v.number(),
+  parentDocumentTypeUnrecognized: v.number(),
+  // sourceType は現行 "image_upload" 一値のみ。判別力は無いが、
+  // 旧値・未知値の存在は経路推定の手がかりになるため件数を取る。
+  parentSourceTypeImageUpload: v.number(),
+  parentSourceTypeUnrecognized: v.number(),
+  parentCreatedByUserIdPresent: v.number(),
+  parentImageFileNamePresent: v.number(),
+  parentReceiptDataContractVersionPresent: v.number(),
+  parentRegisteredReceiptIdPresent: v.number(),
+  parentReviewReasonsNonEmpty: v.number(),
+  parentWarningsNonEmpty: v.number(),
+  parentReceiptUserOverridePresent: v.number(),
+  // interpretation は「現行コードで削除経路が見つからない」以上の意味を
+  // 持たない。旧コードの削除・部分書込・未反映の可能性は残る。
+  parentInterpretationAbsent: v.number(),
+  parentInterpretationSourceAi: v.number(),
+  parentInterpretationSourceLegacyProjection: v.number(),
+  parentInterpretationSourceUnrecognized: v.number(),
+  // draftCreatedAt を「運用者が供給する候補証拠窓」に対して位置付ける。
+  // 本番導入前後の証明ではない（workflow 外反映は未検証）。
+  draftCreatedBeforeWindowStart: v.number(),
+  draftCreatedInWindow: v.number(),
+  draftCreatedAtOrAfterWindowEnd: v.number(),
+};
+
+type MissingPrintedProfileCounts = {
+  scanned: number;
+  draftsWithConfirmedMissingItems: number;
+  draftItemScanTruncated: number;
+  draftsWithUnconfirmedMissing: number;
+  missingPrintedItemsInProfiledDrafts: number;
+  parentStatusQueued: number;
+  parentStatusAnalyzing: number;
+  parentStatusReady: number;
+  parentStatusNeedsReview: number;
+  parentStatusFailed: number;
+  parentStatusRegistered: number;
+  parentStatusUnrecognized: number;
+  parentDocumentTypeReceipt: number;
+  parentDocumentTypeConveniencePayment: number;
+  parentDocumentTypeUnknown: number;
+  parentDocumentTypeUnrecognized: number;
+  parentSourceTypeImageUpload: number;
+  parentSourceTypeUnrecognized: number;
+  parentCreatedByUserIdPresent: number;
+  parentImageFileNamePresent: number;
+  parentReceiptDataContractVersionPresent: number;
+  parentRegisteredReceiptIdPresent: number;
+  parentReviewReasonsNonEmpty: number;
+  parentWarningsNonEmpty: number;
+  parentReceiptUserOverridePresent: number;
+  parentInterpretationAbsent: number;
+  parentInterpretationSourceAi: number;
+  parentInterpretationSourceLegacyProjection: number;
+  parentInterpretationSourceUnrecognized: number;
+  draftCreatedBeforeWindowStart: number;
+  draftCreatedInWindow: number;
+  draftCreatedAtOrAfterWindowEnd: number;
+};
+
+// countDraftProfileAttributes の直接テスト用に export する。
+export const emptyProfileCounts = (): MissingPrintedProfileCounts => ({
+  scanned: 0,
+  draftsWithConfirmedMissingItems: 0,
+  draftItemScanTruncated: 0,
+  draftsWithUnconfirmedMissing: 0,
+  missingPrintedItemsInProfiledDrafts: 0,
+  parentStatusQueued: 0,
+  parentStatusAnalyzing: 0,
+  parentStatusReady: 0,
+  parentStatusNeedsReview: 0,
+  parentStatusFailed: 0,
+  parentStatusRegistered: 0,
+  parentStatusUnrecognized: 0,
+  parentDocumentTypeReceipt: 0,
+  parentDocumentTypeConveniencePayment: 0,
+  parentDocumentTypeUnknown: 0,
+  parentDocumentTypeUnrecognized: 0,
+  parentSourceTypeImageUpload: 0,
+  parentSourceTypeUnrecognized: 0,
+  parentCreatedByUserIdPresent: 0,
+  parentImageFileNamePresent: 0,
+  parentReceiptDataContractVersionPresent: 0,
+  parentRegisteredReceiptIdPresent: 0,
+  parentReviewReasonsNonEmpty: 0,
+  parentWarningsNonEmpty: 0,
+  parentReceiptUserOverridePresent: 0,
+  parentInterpretationAbsent: 0,
+  parentInterpretationSourceAi: 0,
+  parentInterpretationSourceLegacyProjection: 0,
+  parentInterpretationSourceUnrecognized: 0,
+  draftCreatedBeforeWindowStart: 0,
+  draftCreatedInWindow: 0,
+  draftCreatedAtOrAfterWindowEnd: 0,
+});
+
+const missingPrintedProfileCarry = v.object({
+  counts: v.object(missingPrintedProfileCounts),
+  draftCreatedWindowStartTs: v.optional(v.number()),
+  draftCreatedWindowEndTs: v.optional(v.number()),
+});
+
+// draft の属性を profiled draft 1件分だけ集計する。schema 生成不能な
+// 形状（未知の status 等）を直接試せるよう export する。
+export function countDraftProfileAttributes(
+  draft: {
+    status?: unknown;
+    documentType?: unknown;
+    sourceType?: unknown;
+    createdByUserId?: unknown;
+    imageFileName?: unknown;
+    receiptDataContractVersion?: unknown;
+    registeredReceiptId?: unknown;
+    reviewReasons?: unknown;
+    warnings?: unknown;
+    receiptUserOverride?: unknown;
+    receiptInterpretation?: { source?: unknown };
+    createdAt?: unknown;
+  },
+  missingCount: number,
+  draftCreatedWindowStartTs: number | undefined,
+  draftCreatedWindowEndTs: number | undefined,
+  counts: MissingPrintedProfileCounts,
+) {
+  counts.draftsWithConfirmedMissingItems += 1;
+  counts.missingPrintedItemsInProfiledDrafts += missingCount;
+  switch (draft.status) {
+    case "queued":
+      counts.parentStatusQueued += 1;
+      break;
+    case "analyzing":
+      counts.parentStatusAnalyzing += 1;
+      break;
+    case "ready":
+      counts.parentStatusReady += 1;
+      break;
+    case "needs_review":
+      counts.parentStatusNeedsReview += 1;
+      break;
+    case "failed":
+      counts.parentStatusFailed += 1;
+      break;
+    case "registered":
+      counts.parentStatusRegistered += 1;
+      break;
+    default:
+      counts.parentStatusUnrecognized += 1;
+  }
+  switch (draft.documentType) {
+    case "receipt":
+      counts.parentDocumentTypeReceipt += 1;
+      break;
+    case "convenience_payment":
+      counts.parentDocumentTypeConveniencePayment += 1;
+      break;
+    case "unknown":
+      counts.parentDocumentTypeUnknown += 1;
+      break;
+    default:
+      counts.parentDocumentTypeUnrecognized += 1;
+  }
+  if (draft.sourceType === "image_upload") counts.parentSourceTypeImageUpload += 1;
+  else counts.parentSourceTypeUnrecognized += 1;
+  if (draft.createdByUserId !== undefined) counts.parentCreatedByUserIdPresent += 1;
+  if (draft.imageFileName !== undefined) counts.parentImageFileNamePresent += 1;
+  if (draft.receiptDataContractVersion !== undefined) {
+    counts.parentReceiptDataContractVersionPresent += 1;
+  }
+  if (draft.registeredReceiptId !== undefined) counts.parentRegisteredReceiptIdPresent += 1;
+  if (Array.isArray(draft.reviewReasons) && draft.reviewReasons.length > 0) {
+    counts.parentReviewReasonsNonEmpty += 1;
+  }
+  if (Array.isArray(draft.warnings) && draft.warnings.length > 0) {
+    counts.parentWarningsNonEmpty += 1;
+  }
+  if (draft.receiptUserOverride !== undefined) counts.parentReceiptUserOverridePresent += 1;
+  const source = draft.receiptInterpretation?.source;
+  if (draft.receiptInterpretation === undefined) counts.parentInterpretationAbsent += 1;
+  else if (source === "ai") counts.parentInterpretationSourceAi += 1;
+  else if (source === "legacy_projection") {
+    counts.parentInterpretationSourceLegacyProjection += 1;
+  } else counts.parentInterpretationSourceUnrecognized += 1;
+  if (draftCreatedWindowStartTs !== undefined && typeof draft.createdAt === "number") {
+    const windowEnd = draftCreatedWindowEndTs ?? draftCreatedWindowStartTs;
+    if (draft.createdAt < draftCreatedWindowStartTs) {
+      counts.draftCreatedBeforeWindowStart += 1;
+    } else if (draft.createdAt < windowEnd) {
+      counts.draftCreatedInWindow += 1;
+    } else {
+      counts.draftCreatedAtOrAfterWindowEnd += 1;
+    }
+  }
+}
+
+export const missingPrintedDraftProfile = internalQuery({
+  args: {
+    cursor: v.optional(v.string()),
+    carry: v.optional(missingPrintedProfileCarry),
+    draftCreatedWindowStartTs: v.optional(v.number()),
+    draftCreatedWindowEndTs: v.optional(v.number()),
+  },
+  returns: v.object({
+    isDone: v.boolean(),
+    continueCursor: v.union(v.string(), v.null()),
+    page: v.object(missingPrintedProfileCounts),
+    totals: v.object(missingPrintedProfileCounts),
+  }),
+  handler: async (ctx: ReadCtx, args) => {
+    assertCursorCarryPair(args.cursor, args.carry);
+    if (args.draftCreatedWindowEndTs !== undefined) {
+      if (
+        args.draftCreatedWindowStartTs === undefined ||
+        args.draftCreatedWindowEndTs < args.draftCreatedWindowStartTs
+      ) {
+        throw new ConvexError(
+          "draftCreatedWindowEndTs は draftCreatedWindowStartTs と同時に、それ以降の値で指定してください",
+        );
+      }
+    }
+    if (
+      args.carry !== undefined &&
+      (args.carry.draftCreatedWindowStartTs !== args.draftCreatedWindowStartTs ||
+        args.carry.draftCreatedWindowEndTs !== args.draftCreatedWindowEndTs)
+    ) {
+      throw new ConvexError(
+        "継続ページで draftCreatedWindow の境界が変わっています。日付バケットの累計が混ざるため、全ページ同一値を指定してください",
+      );
+    }
+    const page = await ctx.db.query("aiExpenseDrafts").paginate(paged(args.cursor));
+    const counts = emptyProfileCounts();
+    for (const draft of page.page) {
+      counts.scanned += 1;
+      const items = await ctx.db
+        .query("aiExpenseDraftItems")
+        .withIndex("by_group_id_and_draft_id", (q) =>
+          q.eq("groupId", draft.groupId).eq("draftId", draft._id),
+        )
+        .take(PROFILE_ITEM_SCAN_LIMIT);
+      const truncated = items.length >= PROFILE_ITEM_SCAN_LIMIT;
+      if (truncated) counts.draftItemScanTruncated += 1;
+      const missingCount = items.reduce(
+        (acc, item) => acc + (item.printedAmountYen === undefined ? 1 : 0),
+        0,
+      );
+      if (missingCount === 0) {
+        // 打ち切りで欠落が範囲外にある可能性を残す場合は未確認として分離。
+        if (truncated) counts.draftsWithUnconfirmedMissing += 1;
+        continue;
+      }
+      countDraftProfileAttributes(
+        draft,
+        missingCount,
+        args.draftCreatedWindowStartTs,
+        args.draftCreatedWindowEndTs,
+        counts,
+      );
+    }
+    const totals = emptyProfileCounts();
+    const carryCounts: MissingPrintedProfileCounts | undefined = args.carry?.counts;
+    for (const key of Object.keys(totals) as (keyof MissingPrintedProfileCounts)[]) {
+      totals[key] = (carryCounts?.[key] ?? 0) + counts[key];
+    }
+    return {
+      isDone: page.isDone,
+      continueCursor: page.isDone ? null : page.continueCursor,
+      page: counts,
+      totals,
+    };
+  },
+});
+
 const recordCounts = {
   scanned: v.number(),
   migrated: v.number(),
