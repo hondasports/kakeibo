@@ -1694,6 +1694,20 @@ ready / needs_review の下書き一覧は明細読み取り（N+1）を避け�
 2. `pnpm exec convex run aiExpenseDraftListSummaryMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
 3. `pnpm exec convex run aiExpenseDraftListSummaryMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること）
 
+#### aiExpenseDraftItems の printedAmountYen 欠落行（据え置き・backfill 不実施）
+
+2026-11-01 の本番件数取得（件数のみ・read-only）で、`printedAmountYen` を持たない `aiExpenseDraftItems` が 21 行存在することを確認した。これらは `printedAmountYen` 追加前の書き込み経路、または同フィールドを書かなかった過去の明細置換 writer で作られた可能性がある行である。行単位の作成経路・同値性は件数集計では証明できない。
+
+**方針は据え置き（backfill しない）とする。** `amountYen` からの推定補完は行わない。理由は次の通りである。
+
+- `amountYen` と真の印字額の同値性が行単位で証明できない。親下書きに AI 解釈スナップショットが無く、突合材料が存在しない
+- backfill 後は真の印字額と区別がつかず、マーカーなしには不可逆となる
+- 各読取経路は既存の fallback で欠落を許容している（表示は `printedAmountYen ?? normalizedAmountYen ?? amountYen`、税処理入力は `printedAmountYen ?? amountYen`）ため、一括書き込みの実益がない
+
+**残す条件**: `printedAmountYen` は persisted では optional のまま維持し、読取側の fallback 規則を変更しない。fallback を整理・必須化する変更は、欠落行への影響評価を先に行うこと。なお欠落行の親下書きで review・登録後更新による明細置換、または税再解釈が走れば、現行 writer が `printedAmountYen`（再解釈時は入力 fallback 値）を書くため欠落は解消されうる — これは行単位の経路確定ではなく、現行コードの振る舞いに基づく可能性の記述である。
+
+**個別対応**: 行単位の経路特定が必要になった場合は、本番監査証跡（変更履歴等）の照合を個別案件として扱う。件数集計からの推定で個別行の値を確定・補完しない。
+
 ## 17. テスト方針
 
 ### 17.1 Unit test
