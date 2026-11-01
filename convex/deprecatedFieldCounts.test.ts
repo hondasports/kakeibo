@@ -7,8 +7,10 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
+import { classifyJoinEvidence } from "./deprecatedFieldCounts";
 
 type ItemCompatFields = {
+  itemName?: string;
   printedAmountYen?: number;
   lineType?: "item" | "discount" | "promotion_adjustment" | "unknown";
   markers?: string[];
@@ -71,8 +73,8 @@ const valueSnapshot = (items: ItemCompatFields[]) => ({
   confidence: {},
   warnings: [],
   reviewReasons: [],
-  items: items.map((item) => ({
-    itemName: "品物",
+  items: items.map(({ itemName, ...item }) => ({
+    itemName: itemName ?? "品物",
     amountYen: 100,
     confidence: {},
     ...item,
@@ -246,6 +248,11 @@ describe("deprecatedFieldCounts", () => {
       scanned: 3,
       missingReceiptDataContractVersion: 2,
       withTaxSummaryCorrections: 1,
+      taxSummaryCorrectionsPresent: 1,
+      taxSummaryCorrectionsPresentEmpty: 0,
+      interpretationSourceAi: 2,
+      interpretationSourceLegacyProjection: 0,
+      interpretationAbsent: 1,
       interpretation: {
         missingPrintedAmountYen: 1,
         missingLineType: 1,
@@ -348,6 +355,11 @@ describe("deprecatedFieldCounts", () => {
           scanned: 1,
           missingReceiptDataContractVersion: 0,
           withTaxSummaryCorrections: 0,
+          taxSummaryCorrectionsPresent: 0,
+          taxSummaryCorrectionsPresentEmpty: 0,
+          interpretationSourceAi: 0,
+          interpretationSourceLegacyProjection: 0,
+          interpretationAbsent: 0,
           interpretation: {
             missingPrintedAmountYen: 0,
             missingLineType: 0,
@@ -372,5 +384,303 @@ describe("deprecatedFieldCounts", () => {
         cursor: "dummy-cursor",
       }),
     ).rejects.toThrow("cursor と carry は両方指定するか両方省略すること");
+  });
+
+  it("printedAmountJoinEvidence が欠落行を親 snapshot との突合で分類する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await insertGroup(t);
+    // ai snapshot: 一意名一致 + index 一致 + printed === amountYen（整合信号。証明ではない）
+    const d1 = await insertDraft(t, groupId, {
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([{ itemName: "A", printedAmountYen: 100 }]),
+      },
+    });
+    await insertItem(t, groupId, d1, { itemName: "A", amountYen: 100, createdAt: 100 });
+    // ai snapshot: printed !== amountYen（不整合）
+    const d2 = await insertDraft(t, groupId, {
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([{ itemName: "B", printedAmountYen: 80 }]),
+      },
+    });
+    await insertItem(t, groupId, d2, { itemName: "B", amountYen: 100, createdAt: 200 });
+    // ai snapshot: embedded printed 欠落
+    const d3 = await insertDraft(t, groupId, {
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([{ itemName: "C" }]),
+      },
+    });
+    await insertItem(t, groupId, d3, { itemName: "C", createdAt: 200 });
+    // ai snapshot: 同名なし（編集で改名した可能性。不明）
+    const d4 = await insertDraft(t, groupId, {
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([{ itemName: "X", printedAmountYen: 1 }]),
+      },
+    });
+    await insertItem(t, groupId, d4, { itemName: "D", createdAt: 200 });
+    // ai snapshot: 同名複数 + 件数不一致（一意特定不能）
+    const d5 = await insertDraft(t, groupId, {
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([
+          { itemName: "E", printedAmountYen: 1 },
+          { itemName: "E", printedAmountYen: 2 },
+        ]),
+      },
+    });
+    await insertItem(t, groupId, d5, { itemName: "E", createdAt: 200 });
+    // legacy_projection はテーブル再投影（循環）で証拠にならない
+    const d6 = await insertDraft(t, groupId, {
+      receiptInterpretation: {
+        source: "legacy_projection",
+        interpretedAt: 1,
+        values: valueSnapshot([{ itemName: "F", printedAmountYen: 100 }]),
+      },
+    });
+    await insertItem(t, groupId, d6, { itemName: "F", createdAt: 200 });
+    // snapshot なし
+    const d7 = await insertDraft(t, groupId, {});
+    await insertItem(t, groupId, d7, { itemName: "G", createdAt: 200 });
+    // ai snapshot + userOverride 併存（副次フラグ）
+    const d8 = await insertDraft(t, groupId, {
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([{ itemName: "H", printedAmountYen: 100 }]),
+      },
+      receiptUserOverride: {
+        source: "user",
+        updatedAt: 1,
+        fields: ["amountYen"],
+        values: valueSnapshot([{ itemName: "H", printedAmountYen: 100 }]),
+      },
+    });
+    await insertItem(t, groupId, d8, { itemName: "H", amountYen: 100, createdAt: 200 });
+    // ai snapshot: 兄弟行側に同名が2行 → 埋め込み側が1件でも曖昧（両行が同じ
+    // snapshot item に uniqueNameJoin 判定されるのを防ぐ）
+    const d5b = await insertDraft(t, groupId, {
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([{ itemName: "E2", printedAmountYen: 100 }]),
+      },
+    });
+    await insertItem(t, groupId, d5b, { itemName: "E2", amountYen: 100, createdAt: 200 });
+    await insertItem(t, groupId, d5b, { itemName: "E2", amountYen: 200, createdAt: 200 });
+    // 親 draft が別 group → 参照先を信用できない（不明扱い）
+    const groupId2 = await insertGroup(t);
+    const d10 = await insertDraft(t, groupId2, {
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([{ itemName: "J", printedAmountYen: 100 }]),
+      },
+    });
+    await insertItem(t, groupId, d10, { itemName: "J", amountYen: 100, createdAt: 200 });
+    // 親 draft 削除済み → 孤児
+    const d9 = await insertDraft(t, groupId, {});
+    const orphan = await insertItem(t, groupId, d9, { itemName: "I", createdAt: 200 });
+    await t.run(async (ctx) => ctx.db.delete(d9));
+    expect(orphan).toBeDefined();
+    // printedAmountYen 保持行は分類対象外
+    await insertItem(t, groupId, d1, { itemName: "skip", printedAmountYen: 100, createdAt: 200 });
+
+    const result = await t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
+      cutoffTs: 150,
+    });
+    expect(result.isDone).toBe(true);
+    expect(result.totals).toMatchObject({
+      scanned: 13,
+      missingPrintedRows: 12,
+      createdAtBelowCutoff: 1,
+      createdAtAtOrAboveCutoff: 11,
+      parentDraftMissing: 1,
+      parentDraftGroupMismatch: 1,
+      hasUserOverride: 1,
+      interpretationAbsent: 1,
+      interpretationNonAi: 1,
+      interpretationItemsMalformed: 0,
+      siblingsTruncated: 0,
+      rowMissingFromSiblingIndex: 0,
+      // d5b は同名2行それぞれが計上、d5・d1（"skip" 行が sibling にいる）で各1件
+      siblingCountDiffers: 4,
+      ambiguousNameJoinTableSide: 2,
+      noNameOverlap: 1,
+      ambiguousNameJoin: 1,
+      uniqueNameJoinEmbeddedPrintedMissing: 1,
+      uniqueNameJoinPrintedEqualsAmount: 2,
+      uniqueNameJoinPrintedDiffers: 1,
+      uniqueNameJoinPositionConsistent: 4,
+    });
+  });
+
+  it("classifyJoinEvidence は malformed 埋め込み・group 不一致・位置欠落を「不明」に分類する", () => {
+    const item = {
+      _id: "row1",
+      groupId: "g1",
+      draftId: "d1",
+      itemName: "A",
+      amountYen: 100,
+      createdAt: 1,
+    };
+    const siblings = [{ _id: "row1", itemName: "A" }];
+    const counts = () => ({
+      scanned: 0,
+      missingPrintedRows: 0,
+      createdAtBelowCutoff: 0,
+      createdAtAtOrAboveCutoff: 0,
+      parentDraftMissing: 0,
+      parentDraftGroupMismatch: 0,
+      hasUserOverride: 0,
+      interpretationAbsent: 0,
+      interpretationNonAi: 0,
+      interpretationItemsMalformed: 0,
+      siblingsTruncated: 0,
+      rowMissingFromSiblingIndex: 0,
+      siblingCountDiffers: 0,
+      ambiguousNameJoinTableSide: 0,
+      noNameOverlap: 0,
+      ambiguousNameJoin: 0,
+      uniqueNameJoinEmbeddedPrintedMissing: 0,
+      uniqueNameJoinPrintedEqualsAmount: 0,
+      uniqueNameJoinPrintedDiffers: 0,
+      uniqueNameJoinPositionConsistent: 0,
+    });
+    const run = (
+      draft: Parameters<typeof classifyJoinEvidence>[1],
+      sibs: Parameters<typeof classifyJoinEvidence>[2] = siblings,
+    ) => {
+      const c = counts();
+      classifyJoinEvidence(item, draft, sibs, undefined, c);
+      return c;
+    };
+    const aiDraft = (items: unknown) => ({
+      groupId: "g1",
+      receiptInterpretation: { source: "ai", values: { items } },
+    });
+    // items 非配列・要素非オブジェクト・itemName 非文字列 → malformed
+    expect(run(aiDraft({ not: "array" })).interpretationItemsMalformed).toBe(1);
+    expect(run(aiDraft([1, 2])).interpretationItemsMalformed).toBe(1);
+    expect(run(aiDraft([{ itemName: 5 }])).interpretationItemsMalformed).toBe(1);
+    expect(run(aiDraft([{ itemName: undefined }])).interpretationItemsMalformed).toBe(1);
+    // group 不一致は interpretation の内容に関わらず不明扱い
+    expect(
+      run({
+        groupId: "g2",
+        receiptInterpretation: { source: "ai", values: { items: [] } },
+      }).parentDraftGroupMismatch,
+    ).toBe(1);
+    // index 結果に自分が居ない → 位置判定不能として join しない
+    expect(
+      run(aiDraft([{ itemName: "A", printedAmountYen: 100 }]), [{ _id: "other", itemName: "A" }])
+        .rowMissingFromSiblingIndex,
+    ).toBe(1);
+    // 兄弟側同名2行 → 埋め込み1件でも曖昧
+    const dupCounts = counts();
+    classifyJoinEvidence(
+      item,
+      aiDraft([{ itemName: "A", printedAmountYen: 100 }]),
+      [
+        { _id: "row1", itemName: "A" },
+        { _id: "row2", itemName: "A" },
+      ],
+      undefined,
+      dupCounts,
+    );
+    expect(dupCounts.ambiguousNameJoinTableSide).toBe(1);
+    expect(dupCounts.uniqueNameJoinPrintedEqualsAmount).toBe(0);
+  });
+
+  it("printedAmountJoinEvidence は sibling 上限超過を truncated として join しない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await insertGroup(t);
+    const draftId = await insertDraft(t, groupId, {
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 1,
+        values: valueSnapshot([{ itemName: "T", printedAmountYen: 100 }]),
+      },
+    });
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 101; i += 1) {
+        await ctx.db.insert("aiExpenseDraftItems", {
+          groupId,
+          draftId,
+          itemName: i === 0 ? "T" : `品物${i}`,
+          amountYen: 100,
+          confidence: {},
+          createdAt: 1,
+          updatedAt: 1,
+        });
+      }
+    });
+    // BATCH_SIZE=25 を超えるため carry で継続しながら全ページを走査する
+    let result = await t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {});
+    let totals = result.totals;
+    while (!result.isDone) {
+      result = await t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
+        cursor: result.continueCursor ?? undefined,
+        carry: { counts: totals },
+      });
+      totals = result.totals;
+    }
+    expect(totals).toMatchObject({
+      missingPrintedRows: 101,
+      siblingsTruncated: 101,
+      // 打ち切った行は join に進まない（uniqueNameJoin* は増えない）
+      uniqueNameJoinPrintedEqualsAmount: 0,
+      uniqueNameJoinPositionConsistent: 0,
+      siblingCountDiffers: 0,
+    });
+  });
+
+  it("printedAmountJoinEvidence は継続ページで cutoffTs の変化を拒否する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await insertGroup(t);
+    const draftId = await insertDraft(t, groupId, {});
+    for (let i = 0; i < 26; i += 1) {
+      await insertItem(t, groupId, draftId, { createdAt: 100 });
+    }
+    const first = await t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
+      cutoffTs: 150,
+    });
+    expect(first.isDone).toBe(false);
+    // 同一 cutoffTs で継続 → OK
+    const second = await t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
+      cursor: first.continueCursor ?? undefined,
+      carry: { counts: first.totals, cutoffTs: 150 },
+      cutoffTs: 150,
+    });
+    expect(second.isDone).toBe(true);
+    expect(second.totals.missingPrintedRows).toBe(26);
+    expect(second.totals.createdAtBelowCutoff).toBe(26);
+    // 異なる cutoffTs で継続 → 拒否（below/above の累計混入を防ぐ）
+    await expect(
+      t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
+        cursor: first.continueCursor ?? undefined,
+        carry: { counts: first.totals, cutoffTs: 150 },
+        cutoffTs: 999,
+      }),
+    ).rejects.toThrow("cutoffTs が変わっています");
+    // cutoffTs なしで開始した carry を cutoffTs ありで継続するのも拒否
+    const firstNoCutoff = await t.query(
+      internal.deprecatedFieldCounts.printedAmountJoinEvidence,
+      {},
+    );
+    await expect(
+      t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
+        cursor: firstNoCutoff.continueCursor ?? undefined,
+        carry: { counts: firstNoCutoff.totals },
+        cutoffTs: 150,
+      }),
+    ).rejects.toThrow("cutoffTs が変わっています");
   });
 });

@@ -23,6 +23,30 @@ const itemPage = (overrides = {}) => ({
   ...overrides,
 });
 
+const joinPage = (overrides = {}) => ({
+  scanned: 1,
+  missingPrintedRows: 1,
+  createdAtBelowCutoff: 0,
+  createdAtAtOrAboveCutoff: 0,
+  parentDraftMissing: 0,
+  parentDraftGroupMismatch: 0,
+  hasUserOverride: 0,
+  interpretationAbsent: 0,
+  interpretationNonAi: 0,
+  interpretationItemsMalformed: 0,
+  siblingsTruncated: 0,
+  rowMissingFromSiblingIndex: 0,
+  siblingCountDiffers: 0,
+  ambiguousNameJoinTableSide: 0,
+  noNameOverlap: 0,
+  ambiguousNameJoin: 0,
+  uniqueNameJoinEmbeddedPrintedMissing: 0,
+  uniqueNameJoinPrintedEqualsAmount: 1,
+  uniqueNameJoinPrintedDiffers: 0,
+  uniqueNameJoinPositionConsistent: 1,
+  ...overrides,
+});
+
 const ok = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: "" });
 const fail = (stderr) => ({ status: 1, stdout: "", stderr });
 
@@ -130,6 +154,44 @@ describe("scanTable", () => {
         },
       }),
     ).toThrow("循環");
+  });
+});
+
+describe("scanTable printedAmountJoinEvidence", () => {
+  const joinSpec = TABLE_SPECS.printedAmountJoinEvidence;
+
+  it("join エビデンス spec が counter 欠落を拒否し、cutoff と take 上限を JS に埋め込む", () => {
+    expect(() =>
+      validatePage(joinSpec, { page: { scanned: 1 }, isDone: true, continueCursor: null }),
+    ).toThrow("非負の数値ではありません");
+    const calls = [];
+    const exec = (args) => {
+      calls.push(args.at(-1));
+      return ok({ page: joinPage(), isDone: true, continueCursor: null });
+    };
+    const result = scanTable(joinSpec, {
+      targetArgs: [],
+      numItems: 10,
+      maxPages: 5,
+      cutoffTs: 150,
+      exec,
+    });
+    expect(result.totals.uniqueNameJoinPrintedEqualsAmount).toBe(1);
+    expect(calls[0]).toContain("const cutoff = 150;");
+    expect(calls[0]).toContain(".take(101)");
+    expect(calls[0]).toContain("ambiguousNameJoinTableSide");
+    expect(calls[0]).toContain("parentDraftGroupMismatch");
+    // cutoffTs 省略時は undefined が埋め込まれる（below/above はカウントされない）
+    scanTable(joinSpec, {
+      targetArgs: [],
+      numItems: 10,
+      maxPages: 5,
+      exec: (args) => {
+        calls.push(args.at(-1));
+        return ok({ page: joinPage(), isDone: true, continueCursor: null });
+      },
+    });
+    expect(calls[1]).toContain("const cutoff = undefined;");
   });
 });
 
