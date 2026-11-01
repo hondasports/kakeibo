@@ -63,6 +63,31 @@ async function seed(t: ReturnType<typeof convexTest>, owner = false) {
 }
 
 describe("system admin ownerless group recovery", () => {
+  it.each([
+    ["", false],
+    ["   ", false],
+    [`  ${"a".repeat(500)}  `, true],
+    [`  ${"a".repeat(501)}  `, false],
+  ])("理由の境界をサーバーで検証する", async (reason, valid) => {
+    const t = convexTest(schema, convexTestModules);
+    const fixture = await seed(t);
+    const operation = t
+      .withIdentity(identity("admin"))
+      .mutation(api.systemAdminOwnerlessGroupRecovery.recoverOwnerlessGroup, {
+        groupId: fixture.group,
+        targetUserId: fixture.target,
+        reason,
+      });
+    if (valid) {
+      await operation;
+      const audit = await t.run((ctx) => ctx.db.query("systemAdminAuditLogs").take(10));
+      expect(audit[0]?.reason).toBe("a".repeat(500));
+    } else {
+      await expect(operation).rejects.toThrow("理由は1〜500文字で入力してください");
+      const audit = await t.run((ctx) => ctx.db.query("systemAdminAuditLogs").take(10));
+      expect(audit).toEqual([]);
+    }
+  });
   it("owner 0の既存memberをownerへ昇格し、監査と通知を記録する", async () => {
     const t = convexTest(schema, convexTestModules);
     const fixture = await seed(t);

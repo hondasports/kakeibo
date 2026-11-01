@@ -76,6 +76,9 @@ src/
   designTokens.ts              # MUI sx 用デザイントークン（feature 横断）
   designTokens.test.ts
   index.css
+  assets/                      # Vite 同梱の静的アセット（hero.png 等）
+  content/                     # Product Update 原稿データ（product-updates.ts）
+  generated/                   # 生成物（product-updates.json）
   utils/                       # feature 横断ユーティリティ（例: imageDataUrl）
   lib/                         # 横断ユーティリティ（例: weekComparison）
   routing/                     # E2E 専用ルート（e2eRoutes.tsx, e2eFixtures.ts）
@@ -96,7 +99,6 @@ src/
     receipt-review/              # AI下書きレビュー（単票レビューダイアログ・税補正）
       components/                # ReviewDialog, ReviewItemCard, ReviewCheckCards, ...
       hooks/                     # useReviewDialog, useReviewSubmit, useReviewTaxOverrides, ...
-      types/
       utils/                     # mappers, taxWarnings, negativeLineWarnings, ...
                                #   （確認結果の判定は lib/domain/aiExpenseDrafts の reviewChecks 等）
     monthly-summary/           # 月次サマリページ
@@ -182,7 +184,7 @@ src/
       components/
       hooks/
       pages/
-      types/
+      types.ts
       index.ts
 
 convex/
@@ -190,9 +192,7 @@ convex/
   schema.ts
   http.ts                      # HTTP router（route 登録のみ）
   e2eHttp/                     # E2E 専用 httpAction ハンドラ
-  lib/
-    discountItems.ts
-    weekDates.ts
+  e2ePurge.ts                  # E2E テストデータ・孤児グループの purge（internal 関数群）
   users/
     auth.ts
     mutations.ts
@@ -226,6 +226,7 @@ convex/
     mutations.ts
     internal.ts
     expenseEntries.test.ts
+  expenseSearch.ts             # 支出検索 query（searchExpenses）
   weekSessions/
     queries.ts
     mutations.ts
@@ -236,7 +237,8 @@ convex/
     actions.ts
     model.ts
     internal.ts
-    extractionMapping.ts
+    validators.ts              # v.* validator 宣言
+    e2eDraftFixtures.ts        # E2E seed 用フィクスチャ
   receiptAnalysisJobs/
     queries.ts
     mutations.ts
@@ -253,8 +255,13 @@ convex/
     jobs.ts
     suppressions.ts
     model.ts
-    lib/providers.ts
-    webhooks/processResendEvent.ts
+    webhooks/
+      processResendEvent.ts
+      resendWebhook.ts
+  lineLink/                   # LINE アカウント連携（link/unlink・監査）
+  lineWebhook/                # LINE Messaging API webhook（署名検証・summary 応答・リッチメニュー）
+  notifications/              # 通知の enqueue・LINE 通知ジョブ配信
+  notificationSettings.ts     # 通知設定 query/mutation
   crons.ts                    # 定期 cleanup ジョブ
   systemAdmins.ts             # システム管理者認可・管理 API
   systemAdminSearch.ts
@@ -280,6 +287,7 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
     receiptImageExtraction/    # analyzeReceiptImageCore, openaiClient, parse, validators, ...
     receipts/                  # insert, queries, summaryLib, spendingEntries.ts
   domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
+  email/                       # メール provider・template 定義（convex/email から利用）
 
 tests/
   workflow/                    # CI workflow・デプロイ設定などの検証系テスト（Vitest）
@@ -318,7 +326,7 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 | --- | --- | --- |
 | `app-shell` | `week`, `auth`, `ui`, `expense-search` | レイアウト・ナビ・ユーザー表示・検索ボックス |
 | `settings` | `group-admin` | グループ設定パネル |
-| `receipt`, `expense-entry` | `ai-expense-queue`, `ui`, `week` | AI キュー UI・共通 UI・週選択 |
+| `expense-entry` | `ai-expense-queue`, `ui`, `week` | AI キュー UI・共通 UI・週選択 |
 | `ai-expense-queue` | `receipt-review`, `src/types` | レビューダイアログ・受け渡し型 |
 | `weekly-summary`, `monthly-summary`, `yearly-summary`, `dashboard`, `expense-search` | `summary-shared`, `week`, `ui` | 集計表示部品・週ユーティリティ |
 
@@ -326,7 +334,11 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 
 ### 5.2 Convex モジュール分割方針
 
-- **公開 API**（`query` / `mutation` / `action` / `internal*`）は `convex/<domain>/` に置く。
+- **公開 API**（`query` / `mutation` / `action` / `internal*`）は、新しく作るものは `convex/<domain>/` に置く。
+  既存モジュールの一部は `convex/` 直下にある（上記ツリーの `systemAdmins.ts`・`systemAdmin*.ts`・
+  `accountDeletion*.ts`・`expenseSearch.ts`・`e2ePurge.ts`・`notificationSettings.ts`・`crons.ts`・
+  migration 系など）。`convex/<domain>/` へ移すと `api.<module>.<function>` のパスが変わり
+  既存クライアント・`internal.*` 参照と互換しなくなるため、直下の既存モジュールは移動せず維持する。
 - **純粋ヘルパー**（バリデーション、集計、外部 API 呼び出し本体、登録ロジック等）は `lib/convex/<domain>/` に置き、`convex/` から import する。
   `convex/` 配下の `.ts` は Convex が `api.d.ts` に載せるため、ヘルパーを増やしすぎると型推論が深くなりビルドが失敗しうる。
 - **HTTP** は `convex/http.ts` が router のみを担当し、E2E 用 handler は `convex/e2eHttp/` に分離する。
@@ -407,9 +419,9 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   の `readQueryDoc(s)` 経由に統一し、インメモリテストモックのフォールバック
   （`collect` → `take` → `unique`）を維持する。
 - **削除オーケストレーション**（`convex/groups/lib/groupDeletion*.ts` 群）も
-  4層へ移行済み。ステージ順序・遷移判定・リトライ計画・影響集計の純粋関数は
-  `lib/domain/groupDeletion/`（`stages`・`jobTransitions`・`counts`・`impact`・
-  `retry`）、オーケストレーションは `lib/usecase/groupDeletion/`（`startGroupDeletion`・
+  4層へ移行済み。ステージ順序・遷移判定・影響集計の純粋関数は
+  `lib/domain/groupDeletion/`（`stages`・`jobTransitions`・`counts`・`impact`）、
+  リトライ計画は `lib/domain/common/`（`retry`）、オーケストレーションは `lib/usecase/groupDeletion/`（`startGroupDeletion`・
   `resumeGroupDeletion`・`processGroupDeletionBatch`・
   `processRecipientNotificationBatch`・`processGroupDeletionFailureNotification`・
   `recordBatchRetry`・`runPurgeStage`・`countGroupDeletionImpact`・
@@ -425,8 +437,9 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 `accountDeletion` も同じハイブリッド方針で 4 層へ移行済み。
 
 - **既存純粋関数の維持**: `classification`・`confirmation`・`errorCategory`・
-  `resume`・`retry`・`status` は既に `lib/domain/accountDeletion/` に存在するため
+  `resume`・`status` は既に `lib/domain/accountDeletion/` に存在するため
   そのまま利用し、Clerk 削除エラー分類（`clerkError`）を追加した。
+  リトライ計画の純粋関数は `lib/domain/common/`（`retry`）に集約する。
 - **ポート**: `AccountDeletionRequestStore`（Reader 分離）・
   `AccountDeletionGroupPurgeStore`・`AccountDeletionUserDataPurgeStore`・
   `AccountDeletionScheduler`、および汎用 `TransactionalEmailQueue`
@@ -634,7 +647,7 @@ E2E reset・取得）も4層へ移行済み。週の日付計算は既存 `lib/d
 を再利用する。
 
 - **純粋関数**（`lib/domain/weekSessions/`）: `store.ts`（`WeekSessionRecord`・
-  `WeekSessionStore` ポート）と `rules.ts`（ローカル日付 YYYY-MM-DD 生成、
+  `WeekSessionStore` ポート）と `rules.ts`（
   新規 draft フィールド構築、complete patch（reviewMemo は指定時のみキー含有）、
   reset patch（reviewMemo を undefined で明示クリア）、not found / retrieve 失敗検証）。
 - **ユースケース**（`lib/usecase/weekSessions/`）: getOrCreate（既存返却・無ければ
@@ -648,8 +661,9 @@ E2E reset・取得）も4層へ移行済み。週の日付計算は既存 `lib/d
   endpoint名、args/returns、エラー文言、Doc 返却形状、patch キー構成は不変とする。
 
 `receiptImageExtraction`（レシート画像抽出 action）も4層へ移行済み。OpenAI client・
-parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を再利用し、リクエスト構築
-（プロンプト・JSONスキーマ・カテゴリ正規化）は `lib/domain/receiptImageExtraction/` へ統合済み。
+OpenAI 応答 envelope の取り出し・mock 結果は `lib/convex/receiptImageExtraction/` にあり、
+リクエスト構築（プロンプト・JSONスキーマ・カテゴリ正規化）と抽出結果の業務契約は
+`lib/domain/receiptImageExtraction/` へ統合済み。
 
 - **純粋関数**（`lib/domain/receiptImageExtraction/`）: 既存 `mode.ts` に加え、
   `rules.ts`（imageDataUrl 検証、抽出計画解決: mode → real は production 限定 →
@@ -658,10 +672,28 @@ parse・mock 結果は既存の `lib/convex/receiptImageExtraction/` を再利�
   `extractionRequest.ts`（抽出リクエスト構築: `ReceiptCategoryHint`/`CategoryInput` 型、
   BiDi制御文字 sanitize・重複排除 `normalizeCategories`、プロンプト構築
   `buildReceiptExtractionPrompt`、JSONスキーマ `buildReceiptExtractionJsonSchema`、
-  リクエストボディ `buildOpenAIReceiptExtractionRequestBody`）。
+  リクエストボディ `buildOpenAIReceiptExtractionRequestBody`）、
+  `extractionResult.ts`（抽出結果の業務契約の正本: `ExtractReceiptFieldsResult`・
+  `ExtractReceiptItemResult`・`ExtractedReceiptTaxSummary`・`ExtractionConfidence`・
+  `ReceiptItemTaxRatePercent` 等。`ExtractedReceiptTaxSummary` は解釈前の抽出値で、
+  `status`/`reasons` 等を持つ解釈後契約の `ExtractedTaxSummary`
+  （`lib/domain/receipt/tax/types.ts`）とは別名にして区別する。税率・amountBasis・
+  行種別・観測行・マーカー定義は `lib/domain/receipt/**` の正本を参照し、
+  同じ型は複製しない）。
   OpenAI モデルは `RECEIPT_EXTRACTION_OPENAI_MODEL`（現在 `gpt-6-luna`）、
   reasoning 設定は `RECEIPT_EXTRACTION_REASONING`（`effort: "none"` 固定）の
   定数で一元管理し、環境変数では切り替えない。
+- **応答境界**: OpenAI Responses API の envelope（`output → message → output_text`
+  の取り出しと JSON.parse）は infra の
+  `lib/convex/receiptImageExtraction/parseExtraction.ts` が担い、業務 payload の
+  検証・日付補正・明細正規化は `lib/domain/receipt/extraction.ts` の
+  `parseExtractionPayload` が担う。`parseOpenAIResponse` wrapper の成功・失敗契約
+  （ConvexError への変換と文言・判定順序）は不変。
+  `lib/convex/receiptImageExtraction/types.ts` は `OpenAIResponsesApiResponse`・
+  extractor 引数（`ExtractReceiptFieldsArgs`・`OpenAIReceiptExtractorArgs`）などの
+  adapter 固有型のみを所有し、業務型は domain 正本を再exportする。
+  `lib/domain/dependencyDirection.test.ts` が lib/domain → convex 参照の
+  逆依存再導入を検査する。
 - **ユースケース**（`lib/usecase/receiptImageExtraction/`）: `extractReceiptFields`
   （検証 → 計画 → mock/real）と `extractReceiptFieldsForCurrentGroup`
   （group → consent+categories 並列取得 → 抽出）。
@@ -1097,7 +1129,7 @@ AI支出下書き一覧の画像プレビューは、画像送信時にクライ
 リサイズ済みData URLを利用する。画像本体は `aiExpenseDrafts`、`receiptAnalysisImageJobs`、
 Convex Storageへ保存しないため、ページ更新・別端末・別セッションではプレビューできない。
 同時に選択または撮影した画像群は、クライアントの `sessionBatches` に `batchId`、対象ジョブID、
-ファイル名だけを保持し、`listJobs` の `jobId` / `draftId` と結合して同一バッチの進捗を表示する。
+ファイル名だけを保持し、`listJobsByBatch` で取得したジョブの `jobId` / `draftId` と結合して同一バッチの進捗を表示する。
 バッチ情報も永続化せず、複数バッチの登録対象を混在させない。
 失敗ジョブの「再解析」は同じセッションの画像を再送し、「再撮影」はカメラまたはファイルから
 新しい画像を選んで同じジョブを再試行する。保存済みの `needs_review` ジョブも同じ再解析導線を
@@ -1320,9 +1352,9 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 
 - `receiptAnalysisJobs.mutations.createBatch(input)`
 - `receiptAnalysisJobs.queries.listBatches()`
-- `receiptAnalysisJobs.queries.listJobs()`
 - `receiptAnalysisJobs.queries.listJobsByBatch(batchId)`
-- `receiptAnalysisJobs.queries.getJobByDraftId(draftId)`
+- `receiptAnalysisJobs.queries.listActiveJobs()`
+- `receiptAnalysisJobs.queries.listJobsByDraftIds(draftIds)`
 - `receiptAnalysisJobs.actions.analyzeImageJob(jobId, imageDataUrl)`
 - `receiptAnalysisJobs.mutations.retryImageJob(jobId)`
 - `receiptAnalysisJobs.mutations.cancelImageJob(jobId)`
@@ -1333,6 +1365,38 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 
 バッチ画像解析は `receiptAnalysisBatches` / `receiptAnalysisImageJobs` テーブルで管理する。
 各ジョブは `analyzeImageJob` action で非同期に処理され、完了時に internal の `finalizeBatchStatus` でバッチ状態を更新する。
+
+`analyzeImageJob` は job が `queued` のときだけ画像解析を実行し、それ以外の状態では解析せずに終了する。
+有料の解析呼び出しを不正な状態で開始しないよう、`updateJobStatus` も `running` への遷移時に
+job の現状態を検査する。`retryImageJob` が `failed` / `needs_review` を `queued` へ戻してから
+`analyzeImageJob` を呼ぶため、再試行も同じ経路で実行される。
+
+`createBatch` は1回につき10枚まで受け付ける。上限は `lib/domain/receiptAnalysisJobs/rules.ts` の
+`MAX_RECEIPT_ANALYSIS_BATCH_FILES` で定義し、超過時は batch・job を作成せず拒否する。
+
+`running` または `queued` のまま `updatedAt` が `RECEIPT_ANALYSIS_STALE_JOB_MS`（45分）を
+超えた job は、起動元の action が実行上限（Convex runtime の action は30分）で既に
+止まっているか、action の呼び出し自体が届いていないとみなし、cron の
+`recoverStaleReceiptAnalysisJobs`（5分間隔）が `failed` に確定する。
+`queued` の待機は通常数秒で `startAttempt` が `running` へ進めるため、45分経っても
+`queued` の job は呼び出し不達または action 開始前の停止として安全に確定できる。
+1回の実行あたり最大 `RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE`（100件）まで処理し、
+`failed` への遷移は通常の `updateJobStatus` と同じ経路（終端通知の予約を含む）で行う。
+
+回復時は通常の解析失敗と同じ最終状態にそろえる。初回解析で止まった job（draftId なし）
+には失敗 draft を作成して job に紐づけ、再解析で止まった job（draftId あり）は既存
+draft をそのまま維持する。これにより回復した job はキュー一覧に「失敗」の項目として
+残り、既存の再試行導線（draft 項目から `useRetry` 経由）で処理できる。画像 dataUrl は
+クライアントのセッション状態にしかないため、セッションに残っていなければ再試行時に
+利用者が画像を選び直す。
+
+回復後に遅れて届いた解析結果は `finalizeAnalysisAttempt` が `running` 以外の job への
+書き込みを受理しないため破棄され、job は `failed` のまま利用者が再試行できる。
+
+既知の制限: action が draft 作成後・`finalizeAnalysisAttempt` 前に止まると、job に
+紐づかない結果 draft が残り得る（draft 側に起動元の jobId を持たないため検出できない）。
+再解析 job で起きると、回復→再試行の後に同じレシートの下書きが2件並び得る。
+根本対応は draft に起動元 jobId を持たせる schema 変更で、この変更の範囲外。
 
 `createBatch` 時に `receiptAnalysisBatches.createdByUserId` に実行ユーザーの `tokenIdentifier` を保存する。
 ジョブが `needs_review` など terminal 状態に更新されると、`updateJobStatus` は `aiReviewNotificationScheduledAt` を記録し、
@@ -1381,7 +1445,7 @@ Convexにも引数validatorがあるため、Valibotだけに依存しない。�
 ### 12.1 週計算
 
 - 週の開始曜日は `users.weeklyStartDay` から決まり、未設定は月曜日
-- `convex/lib/weekDates.calculateWeekStartDate(date, weekStartDay)` で対象日の週開始日を求める
+- `lib/domain/week/weekDates.calculateWeekStartDate(date, weekStartDay)` で対象日の週開始日を求める
 - `calculateWeekEndDate(weekStartDate)` / `getWeekEndDay(weekStartDay)` で週終了日・終了曜日を求める
 - 日付は `YYYY-MM-DD` 文字列として扱う
 
@@ -1629,6 +1693,56 @@ ready / needs_review の下書き一覧は明細読み取り（N+1）を避け�
 1. `pnpm exec convex run aiExpenseDraftListSummaryMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` を確認）
 2. `pnpm exec convex run aiExpenseDraftListSummaryMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
 3. `pnpm exec convex run aiExpenseDraftListSummaryMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること）
+
+#### aiExpenseDraftItems の printedAmountYen 欠落行（据え置き・backfill 不実施）
+
+2026-11-01 の本番件数取得（件数のみ・read-only）で、`printedAmountYen` を持たない `aiExpenseDraftItems` が 21 行存在することを確認した。これらは `printedAmountYen` 追加前の書き込み経路、または同フィールドを書かなかった過去の明細置換 writer で作られた可能性がある行である。行単位の作成経路・同値性は件数集計では証明できない。
+
+**方針は据え置き（backfill しない）とする。** `amountYen` からの推定補完は行わない。理由は次の通りである。
+
+- `amountYen` と真の印字額の同値性が行単位で証明できない。親下書きに AI 解釈スナップショットが無く、突合材料が存在しない
+- backfill 後は真の印字額と区別がつかず、マーカーなしには不可逆となる
+- 各読取経路は既存の fallback で欠落を許容している（表示は `printedAmountYen ?? normalizedAmountYen ?? amountYen`、税処理入力は `printedAmountYen ?? amountYen`）ため、一括書き込みの実益がない
+
+**残す条件**: `printedAmountYen` は persisted では optional のまま維持し、読取側の fallback 規則を変更しない。fallback を整理・必須化する変更は、欠落行への影響評価を先に行うこと。なお欠落行の親下書きで review・登録後更新による明細置換、または税再解釈が走れば、現行 writer が `printedAmountYen`（再解釈時は入力 fallback 値）を書くため欠落は解消されうる — これは行単位の経路確定ではなく、現行コードの振る舞いに基づく可能性の記述である。
+
+**個別対応**: 行単位の経路特定が必要になった場合は、本番監査証跡（変更履歴等）の照合を個別案件として扱う。件数集計からの推定で個別行の値を確定・補完しない。
+
+#### aiExpenseDraftItems の lineType 欠落行（据え置き・backfill 不実施）
+
+2026-11-01 の本番件数取得で、`lineType` を持たない `aiExpenseDraftItems` が 49 行、加えて `receiptInterpretation`・`receiptUserOverride` 内の埋め込み明細にも各 6 件存在した。埋め込み側は明細行のスナップショット複写であり、独立テーブル側と同一の論理明細を二重に数えうるため、合算しない。`lineType` は 2026-09-04 に追加された項目で、それ以前の書き込み経路の産物と整合する。
+
+**方針は据え置きとする。** 理由は次の通りである。
+
+- 欠落時の読み取りは設計済み fallback が2系統ある: 値引き判定は `lineType === undefined` のとき品目名ヒューリスティック（`isDiscountItemName`）に落ち、review 上の同一性比較は `lineType ?? "item"` として扱う。どちらも現行コードの意図した互換動作である
+- itemName から機械的に補完すると、欠落時に2系統が異なる解釈をしうる行（値引き名の品目は name 系では「値引き」・`?? "item"` 系では「item」）で、どちらの意味を確定すべきかが行単位で判断できない
+- review 置換 writer は `item.lineType ?? previous.lineType` を書くため、提出・先行の両方が無ければ欠落のまま維持される — 欠落の存続自体が現行の許容動作である
+
+**残す条件**: `lineType` は persisted optional のまま維持し、2系統の欠落時 fallback を変更しない。必須化するには行単位の値確定根拠が要る — 件数だけでは必須化を正当化しない。
+
+#### aiExpenseDrafts の receiptDataContractVersion 欠落（据え置き・backfill 不実施）
+
+2026-11-01 の本番件数取得で、`receiptDataContractVersion` を持たない `aiExpenseDrafts` が 40 件中 23 件存在した。同項目は 2026-08-25 の契約導入時に追加され、`createFromExtraction` が新規解析時にだけ `RECEIPT_DATA_CONTRACT_VERSION`（現在値 1）を dual-write する。
+
+**方針は据え置きとする。** 理由は次の通りである。
+
+- 欠落は「契約導入前に作られた下書きである可能性」を示すが、来歴は確定しない。導入前 writer 以外にも、バージョンを書かない別経路・更新・部分書込でも未設定はありうる。契約適合を検証していない行に `1` を書くと「その契約で作られた」という未証明の主張を行に刻むことになる
+- 現行コードで値を読んで処理を分岐する reader は存在しない（UI マッパーへの pass-through のみ）ため、補完しても動作上の実益がない
+- schema は `v.optional(v.literal(1))` で、将来バージョンが増えたとき「無印 = 来歴不明・契約検証なし」として扱える設計が維持される
+
+**残す条件**: optional literal のまま維持し、新規解析経路の dual-write を継続する。既存行への値書き込みは「その契約で作られた」という主張を伴うため、行単位の契約検証証拠なしには行わない。
+
+#### aiExpenseDrafts の receiptUserOverride.taxSummaryCorrections（据え置き・現役フィールド）
+
+2026-11-01 の本番件数取得では、調査時点の 40 draft いずれにも `taxSummaryCorrections` が存在しなかった。これは「その時点で存在しない」ことの確認であり、過去に一度も書かれていない証明・ユーザーが一度も訂正していない証明のどちらでもない。
+
+**方針は据え置きとする（現段階で撤去しない）。** 理由は次の通りである。
+
+- 書き込み経路は現役である: `buildReceiptUserOverride` が訂正値が非空のときだけ書く（`?.length` 条件）。調査時点の不在はこの条件付き書き込みと整合するが、来歴（未訂正・書込失敗・削除・別経路）は件数では区別できない
+- 存在の有無に意味がある: `resolveReceiptTaxCorrections` はフィールドの「存在」で早期 return するため、空配列を持つ行は派生訂正を抑制する。欠落と空配列は意味が異なり、値を書いて状態を作ってはいけない
+- 欠落・空・非空の3状態を保持する契約なので、撤去にはこの区別を維持できる代替表現（例: フラグ・別フィールドへの移設）の設計と移行が要る — 機能廃止だけが撤去手段ではない
+
+**残す条件**: 条件付き書き込みと「存在で早期 return」の読み取り契約を維持する。撤去を検討する場合は、欠落・空・非空の3状態を等価に表現できる形式への移行設計を先に行い、互換性を検証してから判断する。
 
 ## 17. テスト方針
 

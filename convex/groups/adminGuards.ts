@@ -8,10 +8,8 @@ import {
   validateGroupOwnerRole,
   validateNotSelfOperator,
   validateRemovableGroupMemberRole,
-  type GroupAdminRole,
 } from "../../lib/domain/groups/admin";
-
-export type { GroupAdminRole } from "../../lib/domain/groups/admin";
+import type { GroupRole } from "../../lib/domain/groups/role";
 
 export const GROUP_ADMIN_ERRORS = {
   OWNER_ONLY: "グループオーナーのみ実行できます",
@@ -26,7 +24,7 @@ export const GROUP_ADMIN_ERRORS = {
   GROUP_NAME_MISMATCH: "入力されたグループ名が一致しません",
 } as const;
 
-export function assertGroupOwnerRole(role: GroupAdminRole): void {
+export function assertGroupOwnerRole(role: GroupRole): void {
   const result = validateGroupOwnerRole(role);
   if (!result.success) {
     throw new ConvexError(getGroupAdminErrorMessage(result.error));
@@ -50,7 +48,7 @@ export function assertNotSelfOperator(actorUserId: string, targetUserId: string)
   }
 }
 
-export function assertRemovableGroupMemberRole(role: GroupAdminRole): void {
+export function assertRemovableGroupMemberRole(role: GroupRole): void {
   const result = validateRemovableGroupMemberRole(role);
   if (!result.success) {
     throw new ConvexError(getGroupAdminErrorMessage(result.error));

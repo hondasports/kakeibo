@@ -4,10 +4,24 @@
  */
 import { validateExpenseAmount } from "../expenseEntries/expenseEntryItem";
 
+export const SOURCE_DOCUMENT_SOURCE_TYPES = [
+  "manual",
+  "receipt",
+  "convenience_payment",
+  "invoice",
+  "unknown",
+] as const;
+
+export type SourceDocumentSourceType = (typeof SOURCE_DOCUMENT_SOURCE_TYPES)[number];
+
+export const SOURCE_DOCUMENT_STATUSES = ["draft", "ready", "finalized"] as const;
+
+export type SourceDocumentStatus = (typeof SOURCE_DOCUMENT_STATUSES)[number];
+
 export type SourceDocumentFields = {
   groupId: string;
-  sourceType: "manual" | "receipt" | "convenience_payment" | "invoice" | "unknown";
-  status: "draft" | "ready" | "finalized";
+  sourceType: SourceDocumentSourceType;
+  status: SourceDocumentStatus;
   date?: string;
   totalAmount?: number;
   shopName?: string;

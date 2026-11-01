@@ -1,0 +1,55 @@
+{
+  "$comment": "import グラフに乗らない依存（テストが readFileSync 等でrepo内ファイルを読む）→ それを検査するunitテストの対応表。verify:prepush（scripts/verify-prepush.mjs）が変更ファイルをこのmapで引き、当たったテストを vitest related の実行対象に加える。テストがrepo内ファイルを fs で読む構造を追加したらここへ追記すること。キーは e2e/spec-map.json と同じ gitignore 風glob、値はrepo相対のテストファイルパス。",
+  "docs/line/*.png": [
+    "convex/lineWebhook/richMenuClient.test.ts",
+    "lib/domain/lineSummary/richMenu.test.ts"
+  ],
+  ".github/workflows/ci.yml": ["scripts/ci-change-scope.test.mjs"],
+  ".github/workflows/e2e.yml": [
+    "scripts/classify-e2e-relevance.test.mjs",
+    "tests/workflow/e2eWorkflow.test.ts"
+  ],
+  ".github/workflows/preview-deploy.yml": [
+    "scripts/wait-for-staging-window.test.mjs",
+    "tests/workflow/previewDeployWorkflow.test.ts"
+  ],
+  ".github/workflows/production-release.yml": [
+    "scripts/wait-for-staging-window.test.mjs",
+    "tests/workflow/productionReleaseWorkflow.test.ts"
+  ],
+  ".github/workflows/pr-update-spec.yml": ["tests/workflow/prUpdateSpecWorkflow.test.ts"],
+  "vercel.json": ["tests/workflow/securityHeaders.test.ts"],
+  "package.json": ["tests/workflow/localConvexWorkflow.test.ts"],
+  "README.md": ["tests/workflow/localConvexWorkflow.test.ts"],
+  "docs/environment-variables.md": ["tests/workflow/localConvexWorkflow.test.ts"],
+  "docs/service-tooling-setup.md": ["tests/workflow/localConvexWorkflow.test.ts"],
+  "scripts/start-local-convex.mjs": ["tests/workflow/localConvexWorkflow.test.ts"],
+  "scripts/check-pr-product-update.ts": ["tests/workflow/prUpdateSpecWorkflow.test.ts"],
+  "scripts/generate-product-updates.ts": ["tests/workflow/productionReleaseWorkflow.test.ts"],
+  "skills/local-dev-env/SKILL.md": ["tests/workflow/localConvexWorkflow.test.ts"],
+  "src/App.css": [
+    "src/features/ai-expense-queue/components/QueueContent.responsive.test.ts",
+    "src/features/summary-shared/components/ReceiptListCard.responsive.test.ts"
+  ],
+  "src/features/ui/components/SuzumemoLoading.css": [
+    "src/features/ui/components/SuzumemoLoading.test.tsx"
+  ],
+  "public/animations/suzumemo-loading/**": ["src/features/ui/components/SuzumemoLoading.test.tsx"],
+  "src/router.tsx": ["src/features/ui/components/SuzumemoLoadingState.test.tsx"],
+  "src/features/dashboard/pages/DashboardPage.tsx": [
+    "src/features/ui/components/SuzumemoLoadingState.test.tsx"
+  ],
+  "src/features/expense-entry/pages/InputPage.tsx": [
+    "src/features/ui/components/SuzumemoLoadingState.test.tsx"
+  ],
+  "src/features/group-admin/pages/GroupSelectPage.tsx": [
+    "src/features/ui/components/SuzumemoLoadingState.test.tsx"
+  ],
+  "src/features/weekly-summary/pages/SummaryPage.tsx": [
+    "src/features/ui/components/SuzumemoLoadingState.test.tsx"
+  ],
+  "lib/domain/**": ["lib/domain/dependencyDirection.test.ts"],
+  "**/*.md": ["skills/skills.test.mjs"],
+  "**/*.yaml": ["skills/skills.test.mjs"],
+  "**/*.yml": ["skills/skills.test.mjs"]
+}

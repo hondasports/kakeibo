@@ -18,6 +18,20 @@ const sampleReceipt: ReceiptItem = {
 };
 
 describe("ReceiptRow", () => {
+  it("実行環境の数値ロケールに依存せず円表示する", () => {
+    const original = Number.prototype.toLocaleString;
+    const locale = vi.spyOn(Number.prototype, "toLocaleString").mockImplementation(function (
+      this: number,
+    ) {
+      return original.call(this, "de-DE");
+    });
+    try {
+      renderWithProviders(<ReceiptRow receipt={sampleReceipt} />);
+      expect(screen.getByText("1,280円")).toBeInTheDocument();
+    } finally {
+      locale.mockRestore();
+    }
+  });
   it("編集と削除ボタンからコールバックを呼び出す", async () => {
     const user = userEvent.setup();
     const onEdit = vi.fn();

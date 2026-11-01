@@ -29,12 +29,6 @@ export function isLineNotificationJobDue(
   return (job.leaseUntil ?? 0) <= now;
 }
 
-export function isLineNotificationJobAlive(
-  job: Pick<LineNotificationJobRecord, "status">,
-): boolean {
-  return !isTerminalLineNotificationJobStatus(job.status);
-}
-
 export type LineNotificationRetryPlan =
   | { kind: "retry"; nextRetryAt: number; delayMs: number }
   | { kind: "exhausted"; errorCode: string };

@@ -1,6 +1,6 @@
 import type { AiExpenseDraftDocumentType } from "./constants";
 
-type ReceiptShopNameDraftFields = {
+export type ReceiptShopNameDraftFields = {
   documentType?: AiExpenseDraftDocumentType;
   shopName?: string;
   paymentPlace?: string;
@@ -15,15 +15,20 @@ function joinNonEmpty(parts: Array<string | undefined>) {
     .join(" ");
 }
 
-export function resolveReceiptShopNameFromDraft(draft: ReceiptShopNameDraftFields) {
+export function resolveReceiptShopNameFromDraft(
+  draft: ReceiptShopNameDraftFields,
+  fallback = "不明",
+) {
   if (draft.documentType === "convenience_payment") {
     return (
       joinNonEmpty([draft.payeeName, draft.paymentPurpose]) ||
       draft.paymentPlace?.trim() ||
       draft.shopName?.trim() ||
-      "不明"
+      fallback
     );
   }
 
-  return draft.shopName?.trim() || draft.payeeName?.trim() || draft.paymentPlace?.trim() || "不明";
+  return (
+    draft.shopName?.trim() || draft.payeeName?.trim() || draft.paymentPlace?.trim() || fallback
+  );
 }

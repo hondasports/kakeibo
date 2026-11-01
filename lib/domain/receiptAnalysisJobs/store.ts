@@ -1,6 +1,5 @@
 import type {
   ReceiptAnalysisBatchRecord,
-  ReceiptAnalysisBatchStatus,
   ReceiptAnalysisJobRecord,
   ReceiptAnalysisJobStatus,
 } from "./records";
@@ -11,6 +10,11 @@ export interface ReceiptAnalysisReader {
   getJob(id: string): Promise<ReceiptAnalysisJobRecord | null>;
   listJobsByBatch(batchId: string, limit?: number): Promise<ReceiptAnalysisJobRecord[]>;
   listActiveJobsByGroup(groupId: string, limit: number): Promise<ReceiptAnalysisJobRecord[]>;
+  listJobsByStatusUpdatedBefore(
+    status: ReceiptAnalysisJobStatus,
+    updatedBefore: number,
+    limit: number,
+  ): Promise<ReceiptAnalysisJobRecord[]>;
   findJobByDraftId(draftId: string): Promise<ReceiptAnalysisJobRecord | null>;
   countJobsByStatus(batchId: string, status: ReceiptAnalysisJobStatus): Promise<number>;
 }
@@ -50,17 +54,15 @@ export interface ReceiptAnalysisStore extends ReceiptAnalysisReader {
   ): Promise<void>;
   deleteJob(id: string): Promise<void>;
   getDraft(id: string): Promise<{ id: string; status: string; updatedAt: number } | null>;
+  insertFailedAnalysisDraft(args: {
+    groupId: string;
+    createdByUserId?: string;
+    imageFileName?: string;
+    warning: string;
+  }): Promise<string>;
   deleteDraftAndItems(draftId: string, groupId: string): Promise<void>;
 }
 
 export interface ReceiptAnalysisScheduler {
   scheduleAiReviewCheck(delayMs: number, batchId: string): Promise<void>;
 }
-
-export type UpdateJobFields = {
-  status: ReceiptAnalysisJobStatus;
-  draftId?: string;
-  error?: string;
-};
-
-export type BatchStatus = ReceiptAnalysisBatchStatus;

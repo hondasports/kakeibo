@@ -1,10 +1,12 @@
+import { normalizeEmail } from "../users/email";
+
 export type ValidateEmailError = "empty";
 
 export function validateEmail(
   email: string,
 ): { success: true; email: string } | { success: false; error: ValidateEmailError } {
-  const normalized = email.trim().toLowerCase();
-  if (normalized.length === 0) {
+  const normalized = normalizeEmail(email);
+  if (normalized === undefined) {
     return { success: false, error: "empty" };
   }
   return { success: true, email: normalized };
@@ -57,7 +59,7 @@ export function normalizeGmailAddress(email: string): string | null {
 }
 
 export function getInvitationEmailKey(email: string): string {
-  const normalized = email.trim().toLowerCase();
+  const normalized = normalizeEmail(email) ?? "";
   return normalizeGmailAddress(normalized) ?? normalized;
 }
 
@@ -98,8 +100,8 @@ export function invitationEmailsMatch(
   identityEmail: string | undefined,
   invitationEmail: string,
 ): boolean {
-  const normalizedIdentityEmail = identityEmail?.trim().toLowerCase();
-  const normalizedInvitationEmail = invitationEmail.trim().toLowerCase();
+  const normalizedIdentityEmail = normalizeEmail(identityEmail);
+  const normalizedInvitationEmail = normalizeEmail(invitationEmail) ?? "";
   if (!normalizedIdentityEmail) {
     return false;
   }

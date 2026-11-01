@@ -1,23 +1,30 @@
 import type { UserIdentity } from "convex/server";
 import { vi } from "vitest";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
+import type {
+  AiExpenseDraftDocumentType,
+  AiExpenseDraftSourceType,
+  AiExpenseDraftStatus,
+} from "../../lib/domain/aiExpenseDrafts/constants";
+import type { AiExpenseRegistrationMode } from "../../lib/domain/aiExpenseDrafts/receiptDataContract";
+import type { TaxSummaryDecisionStatus } from "../../lib/domain/receipt/tax/types";
 
 export type DraftDoc = {
   _id: string;
   _creationTime: number;
   groupId: string;
-  sourceType: "image_upload";
-  status: "queued" | "analyzing" | "ready" | "needs_review" | "failed" | "registered";
-  documentType: "receipt" | "convenience_payment" | "unknown";
+  sourceType: AiExpenseDraftSourceType;
+  status: AiExpenseDraftStatus;
+  documentType: AiExpenseDraftDocumentType;
   shopName?: string;
   paymentPlace?: string;
   payeeName?: string;
   paymentPurpose?: string;
   date?: string;
   amountYen?: number;
-  registrationMode?: "detailed" | "totalOnly";
+  registrationMode?: AiExpenseRegistrationMode;
   receiptTotalResolution?: {
-    status: "verified" | "ambiguous" | "contradictory";
+    status: TaxSummaryDecisionStatus;
     protectedAmountYen: number | null;
     candidates: Array<{
       amountYen: number;

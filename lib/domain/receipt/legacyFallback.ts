@@ -5,7 +5,9 @@
 import { getYearMonths } from "../common/year";
 import { getMonthEndDate } from "../common/date";
 
-export type EntryKind = "expense" | "income";
+import type { EntryKind as CommonEntryKind } from "../common/entryKind";
+
+export type EntryKind = CommonEntryKind;
 
 /** 判定に必要な expenseEntries の最小形状。 */
 export type FallbackExpenseEntry = { entryType: EntryKind };

@@ -18,7 +18,7 @@ import {
   isCurrentUserMember,
   type GroupMemberListItem,
 } from "../utils/groupMemberDisplay";
-import { formatGroupRoleLabel } from "../../../../lib/domain/groups/role";
+import { formatGroupRoleLabel, type GroupRole } from "../../../../lib/domain/groups/role";
 
 type GroupMemberListProps = {
   members: GroupMemberListItem[];
@@ -30,7 +30,7 @@ type GroupMemberListProps = {
   onRequestRemove?: (member: GroupMemberListItem, displayLabel: string) => void;
   onRequestRoleChange?: (
     member: GroupMemberListItem,
-    newRole: "owner" | "member",
+    newRole: GroupRole,
     displayLabel: string,
   ) => void;
 };
@@ -105,7 +105,7 @@ export function GroupMemberList({
                     data-testid={`group-member-role-select-${member.userId}`}
                     disabled={savingTarget !== null}
                     onChange={(event) => {
-                      const newRole = event.target.value as "owner" | "member";
+                      const newRole = event.target.value as GroupRole;
                       if (newRole !== member.role) {
                         onRequestRoleChange(member, newRole, primaryLabel);
                       }

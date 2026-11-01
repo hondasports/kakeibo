@@ -28,3 +28,11 @@ export async function clickUserMenuItem(page: Page, itemName: string): Promise<v
   await menuItem.waitFor({ state: "visible" });
   await menuItem.click();
 }
+
+/** 設定台帳の「危険な操作」セクションを開く（既に開いていれば何もしない） */
+export async function expandDangerZone(page: Page): Promise<void> {
+  const trigger = page.getByRole("button", { name: "危険な操作" });
+  if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+    await trigger.click();
+  }
+}

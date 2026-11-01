@@ -6,10 +6,6 @@ export function getAiExpenseQueueRegistrationErrorMessage(): string {
   return "登録に失敗しました。時間をおいて再度お試しください。";
 }
 
-export function getAiExpenseQueueRetryErrorMessage(): string {
-  return "読み取れませんでした。画像が暗いか、文字が小さい可能性があります。もう一度撮り直すと改善することがあります。";
-}
-
 export function getAiExpenseQueueDeleteErrorMessage(): string {
   return "削除に失敗しました。時間をおいて再度お試しください。";
 }

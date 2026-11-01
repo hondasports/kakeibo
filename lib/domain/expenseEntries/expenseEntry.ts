@@ -15,8 +15,13 @@ import {
   validateExpenseTitle,
 } from "./expenseEntryItem";
 
-export type ExpenseEntryType = "expense" | "income";
-export type ExpenseEntrySource = "manual" | "ai_suggested" | "imported";
+import type { EntryKind } from "../common/entryKind";
+
+export type ExpenseEntryType = EntryKind;
+
+export const EXPENSE_ENTRY_SOURCES = ["manual", "ai_suggested", "imported"] as const;
+
+export type ExpenseEntrySource = (typeof EXPENSE_ENTRY_SOURCES)[number];
 
 /** expenseEntries ドキュメントのフィールド。id は永続化済みの場合のみ存在する。 */
 export type ExpenseEntryFields = {

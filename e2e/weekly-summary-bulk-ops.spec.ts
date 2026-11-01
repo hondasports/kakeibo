@@ -1,21 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { gotoAuthenticated } from "./helpers/auth";
 import { cleanupE2eExpenseEntries, cleanupTestReceipts } from "./helpers/cleanup";
+import { saveExpense } from "./helpers/expenseEntry";
 
 function uniqueName(prefix: string): string {
   return `${prefix}_${Date.now()}`;
-}
-
-async function saveExpense(
-  page: import("@playwright/test").Page,
-  shopName: string,
-  amount: string,
-) {
-  await page.getByLabel("店舗名 / 支払先").fill(shopName);
-  await page.getByLabel("合計金額").fill(amount);
-  await page.locator('[role="listbox"][aria-label="カテゴリ候補"] [role="option"]').first().click();
-  await page.getByRole("button", { name: "保存して次へ" }).click();
-  await expect(page.getByLabel("店舗名 / 支払先")).toHaveValue("", { timeout: 10_000 });
 }
 
 test.describe("週次サマリーの一括操作（Issue #550）", () => {

@@ -12,12 +12,11 @@ import {
 import { normalizeReceiptDate } from "./receiptDate";
 import type {
   ExtractedFields,
-  ExtractedTaxSummary,
+  ExtractedReceiptTaxSummary,
   ExtractReceiptItemResult,
-  OpenAIResponsesApiResponse,
-  ReceiptMarkerDefinition,
-  ReceiptRawObservationLine,
-} from "../../convex/receiptImageExtraction/types";
+} from "../receiptImageExtraction/extractionResult";
+import type { ReceiptMarkerDefinition } from "./tax/types";
+import { RECEIPT_LINE_ROLES, type ReceiptRawObservationLine } from "./observations";
 import {
   parseTaxRatePercent,
   parseItemTaxRatePercent,
@@ -36,30 +35,17 @@ import {
 export { JAPAN_TIME_ZONE } from "../common/date";
 export const MAX_EXTRACTED_LINE_ITEMS = 100;
 
-export type ParseOpenAIResponseResult =
+export type ParseExtractionPayloadResult =
   | { success: true; extracted: ExtractedFields }
   | { success: false; error: string };
 
-/** OpenAI Responses API のレスポンスから抽出結果を取り出す */
-export function parseOpenAIResponse(data: OpenAIResponsesApiResponse): ParseOpenAIResponseResult {
+/** provider 応答から取り出した抽出 payload を検証し、業務用の抽出結果へ正規化する */
+export function parseExtractionPayload(payload: unknown): ParseExtractionPayloadResult {
   try {
-    const message = data.output?.find((o) => o.type === "message");
-    const textContent = message?.content?.find((c) => c.type === "output_text");
-    if (!textContent?.text) {
-      throw new Error("OpenAI からのレスポンスに期待するテキストコンテンツが含まれていません");
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(textContent.text);
-    } catch {
-      throw new Error("OpenAI からのレスポンスを JSON としてパースできませんでした");
-    }
-
-    if (typeof parsed !== "object" || parsed === null) {
+    if (typeof payload !== "object" || payload === null) {
       throw new Error("OpenAI レスポンスが期待する形式ではありません");
     }
-    const obj = parsed as Record<string, unknown>;
+    const obj = payload as Record<string, unknown>;
 
     if (typeof obj.shopName !== "string") {
       throw new Error("OpenAI レスポンスの shopName が文字列ではありません");
@@ -206,15 +192,7 @@ function parseRawObservation(value: unknown, index: number): ReceiptRawObservati
   if (
     !Array.isArray(line.lineRoleCandidates) ||
     line.lineRoleCandidates.some(
-      (role) =>
-        role !== "item" &&
-        role !== "discount" &&
-        role !== "tax" &&
-        role !== "subtotal" &&
-        role !== "total" &&
-        role !== "payment" &&
-        role !== "change" &&
-        role !== "unknown",
+      (role) => !(RECEIPT_LINE_ROLES as readonly unknown[]).includes(role),
     )
   ) {
     throw new Error(`OpenAI レスポンスの ${field}.lineRoleCandidates が不正です`);
@@ -315,12 +293,11 @@ function parseReceiptItem(value: unknown, index: number): ExtractReceiptItemResu
   return {
     itemName: item.itemName,
     lineType,
-    amountYen: printedAmountYen,
     printedAmountYen,
     amountBasis,
     taxRatePercent,
-    markers: markers ?? (taxMarker ? [taxMarker] : []),
-    taxMarker: taxMarker ?? markers?.[0] ?? "",
+    // markers が無い・空の旧形式の保存応答だけ taxMarker から復元する（parse 入力側の互換）
+    markers: markers?.length ? markers : taxMarker ? [taxMarker] : (markers ?? []),
     quantity: parseOptionalInteger(item.quantity, `items[${index}].quantity`),
     unitPriceYen: parseOptionalInteger(item.unitPriceYen, `items[${index}].unitPriceYen`),
     categoryName: parseOptionalString(item.categoryName, `items[${index}].categoryName`),
@@ -416,7 +393,7 @@ function parseItemConfidence(
   };
 }
 
-function parseOptionalTaxSummaries(value: unknown): ExtractedTaxSummary[] | undefined {
+function parseOptionalTaxSummaries(value: unknown): ExtractedReceiptTaxSummary[] | undefined {
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value)) {
     throw new Error("OpenAI レスポンスの taxSummaries が配列ではありません");
@@ -424,7 +401,7 @@ function parseOptionalTaxSummaries(value: unknown): ExtractedTaxSummary[] | unde
   return value.map((summary, index) => parseTaxSummary(summary, index));
 }
 
-function parseTaxSummary(value: unknown, index: number): ExtractedTaxSummary {
+function parseTaxSummary(value: unknown, index: number): ExtractedReceiptTaxSummary {
   const field = `taxSummaries[${index}]`;
   if (typeof value !== "object" || value === null) {
     throw new Error(`OpenAI レスポンスの ${field} がオブジェクトではありません`);
@@ -468,7 +445,7 @@ function assertExtractedAmountRange(amount: number, field: string): void {
 function parseTaxSummaryConfidence(
   value: unknown,
   field: string,
-): ExtractedTaxSummary["confidence"] {
+): ExtractedReceiptTaxSummary["confidence"] {
   if (typeof value !== "object" || value === null) {
     throw new Error(`OpenAI レスポンスの ${field}.confidence がオブジェクトではありません`);
   }

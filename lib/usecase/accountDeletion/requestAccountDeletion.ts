@@ -5,6 +5,7 @@
  */
 import { ConvexError } from "convex/values";
 import { isValidAccountDeletionConfirmation } from "../../domain/accountDeletion/confirmation";
+import { DEFAULT_MAX_RETRY_ATTEMPTS } from "../../domain/common/retry";
 import { ACCOUNT_DELETION_GROUP_MEMBERSHIP_INVARIANT_MESSAGE } from "../../domain/accountDeletion/classification";
 import type { AccountDeletionMutationDeps } from "./deps";
 import {
@@ -56,7 +57,7 @@ export async function requestAccountDeletion(
     leftGroupCount: classification.groupsToLeave.length,
     deletedGroupCount: classification.groupsToDelete.length,
     attemptCount: 0,
-    maxAttempts: 6,
+    maxAttempts: DEFAULT_MAX_RETRY_ATTEMPTS,
     createdAt: now,
     updatedAt: now,
   });

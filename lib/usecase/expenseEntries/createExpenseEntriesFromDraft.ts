@@ -7,6 +7,7 @@ import type { AiExpenseDraftReader } from "../../domain/aiExpenseDrafts/draftFor
 import { assertUsableCategory } from "../categories/assertUsableCategory";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
+import { loadDraftInGroup } from "../aiExpenseDrafts/loadDraftInGroup";
 
 export type CreateExpenseEntriesFromDraftUsecaseArgs = {
   draftId: string;
@@ -23,13 +24,7 @@ export async function createExpenseEntriesFromDraft(
   },
   args: CreateExpenseEntriesFromDraftUsecaseArgs,
 ): Promise<string[]> {
-  const draft = await deps.aiExpenseDrafts.findById(args.draftId);
-  if (draft === null) {
-    throw new ConvexError("Draft not found");
-  }
-  if (draft.groupId !== ctx.groupId) {
-    throw new ConvexError("Draft does not belong to the current group");
-  }
+  const draft = await loadDraftInGroup(deps.aiExpenseDrafts, ctx.groupId, args.draftId);
   if (draft.status !== "ready") {
     throw new ConvexError("Only ready drafts can create expense entries");
   }

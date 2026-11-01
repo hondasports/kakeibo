@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ishimoriExternalMisreadFixture,
   trialExternal8Fixture,
-} from "../../convex/receiptImageExtraction/fixtures/taxFixtures";
+} from "../receiptImageExtraction/fixtures/taxFixtures";
 import { mapExtractionToDraftArgs } from "./extractionMapping";
 import { foodCategory } from "./testHelpers";
 

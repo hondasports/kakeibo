@@ -3,10 +3,10 @@ import {
   unprovenTargetReceipt,
   observationLine,
 } from "../receipt/tax/fixtures/unprovenTargetReceipt";
-import { buildReviewTaxPreview } from "./reviewItemsTaxPreview";
+import { buildReviewTaxEvidence, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 import { buildReviewChecks } from "./reviewChecks";
 import type { ReinterpretDraftTaxInput } from "../receipt/tax/reinterpretDraftTax";
-import type { ReviewItemValues } from "./reviewTypes";
+import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
 
 function preview(input: ReinterpretDraftTaxInput) {
   const items: ReviewItemValues[] = input.items.map((item, index) => ({
@@ -140,5 +140,169 @@ describe("明細から導出する画面の税計算", () => {
     expect(preview(input).items.some((item) => item.taxAllocationStatus === "unallocated")).toBe(
       true,
     );
+  });
+});
+
+describe("draftの税証拠の射影", () => {
+  function draftWithEvidence(input: ReinterpretDraftTaxInput): AiExpenseDraft {
+    return {
+      _id: "draft",
+      status: "needs_review",
+      documentType: "receipt",
+      reviewReasons: [],
+      taxSummaries: input.taxSummaries,
+      rawObservation: input.rawObservationLines
+        ? { source: "ai_ocr", observedAt: 0, lines: input.rawObservationLines }
+        : undefined,
+      receiptInterpretation: {
+        source: "ai",
+        interpretedAt: 0,
+        values: {
+          status: "needs_review",
+          documentType: "receipt",
+          confidence: {},
+          warnings: [],
+          reviewReasons: [],
+          items: [],
+          taxSummaries: input.sourceTaxSummaries,
+          receiptLineClassifications: input.receiptLineClassifications,
+        },
+      },
+    };
+  }
+
+  it("証拠フィールドをすべて取り出し、原抽出と補正後サマリを取り違えない", () => {
+    const input = unprovenTargetReceipt();
+    input.sourceTaxSummaries = [
+      {
+        taxRatePercent: 10,
+        taxMode: "included",
+        taxableAmountYen: 4000,
+        taxableAmountBasis: "tax_included",
+        taxYen: 400,
+        roundingMethod: "unknown",
+        confidence: {},
+        warnings: [],
+      },
+    ];
+    input.receiptLineClassifications = [
+      {
+        sourceLineIndex: 1,
+        status: "classified",
+        candidates: [{ role: "tax", score: 1, evidence: [] }],
+      },
+    ];
+    const draft: AiExpenseDraft = {
+      ...draftWithEvidence(input),
+      markerDefinitions: [{ marker: "※", description: "軽減税率対象" }],
+      receiptTotalResolution: {
+        status: "verified",
+        protectedAmountYen: 4810,
+        candidates: [],
+        reasons: [],
+      },
+      receiptUserOverride: {
+        source: "user",
+        updatedAt: 1,
+        fields: ["taxSummaries"],
+        values: {
+          status: "needs_review",
+          documentType: "receipt",
+          confidence: {},
+          warnings: [],
+          reviewReasons: [],
+          items: [],
+        },
+      },
+    };
+    expect(buildReviewTaxEvidence(draft)).toEqual({
+      taxSummaries: draft.taxSummaries,
+      sourceTaxSummaries: input.sourceTaxSummaries,
+      markerDefinitions: draft.markerDefinitions,
+      rawObservation: draft.rawObservation,
+      receiptLineClassifications: input.receiptLineClassifications,
+      receiptTotalResolution: draft.receiptTotalResolution,
+      receiptUserOverride: draft.receiptUserOverride,
+    });
+  });
+
+  it.each([
+    { label: "空オブジェクト", draft: {} },
+    { label: "null", draft: null },
+    { label: "undefined", draft: undefined },
+  ])("$label のdraftは証拠を全項目undefinedで返す", ({ draft }) => {
+    expect(buildReviewTaxEvidence(draft)).toEqual({
+      taxSummaries: undefined,
+      sourceTaxSummaries: undefined,
+      markerDefinitions: undefined,
+      rawObservation: undefined,
+      receiptLineClassifications: undefined,
+      receiptTotalResolution: undefined,
+      receiptUserOverride: undefined,
+    });
+  });
+
+  it("射影結果への明示的な上書きはdraftの証拠より優先される", () => {
+    const input = unprovenTargetReceipt();
+    input.sourceTaxSummaries = input.taxSummaries.map((summary) => ({
+      ...summary,
+      taxYen: summary.taxYen - 1,
+    }));
+    const draft = draftWithEvidence(input);
+    const overrideSummaries = [
+      {
+        taxRatePercent: 8 as const,
+        taxMode: "external" as const,
+        taxableAmountYen: 100,
+        taxableAmountBasis: "tax_excluded" as const,
+        taxYen: 8,
+        roundingMethod: "round" as const,
+        warnings: [],
+      },
+    ];
+    const args = {
+      ...buildReviewTaxEvidence(draft),
+      paidTotalYen: 4810,
+      taxSummaries: overrideSummaries,
+    };
+    expect(args.taxSummaries).toBe(overrideSummaries);
+    expect(args.sourceTaxSummaries).toBe(input.sourceTaxSummaries);
+    expect(args.paidTotalYen).toBe(4810);
+  });
+
+  it("builder経由で合成した引数は手列挙と同じプレビュー結果になる", () => {
+    const input = unprovenTargetReceipt();
+    input.sourceTaxSummaries = [
+      {
+        taxRatePercent: 10,
+        taxMode: "included",
+        taxableAmountYen: 4000,
+        taxableAmountBasis: "tax_included",
+        taxYen: 400,
+        roundingMethod: "unknown",
+        confidence: {},
+        warnings: [],
+      },
+    ];
+    input.receiptLineClassifications = [
+      {
+        sourceLineIndex: 1,
+        status: "classified",
+        candidates: [{ role: "tax", score: 1, evidence: [] }],
+      },
+    ];
+    const draft = draftWithEvidence(input);
+    const items: ReviewItemValues[] = input.items.map((item, index) => ({
+      ...item,
+      id: String(index),
+      itemName: item.itemName,
+      categoryId: "category",
+      amountYen: String(item.printedAmountYen),
+    }));
+    const viaBuilder = buildReviewTaxPreview(items, {
+      ...buildReviewTaxEvidence(draft),
+      paidTotalYen: input.amountYen,
+    });
+    expect(viaBuilder).toEqual(preview(input));
   });
 });

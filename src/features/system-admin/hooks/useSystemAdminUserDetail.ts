@@ -2,10 +2,9 @@ import { api } from "../../../../convex/_generated/api";
 import { useCallback, useEffect, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import type {
-  MembershipDialogGroup,
-  SystemAdminMembershipOperation,
-} from "../components/SystemAdminMembershipChangeDialog";
+import type { GroupRole } from "../../../../lib/domain/groups/role";
+import type { MembershipOperation } from "../../../../lib/domain/systemAdmin/membershipOperation";
+import type { MembershipDialogGroup } from "../components/SystemAdminMembershipChangeDialog";
 
 export type UserDetail = {
   id: string;
@@ -14,7 +13,7 @@ export type UserDetail = {
   email: string | null;
   activeGroupId: string | null;
   environment: string;
-  memberships: { groupId: string; groupName: string; role: "owner" | "member" }[];
+  memberships: { groupId: string; groupName: string; role: GroupRole }[];
   invitations: { groupId: string; groupName: string; status: string }[];
   membershipsTruncated?: boolean;
   invitationsTruncated?: boolean;
@@ -23,7 +22,7 @@ export type UserDetail = {
 export type GroupCandidate = { id: string; name: string; status: string };
 
 export type DialogState = {
-  operation: SystemAdminMembershipOperation;
+  operation: MembershipOperation;
   sourceGroup?: MembershipDialogGroup;
   targetGroup?: MembershipDialogGroup;
 } | null;
@@ -107,7 +106,7 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
   };
 
   const requestOperation = (
-    operation: SystemAdminMembershipOperation,
+    operation: MembershipOperation,
     sourceGroup?: MembershipDialogGroup,
     targetGroup?: MembershipDialogGroup,
   ) => {

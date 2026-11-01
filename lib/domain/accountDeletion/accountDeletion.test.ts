@@ -1,14 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { isValidAccountDeletionConfirmation } from "./confirmation";
 import { getAccountDeletionErrorCategory } from "./errorCategory";
-import { getAccountDeletionRetryDelay } from "./retry";
 import { resolveAccountDeletionResumeStatus } from "./resume";
-import { isActiveAccountDeletionStatus, isAccountDeletionFinalizableStatus } from "./status";
+import {
+  accountDeletionActiveStatuses,
+  isActiveAccountDeletionStatus,
+  isAccountDeletionFinalizableStatus,
+} from "./status";
 
 describe("isActiveAccountDeletionStatus", () => {
-  it("active なステータスを判定する", () => {
-    expect(isActiveAccountDeletionStatus("requested")).toBe(true);
-    expect(isActiveAccountDeletionStatus("failed")).toBe(true);
+  it("完了以外の各状態を active として列挙する", () => {
+    expect(accountDeletionActiveStatuses).toEqual([
+      "requested",
+      "preparing_groups",
+      "purging_groups",
+      "deleting_identity",
+      "retry_wait",
+      "identity_deleted",
+      "finalization_retry_wait",
+      "failed",
+    ]);
+    for (const status of accountDeletionActiveStatuses) {
+      expect(isActiveAccountDeletionStatus(status)).toBe(true);
+    }
+    expect(isActiveAccountDeletionStatus("unknown")).toBe(false);
   });
 
   it("完了は active でない", () => {
@@ -25,17 +40,6 @@ describe("isAccountDeletionFinalizableStatus", () => {
   it("それ以外は最終化不可", () => {
     expect(isAccountDeletionFinalizableStatus("preparing_groups")).toBe(false);
     expect(isAccountDeletionFinalizableStatus("completed")).toBe(false);
-  });
-});
-
-describe("getAccountDeletionRetryDelay", () => {
-  it("試行回数に応じた遅延を返す", () => {
-    expect(getAccountDeletionRetryDelay(0)).toBe(60_000);
-    expect(getAccountDeletionRetryDelay(4)).toBe(6 * 60 * 60_000);
-  });
-
-  it("最大インデックスを超えても最後の値を返す", () => {
-    expect(getAccountDeletionRetryDelay(10)).toBe(6 * 60 * 60_000);
   });
 });
 

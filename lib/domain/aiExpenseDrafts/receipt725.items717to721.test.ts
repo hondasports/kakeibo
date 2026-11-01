@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { item, Row, map, check } from "./testHelpers";
 
-describe("725 production receipt regressions (items 715-721 binding)", () => {
-  it("717 binds quantity row to the tobacco product", () => {
+describe("raw 観測行の数量・コード行は直前の商品明細へ束ねる（receipt 725・items 717-721）", () => {
+  it("数量行は商品にせず直前の商品明細へ束ねる（item 717）", () => {
     check(
       map(
         [
@@ -27,7 +27,7 @@ describe("725 production receipt regressions (items 715-721 binding)", () => {
     );
   });
 
-  it("718 matches markers, widths and quantity suffixes without doubling bread", () => {
+  it("マーカー・表記揺れ・数量サフィックス行は商品を二重にしない（item 718）", () => {
     check(
       map(
         [
@@ -51,7 +51,7 @@ describe("725 production receipt regressions (items 715-721 binding)", () => {
     );
   });
 
-  it("719 binds code/amount rows to named products", () => {
+  it("商品コード・金額行は直前の商品名行へ束ねてカテゴリを保持する（item 719）", () => {
     const result = map(
       [item("ファンウェアベスト GY L1", 4780), item("接触冷感コンプレッシ NF30", 998)].map((i) => ({
         ...i,
@@ -71,7 +71,7 @@ describe("725 production receipt regressions (items 715-721 binding)", () => {
     expect(result.items!.map((i) => i.categoryId)).toEqual(["衣服", "衣服"]);
   });
 
-  it("720 preserves repeated meat and missing products without duplicate recovery", () => {
+  it("真に重複する同名商品を保持し、重複した復元をしない（item 720）", () => {
     const amounts = [
       158, 196, 198, 88, 88, 762, 462, 467, 98, 98, 196, 158, 198, 158, 228, 828, 238, 108, 109, 78,
       88, 108, 118, 228, 148, 98, 516, 298, 248, 258, 256, 779,
@@ -138,7 +138,7 @@ describe("725 production receipt regressions (items 715-721 binding)", () => {
     expect(result.items!.reduce((sum, i) => sum + (i.allocatedTaxYen ?? 0), 0)).toBe(659);
   });
 
-  it("721 keeps discounts and normalizes the single external subtotal", () => {
+  it("割引明細を保持し、単一の外税小計を正規化する（item 721）", () => {
     const amounts = [
       128, 256, 158, 98, 98, 38, 426, -43, 196, 196, 88, 228, 828, 128, 78, 78, 208, 198, 98, 98,
       98, 98, 516, 499, 148, 318, 128, 128, 389, 98, 88, 199, 216, 174, -16, 258, -10,

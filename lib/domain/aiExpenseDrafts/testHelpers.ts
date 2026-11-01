@@ -1,7 +1,7 @@
 import { expect } from "vitest";
 import type { CategoryLike } from "../categories/candidate";
 import { mapExtractionToDraftArgs } from "./extractionMapping";
-import { trialExternal8Fixture } from "../../convex/receiptImageExtraction/fixtures/taxFixtures";
+import { trialExternal8Fixture } from "../receiptImageExtraction/fixtures/taxFixtures";
 import type { ReceiptRawObservationLine } from "../receipt/observations";
 
 export const foodCategory: CategoryLike<string> = {

@@ -1,8 +1,11 @@
 import { v } from "convex/values";
+import { GROUP_ROLES } from "../../lib/domain/groups/role";
+
+export const groupRoleValidator = v.union(...GROUP_ROLES.map((value) => v.literal(value)));
 
 export const groupMemberListItemValidator = v.object({
   userId: v.string(),
-  role: v.union(v.literal("owner"), v.literal("member")),
+  role: groupRoleValidator,
   displayName: v.string(),
   email: v.union(v.string(), v.null()),
   isActiveGroup: v.boolean(),

@@ -13,6 +13,7 @@ import type {
 import type { AmountBasis, TaxRatePercent } from "../../domain/receipt/tax/types";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
+import { loadDraftInGroup } from "./loadDraftInGroup";
 
 export type UpdateDraftItemTaxOverridesUsecaseArgs = {
   draftId: string;
@@ -66,7 +67,7 @@ export async function updateDraftItemTaxOverrides(
 
 /**
  * 税系ユースケース共通の読み込み＋編集可否ガード。
- * 存在しない→not found、他グループ→does not belong、registered→cannot be edited、
+ * 存在しない・他グループ→not found、registered→cannot be edited、
  * needs_review/ready 以外→cannot be edited。
  */
 export async function loadEditableDraft(
@@ -74,14 +75,8 @@ export async function loadEditableDraft(
   groupId: string,
   draftId: string,
 ): Promise<AiExpenseDraft> {
-  const fields = await deps.drafts.findById(draftId);
-  if (fields === null) {
-    throw new ConvexError("AI expense draft not found");
-  }
+  const fields = await loadDraftInGroup(deps.drafts, groupId, draftId);
   const draft = AiExpenseDraft.fromPersisted(fields);
-  if (!draft.belongsToGroup(groupId)) {
-    throw new ConvexError("AI expense draft does not belong to the current group");
-  }
   try {
     draft.assertEditableFromQueue();
   } catch (err) {

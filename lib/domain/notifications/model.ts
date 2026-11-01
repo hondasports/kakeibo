@@ -1,4 +1,4 @@
-import { TRANSACTIONAL_EMAIL_TYPES, type TransactionalEmailType } from "../../email/model";
+import { TRANSACTIONAL_EMAIL_TYPES, type TransactionalEmailType } from "../email/model";
 
 export const NOTIFICATION_CHANNELS = ["email", "line"] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
@@ -49,12 +49,6 @@ export function getNotificationCatalogEntry(
   const entry = catalogByType.get(type);
   if (!entry) throw new Error(`Unknown notification type: ${type}`);
   return entry;
-}
-
-export function isTransactionalEmailType(value: unknown): value is TransactionalEmailType {
-  return (
-    typeof value === "string" && (TRANSACTIONAL_EMAIL_TYPES as readonly string[]).includes(value)
-  );
 }
 
 export function isMandatoryEmailType(type: TransactionalEmailType): boolean {

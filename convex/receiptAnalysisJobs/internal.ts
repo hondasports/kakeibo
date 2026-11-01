@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { RECEIPT_ANALYSIS_JOB_STATUSES } from "../../lib/domain/receiptAnalysisJobs/records";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
@@ -10,11 +11,13 @@ import {
   createReceiptAnalysisMutationDeps,
   createReceiptAnalysisQueryDeps,
 } from "../../lib/convex/receiptAnalysisJobs/receiptAnalysisDeps";
+import { ReceiptAnalysisJobDomainError } from "../../lib/domain/receiptAnalysisJobs/rules";
 import {
   deleteReceiptAnalysisDataByUserBatch as deleteUserDataBatch,
   finalizeReceiptAnalysisAttempt,
   finalizeReceiptAnalysisBatchStatus,
   incrementReceiptAnalysisBatchProcessedCount,
+  recoverStaleReceiptAnalysisJobs as recoverStaleJobs,
   scheduleAiReviewNotificationIfNeeded as scheduleNotification,
   updateReceiptAnalysisJobStatus,
 } from "../../lib/usecase/receiptAnalysisJobs/operations";
@@ -23,7 +26,10 @@ export { isTerminalImageJobStatus } from "../../lib/domain/receiptAnalysisJobs/s
 
 function convexError(error: unknown): never {
   if (error instanceof ConvexError) throw error;
-  throw new ConvexError(error instanceof Error ? error.message : "Unknown error");
+  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
+  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
+  if (error instanceof ReceiptAnalysisJobDomainError) throw new ConvexError(error.message);
+  throw error;
 }
 
 export async function getBatchByIdHandler(
@@ -123,13 +129,12 @@ export async function deleteReceiptAnalysisDataByUserBatchHandler(
   return deleteUserDataBatch(createReceiptAnalysisMutationDeps(ctx).store, args);
 }
 
+export async function recoverStaleReceiptAnalysisJobsHandler(ctx: MutationCtx) {
+  return await recoverStaleJobs(createReceiptAnalysisMutationDeps(ctx));
+}
+
 const jobStatusValidator = v.union(
-  v.literal("queued"),
-  v.literal("running"),
-  v.literal("ready"),
-  v.literal("needs_review"),
-  v.literal("failed"),
-  v.literal("cancelled"),
+  ...RECEIPT_ANALYSIS_JOB_STATUSES.map((status) => v.literal(status)),
 );
 
 export const updateJobStatus = internalMutation({
@@ -188,4 +193,9 @@ export const deleteReceiptAnalysisDataByUserBatch = internalMutation({
     limit: v.optional(v.number()),
   },
   handler: deleteReceiptAnalysisDataByUserBatchHandler,
+});
+
+export const recoverStaleReceiptAnalysisJobs = internalMutation({
+  args: {},
+  handler: recoverStaleReceiptAnalysisJobsHandler,
 });

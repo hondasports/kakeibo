@@ -2,7 +2,14 @@
  * accountDeletionGroupPurges のドメイン型とストア・ポート（domain interface）。
  * 実装は infrastructure 層（lib/convex）が提供する。
  */
-export type AccountDeletionGroupPurgeStatus = "pending" | "running" | "failed" | "completed";
+export const ACCOUNT_DELETION_GROUP_PURGE_STATUSES = [
+  "pending",
+  "running",
+  "failed",
+  "completed",
+] as const;
+export type AccountDeletionGroupPurgeStatus =
+  (typeof ACCOUNT_DELETION_GROUP_PURGE_STATUSES)[number];
 
 export type AccountDeletionGroupPurgeFields = {
   requestId: string;

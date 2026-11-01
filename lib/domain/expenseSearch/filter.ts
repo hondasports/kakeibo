@@ -186,19 +186,6 @@ export function filterHistoryGroups(
   });
 }
 
-export function filterReceiptGroups(
-  groups: SearchableReceiptGroup[],
-  filters: Omit<ExpenseSearchFilters, "entryType"> | ExpenseSearchFilters,
-): SearchableReceiptGroup[] {
-  return filterHistoryGroups(
-    groups.map((group) => ({ ...group, type: "expense" as const })),
-    {
-      ...filters,
-      entryType: "expense",
-    },
-  ).filter((group): group is SearchableReceiptGroup => group.type === "expense");
-}
-
 function compareHistoryGroups(left: SearchableHistoryGroup, right: SearchableHistoryGroup): number {
   const dateOrder = right.date.localeCompare(left.date);
   if (dateOrder !== 0) {
@@ -249,21 +236,15 @@ export function paginateHistoryGroups(
   const pageSize = Math.min(Math.max(requestedSize, 1), 100);
   let startIndex = 0;
 
-  if (paginationOpts.cursor) {
-    const keysetCursor = decodeSearchCursor(paginationOpts.cursor);
-    if (keysetCursor !== null) {
-      startIndex = ordered.findIndex(
-        (group) =>
-          group.date < keysetCursor.date ||
-          (group.date === keysetCursor.date && group.id < keysetCursor.id),
-      );
-      if (startIndex < 0) {
-        startIndex = ordered.length;
-      }
-    } else {
-      // Keep cursors issued by the previous release readable during rollout.
-      const legacyOffset = Number.parseInt(paginationOpts.cursor, 10);
-      startIndex = Number.isFinite(legacyOffset) && legacyOffset > 0 ? legacyOffset : 0;
+  const keysetCursor = paginationOpts.cursor ? decodeSearchCursor(paginationOpts.cursor) : null;
+  if (keysetCursor !== null) {
+    startIndex = ordered.findIndex(
+      (group) =>
+        group.date < keysetCursor.date ||
+        (group.date === keysetCursor.date && group.id < keysetCursor.id),
+    );
+    if (startIndex < 0) {
+      startIndex = ordered.length;
     }
   }
 
@@ -278,24 +259,6 @@ export function paginateHistoryGroups(
         ? encodeSearchCursor(page[page.length - 1]!)
         : (paginationOpts.cursor ?? "v1.empty"),
     isDone,
-  };
-}
-
-export function paginateReceiptGroups(
-  groups: SearchableReceiptGroup[],
-  paginationOpts: { numItems: number; cursor: string | null },
-): {
-  page: SearchableReceiptGroup[];
-  continueCursor: string;
-  isDone: boolean;
-} {
-  return paginateHistoryGroups(
-    groups.map((group) => ({ ...group, type: "expense" as const })),
-    paginationOpts,
-  ) as {
-    page: SearchableReceiptGroup[];
-    continueCursor: string;
-    isDone: boolean;
   };
 }
 

@@ -21,13 +21,12 @@ import {
   SystemAdminPageFrame,
 } from "./SystemAdminPageFrame";
 import type { GroupSearchItem, PageResult } from "../types";
-
-type GroupQueryType = "name" | "groupId";
+import type { GroupSearchType } from "../../../../lib/domain/systemAdmin/searchQuery";
 
 export function SystemAdminGroupSearchPage() {
   const searchGroups = useAction(api.systemAdminSearch.searchGroups);
   const [query, setQuery] = useState("");
-  const [queryType, setQueryType] = useState<GroupQueryType>("name");
+  const [queryType, setQueryType] = useState<GroupSearchType>("name");
   const [result, setResult] = useState<PageResult<GroupSearchItem> | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -77,7 +76,7 @@ export function SystemAdminGroupSearchPage() {
               label="検索対象"
               labelId="system-admin-group-query-type-label"
               value={queryType}
-              onChange={(event) => setQueryType(event.target.value as GroupQueryType)}
+              onChange={(event) => setQueryType(event.target.value as GroupSearchType)}
             >
               <MenuItem value="name">グループ名</MenuItem>
               <MenuItem value="groupId">groupId</MenuItem>

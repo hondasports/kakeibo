@@ -3,7 +3,7 @@
  * 既存 groupDeletionBatchRetry.recordRetry の移植 —
  * リトライ計画に従って retry_wait/failed へ遷移し、後続処理をスケジュールする。
  */
-import { planGroupDeletionRetry } from "../../domain/groupDeletion/retry";
+import { planRetry } from "../../domain/common/retry";
 import type { GroupDeletionJobRecord } from "../../domain/groupDeletion/groupDeletionJob";
 import type { GroupDeletionMutationDeps } from "./deps";
 
@@ -12,7 +12,7 @@ export async function recordBatchRetry(
   job: GroupDeletionJobRecord,
 ): Promise<void> {
   const now = Date.now();
-  const retryPlan = planGroupDeletionRetry({
+  const retryPlan = planRetry({
     attemptCount: job.attemptCount,
     maxAttempts: job.maxAttempts,
     now,

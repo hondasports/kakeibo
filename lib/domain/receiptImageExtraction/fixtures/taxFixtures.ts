@@ -1,4 +1,4 @@
-import type { ExtractReceiptFieldsResult, ExtractReceiptItemResult } from "../types";
+import type { ExtractReceiptFieldsResult, ExtractReceiptItemResult } from "../extractionResult";
 
 function item(
   itemName: string,
@@ -9,12 +9,10 @@ function item(
 ): ExtractReceiptItemResult {
   return {
     itemName,
-    amountYen: printedAmountYen,
     printedAmountYen,
     amountBasis,
     taxRatePercent,
     markers: taxRatePercent === 8 ? ["*"] : taxRatePercent === 10 ? ["#"] : [],
-    taxMarker: taxRatePercent === 8 ? "*" : taxRatePercent === 10 ? "#" : "",
     categoryName: "食費",
     confidence: {
       itemName: 1,
@@ -162,8 +160,8 @@ export const ishimoriExternalMisreadFixture: ExtractReceiptFieldsResult = {
   amountYen: 8562,
   categoryName: "食費",
   items: [
-    item("商品A", 4000, null, "unknown", { markers: ["※"], taxMarker: "※" }),
-    item("商品B", 3966, null, "unknown", { markers: ["※"], taxMarker: "※" }),
+    item("商品A", 4000, null, "unknown", { markers: ["※"] }),
+    item("商品B", 3966, null, "unknown", { markers: ["※"] }),
     item("値引", -8, null, "unknown"),
   ],
   taxSummaries: [

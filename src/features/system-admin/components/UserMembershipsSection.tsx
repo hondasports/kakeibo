@@ -1,8 +1,6 @@
 import { Alert, Button, List, ListItem, Paper, Stack, TextField, Typography } from "@mui/material";
-import type {
-  MembershipDialogGroup,
-  SystemAdminMembershipOperation,
-} from "./SystemAdminMembershipChangeDialog";
+import type { MembershipOperation } from "../../../../lib/domain/systemAdmin/membershipOperation";
+import type { MembershipDialogGroup } from "./SystemAdminMembershipChangeDialog";
 import type { GroupCandidate, UserDetail } from "../hooks/useSystemAdminUserDetail";
 
 type UserMembershipsSectionProps = {
@@ -13,7 +11,7 @@ type UserMembershipsSectionProps = {
   onGroupQueryChange: (query: string) => void;
   onSelectSource: (source: MembershipDialogGroup) => void;
   onRequestOperation: (
-    operation: SystemAdminMembershipOperation,
+    operation: MembershipOperation,
     sourceGroup?: MembershipDialogGroup,
     targetGroup?: MembershipDialogGroup,
   ) => void;

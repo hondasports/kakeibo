@@ -1,6 +1,7 @@
 import { Alert, Button, List, ListItem, Paper, Stack, Typography } from "@mui/material";
 import { Link } from "react-router-dom";
 import type { GroupDetail, GroupDetailMember } from "../hooks/useSystemAdminGroupDetail";
+import type { GroupRole } from "../../../../lib/domain/groups/role";
 
 type GroupMembersSectionProps = {
   detail: GroupDetail;
@@ -14,7 +15,7 @@ type GroupMembersSectionProps = {
   onRequestRoleChange: (
     member: GroupDetailMember,
     operation: "role_change" | "owner_transfer",
-    newRole?: "owner" | "member",
+    newRole?: GroupRole,
   ) => void;
   onSelectRoleSource: (member: GroupDetailMember) => void;
 };

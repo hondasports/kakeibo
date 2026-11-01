@@ -1,3 +1,4 @@
+import { AI_EXPENSE_DRAFT_NOT_FOUND_MESSAGE } from "./constants";
 import {
   type ReceiptTotalSource,
   resolveReceiptTotalSource,
@@ -40,8 +41,8 @@ export type TaxInterpretationEligibilityError =
   | "missing_amount_or_summaries";
 
 const eligibilityErrorMessages: Record<TaxInterpretationEligibilityError, string> = {
-  not_found: "AI expense draft not found",
-  wrong_group: "AI expense draft does not belong to the current group",
+  not_found: AI_EXPENSE_DRAFT_NOT_FOUND_MESSAGE,
+  wrong_group: AI_EXPENSE_DRAFT_NOT_FOUND_MESSAGE,
   missing_amount_or_summaries: "Tax reinterpretation requires draft amount and tax summaries",
 };
 

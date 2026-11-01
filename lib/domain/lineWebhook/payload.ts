@@ -4,7 +4,17 @@
  */
 import { MAX_LINE_MESSAGE_ID_LENGTH } from "../lineMessaging/limits";
 
-export type LineWebhookEventType = "text" | "image" | "postback" | "follow" | "unfollow";
+/** LINE webhook から受理するイベント種別の全値。schema・API validator はこの並びに合わせる。 */
+export const LINE_WEBHOOK_EVENT_TYPES = [
+  "text",
+  "image",
+  "postback",
+  "follow",
+  "unfollow",
+] as const;
+
+/** LINE webhook から受理するイベント種別。 */
+export type LineWebhookEventType = (typeof LINE_WEBHOOK_EVENT_TYPES)[number];
 
 export type LineWebhookEventInput = {
   webhookEventId: string;

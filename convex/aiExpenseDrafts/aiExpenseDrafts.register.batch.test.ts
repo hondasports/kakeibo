@@ -200,7 +200,7 @@ describe("aiExpenseDrafts (register) (batch registration)", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         draftIds: ["draft-other"] as any,
       }),
-    ).rejects.toMatchObject({ data: "AI expense draft does not belong to the current group" });
+    ).rejects.toMatchObject({ data: "AI expense draft not found" });
   });
 
   it("登録対象が空なら何もせず空の結果を返す", async () => {

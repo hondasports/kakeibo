@@ -1,3 +1,4 @@
+import { calculateWeekEndDate } from "../../../../lib/domain/week/weekDates";
 import { formatYen } from "../../../../lib/domain/common/currency";
 import { formatDateForDisplay } from "../../../utils/date";
 
@@ -40,12 +41,6 @@ type WeeklyExpenseSource = {
 export const OTHER_CATEGORY_ID = "__other__";
 export const MAX_STACKED_CATEGORIES = 5;
 const OTHER_CATEGORY_COLOR = "#AAB7C4";
-
-function addDays(date: string, days: number): string {
-  const value = new Date(`${date}T00:00:00Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
-}
 
 export function toSeriesDataKey(categoryId: string): string {
   return `series_${categoryId.replace(/[^a-zA-Z0-9]/g, "_")}`;
@@ -170,7 +165,7 @@ export function buildWeeklyExpenseChartData({
 
     return {
       weekStartDate: week.weekStartDate,
-      weekEndDate: addDays(week.weekStartDate, 6),
+      weekEndDate: calculateWeekEndDate(week.weekStartDate),
       label,
       amount: week.totalAmountYen,
       previousDiff: previousWeek ? week.totalAmountYen - previousWeek.totalAmountYen : null,

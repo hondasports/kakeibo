@@ -20,6 +20,8 @@ describe("ExpenseEntryForm（typeSwitch）", () => {
 
       await user.click(screen.getByRole("tab", { name: "収入" }));
       expect(screen.queryByLabelText("店舗名 / 支払先")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "画像を読み取る" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("listbox", { name: "カテゴリ候補" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "レシートを追加" })).not.toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "カテゴリ別の内訳を追加" }),
@@ -61,6 +63,8 @@ describe("ExpenseEntryForm（typeSwitch）", () => {
         }),
       );
       expect(await screen.findByText("収入を保存しました")).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "収入" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("option", { selected: true })).toHaveTextContent("6/2");
     });
 
     it("種別を往復してもそれぞれの未保存入力を保持する", async () => {
@@ -98,7 +102,7 @@ describe("ExpenseEntryForm（typeSwitch）", () => {
       await user.click(screen.getByRole("button", { name: "保存して次へ" }));
 
       expect(await screen.findByText("保存に失敗しました")).toBeInTheDocument();
-      expect(screen.getByLabelText("金額")).toHaveValue("50000");
+      expect(screen.getByLabelText("金額")).toHaveValue("50,000");
       expect(screen.getByLabelText("収入の内容・メモ")).toHaveValue("立替精算");
     });
   });

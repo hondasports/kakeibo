@@ -1,7 +1,6 @@
 import type { Id } from "../../../../convex/_generated/dataModel";
-import type { GroupInvitationPreview } from "../../../../lib/domain/groups/groupInvitation";
 import { api } from "../../../../convex/_generated/api";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth, useClerk, useSignIn, useSignUp } from "@clerk/react";
 import { useAction, useConvexAuth } from "convex/react";
@@ -9,16 +8,19 @@ import {
   buildInvitationFallbackUrl,
   CLERK_STATUS_SIGN_IN,
   firstNameFieldNames,
-  getMissingFields,
-  hasPasswordField,
-  hasSupportedProfileFields,
-  isExistingAccountInvitationError,
   lastNameFieldNames,
-  OAUTH_CALLBACK_PATH,
   type ClerkSignIn,
   type ClerkSignUp,
   type ClerkSignUpResult,
 } from "../lib/groupInvitationClerk";
+import { consumeClerkInvitationTicket, finalizeClerkSignUp } from "../lib/groupInvitationClerkFlow";
+import {
+  groupInvitationAcceptReducer,
+  initialGroupInvitationAcceptState,
+  selectInvitation,
+  selectNeedsAccountSwitch,
+  selectNeedsGroupSwitch,
+} from "../lib/groupInvitationAcceptState";
 
 export function useGroupInvitationAccept() {
   const [searchParams] = useSearchParams();
@@ -31,18 +33,13 @@ export function useGroupInvitationAccept() {
   const signUp = rawSignUp as unknown as ClerkSignUp | undefined;
   const { isAuthenticated } = useConvexAuth();
   const previewInvitation = useAction(api.groups.clerkInvitations.previewInvitation);
-  const [previewResult, setPreviewResult] = useState<{
-    token: string;
-    details: GroupInvitationPreview;
-  } | null>(null);
-  const [switchActiveGroup, setSwitchActiveGroup] = useState(false);
   const acceptInvitation = useAction(api.groups.clerkInvitations.acceptInvitation);
-  const [error, setError] = useState("");
-  const [needsProfileDetails, setNeedsProfileDetails] = useState(false);
-  const [missingProfileFields, setMissingProfileFields] = useState<string[]>([]);
+  const [state, dispatch] = useReducer(
+    groupInvitationAcceptReducer,
+    initialGroupInvitationAcceptState,
+  );
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [isCompletingInvitation, setIsCompletingInvitation] = useState(false);
   const hasStartedClerkInvitation = useRef(false);
   const hasAccepted = useRef(false);
 
@@ -51,38 +48,14 @@ export function useGroupInvitationAccept() {
   const clerkStatus = searchParams.get("__clerk_status");
   const fallbackUrl = buildInvitationFallbackUrl(token);
 
-  const finalizeInvitation = useCallback(async () => {
-    if (!signUp || signUp.status !== "complete") {
-      return false;
-    }
-
-    const { error: finalizeError } = await signUp.finalize({
-      navigate: ({ decorateUrl }) => {
-        window.location.href = decorateUrl(fallbackUrl);
-      },
-    });
-    if (finalizeError) {
-      throw finalizeError;
-    }
-    return true;
-  }, [fallbackUrl, signUp]);
-
-  const startGoogleSignIn = useCallback(async () => {
-    if (!signIn) {
-      throw new Error("Clerk sign-in client is not loaded");
-    }
-
-    const ssoResult = await signIn.sso({
-      redirectCallbackUrl: OAUTH_CALLBACK_PATH,
-      redirectUrl: fallbackUrl,
-      strategy: "oauth_google",
-    });
-    if (ssoResult.error) {
-      throw ssoResult.error;
-    }
-  }, [fallbackUrl, signIn]);
-
-  const needsAccountSwitch = Boolean(isClerkLoaded && isSignedIn && token && clerkTicket);
+  const needsAccountSwitch = selectNeedsAccountSwitch({
+    isClerkLoaded,
+    isSignedIn,
+    token,
+    clerkTicket,
+  });
+  const invitation = selectInvitation(state, { isAuthenticated, clerkTicket, token });
+  const needsGroupSwitch = selectNeedsGroupSwitch(invitation);
 
   const handleAccountSwitch = async () => {
     if (
@@ -96,16 +69,15 @@ export function useGroupInvitationAccept() {
     }
 
     hasStartedClerkInvitation.current = true;
-    setError("");
-    setIsCompletingInvitation(true);
+    dispatch({ type: "accountSwitchStarted" });
     try {
       await signOut({ redirectUrl: `${window.location.pathname}${window.location.search}` });
     } catch (caughtError: unknown) {
       hasStartedClerkInvitation.current = false;
       console.error("[GroupInvitationAcceptPage] failed to sign out current session:", caughtError);
-      setError("招待リンクの認証を開始できませんでした。リンクを開き直して再度お試しください。");
+      dispatch({ type: "accountSwitchFailed" });
     } finally {
-      setIsCompletingInvitation(false);
+      dispatch({ type: "processingFinished" });
     }
   };
 
@@ -126,65 +98,32 @@ export function useGroupInvitationAccept() {
 
     hasStartedClerkInvitation.current = true;
 
-    const consumeClerkInvitation = async () => {
-      if (shouldUseSignIn) {
-        await startGoogleSignIn();
-        return;
-      }
-
-      if (!signUp) {
-        throw new Error("Clerk sign-up client is not loaded");
-      }
-
-      try {
-        const signUpResult = await signUp.ticket({ ticket: clerkTicket });
-        if (signUpResult.error) {
-          throw signUpResult.error;
-        }
-
-        const finalized = await finalizeInvitation();
-        if (!finalized) {
-          const missingFields = getMissingFields(signUpResult, signUp);
-          setMissingProfileFields(missingFields);
-
-          if (hasPasswordField(missingFields)) {
-            const ssoResult = await signUp.sso({
-              redirectCallbackUrl: OAUTH_CALLBACK_PATH,
-              redirectUrl: fallbackUrl,
-              strategy: "oauth_google",
-            });
-            if (ssoResult.error) {
-              throw ssoResult.error;
-            }
-            return;
-          }
-
-          if (hasSupportedProfileFields(missingFields)) {
-            setNeedsProfileDetails(true);
-            return;
-          }
-
-          console.error(
-            "[GroupInvitationAcceptPage] unsupported Clerk invitation requirements:",
-            missingFields,
-          );
-          setError(
-            "招待の認証に追加の設定が必要です。Clerkのサインアップ必須項目を確認してください。",
-          );
-        }
-      } catch (caughtError) {
-        if (isExistingAccountInvitationError(caughtError)) {
-          await startGoogleSignIn();
-          return;
-        }
-        throw caughtError;
-      }
-    };
-
     Promise.resolve()
       .then(() => {
-        setIsCompletingInvitation(true);
-        return consumeClerkInvitation();
+        dispatch({ type: "clerkTicketStarted" });
+        return consumeClerkInvitationTicket({
+          signIn,
+          signUp,
+          shouldUseSignIn,
+          clerkTicket,
+          fallbackUrl,
+        });
+      })
+      .then((outcome) => {
+        if (outcome.kind !== "requirementsDetected") {
+          return;
+        }
+        if (outcome.resolution === "unsupported") {
+          console.error(
+            "[GroupInvitationAcceptPage] unsupported Clerk invitation requirements:",
+            outcome.missingFields,
+          );
+        }
+        dispatch({
+          type: "clerkRequirementsDetected",
+          missingFields: outcome.missingFields,
+          resolution: outcome.resolution,
+        });
       })
       .catch((caughtError: unknown) => {
         hasStartedClerkInvitation.current = false;
@@ -192,23 +131,12 @@ export function useGroupInvitationAccept() {
           "[GroupInvitationAcceptPage] failed to consume Clerk invitation:",
           caughtError,
         );
-        setError("招待リンクの認証を完了できませんでした。リンクを開き直して再度お試しください。");
+        dispatch({ type: "clerkTicketFailed" });
       })
       .finally(() => {
-        setIsCompletingInvitation(false);
+        dispatch({ type: "processingFinished" });
       });
-  }, [
-    clerkStatus,
-    clerkTicket,
-    fallbackUrl,
-    finalizeInvitation,
-    isClerkLoaded,
-    isSignedIn,
-    signIn,
-    signUp,
-    startGoogleSignIn,
-    token,
-  ]);
+  }, [clerkStatus, clerkTicket, fallbackUrl, isClerkLoaded, isSignedIn, signIn, signUp, token]);
 
   const handleProfileDetailsSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -216,14 +144,13 @@ export function useGroupInvitationAccept() {
       return;
     }
 
-    setError("");
-    setIsCompletingInvitation(true);
+    dispatch({ type: "profileDetailsStarted" });
     try {
       const updateParams: { firstName?: string; lastName?: string } = {};
-      if (missingProfileFields.some((field) => firstNameFieldNames.has(field))) {
+      if (state.missingProfileFields.some((field) => firstNameFieldNames.has(field))) {
         updateParams.firstName = firstName.trim();
       }
-      if (missingProfileFields.some((field) => lastNameFieldNames.has(field))) {
+      if (state.missingProfileFields.some((field) => lastNameFieldNames.has(field))) {
         updateParams.lastName = lastName.trim();
       }
 
@@ -232,46 +159,33 @@ export function useGroupInvitationAccept() {
         throw updateResult.error;
       }
 
-      const finalized = await finalizeInvitation();
+      const finalized = await finalizeClerkSignUp(signUp, fallbackUrl);
       if (!finalized) {
-        setError("招待の認証に必要な情報を完了できませんでした。入力内容を確認してください。");
+        dispatch({ type: "profileDetailsFinalizeFailed" });
       }
     } catch (caughtError: unknown) {
       console.error(
         "[GroupInvitationAcceptPage] failed to complete invitation profile:",
         caughtError,
       );
-      setError("招待の認証に必要な情報を保存できませんでした。入力内容を確認してください。");
+      dispatch({ type: "profileDetailsFailed" });
     } finally {
-      setIsCompletingInvitation(false);
+      dispatch({ type: "processingFinished" });
     }
   };
-
-  const invitation =
-    isAuthenticated && !clerkTicket && previewResult?.token === token
-      ? previewResult.details
-      : null;
-  const needsGroupSwitch = Boolean(
-    invitation?.activeGroupId && invitation.activeGroupId !== invitation.groupId,
-  );
 
   useEffect(() => {
     let cancelled = false;
     hasAccepted.current = false;
     Promise.resolve().then(async () => {
       if (cancelled) return;
-      setPreviewResult(null);
-      setSwitchActiveGroup(false);
-      setError("");
+      dispatch({ type: "invitationContextReset" });
       if (!isAuthenticated || !token || clerkTicket) return;
       try {
         const details = await previewInvitation({ token });
-        if (!cancelled) setPreviewResult({ token, details });
+        if (!cancelled) dispatch({ type: "previewLoaded", preview: { token, details } });
       } catch {
-        if (!cancelled)
-          setError(
-            "招待内容を確認できませんでした。招待先のアカウントとリンクの有効性を確認してください。",
-          );
+        if (!cancelled) dispatch({ type: "previewFailed" });
       }
     });
     return () => {
@@ -286,17 +200,16 @@ export function useGroupInvitationAccept() {
       !token ||
       clerkTicket ||
       hasAccepted.current ||
-      (needsGroupSwitch && !switchActiveGroup)
+      (needsGroupSwitch && !state.switchActiveGroup)
     ) {
       return;
     }
     hasAccepted.current = true;
-    setIsCompletingInvitation(true);
-    setError("");
+    dispatch({ type: "acceptStarted" });
     try {
       await acceptInvitation({
         token,
-        switchActiveGroup: needsGroupSwitch && switchActiveGroup,
+        switchActiveGroup: needsGroupSwitch && state.switchActiveGroup,
         ...(invitation.activeGroupId
           ? { expectedActiveGroupId: invitation.activeGroupId as Id<"groups"> }
           : {}),
@@ -304,34 +217,34 @@ export function useGroupInvitationAccept() {
       navigate("/", { replace: true });
     } catch {
       hasAccepted.current = false;
-      setSwitchActiveGroup(false);
-      setPreviewResult(null);
-      setError("招待を処理できませんでした。招待内容を再確認して、もう一度操作してください。");
+      dispatch({ type: "acceptFailed" });
       try {
         const details = await previewInvitation({ token });
-        setPreviewResult({ token, details });
+        dispatch({ type: "previewLoaded", preview: { token, details } });
       } catch {
-        setError(
-          "招待内容を確認できませんでした。招待先のアカウントとリンクの有効性を確認してください。",
-        );
+        dispatch({ type: "previewFailed" });
       }
     } finally {
-      setIsCompletingInvitation(false);
+      dispatch({ type: "processingFinished" });
     }
   };
 
+  const setSwitchActiveGroup = useCallback((checked: boolean) => {
+    dispatch({ type: "switchConsentChanged", checked });
+  }, []);
+
   return {
-    error,
+    error: state.error,
     invitation,
     needsGroupSwitch,
-    switchActiveGroup,
+    switchActiveGroup: state.switchActiveGroup,
     setSwitchActiveGroup,
     handleAcceptInvitation,
     firstName,
-    isCompletingInvitation,
+    isCompletingInvitation: state.isCompletingInvitation,
     lastName,
-    missingProfileFields,
-    needsProfileDetails,
+    missingProfileFields: state.missingProfileFields,
+    needsProfileDetails: state.needsProfileDetails,
     needsAccountSwitch,
     setFirstName,
     setLastName,

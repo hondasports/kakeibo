@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Button,
   CircularProgress,
@@ -10,6 +10,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import {
+  getNormalizeReasonErrorMessage,
+  MAX_REASON_LENGTH,
+  normalizeSystemAdminReason,
+} from "../../../../lib/domain/systemAdmin/reason";
 
 type Props = {
   open: boolean;
@@ -38,13 +43,10 @@ export function SystemAdminInvitationRevokeDialog({
     if (open) setReason("");
   }
   const normalizedReason = reason.trim();
-  const reasonError = useMemo(
-    () =>
-      normalizedReason.length < 1 || normalizedReason.length > 500
-        ? "理由は1〜500文字で入力してください"
-        : "",
-    [normalizedReason],
-  );
+  const reasonResult = normalizeSystemAdminReason(reason);
+  const reasonError = reasonResult.success
+    ? ""
+    : getNormalizeReasonErrorMessage(reasonResult.error);
 
   return (
     <Dialog fullWidth maxWidth="sm" onClose={confirming ? undefined : onCancel} open={open}>
@@ -73,7 +75,7 @@ export function SystemAdminInvitationRevokeDialog({
             value={reason}
           />
           <Typography aria-live="polite" color="text.secondary" variant="caption">
-            {normalizedReason.length}/500文字
+            {normalizedReason.length}/{MAX_REASON_LENGTH}文字
           </Typography>
           {error ? (
             <Typography color="error" role="alert" variant="body2">
@@ -89,7 +91,9 @@ export function SystemAdminInvitationRevokeDialog({
         <Button
           color="error"
           disabled={confirming || Boolean(reasonError) || !invitation}
-          onClick={() => onConfirm(normalizedReason)}
+          onClick={() => {
+            if (reasonResult.success) onConfirm(reasonResult.reason);
+          }}
           startIcon={confirming ? <CircularProgress color="inherit" size={16} /> : undefined}
           variant="contained"
         >

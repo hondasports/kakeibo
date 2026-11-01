@@ -1,31 +1,34 @@
 import { v } from "convex/values";
+import {
+  LINE_LINK_AUDIT_ACTIONS,
+  LINE_LINK_AUDIT_RESULTS,
+  LINE_LINK_REQUEST_STATUSES,
+  LINE_LINK_STATUSES,
+} from "../../lib/domain/lineLink/records";
+import {
+  LINE_LINK_FEEDBACK_CODES,
+  LINE_LINK_FEEDBACK_RESULTS,
+} from "../../lib/domain/lineLink/feedback";
 
 export const lineLinkRequestStatusValidator = v.union(
-  v.literal("pending"),
-  v.literal("claimed"),
-  v.literal("completed"),
-  v.literal("failed"),
-  v.literal("expired"),
+  ...LINE_LINK_REQUEST_STATUSES.map((value) => v.literal(value)),
 );
 
-export const lineLinkStatusValidator = v.union(v.literal("active"), v.literal("revoked"));
+export const lineLinkStatusValidator = v.union(
+  ...LINE_LINK_STATUSES.map((value) => v.literal(value)),
+);
 
 export const lineLinkAuditActionValidator = v.union(
-  v.literal("started"),
-  v.literal("linked"),
-  v.literal("unlinked"),
-  v.literal("failed"),
+  ...LINE_LINK_AUDIT_ACTIONS.map((value) => v.literal(value)),
+);
+
+export const lineLinkAuditResultValidator = v.union(
+  ...LINE_LINK_AUDIT_RESULTS.map((value) => v.literal(value)),
 );
 
 export const lineLinkFeedbackValidator = v.object({
-  result: v.union(v.literal("success"), v.literal("failure")),
-  code: v.union(
-    v.literal("success"),
-    v.literal("expired"),
-    v.literal("invalid"),
-    v.literal("conflict"),
-    v.literal("failed"),
-  ),
+  result: v.union(...LINE_LINK_FEEDBACK_RESULTS.map((value) => v.literal(value))),
+  code: v.union(...LINE_LINK_FEEDBACK_CODES.map((value) => v.literal(value))),
 });
 
 /** 外部連携の内部詳細をUIへ伝播させないための有限な結果コード。 */

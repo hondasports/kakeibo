@@ -1,4 +1,4 @@
-import type { AmountBasis, TaxMode, TaxRatePercent } from "../receipt/tax/types";
+import type { AmountBasis, TaxRatePercent } from "../receipt/tax/types";
 import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
 import { isDiscountLine } from "../receipt/discountItems";
 import { resolveAmountBasis } from "../receipt/tax/resolveAmountBasis";
@@ -16,65 +16,6 @@ export type ReviewBlockerCode =
 
 /** 逆算由来の対象額だけに許容する±1円の一致を、直接印字の完全一致と区別する。 */
 export type ReviewMatchKind = "exact" | "approx";
-
-export type ReviewAmountCheck = {
-  status: ReviewCheckStatus;
-  /** external = 外税2段階比較、direct = 明細合計と支払額の直接比較 */
-  variant: "external" | "direct";
-  paidTotalYen?: number;
-  /** 明細の印字額合計（外税時の税抜小計との比較用） */
-  itemsPrintedTotalYen?: number;
-  /** 支払額との直接比較に使う合計（税込正規化を優先。比較不能な明細があるときは undefined） */
-  itemsComparableTotalYen?: number;
-  /** 外税時に印字された税抜小計（Σ対象額） */
-  printedSubtotalYen?: number;
-  /** 外税時に印字された税額合計 */
-  printedTaxYen?: number;
-  /** 外税時の 小計＋税額 */
-  expectedPaidYen?: number;
-  mismatchStep?: "itemsVsSubtotal" | "subtotalTaxVsPaid" | "itemsVsPaid";
-  /** 計算値 − 印字値（または支払額）。0以外のとき不一致 */
-  differenceYen?: number;
-  /** 比較不能の理由 */
-  reason?: string;
-  blockerCode?: ReviewBlockerCode;
-  affectedItemIds?: string[];
-  /** 修正・確認を促すジャンプ先（セクションまたは明細id） */
-  focusTarget?: string;
-};
-
-export type ReviewTaxRateRow = {
-  taxRatePercent: TaxRatePercent;
-  taxMode?: TaxMode;
-  taxableAmountBasis?: AmountBasis;
-  /** 印字された税率別対象額。サマリが無い税率では undefined */
-  printedYen?: number;
-  /** 同じ税込／税抜基準で集計した明細側の印字額合計 */
-  currentYen?: number;
-  status: ReviewCheckStatus;
-  matchKind?: ReviewMatchKind;
-  /** 現在 − 印字。0以外のとき不一致 */
-  differenceYen?: number;
-  reason?: string;
-  blockerCode?: ReviewBlockerCode;
-  affectedItemIds?: string[];
-};
-
-export type ReviewTaxRateCheck = {
-  status: ReviewCheckStatus;
-  rows: ReviewTaxRateRow[];
-  /** 全行比較不能にする理由（割引対象・税率の未確定など） */
-  reason?: string;
-  blockerCode?: ReviewBlockerCode;
-  affectedItemIds?: string[];
-  /** 修正・確認を促すジャンプ先（セクションまたは明細id） */
-  focusTarget?: string;
-};
-
-export type ReviewChecks = {
-  amount: ReviewAmountCheck;
-  taxRate: ReviewTaxRateCheck;
-};
 
 export type TaxSummary = NonNullable<AiExpenseDraft["taxSummaries"]>[number];
 

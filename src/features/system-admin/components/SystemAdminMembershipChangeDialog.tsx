@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Button,
   CircularProgress,
@@ -10,18 +10,15 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import {
+  getNormalizeReasonErrorMessage,
+  MAX_REASON_LENGTH,
+  normalizeSystemAdminReason,
+} from "../../../../lib/domain/systemAdmin/reason";
+import type { GroupRole } from "../../../../lib/domain/groups/role";
+import type { MembershipOperation } from "../../../../lib/domain/systemAdmin/membershipOperation";
 
-export type SystemAdminMembershipOperation =
-  | "add"
-  | "remove"
-  | "transfer"
-  | "set_active"
-  | "clear_active";
-
-export type SystemAdminRoleOperation =
-  | SystemAdminMembershipOperation
-  | "role_change"
-  | "owner_transfer";
+export type SystemAdminRoleOperation = MembershipOperation | "role_change" | "owner_transfer";
 
 export type MembershipDialogGroup = { id: string; name: string; status?: string };
 
@@ -41,8 +38,8 @@ type Props = {
   error?: string;
   onCancel: () => void;
   onConfirm: (reason: string) => void;
-  currentRole?: "owner" | "member";
-  newRole?: "owner" | "member";
+  currentRole?: GroupRole;
+  newRole?: GroupRole;
   sourceUser?: { id: string; displayName: string; email: string | null };
 };
 
@@ -80,13 +77,10 @@ export function SystemAdminMembershipChangeDialog({
   }
 
   const normalizedReason = reason.trim();
-  const reasonError = useMemo(
-    () =>
-      normalizedReason.length < 1 || normalizedReason.length > 500
-        ? "理由は1〜500文字で入力してください"
-        : "",
-    [normalizedReason],
-  );
+  const reasonResult = normalizeSystemAdminReason(reason);
+  const reasonError = reasonResult.success
+    ? ""
+    : getNormalizeReasonErrorMessage(reasonResult.error);
   const titleId = "system-admin-membership-dialog-title";
   const descriptionId = "system-admin-membership-dialog-description";
   const helperId = "system-admin-membership-reason-helper";
@@ -155,7 +149,7 @@ export function SystemAdminMembershipChangeDialog({
             value={reason}
           />
           <Typography aria-live="polite" color="text.secondary" variant="caption">
-            {normalizedReason.length}/500文字
+            {normalizedReason.length}/{MAX_REASON_LENGTH}文字
           </Typography>
           {error ? (
             <Typography color="error" role="alert" variant="body2">
@@ -171,7 +165,9 @@ export function SystemAdminMembershipChangeDialog({
         <Button
           color={operation === "remove" ? "error" : "primary"}
           disabled={confirming || Boolean(reasonError) || !target}
-          onClick={() => onConfirm(normalizedReason)}
+          onClick={() => {
+            if (reasonResult.success) onConfirm(reasonResult.reason);
+          }}
           startIcon={confirming ? <CircularProgress color="inherit" size={16} /> : undefined}
           variant="contained"
         >

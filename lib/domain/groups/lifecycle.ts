@@ -1,4 +1,5 @@
-export type GroupLifecycleStatus = "active" | "deleting" | "deleted" | "archived";
+export const GROUP_LIFECYCLE_STATUSES = ["active", "deleting", "deleted", "archived"] as const;
+export type GroupLifecycleStatus = (typeof GROUP_LIFECYCLE_STATUSES)[number];
 
 export type GroupWithLifecycleStatus = {
   status?: GroupLifecycleStatus;

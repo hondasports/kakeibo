@@ -1,5 +1,5 @@
 import "./ExpenseEntryFormTestMocks";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { renderWithProviders } from "../../../test/render";
@@ -20,6 +20,7 @@ describe("ExpenseEntryForm（single）", () => {
       expect(screen.getByLabelText("合計金額")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "保存して次へ" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /食費/ })).toHaveAttribute("aria-selected", "true");
     });
 
     it("店舗名・金額・カテゴリを入力して単一項目を保存できる", async () => {
@@ -88,6 +89,26 @@ describe("ExpenseEntryForm（single）", () => {
       expect(await screen.findByText("金額は必須です")).toBeInTheDocument();
     });
 
+    it("合計金額は数字以外を除去し、3桁カンマ区切りで表示する", () => {
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      const amountInput = screen.getByLabelText("合計金額");
+      expect(amountInput).toHaveAttribute("inputmode", "numeric");
+
+      // userEvent.type は整形後のカンマ位置をまたいで打鍵するため、change で一括入力する
+      fireEvent.change(amountInput, { target: { value: "abc" } });
+      expect(amountInput).toHaveValue("");
+
+      fireEvent.change(amountInput, { target: { value: "1234567" } });
+      expect(amountInput).toHaveValue("1,234,567");
+    });
+
     it("保存成功後、店舗名・金額をクリアして次の入力へ進める", async () => {
       const user = userEvent.setup();
       renderWithProviders(
@@ -105,6 +126,10 @@ describe("ExpenseEntryForm（single）", () => {
 
       await waitFor(() => {
         expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("");
+        expect(screen.getByRole("option", { name: /食費/ })).toHaveAttribute(
+          "aria-selected",
+          "true",
+        );
         // 金額はクリア後に "" になる
         const amountInput = screen.getByLabelText("合計金額") as HTMLInputElement;
         expect(amountInput.value).toBe("");

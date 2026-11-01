@@ -10,6 +10,7 @@ import { applyRecordPatch } from "../../domain/common/recordPatch";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import type { AiExpenseDraftDeps } from "./deps";
+import { loadDraftInGroup } from "./loadDraftInGroup";
 
 /**
  * 下書きを AI 解釈スナップショットの値へリセットする。
@@ -21,14 +22,8 @@ export async function resetReceiptToAiInterpretation(
   deps: Pick<AiExpenseDraftDeps, "drafts" | "draftItems">,
   args: { draftId: string },
 ): Promise<{ draft: AiExpenseDraftFields; items: AiExpenseDraftItemFields[] }> {
-  const fields = await deps.drafts.findById(args.draftId);
-  if (fields === null) {
-    throw new ConvexError("AI expense draft not found");
-  }
+  const fields = await loadDraftInGroup(deps.drafts, ctx.groupId, args.draftId);
   const draft = AiExpenseDraft.fromPersisted(fields);
-  if (!draft.belongsToGroup(ctx.groupId)) {
-    throw new ConvexError("AI expense draft not found");
-  }
   try {
     draft.assertResettableToAiInterpretation();
   } catch (err) {

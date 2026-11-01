@@ -1,4 +1,4 @@
-import type { TransactionalEmailType } from "../../email/model";
+import type { TransactionalEmailType } from "../email/model";
 import type { NotificationChannel } from "./model";
 import type {
   LineNotificationEventRecord,

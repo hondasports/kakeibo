@@ -4,17 +4,14 @@
  */
 import type { ExtractionEnvironment } from "./rules";
 
-export type ReceiptCategoryHint = {
-  name: string;
-  description?: string;
-};
+// 抽出リクエスト構築側（extractionRequest）が値の正本を持つため、ここでは再定義しない。
+export type { ReceiptCategoryHint } from "./extractionRequest";
+import type { ReceiptCategoryHint } from "./extractionRequest";
 
 export type ExtractReceiptFieldsInput = {
   imageDataUrl: string;
   telemetryId?: string;
   categories?: ReceiptCategoryHint[];
-  /** @deprecated Use categories so descriptions reach the extractor. */
-  categoryNames?: string[];
 };
 
 /** 抽出結果の型は infra の OpenAI schema 由来のため、ここでは総称型で扱う。 */

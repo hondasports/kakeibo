@@ -16,6 +16,7 @@ import {
 } from "../../../../lib/domain/expenseSearch/datePresets";
 import type { HistoryEntryType } from "../../../../lib/domain/expenseSearch/filter";
 import type { ExpenseSearchFormState } from "../lib/searchParams";
+import { extractAmountDigits } from "../../../utils/currency";
 
 type CategoryOption = {
   _id: string;
@@ -36,10 +37,6 @@ const datePresetOptions: Array<{ label: string; value: Exclude<HistoryDatePreset
   { label: "直近3か月", value: "last3Months" },
   { label: "今年", value: "thisYear" },
 ];
-
-function digitsOnly(value: string): string {
-  return value.replace(/[^\d]/g, "");
-}
 
 function dateFromIso(value: string): Dayjs | null {
   if (!value) {
@@ -199,7 +196,7 @@ export function ExpenseSearchFilters({
             slotProps={{ htmlInput: { inputMode: "numeric", pattern: "[0-9]*" } }}
             value={state.minAmountYen}
             onChange={(event) =>
-              onChange({ ...state, minAmountYen: digitsOnly(event.target.value) })
+              onChange({ ...state, minAmountYen: extractAmountDigits(event.target.value) })
             }
           />
           <TextField
@@ -209,7 +206,7 @@ export function ExpenseSearchFilters({
             slotProps={{ htmlInput: { inputMode: "numeric", pattern: "[0-9]*" } }}
             value={state.maxAmountYen}
             onChange={(event) =>
-              onChange({ ...state, maxAmountYen: digitsOnly(event.target.value) })
+              onChange({ ...state, maxAmountYen: extractAmountDigits(event.target.value) })
             }
           />
           <DatePicker

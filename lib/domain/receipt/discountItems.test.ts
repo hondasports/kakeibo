@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isDiscountItemName,
+  isDiscountLine,
   isValidSignedLineItemAmount,
   sanitizeSignedYenInput,
 } from "./discountItems";
@@ -26,9 +27,18 @@ describe("isValidSignedLineItemAmount", () => {
     ["食料品", -1000, false],
     ["割引", -1000, true],
     ["割引", 0, false],
+    ["不明な明細", 0, false],
     ["割引", 1.5, false],
   ])("%s / %s -> %s", (itemName, amountYen, expected) => {
     expect(isValidSignedLineItemAmount(itemName, amountYen)).toBe(expected);
+  });
+});
+
+describe("isDiscountLine", () => {
+  it("lineType 未設定の既存明細は品名ヒューリスティックで判定する", () => {
+    // lineType 導入前の保存済み行は品名ベースの判定にフォールバックする
+    expect(isDiscountLine("クーポン券割引 10%")).toBe(true);
+    expect(isDiscountLine("食料品")).toBe(false);
   });
 });
 

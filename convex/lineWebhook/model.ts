@@ -1,35 +1,26 @@
 import { v } from "convex/values";
-import type { Infer } from "convex/values";
+import { LINE_WEBHOOK_EVENT_TYPES } from "../../lib/domain/lineWebhook/payload";
+import {
+  LINE_IMAGE_JOB_STATUSES,
+  LINE_IMAGE_SKIP_REASONS,
+  LINE_WEBHOOK_DELIVERIES,
+} from "../../lib/domain/lineWebhook/records";
 
 export const lineWebhookEventTypeValidator = v.union(
-  v.literal("text"),
-  v.literal("image"),
-  v.literal("postback"),
-  v.literal("follow"),
-  v.literal("unfollow"),
+  ...LINE_WEBHOOK_EVENT_TYPES.map((value) => v.literal(value)),
 );
 
-export const lineWebhookDeliveryValidator = v.union(v.literal("linked"), v.literal("unlinked"));
+export const lineWebhookDeliveryValidator = v.union(
+  ...LINE_WEBHOOK_DELIVERIES.map((value) => v.literal(value)),
+);
 
 export const lineImageJobStatusValidator = v.union(
-  v.literal("pending"),
-  v.literal("drafted"),
-  v.literal("failed"),
-  v.literal("skipped"),
+  ...LINE_IMAGE_JOB_STATUSES.map((value) => v.literal(value)),
 );
 
 export const lineImageSkipReasonValidator = v.union(
-  v.literal("unlinked"),
-  v.literal("no_consent"),
-  v.literal("no_group"),
-  v.literal("unresolved_group"),
-  v.literal("fetch_failed"),
-  v.literal("invalid_image"),
-  v.literal("too_large"),
+  ...LINE_IMAGE_SKIP_REASONS.map((value) => v.literal(value)),
 );
-
-export type LineImageJobStatus = Infer<typeof lineImageJobStatusValidator>;
-export type LineImageSkipReason = Infer<typeof lineImageSkipReasonValidator>;
 
 export const lineWebhookEventInputValidator = v.object({
   webhookEventId: v.string(),
@@ -41,6 +32,8 @@ export const lineWebhookEventInputValidator = v.object({
   postbackData: v.optional(v.string()),
   eventTimestamp: v.optional(v.number()),
 });
+
+export type { LineImageJobStatus, LineImageSkipReason } from "../../lib/domain/lineWebhook/records";
 
 export type {
   LineWebhookEventType,

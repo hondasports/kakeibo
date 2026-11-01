@@ -308,6 +308,8 @@ breakpoint は **900px**（`max-width: 899px` が SP）。MUI のキュー内 fl
 ### 6.8 収入入力
 
 - 日付、金額、収入の内容・メモ、`保存して次へ` だけを表示する
+- 金額は入力時に数字以外を除き、3桁区切りで表示する。保存値は円の整数とする
+- 金額・内容の検証とエラー文言は `lib/domain/expenseEntries/expenseEntryItem.ts` を正本とし、履歴の編集でも同じ契約を使う。エラーは対象欄の直下に表示する
 - レシート追加・撮影、店舗、支出カテゴリ、カテゴリ別内訳、AI下書きは表示しない
 - 保存成功後は日付を維持し、金額と内容をクリアする。失敗時は入力値を保持する
 
@@ -457,3 +459,9 @@ MUIをUIコンポーネントの主軸にする。Tailwind CSSはMUIの代替で
 ## 12. 相談元
 
 本方針は、UX/UI Designerエージェント向け役割定義（旧 `.agents/roles/`、現在は廃止）に基づく相談結果を整理したものである。
+
+## 13. Agent Skill
+
+UI/UXの設計・実装・レビューでは、Capability Skill `skills/ui-design` を併用する。このドキュメントは製品方針と画面仕様の正本であり、Skillは正本を作業手順と確認観点へ落としたものとして扱う。
+
+外部Skill `web-design-guidelines` は、出荷前のアクセシビリティとUXの汎用チェックに使える。ただし、一般的な推奨がこのドキュメント、`docs/design-tokens.md`、`docs/suzumemo-theme.md` と矛盾する場合は、repository側の正本を優先する。インストール方法は `docs/service-tooling-setup.md` を参照する。

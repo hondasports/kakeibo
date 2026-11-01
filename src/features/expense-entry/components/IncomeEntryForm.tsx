@@ -1,4 +1,6 @@
 import { Alert, Box, Button, Snackbar, Stack, TextField } from "@mui/material";
+import { currencyFormatter } from "../../../../lib/domain/common/currency";
+import { extractAmountDigits } from "../../../utils/currency";
 import type { useIncomeEntry } from "../hooks/useIncomeEntry";
 import { ExpenseFormHeading } from "./ExpenseFormHeading";
 import { WeekDaySelector } from "./WeekDaySelector";
@@ -56,12 +58,12 @@ export function IncomeEntryForm({
             label="金額"
             name="incomeAmountYen"
             onChange={(event) => {
-              setIncomeAmount(event.target.value);
+              setIncomeAmount(extractAmountDigits(event.target.value));
               setIncomeAmountError("");
             }}
             placeholder="例: 320,000…"
             slotProps={{ htmlInput: { inputMode: "numeric" } }}
-            value={incomeAmount}
+            value={incomeAmount ? currencyFormatter.format(Number(incomeAmount)) : ""}
           />
 
           <TextField

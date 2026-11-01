@@ -5,18 +5,19 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import type { GroupMemberListItem } from "../utils/groupMemberDisplay";
 import type { GroupPendingInvitationListItem } from "../utils/groupInvitationDisplay";
 import type { GroupManagementAuditLogListItem } from "../utils/groupManagementAuditLogDisplay";
+import type { GroupRole } from "../../../../lib/domain/groups/role";
 
 export type GroupInfo = {
   _id: Id<"groups">;
   name: string;
-  role: "owner" | "member";
+  role: GroupRole;
   createdAt: number;
 };
 
 type GroupListItem = {
   _id: Id<"groups">;
   name: string;
-  role: "owner" | "member";
+  role: GroupRole;
   isActive: boolean;
 };
 

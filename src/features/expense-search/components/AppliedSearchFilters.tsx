@@ -1,5 +1,6 @@
 import { Chip, Stack, Typography } from "@mui/material";
 import type { ExpenseSearchFormState } from "../lib/searchParams";
+import { formatYen } from "../../../../lib/domain/common/currency";
 
 export function AppliedSearchFilters({
   state,
@@ -35,14 +36,14 @@ export function AppliedSearchFilters({
   if (state.minAmountYen) {
     chips.push({
       key: "minAmountYen",
-      label: `${Number(state.minAmountYen).toLocaleString()}円以上`,
+      label: `${formatYen(Number(state.minAmountYen))}以上`,
       remove: () => onChange({ ...state, minAmountYen: "" }),
     });
   }
   if (state.maxAmountYen) {
     chips.push({
       key: "maxAmountYen",
-      label: `${Number(state.maxAmountYen).toLocaleString()}円以下`,
+      label: `${formatYen(Number(state.maxAmountYen))}以下`,
       remove: () => onChange({ ...state, maxAmountYen: "" }),
     });
   }

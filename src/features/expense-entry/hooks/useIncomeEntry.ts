@@ -1,6 +1,12 @@
 import { api } from "../../../../convex/_generated/api";
 import { useCallback, useState } from "react";
 import { useMutation } from "convex/react";
+import {
+  getExpenseItemFieldErrorMessage,
+  parseExpenseAmountString,
+  validateExpenseTitle,
+} from "../../../../lib/domain/expenseEntries/expenseEntryItem";
+
 export function useIncomeEntry(date: string) {
   const createIncomeEntry = useMutation(api.expenseEntries.mutations.createIncomeEntry);
 
@@ -16,24 +22,29 @@ export function useIncomeEntry(date: string) {
     async (event: React.FormEvent) => {
       event.preventDefault();
 
-      const normalizedIncomeAmount = incomeAmount.replace(/[^\d]/g, "");
-      const amountYen = Number(normalizedIncomeAmount);
+      const amountResult = parseExpenseAmountString(incomeAmount);
+      const titleResult = validateExpenseTitle(incomeTitle);
+      setIncomeAmountError(
+        amountResult.success
+          ? ""
+          : getExpenseItemFieldErrorMessage("amountYen", amountResult.error),
+      );
+      setIncomeTitleError(
+        titleResult.success ? "" : getExpenseItemFieldErrorMessage("title", titleResult.error),
+      );
 
-      const amountError =
-        !Number.isInteger(amountYen) || amountYen <= 0 ? "1円以上の金額を入力してください" : "";
-      const titleError = incomeTitle.trim() ? "" : "収入の内容を入力してください";
-
-      setIncomeAmountError(amountError);
-      setIncomeTitleError(titleError);
-
-      if (amountError || titleError) {
+      if (!amountResult.success || !titleResult.success) {
         return;
       }
 
       setIncomeSubmitting(true);
       setIncomeError("");
       try {
-        await createIncomeEntry({ date, amountYen, title: incomeTitle.trim() });
+        await createIncomeEntry({
+          date,
+          amountYen: amountResult.amountYen,
+          title: titleResult.title,
+        });
         setIncomeAmount("");
         setIncomeTitle("");
         setIncomeSaved(true);

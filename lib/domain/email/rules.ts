@@ -1,15 +1,17 @@
+import type { EmailProviderError } from "../../email/model";
+import {
+  DEFAULT_MAX_RETRY_ATTEMPTS,
+  calculateRetryDelayMs,
+  isMaxRetryAttemptsReached,
+} from "../common/retry";
 import type {
-  EmailProviderError,
   EmailWebhookEventType,
   TransactionalEmailJobStatus,
   TransactionalEmailType,
-} from "../../email/model";
-import { getRetryDelayMs, isMaxAttemptsReached } from "../../email/retryPolicy";
+} from "./model";
 import type { TransactionalEmailJobRecord } from "./records";
 
 export const EMAIL_PROVIDER_NAME = "resend";
-
-export const EMAIL_JOB_MAX_ATTEMPTS = 6;
 
 export const TERMINAL_EMAIL_JOB_STATUSES = [
   "sent",
@@ -71,7 +73,7 @@ export function buildNewEmailJobFields(args: {
     provider: EMAIL_PROVIDER_NAME,
     status: "queued",
     attemptCount: 0,
-    maxAttempts: EMAIL_JOB_MAX_ATTEMPTS,
+    maxAttempts: DEFAULT_MAX_RETRY_ATTEMPTS,
     createdAt: args.now,
     updatedAt: args.now,
   };
@@ -86,10 +88,10 @@ export function planSendFailure(
   nextAttempt: number,
   now: number,
 ): SendFailurePlan {
-  if (!error.retryable || isMaxAttemptsReached(nextAttempt)) {
+  if (!error.retryable || isMaxRetryAttemptsReached(nextAttempt)) {
     return { kind: "failed" };
   }
-  const delay = getRetryDelayMs(nextAttempt);
+  const delay = calculateRetryDelayMs(nextAttempt);
   if (delay === null) {
     return { kind: "failed" };
   }

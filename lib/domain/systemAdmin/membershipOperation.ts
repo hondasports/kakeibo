@@ -1,4 +1,11 @@
-export type MembershipOperation = "add" | "remove" | "transfer" | "set_active" | "clear_active";
+export const SYSTEM_ADMIN_MEMBERSHIP_OPERATIONS = [
+  "add",
+  "remove",
+  "transfer",
+  "set_active",
+  "clear_active",
+] as const;
+export type MembershipOperation = (typeof SYSTEM_ADMIN_MEMBERSHIP_OPERATIONS)[number];
 
 export type ValidateMembershipOperationShapeError = "invalid_shape" | "same_source_target";
 

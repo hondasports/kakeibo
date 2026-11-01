@@ -8,6 +8,7 @@ import {
   jobRecordToDoc,
 } from "../../lib/convex/receiptAnalysisJobs/convexReceiptAnalysisStore";
 import { createReceiptAnalysisMutationDeps } from "../../lib/convex/receiptAnalysisJobs/receiptAnalysisDeps";
+import { ReceiptAnalysisJobDomainError } from "../../lib/domain/receiptAnalysisJobs/rules";
 import {
   cancelReceiptAnalysisJob,
   createReceiptAnalysisBatch,
@@ -20,7 +21,10 @@ export type CancelImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs"> };
 
 function convexError(error: unknown): never {
   if (error instanceof ConvexError) throw error;
-  throw new ConvexError(error instanceof Error ? error.message : "Unknown error");
+  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
+  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
+  if (error instanceof ReceiptAnalysisJobDomainError) throw new ConvexError(error.message);
+  throw error;
 }
 
 export async function createBatchHandler(

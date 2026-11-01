@@ -2,7 +2,7 @@
  * リクエスト状態更新の小粒ユースケース群（internalMutation 群）。
  * mark 系・scheduleRetry・cleanupCompletedRequests の移植。
  */
-import { getAccountDeletionRetryDelay } from "../../domain/accountDeletion/retry";
+import { planRetry } from "../../domain/common/retry";
 import {
   canMarkDeletingIdentityFrom,
   canMarkIdentityDeletedFrom,
@@ -49,29 +49,32 @@ export async function scheduleAccountDeletionRetry(
 ): Promise<void> {
   const request = await deps.requests.get(args.requestId);
   if (!request || request.status === "completed") return;
-  const nextAttempt = request.attemptCount + 1;
-  if (nextAttempt >= request.maxAttempts) {
+  const now = Date.now();
+  const plan = planRetry({
+    attemptCount: request.attemptCount,
+    maxAttempts: request.maxAttempts,
+    now,
+  });
+  if (plan.status === "failed") {
     await deps.requests.patch(args.requestId, {
       status: "failed",
-      attemptCount: nextAttempt,
+      attemptCount: plan.attemptCount,
       nextRetryAt: undefined,
       lastErrorCode: args.code,
       lastErrorMessage: args.message,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
     return;
   }
-  const delay = getAccountDeletionRetryDelay(nextAttempt - 1);
-  const now = Date.now();
   await deps.requests.patch(args.requestId, {
     status: args.finalization ? "finalization_retry_wait" : "retry_wait",
-    attemptCount: nextAttempt,
-    nextRetryAt: now + delay,
+    attemptCount: plan.attemptCount,
+    nextRetryAt: plan.nextRetryAt,
     lastErrorCode: args.code,
     lastErrorMessage: args.message,
     updatedAt: now,
   });
-  await deps.scheduler.scheduleProcess(args.requestId, delay);
+  await deps.scheduler.scheduleProcess(args.requestId, plan.delayMs);
 }
 
 const CLEANUP_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;

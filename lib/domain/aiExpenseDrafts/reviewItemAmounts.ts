@@ -1,17 +1,19 @@
+import type { AmountBasis, TaxResolutionStatus } from "../receipt/tax/types";
+
 export type ReviewItemForDisplay = {
   amountYen: number;
   printedAmountYen?: number;
   normalizedAmountYen?: number;
-  taxResolutionStatus?: "resolved" | "unresolved";
-  amountBasis?: "tax_included" | "tax_excluded" | "unknown";
+  taxResolutionStatus?: TaxResolutionStatus;
+  amountBasis?: AmountBasis;
 };
 
 export type ReviewReplacePreviousItem = {
   amountYen: number;
   printedAmountYen?: number;
   normalizedAmountYen?: number;
-  taxResolutionStatus?: "resolved" | "unresolved";
-  amountBasis?: "tax_included" | "tax_excluded" | "unknown";
+  taxResolutionStatus?: TaxResolutionStatus;
+  amountBasis?: AmountBasis;
 };
 
 export function resolveReviewItemAmountsForReplace(

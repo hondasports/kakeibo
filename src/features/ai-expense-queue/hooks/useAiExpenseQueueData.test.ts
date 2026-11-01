@@ -11,7 +11,6 @@ vi.mock("../../../../convex/_generated/api", () => ({
     aiExpenseDrafts: { queries: { listByStatus: "drafts", listByStatusPaginated: "registered" } },
     receiptAnalysisJobs: {
       queries: {
-        listJobs: "allJobs",
         listActiveJobs: "activeJobs",
         listJobsByBatch: "batchJobs",
         listJobsByDraftIds: "draftJobs",
@@ -67,7 +66,6 @@ describe("キューの用途別ジョブ購読", () => {
   it("解析中とセッション内バッチだけを購読し、プレビューとバッチ紐づけを保つ", () => {
     const { result } = renderHook(() => useAiExpenseQueueData(options));
     expect(useQueryMock).toHaveBeenCalledWith("activeJobs");
-    expect(useQueryMock).not.toHaveBeenCalledWith("allJobs");
     expect(useQueriesMock).toHaveBeenCalledWith({
       "session-batch": { query: "batchJobs", args: { batchId: "session-batch" } },
     });
@@ -87,7 +85,6 @@ describe("キューの用途別ジョブ購読", () => {
   it("セッション内バッチが無い間は完了済みジョブを購読しない", () => {
     renderHook(() => useAiExpenseQueueData({ ...options, sessionBatches: [] }));
     expect(useQueriesMock).toHaveBeenCalledWith({});
-    expect(useQueryMock).not.toHaveBeenCalledWith("allJobs");
   });
 
   it("処理中とバッチに同じジョブがあっても処理中カードを重複させない", () => {

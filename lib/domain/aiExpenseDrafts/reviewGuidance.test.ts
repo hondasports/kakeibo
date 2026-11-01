@@ -67,6 +67,21 @@ describe("下書きの修正状態と保存内容", () => {
       expect.arrayContaining([expect.objectContaining({ target })]),
     );
   });
+  it.each([
+    { ...discount, categoryId: "" },
+    { ...discount, amountYen: "oops" },
+  ])("割引対象が未選択でも明細の必須項目を案内する", (invalidDiscount) => {
+    const items = [product, invalidDiscount];
+    expect(getReviewSubmitErrorMessage(form, items)).toBe(
+      "明細名、明細金額、カテゴリを確認してください。",
+    );
+    expect(getReviewGuidance(form, items)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ target: "discount", required: true }),
+        expect.objectContaining({ target: "discount", required: false, id: "discount-discount" }),
+      ]),
+    );
+  });
   it("合計だけ保存では商品修正を必須にしないが、基本情報は必要", () => {
     const total = { ...form, priceTaxTreatment: "unknown" as const };
     expect(effectiveReviewMode(total)).toBe("totalOnly");

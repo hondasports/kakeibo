@@ -1,5 +1,6 @@
 import { Stack, TextField, Typography } from "@mui/material";
 import { currencyFormatter } from "../../../../lib/domain/common/currency";
+import { extractAmountDigits } from "../../../utils/currency";
 import { CategoryGrid } from "./CategoryGrid";
 import type { ExpenseEntryCategory } from "../types/types";
 
@@ -52,7 +53,7 @@ export function SingleEntryFields({
         label="合計金額"
         slotProps={{ htmlInput: { "aria-label": "合計金額", inputMode: "numeric" } }}
         onChange={(event) => {
-          const digits = event.target.value.replace(/[^\d]/g, "");
+          const digits = extractAmountDigits(event.target.value);
           onSourceAmountChange(digits);
         }}
         placeholder="例: 4,280"

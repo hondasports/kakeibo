@@ -77,3 +77,7 @@ UI/UX コンセプトを両立するため、色・余白・角丸・タイポ�
 - 入力画面の情報密度を落とさないか
 - ダッシュボード、入力画面、サマリー画面で横断的に使う値か
 - CSS 変数に公開する必要があるか、それとも MUI theme だけで足りるか
+
+## Agent Skill
+
+トークンの追加・変更を含むUI作業では、Capability Skill `skills/ui-design` も確認する。外部Skill `web-design-guidelines` の汎用チェックを使う場合も、視覚値の正本はこのドキュメントと `src/designTokens.ts` とし、外部の推奨だけで新しい色・余白・角丸を直書きしない。

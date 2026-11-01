@@ -186,13 +186,17 @@ pnpm run dev
 
 外部Skillは新しい環境を構築するたびにセクション2.2の手順で再インストールする。
 
+`web-design-guidelines` は、UIコードを対象にしたレビュー専用の汎用Skillとして使う。Suzumemo固有のUI判断は、Git管理するCapability Skill `skills/ui-design` と `docs/ui-ux-design.md`、`docs/design-tokens.md`、`docs/suzumemo-theme.md` を正本とし、外部Skillの推奨だけで配色、フォント、MUI方針を変更しない。
+
 `skills-lock.json` はsecretを含まないスキルhash一覧である。Git管理するかどうかは、スキル再現性を重視するか、生成物を減らすかで別途判断する。
 
 ### 2.4 Node.jsとpnpmのバージョン管理
 
-Node.jsはリポジトリ直下の `mise.toml` を正本とし、現在は `24.22.1` を使う。pnpmは `package.json` の `packageManager` を正本とし、現在は `11.1.2` を使う。
+Node.jsはリポジトリ直下の `mise.toml` を正本とし、現在は `26.13.0` を使う。pnpmは `package.json` の `packageManager` を正本とし、現在は `11.1.2` を使う。
 
 新しい環境では `mise install` でNode.jsとpnpmを導入する。通常の開発シェルではmiseを有効化し、Cursorなどの非対話環境では `mise exec -- <command>` を使う。Node.jsのバージョン切り替えにnvmは使わず、pnpmはmiseで管理する。
+
+Convex local backend（anonymous deployment）は `"use node"` action の実行用に Node.js v20/22/24 の `node` を別途要求する（`DeploymentNotConfiguredForNodeActions`）。ツールチェーンが v24 系以外のとき、`scripts/ensure-convex-node-runtime.mjs` が executor 用の Node を `~/.cache/suzumemo/convex-node-runtime/` に自動配置し、`start-ci-convex.mjs` / `start-local-convex.mjs` が `convex dev` 系の子プロセスにだけ PATH 先頭へ追加する。`pnpm exec convex dev` などスクリプト経由でない呼び出し向けに `~/.nvm/versions/node/v24.22.1` への symlink も作成する。
 
 ### 2.5 パッケージ管理方針
 

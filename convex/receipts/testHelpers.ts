@@ -1,6 +1,8 @@
 import type { UserIdentity } from "convex/server";
 import { vi } from "vitest";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import type { EntryKind } from "../../lib/domain/common/entryKind";
+import type { ExpenseEntrySource } from "../../lib/domain/expenseEntries/expenseEntry";
 
 // ---------------------------------------------------------------------------
 // テスト用型定義
@@ -11,7 +13,7 @@ export type ReceiptDoc = {
   _creationTime: number;
   groupId: string;
   date: string;
-  type?: "expense" | "income";
+  type?: EntryKind;
   shopName?: string;
   bankName?: string;
   amountYen: number;
@@ -33,8 +35,8 @@ export type ExpenseEntryDoc = {
   categoryId: string;
   title: string;
   memo?: string;
-  entryType: "expense" | "income";
-  source: "manual" | "ai_suggested" | "imported";
+  entryType: EntryKind;
+  source: ExpenseEntrySource;
   createdAt: number;
   updatedAt: number;
 };

@@ -10,12 +10,12 @@ import {
   requireE2eSecret,
   requireE2eUserId,
 } from "./e2eAuth";
+import { GROUP_LIFECYCLE_STATUSES } from "../../lib/domain/groups/lifecycle";
 
 const prefixPattern = /^e2e-system-admin-504-[a-z0-9-]+$/;
 const MAX_PREFIX_LENGTH = 80;
 const SEARCH_USER_COUNT = 25;
 const SEARCH_GROUP_COUNT = 24;
-const groupStatuses = ["active", "deleting", "deleted", "archived"] as const;
 
 function assertFixtureEnvironment(prefix: string, actorUserId: string) {
   if (!isE2eAppEnvironment()) throw new ConvexError("E2E fixture is disabled in production");
@@ -113,7 +113,7 @@ export const seedSystemAdminSearchFixture = internalMutation({
       groupIds.push(
         await ctx.db.insert("groups", {
           name: `${args.prefix}-group-${index}`,
-          status: groupStatuses[index % groupStatuses.length],
+          status: GROUP_LIFECYCLE_STATUSES[index % GROUP_LIFECYCLE_STATUSES.length],
           createdAt,
           updatedAt: createdAt,
         }),

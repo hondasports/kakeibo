@@ -1,4 +1,4 @@
-import type { EmailSuppressionReason, EmailWebhookEventType } from "../../email/model";
+import type { EmailSuppressionReason, EmailWebhookEventType } from "./model";
 
 export type StatusAndSuppression = {
   statusUpdate: "sent" | "delivered" | "bounced" | "complained" | "suppressed" | "failed";

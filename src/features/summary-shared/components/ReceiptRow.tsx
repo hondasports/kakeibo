@@ -4,6 +4,7 @@ import { Box, Button, Checkbox, Chip, Stack, Typography } from "@mui/material";
 import { formatDateForDisplay } from "../../week";
 import { MemoExpandableText } from "./MemoExpandableText";
 import type { ReceiptItem } from "../types/types";
+import { formatYen } from "../../../../lib/domain/common/currency";
 
 export type CategoryPreview = {
   _id: string;
@@ -105,7 +106,7 @@ export function ReceiptRow({
         )}
       </Box>
       <Typography className="receipt-row-amount" role="cell" sx={{ fontWeight: 700 }}>
-        {receipt.amountYen.toLocaleString()}円
+        {formatYen(receipt.amountYen)}
       </Typography>
       <Box className="receipt-row-memo" role="cell">
         {receipt.memo ? (

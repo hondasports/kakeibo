@@ -30,14 +30,23 @@ export function checkCategoryUsabilityForEntry(
   groupId: string,
   options?: CategoryUsabilityOptions,
 ): CategoryUsabilityResult {
-  if (category === null) {
-    return { usable: false, error: "not_found" };
+  const result = checkCategoryUsability(category, groupId);
+  if (
+    !result.usable &&
+    result.error === "inactive" &&
+    category?.id === options?.allowInactiveWhenUnchangedFrom
+  ) {
+    return { usable: true };
   }
-  if (category.groupId !== groupId) {
-    return { usable: false, error: "wrong_group" };
-  }
-  if (!category.isActive && options?.allowInactiveWhenUnchangedFrom !== category.id) {
-    return { usable: false, error: "inactive" };
-  }
+  return result;
+}
+
+export function checkCategoryUsability(
+  category: { groupId: string; isActive: boolean } | null,
+  groupId: string,
+): CategoryUsabilityResult {
+  if (category === null) return { usable: false, error: "not_found" };
+  if (category.groupId !== groupId) return { usable: false, error: "wrong_group" };
+  if (!category.isActive) return { usable: false, error: "inactive" };
   return { usable: true };
 }

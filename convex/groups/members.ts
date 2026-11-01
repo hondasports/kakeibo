@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
-import type { GroupAdminRole } from "./adminGuards";
+import type { GroupRole } from "../../lib/domain/groups/role";
+import { groupRoleValidator } from "./validators";
 import { requireGroupOwner } from "./membership";
 import { addMemberByEmail as addMemberByEmailUsecase } from "../../lib/usecase/groups/addMemberByEmail";
 import { removeMember as removeMemberUsecase } from "../../lib/usecase/groups/removeMember";
@@ -21,7 +22,7 @@ export async function removeMemberHandler(ctx: MutationCtx, args: { targetUserId
 
 export async function changeMemberRoleHandler(
   ctx: MutationCtx,
-  args: { targetUserId: string; newRole: GroupAdminRole },
+  args: { targetUserId: string; newRole: GroupRole },
 ) {
   const { groupId, userId } = await requireGroupOwner(ctx);
   return await changeMemberRoleUsecase({ groupId, userId }, createGroupMutationDeps(ctx), args);
@@ -54,7 +55,7 @@ export const removeMember = mutation({
 export const changeMemberRole = mutation({
   args: {
     targetUserId: v.string(),
-    newRole: v.union(v.literal("owner"), v.literal("member")),
+    newRole: groupRoleValidator,
   },
   returns: v.null(),
   handler: changeMemberRoleHandler,

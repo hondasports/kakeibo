@@ -104,8 +104,11 @@ export function buildReplacementDraftItemFields(args: {
       categoryId: item.categoryId,
       amountBasis: taxItem?.amountBasis,
       taxRatePercent: taxItem?.taxRatePercent,
-      markers: taxItem?.markers,
-      taxMarker: taxItem?.taxMarker,
+      markers: taxItem?.markers?.length
+        ? taxItem.markers
+        : taxItem?.taxMarker
+          ? [taxItem.taxMarker]
+          : taxItem?.markers,
       allocatedTaxYen: taxItem?.allocatedTaxYen,
       taxAllocationStatus:
         previous && hasReceiptTaxMetadata({}, [previous]) ? "unallocated" : undefined,

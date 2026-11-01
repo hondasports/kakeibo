@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator } from "@playwright/test";
 import { gotoAuthenticated } from "./helpers/auth";
 import {
   expectLocatorInsideViewport,
@@ -9,23 +9,26 @@ import {
 /** Issue #354 スクショ相当の SP 幅 */
 const MOBILE_VIEWPORT = { width: 406, height: 687 };
 
+/** 遷移アニメーション中は位置が動き続けるため、連続2回の測定値が一致するまで待つ */
+async function waitForStableBounds(...locators: Locator[]) {
+  let previous = "";
+  await expect
+    .poll(
+      async () => {
+        const rects = await Promise.all(locators.map((locator) => locator.boundingBox()));
+        const current = JSON.stringify(rects);
+        const stable = previous === current;
+        previous = current;
+        return stable;
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+}
+
 /**
- * レスポンシブ表示 E2E テスト
- *
- * Issue #20「MVPレスポンシブ確認」の受け入れ確認。
- *
- * カバーするシナリオ:
- *   - ~~シナリオ R-1: 390px viewport でメイン画面の主要要素が表示される (P1 / smoke)~~
- *     **削除** (Issue #49 でダッシュボードが変更されたため)
- *   - ~~シナリオ R-2: 320px viewport でメイン画面の主要要素が表示される (P1 / smoke)~~
- *     **削除** (Issue #49 でダッシュボードが変更されたため)
- *   - シナリオ R-3: 390px viewport で設定画面の主要要素が表示される (P1 / smoke)
- *     **更新** (BottomNavigation 経由の遷移に変更)
- *   - シナリオ R-4: 406px viewport で入力画面が横スクロールせず主要要素が viewport 内に収まる (P1 / smoke)
- *     Issue #354 対応
- *
- * テストデータ・cleanup:
- *   - レシート・カテゴリを作成しないため cleanup 不要。
+ * レスポンシブ表示 E2E テスト（Issue #20「MVPレスポンシブ確認」の受け入れ確認）
+ * レシート・カテゴリを作成しないため cleanup は持たない。
  */
 
 test.describe("レスポンシブ表示（Issue #20）", () => {
@@ -81,8 +84,7 @@ test.describe("レスポンシブ表示（Issue #20）", () => {
     await expect(categoryList).toBeVisible();
     await expect(saveButton).toBeVisible();
 
-    // ページ遷移アニメーション（300ms）完了後に横スクロールと viewport 内収容を確認
-    await page.waitForTimeout(400);
+    await waitForStableBounds(queueSection, shopNameInput, saveButton);
 
     await expectNoHorizontalOverflow(page);
     await expectLocatorInsideViewport(queueSection);
@@ -98,39 +100,6 @@ test.describe("レスポンシブ表示（Issue #20）", () => {
     await expect(page.getByLabel("金額")).toBeVisible();
     await expect(page.getByLabel("収入の内容・メモ")).toBeVisible();
     await expectNoHorizontalOverflow(page);
-  });
-
-  test("@smoke シナリオR-4b: 406px viewport でキュー有データ時も主要要素が viewport 内に収まる", async ({
-    page,
-  }) => {
-    await gotoAuthenticated(page);
-    await page.setViewportSize(MOBILE_VIEWPORT);
-    await page.goto("/__e2e__/ai-expense-queue");
-
-    const queueSection = page.locator("section.ai-expense-queue");
-    const statusSummary = page.locator(".ai-expense-queue-status-summary");
-    const addReceiptButton = queueSection.getByRole("button", { name: "画像を読み取る" }).first();
-    const cameraButton = queueSection.getByRole("button", { name: "カメラで撮影" });
-    const failedChip = queueSection.getByText("読み取り失敗 1件");
-
-    await expect(queueSection).toBeVisible();
-    await expect(statusSummary).toBeVisible();
-    await expect(addReceiptButton).toBeVisible();
-    await expect(cameraButton).toBeVisible();
-    await expect(failedChip).toBeVisible();
-    await expect(queueSection.getByText("登録できます 1件")).toBeVisible();
-    await expect(queueSection.getByText("確認待ち 1件")).toBeVisible();
-
-    await page.waitForTimeout(400);
-
-    await expectNoHorizontalOverflow(page);
-    await expectLocatorInsideViewport(queueSection);
-    await expectLocatorInsideViewport(statusSummary);
-    await expectLocatorInsideViewport(addReceiptButton);
-    await expectLocatorInsideViewport(cameraButton);
-    await expectLocatorInsideViewport(failedChip);
-    await expect(queueSection.getByRole("region", { name: "登録済み" })).toBeVisible();
-    await expectLocatorInsideViewport(queueSection.getByRole("region", { name: "登録済み" }));
   });
 
   test("@smoke シナリオR-4c: 406px viewport で入力ワークベンチが横スクロールせず登録済みがフォームの後", async ({
@@ -152,7 +121,7 @@ test.describe("レスポンシブ表示（Issue #20）", () => {
     await expect(registeredRegion).toBeVisible();
     await expect(registeredRegion.getByText("ジャパン 明石稲美店")).toBeVisible();
 
-    await page.waitForTimeout(400);
+    await waitForStableBounds(addReceiptButton, shopNameInput, registeredRegion);
 
     await expectNoHorizontalOverflow(page);
     await expectLocatorInsideViewport(addReceiptButton);

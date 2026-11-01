@@ -14,6 +14,7 @@ export {
   amountBasisValidator,
   derivedRegistrationSnapshotValidator,
   markerDefinitionsValidator,
+  receiptDraftItemFields,
   receiptItemLineTypeValidator,
   receiptItemTaxRatePercentValidator,
   receiptMarkersValidator,

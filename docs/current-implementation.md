@@ -4,7 +4,7 @@
 
 要件・設計ドキュメントには将来方針や互換性維持のための記述も含まれるため、実装済みかどうかを判断するときは本書とコードを参照する。コードと本書が食い違う場合はコードを正とし、変更したPRで本書も追随させる。
 
-更新基準: `preview` branch のコード（2026-08-15確認）
+更新基準: `preview` branch のコード（2026-10-31確認）
 
 ## 1. 技術スタック
 
@@ -39,13 +39,16 @@
 - `expense-search`
 - `group-admin`
 - `monthly-summary`
-- `receipt`
+- `receipt-review`
 - `settings`
+- `summary-shared`
 - `system-admin`
 - `ui`
 - `week`
 - `weekly-summary`
 - `yearly-summary`
+
+うち `receipt-review` と `summary-shared` は barrel（`index.ts`）を持たない共有 feature で、中身のファイルを直接 import する。
 
 特に、従来の週次中心の構成に加えて、**月次サマリー・年次サマリー・履歴検索**が実装済みである。
 

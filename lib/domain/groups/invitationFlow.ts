@@ -1,5 +1,6 @@
 import { MAX_EMAIL_LENGTH, validateInvitationEmail } from "./email";
 import { getGroupAdminErrorMessage, validateGroupOwnerRole } from "./admin";
+import type { GroupRole } from "./role";
 
 export class ClerkInvitationDomainError extends Error {}
 
@@ -7,7 +8,7 @@ export type InvitationGroupRecord = {
   _id: string;
   name: string;
   clerkOrganizationId: string | null;
-  role: "owner" | "member";
+  role: GroupRole;
   createdAt: number;
 };
 

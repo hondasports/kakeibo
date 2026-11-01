@@ -2,11 +2,15 @@ import { internalMutation } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { createCategoryStore } from "../../lib/convex/categories/convexCategoryStore";
+import { CategoryDomainError } from "../../lib/domain/categories/rules";
 import { deleteE2eCategoriesByGroup, ensureE2eCategory } from "../../lib/usecase/categories";
 
 function convexError(error: unknown): never {
   if (error instanceof ConvexError) throw error;
-  throw new ConvexError(error instanceof Error ? error.message : "Unknown error");
+  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
+  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
+  if (error instanceof CategoryDomainError) throw new ConvexError(error.message);
+  throw error;
 }
 
 export const deleteE2eCategoriesByUser = internalMutation({

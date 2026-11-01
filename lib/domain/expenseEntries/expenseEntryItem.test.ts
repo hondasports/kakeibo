@@ -6,7 +6,6 @@ import {
   getExpenseItemFieldErrorMessage,
   parseExpenseAmountString,
   validateExpenseAmount,
-  validateExpenseItem,
   validateExpenseItemInput,
   validateExpenseItems,
   validateExpenseMemo,
@@ -101,29 +100,6 @@ describe("validateExpenseMemo", () => {
   it("最大長を超える場合は too_long", () => {
     const result = validateExpenseMemo("a".repeat(EXPENSE_ENTRY_MEMO_MAX_LENGTH + 1));
     expect(result).toEqual({ success: false, error: "too_long" });
-  });
-});
-
-describe("validateExpenseItem", () => {
-  it("有効な数値金額の項目を検証する", () => {
-    const result = validateExpenseItem({
-      categoryId: "cat-food",
-      amountYen: 2000,
-      title: "食料品",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it.each([0, -1, 1.5, 10_000_000])("不正な金額 %s を拒否する", (amount) => {
-    const result = validateExpenseItem({
-      categoryId: "cat-food",
-      amountYen: amount,
-      title: "食料品",
-    });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.errors.amountYen).toBeTruthy();
-    }
   });
 });
 

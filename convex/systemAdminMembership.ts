@@ -1,24 +1,18 @@
 import { ConvexError, v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { createSystemAdminMutationDeps } from "../lib/convex/systemAdmin/systemAdminDeps";
+import { systemAdminMembershipOperationValidator } from "../lib/convex/systemAdmin/validators";
 import { systemAdminMembershipOperation as systemAdminMembershipOperationUsecase } from "../lib/usecase/systemAdmin";
 
-const operationValidator = v.union(
-  v.literal("add"),
-  v.literal("remove"),
-  v.literal("transfer"),
-  v.literal("set_active"),
-  v.literal("clear_active"),
-);
 const resultValidator = v.object({
-  operation: operationValidator,
+  operation: systemAdminMembershipOperationValidator,
   status: v.literal("success"),
 });
 
 export const systemAdminMembershipOperation = mutation({
   args: {
     targetUserId: v.id("users"),
-    operation: operationValidator,
+    operation: systemAdminMembershipOperationValidator,
     sourceGroupId: v.optional(v.id("groups")),
     targetGroupId: v.optional(v.id("groups")),
     reason: v.string(),

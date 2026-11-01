@@ -2,20 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_BULK_SPENDING_SELECTION,
   canSelectAnotherSpendingRecord,
-  countBulkSpendingIds,
   dedupeIds,
   getBulkSpendingLimitErrorMessage,
   isExpenseReceiptType,
+  normalizeBulkSpendingIds,
 } from "../../domain/spending/bulkSpending";
 
 describe("bulk spending id helpers", () => {
   it("重複IDを除いて件数を数える", () => {
-    expect(
-      countBulkSpendingIds({
-        expenseEntryIds: ["entry-1", "entry-1", "entry-2"],
-        receiptIds: ["receipt-1", "receipt-1"],
-      }),
-    ).toBe(3);
+    const normalized = normalizeBulkSpendingIds({
+      expenseEntryIds: ["entry-1", "entry-1", "entry-2"],
+      receiptIds: ["receipt-1", "receipt-1"],
+    });
+    expect(normalized.success).toBe(true);
+    if (normalized.success) {
+      expect(normalized.data.totalCount).toBe(3);
+    }
     expect(dedupeIds(["a", "a", "b"])).toEqual(["a", "b"]);
   });
 

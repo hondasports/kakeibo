@@ -12,16 +12,16 @@ import {
 } from "@mui/material";
 import { SystemAdminEmptyState, SystemAdminErrorState } from "../pages/SystemAdminPageFrame";
 import type { UserSearchItem } from "../types";
-import type { SearchType } from "../hooks/useSystemAdminManagement";
+import type { UserSearchType } from "../../../../lib/domain/systemAdmin/searchQuery";
 
 type SystemAdminManagementSearchProps = {
-  searchType: SearchType;
+  searchType: UserSearchType;
   searchQuery: string;
   searching: boolean;
   hasSearched: boolean;
   searchError: boolean;
   candidates: UserSearchItem[];
-  onSearchTypeChange: (type: SearchType) => void;
+  onSearchTypeChange: (type: UserSearchType) => void;
   onSearchQueryChange: (query: string) => void;
   onSearch: () => void;
   onRetry: () => void;
@@ -65,7 +65,7 @@ export function SystemAdminManagementSearch({
               label="検索対象"
               labelId="system-admin-search-type-label"
               value={searchType}
-              onChange={(event) => onSearchTypeChange(event.target.value as SearchType)}
+              onChange={(event) => onSearchTypeChange(event.target.value as UserSearchType)}
             >
               <MenuItem value="displayName">表示名</MenuItem>
               <MenuItem value="email">メールアドレス</MenuItem>

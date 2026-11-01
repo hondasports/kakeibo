@@ -6,6 +6,13 @@ import { internal } from "./_generated/api";
 import { action, internalMutation } from "./_generated/server";
 import { createSystemAdminMutationDeps } from "../lib/convex/systemAdmin/systemAdminDeps";
 import {
+  groupQueryTypeValidator,
+  userSearchTypeValidator,
+} from "../lib/convex/systemAdmin/validators";
+import { GROUP_INVITATION_STATUSES } from "../lib/domain/groups/groupInvitation";
+import { GROUP_LIFECYCLE_STATUSES } from "../lib/domain/groups/lifecycle";
+import { groupRoleValidator } from "./groups/validators";
+import {
   getGroupDetailData as getGroupDetailDataUsecase,
   getUserDetailData as getUserDetailDataUsecase,
   searchGroupsData as searchGroupsDataUsecase,
@@ -15,13 +22,6 @@ import {
 const systemAdminEnvironmentValidator = v.union(
   ...APP_ENVIRONMENTS.map((value) => v.literal(value)),
 );
-const userSearchTypeValidator = v.union(
-  v.literal("displayName"),
-  v.literal("email"),
-  v.literal("userId"),
-);
-const groupQueryTypeValidator = v.union(v.literal("name"), v.literal("groupId"));
-
 const userListItemValidator = v.object({
   id: v.id("users"),
   userId: v.string(),
@@ -34,12 +34,7 @@ const userListItemValidator = v.object({
 const groupListItemValidator = v.object({
   id: v.id("groups"),
   name: v.string(),
-  status: v.union(
-    v.literal("active"),
-    v.literal("deleting"),
-    v.literal("deleted"),
-    v.literal("archived"),
-  ),
+  status: v.union(...GROUP_LIFECYCLE_STATUSES.map((value) => v.literal(value))),
   createdAt: v.number(),
   updatedAt: v.number(),
 });
@@ -54,7 +49,7 @@ const groupSearchResultValidator = v.object({
 const userMembershipValidator = v.object({
   groupId: v.id("groups"),
   groupName: v.string(),
-  role: v.union(v.literal("owner"), v.literal("member")),
+  role: groupRoleValidator,
   createdAt: v.number(),
   updatedAt: v.number(),
 });
@@ -62,12 +57,7 @@ const userInvitationValidator = v.object({
   id: v.id("groupInvitations"),
   groupId: v.id("groups"),
   groupName: v.string(),
-  status: v.union(
-    v.literal("pending"),
-    v.literal("accepted"),
-    v.literal("revoked"),
-    v.literal("expired"),
-  ),
+  status: v.union(...GROUP_INVITATION_STATUSES.map((value) => v.literal(value))),
   createdAt: v.number(),
   updatedAt: v.number(),
 });
@@ -84,19 +74,14 @@ const groupMemberValidator = v.object({
   userId: v.string(),
   displayName: v.union(v.string(), v.null()),
   email: v.union(v.string(), v.null()),
-  role: v.union(v.literal("owner"), v.literal("member")),
+  role: groupRoleValidator,
   createdAt: v.number(),
   updatedAt: v.number(),
 });
 const groupInvitationValidator = v.object({
   id: v.id("groupInvitations"),
   email: v.string(),
-  status: v.union(
-    v.literal("pending"),
-    v.literal("accepted"),
-    v.literal("revoked"),
-    v.literal("expired"),
-  ),
+  status: v.union(...GROUP_INVITATION_STATUSES.map((value) => v.literal(value))),
   createdAt: v.number(),
   updatedAt: v.number(),
 });

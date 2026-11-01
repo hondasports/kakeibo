@@ -4,7 +4,13 @@ import type { ReceiptItemTaxConfirmedField } from "../receipt/tax/types";
  * Convex の generated 型には依存せず、ID は string として扱う。
  */
 import type { ReceiptItemLineType } from "../receipt/discountItems";
-import type { AmountBasis, TaxRatePercent, TaxResolutionSource } from "../receipt/tax/types";
+import type {
+  AmountBasis,
+  TaxAllocationStatus,
+  TaxRatePercent,
+  TaxResolutionSource,
+  TaxResolutionStatus,
+} from "../receipt/tax/types";
 
 /** aiExpenseDraftItems ドキュメントのフィールド。id/creationTime は永続化済みの場合のみ存在する。 */
 export type AiExpenseDraftItemFields = {
@@ -21,9 +27,9 @@ export type AiExpenseDraftItemFields = {
   markers?: string[];
   taxMarker?: string;
   allocatedTaxYen?: number;
-  taxAllocationStatus?: "allocated" | "unallocated";
+  taxAllocationStatus?: TaxAllocationStatus;
   normalizedAmountYen?: number;
-  taxResolutionStatus?: "resolved" | "unresolved";
+  taxResolutionStatus?: TaxResolutionStatus;
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
   taxConfirmedFields?: ReceiptItemTaxConfirmedField[];

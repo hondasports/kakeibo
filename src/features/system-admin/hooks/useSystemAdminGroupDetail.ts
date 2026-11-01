@@ -1,7 +1,9 @@
 import { api } from "../../../../convex/_generated/api";
 import { useCallback, useEffect, useState } from "react";
 import { useAction, useMutation } from "convex/react";
+import { normalizeSystemAdminReason } from "../../../../lib/domain/systemAdmin/reason";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import type { GroupRole } from "../../../../lib/domain/groups/role";
 
 export type GroupDetail = {
   name: string;
@@ -13,7 +15,7 @@ export type GroupDetail = {
     userId: string;
     displayName: string | null;
     email: string | null;
-    role: "owner" | "member";
+    role: GroupRole;
   }[];
   invitations: { id: string; email: string; status: string; createdAt: number }[];
   membersTruncated?: boolean;
@@ -47,7 +49,7 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
 
   const [roleTarget, setRoleTarget] = useState<GroupDetailMember | null>(null);
   const [roleOperation, setRoleOperation] = useState<"role_change" | "owner_transfer" | null>(null);
-  const [roleNewRole, setRoleNewRole] = useState<"owner" | "member">();
+  const [roleNewRole, setRoleNewRole] = useState<GroupRole>();
   const [roleSource, setRoleSource] = useState<GroupDetailMember | null>(null);
   const [roleError, setRoleError] = useState("");
   const [roleSaving, setRoleSaving] = useState(false);
@@ -129,7 +131,7 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
   const requestRoleChange = (
     member: GroupDetailMember,
     operation: "role_change" | "owner_transfer",
-    newRole?: "owner" | "member",
+    newRole?: GroupRole,
   ) => {
     setRoleTarget(member);
     setRoleOperation(operation);
@@ -215,15 +217,15 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
 
   const executeRecovery = async () => {
     if (!groupId || !recoveryTarget?.userDocumentId) return;
-    const reason = recoveryReason.trim();
-    if (reason.length < 1 || reason.length > 500) return;
+    const reasonResult = normalizeSystemAdminReason(recoveryReason);
+    if (!reasonResult.success) return;
     setRecovering(true);
     setRecoveryError("");
     try {
       await recoverOwnerless({
         groupId: groupId as Id<"groups">,
         targetUserId: recoveryTarget.userDocumentId as Id<"users">,
-        reason,
+        reason: reasonResult.reason,
       });
       setRecoveryTarget(null);
       setRecoveryReason("");

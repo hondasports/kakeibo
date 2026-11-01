@@ -223,7 +223,7 @@ describe("aiExpenseDrafts (register) (review ready flow)", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         categoryId: "cat-food" as any,
       }),
-    ).rejects.toMatchObject({ data: "AI expense draft does not belong to the current group" });
+    ).rejects.toMatchObject({ data: "AI expense draft not found" });
   });
 
   it("書類種別が未判定の確認下書きは登録準備OKへ戻せない", async () => {

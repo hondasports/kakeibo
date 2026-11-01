@@ -4,6 +4,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import type { SystemAdminStatus } from "../lib/domain/systemAdmin/systemAdminStore";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
 
@@ -33,7 +34,7 @@ async function seedUsers(t: ReturnType<typeof convexTest>, ids: string[]) {
 async function addAdmin(
   t: ReturnType<typeof convexTest>,
   userId: Id<"users">,
-  status: "active" | "revoked" = "active",
+  status: SystemAdminStatus = "active",
 ) {
   return t.run(async (ctx) =>
     ctx.db.insert("systemAdmins", {

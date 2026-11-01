@@ -12,8 +12,10 @@ import type {
   ReceiptMarkerDefinition,
   ReceiptTaxDecision,
   ReceiptTotalResolution,
+  TaxAllocationStatus,
   TaxRatePercent,
   TaxResolutionSource,
+  TaxResolutionStatus,
 } from "../receipt/tax/types";
 import { classifyCreatedDraft, type CreatedDraftClassificationInput } from "./classification";
 import type {
@@ -23,6 +25,7 @@ import type {
 } from "./constants";
 import {
   applyReceiptUserOverride,
+  RECEIPT_DATA_CONTRACT_VERSION,
   type ReceiptDraftValueSnapshot,
   type ReceiptUserOverrideSnapshot,
 } from "./receiptDataContract";
@@ -40,11 +43,12 @@ export type ExtractedDraftItemInput<TCategoryId extends string = string> = {
   amountBasis?: AmountBasis;
   taxRatePercent?: TaxRatePercent | null;
   markers?: string[];
+  /** @deprecated 永続済み旧形式の読み取り互換用。書き込み時は markers に畳み込む。 */
   taxMarker?: string;
   allocatedTaxYen?: number;
-  taxAllocationStatus?: "allocated" | "unallocated";
+  taxAllocationStatus?: TaxAllocationStatus;
   normalizedAmountYen?: number;
-  taxResolutionStatus?: "resolved" | "unresolved";
+  taxResolutionStatus?: TaxResolutionStatus;
   taxResolutionSource?: TaxResolutionSource;
   taxReviewReasons?: string[];
   taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
@@ -154,7 +158,7 @@ export function buildExtractedDraftFields<TCategoryId extends string, TGroupId e
       taxSummaries: values.taxSummaries,
       receiptTotalResolution: values.receiptTotalResolution,
       receiptTaxDecision: values.receiptTaxDecision,
-      receiptDataContractVersion: 1 as const,
+      receiptDataContractVersion: RECEIPT_DATA_CONTRACT_VERSION,
       markerDefinitions: values.markerDefinitions,
       categoryId: values.categoryId,
       confidence: values.confidence,
@@ -187,8 +191,7 @@ export function buildExtractedDraftItemFields<
     printedAmountYen: item.printedAmountYen,
     amountBasis: item.amountBasis,
     taxRatePercent: item.taxRatePercent,
-    markers: item.markers,
-    taxMarker: item.taxMarker,
+    markers: item.markers?.length ? item.markers : item.taxMarker ? [item.taxMarker] : item.markers,
     allocatedTaxYen: item.allocatedTaxYen,
     taxAllocationStatus: item.taxAllocationStatus,
     normalizedAmountYen: item.normalizedAmountYen,

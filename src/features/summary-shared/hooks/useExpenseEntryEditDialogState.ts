@@ -3,6 +3,11 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { isValidSignedLineItemAmount } from "../../../../lib/domain/receipt/discountItems";
+import {
+  getExpenseItemFieldErrorMessage,
+  parseExpenseAmountString,
+  validateExpenseTitle,
+} from "../../../../lib/domain/expenseEntries/expenseEntryItem";
 import type { ReceiptItem } from "../types/types";
 import { getEditableReceiptTitle } from "../components/ExpenseEntryEditDialog";
 import type { EditableDraftItem } from "../components/ExpenseEntryDraftItemsEditor";
@@ -28,6 +33,8 @@ export function useExpenseEntryEditDialogState({
   const [draftItems, setDraftItems] = useState<EditableDraftItem[]>([]);
   const [draftItemsLoading, setDraftItemsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [amountError, setAmountError] = useState("");
+  const [titleError, setTitleError] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [prevReceipt, setPrevReceipt] = useState<ReceiptItem | null>(null);
@@ -49,6 +56,8 @@ export function useExpenseEntryEditDialogState({
       setDraftItems([]);
       setDraftItemsLoading(Boolean(receipt.aiExpenseDraftId));
       setError("");
+      setAmountError("");
+      setTitleError("");
     }
   }
 
@@ -59,15 +68,19 @@ export function useExpenseEntryEditDialogState({
     if (receipt.aiExpenseDraftId && registrationMode === "detailed" && draftItemsLoading) {
       return;
     }
-    const parsedAmount = Number(amountYen.replace(/[^\d]/g, ""));
-    if (!Number.isInteger(parsedAmount) || parsedAmount <= 0) {
-      setError("金額は1円以上の整数で入力してください。");
+    const amountResult = parseExpenseAmountString(amountYen);
+    const titleResult = validateExpenseTitle(title);
+    setError("");
+    setAmountError(
+      amountResult.success ? "" : getExpenseItemFieldErrorMessage("amountYen", amountResult.error),
+    );
+    setTitleError(
+      titleResult.success ? "" : getExpenseItemFieldErrorMessage("title", titleResult.error),
+    );
+    if (!amountResult.success || !titleResult.success) {
       return;
     }
-    if (!title.trim()) {
-      setError("タイトルを入力してください。");
-      return;
-    }
+    const parsedAmount = amountResult.amountYen;
     if (!date.trim()) {
       setError("日付を入力してください。");
       return;
@@ -102,7 +115,7 @@ export function useExpenseEntryEditDialogState({
             date,
             amountYen: parsedAmount,
             categoryId: categoryId as Id<"categories">,
-            shopName: title.trim(),
+            shopName: titleResult.title,
             memo: memo.trim(),
             registrationMode,
             items: registrationMode === "detailed" ? submittedItems : undefined,
@@ -112,7 +125,7 @@ export function useExpenseEntryEditDialogState({
             expenseEntryId: receipt._id as Id<"expenseEntries">,
             date,
             amountYen: parsedAmount,
-            title: title.trim(),
+            title: titleResult.title,
             memo: memo.trim() || undefined,
           });
         } else {
@@ -121,7 +134,7 @@ export function useExpenseEntryEditDialogState({
             date,
             amountYen: parsedAmount,
             categoryId: categoryId as Id<"categories">,
-            title: title.trim(),
+            title: titleResult.title,
             memo: memo.trim() || undefined,
           });
         }
@@ -130,7 +143,7 @@ export function useExpenseEntryEditDialogState({
           receiptId: receipt._id as Id<"receipts">,
           date,
           amountYen: parsedAmount,
-          bankName: title.trim(),
+          bankName: titleResult.title,
           memo: memo.trim() || undefined,
         });
       } else {
@@ -139,7 +152,7 @@ export function useExpenseEntryEditDialogState({
           date,
           amountYen: parsedAmount,
           categoryId: categoryId as Id<"categories">,
-          shopName: title.trim(),
+          shopName: titleResult.title,
           memo: memo.trim() || undefined,
         });
       }
@@ -174,6 +187,10 @@ export function useExpenseEntryEditDialogState({
     draftItemsLoading,
     setDraftItemsLoading,
     error,
+    amountError,
+    setAmountError,
+    titleError,
+    setTitleError,
     saving,
     handleSave,
     isDraftItemsLoading,

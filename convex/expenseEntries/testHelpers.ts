@@ -2,6 +2,8 @@ import type { UserIdentity } from "convex/server";
 import { vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import type { EntryKind } from "../../lib/domain/common/entryKind";
+import type { ExpenseEntrySource } from "../../lib/domain/expenseEntries/expenseEntry";
 
 // ---------------------------------------------------------------------------
 // テスト用型定義
@@ -64,8 +66,8 @@ export type ExpenseEntryDoc = {
   categoryId: string;
   title: string;
   memo?: string;
-  entryType: "expense" | "income";
-  source: "manual" | "ai_suggested" | "imported";
+  entryType: EntryKind;
+  source: ExpenseEntrySource;
   createdAt: number;
   updatedAt: number;
 };

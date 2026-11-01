@@ -209,55 +209,6 @@ export function validateExpenseItems(input: {
 }
 
 /**
- * 検証済みの支出項目データを検証する。
- * Convex 側など、既に数値に変換済みの値に対して使う。
- */
-export function validateExpenseItem(
-  input: ExpenseItem,
-): { success: true; data: ExpenseItem } | { success: false; errors: ExpenseItemErrors } {
-  const errors: ExpenseItemErrors = {};
-
-  if (input.categoryId === "") {
-    errors.categoryId = "empty";
-  }
-
-  const amountResult = validateExpenseAmount(input.amountYen);
-  if (!amountResult.success) {
-    errors.amountYen = amountResult.error;
-  }
-
-  let title = input.title;
-  const titleResult = validateExpenseTitle(input.title);
-  if (!titleResult.success) {
-    errors.title = titleResult.error;
-  } else {
-    title = titleResult.title;
-  }
-
-  let memo = input.memo;
-  const memoResult = validateExpenseMemo(input.memo);
-  if (!memoResult.success) {
-    errors.memo = memoResult.error;
-  } else {
-    memo = memoResult.memo;
-  }
-
-  if (Object.keys(errors).length > 0) {
-    return { success: false, errors };
-  }
-
-  return {
-    success: true,
-    data: {
-      categoryId: input.categoryId,
-      amountYen: input.amountYen,
-      title,
-      memo,
-    },
-  };
-}
-
-/**
  * UI からの入力値を支出項目データに変換・検証する。
  * 金額は文字列から数値に変換される。
  */

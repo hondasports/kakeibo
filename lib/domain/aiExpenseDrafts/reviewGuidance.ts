@@ -1,16 +1,10 @@
-import { parseExpenseAmountString } from "../expenseEntries/expenseEntryItem";
-import { isValidIsoDateString } from "../week/weekDates";
-import { isDiscountLine, isValidSignedLineItemAmount } from "../receipt/discountItems";
+import { isDiscountLine } from "../receipt/discountItems";
 import type {
   AiExpenseDraftJudgmentInput,
   ReviewFormValues,
   ReviewItemValues,
 } from "./reviewTypes";
-import {
-  getReviewDocumentTypeErrorMessage,
-  getReviewItemsErrorMessage,
-  getReviewCategoryAggregateErrorMessage,
-} from "./reviewValidation";
+import { REVIEW_VALIDATION_MESSAGES, validateReviewInput } from "./reviewValidation";
 import {
   buildTaxContextFromReviewItem,
   getReviewItemTaxConfirmation,
@@ -51,14 +45,15 @@ export function getReviewGuidance(
   const issues: ReviewGuidanceItem[] = [];
   const add = (id: string, message: string, target: string, required: boolean) =>
     issues.push({ id, message, target, required });
-  const documentError = getReviewDocumentTypeErrorMessage(form.documentType);
-  if (documentError) add("document", documentError, "document", true);
-  if (!form.shopName.trim()) add("shopName", "店名・内容を入力してください。", "shopName", true);
-  if (!isValidIsoDateString(form.date)) add("date", "支出日を確認してください。", "date", true);
-  if (!parseExpenseAmountString(form.amountYen).success)
-    add("amount", "合計金額を1円以上で入力してください。", "amountYen", true);
-  if (!form.categoryId)
-    add("category", "レシート全体のカテゴリを選択してください。", "categoryId", true);
+  const validation = validateReviewInput(
+    { ...form, registrationMode: effectiveReviewMode(form) },
+    items,
+  );
+  for (const issue of validation) {
+    const message = REVIEW_VALIDATION_MESSAGES[issue.code].guidance;
+    if (issue.itemIndex === undefined && issue.code !== "aggregate" && message)
+      add(issue.code, message, issue.field, issue.required);
+  }
   if (effectiveReviewMode(form) === "detailed") {
     const taxCheck = buildTaxRateCheck({
       items,
@@ -94,7 +89,7 @@ export function getReviewGuidance(
         taxSummaryIndex: index,
       });
     });
-    for (const item of items) {
+    for (const [itemIndex, item] of items.entries()) {
       const name = item.itemName || "名称未設定";
       const target = items.find((candidate) => candidate.id === item.discountTargetItemId);
       if (
@@ -134,21 +129,26 @@ export function getReviewGuidance(
           false,
         );
       }
-      // 割引対象の未確定は税率別集計を比較不能にする確認項目。
-      // 下書き保存は妨げない（登録前に解消する必須検証とは分離する）。
-      if (isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId)
-        add(
-          "discount-" + item.id,
-          "「" + name + "」：割引対象の商品を選択してください。",
-          item.id,
-          false,
-        );
-      else if (!item.itemName.trim())
-        add("name-" + item.id, "明細名を入力してください。", item.id, true);
-      else if (!isValidSignedLineItemAmount(item.itemName, Number(item.amountYen), item.lineType))
-        add("amount-" + item.id, "「" + name + "」：明細金額を確認してください。", item.id, true);
-      else if (!item.categoryId)
-        add("category-" + item.id, "「" + name + "」：カテゴリを選択してください。", item.id, true);
+      for (const issue of validation.filter((entry) => entry.itemIndex === itemIndex)) {
+        if (issue.code === "discountTarget")
+          add(
+            "discount-" + item.id,
+            "「" + name + "」：割引対象の商品を選択してください。",
+            item.id,
+            false,
+          );
+        if (issue.code === "itemName")
+          add("name-" + item.id, REVIEW_VALIDATION_MESSAGES.itemName.guidance, item.id, true);
+        if (issue.code === "itemAmount")
+          add("amount-" + item.id, "「" + name + "」：明細金額を確認してください。", item.id, true);
+        if (issue.code === "itemCategory")
+          add(
+            "category-" + item.id,
+            "「" + name + "」：カテゴリを選択してください。",
+            item.id,
+            true,
+          );
+      }
       if (buildTaxContextFromReviewItem(item).status === "unresolved") {
         add(
           `tax-${item.id}`,
@@ -158,10 +158,8 @@ export function getReviewGuidance(
         );
       }
     }
-    if (!items.some((item) => getReviewItemsErrorMessage([item]))) {
-      const aggregateError = getReviewCategoryAggregateErrorMessage(items);
-      if (aggregateError) add("aggregate", aggregateError, "items", true);
-    }
+    if (validation.some((issue) => issue.code === "aggregate"))
+      add("aggregate", REVIEW_VALIDATION_MESSAGES.aggregate.guidance, "items", true);
   }
   if (
     draft?.reviewReasons.some((reason) =>

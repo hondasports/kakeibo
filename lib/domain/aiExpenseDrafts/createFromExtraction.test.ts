@@ -120,6 +120,43 @@ describe("buildExtractedDraftItemFields", () => {
     });
     expect(fields.taxAllocationStatus).toBeUndefined();
   });
+
+  it.each([undefined, []] as const)(
+    "markers %s かつ taxMarker 非空の旧形式入力は markers に畳み込み taxMarker を書かない",
+    (markers) => {
+      const fields = buildExtractedDraftItemFields(
+        "g1",
+        "d1",
+        {
+          itemName: "商品",
+          amountYen: 100,
+          markers,
+          taxMarker: "※",
+          confidence: { itemName: 1 },
+        },
+        7,
+      );
+      expect(fields.markers).toEqual(["※"]);
+      expect(fields).not.toHaveProperty("taxMarker");
+    },
+  );
+
+  it("markers 非空なら taxMarker より markers を優先する", () => {
+    const fields = buildExtractedDraftItemFields(
+      "g1",
+      "d1",
+      {
+        itemName: "商品",
+        amountYen: 100,
+        markers: ["#"],
+        taxMarker: "※",
+        confidence: { itemName: 1 },
+      },
+      7,
+    );
+    expect(fields.markers).toEqual(["#"]);
+    expect(fields).not.toHaveProperty("taxMarker");
+  });
 });
 
 describe("buildFailedDraftFields", () => {

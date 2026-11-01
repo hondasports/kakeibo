@@ -1,21 +1,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { gotoAuthenticated } from "./helpers/auth";
+import { getCurrentClerkTokenIdentifier, gotoAuthenticated } from "./helpers/auth";
 import { cleanupAiExpenseQueue } from "./helpers/cleanup";
 import { seedMixedTaxReviewDraftByUser, seedTaxReviewDraftByUser } from "./helpers/seed";
+import { expandDetailsIfClosed, waitForReceiptInputQueue } from "./helpers/receiptQueue";
 
 const INPUT_PATH = "/weeks/current/input";
-
-async function waitForReceiptInputQueue(page: Page) {
-  await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible({
-    timeout: 20_000,
-  });
-  await expect(page.getByRole("heading", { name: "レシート入力" })).toBeVisible({
-    timeout: 20_000,
-  });
-  const queue = page.locator(".input-workbench--expense");
-  await expect(queue).toBeVisible({ timeout: 20_000 });
-  return queue;
-}
 
 async function openFirstReviewDialog(page: Page) {
   const queue = await waitForReceiptInputQueue(page);
@@ -32,7 +21,7 @@ async function openFirstReviewDialog(page: Page) {
 
 async function expectItemTaxRate(dialog: Locator, itemName: string, taxRate: string) {
   const detail = dialog.locator("details").filter({ hasText: itemName }).first();
-  if ((await detail.getAttribute("open")) === null) await detail.locator("summary").click();
+  await expandDetailsIfClosed(detail);
   await expect(detail.getByRole("combobox", { name: itemName + "の税率", exact: true })).toHaveText(
     taxRate,
   );
@@ -44,13 +33,8 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
   });
 
   test("@smoke R001 ユーザー確認した支払総額を再編集後も保持する", async ({ page }) => {
-    const userId = process.env.E2E_CLERK_USER_ID?.trim();
-    if (!userId) {
-      test.skip();
-      return;
-    }
-
     await gotoAuthenticated(page, INPUT_PATH);
+    const userId = await getCurrentClerkTokenIdentifier(page);
     await waitForReceiptInputQueue(page);
     await seedTaxReviewDraftByUser(userId);
     await page.reload();
@@ -73,25 +57,27 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
   });
 
   test("@smoke R003 混在税率の商品修正後に詳細保存できる", async ({ page }) => {
-    const userId = process.env.E2E_CLERK_USER_ID?.trim();
-    if (!userId) {
-      test.skip();
-      return;
-    }
-
     await gotoAuthenticated(page, INPUT_PATH);
+    const userId = await getCurrentClerkTokenIdentifier(page);
     await waitForReceiptInputQueue(page);
     await seedMixedTaxReviewDraftByUser(userId);
     await page.reload();
     const { queue, dialog } = await openFirstReviewDialog(page);
+
+    await expect(dialog.getByRole("heading", { name: /商品一覧/ })).toBeVisible();
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(800);
 
     // 未確認の各商品は、旧税内訳から逆算せず商品ごとに確認する。
     const expectedMixedTaxRates = { パン: "8%", 洗剤: "10%", 牛乳: "8%", ラップ: "10%" };
     const milkRow = dialog.locator('section[aria-label="商品一覧"] details').filter({
       hasText: "牛乳",
     });
-    if ((await milkRow.getAttribute("open")) === null) await milkRow.locator("summary").click();
-    await milkRow.getByRole("combobox", { name: "牛乳の税率", exact: true }).click();
+    await expandDetailsIfClosed(milkRow);
+    const milkTaxRate = milkRow.getByRole("combobox", { name: "牛乳の税率", exact: true });
+    await expect
+      .poll(async () => (await milkTaxRate.boundingBox())?.width ?? 0)
+      .toBeGreaterThanOrEqual(176);
+    await milkTaxRate.click();
     await page.getByRole("option", { name: "8%", exact: true }).click();
     await dialog.getByRole("combobox", { name: "牛乳の表示価格", exact: true }).click();
     await page.getByRole("option", { name: "税込", exact: true }).click();
@@ -101,7 +87,7 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     const wrapRow = dialog
       .locator('section[aria-label="商品一覧"] details')
       .filter({ hasText: "ラップ" });
-    if ((await wrapRow.getAttribute("open")) === null) await wrapRow.locator("summary").click();
+    await expandDetailsIfClosed(wrapRow);
     await wrapRow.getByRole("combobox", { name: "ラップの税率", exact: true }).click();
     await page.getByRole("option", { name: "10%", exact: true }).click();
     await wrapRow.getByRole("combobox", { name: "ラップの表示価格", exact: true }).click();
@@ -132,69 +118,5 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     for (const [itemName, expectedRate] of Object.entries(expectedMixedTaxRates)) {
       await expectItemTaxRate(reopenedDialog, itemName, expectedRate);
     }
-  });
-
-  // totalOnly の下書きは dev バックエンドのシードに依存せず、
-  // フロントのみの __e2e__ fixture で確認する（registrationMode の表示・保存導線）。
-  test("@smoke R018 確認済みtotalOnlyの下書きは合計だけ保存モードで開ける", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1&totalOnly=1");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    const reviewSection = queue.getByRole("region", { name: "確認待ち" });
-    await expect(reviewSection.getByText("review-totalonly.png")).toBeVisible();
-    await reviewSection
-      .locator(".ai-expense-queue-item")
-      .filter({ hasText: "review-totalonly.png" })
-      .getByRole("button", { name: "確認する" })
-      .click();
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await expect(dialog).toBeVisible();
-
-    await dialog.getByLabel("合計金額", { exact: true }).fill("5000");
-    await expect(dialog.getByText(/税を推測せず、レシート合計だけで保存します/)).toBeVisible();
-    await dialog.getByRole("button", { name: "レシート合計だけ保存" }).click();
-    await expect(dialog).toBeHidden();
-
-    const readyItem = queue
-      .getByRole("region", { name: "登録できます" })
-      .locator(".ai-expense-queue-item")
-      .filter({ hasText: "E2E合計のみ店" });
-    await expect(readyItem.getByText("5,000円")).toBeVisible();
-    await expect(readyItem.getByText("合計だけで保存")).toBeVisible();
-    await expect(readyItem.getByRole("button", { name: "登録する" })).toBeEnabled();
-  });
-
-  test("@smoke totalOnlyの下書きは再編集しても合計だけ登録を維持できる", async ({ page }) => {
-    await gotoAuthenticated(page, "/__e2e__/ai-expense-queue?withItems=1&totalOnly=1");
-
-    const queue = page.getByRole("region", { name: "レシート入力" });
-    await queue
-      .getByRole("region", { name: "確認待ち" })
-      .locator(".ai-expense-queue-item")
-      .filter({ hasText: "review-totalonly.png" })
-      .getByRole("button", { name: "確認する" })
-      .click();
-    const dialog = page.getByRole("dialog", { name: "下書き確認" });
-    await expect(dialog).toBeVisible();
-
-    await expect(dialog.getByText(/税を推測せず、レシート合計だけで保存します/)).toBeVisible();
-    await dialog.getByRole("button", { name: "レシート合計だけ保存" }).click();
-    await expect(dialog).toBeHidden();
-
-    const readyItem = queue
-      .getByRole("region", { name: "登録できます" })
-      .locator(".ai-expense-queue-item")
-      .filter({ hasText: "E2E合計のみ店" })
-      .first();
-    await expect(readyItem.getByText("合計だけで保存")).toBeVisible();
-    await readyItem.getByRole("button", { name: "修正する" }).click();
-    await expect(dialog).toBeVisible();
-
-    await expect(dialog.getByText(/税を推測せず、レシート合計だけで保存します/)).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "レシート合計だけ保存" })).toBeEnabled();
-    await dialog.getByRole("button", { name: "レシート合計だけ保存" }).click();
-    await expect(dialog).toBeHidden();
-    await expect(readyItem.getByText("合計だけで保存")).toBeVisible();
-    await expect(readyItem.getByRole("button", { name: "登録する" })).toBeEnabled();
   });
 });

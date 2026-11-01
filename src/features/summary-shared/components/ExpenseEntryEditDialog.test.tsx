@@ -98,6 +98,76 @@ describe("ExpenseEntryEditDialog AI draft history", () => {
     expect(updateExpenseEntryMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["expenseEntry", "income"],
+    ["expenseEntry", "expense"],
+    ["receipt", "income"],
+    ["receipt", "expense"],
+  ] as const)(
+    "%s / %s の編集で上限とフィールドエラーを共通契約に揃える",
+    async (recordType, type) => {
+      const onSaved = vi.fn();
+      const onClose = vi.fn();
+      render(
+        <ExpenseEntryEditDialog
+          categories={[{ _id: "cat-food", name: "食費" }]}
+          onClose={onClose}
+          onSaved={onSaved}
+          open
+          receipt={{
+            _id: "entry-1",
+            date: "2026-08-26",
+            type,
+            recordType,
+            amountYen: 100,
+            bankName: "給与",
+            shopName: "店舗",
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+          }}
+        />,
+      );
+      const amountInput = screen.getByLabelText("金額");
+      const titleInput = screen.getByLabelText(type === "income" ? "内容" : "タイトル");
+      for (const [amount, title, field, message] of [
+        ["10000000", "給与", amountInput, "金額は 9,999,999 円以下です"],
+        ["0", "給与", amountInput, "金額は 1 円以上です"],
+        ["100", " ", titleInput, "内容は必須です"],
+        ["100", "給".repeat(101), titleInput, "内容は 100 文字以内です"],
+      ] as const) {
+        fireEvent.change(amountInput, { target: { value: amount } });
+        fireEvent.change(titleInput, { target: { value: title } });
+        fireEvent.click(screen.getByRole("button", { name: "保存" }));
+        expect(field).toHaveAttribute("aria-invalid", "true");
+        expect(screen.getByText(message)).toBeInTheDocument();
+        expect(updateExpenseEntryMock).not.toHaveBeenCalled();
+        expect(updateReceiptMock).not.toHaveBeenCalled();
+        expect(updateRegisteredDraftMock).not.toHaveBeenCalled();
+        expect(onSaved).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
+      }
+      fireEvent.change(amountInput, { target: { value: "9,999,999" } });
+      expect(amountInput).toHaveValue("9999999");
+      fireEvent.change(titleInput, { target: { value: ` ${"給".repeat(100)} ` } });
+      fireEvent.click(screen.getByRole("button", { name: "保存" }));
+      const mutation = recordType === "expenseEntry" ? updateExpenseEntryMock : updateReceiptMock;
+      await waitFor(() =>
+        expect(mutation).toHaveBeenCalledWith(
+          expect.objectContaining({
+            amountYen: 9999999,
+            [recordType === "expenseEntry" ? "title" : type === "income" ? "bankName" : "shopName"]:
+              "給".repeat(100),
+          }),
+        ),
+      );
+      expect(amountInput).toHaveAttribute("aria-invalid", "false");
+      expect(titleInput).toHaveAttribute("aria-invalid", "false");
+      expect(onSaved).toHaveBeenCalledOnce();
+      expect(onClose).toHaveBeenCalledOnce();
+    },
+  );
+
   it("履歴で保存済みOCR明細を修正してdetailedへ切り替えられる", async () => {
     render(
       <ExpenseEntryEditDialog

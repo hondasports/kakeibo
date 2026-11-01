@@ -1,11 +1,11 @@
 import { ConfirmDangerousActionDialog } from "./ConfirmDangerousActionDialog";
-import { formatGroupRoleLabel } from "../../../../lib/domain/groups/role";
+import { formatGroupRoleLabel, type GroupRole } from "../../../../lib/domain/groups/role";
 
 type PendingRoleChange = {
   userId: string;
   displayLabel: string;
-  currentRole: "owner" | "member";
-  newRole: "owner" | "member";
+  currentRole: GroupRole;
+  newRole: GroupRole;
 };
 
 type GroupRoleChangeDialogProps = {

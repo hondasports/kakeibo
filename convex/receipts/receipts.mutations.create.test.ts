@@ -1,5 +1,5 @@
 import { insertReceiptForGroup } from "../../lib/convex/receipts/insert";
-import { calculateWeekStartDate } from "../lib/weekDates";
+import { calculateWeekStartDate } from "../../lib/domain/week/weekDates";
 import { createReceiptHandler, updateReceiptHandler } from "./crud";
 import { createReceipt } from "./mutations";
 import { ConvexError } from "convex/values";

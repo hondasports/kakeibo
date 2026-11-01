@@ -1,8 +1,9 @@
 import type { Id } from "../../convex/_generated/dataModel";
 import type { ConvexHttpClient } from "convex/browser";
 import { api } from "../../convex/_generated/api";
+import type { GroupRole } from "../../lib/domain/groups/role";
 
-type Group = { _id: Id<"groups">; name: string; role: "owner" | "member" };
+type Group = { _id: Id<"groups">; name: string; role: GroupRole };
 export type InvitationGroupOperations = {
   getActor: () => Promise<string>;
   getCurrentGroup: () => Promise<Group | null>;

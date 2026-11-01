@@ -108,9 +108,8 @@ describe("MonthlySummaryPage（編集・削除）", () => {
     await user.clear(within(dialog).getByLabelText("金額"));
     await user.click(within(dialog).getByRole("button", { name: "保存" }));
 
-    expect(
-      await within(dialog).findByText("金額は1円以上の整数で入力してください。"),
-    ).toBeInTheDocument();
+    expect(await within(dialog).findByText("金額は必須です")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("金額")).toHaveAttribute("aria-invalid", "true");
     expect(updateMock).not.toHaveBeenCalled();
   });
   it("編集時にタイトルが空なら保存せずエラーを表示する", async () => {
@@ -131,7 +130,8 @@ describe("MonthlySummaryPage（編集・削除）", () => {
     await user.clear(within(dialog).getByLabelText("タイトル"));
     await user.click(within(dialog).getByRole("button", { name: "保存" }));
 
-    expect(await within(dialog).findByText("タイトルを入力してください。")).toBeInTheDocument();
+    expect(await within(dialog).findByText("内容は必須です")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("タイトル")).toHaveAttribute("aria-invalid", "true");
     expect(updateMock).not.toHaveBeenCalled();
   });
   it("編集時に日付が空なら保存せずエラーを表示する", async () => {

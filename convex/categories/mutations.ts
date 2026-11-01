@@ -10,6 +10,7 @@ import {
   createCategorySeedStore,
   createCategoryStore,
 } from "../../lib/convex/categories/convexCategoryStore";
+import { CategoryDomainError } from "../../lib/domain/categories/rules";
 import {
   createCategory as createCategoryUsecase,
   deactivateCategory as deactivateCategoryUsecase,
@@ -24,7 +25,10 @@ export { E2E_CATEGORY_NAME_PREFIX };
 
 function convexError(error: unknown): never {
   if (error instanceof ConvexError) throw error;
-  throw new ConvexError(error instanceof Error ? error.message : "Unknown error");
+  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
+  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
+  if (error instanceof CategoryDomainError) throw new ConvexError(error.message);
+  throw error;
 }
 
 /** seedDefaultCategories mutation の handler ロジック（テスト用に export） */
