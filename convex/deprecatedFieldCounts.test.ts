@@ -363,6 +363,7 @@ describe("deprecatedFieldCounts", () => {
           interpretationMalformed: 0,
           userOverrideMalformed: 0,
           interpretation: {
+            scanned: 0,
             missingPrintedAmountYen: 0,
             missingLineType: 0,
             missingMarkers: 0,
@@ -371,6 +372,7 @@ describe("deprecatedFieldCounts", () => {
             withTaxMarker: 0,
           },
           userOverride: {
+            scanned: 0,
             missingPrintedAmountYen: 0,
             missingLineType: 0,
             missingMarkers: 0,
