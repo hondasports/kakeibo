@@ -275,7 +275,6 @@ export function mapExtractionToDraftArgs<TId>(
         item: {
           itemName,
           lineType: "item" as const,
-          amountYen: line.amountYen,
           printedAmountYen: line.amountYen,
           amountBasis: "unknown" as const,
           taxRatePercent: null,
