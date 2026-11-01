@@ -88,4 +88,11 @@ describe("resolveReviewItemDisplayAmountYen", () => {
       }),
     ).toBe(108);
   });
+
+  it("印字・正規化どちらも無い保存済み行は登録用金額を表示する", () => {
+    // printedAmountYen 導入前や未導入経路で作られた行は両方を持たない
+    expect(
+      resolveReviewItemDisplayAmountYen({ amountYen: 108, taxResolutionStatus: "unresolved" }),
+    ).toBe(108);
+  });
 });

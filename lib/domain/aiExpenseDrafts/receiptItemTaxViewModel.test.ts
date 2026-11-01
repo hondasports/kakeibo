@@ -99,4 +99,20 @@ describe("toReceiptItemTaxViewModel", () => {
 
     expect(vm.reviewReasonLabels[0]).toBe("分析結果に確認が必要な項目があります");
   });
+
+  it("印字・正規化どちらも無い保存済み行は登録用金額からラベルを組み立てる", () => {
+    // printedAmountYen 導入前や未導入経路で作られた行は両方を持たない
+    const vm = toReceiptItemTaxViewModel({
+      id: "1",
+      itemName: "item",
+      amountYen: "100",
+      categoryId: "cat",
+      taxResolutionStatus: "unresolved",
+      taxAllocationStatus: "unallocated",
+      amountBasis: "unknown",
+    });
+
+    expect(vm.printedAmountLabel).toBe("100円");
+    expect(vm.normalizedAmountLabel).toBe("未確定");
+  });
 });
