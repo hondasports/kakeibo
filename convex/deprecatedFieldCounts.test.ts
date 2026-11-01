@@ -498,14 +498,16 @@ describe("deprecatedFieldCounts", () => {
     await insertItem(t, groupId, d1, { itemName: "skip", printedAmountYen: 100, createdAt: 200 });
 
     const result = await t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
-      cutoffTs: 150,
+      deployWindowStartTs: 150,
+      deployWindowEndTs: 160,
     });
     expect(result.isDone).toBe(true);
     expect(result.totals).toMatchObject({
       scanned: 13,
       missingPrintedRows: 12,
-      createdAtBelowCutoff: 1,
-      createdAtAtOrAboveCutoff: 11,
+      createdAtBeforeDeployWindowStart: 1,
+      createdAtInDeployWindow: 0,
+      createdAtAtOrAfterDeployWindowEnd: 11,
       parentDraftMissing: 1,
       parentDraftGroupMismatch: 1,
       hasUserOverride: 1,
@@ -539,8 +541,9 @@ describe("deprecatedFieldCounts", () => {
     const counts = () => ({
       scanned: 0,
       missingPrintedRows: 0,
-      createdAtBelowCutoff: 0,
-      createdAtAtOrAboveCutoff: 0,
+      createdAtBeforeDeployWindowStart: 0,
+      createdAtInDeployWindow: 0,
+      createdAtAtOrAfterDeployWindowEnd: 0,
       parentDraftMissing: 0,
       parentDraftGroupMismatch: 0,
       hasUserOverride: 0,
@@ -563,7 +566,7 @@ describe("deprecatedFieldCounts", () => {
       sibs: Parameters<typeof classifyJoinEvidence>[2] = siblings,
     ) => {
       const c = counts();
-      classifyJoinEvidence(item, draft, sibs, undefined, c);
+      classifyJoinEvidence(item, draft, sibs, undefined, undefined, c);
       return c;
     };
     const aiDraft = (items: unknown) => ({
@@ -597,10 +600,27 @@ describe("deprecatedFieldCounts", () => {
         { _id: "row2", itemName: "A" },
       ],
       undefined,
+      undefined,
       dupCounts,
     );
     expect(dupCounts.ambiguousNameJoinTableSide).toBe(1);
     expect(dupCounts.uniqueNameJoinPrintedEqualsAmount).toBe(0);
+    // 日付バケット: 窓内は「deploy 前後どちらとも不明」で独立計上。
+    // endTs 省略は空窓（start 以降は全て atOrAfterEnd）。
+    const dateOf = (createdAt: number, start?: number, end?: number) => {
+      const c = counts();
+      classifyJoinEvidence({ ...item, createdAt }, aiDraft([]), siblings, start, end, c);
+      return c;
+    };
+    expect(dateOf(149, 150, 160).createdAtBeforeDeployWindowStart).toBe(1);
+    expect(dateOf(155, 150, 160).createdAtInDeployWindow).toBe(1);
+    expect(dateOf(160, 150, 160).createdAtAtOrAfterDeployWindowEnd).toBe(1);
+    expect(dateOf(200, 150).createdAtAtOrAfterDeployWindowEnd).toBe(1);
+    expect(dateOf(200, 150).createdAtInDeployWindow).toBe(0);
+    const noWindow = dateOf(200);
+    expect(noWindow.createdAtBeforeDeployWindowStart).toBe(0);
+    expect(noWindow.createdAtInDeployWindow).toBe(0);
+    expect(noWindow.createdAtAtOrAfterDeployWindowEnd).toBe(0);
   });
 
   it("printedAmountJoinEvidence は sibling 上限超過を truncated として join しない", async () => {
@@ -646,7 +666,7 @@ describe("deprecatedFieldCounts", () => {
     });
   });
 
-  it("printedAmountJoinEvidence は継続ページで cutoffTs の変化を拒否する", async () => {
+  it("printedAmountJoinEvidence は継続ページで deployWindow の変化を拒否する", async () => {
     const t = convexTest(schema, convexTestModules);
     const groupId = await insertGroup(t);
     const draftId = await insertDraft(t, groupId, {});
@@ -654,27 +674,52 @@ describe("deprecatedFieldCounts", () => {
       await insertItem(t, groupId, draftId, { createdAt: 100 });
     }
     const first = await t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
-      cutoffTs: 150,
+      deployWindowStartTs: 150,
+      deployWindowEndTs: 160,
     });
     expect(first.isDone).toBe(false);
-    // 同一 cutoffTs で継続 → OK
+    // 同一の窓境界で継続 → OK
     const second = await t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
       cursor: first.continueCursor ?? undefined,
-      carry: { counts: first.totals, cutoffTs: 150 },
-      cutoffTs: 150,
+      carry: {
+        counts: first.totals,
+        deployWindowStartTs: 150,
+        deployWindowEndTs: 160,
+      },
+      deployWindowStartTs: 150,
+      deployWindowEndTs: 160,
     });
     expect(second.isDone).toBe(true);
     expect(second.totals.missingPrintedRows).toBe(26);
-    expect(second.totals.createdAtBelowCutoff).toBe(26);
-    // 異なる cutoffTs で継続 → 拒否（below/above の累計混入を防ぐ）
+    expect(second.totals.createdAtBeforeDeployWindowStart).toBe(26);
+    // 異なる start で継続 → 拒否（日付バケットの累計混入を防ぐ）。
+    // end < start の無効ペアは引数検証が先に落とすため、有効ペアでずらす。
     await expect(
       t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
         cursor: first.continueCursor ?? undefined,
-        carry: { counts: first.totals, cutoffTs: 150 },
-        cutoffTs: 999,
+        carry: {
+          counts: first.totals,
+          deployWindowStartTs: 150,
+          deployWindowEndTs: 160,
+        },
+        deployWindowStartTs: 999,
+        deployWindowEndTs: 1000,
       }),
-    ).rejects.toThrow("cutoffTs が変わっています");
-    // cutoffTs なしで開始した carry を cutoffTs ありで継続するのも拒否
+    ).rejects.toThrow("deployWindow の境界が変わっています");
+    // 異なる end で継続 → 拒否
+    await expect(
+      t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
+        cursor: first.continueCursor ?? undefined,
+        carry: {
+          counts: first.totals,
+          deployWindowStartTs: 150,
+          deployWindowEndTs: 160,
+        },
+        deployWindowStartTs: 150,
+        deployWindowEndTs: 999,
+      }),
+    ).rejects.toThrow("deployWindow の境界が変わっています");
+    // 窓なしで開始した carry を窓ありで継続するのも拒否
     const firstNoCutoff = await t.query(
       internal.deprecatedFieldCounts.printedAmountJoinEvidence,
       {},
@@ -683,8 +728,20 @@ describe("deprecatedFieldCounts", () => {
       t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
         cursor: firstNoCutoff.continueCursor ?? undefined,
         carry: { counts: firstNoCutoff.totals },
-        cutoffTs: 150,
+        deployWindowStartTs: 150,
       }),
-    ).rejects.toThrow("cutoffTs が変わっています");
+    ).rejects.toThrow("deployWindow の境界が変わっています");
+    // end 単独・end < start は初回呼び出し時点で拒否
+    await expect(
+      t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
+        deployWindowEndTs: 160,
+      }),
+    ).rejects.toThrow("deployWindowStartTs と同時に");
+    await expect(
+      t.query(internal.deprecatedFieldCounts.printedAmountJoinEvidence, {
+        deployWindowStartTs: 200,
+        deployWindowEndTs: 160,
+      }),
+    ).rejects.toThrow("deployWindowStartTs と同時に");
   });
 });

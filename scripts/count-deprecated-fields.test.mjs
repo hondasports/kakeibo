@@ -26,8 +26,9 @@ const itemPage = (overrides = {}) => ({
 const joinPage = (overrides = {}) => ({
   scanned: 1,
   missingPrintedRows: 1,
-  createdAtBelowCutoff: 0,
-  createdAtAtOrAboveCutoff: 0,
+  createdAtBeforeDeployWindowStart: 0,
+  createdAtInDeployWindow: 0,
+  createdAtAtOrAfterDeployWindowEnd: 0,
   parentDraftMissing: 0,
   parentDraftGroupMismatch: 0,
   hasUserOverride: 0,
@@ -160,7 +161,7 @@ describe("scanTable", () => {
 describe("scanTable printedAmountJoinEvidence", () => {
   const joinSpec = TABLE_SPECS.printedAmountJoinEvidence;
 
-  it("join エビデンス spec が counter 欠落を拒否し、cutoff と take 上限を JS に埋め込む", () => {
+  it("join エビデンス spec が counter 欠落を拒否し、deployWindow 境界と take 上限を JS に埋め込む", () => {
     expect(() =>
       validatePage(joinSpec, { page: { scanned: 1 }, isDone: true, continueCursor: null }),
     ).toThrow("非負の数値ではありません");
@@ -173,15 +174,18 @@ describe("scanTable printedAmountJoinEvidence", () => {
       targetArgs: [],
       numItems: 10,
       maxPages: 5,
-      cutoffTs: 150,
+      deployWindowStartTs: 150,
+      deployWindowEndTs: 160,
       exec,
     });
     expect(result.totals.uniqueNameJoinPrintedEqualsAmount).toBe(1);
-    expect(calls[0]).toContain("const cutoff = 150;");
+    expect(calls[0]).toContain("const ws = 150;");
+    expect(calls[0]).toContain("const we = 160;");
+    expect(calls[0]).toContain("createdAtInDeployWindow");
     expect(calls[0]).toContain(".take(101)");
     expect(calls[0]).toContain("ambiguousNameJoinTableSide");
     expect(calls[0]).toContain("parentDraftGroupMismatch");
-    // cutoffTs 省略時は undefined が埋め込まれる（below/above はカウントされない）
+    // 窓境界の省略時は undefined が埋め込まれる（日付バケットはカウントされない）
     scanTable(joinSpec, {
       targetArgs: [],
       numItems: 10,
@@ -191,7 +195,21 @@ describe("scanTable printedAmountJoinEvidence", () => {
         return ok({ page: joinPage(), isDone: true, continueCursor: null });
       },
     });
-    expect(calls[1]).toContain("const cutoff = undefined;");
+    expect(calls[1]).toContain("const ws = undefined;");
+    expect(calls[1]).toContain("const we = undefined;");
+    // start のみ指定時は end も undefined で埋め込まれ、inline 側で空窓に解決される
+    scanTable(joinSpec, {
+      targetArgs: [],
+      numItems: 10,
+      maxPages: 5,
+      deployWindowStartTs: 150,
+      exec: (args) => {
+        calls.push(args.at(-1));
+        return ok({ page: joinPage(), isDone: true, continueCursor: null });
+      },
+    });
+    expect(calls[2]).toContain("const ws = 150;");
+    expect(calls[2]).toContain("const we = undefined;");
   });
 });
 
