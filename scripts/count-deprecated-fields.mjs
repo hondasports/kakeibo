@@ -124,6 +124,8 @@ const JOIN_EVIDENCE_COUNTERS = [
 // draft 自体をページ走査するため dedup は構造的に不要・親 ID は出力に含まれない。
 // 明細は .take(101) で打ち切り、欠落が確認できない打ち切り draft は
 // draftsWithUnconfirmedMissing に分離して属性集計へ進めない。
+// 明細は (draft.groupId, draftId) index で読むため、孤児・group 不一致の
+// 明細は親から見えず missingPrintedRows とは差が出る（設計通り）。
 // draftCreated* バケットは「運用者が供給する候補証拠窓」への位置
 // （本番導入前後の証明ではない）。
 const PROFILE_COUNTERS = [

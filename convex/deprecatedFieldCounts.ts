@@ -729,7 +729,9 @@ const missingPrintedProfileCounts = {
   // （属性集計から外す terminal 相当バケット）。
   draftsWithUnconfirmedMissing: v.number(),
   // 確認できた欠落明細の合計（aiExpenseDraftItems 側走査の
-  // missingPrintedRows との照合用。孤児明細・未確認 draft 分は含まない）。
+  // missingPrintedRows との照合用。孤児明細・group 不一致明細
+  // （(draft.groupId, draftId) index では親から見えない）・
+  // 未確認 draft 分は含まない）。
   missingPrintedItemsInProfiledDrafts: v.number(),
   // 以降は profiled draft ごとの属性（各 draft につきいずれか1系統ずつ）。
   parentStatusQueued: v.number(),
