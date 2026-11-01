@@ -69,6 +69,25 @@ const emptyItemCounts = (): ItemCompatCounts => ({
   withTaxMarker: 0,
 });
 
+// 埋め込み items（interpretation/userOverride 内）の走査数も runner の
+// nested 集計（ITEM_COUNTERS = scanned 込み）と同じ形状で保持する。
+const embeddedItemCounts = {
+  scanned: v.number(),
+  ...itemCompatCounts,
+};
+type EmbeddedItemCounts = ItemCompatCounts & { scanned: number };
+const emptyEmbeddedCounts = (): EmbeddedItemCounts => ({
+  scanned: 0,
+  ...emptyItemCounts(),
+});
+const mergeEmbeddedCounts = (
+  carry: EmbeddedItemCounts | undefined,
+  page: EmbeddedItemCounts,
+): EmbeddedItemCounts => ({
+  scanned: (carry?.scanned ?? 0) + page.scanned,
+  ...mergeItemCounts(carry, page),
+});
+
 const mergeItemCounts = (
   carry: ItemCompatCounts | undefined,
   page: ItemCompatCounts,
@@ -525,8 +544,8 @@ const draftCounts = {
   // 可視化する（runner inline query の nested() と同じ判定）。
   interpretationMalformed: v.number(),
   userOverrideMalformed: v.number(),
-  interpretation: v.object(itemCompatCounts),
-  userOverride: v.object(itemCompatCounts),
+  interpretation: v.object(embeddedItemCounts),
+  userOverride: v.object(embeddedItemCounts),
 };
 
 type DraftCounts = {
@@ -540,8 +559,8 @@ type DraftCounts = {
   interpretationAbsent: number;
   interpretationMalformed: number;
   userOverrideMalformed: number;
-  interpretation: ItemCompatCounts;
-  userOverride: ItemCompatCounts;
+  interpretation: EmbeddedItemCounts;
+  userOverride: EmbeddedItemCounts;
 };
 
 // container === undefined → "absent"（欠落は malformed と区別する）。
@@ -554,11 +573,12 @@ const embeddedItemsOf = (container: unknown): unknown[] | "absent" | "malformed"
 
 const countEmbeddedItems = (
   items: unknown[] | "absent" | "malformed",
-  counts: ItemCompatCounts,
+  counts: EmbeddedItemCounts,
 ): "absent" | "malformed" | "counted" => {
   if (items === "absent") return "absent";
   if (items === "malformed") return "malformed";
   for (const item of items) {
+    counts.scanned += 1;
     countMissingItemFields(item as Parameters<typeof countMissingItemFields>[0], counts);
   }
   return "counted";
@@ -589,8 +609,8 @@ export const aiExpenseDrafts = internalQuery({
       interpretationAbsent: 0,
       interpretationMalformed: 0,
       userOverrideMalformed: 0,
-      interpretation: emptyItemCounts(),
-      userOverride: emptyItemCounts(),
+      interpretation: emptyEmbeddedCounts(),
+      userOverride: emptyEmbeddedCounts(),
     };
     for (const draft of page.page) {
       counts.scanned += 1;
@@ -649,8 +669,8 @@ export const aiExpenseDrafts = internalQuery({
           (args.carry?.interpretationMalformed ?? 0) + counts.interpretationMalformed,
         userOverrideMalformed:
           (args.carry?.userOverrideMalformed ?? 0) + counts.userOverrideMalformed,
-        interpretation: mergeItemCounts(args.carry?.interpretation, counts.interpretation),
-        userOverride: mergeItemCounts(args.carry?.userOverride, counts.userOverride),
+        interpretation: mergeEmbeddedCounts(args.carry?.interpretation, counts.interpretation),
+        userOverride: mergeEmbeddedCounts(args.carry?.userOverride, counts.userOverride),
       },
     };
   },
