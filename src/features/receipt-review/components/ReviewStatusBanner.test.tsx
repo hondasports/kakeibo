@@ -179,6 +179,23 @@ describe("ReviewStatusBanner", () => {
     expect(onJump).toHaveBeenCalledWith("item-1");
   });
 
+  it("税内訳の保留を商品の税設定未確定と表示しない", () => {
+    const blocker = {
+      status: "uncomparable" as const,
+      blockerCode: "unverified-tax-summary" as const,
+      reason: "税内訳を確認してください",
+      affectedItemIds: ["item-1"],
+    };
+    const { banner } = renderBanner({
+      amount: { ...blocker, variant: "external" },
+      taxRate: { ...blocker, rows: [] },
+    });
+    expect(within(banner).getByText("レシートの税内訳を確認してください")).toBeInTheDocument();
+    expect(
+      within(banner).queryByText("税設定の確認が必要な商品があります"),
+    ).not.toBeInTheDocument();
+  });
+
   it("税込／税抜の矛盾による比較不能は1つの案内にまとめる", async () => {
     const user = userEvent.setup();
     const onJump = vi.fn();

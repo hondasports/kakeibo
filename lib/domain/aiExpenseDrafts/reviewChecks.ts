@@ -1,5 +1,6 @@
 import type { ReceiptLineClassification, ReceiptRawObservation } from "../receipt/observations";
 import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
+import type { ReviewGuidanceItem } from "./reviewGuidance";
 import type { ReviewAmountCheck } from "./reviewAmountChecks";
 import type { ReviewTaxRateCheck } from "./reviewTaxChecks";
 import { buildAmountCheck } from "./reviewAmountChecks";
@@ -26,8 +27,20 @@ export function buildReviewChecks(args: {
  * 確認推奨に数える比較不能の件数。
  * レシートに税内訳が無いだけの比較不能は、ユーザーが直せないため数えない。
  */
-export function countActionableUncomparable(checks: ReviewChecks): number {
-  return [checks.amount, checks.taxRate].filter(
+export function countActionableUncomparable(
+  checks: ReviewChecks,
+  guidance: ReviewGuidanceItem[] = [],
+): number {
+  const actionable = [checks.amount, checks.taxRate].filter(
     (check) => check.status === "uncomparable" && check.blockerCode !== "missing-tax-summary",
-  ).length;
+  );
+  const summaryChecks = actionable.filter(
+    (check) => check.blockerCode === "unverified-tax-summary",
+  );
+  const summaryGuidanceExists = guidance.some((issue) => issue.taxSummaryIndex !== undefined);
+  return (
+    actionable.length -
+    summaryChecks.length +
+    (summaryChecks.length > 0 && !summaryGuidanceExists ? 1 : 0)
+  );
 }

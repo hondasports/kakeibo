@@ -48,7 +48,9 @@ export function ReviewStatusBanner({
       ? amount.blockerCode
       : undefined;
   const combineUncomparable =
-    sharedBlockerCode === "unresolved-tax" || sharedBlockerCode === "basis-conflict";
+    sharedBlockerCode === "unresolved-tax" ||
+    sharedBlockerCode === "basis-conflict" ||
+    sharedBlockerCode === "unverified-tax-summary";
   const combinedAffectedItemCount = new Set([
     ...(amount.affectedItemIds ?? []),
     ...(taxRate.affectedItemIds ?? []),
@@ -80,14 +82,18 @@ export function ReviewStatusBanner({
       {combineUncomparable && (
         <Alert severity="warning">
           <Typography variant="subtitle2">
-            {sharedBlockerCode === "basis-conflict"
-              ? "商品の税込／税抜設定が、レシートの税内訳と一致していません"
-              : "税設定の確認が必要な商品があります"}
+            {sharedBlockerCode === "unverified-tax-summary"
+              ? "レシートの税内訳を確認してください"
+              : sharedBlockerCode === "basis-conflict"
+                ? "商品の税込／税抜設定が、レシートの税内訳と一致していません"
+                : "税設定の確認が必要な商品があります"}
           </Typography>
           <Typography variant="body2">
-            {sharedBlockerCode === "basis-conflict"
-              ? `税込／税抜の設定が一致していない商品が${combinedItemCount}件あります。商品ごとに確認してください。`
-              : `税設定の確認が必要な商品が${combinedItemCount}件あります。商品ごとに確認してください。`}
+            {sharedBlockerCode === "unverified-tax-summary"
+              ? "対象額・税額・合計をレシート画像と照合してください。"
+              : sharedBlockerCode === "basis-conflict"
+                ? `税込／税抜の設定が一致していない商品が${combinedItemCount}件あります。商品ごとに確認してください。`
+                : `税設定の確認が必要な商品が${combinedItemCount}件あります。商品ごとに確認してください。`}
           </Typography>
           <Box>
             <Button
@@ -96,7 +102,11 @@ export function ReviewStatusBanner({
               type="button"
               onClick={() => onJump(taxRate.focusTarget ?? amount.focusTarget ?? "items")}
             >
-              {sharedBlockerCode === "basis-conflict" ? "該当商品を確認する" : "税設定を確認する"}
+              {sharedBlockerCode === "unverified-tax-summary"
+                ? "商品とレシートを確認する"
+                : sharedBlockerCode === "basis-conflict"
+                  ? "該当商品を確認する"
+                  : "税設定を確認する"}
             </Button>
           </Box>
         </Alert>
@@ -139,7 +149,11 @@ export function ReviewStatusBanner({
       )}
       {taxRate.status === "uncomparable" && !combineUncomparable && (
         <Alert severity="warning">
-          <Typography variant="subtitle2">商品の税率を確認してください</Typography>
+          <Typography variant="subtitle2">
+            {taxRate.blockerCode === "unverified-tax-summary"
+              ? "レシートの税内訳を確認してください"
+              : "商品の税率を確認してください"}
+          </Typography>
           <Typography variant="body2">
             {taxRate.reason ?? "商品の税率または税込／税抜設定を、レシートと照合してください。"}
           </Typography>
@@ -150,7 +164,9 @@ export function ReviewStatusBanner({
               type="button"
               onClick={() => onJump(taxRate.focusTarget ?? "items")}
             >
-              税率を確認する
+              {taxRate.blockerCode === "unverified-tax-summary"
+                ? "商品とレシートを確認する"
+                : "税率を確認する"}
             </Button>
           </Box>
         </Alert>

@@ -9,8 +9,8 @@ import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
 import { buildDraftListSummary } from "./listSummary";
 import { buildDraftRegistrationItems } from "./registrationItems";
-import { buildReviewChecks } from "./reviewChecks";
-import { resolvedItem } from "./reviewChecksTestHelpers";
+import { buildReviewChecks, countActionableUncomparable } from "./reviewChecks";
+import { resolvedItem, summary } from "./reviewChecksTestHelpers";
 import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 import { isAmountAndTaxResolved } from "./reviewJudgment";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
@@ -62,6 +62,52 @@ const unverifiedCases = unverifiedStatuses.flatMap((status) =>
 );
 
 describe("未検証の税内訳の確認結果", () => {
+  it("混在税率でも未検証内訳による未配分を重複計上しない", () => {
+    const items = [
+      resolvedItem({ id: "a", taxAllocationStatus: "unallocated" }),
+      resolvedItem({
+        id: "b",
+        amountYen: "110",
+        printedAmountYen: 110,
+        taxRatePercent: 10,
+        amountBasis: "tax_included",
+        normalizedAmountYen: 110,
+        taxAllocationStatus: "allocated",
+      }),
+    ];
+    const checks = buildReviewChecks({
+      items,
+      paidTotalYen: 218,
+      taxSummaries: [
+        summary({ status: "contradictory" }),
+        summary({
+          taxRatePercent: 10,
+          taxMode: "included",
+          taxableAmountBasis: "tax_included",
+          taxableAmountYen: 110,
+          taxYen: 10,
+        }),
+      ],
+    });
+    expect(checks.amount.blockerCode).toBe("unverified-tax-summary");
+    expect(
+      countActionableUncomparable(checks, [
+        { id: "summary-0", message: "確認", target: "items", required: false, taxSummaryIndex: 0 },
+      ]),
+    ).toBe(0);
+  });
+
+  it("税内訳の確認案内がある場合、同じ原因の比較不能を重複計上しない", () => {
+    const checks = buildReviewChecks(duplicatedExternalReceipt("contradictory"));
+    expect(checks.amount.blockerCode).toBe("unverified-tax-summary");
+    expect(checks.taxRate.blockerCode).toBe("unverified-tax-summary");
+    expect(
+      countActionableUncomparable(checks, [
+        { id: "summary-1", message: "確認", target: "items", required: false, taxSummaryIndex: 1 },
+      ]),
+    ).toBe(0);
+  });
+
   it.each(unverifiedCases)(
     "外税の金額確認は同値の未検証行を隠さない（$status、逆順=$reverse）",
     ({ status, reverse }) => {
@@ -72,7 +118,7 @@ describe("未検証の税内訳の確認結果", () => {
       expect(amount).toMatchObject({
         variant: "external",
         status: "uncomparable",
-        blockerCode: "unresolved-tax",
+        blockerCode: "unverified-tax-summary",
       });
       expect(amount.reason).toContain("税内訳が未検証");
       expect(amount.printedSubtotalYen).toBeUndefined();
@@ -89,12 +135,15 @@ describe("未検証の税内訳の確認結果", () => {
       const { taxRate } = buildReviewChecks(receipt);
       const unverifiedIndex = reverse ? 0 : 1;
 
-      expect(taxRate).toMatchObject({ status: "uncomparable", blockerCode: "unresolved-tax" });
+      expect(taxRate).toMatchObject({
+        status: "uncomparable",
+        blockerCode: "unverified-tax-summary",
+      });
       expect(taxRate.rows).toHaveLength(2);
       expect(taxRate.rows[unverifiedIndex]).toMatchObject({
         printedYen: 404,
         status: "uncomparable",
-        blockerCode: "unresolved-tax",
+        blockerCode: "unverified-tax-summary",
       });
       expect(taxRate.rows[unverifiedIndex].reason).toContain("税内訳が未検証");
       expect(taxRate.rows[1 - unverifiedIndex].status).toBe("matched");
@@ -141,7 +190,7 @@ describe("未検証の税内訳の確認結果", () => {
       expect(taxRate.status).toBe("uncomparable");
       expect(taxRate.rows[0]).toMatchObject({
         status: "uncomparable",
-        blockerCode: "unresolved-tax",
+        blockerCode: "unverified-tax-summary",
       });
       expect(taxRate.rows[0].matchKind).toBeUndefined();
     },

@@ -11,6 +11,7 @@ export type ReviewBlockerCode =
   | "missing-items"
   | "missing-amount"
   | "unresolved-tax"
+  | "unverified-tax-summary"
   | "basis-conflict"
   | "missing-tax-summary";
 
