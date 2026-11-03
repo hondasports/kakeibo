@@ -18,6 +18,13 @@ function hasConflictingRate(rawText: string, rate: number): boolean {
   return rates.length !== (text.match(/%/g)?.length ?? 0) || rates.some((value) => value !== rate);
 }
 
+function isMarkerExplanation(line: ReceiptRawObservationLine): boolean {
+  if (line.amountYen !== null || line.amountText?.trim()) return false;
+  return /^[※*＊].*印(?:は|が).*軽減税率(?:\(8%\)|8%)?対象(?:商品|品目)(?:です|となります)?[。.]?$/.test(
+    normalizedText(line.rawText),
+  );
+}
+
 /** 商品・割引だけの役割なら、名称中の税表記を独立した税内訳にしない。 */
 function isItemOrDiscountOnly(line: ReceiptRawObservationLine): boolean {
   return (
@@ -58,6 +65,7 @@ export function independentSummaryLines(
     (line) =>
       line.explicitlyPrinted &&
       !isReceiptCountLabel(line.rawText) &&
+      !isMarkerExplanation(line) &&
       !isItemOrDiscountOnly(line) &&
       !isNonTaxEvidenceLine(line, byIndex.get(line.sourceLineIndex)),
   );

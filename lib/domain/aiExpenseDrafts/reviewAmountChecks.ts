@@ -1,8 +1,10 @@
 import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
 import { distinctTaxSummaryAmounts } from "../receipt/tax/taxAmountBasis";
 import { isVerifiedTaxSummaryStatus } from "../receipt/tax/taxSummaryConsistency";
+import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
 import type { ReviewBlockerCode, ReviewCheckStatus } from "./reviewCheckUtils";
 import {
+  effectiveTaxRateOf,
   findBasisConflicts,
   itemComparableYen,
   itemPrintedYen,
@@ -116,7 +118,7 @@ export function buildAmountCheck(args: {
         itemsPrintedTotalYen,
         itemsComparableTotalYen,
         reason: "税内訳が未検証のため、金額を比較できません",
-        blockerCode: "unresolved-tax",
+        blockerCode: "unverified-tax-summary",
         affectedItemIds: args.items.map((item) => item.id),
         focusTarget: "items",
       };
@@ -159,19 +161,36 @@ export function buildAmountCheck(args: {
 
   // 税込基準が未確定の明細（税抜かつ未配分、基準不明など）を支払額と比較しない
   const uncertainItem = args.items.find((item) => itemComparableYen(item) === undefined);
-  if (uncertainItem || itemsComparableTotalYen === undefined)
+  if (uncertainItem || itemsComparableTotalYen === undefined) {
+    const uncertainItems = args.items.filter((item) => itemComparableYen(item) === undefined);
+    const summaryBlocked =
+      uncertainItems.length > 0 &&
+      uncertainItems.every(
+        (item) =>
+          item.taxAllocationStatus === "unallocated" &&
+          buildTaxContextFromReviewItem(item).status === "resolved" &&
+          summaries.some(
+            (summary) =>
+              summary.taxRatePercent === effectiveTaxRateOf(item, args.items) &&
+              summary.status !== undefined &&
+              !isVerifiedTaxSummaryStatus(summary.status),
+          ),
+      );
     return {
       status: "uncomparable",
       variant,
       paidTotalYen,
       itemsPrintedTotalYen,
-      reason: "税設定・登録額の確認が必要な明細があるため、支払額と比較できません",
-      blockerCode: "unresolved-tax",
+      reason: summaryBlocked
+        ? "税内訳が未検証のため、金額を比較できません"
+        : "税設定・登録額の確認が必要な明細があるため、支払額と比較できません",
+      blockerCode: summaryBlocked ? "unverified-tax-summary" : "unresolved-tax",
       affectedItemIds: args.items
         .filter((item) => itemComparableYen(item) === undefined)
         .map((item) => item.id),
       focusTarget: uncertainItem?.id,
     };
+  }
 
   const differenceYen = itemsComparableTotalYen - paidTotalYen;
   const base = { variant, paidTotalYen, itemsComparableTotalYen, itemsPrintedTotalYen };

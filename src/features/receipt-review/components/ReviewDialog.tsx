@@ -155,7 +155,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const checkMismatchCount = [checks.amount, checks.taxRate].filter(
     (check) => check.status === "mismatch",
   ).length;
-  const checkUncomparableCount = countActionableUncomparable(checks);
+  const checkUncomparableCount = countActionableUncomparable(checks, recommendations);
   const fixCount = required.length + checkMismatchCount;
   const recommendationCount = recommendations.length + checkUncomparableCount;
   const busy = props.reviewSubmitting || props.taxUpdatingItemId != null;
