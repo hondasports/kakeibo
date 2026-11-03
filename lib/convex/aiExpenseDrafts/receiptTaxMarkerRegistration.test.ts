@@ -84,7 +84,7 @@ describe("軽減税率注記の保存と登録", () => {
             observedAt: 1,
             lines: [
               line("8%対象額 246円", 246, 0),
-              line("外税8% 19円", conflict ? 20 : 19, 1),
+              line(conflict ? "外税8% 20円" : "外税8% 19円", conflict ? 20 : 19, 1),
               line("合計 265円", 265, 2),
               line("※印は軽減税率対象商品です。", null, 3),
             ],
@@ -121,12 +121,26 @@ describe("軽減税率注記の保存と登録", () => {
       const retrieved = await client.query(api.aiExpenseDrafts.queries.getWithItems, { draftId });
       expect(retrieved).toBeTruthy();
       if (conflict) {
+        expect(retrieved?.items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(
+          true,
+        );
         await expect(
           client.mutation(api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries, {
             draftIds: [draftId],
           }),
         ).rejects.toThrow();
       } else {
+        expect(retrieved?.draft.taxSummaries).toMatchObject([
+          { taxRatePercent: 8, taxableAmountYen: 246, taxYen: 19, status: "verified" },
+        ]);
+        expect(
+          retrieved?.items
+            .map((item) => item.normalizedAmountYen)
+            .sort((a, b) => (a ?? 0) - (b ?? 0)),
+        ).toEqual([116, 149]);
+        expect(retrieved?.items.every((item) => item.taxAllocationStatus === "allocated")).toBe(
+          true,
+        );
         const result = await client.mutation(
           api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries,
           { draftIds: [draftId] },
