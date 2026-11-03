@@ -108,6 +108,88 @@ describe("下書きの修正導線", () => {
     await user.click(within(row).getByRole("button", { name: "この税設定を確認する" }));
     expect(onConfirmItemTax).toHaveBeenCalledExactlyOnceWith("food", 8, "tax_included");
   });
+  it("未検証の税内訳による比較不能は確認案内と重複して数えない", () => {
+    render(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={{
+          ...props.selectedReviewDraft!,
+          rawObservation: {
+            source: "ai_ocr",
+            observedAt: 1,
+            lines: [
+              {
+                rawText: "8%対象額 246円",
+                amountYen: 246,
+                amountText: "246",
+                lineRoleCandidates: ["tax"],
+                roleConfidence: 1,
+                explicitlyPrinted: true,
+                sourceLineIndex: 0,
+              },
+              {
+                rawText: "外税8% 20円",
+                amountYen: 20,
+                amountText: "20",
+                lineRoleCandidates: ["tax"],
+                roleConfidence: 1,
+                explicitlyPrinted: true,
+                sourceLineIndex: 1,
+              },
+              {
+                rawText: "合計 265円",
+                amountYen: 265,
+                amountText: "265",
+                lineRoleCandidates: ["total"],
+                roleConfidence: 1,
+                explicitlyPrinted: true,
+                sourceLineIndex: 2,
+              },
+            ],
+          },
+          taxSummaries: [
+            {
+              taxRatePercent: 8,
+              taxMode: "external",
+              taxableAmountYen: 246,
+              taxableAmountBasis: "tax_excluded",
+              taxYen: 19,
+              roundingMethod: "floor",
+              warnings: ["contradictory_receipt_tax_evidence"],
+              status: "contradictory",
+            },
+          ],
+        }}
+        reviewForm={{
+          ...props.reviewForm,
+          amountYen: "265",
+          priceTaxTreatment: "excluded",
+          taxRateComposition: "rate8",
+        }}
+        reviewItems={[108, 138].map((amount, index) => ({
+          id: `item-${index}`,
+          itemName: `商品${index}`,
+          amountYen: String(amount),
+          printedAmountYen: amount,
+          categoryId: "food",
+          amountBasis: "tax_excluded" as const,
+          taxRatePercent: 8 as const,
+          taxResolutionStatus: "resolved" as const,
+          taxResolutionSource: "item_explicit" as const,
+          taxAllocationStatus: "unallocated" as const,
+        }))}
+      />,
+    );
+    expect(
+      within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 1件"),
+    ).toBeVisible();
+    const banner = screen.getByRole("region", { name: "全体の確認状態" });
+    expect(within(banner).getByText("レシートの税内訳を確認してください")).toBeVisible();
+    expect(
+      within(banner).queryByText("税設定の確認が必要な商品があります"),
+    ).not.toBeInTheDocument();
+  });
+
   it("一致時は全体の読み取り確認を個別推奨に数えず、重複表示もしない", () => {
     render(
       <ReviewDialog

@@ -78,6 +78,60 @@ describe("#835 保存時の税再解釈で未確定を解消する", () => {
       categoryId: CAT_ID,
     });
 
+  it.each([false, true])(
+    "注記を含む外税の保存・再保存・登録判定は印字矛盾を保護する（矛盾=%s）",
+    async (conflict) => {
+      const { ctx, getDraft, getItems } = makeCtx({
+        amountYen: 265,
+        taxSummaries: [ambiguousSummary(8, 246, 19, "external")],
+        items: [108, 138].map((amount, index) =>
+          resolvedItem({
+            _id: `item-${index}`,
+            itemName: `商品${index}`,
+            amountYen: amount,
+            printedAmountYen: amount,
+            amountBasis: "tax_excluded",
+          }),
+        ),
+      });
+      const line = (rawText: string, amountYen: number | null, sourceLineIndex: number) => ({
+        rawText,
+        amountYen,
+        amountText: amountYen === null ? null : String(amountYen),
+        sourceLineIndex,
+        explicitlyPrinted: true,
+        lineRoleCandidates: ["unknown"],
+        roleConfidence: 1,
+      });
+      await ctx.db.patch(DRAFT_ID, {
+        rawObservation: {
+          source: "ai_ocr",
+          observedAt: 1,
+          lines: [
+            line("8%対象額 246円", 246, 0),
+            line(conflict ? "外税8% 20円" : "外税8% 19円", conflict ? 20 : 19, 1),
+            line("合計 265円", 265, 2),
+            line("※印は軽減税率対象商品です。", null, 3),
+          ],
+        },
+      } as never);
+      await save(ctx, 265);
+      await save(ctx, 265);
+      const register = () =>
+        buildDraftRegistrationItems(
+          getDraft() as unknown as Doc<"aiExpenseDrafts">,
+          getItems() as unknown as Doc<"aiExpenseDraftItems">[],
+        );
+      if (conflict) {
+        expect(getItems().every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+        expect(register).toThrow();
+      } else {
+        expect(getItems().map((item) => item.normalizedAmountYen)).toEqual([116, 149]);
+        expect(register().reduce((sum, item) => sum + item.amountYen, 0)).toBe(265);
+      }
+    },
+  );
+
   it("税込・混在税率で未確定が残る下書きを保存で自己修復し登録できる", async () => {
     const { ctx, getDraft, getItems } = makeCtx({
       amountYen: 3500,
