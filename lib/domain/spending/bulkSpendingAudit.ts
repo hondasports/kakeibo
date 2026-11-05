@@ -1,13 +1,14 @@
 /**
  * 支出一括操作の監査スナップショット構築に関するドメインルール。
  */
+import type { RecordType } from "../common/recordKind";
 
 export const BULK_SPENDING_CATEGORY_CHANGED_ACTION = "spending_bulk_category_changed" as const;
 export const BULK_SPENDING_DELETED_ACTION = "spending_bulk_deleted" as const;
 
 export type BulkSpendingAuditRecord = {
   id: string;
-  kind: "expenseEntry" | "receipt";
+  kind: RecordType;
   date: string;
   categoryId?: string;
 };

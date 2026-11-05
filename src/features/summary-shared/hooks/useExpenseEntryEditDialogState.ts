@@ -8,6 +8,7 @@ import {
   parseExpenseAmountString,
   validateExpenseTitle,
 } from "../../../../lib/domain/expenseEntries/expenseEntryItem";
+import type { AiExpenseRegistrationMode } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import type { ReceiptItem } from "../types/types";
 import { getEditableReceiptTitle } from "../components/ExpenseEntryEditDialog";
 import type { EditableDraftItem } from "../components/ExpenseEntryDraftItemsEditor";
@@ -29,7 +30,7 @@ export function useExpenseEntryEditDialogState({
   const [categoryId, setCategoryId] = useState("");
   const [title, setTitle] = useState("");
   const [memo, setMemo] = useState("");
-  const [registrationMode, setRegistrationMode] = useState<"detailed" | "totalOnly">("detailed");
+  const [registrationMode, setRegistrationMode] = useState<AiExpenseRegistrationMode>("detailed");
   const [draftItems, setDraftItems] = useState<EditableDraftItem[]>([]);
   const [draftItemsLoading, setDraftItemsLoading] = useState(false);
   const [error, setError] = useState("");

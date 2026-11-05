@@ -2,11 +2,16 @@ import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { searchExpensesHandler } from "../lib/convex/expenseSearch/searchExpenses";
+import {
+  historyEntryTypeValidator,
+  historyTrendGranularityValidator,
+} from "../lib/convex/expenseSearch/validators";
+import { entryKindValidator, recordTypeValidator } from "../lib/convex/receipts/validators";
 
 const expenseSearchReceiptValidator = v.object({
   _id: v.string(),
   date: v.string(),
-  type: v.union(v.literal("expense"), v.literal("income")),
+  type: entryKindValidator,
   shopName: v.optional(v.string()),
   bankName: v.optional(v.string()),
   amountYen: v.number(),
@@ -14,7 +19,7 @@ const expenseSearchReceiptValidator = v.object({
   categoryName: v.optional(v.string()),
   categoryColor: v.optional(v.string()),
   memo: v.optional(v.string()),
-  recordType: v.union(v.literal("expenseEntry"), v.literal("receipt")),
+  recordType: recordTypeValidator,
   itemName: v.optional(v.string()),
   receiptGroupId: v.optional(v.string()),
   receiptShopName: v.optional(v.string()),
@@ -68,7 +73,7 @@ const historyComparisonValidator = v.union(
 
 export const searchExpenses = query({
   args: {
-    entryType: v.optional(v.union(v.literal("all"), v.literal("expense"), v.literal("income"))),
+    entryType: v.optional(historyEntryTypeValidator),
     shopQuery: v.optional(v.string()),
     categoryId: v.optional(v.id("categories")),
     minAmountYen: v.optional(v.number()),
@@ -96,7 +101,7 @@ export const searchExpenses = query({
         key: v.string(),
         startDate: v.string(),
         endDate: v.string(),
-        granularity: v.union(v.literal("day"), v.literal("week"), v.literal("month")),
+        granularity: historyTrendGranularityValidator,
         totalExpenseYen: v.number(),
         totalIncomeYen: v.number(),
         netAmountYen: v.number(),

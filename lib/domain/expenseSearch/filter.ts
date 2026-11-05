@@ -1,8 +1,11 @@
 import type { IncomeListEntry, SpendingEntry } from "../receipt/spendingEntry";
+import { ENTRY_KINDS } from "../common/entryKind";
 import { isValidIsoDateString } from "../week/weekDates";
 import { getHistoryTrendRangeError } from "./trendRange";
 
-export type HistoryEntryType = "all" | "expense" | "income";
+export const HISTORY_ENTRY_TYPES = ["all", ...ENTRY_KINDS] as const;
+
+export type HistoryEntryType = (typeof HISTORY_ENTRY_TYPES)[number];
 
 export type SearchableReceiptGroup = {
   id: string;
