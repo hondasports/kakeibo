@@ -152,5 +152,7 @@ jobs:
 
       - name: Mapped contract tests
         # .md のみの変更で map に対応テストがあるときだけ、該当テストだけを実行する。
+        # --passWithNoTests は付けない: 収集0件を成功にすると文書契約テストが
+        # 静かに抜けるため、対象が壊れている場合はこのstepを失敗させる。
         if: ${{ needs.scope.result == 'success' && needs.scope.outputs.code_changed != 'true' && needs.scope.outputs.mapped_tests != '' }}
-        run: pnpm exec vitest run --passWithNoTests ${{ needs.scope.outputs.mapped_tests }}
+        run: pnpm exec vitest run ${{ needs.scope.outputs.mapped_tests }}

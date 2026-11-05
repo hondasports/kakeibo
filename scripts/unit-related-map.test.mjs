@@ -36,6 +36,46 @@ describe("loadUnitRelatedMap", () => {
     );
     expect(loadUnitRelatedMap(dir)).toEqual({ "docs/*.md": ["x.test.ts"] });
   });
+
+  test("値が文字列配列でないmapはエラー（文字列を1文字ずつ反復するのを防ぐ）", () => {
+    const dir = tmpdirFixture();
+    mkdirSync(path.join(dir, "scripts"), { recursive: true });
+    writeFileSync(
+      path.join(dir, UNIT_RELATED_MAP_PATH),
+      JSON.stringify({ "docs/*.md": "x.test.ts" }),
+    );
+    expect(() => loadUnitRelatedMap(dir)).toThrow("must be an array of strings");
+  });
+
+  test("配列の要素が文字列でないmapはエラー", () => {
+    const dir = tmpdirFixture();
+    mkdirSync(path.join(dir, "scripts"), { recursive: true });
+    writeFileSync(
+      path.join(dir, UNIT_RELATED_MAP_PATH),
+      JSON.stringify({ "docs/*.md": ["x.test.ts", 42] }),
+    );
+    expect(() => loadUnitRelatedMap(dir)).toThrow("must be an array of strings");
+  });
+
+  test("トップレベルがオブジェクトでないmapはエラー", () => {
+    const dir = tmpdirFixture();
+    mkdirSync(path.join(dir, "scripts"), { recursive: true });
+    writeFileSync(path.join(dir, UNIT_RELATED_MAP_PATH), JSON.stringify(["x.test.ts"]));
+    expect(() => loadUnitRelatedMap(dir)).toThrow("must be a JSON object");
+  });
+
+  test("$で始まるキーは値が文字列でも有効（メタデータ）", () => {
+    const dir = tmpdirFixture();
+    mkdirSync(path.join(dir, "scripts"), { recursive: true });
+    writeFileSync(
+      path.join(dir, UNIT_RELATED_MAP_PATH),
+      JSON.stringify({ $comment: "説明", "docs/*.md": ["x.test.ts"] }),
+    );
+    expect(loadUnitRelatedMap(dir)).toEqual({
+      $comment: "説明",
+      "docs/*.md": ["x.test.ts"],
+    });
+  });
 });
 
 describe("unitMappedTests", () => {

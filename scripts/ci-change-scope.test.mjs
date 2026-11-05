@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -120,6 +120,25 @@ describe("runCiChangeScope", () => {
     expect(result.mappedTests).toEqual([]);
   });
 
+  test("unit関連mapが壊れている環境でも code_changed=true に倒す", () => {
+    const dir = tmpdirFixture();
+    mkdirSync(path.join(dir, "scripts"), { recursive: true });
+    writeFileSync(
+      path.join(dir, "scripts", "unit-related-map.json"),
+      JSON.stringify({ "docs/*.md": "skills/skills.test.mjs" }),
+    );
+    const result = runCiChangeScope({
+      baseSha: BASE,
+      headSha: HEAD,
+      cwd: dir,
+      readChanged: () => ["docs/a.md"],
+    });
+
+    expect(result.codeChanged).toBe(true);
+    expect(result.reason).toBe("unit_map_failed");
+    expect(result.mappedTests).toEqual([]);
+  });
+
   test("diff取得失敗・新規branchは従来どおり安全側", () => {
     const failed = runCiChangeScope({
       baseSha: BASE,
@@ -210,5 +229,7 @@ describe("ci.yml", () => {
     );
     expect(mapped.run).toContain("vitest run");
     expect(mapped.run).toContain("${{ needs.scope.outputs.mapped_tests }}");
+    // 収集0件を成功にしない（文書契約テストが静かに抜けるのを防ぐ）
+    expect(mapped.run).not.toContain("passWithNoTests");
   });
 });

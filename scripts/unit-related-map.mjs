@@ -13,6 +13,8 @@ export const UNIT_RELATED_MAP_PATH = "scripts/unit-related-map.json";
  * テストへ対応づける。無ければ空map（mapは任意の追加知識）。
  * required: true のときはmap不在をエラーにする。CI scopeのようにmap欠落で
  * 文書依存テストの実行が抜けることを許せない呼び出し側向け。
+ * 値が文字列配列でない壊れたmapは常にエラー（文字列を反復してテストを
+ * 静かに取りこぼすのを防ぐ）。
  */
 export function loadUnitRelatedMap(cwd = repoRoot, { required = false } = {}) {
   const mapPath = path.join(cwd, UNIT_RELATED_MAP_PATH);
@@ -20,7 +22,17 @@ export function loadUnitRelatedMap(cwd = repoRoot, { required = false } = {}) {
     if (required) throw new Error(`${UNIT_RELATED_MAP_PATH} not found`);
     return {};
   }
-  return JSON.parse(readFileSync(mapPath, "utf8"));
+  const map = JSON.parse(readFileSync(mapPath, "utf8"));
+  if (!map || typeof map !== "object" || Array.isArray(map)) {
+    throw new Error(`${UNIT_RELATED_MAP_PATH} must be a JSON object`);
+  }
+  for (const [key, value] of Object.entries(map)) {
+    if (key.startsWith("$")) continue;
+    if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+      throw new Error(`${UNIT_RELATED_MAP_PATH}: "${key}" must be an array of strings`);
+    }
+  }
+  return map;
 }
 
 /**
