@@ -1,5 +1,7 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
+import { aiExpenseRegistrationModeValidator } from "../aiExpenseDrafts/validators";
+import { entryKindValidator, recordTypeValidator } from "../../lib/convex/receipts/validators";
 
 export {
   buildCategoryInfoMap,
@@ -55,13 +57,13 @@ const incomeListEntryValidator = v.object({
   bankName: v.optional(v.string()),
   amountYen: v.number(),
   memo: v.optional(v.string()),
-  recordType: v.union(v.literal("expenseEntry"), v.literal("receipt")),
+  recordType: recordTypeValidator,
 });
 
 const receiptWithCategoryValidator = v.object({
   _id: v.string(),
   date: v.string(),
-  type: v.optional(v.union(v.literal("expense"), v.literal("income"))),
+  type: v.optional(entryKindValidator),
   shopName: v.optional(v.string()),
   bankName: v.optional(v.string()),
   amountYen: v.number(),
@@ -69,13 +71,13 @@ const receiptWithCategoryValidator = v.object({
   categoryName: v.string(),
   categoryColor: v.string(),
   memo: v.optional(v.string()),
-  recordType: v.union(v.literal("expenseEntry"), v.literal("receipt")),
+  recordType: recordTypeValidator,
   itemName: v.optional(v.string()),
   receiptGroupId: v.optional(v.string()),
   receiptShopName: v.optional(v.string()),
   receiptTotalAmountYen: v.optional(v.number()),
   aiExpenseDraftId: v.optional(v.string()),
-  registrationMode: v.optional(v.union(v.literal("detailed"), v.literal("totalOnly"))),
+  registrationMode: v.optional(aiExpenseRegistrationModeValidator),
 });
 
 const categorySummaryValidator = v.object({

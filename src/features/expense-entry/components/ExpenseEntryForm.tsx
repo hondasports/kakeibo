@@ -1,4 +1,5 @@
 import type { Id } from "../../../../convex/_generated/dataModel";
+import type { EntryKind } from "../../../../lib/domain/common/entryKind";
 import { useState } from "react";
 import { Box, Paper, Stack, Tab, Tabs } from "@mui/material";
 import { useExpenseEntryForm } from "../hooks/useExpenseEntryForm";
@@ -17,7 +18,7 @@ export function ExpenseEntryForm({
   weekEndDate,
   categories,
 }: ExpenseEntryFormProps) {
-  const [entryType, setEntryType] = useState<"expense" | "income">("expense");
+  const [entryType, setEntryType] = useState<EntryKind>("expense");
   const expense = useExpenseEntryForm({ weekStartDate, weekEndDate, categories });
   const income = useIncomeEntry(expense.date);
 
@@ -29,7 +30,7 @@ export function ExpenseEntryForm({
             aria-label="支出・収入切り替え"
             value={entryType}
             variant="fullWidth"
-            onChange={(_event, value: "expense" | "income") => setEntryType(value)}
+            onChange={(_event, value: EntryKind) => setEntryType(value)}
           >
             <Tab label="支出" value="expense" />
             <Tab label="収入" value="income" />

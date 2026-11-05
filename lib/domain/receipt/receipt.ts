@@ -4,6 +4,7 @@
  * Convex の generated 型には依存せず、ID は string として扱う。
  */
 import { calculateWeekStartDate } from "../week/weekDates";
+import type { EntryKind } from "../common/entryKind";
 import {
   normalizeCreateReceiptArgs,
   normalizeUpdateReceiptPatch,
@@ -18,7 +19,7 @@ export type ReceiptFields = {
   groupId: string;
   createdByUserId?: string;
   date: string;
-  type?: "expense" | "income";
+  type?: EntryKind;
   shopName?: string;
   bankName?: string;
   amountYen: number;

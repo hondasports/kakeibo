@@ -3,6 +3,7 @@ import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { createReceiptHandler } from "../../lib/convex/receipts/insert";
+import { entryKindValidator } from "../../lib/convex/receipts/validators";
 import { updateReceiptHandler } from "../../lib/convex/receipts/update";
 import { deleteReceiptHandler } from "../../lib/convex/receipts/delete";
 
@@ -38,7 +39,7 @@ export async function deleteReceiptsByUserHandler(
 export const createReceipt = mutation({
   args: {
     date: v.string(),
-    type: v.optional(v.union(v.literal("expense"), v.literal("income"))),
+    type: v.optional(entryKindValidator),
     shopName: v.optional(v.string()),
     bankName: v.optional(v.string()),
     amountYen: v.number(),

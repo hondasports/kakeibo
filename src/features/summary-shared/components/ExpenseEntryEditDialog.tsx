@@ -10,6 +10,7 @@ import {
   TextField,
 } from "@mui/material";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import type { AiExpenseRegistrationMode } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import type { ReceiptItem } from "../types/types";
 import { extractAmountDigits } from "../../../utils/currency";
 import { useExpenseEntryEditDialogState } from "../hooks/useExpenseEntryEditDialogState";
@@ -117,7 +118,7 @@ export function ExpenseEntryEditDialog({
               fullWidth
               label="登録方法"
               onChange={(event) =>
-                setRegistrationMode(event.target.value as "detailed" | "totalOnly")
+                setRegistrationMode(event.target.value as AiExpenseRegistrationMode)
               }
               select
               value={registrationMode}

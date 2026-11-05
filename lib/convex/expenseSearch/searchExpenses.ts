@@ -9,6 +9,7 @@ import {
   type ExpenseSearchReceipt,
   type ExpenseSearchResult,
 } from "../../domain/expenseSearch/searchResult";
+import type { HistoryEntryType } from "../../domain/expenseSearch/filter";
 import {
   searchExpenses,
   type ExpenseSearchStore,
@@ -18,7 +19,7 @@ import { loadHistoryEntriesForSearch } from "./loadSpendingEntries";
 export type { ExpenseSearchReceipt, ExpenseSearchResult };
 
 export type ExpenseSearchArgs = {
-  entryType?: "all" | "expense" | "income";
+  entryType?: HistoryEntryType;
   shopQuery?: string;
   categoryId?: Id<"categories">;
   minAmountYen?: number;
