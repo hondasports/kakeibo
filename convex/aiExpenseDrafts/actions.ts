@@ -1,7 +1,8 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { action } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
-import type { Doc } from "../_generated/dataModel";
+import { api } from "../_generated/api";
+import type { Doc, Id } from "../_generated/dataModel";
 import {
   analyzeReceiptImageToDraftCore,
   assertReceiptImageConsent,
@@ -16,7 +17,11 @@ export async function analyzeReceiptImageToDraftHandler(
   args: AnalyzeReceiptImageToDraftArgs,
 ): Promise<Doc<"aiExpenseDrafts">> {
   await assertReceiptImageConsent(ctx);
-  return await analyzeReceiptImageToDraftCore(ctx, args);
+  const group: { _id: Id<"groups"> } | null = await ctx.runQuery(api.groups.queries.getMyGroup, {});
+  if (group === null) {
+    throw new ConvexError("グループに所属していません");
+  }
+  return await analyzeReceiptImageToDraftCore(ctx, { groupId: group._id, ...args });
 }
 
 export const analyzeReceiptImageToDraft = action({

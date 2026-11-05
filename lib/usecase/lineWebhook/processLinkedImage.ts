@@ -98,6 +98,7 @@ export async function buildLinkedImageReply(
 
   const draft = await deps.drafts.createDraftFromImage({
     userId: job.userId,
+    groupId: context.groupId,
     imageDataUrl: dataUrl.dataUrl,
     categories: context.categories,
   });

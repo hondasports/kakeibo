@@ -1,13 +1,14 @@
 import { ConvexError } from "convex/values";
 import { api, internal } from "../../../convex/_generated/api";
 import type { ActionCtx } from "../../../convex/_generated/server";
-import type { Doc } from "../../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { ReceiptUserOverrideSnapshot } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { mapExtractionToDraftArgs } from "../../../lib/domain/aiExpenseDrafts/extractionMapping";
 import { extractReceiptFieldsHandler } from "../../../convex/receiptImageExtraction/extraction";
 import { measureReceiptExtractionSave } from "./telemetry";
 
 export type AnalyzeReceiptImageCoreArgs = {
+  groupId: Id<"groups">;
   imageDataUrl: string;
   imageFileName?: string;
   preservedUserOverride?: ReceiptUserOverrideSnapshot<Doc<"categories">["_id"]>;
@@ -49,7 +50,9 @@ export async function analyzeReceiptImageToDraftCore(
   let categories: Doc<"categories">[];
   let extracted;
   try {
-    categories = await ctx.runQuery(api.categories.queries.listActive, {});
+    categories = await ctx.runQuery(internal.categories.internal.listActiveForGroup, {
+      groupId: args.groupId,
+    });
     extracted = await extractReceiptFieldsHandler(ctx, {
       imageDataUrl: args.imageDataUrl,
       telemetryId: args.telemetryId,
@@ -61,6 +64,7 @@ export async function analyzeReceiptImageToDraftCore(
   } catch (err) {
     return await measureReceiptExtractionSave(args.telemetryId, "failure_draft", () =>
       ctx.runMutation(internal.aiExpenseDrafts.internal.createFailedDraftFromImageAnalysis, {
+        groupId: args.groupId,
         warning: getSafeFailureWarning(err),
         imageFileName: args.imageFileName,
       }),
@@ -69,6 +73,7 @@ export async function analyzeReceiptImageToDraftCore(
 
   return await measureReceiptExtractionSave(args.telemetryId, "result_draft", () =>
     ctx.runMutation(internal.aiExpenseDrafts.internal.createFromExtraction, {
+      groupId: args.groupId,
       ...mapExtractionToDraftArgs(extracted, categories, args.imageFileName),
       preservedUserOverride: args.preservedUserOverride,
     }),

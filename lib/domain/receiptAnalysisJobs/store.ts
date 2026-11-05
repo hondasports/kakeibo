@@ -53,7 +53,9 @@ export interface ReceiptAnalysisStore extends ReceiptAnalysisReader {
     },
   ): Promise<void>;
   deleteJob(id: string): Promise<void>;
-  getDraft(id: string): Promise<{ id: string; status: string; updatedAt: number } | null>;
+  getDraft(
+    id: string,
+  ): Promise<{ id: string; groupId: string; status: string; updatedAt: number } | null>;
   insertFailedAnalysisDraft(args: {
     groupId: string;
     createdByUserId?: string;

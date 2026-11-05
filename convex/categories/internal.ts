@@ -1,9 +1,15 @@
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { createCategoryStore } from "../../lib/convex/categories/convexCategoryStore";
+import {
+  categoryRecordToDoc,
+  createCategoryReader,
+  createCategoryStore,
+} from "../../lib/convex/categories/convexCategoryStore";
 import { CategoryDomainError } from "../../lib/domain/categories/rules";
 import { deleteE2eCategoriesByGroup, ensureE2eCategory } from "../../lib/usecase/categories";
+import { listActive as listActiveUsecase } from "../../lib/usecase/categories";
+import { requireGroupMembershipForGroup } from "../groups/membership";
 
 function convexError(error: unknown): never {
   if (error instanceof ConvexError) throw error;
@@ -23,6 +29,21 @@ export const deleteE2eCategoriesByUser = internalMutation({
     } catch (error) {
       convexError(error);
     }
+  },
+});
+
+/**
+ * 処理開始時に確定した groupId のアクティブカテゴリを返す内部 query。
+ * 呼び出し元（action）が渡す groupId はサーバー側で現在の所属を再検証する。
+ */
+export const listActiveForGroup = internalQuery({
+  args: {
+    groupId: v.id("groups"),
+  },
+  handler: async (ctx, args) => {
+    await requireGroupMembershipForGroup(ctx, args.groupId);
+    const records = await listActiveUsecase(createCategoryReader(ctx), args.groupId);
+    return records.map(categoryRecordToDoc);
   },
 });
 

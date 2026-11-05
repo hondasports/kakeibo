@@ -13,6 +13,7 @@ import {
   canRetryReceiptAnalysisJob,
   clampReceiptAnalysisCleanupLimit,
   MAX_RECEIPT_ANALYSIS_BATCH_FILES,
+  RECEIPT_ANALYSIS_GROUP_SCOPE_ERROR,
   RECEIPT_ANALYSIS_STALE_JOB_ERROR,
   RECEIPT_ANALYSIS_STALE_JOB_MS,
   RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
@@ -174,19 +175,25 @@ export async function finalizeReceiptAnalysisAttempt(
   }
   if (args.groupId !== undefined && job.groupId !== args.groupId)
     throw new ReceiptAnalysisJobDomainError("Job not found");
+  // job の group と異なる group に保存された draft は採用せず、実際の保存先 group で削除する
+  const newDraft = await deps.store.getDraft(args.newDraftId);
+  const draftGroupMismatch = newDraft !== null && newDraft.groupId !== job.groupId;
+  if (draftGroupMismatch) {
+    await deps.store.deleteDraftAndItems(args.newDraftId, newDraft.groupId);
+  }
   const isStale = (job.draftId ?? null) !== args.expectedDraftId;
   // 完了の書き込みを受理するのは実行中の attempt のみ。回復で failed に確定した job や、
   // cancel・別 attempt で既に終端へ進んだ job への遅着は、届いた新規 draft を破棄して
   // 現在の状態を維持する
   if (job.status !== "running" || isStale) {
-    if (job.draftId !== args.newDraftId)
+    if (job.draftId !== args.newDraftId && !draftGroupMismatch)
       await deps.store.deleteDraftAndItems(args.newDraftId, job.groupId);
     return { applied: false };
   }
   if (args.expectedDraftId !== null && args.expectedDraftUpdatedAt !== undefined) {
     const currentDraft = await deps.store.getDraft(args.expectedDraftId);
     if (!currentDraft || currentDraft.updatedAt !== args.expectedDraftUpdatedAt) {
-      await deps.store.deleteDraftAndItems(args.newDraftId, job.groupId);
+      if (!draftGroupMismatch) await deps.store.deleteDraftAndItems(args.newDraftId, job.groupId);
       if (!currentDraft) {
         await deps.store.clearJobFields(args.jobId, {
           status: "cancelled",
@@ -213,6 +220,15 @@ export async function finalizeReceiptAnalysisAttempt(
       await scheduleAiReviewNotificationIfNeeded(deps, job.batchId, restoredStatus);
       return { applied: false, reason: "draft_changed" };
     }
+  }
+  if (draftGroupMismatch) {
+    await deps.store.clearJobFields(args.jobId, {
+      status: "failed",
+      error: RECEIPT_ANALYSIS_GROUP_SCOPE_ERROR,
+      updatedAt: now,
+    });
+    await scheduleAiReviewNotificationIfNeeded(deps, job.batchId, "failed", now);
+    return { applied: true };
   }
   if (args.status === "failed" && args.expectedDraftId !== null) {
     await deps.store.deleteDraftAndItems(args.newDraftId, job.groupId);

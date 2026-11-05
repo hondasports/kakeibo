@@ -58,6 +58,7 @@ export type {
 
 export const createFailedDraftFromImageAnalysis = internalMutation({
   args: {
+    groupId: v.id("groups"),
     warning: v.string(),
     imageFileName: v.optional(v.string()),
   },
@@ -67,6 +68,7 @@ export const createFailedDraftFromImageAnalysis = internalMutation({
 const extractedDraftItemValidator = v.object(receiptDraftItemFields);
 
 const extractedDraftArgs = {
+  groupId: v.id("groups"),
   documentType: aiExpenseDraftDocumentTypeValidator,
   shopName: v.optional(v.string()),
   paymentPlace: v.optional(v.string()),
@@ -105,6 +107,7 @@ export const createFromExtractionForUser = internalMutation({
 export const createFailedDraftFromImageAnalysisForUser = internalMutation({
   args: {
     userId: v.string(),
+    groupId: v.id("groups"),
     warning: v.string(),
     imageFileName: v.optional(v.string()),
   },

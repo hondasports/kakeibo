@@ -83,7 +83,7 @@ export function createLineImageContextReader(ctx: ActionCtx): LineImageContextRe
 /** 画像→下書き生成（抽出 + aiExpenseDrafts 内部 mutation）。 */
 export function createLineImageDraftRunner(ctx: ActionCtx): LineImageDraftRunner {
   return {
-    async createDraftFromImage({ userId, imageDataUrl, categories }) {
+    async createDraftFromImage({ userId, groupId, imageDataUrl, categories }) {
       try {
         const extracted = await extractReceiptFieldsFromImage({
           imageDataUrl,
@@ -103,7 +103,7 @@ export function createLineImageDraftRunner(ctx: ActionCtx): LineImageDraftRunner
         );
         const draft = await ctx.runMutation(
           internal.aiExpenseDrafts.internal.createFromExtractionForUser,
-          { userId, ...draftArgs },
+          { userId, groupId: groupId as Id<"groups">, ...draftArgs },
         );
         return { status: draft.status, draftId: draft._id };
       } catch (error) {
@@ -111,6 +111,7 @@ export function createLineImageDraftRunner(ctx: ActionCtx): LineImageDraftRunner
           internal.aiExpenseDrafts.internal.createFailedDraftFromImageAnalysisForUser,
           {
             userId,
+            groupId: groupId as Id<"groups">,
             warning: getSafeFailureWarning(error),
             imageFileName: LINE_IMAGE_FILE_NAME,
           },

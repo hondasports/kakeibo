@@ -160,6 +160,24 @@ export function createMutationCtx(
           }
           return { unique: vi.fn().mockResolvedValue(groupMember) };
         }
+        // groupMembers の by_group_id_and_user_id は eq 条件に一致するメンバーだけを返す
+        if (_indexName === "by_group_id_and_user_id" && _tableName === "groupMembers") {
+          const filters: Record<string, unknown> = {};
+          const q = {
+            eq: vi.fn().mockImplementation((field: string, value: unknown) => {
+              filters[field] = value;
+              return q;
+            }),
+          };
+          if (builder) builder(q);
+          const matched =
+            groupMember !== null &&
+            filters.groupId === groupMember.groupId &&
+            filters.userId === groupMember.userId
+              ? groupMember
+              : null;
+          return { unique: vi.fn().mockResolvedValue(matched) };
+        }
         const rows =
           _tableName === "expenseEntries" ? (opts.expenseEntries ?? []) : (opts.items ?? []);
         return {
@@ -219,6 +237,24 @@ export function createQueryCtx(
         const q = { eq: vi.fn().mockImplementation(() => q) };
         builder(q);
         return { unique: vi.fn().mockResolvedValue(groupMember) };
+      }
+      // groupMembers の by_group_id_and_user_id は eq 条件に一致するメンバーだけを返す
+      if (indexName === "by_group_id_and_user_id") {
+        const filters: Record<string, unknown> = {};
+        const q = {
+          eq: vi.fn().mockImplementation((field: string, value: unknown) => {
+            filters[field] = value;
+            return q;
+          }),
+        };
+        builder(q);
+        const matched =
+          groupMember !== null &&
+          filters.groupId === groupMember.groupId &&
+          filters.userId === groupMember.userId
+            ? groupMember
+            : null;
+        return { unique: vi.fn().mockResolvedValue(matched) };
       }
 
       const filters: Record<string, unknown> = {};
@@ -301,6 +337,9 @@ export function createActionCtx(
         hasAcceptedExternalApiConsent: hasConsent,
         acceptedAt: hasConsent ? 1234567890 : null,
       };
+    }
+    if (queryCallCount === 2) {
+      return { _id: GROUP_ID };
     }
     return [];
   });
