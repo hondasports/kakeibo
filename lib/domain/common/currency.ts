@@ -17,8 +17,8 @@ export function formatYenAbs(amount: number): string {
 }
 
 /**
- * 正負の符号つきで日本円表記にフォーマットする。0 は符号なし。
- * 例: 1234 → "+1,234円"、-1234 → "−1,234円"、0 → "0円"
+ * 0 に符号を付けないのは ±0 が増減を表さないため。
+ * 負号は ASCII ハイフンではなく U+2212 のマイナス記号を使う。
  */
 export function formatSignedYen(amount: number): string {
   if (amount === 0) {
