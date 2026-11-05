@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatYen, formatYenAbs, formatYenCompact } from "./currency";
+import { formatSignedYen, formatYen, formatYenAbs, formatYenCompact } from "./currency";
 
 describe("formatYen", () => {
   it("正の数値を円付きでフォーマットする", () => {
@@ -22,6 +22,20 @@ describe("formatYenAbs", () => {
 
   it("正の数値はそのまま", () => {
     expect(formatYenAbs(1234)).toBe("1,234円");
+  });
+});
+
+describe("formatSignedYen", () => {
+  it("正の数値は + 付きでフォーマットする", () => {
+    expect(formatSignedYen(1234)).toBe("+1,234円");
+  });
+
+  it("負の数値は − 付きでフォーマットする", () => {
+    expect(formatSignedYen(-1234)).toBe("−1,234円");
+  });
+
+  it("0 は符号なしの 0円 と返す", () => {
+    expect(formatSignedYen(0)).toBe("0円");
   });
 });
 
