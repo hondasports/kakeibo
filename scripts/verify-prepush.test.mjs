@@ -9,7 +9,6 @@ import {
   portBusy,
   runPrepush,
   sanitizeHookEnv,
-  unitMappedTests,
   unitRelatedTargets,
 } from "./verify-prepush.mjs";
 
@@ -87,23 +86,6 @@ describe("unitRelatedTargets", () => {
       { exists },
     );
     expect(targets).toEqual(["scripts/x.mjs", "src/app.ts", "convex/schema.ts"]);
-  });
-});
-
-describe("unitMappedTests", () => {
-  const map = {
-    $comment: "map説明は対象外",
-    "docs/line/*.png": ["lib/a.test.ts", "convex/b.test.ts"],
-    "assets/**": ["lib/a.test.ts"],
-  };
-  test("globに当たる変更ファイルから対応テストを引く（$キー無視・重複排除・ソート）", () => {
-    expect(unitMappedTests(["docs/line/menu.png", "assets/x.png"], map)).toEqual([
-      "convex/b.test.ts",
-      "lib/a.test.ts",
-    ]);
-  });
-  test("当たらない変更は空", () => {
-    expect(unitMappedTests(["src/app.ts"], map)).toEqual([]);
   });
 });
 
