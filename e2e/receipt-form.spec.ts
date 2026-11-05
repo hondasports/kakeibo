@@ -1,5 +1,6 @@
 import { test, expect, type Locator } from "@playwright/test";
 import { barClasses } from "@mui/x-charts/BarChart";
+import { chartsTooltipClasses } from "@mui/x-charts/ChartsTooltip";
 import { gotoAuthenticated } from "./helpers/auth";
 import { expectNoHorizontalOverflow } from "./helpers/viewport";
 import {
@@ -472,6 +473,12 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
 
     const graph = page.getByRole("img", { name: "週別支出推移グラフ" });
     await expect(graph).toBeVisible({ timeout: 20_000 });
+    // クリックで項目にフォーカスが当たると読み上げ用の非表示要素にも同じ文言が入るため、
+    // Tooltipのポップアップ内に限定して検証する
+    const tooltipSummary = page
+      .locator(`.${chartsTooltipClasses.paper}`)
+      .getByText(/支出合計 .*円/)
+      .first();
 
     // データがある場合はグラフだけでなく上部3指標も読める
     await expect(page.getByText("合計支出")).toBeVisible();
@@ -480,14 +487,14 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
     const bar = graph.locator(`.${barClasses.element}`).last();
     await expect(bar).toBeVisible();
     await bar.hover();
-    await expect(page.getByText(/支出合計 .*円/).first()).toBeVisible();
+    await expect(tooltipSummary).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileBar = graph.locator(`.${barClasses.element}`).last();
     await expect(mobileBar).toBeVisible();
     await expectChartLabelsWithinBounds(graph);
     await mobileBar.click();
-    await expect(page.getByText(/支出合計 .*円/).first()).toBeVisible();
+    await expect(tooltipSummary).toBeVisible();
   });
 });
 
