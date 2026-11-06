@@ -6,8 +6,9 @@
 
 Clerk Restricted mode はアプリへの入口制限（招待制ユーザー管理）であり、
 Convex データへの認可とは別の仕組みです。
-Convex 側では必ず `ctx.auth.getUserIdentity()` を使い、
-未認証の場合は query / mutation / action を拒否します。
+ユーザー向けの保護された Convex API は `ctx.auth.getUserIdentity()` から主体を解決し、
+未認証の家計データ取得・変更を拒否します。退会状態 query の明示的な例外、公開 API、内部関数は
+それぞれの入口の契約に従います。
 
 家計データの所有境界は **グループ（`groupId`）** です。ユーザーは `groupMembers` を通じて
 1 つ以上のグループに所属し、`users.activeGroupId` で表示対象グループを選択します。
@@ -18,12 +19,18 @@ Convex 側では必ず `ctx.auth.getUserIdentity()` を使い、
 
 | ルール           | 詳細                                                                                       |
 | ---------------- | ------------------------------------------------------------------------------------------ |
-| 認証確認         | すべての query / mutation / action で `ctx.auth.getUserIdentity()` を呼ぶ                  |
-| 未認証拒否       | `identity === null` の場合は `ConvexError("Not authenticated")` をスローする               |
+| 認証確認         | ユーザー向けの保護された API は共通ヘルパー等を通じて `ctx.auth.getUserIdentity()` を確認する |
+| 未認証拒否       | 保護された API は `identity === null` の場合に `ConvexError("Not authenticated")` をスローする |
 | 認可キー         | `identity.tokenIdentifier` を優先する（`subject` は使わない）                              |
 | userId の解決    | クライアント引数を信用せず、サーバー側で `identity.tokenIdentifier` から解決する         |
 | データ所有境界   | receipt / category / weekSession / expenseEntry などの家計データは **`groupId`** で分離する |
 | グループ所属確認 | 家計データへアクセスする query / mutation では `requireGroupMembership` 等で所属を確認する |
+
+### 退会状態 query の例外
+
+`convex/accountDeletion.ts` の `getMyAccountDeletionStatus` は、退会完了直後などの認証遷移中は
+例外ではなく `null` を返します（`convex/accountDeletion.test.ts`）。未認証時にユーザーや
+家計データを返すものではなく、家計データ API の認証・グループ所属確認を省略する根拠にはなりません。
 
 ### 共通ヘルパー
 
@@ -105,8 +112,9 @@ ClerkProvider
 
 ### 認証状態のチェック順序（`App.tsx`）
 
-公開パス（`/privacy`、`/terms`、`/maintenance` 等）は認証前に `RouterProvider` へ渡す。
-それ以外は `AuthenticatedApp` で以下を順に確認する。
+`/sso-callback` はClerkの認証コールバックとして直接処理する。公開パスと未定義URLは認証前に
+`RouterProvider` へ渡し、公開ページや404を表示する。家計・設定・管理画面などの認証対象パスは
+`AuthenticatedApp` で以下を順に確認する。
 
 1. `useAuth().isLoaded` が `false` → ローディング表示
 2. `useAuth().isSignedIn` が `false` → サインイン画面（`SignedOutScreen`）
@@ -122,7 +130,11 @@ ClerkProvider
 
 - グループ未所属 → `/group/setup` へリダイレクト
 - 複数グループ所属かつ `activeGroupId` 未選択 → `/group/select` へリダイレクト
-- 招待受け入れ → `/group/invitations/accept`（公開パスとして認証前ルーターにも載せる）
+- アカウント削除中 → `/settings/account/delete/status` へリダイレクト
+
+`/group/invitations/accept`、`/settings/account/delete/status`、`/group/delete/status/:jobId` は
+`GroupRouteGuard` の外に置く。招待ページは未認証でも案内を表示するが、参加確定には認証と
+本人の参加確認が必要である。削除状況も、ガードの外にあることを理由に他人のジョブを参照できるわけではない。
 
 ### useInitializeUser フック（`src/features/auth/hooks/useInitializeUser.ts`）
 
