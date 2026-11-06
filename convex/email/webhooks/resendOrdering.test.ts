@@ -27,7 +27,7 @@ async function setup(legacy = false) {
       maxAttempts: 6,
       createdAt: 1,
       updatedAt: 1,
-      ...(legacy ? { lastProviderEventAt: 100 } : { lastVerifiedProviderEventAt: 1 }),
+      ...(legacy ? { lastProviderEventAt: 100 } : {}),
     }),
   );
   const send = async (id: string, type: string, createdAt: string) => {
