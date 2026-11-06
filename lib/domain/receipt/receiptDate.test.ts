@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { normalizeReceiptDate } from "./receiptDate";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { isPlausibleReceiptYear, normalizeReceiptDate } from "./receiptDate";
 
 describe("normalizeReceiptDate", () => {
   it.each([
@@ -49,4 +49,26 @@ describe("normalizeReceiptDate", () => {
       expect(result.error).toBe("no_candidate");
     }
   });
+});
+
+describe("JST基準の日付境界", () => {
+  afterEach(() => vi.useRealTimers());
+  it("JSTの年越しで翌年の許可境界が切り替わる", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-12-31T14:59:59Z"));
+    expect(isPlausibleReceiptYear(2028)).toBe(false);
+    vi.setSystemTime(new Date("2026-12-31T15:00:00Z"));
+    expect(isPlausibleReceiptYear(2028)).toBe(true);
+    expect(isPlausibleReceiptYear(2029)).toBe(false);
+    expect(normalizeReceiptDate("2028-02-29")).toEqual({ success: true, date: "2028-02-29" });
+  });
+  it.each(["2011-12-30", "0100-01-01", "2000-02-29"])("%s は実行環境によらず受理する", (date) => {
+    expect(normalizeReceiptDate(date)).toEqual({ success: true, date });
+  });
+  it.each(["0000-01-01", "0001-01-01", "0099-01-01", "1900-02-29", "2024-04-31"])(
+    "%s の既存拒否契約を保つ",
+    (date) => {
+      expect(normalizeReceiptDate(date)).toEqual({ success: false, error: "invalid" });
+    },
+  );
 });

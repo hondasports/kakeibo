@@ -34,3 +34,12 @@ export function getMonthEndDate(monthStartDate: string): string {
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   return `${yearStr}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
 }
+
+export function isValidCalendarDate(year: number, month: number, day: number): boolean {
+  // 0〜99年を1900年代へ補正していた既存の検証結果（拒否）を維持する。
+  if (!Number.isInteger(year) || year < 100 || year > 9999) return false;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  );
+}
