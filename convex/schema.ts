@@ -624,6 +624,7 @@ export default defineSchema({
     status: transactionalEmailJobStatusValidator,
     providerMessageId: v.optional(v.string()),
     lastProviderEventAt: v.optional(v.number()),
+    lastVerifiedProviderEventAt: v.optional(v.number()),
     attemptCount: v.number(),
     maxAttempts: v.number(),
     nextRetryAt: v.optional(v.number()),

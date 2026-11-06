@@ -4,20 +4,17 @@ import {
   type EmailSuppressionReason,
   type EmailWebhookEventType,
 } from "../../email/model";
-import {
-  extractResendEventFields,
-  isStaleWebhookEvent,
-  type ResendWebhookPayloadData,
-} from "../../domain/email/rules";
+import { extractResendEventFields, type ResendWebhookPayloadData } from "../../domain/email/rules";
 import type { ResendEventRunner } from "../../domain/email/runner";
 import type { EmailWebhookEventStore } from "../../domain/email/store";
-import { resolveStatusAndSuppression } from "../../domain/email/webhook";
+import { resolveStatusAndSuppression, shouldApplyWebhookStatus } from "../../domain/email/webhook";
 
 export type ProcessResendEventArgs = {
   svixId: string;
   provider: string;
   eventType: EmailWebhookEventType;
   payloadJson: string;
+  eventCreatedAt?: number;
   processedAt: number;
 };
 
@@ -42,11 +39,16 @@ export async function processResendEvent(
   }
 
   const typedData = data as ResendWebhookPayloadData;
-  const { providerMessageId, recipientEmail, eventCreatedAt } = extractResendEventFields(typedData);
+  const { providerMessageId, recipientEmail } = extractResendEventFields(typedData);
+  const eventCreatedAt = args.eventCreatedAt;
 
   const duplicate = await deps.runner.findEventBySvixId(args.svixId);
   if (duplicate) {
     return;
+  }
+
+  if (eventCreatedAt === undefined || !Number.isFinite(eventCreatedAt)) {
+    throw new ConvexError("Invalid webhook event timestamp");
   }
 
   let statusUpdate:
@@ -84,18 +86,22 @@ export async function processResendEvent(
     return;
   }
 
-  const latestEvent = await deps.runner.findLatestEventForProviderMessageId(providerMessageId);
-
-  if (isStaleWebhookEvent(latestEvent?.eventCreatedAt, eventCreatedAt)) {
-    return;
+  const watermark = job.lastVerifiedProviderEventAt;
+  const isLegacyState = watermark === undefined && job.lastProviderEventAt !== undefined;
+  if (
+    !isLegacyState &&
+    eventCreatedAt !== undefined &&
+    Number.isFinite(eventCreatedAt) &&
+    shouldApplyWebhookStatus(job.status, statusUpdate, watermark, eventCreatedAt)
+  ) {
+    await deps.runner.updateJobStatusFromWebhook({
+      jobId: job.id,
+      status: statusUpdate,
+      lastProviderEventAt: eventCreatedAt,
+      lastVerifiedProviderEventAt: eventCreatedAt,
+      updatedAt: now,
+    });
   }
-
-  await deps.runner.updateJobStatusFromWebhook({
-    jobId: job.id,
-    status: statusUpdate,
-    lastProviderEventAt: eventCreatedAt ?? now,
-    updatedAt: now,
-  });
 
   if (suppressionReason && recipientEmail) {
     await deps.runner.upsertSuppression({

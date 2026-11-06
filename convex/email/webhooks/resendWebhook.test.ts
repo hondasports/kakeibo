@@ -81,6 +81,7 @@ describe("createResendWebhookHandler", () => {
       () =>
         asAny({
           type: "email.delivered",
+          created_at: "2026-07-10T12:00:00Z",
           data: {},
         }) as WebhookEventPayload,
     );
@@ -104,7 +105,7 @@ describe("createResendWebhookHandler", () => {
       () =>
         asAny({
           type: "email.delivered",
-          created_at: "2026-07-10T12:00:00Z",
+          created_at: "2026-07-10T12:05:00Z",
           data: {
             email_id: "msg-1",
             created_at: "2026-07-10T12:00:00Z",
@@ -134,6 +135,7 @@ describe("createResendWebhookHandler", () => {
         svixId: "id-1",
         provider: "resend",
         eventType: "email.delivered",
+        eventCreatedAt: Date.parse("2026-07-10T12:05:00Z"),
       }),
     );
   });
@@ -143,6 +145,7 @@ describe("createResendWebhookHandler", () => {
       () =>
         asAny({
           type: "email.delivered",
+          created_at: "2026-07-10T12:00:00Z",
           data: {},
         }) as WebhookEventPayload,
     );
@@ -191,6 +194,17 @@ describe("createResendWebhookHandler", () => {
     expect(ctx.runMutation).not.toHaveBeenCalled();
   });
 
+  it.each([undefined, "invalid"])("rejects an invalid event timestamp: %s", async (created_at) => {
+    const handler = createResendWebhookHandler(() =>
+      asAny({ type: "email.delivered", created_at, data: {} }),
+    );
+    const ctx = createActionCtx();
+    const req = createRequest({ body: "{}", headers: { "svix-id": "id-1" } });
+    const response = (await asAny(handler)(ctx, req as any)) as MockResponse;
+    expect(response.status).toBe(400);
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+  });
+
   it("returns 413 for oversize bodies before verification or processing", async () => {
     const verifier = vi.fn();
     const handler = createResendWebhookHandler(verifier);
@@ -223,7 +237,12 @@ describe("createResendWebhookHandler", () => {
   it("verifies the exact raw body for payloads at the size limit", async () => {
     const body = "x".repeat(MAX_RESEND_WEBHOOK_BODY_BYTES);
     const verifier = vi.fn(
-      () => asAny({ type: "email.delivered", data: {} }) as WebhookEventPayload,
+      () =>
+        asAny({
+          type: "email.delivered",
+          created_at: "2026-07-10T12:00:00Z",
+          data: {},
+        }) as WebhookEventPayload,
     );
     const handler = createResendWebhookHandler(verifier);
     const req = createRequest({

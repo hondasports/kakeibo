@@ -89,6 +89,9 @@ export function createResendEventRunner(
         jobId: args.jobId as Id<"transactionalEmailJobs">,
         status: args.status,
         lastProviderEventAt: args.lastProviderEventAt,
+        ...(args.lastVerifiedProviderEventAt === undefined
+          ? {}
+          : { lastVerifiedProviderEventAt: args.lastVerifiedProviderEventAt }),
         updatedAt: args.updatedAt,
       });
     },

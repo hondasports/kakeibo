@@ -80,6 +80,7 @@ export const updateJobStatusFromWebhook = internalMutation({
       v.literal("failed"),
     ),
     lastProviderEventAt: v.number(),
+    lastVerifiedProviderEventAt: v.optional(v.number()),
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {

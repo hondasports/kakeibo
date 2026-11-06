@@ -51,6 +51,7 @@ export type UpdateJobStatusFromWebhookFields = {
   jobId: string;
   status: TerminalEmailJobStatus;
   lastProviderEventAt: number;
+  lastVerifiedProviderEventAt?: number;
   updatedAt: number;
 };
 

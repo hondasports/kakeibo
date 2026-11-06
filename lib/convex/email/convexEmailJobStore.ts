@@ -45,6 +45,9 @@ export function toEmailJobRecord(doc: Doc<"transactionalEmailJobs">): Transactio
     ...(doc.lastProviderEventAt === undefined
       ? {}
       : { lastProviderEventAt: doc.lastProviderEventAt }),
+    ...(doc.lastVerifiedProviderEventAt === undefined
+      ? {}
+      : { lastVerifiedProviderEventAt: doc.lastVerifiedProviderEventAt }),
     attemptCount: doc.attemptCount,
     maxAttempts: doc.maxAttempts,
     ...(doc.nextRetryAt === undefined ? {} : { nextRetryAt: doc.nextRetryAt }),
@@ -137,6 +140,9 @@ export function createEmailJobStore(ctx: Pick<MutationCtx, "db">): Transactional
       await ctx.db.patch(args.jobId as Id<"transactionalEmailJobs">, {
         status: args.status,
         lastProviderEventAt: args.lastProviderEventAt,
+        ...(args.lastVerifiedProviderEventAt === undefined
+          ? {}
+          : { lastVerifiedProviderEventAt: args.lastVerifiedProviderEventAt }),
         updatedAt: args.updatedAt,
       });
     },

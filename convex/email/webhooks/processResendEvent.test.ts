@@ -108,6 +108,7 @@ describe("processResendEventHandler", () => {
       provider: "resend",
       eventType: "email.delivered",
       payloadJson: JSON.stringify(payload),
+      eventCreatedAt: Date.parse("2026-07-10T12:00:00Z"),
       processedAt: 1000,
     });
 
@@ -136,8 +137,7 @@ describe("processResendEventHandler", () => {
 
   it("does not update job when a newer event has already been processed", async () => {
     const ctx = createMutationCtx({
-      job: { _id: "job-1" },
-      latestEvent: { eventCreatedAt: Date.parse("2026-07-10T13:00:00Z") },
+      job: { _id: "job-1", lastVerifiedProviderEventAt: Date.parse("2026-07-10T13:00:00Z") },
     });
 
     const payload = {
@@ -151,6 +151,7 @@ describe("processResendEventHandler", () => {
       provider: "resend",
       eventType: "email.delivered",
       payloadJson: JSON.stringify(payload),
+      eventCreatedAt: Date.parse("2026-07-10T12:00:00Z"),
       processedAt: 1000,
     });
 

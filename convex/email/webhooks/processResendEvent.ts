@@ -13,6 +13,7 @@ export async function processResendEventHandler(
     provider: string;
     eventType: EmailWebhookEventType;
     payloadJson: string;
+    eventCreatedAt?: number;
     processedAt: number;
   },
 ): Promise<void> {
@@ -25,6 +26,7 @@ export const processResendEvent = internalMutation({
     provider: v.string(),
     eventType: emailWebhookEventTypeValidator,
     payloadJson: v.string(),
+    eventCreatedAt: v.optional(v.number()),
     processedAt: v.number(),
   },
   handler: processResendEventHandler,

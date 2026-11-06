@@ -54,6 +54,7 @@ export interface ResendEventSubmitter {
     provider: string;
     eventType: string;
     payloadJson: string;
+    eventCreatedAt?: number;
     processedAt: number;
   }): Promise<void>;
 }
