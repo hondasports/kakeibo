@@ -20,6 +20,7 @@ export function invitationDocToFields(doc: Doc<"groupInvitations">): GroupInvita
     status: doc.status,
     invitedByUserId: doc.invitedByUserId,
     clerkInvitationId: doc.clerkInvitationId,
+    deliveryPending: doc.deliveryPending,
     acceptedByUserId: doc.acceptedByUserId,
     acceptedAt: doc.acceptedAt,
     createdAt: doc.createdAt,

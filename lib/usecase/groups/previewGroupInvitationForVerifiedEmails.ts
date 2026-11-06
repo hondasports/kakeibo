@@ -22,7 +22,7 @@ export async function requireGroupInvitationForVerifiedEmails(
   args: InvitationRecipient,
 ) {
   const invite = await deps.invitations.findByToken(args.token);
-  if (invite === null || invite.status !== "pending") {
+  if (invite === null || invite.status !== "pending" || invite.deliveryPending === true) {
     throw new ConvexError("招待が見つかりません");
   }
   if (!invitationEmailsMatchAny(args.acceptedEmails, invite.email)) {
