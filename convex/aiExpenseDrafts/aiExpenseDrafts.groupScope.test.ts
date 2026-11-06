@@ -297,7 +297,7 @@ describe("receipt 画像解析の group pin", () => {
   it("finalize は job と異なる group の draft を拒否して job を failed にする", async () => {
     const t = convexTest(schema, convexTestModules);
     const { groupAId, groupBId } = await seedTwoGroups(t, { activeGroup: "a" });
-    const { jobId, misplacedDraftId } = await t.run(async (ctx) => {
+    const { jobId, misplacedDraftId, controlDraftId } = await t.run(async (ctx) => {
       const batchId = await ctx.db.insert("receiptAnalysisBatches", {
         groupId: groupAId,
         createdByUserId: USER_ID,
@@ -328,7 +328,18 @@ describe("receipt 画像解析の group pin", () => {
         createdAt: 1,
         updatedAt: 1,
       });
-      return { jobId, misplacedDraftId: draftId };
+      const controlDraftId = await ctx.db.insert("aiExpenseDrafts", {
+        groupId: groupAId,
+        createdByUserId: USER_ID,
+        sourceType: "image_upload",
+        status: "ready",
+        documentType: "receipt",
+        confidence: {},
+        reviewReasons: [],
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      return { jobId, misplacedDraftId: draftId, controlDraftId };
     });
 
     const result = await t.mutation(internal.receiptAnalysisJobs.internal.finalizeAnalysisAttempt, {
@@ -343,7 +354,7 @@ describe("receipt 画像解析の group pin", () => {
     const job = await t.run(async (ctx) => ctx.db.get(jobId));
     expect(job).toMatchObject({ status: "failed" });
     expect(job?.draftId).toBeUndefined();
-    // 誤って別 group に保存された draft は残さず削除する
-    expect(await listDrafts(t)).toHaveLength(0);
+    const remainingDrafts = await listDrafts(t);
+    expect(remainingDrafts.map((draft) => draft._id)).toEqual([controlDraftId]);
   });
 });
