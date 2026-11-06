@@ -292,7 +292,7 @@ LINEからの家計データ登録・更新・削除は「実装済み」とは�
 | POST | `/webhooks/resend` | Resend webhook |
 | POST | `/webhooks/line` | LINE Messaging API webhook |
 
-E2E専用HTTPエンドポイントはデプロイ時の環境変数に依存せず常時登録される。各handlerが `APP_ENV=development`、secret、固定E2Eユーザーを実行時に検証し、それ以外ではfail-closedする。詳細は `docs/environment-variables.md` を参照する。
+E2E専用HTTPエンドポイントはデプロイ時の環境変数に依存せず常時登録される。各handlerは `APP_ENV=development` とsecretを実行時に検証する。seed・cleanup等は固定E2Eユーザーも検証するが、`/e2e/purge-orphans` はユーザーIDを要求せずdeployment全体の孤児・終端運用データを対象にする。対象範囲とcron経路は `docs/environment-variables.md` を参照する。
 
 ## 10. 現行コードで未実装・将来扱いの主な項目
 
