@@ -77,7 +77,7 @@
 | 家計データの閲覧・入力 | 可 | 可 | 既存 | 管理権限とは独立 |
 | オーナー権限譲渡 | 可（`member` へ） | 不可 | Phase2（#222 実装済み） | 譲渡元は `member` に降格。`changeMemberRole` とは別 mutation。`group_ownership_received` / `group_ownership_transferred` メール通知を送信 |
 | ロール変更 | 可（自グループ・他メンバー） | 不可 | Phase2（#223 実装済み） | 自分自身は不可。最後の owner 降格不可。`group_role_changed` メール通知を送信 |
-| グループ削除 | 可（`owner` のみ） | 不可 | Phase2（#224 実装済み） | 物理削除。家計データ・所属・招待を削除。Clerk / `users` は削除しない。`group_deleted` メール通知をメンバー全員へ送信 |
+| グループ削除 | 可（`owner` のみ） | 不可 | Phase2（#224 実装済み） | 物理削除ジョブ。家計データ・所属・招待・グループ管理操作ログを削除し、Clerk / `users` は残す。通知対象メンバーには開始・完了メールを enqueue（メール未保持時は送信しない） |
 | Clerk ユーザー削除（セルフサービス退会） | 不可 | 不可 | group admin からは削除不可。`#480` で `/settings/account/delete` として実装済み | ユーザー本人のみ |
 | アプリ全体管理者操作 | 不可 | 不可 | 実装済み（#227 システム管理者 `/admin`） | |
 
@@ -141,17 +141,17 @@ group admin から他ユーザーの Clerk アカウントを削除する機能�
 
 ### 6.2 グループ削除（#224 実装済み）
 
-`deleteGroup` mutation と危険な操作 UI で提供する。グループと紐づく Convex データを物理削除する。
+`requestGroupDeletion` mutation と危険な操作 UI で提供する。グループと紐づく Convex データをバックグラウンドジョブで物理削除する。
 
 | ルール | 内容 |
 | --- | --- |
 | 実行権限 | `owner` のみ（`requireGroupOwner`） |
-| 削除方式 | 削除リクエストを受け付けると `groupDeletionJobs` を作成し、バックグラウンド worker が順次物理削除する。対象テーブル: `groups`, `groupMembers`, `groupInvitations`, `expenseEntries`, `receipts`, `categories`, `sourceDocuments`（添付画像ストレージ含む）, `weekSessions`, `aiExpenseDrafts`, `aiExpenseDraftItems`, `receiptAnalysisBatches`, `receiptAnalysisImageJobs` |
-| 削除しない | `users`, Clerk アカウント, `managementAuditLogs`（監査証跡として保持） |
-| activeGroupId | 削除対象を active にしていた全メンバーへ、別の所属グループまたは `null` を設定 |
-| 監査ログ | 削除実行前に `group_deleted` を記録（`afterValue` に削除件数サマリ `affectedCounts` を含む） |
-| 通知 | 削除前に `groupMembers` 全員へ `group_deleted` のメール通知を送信する |
-|| ジョブ管理 | `groupDeletionJobs` が削除進行状況を、`groupDeletionNotificationRecipients` がメンバーへの通知状態を管理する |
+| 削除方式 | 削除リクエストを受け付けると `groupDeletionJobs` を作成し、バックグラウンド worker が順次物理削除する。対象テーブル: `groups`, `groupMembers`, `groupInvitations`, `expenseEntries`, `receipts`, `categories`, `sourceDocuments`（添付画像ストレージ含む）, `weekSessions`, `aiExpenseDrafts`, `aiExpenseDraftItems`, `receiptAnalysisBatches`, `receiptAnalysisImageJobs`, `managementAuditLogs` |
+| 削除しない | `users`, Clerk アカウント |
+| activeGroupId | 削除依頼者と、削除対象を active にしていたメンバーの `activeGroupId` を解除する。別グループの自動選択は行わない |
+| 監査ログ | 当該グループの `managementAuditLogs` は purge 対象で、削除件数はジョブへ記録する。現行の削除経路では `group_deleted` の監査ログを作成せず、同名の完了メールテンプレートを使う |
+| 通知 | 削除前にメンバーを通知先として snapshot し、開始メール `group_deletion_started` を enqueue。削除後に完了メール `group_deleted` を enqueue する（メール未保持時は送信しない） |
+| ジョブ管理 | `groupDeletionJobs` が削除進行状況を、`groupDeletionNotificationRecipients` がメンバーへの通知状態を管理する。通知処理完了後に受信者レコードは削除する |
 | 確認 UI | 対象グループ名、削除対象データの影響範囲（件数付き）、完全削除・復旧不可の警告、Clerk/ユーザー非削除の注記、確認用グループ名入力 |
 | 成功後遷移 | 他に所属グループがあれば `/group/select`、なければ `/group/setup` |
 
