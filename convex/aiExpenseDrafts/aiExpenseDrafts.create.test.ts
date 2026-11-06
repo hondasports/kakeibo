@@ -29,6 +29,7 @@ describe("aiExpenseDrafts (create)", () => {
     });
 
     const result = await createFromExtractionHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       documentType: "receipt",
       shopName: "スーパー青葉",
       date: "2026-06-01",
@@ -114,6 +115,7 @@ describe("aiExpenseDrafts (create)", () => {
     });
 
     await createFromExtractionHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       documentType: "receipt",
       shopName: "マルアイ",
       date: "2026-08-16",
@@ -174,6 +176,7 @@ describe("aiExpenseDrafts (create)", () => {
     };
 
     await createFromExtractionHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       documentType: "receipt",
       shopName: "AI再解析店舗",
       date: "2026-07-04",
@@ -207,6 +210,7 @@ describe("aiExpenseDrafts (create)", () => {
     });
 
     await createFromExtractionHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       documentType: "receipt",
       shopName: "TRIAL",
       date: "2026-07-03",
@@ -299,6 +303,7 @@ describe("aiExpenseDrafts (create)", () => {
     });
 
     await createFromExtractionHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       documentType: "receipt",
       shopName: "スーパー青葉",
       date: "2026-06-01",
@@ -346,6 +351,7 @@ describe("aiExpenseDrafts (create)", () => {
     });
 
     await createFromExtractionHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       documentType: "receipt",
       shopName: "ドラッグストアA",
       date: "2026-06-21",
@@ -437,6 +443,7 @@ describe("aiExpenseDrafts (create)", () => {
     });
 
     await createFailedDraftFromImageAnalysisHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       warning: "画像解析に失敗しました",
     });
 
@@ -459,6 +466,7 @@ describe("aiExpenseDrafts (create)", () => {
 
     await expect(
       createFromExtractionHandler(ctx, {
+        groupId: GROUP_ID as Id<"groups">,
         documentType: "receipt",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         categoryId: "category-missing" as any,
@@ -473,6 +481,7 @@ describe("aiExpenseDrafts (create)", () => {
 
     await expect(
       createFromExtractionHandler(ctx, {
+        groupId: GROUP_ID as Id<"groups">,
         documentType: "receipt",
         confidence: {},
         warnings: [],
@@ -485,6 +494,7 @@ describe("aiExpenseDrafts (create)", () => {
 
     await expect(
       createFailedDraftFromImageAnalysisHandler(ctx, {
+        groupId: GROUP_ID as Id<"groups">,
         warning: "解析に失敗しました",
       }),
     ).rejects.toMatchObject({ data: "AI expense draft was not found after creation" });
@@ -515,6 +525,7 @@ describe("aiExpenseDrafts (create)", () => {
 
     await expect(
       createFromExtractionHandler(ctx, {
+        groupId: GROUP_ID as Id<"groups">,
         documentType: "receipt",
         confidence: {},
         warnings: [],
@@ -587,6 +598,7 @@ describe("aiExpenseDrafts (create)", () => {
           hasAcceptedExternalApiConsent: true,
           acceptedAt: 1234567890,
         })
+        .mockResolvedValueOnce({ _id: GROUP_ID })
         .mockResolvedValueOnce([
           { _id: "cat-food", name: "食費", color: "#F4A27A", isActive: true, sortOrder: 1 },
         ]);

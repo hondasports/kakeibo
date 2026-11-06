@@ -3,14 +3,14 @@ import type { MutationCtx } from "../../../convex/_generated/server";
 import type { Id } from "../../../convex/_generated/dataModel";
 import {
   requireGroupMembership,
-  resolveActiveGroupForUserId,
+  requireGroupMembershipForGroup,
+  requireGroupMembershipForUserInGroup,
 } from "../../../convex/groups/membership";
 import { deleteDraftAndItems } from "./draftRepository";
 import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
 import {
-  ACTIVE_GROUP_REQUIRED_MESSAGE,
   buildExtractedDraftFields,
   buildExtractedDraftItemFields,
   buildFailedDraftFields,
@@ -21,9 +21,12 @@ import {
   type ExtractedDraftItemInput,
 } from "../../domain/aiExpenseDrafts/createFromExtraction";
 
-export type CreateFromExtractionArgs = ExtractedDraftInput<Id<"categories">>;
+export type CreateFromExtractionArgs = ExtractedDraftInput<Id<"categories">> & {
+  groupId: Id<"groups">;
+};
 
 export type CreateFailedDraftFromImageAnalysisArgs = {
+  groupId: Id<"groups">;
   warning: string;
   imageFileName?: string;
 };
@@ -117,47 +120,40 @@ export async function persistFailedDraft(
   return draft;
 }
 
-async function requireResolvedActorForUser(
-  ctx: MutationCtx,
-  userId: string,
-): Promise<ResolvedActor> {
-  const resolved = await resolveActiveGroupForUserId(ctx, userId);
-  if (resolved.status !== "resolved") {
-    throw new ConvexError(ACTIVE_GROUP_REQUIRED_MESSAGE);
-  }
-  return { userId, groupId: resolved.membership.groupId };
-}
-
 export async function createFromExtractionHandler(
   ctx: MutationCtx,
   args: CreateFromExtractionArgs,
 ) {
-  const { groupId, userId } = await requireGroupMembership(ctx);
-  return persistExtractedDraft(ctx, { userId, groupId }, args);
+  const membership = await requireGroupMembershipForGroup(ctx, args.groupId);
+  return persistExtractedDraft(
+    ctx,
+    { userId: membership.userId, groupId: membership.groupId },
+    args,
+  );
 }
 
 export async function createFromExtractionForUserHandler(
   ctx: MutationCtx,
   args: CreateFromExtractionForUserArgs,
 ) {
-  const actor = await requireResolvedActorForUser(ctx, args.userId);
-  return persistExtractedDraft(ctx, actor, args);
+  const membership = await requireGroupMembershipForUserInGroup(ctx, args.userId, args.groupId);
+  return persistExtractedDraft(ctx, { userId: args.userId, groupId: membership.groupId }, args);
 }
 
 export async function createFailedDraftFromImageAnalysisHandler(
   ctx: MutationCtx,
   args: CreateFailedDraftFromImageAnalysisArgs,
 ) {
-  const { groupId, userId } = await requireGroupMembership(ctx);
-  return persistFailedDraft(ctx, { userId, groupId }, args);
+  const membership = await requireGroupMembershipForGroup(ctx, args.groupId);
+  return persistFailedDraft(ctx, { userId: membership.userId, groupId: membership.groupId }, args);
 }
 
 export async function createFailedDraftFromImageAnalysisForUserHandler(
   ctx: MutationCtx,
   args: CreateFailedDraftFromImageAnalysisForUserArgs,
 ) {
-  const actor = await requireResolvedActorForUser(ctx, args.userId);
-  return persistFailedDraft(ctx, actor, args);
+  const membership = await requireGroupMembershipForUserInGroup(ctx, args.userId, args.groupId);
+  return persistFailedDraft(ctx, { userId: args.userId, groupId: membership.groupId }, args);
 }
 
 export async function deleteOrphanedDraftHandler(

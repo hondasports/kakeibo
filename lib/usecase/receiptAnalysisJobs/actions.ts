@@ -26,6 +26,7 @@ export async function analyzeReceiptImageJob(
   let jobFailed = false;
   try {
     draft = await runner.analyzeImage({
+      groupId: job.groupId,
       imageDataUrl: args.imageDataUrl,
       imageFileName: job.fileName,
       telemetryId: args.jobId,
@@ -34,7 +35,7 @@ export async function analyzeReceiptImageJob(
     if (draft.status === "failed") jobFailed = true;
   } catch (error) {
     jobFailed = true;
-    draft = await runner.createFailureDraft(args.jobId, job.fileName, error);
+    draft = await runner.createFailureDraft(args.jobId, job.fileName, error, job.groupId);
   }
   const finalization = await runner.finalizeAttempt({
     jobId: args.jobId,

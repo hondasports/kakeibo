@@ -223,7 +223,14 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
     },
     async getDraft(id) {
       const doc = await ctx.db.get(id as Id<"aiExpenseDrafts">);
-      return doc === null ? null : { id: doc._id, status: doc.status, updatedAt: doc.updatedAt };
+      return doc === null
+        ? null
+        : {
+            id: doc._id,
+            groupId: doc.groupId,
+            status: doc.status,
+            updatedAt: doc.updatedAt,
+          };
     },
     async insertFailedAnalysisDraft({ groupId, createdByUserId, imageFileName, warning }) {
       const draft = await persistFailedDraft(
@@ -234,7 +241,11 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
           userId: createdByUserId ?? "",
           groupId: groupId as Id<"groups">,
         },
-        { warning, imageFileName },
+        {
+          groupId: groupId as Id<"groups">,
+          warning,
+          imageFileName,
+        },
       );
       return draft._id;
     },

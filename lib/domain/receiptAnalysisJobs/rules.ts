@@ -28,6 +28,8 @@ export const MAX_RECEIPT_ANALYSIS_BATCH_FILES = 10;
 export const RECEIPT_ANALYSIS_STALE_JOB_MS = 45 * 60 * 1000;
 export const RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE = 100;
 export const RECEIPT_ANALYSIS_STALE_JOB_ERROR = "解析が完了しませんでした。もう一度お試しください";
+export const RECEIPT_ANALYSIS_GROUP_SCOPE_ERROR =
+  "解析結果を保存できませんでした。もう一度お試しください";
 
 export function canRetryReceiptAnalysisJob(status: ReceiptAnalysisJobStatus): boolean {
   return status === "failed" || status === "needs_review";

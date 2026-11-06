@@ -269,6 +269,7 @@ describe("aiExpenseDrafts (queries)", () => {
           hasAcceptedExternalApiConsent: true,
           acceptedAt: 1234567890,
         })
+        .mockResolvedValueOnce({ _id: GROUP_ID })
         .mockResolvedValueOnce([
           { _id: "cat-daily", name: "日用品", color: "#A6B28B", isActive: true, sortOrder: 2 },
         ]);
@@ -299,6 +300,7 @@ describe("aiExpenseDrafts (queries)", () => {
           hasAcceptedExternalApiConsent: true,
           acceptedAt: 1234567890,
         })
+        .mockResolvedValueOnce({ _id: GROUP_ID })
         .mockResolvedValueOnce([
           { _id: "cat-food", name: "食費", color: "#F4A27A", isActive: true, sortOrder: 1 },
           { _id: "cat-tax", name: "税金", color: "#AAB7C4", isActive: true, sortOrder: 9 },
@@ -329,6 +331,7 @@ describe("aiExpenseDrafts (queries)", () => {
         hasAcceptedExternalApiConsent: true,
         acceptedAt: 1234567890,
       })
+      .mockResolvedValueOnce({ _id: GROUP_ID })
       .mockResolvedValueOnce([
         { _id: "cat-food", name: "食費", color: "#F4A27A", isActive: true, sortOrder: 1 },
         { _id: "cat-medical", name: "医療費", color: "#C8D9A2", isActive: true, sortOrder: 2 },

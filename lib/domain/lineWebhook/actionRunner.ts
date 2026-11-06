@@ -48,6 +48,7 @@ export type LineImageDraftResult = { status: string; draftId: string };
 export interface LineImageDraftRunner {
   createDraftFromImage(input: {
     userId: string;
+    groupId: string;
     imageDataUrl: string;
     categories: LineCategoryHint[];
   }): Promise<LineImageDraftResult>;
