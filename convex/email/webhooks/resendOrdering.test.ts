@@ -5,6 +5,7 @@ import { createHmac } from "node:crypto";
 import { convexTest } from "convex-test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import schema from "../../schema";
+import { internal } from "../../_generated/api";
 import { convexTestModules } from "../../test.setup";
 
 const signingKey = Buffer.from("test-key-only-test-key-only-test");
@@ -60,11 +61,14 @@ async function setup(legacy = false) {
       events: await ctx.db.query("emailWebhookEvents").collect(),
       suppressions: await ctx.db.query("emailSuppressions").collect(),
     }));
-  return { send, read };
+  return { t, send, read };
 }
 
 describe("署名済みResend webhookの順序", () => {
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
   it("配信完了後の古い送信通知で状態を戻さず重複を保存しない", async () => {
     const { send, read } = await setup();
     const delivered = "2026-01-01T00:05:00Z";
@@ -110,7 +114,23 @@ describe("署名済みResend webhookの順序", () => {
     const result = await read();
     expect(result.job).toMatchObject({ status: "delivered", lastProviderEventAt: 100 });
     expect(result.job?.lastVerifiedProviderEventAt).toBeUndefined();
+    expect(result.job!.updatedAt).toBeGreaterThan(1);
     expect(result.events).toHaveLength(2);
+    expect(result.suppressions).toEqual([expect.objectContaining({ reason: "bounce" })]);
+  });
+  it("旧形式への通知後も保持期間を維持し、cleanup後のbounceで配信停止を登録する", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-01T00:00:00Z"));
+    const { t, send, read } = await setup(true);
+    expect((await send("legacy-delivered", "email.delivered", "2026-01-31T00:00:00Z")).status).toBe(
+      200,
+    );
+    vi.setSystemTime(new Date("2026-02-02T00:00:00Z"));
+    await t.mutation(internal.email.cleanup.cleanupOldEmailRecords, {});
+    expect((await read()).job).toMatchObject({ status: "delivered", lastProviderEventAt: 100 });
+    expect((await send("legacy-bounce", "email.bounced", "2026-02-01T00:01:00Z")).status).toBe(200);
+    const result = await read();
+    expect(result.job).toMatchObject({ status: "delivered", lastProviderEventAt: 100 });
     expect(result.suppressions).toEqual([expect.objectContaining({ reason: "bounce" })]);
   });
 });

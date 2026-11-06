@@ -88,6 +88,15 @@ export const updateJobStatusFromWebhook = internalMutation({
   },
 });
 
+export const refreshLegacyJobRetention = internalMutation({
+  args: { jobId: v.id("transactionalEmailJobs"), updatedAt: v.number() },
+  handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.jobId);
+    if (job === null) return;
+    await ctx.db.patch(args.jobId, { updatedAt: Math.max(job.updatedAt, args.updatedAt) });
+  },
+});
+
 export const getLatestWebhookEventForProviderMessageId = internalQuery({
   args: { providerMessageId: v.string() },
   handler: async (ctx, { providerMessageId }) => {

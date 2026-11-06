@@ -88,6 +88,9 @@ export async function processResendEvent(
 
   const watermark = job.lastVerifiedProviderEventAt;
   const isLegacyState = watermark === undefined && job.lastProviderEventAt !== undefined;
+  if (isLegacyState) {
+    await deps.runner.refreshLegacyJobRetention(job.id, now);
+  }
   if (
     !isLegacyState &&
     eventCreatedAt !== undefined &&

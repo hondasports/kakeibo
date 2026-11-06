@@ -16,6 +16,7 @@ function createDeps({
     findJobByProviderMessageId: vi.fn().mockResolvedValue(job),
     findLatestEventForProviderMessageId: vi.fn().mockResolvedValue(latestEvent),
     updateJobStatusFromWebhook: vi.fn().mockResolvedValue(undefined),
+    refreshLegacyJobRetention: vi.fn().mockResolvedValue(undefined),
     upsertSuppression: vi.fn().mockResolvedValue("sup-1"),
   };
   const events = { insertEvent: vi.fn().mockResolvedValue("event-1") };

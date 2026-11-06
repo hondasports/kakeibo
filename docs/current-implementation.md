@@ -292,6 +292,8 @@ LINEからの家計データ登録・更新・削除は「実装済み」とは�
 | POST | `/webhooks/resend` | Resend webhook |
 | POST | `/webhooks/line` | LINE Messaging API webhook |
 
+Resend webhookは署名検証済みpayload最上位の発生時刻を使い、通知の順序を判定する。旧形式でWebhook状態更新済みのメールは過去の正確な発生時刻を復元できないため、状態を保留する。対象jobが存在する間はイベント記録と配信停止を続け、通知を受けた旧jobの保持期限を延長する。保留は自動解除されず、同じイベントの再送でも解除されない。終端メールjobは最終更新から30日、イベントは処理時刻から30日でそれぞれ削除対象となる。job削除後に届いた通知はイベントとして記録するが、既存仕様では配信停止には反映されない。旧データを正確に自動復旧する機能はない。将来の個別復旧では、[Resend Webhook API](https://resend.com/changelog/headless-webhook-api) の保持期間内に対象Webhookのイベントpayloadを取得・照合する方法が候補となる。ただし履歴の網羅性や未着イベントを確認できない場合は保留を維持する。同じIDのWebhook再送では重複排除され、保留は解除されない。復旧機能は未実装であり、実データの調査・本番変更は対象と操作の明示承認が必要。
+
 E2E専用HTTPエンドポイントはデプロイ時の環境変数に依存せず常時登録される。各handlerは `APP_ENV=development` とsecretを実行時に検証する。seed・cleanup等は固定E2Eユーザーも検証するが、`/e2e/purge-orphans` はユーザーIDを要求せずdeployment全体の孤児・終端運用データを対象にする。対象範囲とcron経路は `docs/environment-variables.md` を参照する。
 
 ## 10. 現行コードで未実装・将来扱いの主な項目
