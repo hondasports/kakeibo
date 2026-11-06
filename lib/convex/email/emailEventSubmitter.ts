@@ -13,6 +13,7 @@ export function createResendEventSubmitter(
         provider: args.provider,
         eventType: args.eventType as EmailWebhookEventType,
         payloadJson: args.payloadJson,
+        ...(args.eventCreatedAt === undefined ? {} : { eventCreatedAt: args.eventCreatedAt }),
         processedAt: args.processedAt,
       });
     },

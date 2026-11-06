@@ -21,6 +21,7 @@ export type TransactionalEmailJobRecord = {
   status: TransactionalEmailJobStatus;
   providerMessageId?: string;
   lastProviderEventAt?: number;
+  lastVerifiedProviderEventAt?: number;
   attemptCount: number;
   maxAttempts: number;
   nextRetryAt?: number;

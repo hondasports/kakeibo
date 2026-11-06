@@ -101,7 +101,6 @@ export function planSendFailure(
 export type ResendWebhookPayloadFields = {
   providerMessageId?: string;
   recipientEmail?: string;
-  eventCreatedAt?: number;
 };
 
 export type ResendWebhookPayloadData = {
@@ -119,27 +118,10 @@ export type ResendWebhookPayloadData = {
 export function extractResendEventFields(
   data: ResendWebhookPayloadData,
 ): ResendWebhookPayloadFields {
-  let eventCreatedAt: number | undefined;
-  if (data.created_at) {
-    const parsed = Date.parse(data.created_at);
-    eventCreatedAt = Number.isNaN(parsed) ? undefined : parsed;
-  }
   return {
     providerMessageId: data.email_id,
     recipientEmail: data.to?.[0],
-    eventCreatedAt,
   };
-}
-
-export function isStaleWebhookEvent(
-  latestEventCreatedAt: number | undefined,
-  eventCreatedAt: number | undefined,
-): boolean {
-  return (
-    latestEventCreatedAt !== undefined &&
-    eventCreatedAt !== undefined &&
-    latestEventCreatedAt > eventCreatedAt
-  );
 }
 
 export const RESEND_WEBHOOK_EVENT_TYPES: readonly EmailWebhookEventType[] = [

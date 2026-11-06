@@ -5,7 +5,6 @@ import {
   emailCleanupCutoff,
   extractResendEventFields,
   isResendWebhookEventType,
-  isStaleWebhookEvent,
   isTerminalEmailJobStatus,
   planSendFailure,
   shouldContinueEmailCleanup,
@@ -109,7 +108,7 @@ describe("planSendFailure", () => {
 });
 
 describe("extractResendEventFields", () => {
-  it("extracts providerMessageId, first recipient, and parsed created_at", () => {
+  it("extracts providerMessageId and first recipient without treating email creation as event time", () => {
     expect(
       extractResendEventFields({
         email_id: "msg-1",
@@ -119,22 +118,7 @@ describe("extractResendEventFields", () => {
     ).toEqual({
       providerMessageId: "msg-1",
       recipientEmail: "a@example.com",
-      eventCreatedAt: Date.parse("2026-07-10T12:00:00Z"),
     });
-  });
-
-  it("returns undefined eventCreatedAt for unparseable timestamps", () => {
-    expect(extractResendEventFields({ created_at: "not-a-date" }).eventCreatedAt).toBeUndefined();
-  });
-});
-
-describe("isStaleWebhookEvent", () => {
-  it("is stale only when the latest event is newer and both timestamps exist", () => {
-    expect(isStaleWebhookEvent(2000, 1000)).toBe(true);
-    expect(isStaleWebhookEvent(1000, 2000)).toBe(false);
-    expect(isStaleWebhookEvent(undefined, 1000)).toBe(false);
-    expect(isStaleWebhookEvent(2000, undefined)).toBe(false);
-    expect(isStaleWebhookEvent(1000, 1000)).toBe(false);
   });
 });
 

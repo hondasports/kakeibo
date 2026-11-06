@@ -45,11 +45,17 @@ export function createResendWebhookHandler(
       return new Response("ok", { status: 200 });
     }
 
+    const eventCreatedAt =
+      typeof event.created_at === "string" ? Date.parse(event.created_at) : NaN;
+    if (!Number.isFinite(eventCreatedAt))
+      return new Response("Invalid event timestamp", { status: 400 });
+
     await createResendEventSubmitter(ctx).submit({
       svixId: id,
       provider: "resend",
       eventType: event.type,
       payloadJson: JSON.stringify(event.data),
+      eventCreatedAt,
       processedAt,
     });
 

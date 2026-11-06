@@ -42,6 +42,7 @@ export interface ResendEventRunner {
     providerMessageId: string,
   ): Promise<EmailWebhookEventRecord | null>;
   updateJobStatusFromWebhook(fields: UpdateJobStatusFromWebhookFields): Promise<void>;
+  refreshLegacyJobRetention(jobId: string, updatedAt: number): Promise<void>;
   upsertSuppression(args: UpsertEmailSuppressionArgs): Promise<string>;
 }
 
@@ -54,6 +55,7 @@ export interface ResendEventSubmitter {
     provider: string;
     eventType: string;
     payloadJson: string;
+    eventCreatedAt?: number;
     processedAt: number;
   }): Promise<void>;
 }
