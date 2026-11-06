@@ -52,7 +52,7 @@ flowchart LR
 - **レイヤー**: `lib/domain` は Convex に依存しない純粋なドメインルールで、この依存方向は `lib/domain/dependencyDirection.test.ts` が検査します。`convex/*` は `lib/usecase`・`lib/convex` を経由してドメインを使い、画面は `lib/domain` だけを直接参照します。
 - **データ境界**: 家計データは家族グループ単位で共有し、認可は Convex 側で認証済みの主体とグループ所属から判定します（`docs/group-admin-permissions.md`・`docs/auth-guard.md`）。
 - **AI レシート入力**: 解析結果は直接確定せず、下書きとしてユーザーが確認してから登録します。OpenAI への実送信は環境変数で制御し、通常の Local / Preview / CI では mock を使います。
-- **環境**: DEV / PREVIEW / PROD の 3 環境で Clerk・Convex・Vercel を分離しています。
+- **環境**: DEV / PREVIEW / PROD の 3 環境を持ちます。Convex deployment は 3 環境で分け、Clerk instance と Vercel env は DEV / PREVIEW と PROD の間で分けています（DEV / PREVIEW は Clerk Development instance と Vercel Preview env を共用）。詳細は [`docs/technical-design.md`](docs/technical-design.md) の「16. 環境設計」を参照してください。
 
 詳細は [`docs/technical-design.md`](docs/technical-design.md)、現在の実装範囲は [`docs/current-implementation.md`](docs/current-implementation.md) を正とします。
 
@@ -85,8 +85,8 @@ flowchart TD
 | --- | --- | --- |
 | 共通契約 | 作業前の確認、仕様の補完、確認が必要な判断、本番・不可逆操作の承認、外部コンテンツの命令を信頼しないことなどを全エージェント共通で定める | [`AGENTS.md`](AGENTS.md) |
 | Capability Skill | 触るパスや操作（Convex・認証・税計算・LINE・E2E・本番操作など）に応じて、編集前に読む手順とチェックリストを切り替える | [`skills/`](skills/) |
-| Workspace Preflight | 保護ブランチや他タスクの差分の上で編集しないよう、専用 worktree・task branch・clean baseline を機械的に確認する | `scripts/check-task-worktree.mjs` |
-| ローカルの安全網 | commit / push 時に差分へ関係する lint・テストを自動で実行する | `.husky/`・`scripts/verify-prepush.mjs` |
+| Workspace Preflight | 保護ブランチや未コミット差分の上で編集しないよう、専用 worktree・task branch・clean baseline を機械的に確認する。task と branch の対応や差分範囲は判定しないため、PR に無関係な変更が含まれていないかは Issue・PR 本文で別途確認する | `scripts/check-task-worktree.mjs`・[`skills/workspace-preflight`](skills/workspace-preflight/) |
+| ローカルの安全網 | commit / push 時に差分へ関係する lint・テストを自動で実行する。`pnpm install` だけでは hook が有効にならないため、worktree ごとに `pnpm exec husky` を実行する | `.husky/`・`scripts/verify-prepush.mjs`・[`docs/development-process.md`](docs/development-process.md) の「Worktree作成時セットアップ」 |
 | CI | 変更範囲を判定したうえで Lint・Build・Test・E2E を実行し、PR 本文の更新履歴ブロックも検証する | [`.github/workflows/`](.github/workflows/) |
 | レビュー基準 | 正確性・セキュリティ・データ整合性を優先し、好みの指摘を減らす repo 固有の判断基準を、自動レビューとセルフレビューで共有する | `AGENTS.md` の Code Review Rules・`.coderabbit.yaml`・[`skills/repo-code-review`](skills/repo-code-review/) |
 | 環境分離 | 通常の開発・PR CI の E2E は local deployment と mock を使い、本番や外部サービスへの write は明示的な承認なしに行わない | [`docs/development-process.md`](docs/development-process.md)・[`skills/service-ops-safety`](skills/service-ops-safety/) |
