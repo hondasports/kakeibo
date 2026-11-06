@@ -49,13 +49,13 @@ pnpm run dev
 
 このコマンドはlocal deploymentが無ければ作成し、local deploymentを選択してからConvexのwatchとViteを同時に開始します。ローカルのFunction callsやDatabase I/OはConvexプランの利用枠に加算されません。Convexだけを起動する場合は `pnpm run convex:dev` を使ってください。
 
-外部サービスから受けるWebhookの確認や、PR E2E向けにクラウドのdev deploymentへ関数を反映する場合だけ、明示的に次を使います。このコマンドはクラウド利用枠を消費します。
+公開URLで外部サービスから受けるWebhookを確認するなど、クラウドのdev deploymentが必要な場合だけ、明示的に次を使います。このコマンドはクラウド利用枠を消費します。PR CIのE2Eはジョブ専用の使い捨てlocal backendを使い、cloud devへの事前反映は不要です。
 
 ```bash
 pnpm run convex:dev:cloud
 ```
 
-Cursor Cloud等で匿名dev deploymentが必要な場合は `CONVEX_AGENT_MODE=anonymous npx convex dev` を使います（`AGENTS.md` 参照）。
+Cursor Cloud等で匿名local deploymentが必要な場合は `CONVEX_AGENT_MODE=anonymous pnpm exec convex dev` を使います（`skills/convex-local-ops/SKILL.md` 参照）。
 
 初回はlocal deploymentの作成確認に同意します。Clerk issuerとE2E用設定は、local watcherを起動したまま別ターミナルで同期できます。
 

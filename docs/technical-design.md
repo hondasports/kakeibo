@@ -993,6 +993,10 @@ active record が確認できない場合は fail closed にする。
 | `/`                            | ダッシュボード     | 今週の支出、カテゴリ別支出、入力状態を確認する |
 | `/weeks/current/input`         | 今週のレシート入力 | レシートを連続入力する                     |
 | `/weeks/:weekStartDate`        | 週次サマリー       | 指定週の集計、支出一覧を確認する           |
+| `/months/:month` | 月次サマリー | 月間収支、カテゴリ別支出、カレンダーと明細を確認する |
+| `/years/:year` | 年次サマリー | 年間収支と月別推移を確認する |
+| `/search` | 履歴検索 | 支出・収入を条件で検索し、集計・比較する |
+| `/settings/line/callback` | LINE連携コールバック | WebユーザーとLINEアカウントの連携を完了する |
 | `/settings`                    | 設定               | グループ、カテゴリ、週の開始曜日を設定する（終了曜日は自動） |
 | `/categories`                  | 設定               | `/settings` と同じ設定画面への互換ルート   |
 | `/group/setup`                 | グループ作成       | グループ未所属ユーザーが家族グループを作成する |
@@ -1463,11 +1467,17 @@ Convexにも引数validatorがあるため、Valibotだけに依存しない。�
 - 支出件数
 - 前週比
 
-**集計互換ルール（`lib/convex/receipts/spendingEntries.ts`）:**
+**集計互換ルール（adapter: `lib/convex/receipts/spendingEntries.ts`、純粋ルール: `lib/domain/receipt/legacyFallback.ts`）:**
 
-- 対象期間（週・日・月）内に **1 件でも** `expenseEntries` が存在する場合、当該期間の `receipts` を
-  集計対象から **すべて除外** する（二重計上防止）
-- `expenseEntries` が存在しない期間は `receipts` を従来どおり集計する
+| 対象 | 取得元の選択 |
+| --- | --- |
+| 日・週・月の支出一覧 | 対象期間に新形式の支出があればそれだけを使う。新形式が収入のみ、または無い場合は旧形式の支出を使う |
+| 週収入（ダッシュボード・週次サマリー） | 新形式の収入があればそれだけを使う。新形式の支出のみがある週は収入を空とし、新形式が全く無い週だけ旧形式の収入を使う |
+| 月次集計・月収入 | 支出と収入それぞれで新形式を優先し、その種別が無い場合だけ旧形式で補完する |
+| 年次集計 | 月ごと・種別ごとに月次と同じルールを適用する |
+| 履歴検索 | 新旧両形式を結合する。サマリーの旧形式抑止ルールは適用しない |
+
+新形式の収入があるだけで旧形式の支出をすべて除外するわけではない。週収入と月収入の互換挙動も同一ではない。
 
 集計は Convex query で行う。
 
@@ -1551,6 +1561,8 @@ CSV生成関数、CSVダウンロード処理はいずれも未実装である�
 
 ## 14. レシート画像入力PoC設計
 
+本節は初回PoCの設計履歴として残す。現行の解析ジョブ・下書き保存・登録フローは10.8・10.9節を参照する。以下のフォーム候補反映・`receipts` への保存手順を現行フローとして使わない。
+
 初回PoCでは、ブラウザで選択したレシート画像をクライアント側でリサイズし、Convex Action から OpenAI Vision 対応 API へ送信して `shopName` / `date` / `amountYen` の候補を返す。
 
 ### 14.1 プライバシーと保存方針
@@ -1571,11 +1583,11 @@ CSV生成関数、CSVダウンロード処理はいずれも未実装である�
 
 Vite SPAはVercelで配信する。
 
-独自ドメインは初期MVPでは使わず、Vercelが提供する `*.vercel.app` URLを使う。
+初期MVPでは独自ドメインを使わず、Vercelが提供する `*.vercel.app` URLを使う方針だった。
 
-DEV/PreviewはVercel Preview DeploymentのURLを使い、PRODはVercel Production DeploymentのURLを使う。
+現行の固定PREVIEWは `preview.suzumemo.jp` を使う（`.github/workflows/preview-deploy.yml` の `PREVIEW_DOMAIN`）。PR Previewとリリース候補はVercelのデプロイURLを使う。本番URL・リリース手順は `docs/production-release.md` を参照する。
 
-将来、独自ドメインやCloudflare Workers固有の処理が必要になった場合に、ドメイン移行やHono追加を検討する。
+Cloudflare Workers固有の処理が必要になった場合に、Hono追加を検討する。
 
 ## 16. 環境設計
 
@@ -1584,10 +1596,10 @@ DEV / PREVIEW / PROD の3環境を分けて構築する。
 | 領域           | DEV                                              | PREVIEW                                          | PROD                                              |
 | -------------- | ------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------- |
 | フロントエンド | Vercel Preview URL、またはlocalhost              | `preview` branch の Vercel Preview              | Vercel Production URL                             |
-| URL            | `https://kakeibo-*.vercel.app` などのPreview URL | `https://kakeibo-*.vercel.app` などのPreview URL | `https://www.suzumemo.jp` などのProduction URL    |
+| URL            | localhost、またはPRごとのVercel URL | `https://preview.suzumemo.jp` | `https://www.suzumemo.jp` などのProduction URL |
 | Clerk          | Development instance                             | Development instance                             | Production instance                               |
 | Clerk認証方式  | Google OAuth                                     | Google OAuth                                     | Google OAuth                                      |
-| Convex         | dev deployment                                   | fixed staging deployment                         | production deployment                             |
+| Convex         | 通常開発はlocal deployment、PR CIはジョブ専用の匿名local backend。公開Webhook確認等だけcloud dev | fixed staging deployment | production deployment |
 | データ         | テストデータ                                     | 統合確認・PROD候補確認用の代表データ             | 実ユーザーデータ                                  |
 | 環境変数       | `.env.local`、Vercel Preview env                 | GitHub Environment `Preview`、Vercel Preview env、Convex staging env | GitHub Environment `production`、Vercel Production env、Convex Production env |
 
@@ -1631,7 +1643,7 @@ VercelにはPreview / Productionの環境変数を分けて登録する。Produc
 
 - PRまたは開発ブランチをDEV/PR Previewに紐づける
 - `preview` branch への push は `preview-deploy.yml` からPREVIEWへ自動デプロイする
-- PROD反映は `production-release.yml` から、PREVIEWで検証した同じ commit / ref をProductionへ再デプロイする
+- `main` pushで `production-release.yml` が起動し、リリース候補E2E後に本番承認を待つ。手動実行は `main` / `release/*` refを受け付ける。正規手順は `docs/production-release.md` を参照する
 - PROD反映は GitHub Environment `production` の承認後に、Convex Production、Vercel Production、PROD smoke checklist の順で実行する
 - schema変更はまずDEV Convex deploymentで確認する
 - schema変更を含むリリース候補はPREVIEW Convex deploymentで代表データを使って確認する

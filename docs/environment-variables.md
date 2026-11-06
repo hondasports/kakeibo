@@ -54,7 +54,8 @@ Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email
 | 環境                   | Convex接続先              | 主な用途                                      |
 | ---------------------- | ------------------------- | --------------------------------------------- |
 | Local                  | local deployment          | 通常の画面開発、local E2E、実バックエンド確認 |
-| DEV/PR Preview         | cloud dev deployment      | GitHub Actions E2E、公開Webhook確認            |
+| PR CI E2E              | ジョブ専用の匿名local backend | `scripts/start-ci-convex.mjs` が起動・同期・終了 |
+| DEV/PR Preview         | 明示設定したcloud dev等   | 公開Webhook確認、通常のVercel PR Preview。PR CI E2Eとは別 |
 | PREVIEW RC             | fixed staging deployment  | `preview` branchの統合確認                    |
 | Production             | production deployment     | 本番トラフィック                              |
 
@@ -113,7 +114,7 @@ Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email
 > | system admin の検索・グループ削除ジョブ一覧 | `APP_ENVが正しく設定されていません` で拒否（development 表示へフォールバックしない） |
 > | E2E 用 HTTP / purge | 従来どおり `development` 以外は 503 / no-op |
 >
-> **system admin の `preview` について**: system admin の環境（`systemAdmins.environment` と `expectedEnvironment`）は、`development` / `preview` / `production` の3値で、これは system admin の権限が属する環境を表すデータ上の定義であり（`docs/system-admin-authorization.md`、`lib/domain/systemAdmin/environment.ts`）、mock や実 apply の可否を決める上記の allow-list とは別の問いである。`APP_ENV=preview` はレシート抽出・LINE mock・リッチメニュー apply では不正値として拒否されるが、system admin の検索・ジョブ一覧では環境ラベルとして受け付ける。この3値は既存の管理者行と bootstrap 手順に依存するため、`APP_ENV` の許可値（2値）に揃えて `preview` を外すと管理者の環境モデルを壊す。実際の PREVIEW / RC は `APP_ENV=development` で動いているため、`APP_ENV=preview` を設定する運用は想定しない。
+> **system admin の `preview` について**: `lib/domain/systemAdmin/environment.ts` は `APP_ENV` から `development` / `preview` / `production` の環境ラベルを解決する。bootstrap等の `expectedEnvironment` は操作対象との一致確認用で、`systemAdmins` テーブルに `environment` 列はない。管理者の環境分離はConvex deploymentのデータ境界で行う（`docs/system-admin-authorization.md`）。`APP_ENV=preview` は管理APIの環境ラベルとして解決できるが、レシート抽出・LINE mock・リッチメニュー applyでは不正値として拒否される。実際のPREVIEW / RCは `APP_ENV=development` で動くため、`APP_ENV=preview` を設定する運用は想定しない。
 >
 > 各環境の設定元: Local は `pnpm run e2e:env-sync`（`development`）、CI E2E は `scripts/start-ci-convex.mjs`（`development`）、PREVIEW / PREVIEW RC は `preview-deploy.yml` / `production-release.yml`（`development`）、PROD は `production-release.yml`（`production`）。
 > `convex env set APP_ENV ...` を手動で行う環境（新規 Convex deployment など）は、機能を使う前に必ず設定する。
@@ -265,28 +266,24 @@ Vercel DashboardのEnvironment Variablesに設定する。
 
 ## Vercel ビルドとConvexデプロイの仕組み
 
-**現在の実態（2026-05 確認済み）**
+**現在のビルド・デプロイ経路**
 
-Vercel のビルドコマンドは **`pnpm run build`（`tsc -b && vite build`）のみ**で、
-`npx convex deploy` は実行されていない。そのため `CONVEX_DEPLOY_KEY` は
-Vercel に設定されておらず、Vercel ビルドから Convex への関数デプロイは行われない。
+Vercelのビルドコマンドは **`pnpm run build`（`tsc -b && vite build`）** で、Vercel側のビルドからConvexへの関数デプロイは行わない。Convexへの反映は、ローカル開発のwatcher、CI専用local backend、またはGitHub ActionsのPreview / Production deployが担当する。
 
 通常のローカル開発では `pnpm run dev` がlocal deploymentを選択し、Convex watcherとViteを起動する。Convexだけを起動する場合は `pnpm run convex:dev` を使う。
-PR E2E用のcloud dev deploymentへ反映する場合だけ、ローカル開発者が
-`pnpm run convex:dev:cloud -- --once` を明示的に実行する。
+公開Webhook等の確認でcloud dev deploymentへ反映する場合だけ、ローカル開発者が
+`pnpm run convex:dev:cloud -- --once` を明示的に実行する。PR CI E2Eのための事前反映は不要である。
 
 **Vercel Preview / PREVIEW 環境の Convex 接続先**
 
-通常の PR E2E は GitHub Actions の `pull_request` イベントで直接起動し、CI 内の Vite dev server から dev deployment を向く。
+通常の PR E2E は GitHub Actions の `pull_request` イベントで直接起動し、CI 内の Vite dev server からジョブ専用の匿名local backendを向く。`scripts/start-ci-convex.mjs` が関数反映・環境同期・終了処理を行い、共有cloud devには接続しない。
 Vercel Preview Deployment の生成有無は、PR E2E の起動条件にしない。
 `preview` branch の統合確認は、固定 Convex staging deployment を向く。
 `preview-deploy.yml` は `convex deploy --cmd-url-env-var-name VITE_CONVEX_URL` で staging URL を Vercel build に渡す。
 
 この構成の含意:
 
-- Convex 関数を追加・変更した PR では、E2E 実行前に `pnpm run convex:dev:cloud -- --once` で
-  dev deployment に反映する必要がある。反映前に E2E を実行すると `FunctionNotFound`
-  エラーが発生する。
+- Convex関数を追加・変更したPRでも、CIの使い捨てbackendへ当該コードが反映される。共有cloud devへの手動反映は不要である。
 - PREVIEW は dev deployment ではなく固定 Convex staging deployment を使うため、DEVデータは共有しない。
 - `VITE_CONVEX_SITE_URL`（Convex HTTP エンドポイント）は Local / DEV E2E で使う。
   PREVIEW では必要な smoke 内容に応じて、Convex staging deployment の site URL を使うか、
@@ -298,8 +295,7 @@ Production には `production-release.yml` から `pnpm exec convex deploy --cmd
 
 ## GitHub Actionsでの扱い
 
-PR単位のE2Eでは、GitHub ActionsからConvexへの直接デプロイは行わない。
-Convex 関数のデプロイはローカル開発者が `pnpm run convex:dev:cloud -- --once` でcloud dev deploymentを明示選択して行う。
+PR単位のE2EではGitHub Actions内に使い捨てlocal backendを起動し、テスト対象コードをそこへ反映する。共有cloud devへの直接デプロイやローカル開発者による事前反映は行わない。固定PREVIEW・リリース候補・PRODのcloud deployment反映はそれぞれのworkflowが担当する。
 
 ### Production リリース時の生成変数
 
@@ -356,7 +352,7 @@ Production 用の secret / variable は `production` environment にだけ置く
 
 1. **Secrets限定**: 秘匿情報はGitHub Actions Secretsにのみ保存
 2. **ログ出力禁止**: Secretsをログ、PRコメント、チャットに出力しない
-3. **E2E用認証情報**: `E2E_CLERK_USER_EMAIL` / `E2E_CLERK_USER_PASSWORD` はGitHub Actions Secretsにのみ保存し、ログ・PRコメント・チャットには出力しない
+3. **E2E用認証情報**: CIでは `CLERK_SECRET_KEY` / `E2E_CLERK_USER_EMAIL` をGitHub Actions Secretsから渡し、ログ・PRコメント・チャットへ出力しない。現行helperはTesting Token方式で、`E2E_CLERK_USER_PASSWORD` は未使用
 4. **公開情報**: `VITE_*` はVercel DashboardのEnvironment Variablesに設定
 
 ## Convex Dashboard設定
