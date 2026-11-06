@@ -217,6 +217,7 @@ export default defineSchema({
     status: v.union(...GROUP_INVITATION_STATUSES.map((value) => v.literal(value))),
     invitedByUserId: v.string(),
     clerkInvitationId: v.optional(v.string()),
+    deliveryPending: v.optional(v.boolean()),
     acceptedByUserId: v.optional(v.string()),
     acceptedAt: v.optional(v.number()),
     createdAt: v.number(),

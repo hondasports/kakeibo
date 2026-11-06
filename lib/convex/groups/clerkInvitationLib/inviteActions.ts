@@ -23,7 +23,10 @@ type InviteMemberArgs = {
 };
 
 type ClerkInvitationClient = {
-  invitations: Pick<ReturnType<typeof getClerkClient>["invitations"], "createInvitation">;
+  invitations: Pick<
+    ReturnType<typeof getClerkClient>["invitations"],
+    "createInvitation" | "revokeInvitation"
+  >;
 };
 
 type InviteMemberDeps = {
@@ -70,9 +73,10 @@ function createInvitationStore(
           ? { clerkInvitationId: input.clerkInvitationId }
           : {}),
       }),
-    deletePendingGroupInvitationRecordByToken: (token) =>
+    deletePendingGroupInvitationRecordByToken: (token, clerkInvitationId) =>
       ctx.runMutation(internal.groups.invitations.deletePendingGroupInvitationRecordByToken, {
         token,
+        ...(clerkInvitationId === undefined ? {} : { clerkInvitationId }),
       }),
     cancelPendingGroupInvitation: (invitationId) =>
       ctx.runMutation(api.groups.invitations.cancelPendingGroupInvitation, {

@@ -1,16 +1,20 @@
 /**
  * pending 招待レコード削除ユースケース（internalMutation）。
- * pending かつ Clerk 招待でないレコードのみ削除し、削除した ID を返す。
+ * pending の予約、または補償対象の Clerk ID と一致するレコードを削除する。
  */
 import type { GroupInvitationRepository } from "../../domain/groups/groupInvitationRepository";
 
 export async function deletePendingGroupInvitationRecordByToken(
   deps: { invitations: GroupInvitationRepository },
-  args: { token: string },
+  args: { token: string; clerkInvitationId?: string },
 ): Promise<string | null> {
   const existing = await deps.invitations.findByToken(args.token);
 
-  if (existing === null || existing.status !== "pending" || existing.clerkInvitationId) {
+  if (
+    existing === null ||
+    existing.status !== "pending" ||
+    (existing.clerkInvitationId && existing.clerkInvitationId !== args.clerkInvitationId)
+  ) {
     return null;
   }
 

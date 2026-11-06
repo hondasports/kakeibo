@@ -8,6 +8,25 @@ import { describe, expect, it, vi } from "vitest";
 import { MAX_PENDING_GROUP_INVITATIONS } from "../../lib/domain/groups/groupInvitation";
 import { createIdentity, createMockDb } from "./testHelpers";
 
+function createOwnerDb(state: Parameters<typeof createMockDb>[0]) {
+  const ownerId = "https://issuer.example|owner";
+  const ctx = createMockDb({
+    ...state,
+    groupMembers: [
+      {
+        _id: "owner-membership" as Id<"groupMembers">,
+        groupId: "group-001" as Id<"groups">,
+        userId: ownerId,
+        role: "owner",
+        createdAt: 1000,
+        updatedAt: 1000,
+      },
+    ],
+  });
+  ctx.auth.getUserIdentity = vi.fn().mockResolvedValue(createIdentity(ownerId));
+  return ctx;
+}
+
 describe("groups (invitations) (assert and create)", () => {
   it("addMemberByEmailHandler は対象ユーザーが別グループ所属済みでも現在グループに追加できる", async () => {
     const ownerId = "https://issuer.example|owner";
@@ -309,7 +328,7 @@ describe("groups (invitations) (assert and create)", () => {
   });
 
   it("createGroupInvitationRecordHandler は既存 pending を無効化してから新しい招待を作成する", async () => {
-    const ctx = createMockDb({
+    const ctx = createOwnerDb({
       groupInvitations: [
         {
           _id: "invite-pending" as Id<"groupInvitations">,
@@ -341,7 +360,7 @@ describe("groups (invitations) (assert and create)", () => {
   });
 
   it("createGroupInvitationRecordHandler は複数の pending をまとめて無効化して再招待できる", async () => {
-    const ctx = createMockDb({
+    const ctx = createOwnerDb({
       groupInvitations: [
         {
           _id: "invite-pending-1" as Id<"groupInvitations">,
@@ -403,7 +422,7 @@ describe("groups (invitations) (上限と入力検証)", () => {
   }
 
   it("pending が上限未満(上限-1件)なら新規招待を作成できる", async () => {
-    const ctx = createMockDb({
+    const ctx = createOwnerDb({
       groupInvitations: pendingInvitations(MAX_PENDING_GROUP_INVITATIONS - 1),
     });
 
@@ -422,7 +441,7 @@ describe("groups (invitations) (上限と入力検証)", () => {
   });
 
   it("pending が上限に達していたら新規招待を拒否し、行を作らない", async () => {
-    const ctx = createMockDb({
+    const ctx = createOwnerDb({
       groupInvitations: pendingInvitations(MAX_PENDING_GROUP_INVITATIONS),
     });
 
@@ -438,7 +457,7 @@ describe("groups (invitations) (上限と入力検証)", () => {
   });
 
   it("上限到達時でも pending 済みアドレスへの再招待は許可される", async () => {
-    const ctx = createMockDb({
+    const ctx = createOwnerDb({
       groupInvitations: pendingInvitations(MAX_PENDING_GROUP_INVITATIONS),
     });
 
@@ -458,7 +477,7 @@ describe("groups (invitations) (上限と入力検証)", () => {
   });
 
   it("他グループの pending は上限に数えない", async () => {
-    const ctx = createMockDb({
+    const ctx = createOwnerDb({
       groupInvitations: pendingInvitations(MAX_PENDING_GROUP_INVITATIONS).map((invitation) => ({
         ...invitation,
         groupId: "group-other" as Id<"groups">,
@@ -476,7 +495,7 @@ describe("groups (invitations) (上限と入力検証)", () => {
   });
 
   it("形式不正のメールアドレスは掃除も insert もせず拒否する", async () => {
-    const ctx = createMockDb({});
+    const ctx = createOwnerDb({});
 
     await expect(
       createGroupInvitationRecordHandler(ctx, {
@@ -507,7 +526,7 @@ describe("groups (invitations) (2段階目の確定と同時招待の競合)", (
   }
 
   it("後続予約に revoke された予約行は 2 段階目で復活させず、pending を 1 件のまま保つ", async () => {
-    const ctx = createMockDb({});
+    const ctx = createOwnerDb({});
     const email = "race@example.com";
 
     // 同一メールへの同時 inviteMember: A,B とも予約（1段階目）を通る。B が A を revoke する。
@@ -537,7 +556,7 @@ describe("groups (invitations) (2段階目の確定と同時招待の競合)", (
   });
 
   it("同時招待を重ねても pending 件数は上限を超えない", async () => {
-    const ctx = createMockDb({
+    const ctx = createOwnerDb({
       groupInvitations: Array.from({ length: MAX_PENDING_GROUP_INVITATIONS - 1 }, (_, index) => ({
         _id: `invite-${index}` as Id<"groupInvitations">,
         groupId: "group-001" as Id<"groups">,
@@ -578,7 +597,7 @@ describe("groups (invitations) (2段階目の確定と同時招待の競合)", (
   });
 
   it("現行の予約は 2 段階目で clerkInvitationId が追記され pending のまま", async () => {
-    const ctx = createMockDb({});
+    const ctx = createOwnerDb({});
     const email = "single@example.com";
     await createGroupInvitationRecordHandler(ctx, { ...base, email, token: "token-a" });
     await createGroupInvitationRecordHandler(ctx, {
@@ -595,7 +614,7 @@ describe("groups (invitations) (2段階目の確定と同時招待の競合)", (
   });
 
   it("取消済み(revoked)の行は clerkInvitationId 付きで確定しても pending に戻らない", async () => {
-    const ctx = createMockDb({
+    const ctx = createOwnerDb({
       groupInvitations: [
         {
           _id: "invite-revoked" as Id<"groupInvitations">,

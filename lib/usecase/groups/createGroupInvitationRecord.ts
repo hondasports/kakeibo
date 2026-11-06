@@ -36,14 +36,21 @@ export async function createGroupInvitationRecord(
     // pending に戻すと「同一メール pending 1 件」「上限」の不変条件を壊すため復活させない。
     // 予約行が pending のままなら、後続予約は存在せず（存在すれば revoke されている）、
     // 件数にも予約時点で数えられているため、再判定せず clerkInvitationId だけを追記すれば足りる。
-    if (existing.status !== "pending") {
+    if (
+      existing.status !== "pending" ||
+      existing.groupId !== args.groupId ||
+      existing.invitedByUserId !== args.invitedByUserId ||
+      existing.email !== normalizeEmailOrThrow(args.email)
+    ) {
       throw new ConvexError(
         "同じメールアドレスへの別の招待操作により、この招待は無効になりました。招待一覧を確認してから再度お試しください",
       );
     }
     await deps.invitations.patch(existing.id, {
       updatedAt: now,
-      ...(args.clerkInvitationId ? { clerkInvitationId: args.clerkInvitationId } : {}),
+      ...(args.clerkInvitationId
+        ? { clerkInvitationId: args.clerkInvitationId, deliveryPending: false }
+        : {}),
     });
     return existing.id;
   }
@@ -75,6 +82,7 @@ export async function createGroupInvitationRecord(
     email,
     token: args.token,
     status: "pending" as const,
+    deliveryPending: !args.clerkInvitationId,
     invitedByUserId: args.invitedByUserId,
     createdAt: now,
     updatedAt: now,

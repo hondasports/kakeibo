@@ -12,7 +12,10 @@ export type ClerkInvitationStore = {
   createGroupInvitationRecord: (
     input: ReturnType<typeof buildGroupInvitationRecordInput>,
   ) => Promise<unknown>;
-  deletePendingGroupInvitationRecordByToken: (token: string) => Promise<unknown>;
+  deletePendingGroupInvitationRecordByToken: (
+    token: string,
+    clerkInvitationId?: string,
+  ) => Promise<unknown>;
   cancelPendingGroupInvitation: (invitationId: string) => Promise<{ clerkInvitationIds: string[] }>;
 };
 
@@ -27,6 +30,7 @@ export type InviteClerkServices = {
   ) => ReturnType<typeof buildClerkInvitationParams>;
   getClerk: () => {
     invitations: {
+      revokeInvitation: (invitationId: string) => Promise<unknown>;
       createInvitation: (
         params: ReturnType<typeof buildClerkInvitationParams>,
       ) => Promise<{ id: string }>;
@@ -71,30 +75,39 @@ export async function inviteMember(
   };
   await store.createGroupInvitationRecord(buildGroupInvitationRecordInput(baseRecord));
 
-  const clerk = services.getClerk();
-  let invitation: { id: string };
+  let invitation: { id: string } | undefined;
   try {
+    const clerk = services.getClerk();
     invitation = await clerk.invitations.createInvitation(
       services.buildClerkInvitationParams(email, redirectUrl, group._id, token),
     );
+    await store.createGroupInvitationRecord(
+      buildGroupInvitationRecordInput({
+        ...baseRecord,
+        clerkInvitationId: invitation.id,
+      }),
+    );
   } catch (caughtError) {
     try {
-      await store.deletePendingGroupInvitationRecordByToken(token);
+      await store.deletePendingGroupInvitationRecordByToken(token, invitation?.id);
     } catch (cleanupError) {
       services.warn(
         "[groups.clerkInvitations.inviteMember] failed to clean up reserved invitation",
         cleanupError instanceof Error ? cleanupError.name : "UnknownError",
       );
     }
+    if (invitation !== undefined) {
+      try {
+        await services.getClerk().invitations.revokeInvitation(invitation.id);
+      } catch (revokeError) {
+        services.warn(
+          "[groups.clerkInvitations.inviteMember] failed to revoke Clerk invitation",
+          revokeError instanceof Error ? revokeError.name : "UnknownError",
+        );
+      }
+    }
     throw caughtError;
   }
-
-  await store.createGroupInvitationRecord(
-    buildGroupInvitationRecordInput({
-      ...baseRecord,
-      clerkInvitationId: invitation.id,
-    }),
-  );
 
   return {
     token,
