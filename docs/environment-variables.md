@@ -126,12 +126,13 @@ Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email
 | `E2E_CLEANUP_SECRET` | E2E クリーンアップ API の認証シークレット | ✅    | ✅  | ✅         | .env.local / GitHub Actions Secret / Convex Dashboard |
 | `E2E_CLERK_USER_ID`  | E2E操作を許可する固定テストユーザーの Clerk tokenIdentifier | ✅    | 生成 | ✅         | .env.local / Convex Dashboard |
 
-Convex の E2E 専用 HTTP エンドポイント（`convex/http.ts` / `convex/e2eHttp/`）は、
-Convex のデプロイ時に環境変数を評価してルート登録を切り替えず、常時登録される。各handlerが
-`E2E_CLEANUP_SECRET`、`E2E_CLERK_USER_ID` の設定とヘッダ
-`X-E2E-Cleanup-Secret` が必要で、対象ユーザーとグループは固定テストユーザーの範囲に限定される。
-`APP_ENV=development` 以外、secret または user ID が未設定の場合は handler が503を返す。
-これにより、環境変数変更時にConvexのルートテーブルが古いままになることを防ぎつつ、実行時の認証・環境境界は維持する。
+Convex の E2E 専用 HTTP エンドポイント（`convex/http.ts` / `convex/e2eHttp/`）は常時登録される。各handlerは実行時に `APP_ENV=development`、`E2E_CLEANUP_SECRET` とヘッダ `X-E2E-Cleanup-Secret` を検証する。環境が許可外またはsecretが未設定なら503、不正なsecretなら401を返す。
+
+固定ユーザーを対象とするseed・cleanup・認証確認APIは `E2E_CLERK_USER_ID` も必要とし、未設定なら503を返す。対象のユーザーIDは設定値と照合される。
+
+**例外: `POST /e2e/purge-orphans` は固定ユーザーを検証せず、deployment全体を対象に物理削除する。** `E2E_CLERK_USER_ID` は不要で、共有環境でも固定テストユーザーだけに限定されない。対象はメンバーのいないグループとその関連データ、削除済みグループを参照する残存データ、参照先がない終端のグループ削除ジョブと通知先、終端状態のメールジョブ、処理済みWebhook記録、所属のない `e2e-seed|` ユーザー。メンバーのいるグループ、削除中グループ、進行中メールジョブ、通常ユーザーとsystem adminデータは対象外。操作前にdeploymentと対象範囲を確認する。
+
+同じ掃除は24時間ごとの内部cronでも実行され、`APP_ENV=development` 以外では何もしない。HTTP経路と異なりcronはHTTP secretを使わない。ルートは環境変数変更時も登録されたままで、各handlerが実行時に境界を検証する。
 
 GitHub Actionsでは、`preview-deploy.yml`、`e2e.yml`、`production-release.yml`が
 `CLERK_SECRET_KEY`で`E2E_CLERK_USER_EMAIL`に対応するClerkユーザーを解決し、
@@ -140,7 +141,8 @@ publishable keyから得たissuerとユーザーIDを組み合わせて`E2E_CLER
 
 | エンドポイント | 用途 |
 | --- | --- |
-| `POST /e2e/cleanup` | E2E テストデータのクリーンアップ |
+| `POST /e2e/cleanup` | 固定テストユーザーのE2Eテストデータのクリーンアップ |
+| `POST /e2e/purge-orphans` | deployment全体の孤児・終端運用データの物理削除（固定ユーザー検証なし） |
 | `POST /e2e/seed-ai-expense-draft` | AI 下書きのシード（認証なし疎通確認） |
 | `POST /e2e/seed-pending-group-invitation` | pending 招待のシード（`group-access` E2E 用） |
 
