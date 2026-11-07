@@ -1,3 +1,6 @@
+import { isValidCalendarDate } from "../common/date";
+import { getCurrentYear } from "../common/year";
+
 export type ReceiptDateError = "no_candidate" | "ambiguous" | "range_expression" | "invalid";
 
 const RANGE_EXPRESSION_PATTERN = /[~〜～]|から|まで/;
@@ -11,7 +14,7 @@ const DATE_PATTERNS = [
 
 export function isPlausibleReceiptYear(
   year: number,
-  referenceYear = new Date().getFullYear(),
+  referenceYear = Number(getCurrentYear()),
 ): boolean {
   return year >= 1 && year <= referenceYear + 1;
 }
@@ -40,7 +43,7 @@ export function normalizeReceiptDate(
 
   return {
     success: true,
-    date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+    date: `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
   };
 }
 
@@ -57,9 +60,4 @@ function findDateCandidates(value: string): Array<{ year: number; month: number;
     }
   }
   return candidates;
-}
-
-function isValidCalendarDate(year: number, month: number, day: number): boolean {
-  const date = new Date(year, month - 1, day);
-  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }

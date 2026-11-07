@@ -63,6 +63,7 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
     },
     async analyzeImage(args) {
       const draft = await analyzeReceiptImageToDraftCore(ctx, {
+        groupId: args.groupId as Id<"groups">,
         imageDataUrl: args.imageDataUrl,
         imageFileName: args.imageFileName,
         telemetryId: args.telemetryId,
@@ -77,9 +78,10 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
         ...(draft.warnings === undefined ? {} : { warnings: draft.warnings }),
       };
     },
-    async createFailureDraft(telemetryId, imageFileName, error) {
+    async createFailureDraft(telemetryId, imageFileName, error, groupId) {
       const draft = await measureReceiptExtractionSave(telemetryId, "failure_draft", () =>
         ctx.runMutation(internal.aiExpenseDrafts.internal.createFailedDraftFromImageAnalysis, {
+          groupId: groupId as Id<"groups">,
           warning: getSafeFailureWarning(error),
           imageFileName,
         }),

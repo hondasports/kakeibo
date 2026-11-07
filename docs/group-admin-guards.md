@@ -123,5 +123,5 @@ Clerk API を呼ぶ action は DB コンテキストを持たないため、`api
 | メンバー解除 | `removeMember` + 共通ガード | `GroupSettingsPanel` + 確認ダイアログ |
 | ロール変更 | `changeMemberRole` + 共通ガード | `GroupMemberList` + 確認ダイアログ |
 | オーナー権限譲渡 | `transferGroupOwnership` + 共通ガード | `GroupSettingsPanel` 危険な操作 + 確認ダイアログ |
-| グループ削除 | `deleteGroup` + `requireGroupOwner` + 物理削除 | `GroupSettingsPanel` 危険な操作 + 確認ダイアログ |
+| グループ削除 | `requestGroupDeletion` + `requireGroupOwner` + 物理削除ジョブ | `GroupDangerZone` 危険な操作 + 確認ダイアログ |
 | メンバー招待 | `inviteMember` action + `assertGroupOwnerRole` | `GroupSettingsPanel` 招待フォーム |

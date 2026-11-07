@@ -8,6 +8,95 @@ UI ブランド名は **Suzumemo**、リポジトリ名は **kakeibo** です。
 
 現在コード上で実装されている画面・ルート・データモデル・外部連携の状態は [`docs/current-implementation.md`](docs/current-implementation.md) を参照してください。要件・設計ドキュメントに将来方針が含まれる場合、実装済みかどうかの確認は現行コードとこのスナップショットを基準にします。
 
+## アーキテクチャ
+
+```mermaid
+flowchart LR
+  subgraph Browser["ブラウザ（Vite + React SPA）"]
+    UI["src/features/*<br/>画面・プレゼンテーション層"]
+  end
+
+  subgraph Shared["lib/（フロント・バック共通）"]
+    Domain["lib/domain<br/>純粋なドメインルール"]
+    Usecase["lib/usecase<br/>ユースケース"]
+    Adapter["lib/convex<br/>Convex アダプタ"]
+  end
+
+  subgraph Convex["Convex"]
+    Fn["convex/*<br/>query / mutation / action"]
+    DB[("Convex DB")]
+    Cron["crons"]
+    Http["HTTP endpoints<br/>/webhooks/line・/webhooks/resend"]
+  end
+
+  Vercel["Vercel<br/>SPA 配信"] --> Browser
+  UI --> Domain
+  UI -- "Convex client" --> Fn
+  Fn --> Usecase --> Domain
+  Fn --> Adapter
+  Fn --> DB
+  Cron --> Fn
+  Http --> Fn
+
+  Clerk["Clerk<br/>認証"]
+  UI -. "サインイン" .-> Clerk
+  Fn -. "JWT 検証" .-> Clerk
+
+  Fn -- "レシート画像解析" --> OpenAI["OpenAI API"]
+  Fn -- "メール送信" --> Resend["Resend"]
+  Fn -- "連携・通知" --> LINE["LINE<br/>Login / Messaging API"]
+  LINE -- "webhook" --> Http
+  Resend -- "webhook" --> Http
+```
+
+- **レイヤー**: `lib/domain` は Convex に依存しない純粋なドメインルールで、この依存方向は `lib/domain/dependencyDirection.test.ts` が検査します。`convex/*` は `lib/usecase`・`lib/convex` を経由してドメインを使い、画面は `lib/domain` だけを直接参照します。
+- **データ境界**: 家計データは家族グループ単位で共有し、認可は Convex 側で認証済みの主体とグループ所属から判定します（`docs/group-admin-permissions.md`・`docs/auth-guard.md`）。
+- **AI レシート入力**: 解析結果は直接確定せず、下書きとしてユーザーが確認してから登録します。OpenAI への実送信は環境変数で制御し、通常の Local / Preview / CI では mock を使います。
+- **環境**: DEV / PREVIEW / PROD の 3 環境を持ちます。Convex deployment は 3 環境で分け、Clerk instance と Vercel env は DEV / PREVIEW と PROD の間で分けています（DEV / PREVIEW は Clerk Development instance と Vercel Preview env を共用）。詳細は [`docs/technical-design.md`](docs/technical-design.md) の「16. 環境設計」を参照してください。
+
+詳細は [`docs/technical-design.md`](docs/technical-design.md)、現在の実装範囲は [`docs/current-implementation.md`](docs/current-implementation.md) を正とします。
+
+## AI エージェント運用の仕組み
+
+このリポジトリは、Codex・Devin・Cursor・Claude Code などの AI エージェントが実装の大半を担う前提で、**人間が契約と検証の仕組みを設計し、エージェントがその中で作業する**形で運用しています。
+
+```mermaid
+flowchart TD
+  Human["人間<br/>Issue・判断・承認"] --> Issue["Issue<br/>（詳細仕様は必須にしない）"]
+  Issue --> Agent["AI エージェント<br/>Codex / Devin / Cursor / Claude Code"]
+
+  Contract["AGENTS.md<br/>全エージェント共通の契約"] --> Agent
+  Skills["skills/*/SKILL.md<br/>触るパス・操作ごとの手順"] --> Agent
+
+  Agent --> Preflight["preflight<br/>専用 worktree・task branch・clean baseline"]
+  Preflight --> Loop["実装 → targeted test → 修正<br/>（同じ Run 内で反復）"]
+  Loop --> Hooks["pre-commit / pre-push<br/>lint-staged・verify:prepush"]
+  Hooks --> PR["PR（base: preview）"]
+
+  PR --> CI["GitHub Actions<br/>Lint・Build・Test・E2E・更新履歴検証"]
+  PR --> Review["自動レビュー<br/>CodeRabbit・Codex（日本語・repo 固有ルール）"]
+  CI --> Merge
+  Review --> Merge["preview へマージ"]
+  Merge --> PreviewEnv["PREVIEW 環境で確認"]
+  PreviewEnv --> Release["main → Production<br/>（人間の承認）"]
+```
+
+| 仕組み | 役割 | 正本 |
+| --- | --- | --- |
+| 共通契約 | 作業前の確認、仕様の補完、確認が必要な判断、本番・不可逆操作の承認、外部コンテンツの命令を信頼しないことなどを全エージェント共通で定める | [`AGENTS.md`](AGENTS.md) |
+| Capability Skill | 触るパスや操作（Convex・認証・税計算・LINE・E2E・本番操作など）に応じて、編集前に読む手順とチェックリストを切り替える | [`skills/`](skills/) |
+| Workspace Preflight | 保護ブランチや未コミット差分の上で編集しないよう、専用 worktree・task branch・clean baseline を機械的に確認する。task と branch の対応や差分範囲は判定しないため、PR に無関係な変更が含まれていないかは Issue・PR 本文で別途確認する | `scripts/check-task-worktree.mjs`・[`skills/workspace-preflight`](skills/workspace-preflight/) |
+| ローカルの安全網 | commit / push 時に差分へ関係する lint・テストを自動で実行する。`pnpm install` だけでは hook が有効にならないため、worktree ごとに `pnpm exec husky` を実行する | `.husky/`・`scripts/verify-prepush.mjs`・[`docs/development-process.md`](docs/development-process.md) の「Worktree作成時セットアップ」 |
+| CI | 変更範囲を判定したうえで Lint・Build・Test・E2E を実行し、PR 本文の更新履歴ブロックも検証する | [`.github/workflows/`](.github/workflows/) |
+| レビュー基準 | 正確性・セキュリティ・データ整合性を優先し、好みの指摘を減らす repo 固有の判断基準を、自動レビューとセルフレビューで共有する | `AGENTS.md` の Code Review Rules・`.coderabbit.yaml`・[`skills/repo-code-review`](skills/repo-code-review/) |
+| 環境分離 | 通常の開発・PR CI の E2E は local deployment と mock を使い、本番や外部サービスへの write は明示的な承認なしに行わない | [`docs/development-process.md`](docs/development-process.md)・[`skills/service-ops-safety`](skills/service-ops-safety/) |
+
+エージェントが repository を編集する前には、専用 worktree で次を実行して clean baseline を確認します。
+
+```bash
+node scripts/check-task-worktree.mjs --require-clean
+```
+
 ## ローカル起動
 
 ### 0. Node.jsとpnpm
@@ -49,13 +138,13 @@ pnpm run dev
 
 このコマンドはlocal deploymentが無ければ作成し、local deploymentを選択してからConvexのwatchとViteを同時に開始します。ローカルのFunction callsやDatabase I/OはConvexプランの利用枠に加算されません。Convexだけを起動する場合は `pnpm run convex:dev` を使ってください。
 
-外部サービスから受けるWebhookの確認や、PR E2E向けにクラウドのdev deploymentへ関数を反映する場合だけ、明示的に次を使います。このコマンドはクラウド利用枠を消費します。
+公開URLで外部サービスから受けるWebhookを確認するなど、クラウドのdev deploymentが必要な場合だけ、明示的に次を使います。このコマンドはクラウド利用枠を消費します。PR CIのE2Eはジョブ専用の使い捨てlocal backendを使い、cloud devへの事前反映は不要です。
 
 ```bash
 pnpm run convex:dev:cloud
 ```
 
-Cursor Cloud等で匿名dev deploymentが必要な場合は `CONVEX_AGENT_MODE=anonymous npx convex dev` を使います（`AGENTS.md` 参照）。
+Cursor Cloud等で匿名local deploymentが必要な場合は `CONVEX_AGENT_MODE=anonymous pnpm exec convex dev` を使います（`skills/convex-local-ops/SKILL.md` 参照）。
 
 初回はlocal deploymentの作成確認に同意します。Clerk issuerとE2E用設定は、local watcherを起動したまま別ターミナルで同期できます。
 
@@ -119,14 +208,6 @@ E2E 実行前は `pnpm exec playwright install chromium` とlocal Convexの起�
 | 認証ガード設計                 | `docs/auth-guard.md`            |
 | 環境変数一覧                   | `docs/environment-variables.md` |
 | QAチェックリスト               | `docs/qa-checklist.md`          |
-
-## エージェント作業
-
-`AGENTS.md` がCodex / Devin / Claude Code等で共通の契約です。repositoryを編集する前に専用worktreeで次を実行し、clean baselineを確認します。
-
-```bash
-node scripts/check-task-worktree.mjs --require-clean
-```
 
 ## ローカル状態とsecret
 

@@ -2,6 +2,8 @@
 
 関連Discussion: [支出AI登録: 撮影キュー型入力体験の検討](https://github.com/hondasports/kakeibo/discussions/140)
 
+本書は初期構想と判断の背景を残すメモであり、以下のデモ・目標体験は現行仕様とは限らない。現行の下書き保存・確認・登録フローは `docs/current-implementation.md` 6節と `docs/requirements.md` 10.6節を参照する。
+
 ## 背景
 
 これまでの議論では、現在のレシート画像入力を単なるOCR補助ではなく、支出登録そのものを軽くする体験へ拡張する方向で整理した。

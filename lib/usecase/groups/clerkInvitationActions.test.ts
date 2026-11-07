@@ -39,6 +39,7 @@ function createServices(overrides: Partial<InviteClerkServices> = {}) {
     getClerk: vi.fn(() => ({
       invitations: {
         createInvitation: vi.fn(async () => ({ id: "clerk-invite-001" })),
+        revokeInvitation: vi.fn(async () => undefined),
       },
     })),
     warn: vi.fn(),
@@ -77,7 +78,7 @@ describe("inviteMember", () => {
     });
   });
 
-  it("2段階目が superseded で拒否されたらエラーを伝播し、Clerk招待を再送せず補償削除もしない", async () => {
+  it("2段階目が superseded で拒否されたらエラーを伝播し、送信済みClerk招待を取り消す", async () => {
     const createInvitation = vi.fn(async () => ({ id: "clerk-invite-001" }));
     const store = createStore({
       createGroupInvitationRecord: vi
@@ -86,12 +87,17 @@ describe("inviteMember", () => {
         .mockRejectedValueOnce(new Error("この招待は無効になりました")),
     });
     const services = createServices({
-      getClerk: vi.fn(() => ({ invitations: { createInvitation } })),
+      getClerk: vi.fn(() => ({
+        invitations: { createInvitation, revokeInvitation: vi.fn(async () => undefined) },
+      })),
     });
 
     await expect(inviteMember(store, services, args)).rejects.toThrow("無効になりました");
     expect(createInvitation).toHaveBeenCalledTimes(1);
-    expect(store.deletePendingGroupInvitationRecordByToken).not.toHaveBeenCalled();
+    expect(store.deletePendingGroupInvitationRecordByToken).toHaveBeenCalledWith(
+      "invite-token",
+      "clerk-invite-001",
+    );
   });
 
   it("グループ未選択ならドメインエラーで止まり副作用を起こさない", async () => {
@@ -108,12 +114,18 @@ describe("inviteMember", () => {
     const clerkError = new Error("Clerk unavailable");
     const services = createServices({
       getClerk: vi.fn(() => ({
-        invitations: { createInvitation: vi.fn(async () => Promise.reject(clerkError)) },
+        invitations: {
+          createInvitation: vi.fn(async () => Promise.reject(clerkError)),
+          revokeInvitation: vi.fn(async () => undefined),
+        },
       })),
     });
     const store = createStore();
     await expect(inviteMember(store, services, args)).rejects.toBe(clerkError);
-    expect(store.deletePendingGroupInvitationRecordByToken).toHaveBeenCalledWith("invite-token");
+    expect(store.deletePendingGroupInvitationRecordByToken).toHaveBeenCalledWith(
+      "invite-token",
+      undefined,
+    );
     expect(store.createGroupInvitationRecord).toHaveBeenCalledTimes(1);
   });
 
@@ -121,7 +133,10 @@ describe("inviteMember", () => {
     const clerkError = new Error("Clerk unavailable");
     const services = createServices({
       getClerk: vi.fn(() => ({
-        invitations: { createInvitation: vi.fn(async () => Promise.reject(clerkError)) },
+        invitations: {
+          createInvitation: vi.fn(async () => Promise.reject(clerkError)),
+          revokeInvitation: vi.fn(async () => undefined),
+        },
       })),
     });
     const store = createStore({
@@ -190,7 +205,9 @@ describe("inviteMember (メールアドレス検証)", () => {
     const store = createStore();
     const createInvitation = vi.fn(async () => ({ id: "clerk-invite-001" }));
     const services = createServices({
-      getClerk: vi.fn(() => ({ invitations: { createInvitation } })),
+      getClerk: vi.fn(() => ({
+        invitations: { createInvitation, revokeInvitation: vi.fn(async () => undefined) },
+      })),
     });
 
     await expect(inviteMember(store, services, { ...args, email })).rejects.toThrowError(

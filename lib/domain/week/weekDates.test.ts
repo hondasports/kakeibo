@@ -136,3 +136,20 @@ describe("週日付の年・月境界", () => {
     expect(calculateRelativeWeekStartDate("2024-01-01", -1)).toBe("2023-12-25");
   });
 });
+
+describe("暦日のタイムゾーン非依存性", () => {
+  it.each(["2011-12-30", "0100-01-01", "2000-02-29", "9999-12-31"])("%s を受理する", (date) => {
+    expect(isValidIsoDateString(date)).toBe(true);
+  });
+  it.each([
+    "0000-01-01",
+    "0001-01-01",
+    "0099-01-01",
+    "1900-02-29",
+    "2024-04-31",
+    "2024-00-01",
+    "2024-01-00",
+  ])("%s の既存拒否契約を保つ", (date) => {
+    expect(isValidIsoDateString(date)).toBe(false);
+  });
+});

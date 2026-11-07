@@ -147,6 +147,61 @@ export async function requireGroupMembership(
   return membership;
 }
 
+async function resolveMembershipInGroup(
+  ctx: Pick<QueryCtx, "db">,
+  userId: string,
+  groupId: Id<"groups">,
+): Promise<GroupMembership | null> {
+  const deps = createMembershipKernelDeps(ctx);
+  const member = await deps.memberships.findByGroupAndUser(groupId, userId);
+  if (member === null) {
+    return null;
+  }
+  const group = await deps.groups.get(groupId);
+  if (group !== null && isGroupDeleted(group)) {
+    return null;
+  }
+  return {
+    membershipId: member.id as Id<"groupMembers">,
+    groupId,
+    userId,
+    role: member.role,
+  };
+}
+
+/**
+ * 指定グループへの現在の所属を要求する。
+ * 処理開始時に確定した groupId を保存時まで固定する経路で使い、
+ * active group の再解決は行わない。
+ */
+export async function requireGroupMembershipForGroup(
+  ctx: Pick<QueryCtx, "auth" | "db">,
+  groupId: Id<"groups">,
+): Promise<GroupMembership> {
+  const userId = await requireAuthenticatedUserId(ctx);
+  const membership = await resolveMembershipInGroup(ctx, userId, groupId);
+  if (membership === null) {
+    throw new ConvexError("グループに所属していません");
+  }
+  return membership;
+}
+
+/**
+ * Clerk 認証を介さず、既知の userId が指定グループの現在のメンバーであることを要求する。
+ * LINE などの内部連携経路で、処理開始時に解決した groupId を保存まで固定する用途。
+ */
+export async function requireGroupMembershipForUserInGroup(
+  ctx: Pick<QueryCtx, "db">,
+  userId: string,
+  groupId: Id<"groups">,
+): Promise<GroupMembership> {
+  const membership = await resolveMembershipInGroup(ctx, userId, groupId);
+  if (membership === null) {
+    throw new ConvexError("グループに所属していません");
+  }
+  return membership;
+}
+
 /**
  * active group のオーナー権限を要求する。
  * 管理系 mutation はこのヘルパーまたは groupAdminGuards の assertion を使う。

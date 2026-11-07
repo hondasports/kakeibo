@@ -1,3 +1,5 @@
+import type { EntryKind } from "../common/entryKind";
+import type { RecordType } from "../common/recordKind";
 import type { HistoryAggregate, HistoryComparison, HistoryTrendPoint } from "./analytics";
 import type { SearchableHistoryGroup } from "./filter";
 
@@ -6,7 +8,7 @@ export class ExpenseSearchDomainError extends Error {}
 export type ExpenseSearchReceipt = {
   _id: string;
   date: string;
-  type: "expense" | "income";
+  type: EntryKind;
   shopName?: string;
   bankName?: string;
   amountYen: number;
@@ -14,7 +16,7 @@ export type ExpenseSearchReceipt = {
   categoryName?: string;
   categoryColor?: string;
   memo?: string;
-  recordType: "expenseEntry" | "receipt";
+  recordType: RecordType;
   itemName?: string;
   receiptGroupId?: string;
   receiptShopName?: string;

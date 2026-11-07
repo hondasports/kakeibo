@@ -24,7 +24,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { isMetadataOnlyPath, normalizeChangedPath } from "./classify-e2e-relevance.mjs";
 import { parseEnvFile } from "./sync-e2e-env.mjs";
-import { globToRegExp, selectSpecs } from "./select-e2e-specs.mjs";
+import { selectSpecs } from "./select-e2e-specs.mjs";
+import { loadUnitRelatedMap, unitMappedTests } from "./unit-related-map.mjs";
 import { e2ePortChecks, resolveE2EPorts } from "./lib/isolated-e2e-ports.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -109,37 +110,6 @@ export function unitRelatedTargets(
         !file.endsWith(".json") &&
         exists(file),
     );
-}
-
-const UNIT_RELATED_MAP_PATH = "scripts/unit-related-map.json";
-
-/**
- * unit関連mapを読む。テストがimportせずfsで読むrepo内ファイルを、それを検査する
- * テストへ対応づける。無ければ空map（mapは任意の追加知識）。
- */
-export function loadUnitRelatedMap(cwd = repoRoot) {
-  const mapPath = path.join(cwd, UNIT_RELATED_MAP_PATH);
-  return existsSync(mapPath) ? JSON.parse(readFileSync(mapPath, "utf8")) : {};
-}
-
-/**
- * unit関連mapに当たる変更ファイルから、importグラフに乗らない依存テストを引く。
- * .md/.json等 unitRelatedTargets から外れる変更でもmapヒットすれば対象にする。
- */
-export function unitMappedTests(changedFiles, map) {
-  const tests = new Set();
-  const compiled = Object.keys(map)
-    .filter((key) => !key.startsWith("$"))
-    .map((pattern) => [globToRegExp(pattern), pattern]);
-  for (const file of changedFiles) {
-    const normalized = normalizeChangedPath(file);
-    for (const [re, pattern] of compiled) {
-      if (re.test(normalized)) {
-        for (const test of map[pattern]) tests.add(test);
-      }
-    }
-  }
-  return [...tests].sort();
 }
 
 /* -------------------------------------------------------------- preflight */

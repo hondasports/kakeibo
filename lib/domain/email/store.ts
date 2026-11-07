@@ -51,6 +51,7 @@ export type UpdateJobStatusFromWebhookFields = {
   jobId: string;
   status: TerminalEmailJobStatus;
   lastProviderEventAt: number;
+  lastVerifiedProviderEventAt?: number;
   updatedAt: number;
 };
 
@@ -101,6 +102,7 @@ export interface EmailWebhookEventReader {
 
 export interface EmailWebhookEventStore extends EmailWebhookEventReader {
   insertEvent(fields: NewEmailWebhookEventFields): Promise<string>;
+  markEventApplied(id: string, appliedAt: number): Promise<void>;
   deleteEvent(id: string): Promise<void>;
 }
 

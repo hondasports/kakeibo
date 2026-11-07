@@ -10,7 +10,11 @@ import {
   getEmailEventDocBySvixId,
 } from "../../lib/convex/email/convexEmailWebhookEventStore";
 import { deleteTestEmailRecords as deleteTestEmailRecordsUsecase } from "../../lib/usecase/email/deleteTestRecords";
-import { createDeleteTestEmailRecordsDeps } from "../../lib/convex/email/emailDeps";
+import {
+  createDeleteTestEmailRecordsDeps,
+  createProcessResendEventDeps,
+} from "../../lib/convex/email/emailDeps";
+import { reconcileResendEvents } from "../../lib/usecase/email/processResendEvent";
 
 export const getJobById = internalQuery({
   args: { jobId: v.id("transactionalEmailJobs") },
@@ -37,6 +41,7 @@ export const updateJobForSend = internalMutation({
   },
   handler: async (ctx, args) => {
     await createEmailJobStore(ctx).markJobSent(args);
+    await reconcileResendEvents(createProcessResendEventDeps(ctx), args.providerMessageId);
   },
 });
 
@@ -80,10 +85,20 @@ export const updateJobStatusFromWebhook = internalMutation({
       v.literal("failed"),
     ),
     lastProviderEventAt: v.number(),
+    lastVerifiedProviderEventAt: v.optional(v.number()),
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
     await createEmailJobStore(ctx).updateJobStatusFromWebhook(args);
+  },
+});
+
+export const refreshLegacyJobRetention = internalMutation({
+  args: { jobId: v.id("transactionalEmailJobs"), updatedAt: v.number() },
+  handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.jobId);
+    if (job === null) return;
+    await ctx.db.patch(args.jobId, { updatedAt: Math.max(job.updatedAt, args.updatedAt) });
   },
 });
 

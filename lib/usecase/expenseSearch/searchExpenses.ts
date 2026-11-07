@@ -9,6 +9,7 @@ import {
   groupHistoryEntries,
   paginateHistoryGroups,
   parseExpenseSearchFilters,
+  type HistoryEntryType,
   type SearchableHistoryGroup,
 } from "../../domain/expenseSearch/filter";
 import {
@@ -40,7 +41,7 @@ export type ExpenseSearchStore = {
 };
 
 export type SearchExpensesInput = {
-  entryType?: "all" | "expense" | "income";
+  entryType?: HistoryEntryType;
   shopQuery?: string;
   categoryId?: string;
   minAmountYen?: number;

@@ -40,12 +40,15 @@ async function setup(profileEmail: string | undefined = "primary@example.test") 
     return groupId;
   });
   const invite = async (token: string, email = "secondary@example.test") =>
-    t.mutation(internal.groups.invitations.createGroupInvitationRecord, {
-      groupId,
-      email,
-      token,
-      invitedByUserId: ownerId,
-    });
+    t
+      .withIdentity({ tokenIdentifier: ownerId })
+      .mutation(internal.groups.invitations.createGroupInvitationRecord, {
+        groupId,
+        email,
+        token,
+        invitedByUserId: ownerId,
+        clerkInvitationId: `clerk-${token}`,
+      });
   const remove = () =>
     t
       .withIdentity({ tokenIdentifier: ownerId })
@@ -215,12 +218,24 @@ describe("管理者による所属解除と招待の発行順", () => {
 
   it("移動先グループの招待は移動前の発行でも受け入れる", async () => {
     const { t, targetGroupId, operate, accept } = await setupSystemAdminRemoval();
-    await t.mutation(internal.groups.invitations.createGroupInvitationRecord, {
-      groupId: targetGroupId,
-      email: "secondary@example.test",
-      token: "destination-invitation",
-      invitedByUserId: ownerId,
-    });
+    await t.run((ctx) =>
+      ctx.db.insert("groupMembers", {
+        groupId: targetGroupId,
+        userId: ownerId,
+        role: "owner",
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+    await t
+      .withIdentity({ tokenIdentifier: ownerId })
+      .mutation(internal.groups.invitations.createGroupInvitationRecord, {
+        groupId: targetGroupId,
+        email: "secondary@example.test",
+        token: "destination-invitation",
+        clerkInvitationId: "clerk-destination",
+        invitedByUserId: ownerId,
+      });
     await operate("transfer");
     await expect(accept("destination-invitation")).resolves.toEqual(targetGroupId);
   });

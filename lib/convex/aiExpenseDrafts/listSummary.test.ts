@@ -317,6 +317,7 @@ describe("解析結果からの作成", () => {
     });
 
     await createFromExtractionHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       documentType: "receipt",
       shopName: "スーパー青葉",
       date: "2026-06-01",
@@ -406,6 +407,7 @@ describe("解析結果からの作成", () => {
     });
 
     await createFromExtractionHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       documentType: "receipt",
       shopName: "テスト店",
       date: "2026-10-14",
@@ -519,6 +521,7 @@ describe("解析結果からの作成", () => {
     });
 
     await createFailedDraftFromImageAnalysisHandler(ctx, {
+      groupId: GROUP_ID as Id<"groups">,
       warning: "[receipt_extraction:timeout] response body timeout",
       imageFileName: "receipt.jpg",
     });

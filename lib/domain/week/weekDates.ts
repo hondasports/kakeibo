@@ -3,7 +3,7 @@
  * UI / Convex の両方から利用できる純粋関数のみを含む。
  */
 
-import { addDays } from "../common/date";
+import { addDays, isValidCalendarDate } from "../common/date";
 
 /** 既定の週開始曜日（月曜日）。曜日は JavaScript の Date と同じく 0=日〜6=土。 */
 export const DEFAULT_WEEK_START_DAY = 1;
@@ -71,6 +71,5 @@ export function isValidIsoDateString(dateStr: string): boolean {
     return false;
   }
   const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  return isValidCalendarDate(year, month, day);
 }

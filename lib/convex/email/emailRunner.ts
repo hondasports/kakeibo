@@ -84,11 +84,20 @@ export function createResendEventRunner(
       );
       return doc ? toEmailWebhookEventRecord(doc) : null;
     },
+    async refreshLegacyJobRetention(jobId, updatedAt) {
+      await ctx.runMutation(internal.email.internal.refreshLegacyJobRetention, {
+        jobId: jobId as Id<"transactionalEmailJobs">,
+        updatedAt,
+      });
+    },
     async updateJobStatusFromWebhook(args) {
       await ctx.runMutation(internal.email.internal.updateJobStatusFromWebhook, {
         jobId: args.jobId as Id<"transactionalEmailJobs">,
         status: args.status,
         lastProviderEventAt: args.lastProviderEventAt,
+        ...(args.lastVerifiedProviderEventAt === undefined
+          ? {}
+          : { lastVerifiedProviderEventAt: args.lastVerifiedProviderEventAt }),
         updatedAt: args.updatedAt,
       });
     },

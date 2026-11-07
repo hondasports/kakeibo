@@ -255,7 +255,7 @@ describe("inviteMemberHandler", () => {
   it("ローカル予約を作ってから Clerk invitation を作成し、成功後に clerkInvitationId を追記する", async () => {
     const createInvitation = vi.fn().mockResolvedValue({ id: "clerk-invite-001" });
     const getClerkClient = vi.fn(() => ({
-      invitations: { createInvitation },
+      invitations: { createInvitation, revokeInvitation: vi.fn(async () => undefined) },
     }));
     const createToken = vi.fn(() => "invite-token");
     const ctx = {
@@ -351,7 +351,7 @@ describe("inviteMemberHandler", () => {
   it("Clerk invitation 作成に失敗したらローカル予約を削除する", async () => {
     const createInvitation = vi.fn().mockRejectedValue(new Error("Clerk unavailable"));
     const getClerkClient = vi.fn(() => ({
-      invitations: { createInvitation },
+      invitations: { createInvitation, revokeInvitation: vi.fn(async () => undefined) },
     }));
     const createToken = vi.fn(() => "invite-token");
     const ctx = {

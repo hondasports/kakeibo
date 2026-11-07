@@ -21,6 +21,7 @@ export type TransactionalEmailJobRecord = {
   status: TransactionalEmailJobStatus;
   providerMessageId?: string;
   lastProviderEventAt?: number;
+  lastVerifiedProviderEventAt?: number;
   attemptCount: number;
   maxAttempts: number;
   nextRetryAt?: number;
@@ -52,6 +53,7 @@ export type EmailWebhookEventRecord = {
   recipientEmail?: string;
   payloadJson: string;
   eventCreatedAt?: number;
+  appliedAt?: number;
   processedAt: number;
   createdAt: number;
 };

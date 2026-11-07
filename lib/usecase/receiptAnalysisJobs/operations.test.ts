@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ReceiptAnalysisJobRecord } from "../../domain/receiptAnalysisJobs/records";
 import {
   MAX_RECEIPT_ANALYSIS_BATCH_FILES,
+  RECEIPT_ANALYSIS_GROUP_SCOPE_ERROR,
   RECEIPT_ANALYSIS_STALE_JOB_ERROR,
   RECEIPT_ANALYSIS_STALE_JOB_MS,
   RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE,
@@ -268,6 +269,9 @@ it("旧actionからgroupIdなしで届く完了更新も受理する", async () 
     getJob: vi
       .fn()
       .mockResolvedValue({ groupId: "group-1", draftId: "new-draft", status: "ready" }),
+    getDraft: vi
+      .fn()
+      .mockResolvedValue({ id: "new-draft", groupId: "group-1", status: "ready", updatedAt: 1 }),
     deleteDraftAndItems: vi.fn(),
   } as unknown as ReceiptAnalysisStore;
   await expect(
@@ -501,6 +505,9 @@ describe("回復と遅れて終わる解析の競合", () => {
         groupId: "group-1",
         status: "failed",
       }),
+      getDraft: vi
+        .fn()
+        .mockResolvedValue({ id: "draft-late", groupId: "group-1", status: "ready", updatedAt: 1 }),
       deleteDraftAndItems: vi.fn(),
       clearJobFields: vi.fn(),
       patchJob: vi.fn(),
@@ -531,6 +538,9 @@ describe("回復と遅れて終わる解析の競合", () => {
         status: "ready",
         draftId: "draft-won",
       }),
+      getDraft: vi
+        .fn()
+        .mockResolvedValue({ id: "draft-late", groupId: "group-1", status: "ready", updatedAt: 1 }),
       deleteDraftAndItems: vi.fn(),
       clearJobFields: vi.fn(),
     } as unknown as ReceiptAnalysisStore;
@@ -548,5 +558,131 @@ describe("回復と遅れて終わる解析の競合", () => {
     expect(result).toEqual({ applied: false });
     expect(store.deleteDraftAndItems).toHaveBeenCalledWith("draft-late", "group-1");
     expect(store.clearJobFields).not.toHaveBeenCalled();
+  });
+});
+
+describe("finalizeReceiptAnalysisAttempt の group 境界", () => {
+  it("job と異なる group に保存された draft は採用せず実際の group で削除して job を failed にする", async () => {
+    const store = {
+      getJob: vi.fn().mockResolvedValue({
+        id: "job-1",
+        batchId: "batch-1",
+        groupId: "group-1",
+        status: "running",
+      }),
+      getDraft: vi.fn().mockResolvedValue({
+        id: "draft-x",
+        groupId: "group-2",
+        status: "ready",
+        updatedAt: 1,
+      }),
+      deleteDraftAndItems: vi.fn(),
+      clearJobFields: vi.fn(),
+      patchJob: vi.fn(),
+      getBatch: vi.fn().mockResolvedValue(null),
+    } as unknown as ReceiptAnalysisStore;
+
+    const result = await finalizeReceiptAnalysisAttempt(
+      { store, scheduler: { scheduleAiReviewCheck: vi.fn() } },
+      {
+        jobId: "job-1",
+        groupId: "group-1",
+        expectedDraftId: null,
+        newDraftId: "draft-x",
+        status: "ready",
+      },
+    );
+
+    expect(result).toEqual({ applied: true });
+    expect(store.deleteDraftAndItems).toHaveBeenCalledWith("draft-x", "group-2");
+    expect(store.clearJobFields).toHaveBeenCalledWith(
+      "job-1",
+      expect.objectContaining({ status: "failed", error: RECEIPT_ANALYSIS_GROUP_SCOPE_ERROR }),
+    );
+    expect(store.patchJob).not.toHaveBeenCalled();
+  });
+
+  it("cancelled job への遅着は group 不一致 draft を実 group で破棄し job 状態を維持する", async () => {
+    const store = {
+      getJob: vi.fn().mockResolvedValue({
+        id: "job-1",
+        batchId: "batch-1",
+        groupId: "group-1",
+        status: "cancelled",
+      }),
+      getDraft: vi.fn().mockResolvedValue({
+        id: "draft-x",
+        groupId: "group-2",
+        status: "ready",
+        updatedAt: 1,
+      }),
+      deleteDraftAndItems: vi.fn(),
+      clearJobFields: vi.fn(),
+      patchJob: vi.fn(),
+    } as unknown as ReceiptAnalysisStore;
+
+    const result = await finalizeReceiptAnalysisAttempt(
+      { store, scheduler: { scheduleAiReviewCheck: vi.fn() } },
+      {
+        jobId: "job-1",
+        groupId: "group-1",
+        expectedDraftId: null,
+        newDraftId: "draft-x",
+        status: "ready",
+      },
+    );
+
+    expect(result).toEqual({ applied: false });
+    expect(store.deleteDraftAndItems).toHaveBeenCalledTimes(1);
+    expect(store.deleteDraftAndItems).toHaveBeenCalledWith("draft-x", "group-2");
+    expect(store.clearJobFields).not.toHaveBeenCalled();
+    expect(store.patchJob).not.toHaveBeenCalled();
+  });
+
+  it("再解析で旧 draft がある job も group 不一致なら failed にし旧 draft を維持する", async () => {
+    const drafts: Record<
+      string,
+      { id: string; groupId: string; status: string; updatedAt: number }
+    > = {
+      "draft-x": { id: "draft-x", groupId: "group-2", status: "ready", updatedAt: 20 },
+      "draft-old": { id: "draft-old", groupId: "group-1", status: "needs_review", updatedAt: 10 },
+    };
+    const store = {
+      getJob: vi.fn().mockResolvedValue({
+        id: "job-1",
+        batchId: "batch-1",
+        groupId: "group-1",
+        status: "running",
+        draftId: "draft-old",
+      }),
+      getDraft: vi.fn().mockImplementation(async (id: string) => drafts[id] ?? null),
+      deleteDraftAndItems: vi.fn(),
+      clearJobFields: vi.fn(),
+      patchJob: vi.fn(),
+      getBatch: vi.fn().mockResolvedValue(null),
+    } as unknown as ReceiptAnalysisStore;
+
+    const result = await finalizeReceiptAnalysisAttempt(
+      { store, scheduler: { scheduleAiReviewCheck: vi.fn() } },
+      {
+        jobId: "job-1",
+        groupId: "group-1",
+        expectedDraftId: "draft-old",
+        expectedDraftUpdatedAt: 10,
+        newDraftId: "draft-x",
+        status: "ready",
+      },
+    );
+
+    expect(result).toEqual({ applied: true });
+    expect(store.deleteDraftAndItems).toHaveBeenCalledWith("draft-x", "group-2");
+    expect(store.deleteDraftAndItems).not.toHaveBeenCalledWith("draft-old", expect.anything());
+    expect(store.clearJobFields).toHaveBeenCalledWith(
+      "job-1",
+      expect.objectContaining({ status: "failed", error: RECEIPT_ANALYSIS_GROUP_SCOPE_ERROR }),
+    );
+    const patch = vi.mocked(store.clearJobFields).mock.calls[0][1] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty("draftId");
+    expect(patch).not.toHaveProperty("clearDraftId");
   });
 });

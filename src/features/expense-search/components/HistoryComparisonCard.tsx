@@ -1,7 +1,8 @@
 import { Box, Button, Paper, Stack, Typography } from "@mui/material";
 import type { HistoryComparison } from "../../../../lib/domain/expenseSearch/analytics";
+import { formatSignedYen } from "../../../../lib/domain/common/currency";
 import { formatDateForDisplay } from "../../../utils/date";
-import { formatSignedPercent, formatSignedYen } from "./historyFormat";
+import { formatSignedPercent } from "./historyFormat";
 
 function formatRange(startDate: string, endDate: string): string {
   return `${formatDateForDisplay(startDate)}〜${formatDateForDisplay(endDate)}`;

@@ -1,6 +1,7 @@
+import type { RecordType } from "../../../../lib/domain/common/recordKind";
 import type { ReceiptItem } from "../types/types";
 
-export type SpendingSelectionKey = `${"expenseEntry" | "receipt"}:${string}`;
+export type SpendingSelectionKey = `${RecordType}:${string}`;
 
 export function getSpendingSelectionKey(
   receipt: Pick<ReceiptItem, "_id" | "recordType">,
@@ -13,12 +14,12 @@ export function isSelectableExpenseReceipt(receipt: ReceiptItem): boolean {
 }
 
 export function parseSpendingSelectionKey(key: SpendingSelectionKey): {
-  recordType: "expenseEntry" | "receipt";
+  recordType: RecordType;
   id: string;
 } {
   const [recordType, ...rest] = key.split(":");
   return {
-    recordType: recordType as "expenseEntry" | "receipt",
+    recordType: recordType as RecordType,
     id: rest.join(":"),
   };
 }

@@ -1,4 +1,5 @@
 import type { EntryKind } from "../common/entryKind";
+import type { RecordType } from "../common/recordKind";
 import type { AiExpenseRegistrationMode } from "../aiExpenseDrafts/receiptDataContract";
 
 export type SpendingEntry = {
@@ -10,7 +11,7 @@ export type SpendingEntry = {
   amountYen: number;
   categoryId: string;
   memo?: string;
-  recordType: "expenseEntry" | "receipt";
+  recordType: RecordType;
   itemName?: string;
   receiptGroupId?: string;
   receiptShopName?: string;
@@ -26,7 +27,7 @@ export type IncomeListEntry = {
   bankName?: string;
   amountYen: number;
   memo?: string;
-  recordType: "expenseEntry" | "receipt";
+  recordType: RecordType;
 };
 
 export type ReceiptForSpending = {

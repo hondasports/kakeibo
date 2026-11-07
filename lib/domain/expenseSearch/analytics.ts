@@ -22,7 +22,9 @@ export type HistoryAggregate = {
   byCategory: CategorySummary[];
 };
 
-export type HistoryTrendGranularity = "day" | "week" | "month";
+export const HISTORY_TREND_GRANULARITIES = ["day", "week", "month"] as const;
+
+export type HistoryTrendGranularity = (typeof HISTORY_TREND_GRANULARITIES)[number];
 
 export type HistoryTrendPoint = {
   key: string;

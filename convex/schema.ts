@@ -1,5 +1,5 @@
 import { RECEIPT_DATA_CONTRACT_VERSION } from "../lib/domain/aiExpenseDrafts/receiptDataContract";
-import { ENTRY_KINDS } from "../lib/domain/common/entryKind";
+import { entryKindValidator } from "../lib/convex/receipts/validators";
 import { EXPENSE_ENTRY_SOURCES } from "../lib/domain/expenseEntries/expenseEntry";
 import {
   SOURCE_DOCUMENT_SOURCE_TYPES,
@@ -217,6 +217,7 @@ export default defineSchema({
     status: v.union(...GROUP_INVITATION_STATUSES.map((value) => v.literal(value))),
     invitedByUserId: v.string(),
     clerkInvitationId: v.optional(v.string()),
+    deliveryPending: v.optional(v.boolean()),
     acceptedByUserId: v.optional(v.string()),
     acceptedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -444,7 +445,7 @@ export default defineSchema({
     categoryId: v.optional(v.id("categories")),
     title: v.string(),
     memo: v.optional(v.string()),
-    entryType: v.union(...ENTRY_KINDS.map((value) => v.literal(value))),
+    entryType: entryKindValidator,
     source: v.union(...EXPENSE_ENTRY_SOURCES.map((value) => v.literal(value))),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -461,7 +462,7 @@ export default defineSchema({
     createdByUserId: v.optional(v.string()),
     date: v.string(),
     // type は支出(expense) / 収入(income) を区別する。既存レコードとの後方互換のため optional とする。
-    type: v.optional(v.union(...ENTRY_KINDS.map((value) => v.literal(value)))),
+    type: v.optional(entryKindValidator),
     // shopName は支出の場合に使用する。後方互換のため optional とする。
     shopName: v.optional(v.string()),
     // bankName は収入の場合に使用する。
@@ -623,6 +624,7 @@ export default defineSchema({
     status: transactionalEmailJobStatusValidator,
     providerMessageId: v.optional(v.string()),
     lastProviderEventAt: v.optional(v.number()),
+    lastVerifiedProviderEventAt: v.optional(v.number()),
     attemptCount: v.number(),
     maxAttempts: v.number(),
     nextRetryAt: v.optional(v.number()),
@@ -705,6 +707,7 @@ export default defineSchema({
     recipientEmail: v.optional(v.string()),
     payloadJson: v.string(),
     eventCreatedAt: v.optional(v.number()),
+    appliedAt: v.optional(v.number()),
     processedAt: v.number(),
     createdAt: v.number(),
   })

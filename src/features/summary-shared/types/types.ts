@@ -1,3 +1,7 @@
+import type { EntryKind } from "../../../../lib/domain/common/entryKind";
+import type { RecordType } from "../../../../lib/domain/common/recordKind";
+import type { AiExpenseRegistrationMode } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
+
 export type CategorySummary = {
   categoryId: string;
   categoryName: string;
@@ -9,7 +13,7 @@ export type CategorySummary = {
 export type ReceiptItem = {
   _id: string;
   date: string;
-  type?: "expense" | "income";
+  type?: EntryKind;
   shopName?: string;
   bankName?: string;
   amountYen: number;
@@ -17,13 +21,13 @@ export type ReceiptItem = {
   categoryName: string;
   categoryColor: string;
   memo?: string;
-  recordType: "expenseEntry" | "receipt";
+  recordType: RecordType;
   itemName?: string;
   receiptGroupId?: string;
   receiptShopName?: string;
   receiptTotalAmountYen?: number;
   aiExpenseDraftId?: string;
-  registrationMode?: "detailed" | "totalOnly";
+  registrationMode?: AiExpenseRegistrationMode;
 };
 
 export type ReceiptGroup = {
@@ -70,7 +74,7 @@ export type IncomeItem = {
   bankName?: string;
   amountYen: number;
   memo?: string;
-  recordType: "expenseEntry" | "receipt";
+  recordType: RecordType;
 };
 
 export function incomeItemToReceiptItem(income: IncomeItem): ReceiptItem {

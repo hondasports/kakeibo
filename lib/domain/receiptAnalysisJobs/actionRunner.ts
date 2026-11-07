@@ -21,6 +21,7 @@ export interface ReceiptAnalysisActionRunner {
     groupId: string,
   ): Promise<{ draftUpdatedAt: number; value: unknown } | null>;
   analyzeImage(args: {
+    groupId: string;
     imageDataUrl: string;
     imageFileName: string;
     telemetryId: string;
@@ -30,6 +31,7 @@ export interface ReceiptAnalysisActionRunner {
     telemetryId: string,
     imageFileName: string,
     error: unknown,
+    groupId: string,
   ): Promise<AnalysisDraftResult>;
   finalizeAttempt(args: {
     jobId: string;

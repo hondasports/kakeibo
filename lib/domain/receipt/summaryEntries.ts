@@ -1,5 +1,6 @@
 import type { SpendingEntry } from "./spendingEntry";
 import type { EntryKind } from "../common/entryKind";
+import type { RecordType } from "../common/recordKind";
 import type { AiExpenseRegistrationMode } from "../aiExpenseDrafts/receiptDataContract";
 
 export type CategoryInfoMap = Map<string, { name: string; color: string }>;
@@ -15,7 +16,7 @@ export type SummaryReceiptEntry = {
   categoryName: string;
   categoryColor: string;
   memo?: string;
-  recordType: "expenseEntry" | "receipt";
+  recordType: RecordType;
   itemName?: string;
   receiptGroupId?: string;
   receiptShopName?: string;

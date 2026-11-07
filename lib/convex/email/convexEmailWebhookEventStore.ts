@@ -33,6 +33,7 @@ export function toEmailWebhookEventRecord(doc: Doc<"emailWebhookEvents">): Email
     ...(doc.recipientEmail === undefined ? {} : { recipientEmail: doc.recipientEmail }),
     payloadJson: doc.payloadJson,
     ...(doc.eventCreatedAt === undefined ? {} : { eventCreatedAt: doc.eventCreatedAt }),
+    ...(doc.appliedAt === undefined ? {} : { appliedAt: doc.appliedAt }),
     processedAt: doc.processedAt,
     createdAt: doc.createdAt,
   };
@@ -82,6 +83,9 @@ export function createEmailWebhookEventStore(ctx: Pick<MutationCtx, "db">): Emai
     ...createEmailWebhookEventReader(ctx),
     async insertEvent(fields) {
       return await ctx.db.insert("emailWebhookEvents", fields);
+    },
+    async markEventApplied(id, appliedAt) {
+      await ctx.db.patch(id as Id<"emailWebhookEvents">, { appliedAt });
     },
     async deleteEvent(id) {
       await ctx.db.delete(id as Id<"emailWebhookEvents">);

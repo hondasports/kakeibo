@@ -4,7 +4,7 @@
 
 要件・設計ドキュメントには将来方針や互換性維持のための記述も含まれるため、実装済みかどうかを判断するときは本書とコードを参照する。コードと本書が食い違う場合はコードを正とし、変更したPRで本書も追随させる。
 
-更新基準: `preview` branch のコード（2026-10-31確認）
+更新基準: `preview` branch のコード（2026-11-06確認）
 
 ## 1. 技術スタック
 
@@ -80,7 +80,9 @@
 | `/group/delete/status/:jobId` | グループ削除状況 | 非同期削除ジョブ |
 | `/admin` | システム管理 | `SystemAdminRouteGuard` 配下 |
 
-`/admin` 配下には、ユーザー検索・詳細、グループ検索・詳細、監査ログ、システム管理者管理、グループ削除復旧の画面がある。
+`/admin` 配下には、ユーザー検索・詳細、グループ検索・詳細、監査ログ、システム管理者管理、グループ削除復旧、通知設定の画面がある。
+
+`/sso-callback` は通常のルートではなく `src/App.tsx` で直接処理する。公開パス・認証遷移とグループルートガードの境界は `docs/auth-guard.md` を参照する。
 
 ### 3.1 グループルートガード
 
@@ -187,7 +189,7 @@
 
 既存データとの互換層として残っている。新規の手入力・AI登録は `expenseEntries` を主導線とする。
 
-集計コードは移行期間の二重計上を避けるため、`expenseEntries` と互換 `receipts` の扱いを統合している。詳細は `docs/technical-design.md` のM18節を参照する。
+集計コードは移行期間の二重計上を避けるため、期間・種別ごとに `expenseEntries` と互換 `receipts` の取得元を選ぶ。週収入・月収入・履歴検索の違いは `docs/technical-design.md` 12.2節を参照する。
 
 ## 6. AIレシート入力
 
@@ -290,7 +292,13 @@ LINEからの家計データ登録・更新・削除は「実装済み」とは�
 | POST | `/webhooks/resend` | Resend webhook |
 | POST | `/webhooks/line` | LINE Messaging API webhook |
 
-E2E専用HTTPエンドポイントはデプロイ時の環境変数に依存せず常時登録される。各handlerが `APP_ENV=development`、secret、固定E2Eユーザーを実行時に検証し、それ以外ではfail-closedする。詳細は `docs/environment-variables.md` を参照する。
+Resend webhookは署名検証済みpayload最上位の発生時刻を使い、通知の順序を判定する。旧形式でWebhook状態更新済みのメールは過去の正確な発生時刻を復元できないため、状態を保留する。対象jobが存在する間はイベント記録と配信停止を続け、通知を受けた旧jobの保持期限を延長する。保留は自動解除されず、同じイベントの再送でも解除されない。終端メールjobは最終更新から30日、イベントは処理時刻から30日でそれぞれ削除対象となる。job削除後に届いた通知はイベントとして記録するが、既存仕様では配信停止には反映されない。旧データを正確に自動復旧する機能はない。将来の個別復旧では、[Resend Webhook API](https://resend.com/changelog/headless-webhook-api) の保持期間内に対象Webhookのイベントpayloadを取得・照合する方法が候補となる。ただし履歴の網羅性や未着イベントを確認できない場合は保留を維持する。同じIDのWebhook再送では重複排除され、保留は解除されない。復旧機能は未実装であり、実データの調査・本番変更は対象と操作の明示承認が必要。
+
+送信結果の保存より先に受信したイベントは未適用のまま記録し、providerMessageIdをjobへ保存するmutation内で、そのIDのイベントを照合する。状態・配信停止の反映と適用印（`emailWebhookEvents.appliedAt`）を同じtransactionで保存するため、Webhookと送信保存の順序に依存せず、再送・送信結果の再保存でも二重反映やsentへの巻き戻りを防ぐ。未知のメッセージはjobに結びつくまで配信停止に使わず、発生時刻のない旧イベントは推測で適用しない。保持期間とcleanup条件は変えない。既に関連づけ済みの全jobを走査・復旧するmigrationは行わない。
+
+`appliedAt` はoptionalで既存行のbackfillは不要。修正を戻す場合も、書き込み済み行との互換性のためschemaのoptionalフィールドは残し、処理側の変更だけを戻す。フィールドの削除や既存データの個別復旧は別途承認・migrationが必要となる。
+
+E2E専用HTTPエンドポイントはデプロイ時の環境変数に依存せず常時登録される。各handlerは `APP_ENV=development` とsecretを実行時に検証する。seed・cleanup等は固定E2Eユーザーも検証するが、`/e2e/purge-orphans` はユーザーIDを要求せずdeployment全体の孤児・終端運用データを対象にする。対象範囲とcron経路は `docs/environment-variables.md` を参照する。
 
 ## 10. 現行コードで未実装・将来扱いの主な項目
 

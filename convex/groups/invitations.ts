@@ -1,4 +1,6 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
+import { requireGroupMembershipForGroup } from "./membership";
+import { assertGroupOwnerRole } from "./adminGuards";
 import { internalMutation, internalQuery, mutation } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
@@ -55,13 +57,18 @@ export async function createGroupInvitationRecordHandler(
     clerkInvitationId?: string;
   },
 ) {
+  const membership = await requireGroupMembershipForGroup(ctx, args.groupId);
+  assertGroupOwnerRole(membership.role);
+  if (membership.userId !== args.invitedByUserId || (await ctx.db.get(args.groupId)) === null) {
+    throw new ConvexError("招待を作成する権限がありません");
+  }
   const invitationId = await createGroupInvitationRecordUsecase(createGroupMutationDeps(ctx), args);
   return invitationId as Id<"groupInvitations">;
 }
 
 export async function deletePendingGroupInvitationRecordByTokenHandler(
   ctx: MutationCtx,
-  args: { token: string },
+  args: { token: string; clerkInvitationId?: string },
 ) {
   const invitationId = await deletePendingGroupInvitationRecordByTokenUsecase(
     createGroupMutationDeps(ctx),
@@ -93,7 +100,7 @@ export const createGroupInvitationRecord = internalMutation({
 });
 
 export const deletePendingGroupInvitationRecordByToken = internalMutation({
-  args: { token: v.string() },
+  args: { token: v.string(), clerkInvitationId: v.optional(v.string()) },
   handler: deletePendingGroupInvitationRecordByTokenHandler,
 });
 

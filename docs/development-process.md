@@ -288,7 +288,7 @@ CIで実行するbackendは共有cloud devではなく、ジョブごとの `CON
 - `.github/workflows/preview-deploy.yml`
 - `.github/workflows/production-release.yml`
 
-各workflowのNode.jsは `jdx/mise-action`（SHA固定。現行 `v5.2.3`）でリポジトリの `mise.toml` から導入する。pnpmは `package.json` の `packageManager` に合わせて `pnpm/action-setup` で導入し、ローカルとCIでNode.jsの選択元を分けない。
+各workflowのNode.jsは `jdx/mise-action`（SHA固定。現行 `v5.2.5`）でリポジトリの `mise.toml` から導入する。pnpmは `package.json` の `packageManager` に合わせて `pnpm/action-setup` で導入し、ローカルとCIでNode.jsの選択元を分けない。
 
 通常CIの主なcheck:
 
@@ -304,7 +304,7 @@ PRのrequired checksがすべてsuccessになるまでmergeしない。
 
 `ci.yml` の `push` triggerは `preview` のみ。`main` への merge commit は `preview -> main` の PR で同一ツリーが検証済みのため、main push では `ci.yml` を再実行しない。同じ理由で `production-release.yml` の preflight も main push 時は lint / format / test をスキップし、手動リリース時のみ実行する。チェック未実行のまま取り込まれた変更を main で再検証したい場合は、`ci.yml` の `workflow_dispatch` で手動実行する。
 
-`ci.yml` は workflow 単位の `paths-ignore` を持たず、常に起動する。先頭の `CI scope` ジョブ（`scripts/ci-change-scope.mjs`）が base/head 間の差分を判定し、`.md` 以外の変更が無いときだけ `Lint` / `Build` / `Test` を skip する（required check は skip を合格扱いする）。scope 判定の失敗・判定不能・新規ブランチのpush（`before` 全ゼロ）・`workflow_dispatch` では安全側に倒して全ジョブを実行する。判定の対象は `.md` のみで、その他の拡張子やディレクトリは除外しない。`.md` だけのPRでも文書差分の機械確認を残したい場合は `git diff --check` 等で代替できる。この「job-level で判定して skip」する考え方は `e2e.yml` の classify ジョブ（後述「PR CI E2Eの差分判定」）と同じである。
+`ci.yml` は workflow 単位の `paths-ignore` を持たず、常に起動する。先頭の `CI scope` ジョブ（`scripts/ci-change-scope.mjs`）が base/head 間の差分を判定し、`.md` 以外の変更が無いときは `Lint` / `Build` を skip する（required check は skip を合格扱いする）。`.md` のみの変更でも、`scripts/unit-related-map.json` に対応づけのあるunit契約テスト（文書を `readFileSync` 等で読むテスト）があれば `Test` ジョブがそのテストだけを実行し、対応テストが無ければ `Test` も skip される。unit関連mapの選定は `verify:prepush` と同じ正本を使い、CI側に別の対応表は持たない。scope 判定の失敗・判定不能・unit関連mapの欠落/破損・新規ブランチのpush（`before` 全ゼロ）・`workflow_dispatch` では安全側に倒して全ジョブを実行する。判定の対象は `.md` のみで、その他の拡張子やディレクトリは除外しない。この「job-level で判定して skip」する考え方は `e2e.yml` の classify ジョブ（後述「PR CI E2Eの差分判定」）と同じである。
 
 ### local / CIの重複を避ける
 

@@ -1,12 +1,5 @@
 import { Box, Paper, Skeleton, Stack, Typography } from "@mui/material";
-import { formatYen, formatYenAbs } from "../../../../lib/domain/common/currency";
-
-function formatNetAmount(value: number): string {
-  if (value === 0) {
-    return formatYen(0);
-  }
-  return `${value < 0 ? "−" : "+"}${formatYenAbs(value)}`;
-}
+import { formatSignedYen, formatYen } from "../../../../lib/domain/common/currency";
 
 function Metric({
   label,
@@ -83,7 +76,7 @@ export function MonthlyMetricsPanel({
             <Metric
               label="差引"
               tone={netAmountYen < 0 ? "warning" : "good"}
-              value={formatNetAmount(netAmountYen)}
+              value={formatSignedYen(netAmountYen)}
             />
           </Box>
         )}

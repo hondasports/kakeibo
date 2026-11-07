@@ -46,3 +46,25 @@ export function resolveStatusAndSuppression(
       return undefined;
   }
 }
+
+const SAME_TIME_STATUS_PRIORITY = {
+  sent: 0,
+  delivered: 1,
+  failed: 2,
+  suppressed: 3,
+  bounced: 4,
+  complained: 5,
+} as const;
+
+export function shouldApplyWebhookStatus(
+  currentStatus: string,
+  nextStatus: StatusAndSuppression["statusUpdate"],
+  watermark: number | undefined,
+  eventCreatedAt: number,
+): boolean {
+  if (watermark === undefined || eventCreatedAt > watermark) return true;
+  if (eventCreatedAt < watermark) return false;
+  const currentPriority =
+    SAME_TIME_STATUS_PRIORITY[currentStatus as keyof typeof SAME_TIME_STATUS_PRIORITY];
+  return currentPriority === undefined || SAME_TIME_STATUS_PRIORITY[nextStatus] > currentPriority;
+}

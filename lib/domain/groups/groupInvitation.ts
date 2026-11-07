@@ -26,6 +26,7 @@ export type GroupInvitationFields = {
   status: GroupInvitationStatus;
   invitedByUserId: string;
   clerkInvitationId?: string;
+  deliveryPending?: boolean;
   acceptedByUserId?: string;
   acceptedAt?: number;
   createdAt: number;
