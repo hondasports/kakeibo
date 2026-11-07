@@ -53,6 +53,7 @@ export type EmailWebhookEventRecord = {
   recipientEmail?: string;
   payloadJson: string;
   eventCreatedAt?: number;
+  appliedAt?: number;
   processedAt: number;
   createdAt: number;
 };

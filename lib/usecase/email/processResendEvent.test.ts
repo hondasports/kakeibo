@@ -19,7 +19,11 @@ function createDeps({
     refreshLegacyJobRetention: vi.fn().mockResolvedValue(undefined),
     upsertSuppression: vi.fn().mockResolvedValue("sup-1"),
   };
-  const events = { insertEvent: vi.fn().mockResolvedValue("event-1") };
+  const events = {
+    insertEvent: vi.fn().mockResolvedValue("event-1"),
+    markEventApplied: vi.fn().mockResolvedValue(undefined),
+    listEventsByProviderMessageId: vi.fn().mockResolvedValue([]),
+  };
   return { runner, events, now: () => 9999 };
 }
 

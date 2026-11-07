@@ -581,7 +581,8 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 - **ユースケース**（`lib/usecase/email/`）: enqueue（payload検証・正規化・
   businessDedupeKey冪等・0ms schedule）、processEmailJob（終端/抑制/payload/
   送信結果の分岐とretry再予約）、processResendEvent（svixId dedupe・event記録・
-  鮮度比較・status更新・suppression upsert）、cleanup、suppression upsert、
+  鮮度比較・status更新・suppression upsert・適用印）、reconcileResendEvents
+  （送信結果保存と同じmutationで先着の未適用eventを照合・反映）、cleanup、suppression upsert、
   E2E用テストレコード削除。
 - **インフラ**（`lib/convex/email/`）: 3テーブルのConvex storeとDoc/Record変換、
   scheduler、action/webhook向けrunQuery/runMutationブリッジ、Resend provider選択
