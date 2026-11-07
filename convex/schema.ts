@@ -707,6 +707,7 @@ export default defineSchema({
     recipientEmail: v.optional(v.string()),
     payloadJson: v.string(),
     eventCreatedAt: v.optional(v.number()),
+    appliedAt: v.optional(v.number()),
     processedAt: v.number(),
     createdAt: v.number(),
   })

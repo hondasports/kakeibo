@@ -106,6 +106,8 @@ export function createEmailJobStore(ctx: Pick<MutationCtx, "db">): Transactional
       return await ctx.db.insert("transactionalEmailJobs", fields);
     },
     async markJobSent(args: MarkJobSentFields) {
+      const job = await ctx.db.get(args.jobId as Id<"transactionalEmailJobs">);
+      if (job?.providerMessageId === args.providerMessageId) return;
       await ctx.db.patch(args.jobId as Id<"transactionalEmailJobs">, {
         providerMessageId: args.providerMessageId,
         status: args.status,

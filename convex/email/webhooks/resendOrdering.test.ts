@@ -10,7 +10,7 @@ import { convexTestModules } from "../../test.setup";
 
 const signingKey = Buffer.from("test-key-only-test-key-only-test");
 
-async function setup(legacy = false) {
+async function setup(legacy = false, linked = true) {
   vi.stubEnv("RESEND_API_KEY", "re_test_synthetic");
   vi.stubEnv("RESEND_WEBHOOK_SECRET", `whsec_${signingKey.toString("base64")}`);
   const t = convexTest(schema, convexTestModules);
@@ -22,8 +22,8 @@ async function setup(legacy = false) {
       normalizedRecipientEmail: "test@example.invalid",
       subject: "test",
       provider: "resend",
-      providerMessageId: "message-id",
-      status: legacy ? "delivered" : "sent",
+      ...(linked ? { providerMessageId: "message-id" } : {}),
+      status: legacy ? "delivered" : linked ? "sent" : "queued",
       attemptCount: 1,
       maxAttempts: 6,
       createdAt: 1,
@@ -61,7 +61,14 @@ async function setup(legacy = false) {
       events: await ctx.db.query("emailWebhookEvents").collect(),
       suppressions: await ctx.db.query("emailSuppressions").collect(),
     }));
-  return { t, send, read };
+  const completeSend = () =>
+    t.mutation(internal.email.internal.updateJobForSend, {
+      jobId,
+      providerMessageId: "message-id",
+      status: "sent",
+      updatedAt: Date.now(),
+    });
+  return { t, send, read, completeSend };
 }
 
 describe("署名済みResend webhookの順序", () => {
@@ -95,6 +102,90 @@ describe("署名済みResend webhookの順序", () => {
     expect((await send("delivered", "email.delivered", "2026-01-01T00:05:00Z")).status).toBe(200);
     expect((await read()).job).toMatchObject({ status: "delivered" });
   });
+  it.each([
+    ["email.delivered", "delivered", undefined],
+    ["email.bounced", "bounced", "bounce"],
+    ["email.complained", "complained", "complaint"],
+  ] as const)(
+    "送信結果保存前の%sを保存時に回収し、再送でも重複しない",
+    async (type, status, reason) => {
+      const { send, read, completeSend } = await setup(false, false);
+      const createdAt = "2026-01-01T00:05:00Z";
+      expect((await send("early", type, createdAt)).status).toBe(200);
+      const pending = await read();
+      expect(pending.job?.status).toBe("queued");
+      expect(pending.suppressions).toHaveLength(0);
+      expect(pending.events).toHaveLength(1);
+      expect(pending.events[0].appliedAt).toBeUndefined();
+
+      await completeSend();
+      const result = await read();
+      expect(result.job).toMatchObject({
+        status,
+        lastVerifiedProviderEventAt: Date.parse(createdAt),
+      });
+      expect(result.suppressions).toEqual(reason ? [expect.objectContaining({ reason })] : []);
+      expect(result.events).toHaveLength(1);
+
+      expect((await send("early", type, createdAt)).status).toBe(200);
+      await completeSend();
+      expect(await read()).toEqual(result);
+    },
+  );
+  it.each([
+    ["email.delivered", "delivered", undefined],
+    ["email.bounced", "bounced", "bounce"],
+    ["email.complained", "complained", "complaint"],
+  ] as const)("保存処理と%sの同時呼び出しでも副作用を失わない", async (type, status, reason) => {
+    const { send, read, completeSend } = await setup(false, false);
+    const [response] = await Promise.all([
+      send("concurrent", type, "2026-01-01T00:05:00Z"),
+      completeSend(),
+    ]);
+    expect(response.status).toBe(200);
+    const result = await read();
+    expect(result.job?.status).toBe(status);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0].appliedAt).toEqual(expect.any(Number));
+    expect(result.suppressions).toEqual(reason ? [expect.objectContaining({ reason })] : []);
+  });
+  it.each([true, false])(
+    "先着イベントの回収でも時刻順と配信停止を守る（bounceが先=%s）",
+    async (bounceFirst) => {
+      const { send, read, completeSend } = await setup(false, false);
+      const events = [
+        ["bounce", "email.bounced", "2026-01-01T00:01:00Z"],
+        ["delivered", "email.delivered", "2026-01-01T00:05:00Z"],
+      ];
+      for (const [id, type, time] of bounceFirst ? events : events.reverse()) {
+        expect((await send(id, type, time)).status).toBe(200);
+      }
+      expect((await send("delay", "email.delivery_delayed", "2026-01-01T00:10:00Z")).status).toBe(
+        200,
+      );
+      await completeSend();
+      expect((await send("late-sent", "email.sent", "2026-01-01T00:00:01Z")).status).toBe(200);
+      const result = await read();
+      expect(result.job).toMatchObject({
+        status: "delivered",
+        lastVerifiedProviderEventAt: Date.parse("2026-01-01T00:05:00Z"),
+      });
+      expect(result.suppressions).toEqual([expect.objectContaining({ reason: "bounce" })]);
+    },
+  );
+  it.each([true, false])(
+    "回収でも同時刻は配信完了を送信より優先する（配信完了が先=%s）",
+    async (deliveredFirst) => {
+      const { send, read, completeSend } = await setup(false, false);
+      for (const type of deliveredFirst
+        ? ["email.delivered", "email.sent"]
+        : ["email.sent", "email.delivered"]) {
+        expect((await send(type, type, "2026-01-01T00:05:00Z")).status).toBe(200);
+      }
+      await completeSend();
+      expect((await read()).job?.status).toBe("delivered");
+    },
+  );
   it.each([true, false])(
     "同時刻の通知は到着順に依らず配信完了を優先する（配信完了が先=%s）",
     async (deliveredFirst) => {
@@ -107,6 +198,90 @@ describe("署名済みResend webhookの順序", () => {
       expect((await read()).job).toMatchObject({ status: "delivered" });
     },
   );
+  it("別のメッセージの先着イベントは回収せず配信停止を登録しない", async () => {
+    const { t, send, read } = await setup(false, false);
+    expect((await send("unknown", "email.bounced", "2026-01-01T00:05:00Z")).status).toBe(200);
+    const otherJob = await t.run((ctx) =>
+      ctx.db.insert("transactionalEmailJobs", {
+        templateType: "email_delivery_test",
+        payloadJson: "{}",
+        recipientEmail: "other@example.invalid",
+        normalizedRecipientEmail: "other@example.invalid",
+        subject: "test",
+        provider: "resend",
+        status: "queued",
+        attemptCount: 1,
+        maxAttempts: 6,
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+    await t.mutation(internal.email.internal.updateJobForSend, {
+      jobId: otherJob,
+      providerMessageId: "another-message-id",
+      status: "sent",
+      updatedAt: 2,
+    });
+    const result = await read();
+    expect(result.job?.status).toBe("queued");
+    expect(result.events[0].appliedAt).toBeUndefined();
+    expect(result.suppressions).toHaveLength(0);
+  });
+  it("時刻のない旧イベントは推測で回収しない", async () => {
+    const { t, read, completeSend } = await setup(false, false);
+    await t.run((ctx) =>
+      ctx.db.insert("emailWebhookEvents", {
+        svixId: "legacy-event",
+        provider: "resend",
+        eventType: "email.bounced",
+        providerMessageId: "message-id",
+        recipientEmail: "test@example.invalid",
+        payloadJson: JSON.stringify({ email_id: "message-id" }),
+        processedAt: 1,
+        createdAt: 1,
+      }),
+    );
+    await completeSend();
+    const result = await read();
+    expect(result.job?.status).toBe("sent");
+    expect(result.job?.lastVerifiedProviderEventAt).toBeUndefined();
+    expect(result.events[0].appliedAt).toBeUndefined();
+    expect(result.suppressions).toHaveLength(0);
+  });
+  it("旧形式の状態は送信結果の再保存でも上書きしない", async () => {
+    const { send, read, completeSend } = await setup(true);
+    expect((await send("legacy-bounce", "email.bounced", "2026-01-01T00:05:00Z")).status).toBe(200);
+    const before = await read();
+    await completeSend();
+    expect(await read()).toEqual(before);
+    expect(before.job?.status).toBe("delivered");
+    expect(before.job?.lastVerifiedProviderEventAt).toBeUndefined();
+  });
+  it("先着イベントの回収が失敗したら送信結果・副作用・適用印もcommitしない", async () => {
+    const { t, send, read, completeSend } = await setup(false, false);
+    expect((await send("early-bounce", "email.bounced", "2026-01-01T00:05:00Z")).status).toBe(200);
+    await t.run((ctx) =>
+      ctx.db.insert("emailWebhookEvents", {
+        svixId: "corrupt-event",
+        provider: "resend",
+        eventType: "email.delivered",
+        providerMessageId: "message-id",
+        payloadJson: "not-json",
+        eventCreatedAt: Date.parse("2026-01-01T00:10:00Z"),
+        processedAt: 1,
+        createdAt: 1,
+      }),
+    );
+    const before = await read();
+    await expect(completeSend()).rejects.toThrow("Invalid webhook payload JSON");
+    expect(await read()).toEqual(before);
+    await t.run((ctx) =>
+      ctx.db.delete(before.events.find((event) => event.svixId === "corrupt-event")!._id),
+    );
+    await completeSend();
+    expect((await read()).job?.status).toBe("bounced");
+    expect((await read()).suppressions).toHaveLength(1);
+  });
   it("旧形式の状態を保留しつつイベント記録と配信停止を続ける", async () => {
     const { send, read } = await setup(true);
     expect((await send("sent", "email.sent", "2026-01-01T00:00:01Z")).status).toBe(200);

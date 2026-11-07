@@ -1,12 +1,9 @@
 import { ConvexError } from "convex/values";
-import {
-  normalizeEmail,
-  type EmailSuppressionReason,
-  type EmailWebhookEventType,
-} from "../../email/model";
+import { normalizeEmail, type EmailWebhookEventType } from "../../email/model";
 import { extractResendEventFields, type ResendWebhookPayloadData } from "../../domain/email/rules";
 import type { ResendEventRunner } from "../../domain/email/runner";
 import type { EmailWebhookEventStore } from "../../domain/email/store";
+import type { EmailWebhookEventRecord } from "../../domain/email/records";
 import { resolveStatusAndSuppression, shouldApplyWebhookStatus } from "../../domain/email/webhook";
 
 export type ProcessResendEventArgs = {
@@ -20,17 +17,17 @@ export type ProcessResendEventArgs = {
 
 export type ProcessResendEventDeps = {
   runner: ResendEventRunner;
-  events: Pick<EmailWebhookEventStore, "insertEvent">;
+  events: Pick<
+    EmailWebhookEventStore,
+    "insertEvent" | "markEventApplied" | "listEventsByProviderMessageId"
+  >;
   now?: () => number;
 };
 
-export async function processResendEvent(
-  deps: ProcessResendEventDeps,
-  args: ProcessResendEventArgs,
-): Promise<void> {
+function parsePayload(payloadJson: string): ResendWebhookPayloadData {
   let data: unknown;
   try {
-    data = JSON.parse(args.payloadJson);
+    data = JSON.parse(payloadJson);
   } catch {
     throw new ConvexError("Invalid webhook payload JSON");
   }
@@ -38,7 +35,14 @@ export async function processResendEvent(
     throw new ConvexError("Invalid webhook payload JSON");
   }
 
-  const typedData = data as ResendWebhookPayloadData;
+  return data as ResendWebhookPayloadData;
+}
+
+export async function processResendEvent(
+  deps: ProcessResendEventDeps,
+  args: ProcessResendEventArgs,
+): Promise<void> {
+  const typedData = parsePayload(args.payloadJson);
   const { providerMessageId, recipientEmail } = extractResendEventFields(typedData);
   const eventCreatedAt = args.eventCreatedAt;
 
@@ -51,21 +55,8 @@ export async function processResendEvent(
     throw new ConvexError("Invalid webhook event timestamp");
   }
 
-  let statusUpdate:
-    | NonNullable<ReturnType<typeof resolveStatusAndSuppression>>["statusUpdate"]
-    | undefined;
-  let suppressionReason: EmailSuppressionReason | undefined;
-  let suppressionSource: string | undefined;
-  const resolved = resolveStatusAndSuppression(args.eventType, typedData);
-  if (resolved) {
-    statusUpdate = resolved.statusUpdate;
-    suppressionReason = resolved.suppressionReason;
-    suppressionSource = resolved.suppressionSource;
-  }
-
   const now = (deps.now ?? Date.now)();
-
-  await deps.events.insertEvent({
+  const event = {
     svixId: args.svixId,
     provider: args.provider,
     eventType: args.eventType,
@@ -75,9 +66,29 @@ export async function processResendEvent(
     eventCreatedAt,
     processedAt: args.processedAt,
     createdAt: now,
-  });
+  };
+  const id = await deps.events.insertEvent(event);
+  await applyResendEvent(deps, { ...event, id }, now);
+}
 
-  if (!providerMessageId || !statusUpdate) {
+export async function reconcileResendEvents(
+  deps: ProcessResendEventDeps,
+  providerMessageId: string,
+): Promise<void> {
+  const events = await deps.events.listEventsByProviderMessageId(providerMessageId);
+  const now = (deps.now ?? Date.now)();
+  for (const event of events) {
+    if (event.appliedAt === undefined) await applyResendEvent(deps, event, now);
+  }
+}
+
+async function applyResendEvent(
+  deps: ProcessResendEventDeps,
+  event: EmailWebhookEventRecord,
+  now: number,
+): Promise<void> {
+  const { providerMessageId, recipientEmail, eventCreatedAt } = event;
+  if (!providerMessageId || eventCreatedAt === undefined || !Number.isFinite(eventCreatedAt)) {
     return;
   }
 
@@ -86,6 +97,12 @@ export async function processResendEvent(
     return;
   }
 
+  const resolved = resolveStatusAndSuppression(event.eventType, parsePayload(event.payloadJson));
+  if (!resolved) {
+    await deps.events.markEventApplied(event.id, now);
+    return;
+  }
+  const { statusUpdate, suppressionReason, suppressionSource } = resolved;
   const watermark = job.lastVerifiedProviderEventAt;
   const isLegacyState = watermark === undefined && job.lastProviderEventAt !== undefined;
   if (isLegacyState) {
@@ -93,8 +110,6 @@ export async function processResendEvent(
   }
   if (
     !isLegacyState &&
-    eventCreatedAt !== undefined &&
-    Number.isFinite(eventCreatedAt) &&
     shouldApplyWebhookStatus(job.status, statusUpdate, watermark, eventCreatedAt)
   ) {
     await deps.runner.updateJobStatusFromWebhook({
@@ -116,4 +131,5 @@ export async function processResendEvent(
       createdAt: now,
     });
   }
+  await deps.events.markEventApplied(event.id, now);
 }

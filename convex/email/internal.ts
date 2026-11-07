@@ -10,7 +10,11 @@ import {
   getEmailEventDocBySvixId,
 } from "../../lib/convex/email/convexEmailWebhookEventStore";
 import { deleteTestEmailRecords as deleteTestEmailRecordsUsecase } from "../../lib/usecase/email/deleteTestRecords";
-import { createDeleteTestEmailRecordsDeps } from "../../lib/convex/email/emailDeps";
+import {
+  createDeleteTestEmailRecordsDeps,
+  createProcessResendEventDeps,
+} from "../../lib/convex/email/emailDeps";
+import { reconcileResendEvents } from "../../lib/usecase/email/processResendEvent";
 
 export const getJobById = internalQuery({
   args: { jobId: v.id("transactionalEmailJobs") },
@@ -37,6 +41,7 @@ export const updateJobForSend = internalMutation({
   },
   handler: async (ctx, args) => {
     await createEmailJobStore(ctx).markJobSent(args);
+    await reconcileResendEvents(createProcessResendEventDeps(ctx), args.providerMessageId);
   },
 });
 
