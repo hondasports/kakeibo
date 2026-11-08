@@ -6,6 +6,7 @@ import {
 import { interpretReceiptTax } from "./interpretReceiptTax";
 import type {
   AmountBasis,
+  ExtractedReceiptItem,
   ExtractedTaxSummary,
   ReceiptMarkerDefinition,
   ReceiptTaxInput,
@@ -22,6 +23,8 @@ import {
 } from "../observations";
 import { ITEM_IDENTITY_CHANGED, getItemTaxConfirmedFields } from "./itemTaxConfirmation";
 import { deriveReceiptTaxSummaries } from "./deriveReceiptTaxSummaries";
+import { normalizeTaxSummary } from "./taxSummaryConsistency";
+import { taxSummaryEvidenceLines } from "./summaryEvidence";
 
 export type DraftTaxOverride = {
   itemIndex: number;
@@ -73,6 +76,77 @@ function shouldApplyBulkOverride(
   return extracted.amountBasis === "unknown" && extracted.taxRatePercent === null;
 }
 
+function hasPrintedSummaryAmounts(
+  summary: ExtractedTaxSummary,
+  normalizedSources: ExtractedTaxSummary[],
+  input: ReinterpretDraftTaxInput,
+  lines: ReturnType<typeof resolveObservationAmounts>,
+): boolean {
+  const options = {
+    singleSummary: normalizedSources.length === 1,
+    classifications: input.receiptLineClassifications,
+  };
+  return (
+    taxSummaryEvidenceLines(lines, summary.taxRatePercent, "target", options).some(
+      (line) => line.amountYen === summary.taxableAmountYen,
+    ) &&
+    taxSummaryEvidenceLines(lines, summary.taxRatePercent, "tax", options).some(
+      (line) => line.amountYen === summary.taxYen,
+    )
+  );
+}
+
+function resolveReconciledItemBases(
+  items: ExtractedReceiptItem[],
+  normalizedSources: ExtractedTaxSummary[],
+  input: ReinterpretDraftTaxInput,
+  rawObservationLines: ReturnType<typeof resolveObservationAmounts>,
+): ExtractedReceiptItem[] {
+  const candidates = items.map((item, index) => {
+    if (
+      item.amountBasis !== "unknown" ||
+      getItemTaxConfirmedFields(input.items[index]).includes("amountBasis") ||
+      (input.override?.itemIndex === index && input.override.amountBasis !== undefined)
+    )
+      return item;
+    const matching = normalizedSources.filter(
+      (summary) =>
+        summary.taxRatePercent === item.taxRatePercent &&
+        summary.status === "verified" &&
+        summary.reasons?.some(
+          (reason) => reason === "reconciled_to_external" || reason === "reconciled_to_included",
+        ),
+    );
+    if (matching.length !== 1) return item;
+    return { ...item, amountBasis: matching[0].taxableAmountBasis };
+  });
+  if (!candidates.some((item, index) => item.amountBasis !== items[index].amountBasis))
+    return items;
+  const candidateSummaries = deriveReceiptTaxSummaries({
+    amountYen: input.amountYen,
+    items: candidates,
+    lines: rawObservationLines,
+    classifications: input.receiptLineClassifications,
+    correctedSummaries: input.correctedTaxSummaries,
+  });
+  const hasMatchingEvidence = normalizedSources.every((summary) => {
+    const derived = candidateSummaries.find(
+      (entry) => entry.taxRatePercent === summary.taxRatePercent,
+    );
+    return (
+      derived &&
+      derived.warnings.length === 0 &&
+      derived.taxableAmountYen === summary.taxableAmountYen &&
+      derived.taxYen === summary.taxYen &&
+      derived.taxableAmountBasis === summary.taxableAmountBasis &&
+      hasPrintedSummaryAmounts(summary, normalizedSources, input, rawObservationLines)
+    );
+  });
+  return hasMatchingEvidence && candidateSummaries.length === normalizedSources.length
+    ? candidates
+    : items;
+}
+
 export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): ReinterpretDraftTaxResult {
   const rawObservationLines = resolveObservationAmounts(input.rawObservationLines);
   const needsRateConfirmation = input.items.map(
@@ -84,7 +158,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
         shouldApplyBulkOverride(item, draftItemToExtractedReceiptItem(item))
       ),
   );
-  const items = input.items.map((item, index) => {
+  const adjustedItems = input.items.map((item, index) => {
     const extracted = draftItemToExtractedReceiptItem(item);
     // 前回の判定理由は再計算する。OCR由来の一般的な注意は保持する。
     extracted.warnings = extracted.warnings.filter(
@@ -141,6 +215,17 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     }
     return decisionAdjusted;
   });
+
+  const sourceSummaries = input.sourceTaxSummaries ?? [];
+  const normalizedSources = sourceSummaries.map((summary) =>
+    normalizeTaxSummary(summary, sourceSummaries.length === 1 ? input.amountYen : undefined),
+  );
+  const items = resolveReconciledItemBases(
+    adjustedItems,
+    normalizedSources,
+    input,
+    rawObservationLines,
+  );
 
   const confirmedFields = items.map((item, index) => {
     const original = input.items[index];
@@ -286,6 +371,25 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
   );
   const resolvedInterpretation = {
     ...interpretation,
+    taxSummaries: interpretation.taxSummaries.map((summary) => {
+      const matching = normalizedSources.filter(
+        (entry) => entry.taxRatePercent === summary.taxRatePercent,
+      );
+      const source = matching.length === 1 ? matching[0] : undefined;
+      if (
+        summary.status !== "verified" ||
+        source?.status !== "verified" ||
+        source.taxableAmountYen !== summary.taxableAmountYen ||
+        source.taxYen !== summary.taxYen ||
+        source.taxableAmountBasis !== summary.taxableAmountBasis ||
+        !hasPrintedSummaryAmounts(summary, normalizedSources, input, rawObservationLines)
+      )
+        return summary;
+      return {
+        ...summary,
+        reasons: [...new Set([...(summary.reasons ?? []), ...(source.reasons ?? [])])],
+      };
+    }),
     items: effectiveItems,
     decision: hasTaxReadingCorrection
       ? {
