@@ -83,7 +83,7 @@ describe("下書きの修正状態と保存内容", () => {
     );
   });
   it("合計だけ保存では商品修正を必須にしないが、基本情報は必要", () => {
-    const total = { ...form, priceTaxTreatment: "unknown" as const };
+    const total = { ...form, registrationMode: "totalOnly" as const };
     expect(effectiveReviewMode(total)).toBe("totalOnly");
     expect(getReviewGuidance(total, [discount]).filter((issue) => issue.required)).toEqual([]);
     expect(

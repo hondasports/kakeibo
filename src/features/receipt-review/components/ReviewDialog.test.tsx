@@ -27,8 +27,6 @@ const props: ComponentProps<typeof ReviewDialog> = {
     amountYen: "92",
     categoryId: "food",
     registrationMode: "detailed",
-    priceTaxTreatment: "included",
-    taxRateComposition: "mixed",
   },
   reviewItems: [
     {
@@ -176,8 +174,6 @@ describe("下書きの修正導線", () => {
         reviewForm={{
           ...props.reviewForm,
           amountYen: "116",
-          priceTaxTreatment: undefined,
-          taxRateComposition: undefined,
         }}
         reviewItems={[
           {
@@ -256,8 +252,6 @@ describe("下書きの修正導線", () => {
         reviewForm={{
           ...props.reviewForm,
           amountYen: "265",
-          priceTaxTreatment: "excluded",
-          taxRateComposition: "rate8",
         }}
         reviewItems={[108, 138].map((amount, index) => ({
           id: `item-${index}`,
@@ -532,8 +526,6 @@ describe("Issue #892 現在の税内訳に揃えた表示", () => {
         reviewForm={{
           ...props.reviewForm,
           amountYen: "216",
-          priceTaxTreatment: "excluded",
-          taxRateComposition: "rate8",
         }}
         reviewItems={[
           {
@@ -563,7 +555,7 @@ it("個別修正した税込登録額を再描画で上書きしない", async (
   render(
     <ReviewDialog
       {...props}
-      reviewForm={{ ...props.reviewForm, amountYen: "110", taxRateComposition: "rate8" }}
+      reviewForm={{ ...props.reviewForm, amountYen: "110" }}
       reviewItems={[
         {
           ...props.reviewItems[0],

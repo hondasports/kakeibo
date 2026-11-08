@@ -31,9 +31,7 @@ const NON_ACTIONABLE_SUMMARY_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 export function effectiveReviewMode(form: ReviewFormValues) {
-  return form.priceTaxTreatment === "unknown" || form.taxRateComposition === "unknown"
-    ? "totalOnly"
-    : form.registrationMode;
+  return form.registrationMode;
 }
 
 /** The same list drives required counts, inline messages and the primary action. */

@@ -75,12 +75,6 @@ describe("validateTaxInterpretationEligibility", () => {
       validateTaxInterpretationEligibility(makeDraft({ taxSummaries: [] }), "g1", undefined),
     ).toMatchObject({ success: true });
   });
-  it("decisionOverride があれば税サマリ無しでも許可する", () => {
-    const r = validateTaxInterpretationEligibility(makeDraft({ taxSummaries: [] }), "g1", {
-      decisionOverride: { priceTaxTreatment: "included" },
-    });
-    expect(r.success).toBe(true);
-  });
   it("明細単位のoverrideがあれば税サマリ無しでも許可する", () => {
     const r = validateTaxInterpretationEligibility(makeDraft({ taxSummaries: [] }), "g1", {
       override: { itemIndex: 0, taxRatePercent: 8, amountBasis: "tax_included" },

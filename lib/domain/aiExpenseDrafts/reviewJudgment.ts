@@ -42,8 +42,6 @@ export function isAmountAndTaxResolved(draft: AiExpenseDraftJudgmentInput): bool
   const previewArgs = {
     ...buildReviewTaxEvidence(draft),
     paidTotalYen,
-    priceTaxTreatment: form.priceTaxTreatment,
-    taxRateComposition: form.taxRateComposition,
   };
   const sourceItems = applyReviewItemsTaxPreview(categoryState.items, previewArgs);
   const preview = buildReviewTaxPreview(sourceItems, previewArgs);

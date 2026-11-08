@@ -82,9 +82,7 @@ export function useReviewSubmit({
     if (!selectedReviewDraftId) {
       return;
     }
-    const hasUnknownTaxChoice =
-      reviewForm.priceTaxTreatment === "unknown" || reviewForm.taxRateComposition === "unknown";
-    const effectiveRegistrationMode = hasUnknownTaxChoice ? "totalOnly" : registrationModeOverride;
+    const effectiveRegistrationMode = registrationModeOverride;
     const submittedForm = effectiveRegistrationMode
       ? { ...reviewForm, registrationMode: effectiveRegistrationMode }
       : reviewForm;
@@ -112,8 +110,6 @@ export function useReviewSubmit({
             amountYen,
             categoryId: submittedForm.categoryId,
             registrationMode: submittedForm.registrationMode,
-            priceTaxTreatment: submittedForm.priceTaxTreatment,
-            taxRateComposition: submittedForm.taxRateComposition,
             items: submittedItems.map((item) => ({
               itemName: item.itemName.trim(),
               confirmedTaxRatePercent: item.confirmedTaxRatePercent,
@@ -145,8 +141,6 @@ export function useReviewSubmit({
           amountYen,
           categoryId: submittedForm.categoryId as Id<"categories">,
           registrationMode: submittedForm.registrationMode,
-          priceTaxTreatment: submittedForm.priceTaxTreatment,
-          taxRateComposition: submittedForm.taxRateComposition,
           items: submittedItems.map((item) => ({
             ...(item.persistedItemId
               ? { itemId: item.persistedItemId as Id<"aiExpenseDraftItems"> }

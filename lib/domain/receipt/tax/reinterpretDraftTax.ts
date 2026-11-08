@@ -12,8 +12,6 @@ import type {
   ReceiptTaxInput,
   ReceiptTotalSource,
   ReceiptTaxInterpretation,
-  PriceTaxTreatment,
-  TaxRateComposition,
   TaxRatePercent,
 } from "./types";
 import {
@@ -51,10 +49,6 @@ export type ReinterpretDraftTaxInput = {
   receiptLineClassifications?: ReceiptLineClassification[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
-  decisionOverride?: {
-    priceTaxTreatment?: PriceTaxTreatment;
-    taxRateComposition?: TaxRateComposition;
-  };
 };
 
 export type ReinterpretDraftTaxResult = {
@@ -164,23 +158,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     extracted.warnings = extracted.warnings.filter(
       (warning) => warning !== "unresolved_tax_rate" && warning !== "unresolved_amount_basis",
     );
-    const decisionAmountBasis =
-      input.decisionOverride?.priceTaxTreatment === "included"
-        ? "tax_included"
-        : input.decisionOverride?.priceTaxTreatment === "excluded"
-          ? "tax_excluded"
-          : undefined;
-    const decisionTaxRate =
-      input.decisionOverride?.taxRateComposition === "rate8"
-        ? 8
-        : input.decisionOverride?.taxRateComposition === "rate10"
-          ? 10
-          : undefined;
-    const decisionAdjusted = {
-      ...extracted,
-      amountBasis: decisionAmountBasis ?? extracted.amountBasis,
-      taxRatePercent: decisionTaxRate ?? extracted.taxRatePercent,
-    };
+    const decisionAdjusted = extracted;
     if (needsRateConfirmation[index]) {
       return {
         ...decisionAdjusted,
@@ -234,20 +212,8 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     const bulk =
       input.bulkUnresolvedOverride &&
       shouldApplyBulkOverride(original, draftItemToExtractedReceiptItem(original));
-    if (
-      override?.amountBasis !== undefined ||
-      bulk ||
-      input.decisionOverride?.priceTaxTreatment === "included" ||
-      input.decisionOverride?.priceTaxTreatment === "excluded"
-    )
-      confirmed.add("amountBasis");
-    if (
-      override?.taxRatePercent !== undefined ||
-      bulk ||
-      input.decisionOverride?.taxRateComposition === "rate8" ||
-      input.decisionOverride?.taxRateComposition === "rate10"
-    )
-      confirmed.add("taxRatePercent");
+    if (override?.amountBasis !== undefined || bulk) confirmed.add("amountBasis");
+    if (override?.taxRatePercent !== undefined || bulk) confirmed.add("taxRatePercent");
     if (item.amountBasis === "unknown") confirmed.delete("amountBasis");
     if (item.taxRatePercent === null || needsRateConfirmation[index])
       confirmed.delete("taxRatePercent");
@@ -269,49 +235,6 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     classifications: input.receiptLineClassifications,
   });
 
-  const userItemPriceWasEdited =
-    input.override?.amountBasis !== undefined ||
-    input.bulkUnresolvedOverride?.amountBasis !== undefined;
-  const userPriceWasEdited =
-    userItemPriceWasEdited || input.decisionOverride?.priceTaxTreatment !== undefined;
-  const userRateWasEdited =
-    input.override?.taxRatePercent !== undefined ||
-    input.bulkUnresolvedOverride?.taxRatePercent !== undefined ||
-    input.decisionOverride?.taxRateComposition !== undefined;
-  const treatmentFromItems = (): PriceTaxTreatment => {
-    const bases = new Set(items.map((item) => item.amountBasis));
-    if (bases.has("unknown")) return "unknown";
-    if (bases.has("tax_included") && bases.has("tax_excluded")) return "perItem";
-    if (bases.has("tax_included")) return "included";
-    if (bases.has("tax_excluded")) return "excluded";
-    return "unknown";
-  };
-  const treatmentFromSummaries = (): PriceTaxTreatment => {
-    const bases = new Set(
-      taxSummaries.map((summary) => {
-        if (summary.taxableAmountBasis !== "unknown") return summary.taxableAmountBasis;
-        if (summary.taxMode === "included") return "tax_included" as const;
-        if (summary.taxMode === "external") return "tax_excluded" as const;
-        return "unknown" as const;
-      }),
-    );
-    if (bases.has("tax_included") && bases.has("tax_excluded")) return "perItem";
-    if (bases.has("tax_included")) return "included";
-    if (bases.has("tax_excluded")) return "excluded";
-    return "unknown";
-  };
-  const compositionFromItemsAndSummaries = (): TaxRateComposition => {
-    if (items.some((item) => item.taxRatePercent === null)) return "unknown";
-    const rates = new Set([
-      ...items.map((item) => item.taxRatePercent),
-      ...taxSummaries.map((summary) => summary.taxRatePercent),
-    ]);
-    if (rates.has(8) && rates.has(10)) return "mixed";
-    if (rates.has(8)) return "rate8";
-    if (rates.has(10)) return "rate10";
-    return "unknown";
-  };
-
   const interpretation = interpretReceiptTax({
     amountYen: input.amountYen,
     receiptTotalSource: input.receiptTotalSource,
@@ -322,18 +245,6 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     markerDefinitions: input.markerDefinitions,
     rawObservationLines,
     receiptLineClassifications: input.receiptLineClassifications,
-    userOverride:
-      userPriceWasEdited || userRateWasEdited
-        ? {
-            priceTaxTreatment: userPriceWasEdited
-              ? (input.decisionOverride?.priceTaxTreatment ??
-                (userItemPriceWasEdited ? treatmentFromItems() : treatmentFromSummaries()))
-              : undefined,
-            taxRateComposition: userRateWasEdited
-              ? (input.decisionOverride?.taxRateComposition ?? compositionFromItemsAndSummaries())
-              : undefined,
-          }
-        : undefined,
   });
   const interpretedItems = interpretation.items;
   const amountsResolved =

@@ -142,7 +142,7 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
     expect(registerReadyDraftsAsExpenseEntriesMock).not.toHaveBeenCalled();
   });
 
-  it("税情報が不明で保存された下書きは合計だけ保存モードを維持する", async () => {
+  it("旧税判定が不明でも登録モードを自動変更せず詳細で保存する", async () => {
     const user = userEvent.setup();
     useQueryMock.mockImplementation((reference: string, args: { draftId?: string } | "skip") => {
       if (reference !== "aiExpenseDrafts.queries.getWithItems" || args === "skip") return [];
@@ -185,11 +185,11 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
 
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
     expect(
-      within(dialog).getByText(/履歴・予算・カテゴリ集計には使われません/),
-    ).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "レシート合計だけ保存" }));
+      within(dialog).queryByText(/履歴・予算・カテゴリ集計には使われません/),
+    ).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
     expect(updateForReviewMock).toHaveBeenCalledWith(
-      expect.objectContaining({ amountYen: 1680, registrationMode: "totalOnly" }),
+      expect.objectContaining({ amountYen: 1680, registrationMode: "detailed" }),
     );
   });
 

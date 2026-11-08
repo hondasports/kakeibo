@@ -2,7 +2,7 @@ import {
   resolveReceiptTotalSource,
   resolveReceiptTotalSupportingCandidates,
 } from "./receiptTotalEvidence";
-import { resolveReceiptTaxChoices, resolveReceiptTaxCorrections } from "./receiptDataContract";
+import { resolveReceiptTaxCorrections } from "./receiptDataContract";
 /**
  * 下書き → 支出エントリ/レシート登録用の明細構築に関するドメイン知識。
  * totalOnly 時の合計確認・税解釈の確定状態の検証を行う。
@@ -92,7 +92,6 @@ export function buildDraftRegistrationItems(
       receiptTotalSource: resolveReceiptTotalSource(draft),
       receiptTotalSupportingCandidates: resolveReceiptTotalSupportingCandidates(draft),
       amountYen: draft.amountYen!,
-      decisionOverride: resolveReceiptTaxChoices(draft),
       receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
       items: items.map(mapDraftItemToTaxFields),
       rawObservationLines:

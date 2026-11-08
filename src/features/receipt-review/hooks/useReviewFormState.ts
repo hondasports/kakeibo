@@ -1,9 +1,5 @@
 import { hasReceiptTaxMetadata } from "../../../../lib/domain/receipt/tax/draftTaxMapping";
-import {
-  ITEM_IDENTITY_CHANGED,
-  confirmItemTaxRate,
-  invalidateItemTaxRateConfirmation,
-} from "../../../../lib/domain/receipt/tax/itemTaxConfirmation";
+import { invalidateItemTaxRateConfirmation } from "../../../../lib/domain/receipt/tax/itemTaxConfirmation";
 import { useState } from "react";
 import {
   mapDraftItemsToReviewItems,
@@ -64,8 +60,6 @@ export function useReviewFormState({
       applyReviewItemsTaxPreview(categoryState.items, {
         ...buildReviewTaxEvidence(selectedReviewDraft),
         paidTotalYen: Number(mappedForm.amountYen),
-        priceTaxTreatment: mappedForm.priceTaxTreatment,
-        taxRateComposition: mappedForm.taxRateComposition,
       }),
     );
     setIsCategorySplit(categoryState.isCategorySplit);
@@ -88,40 +82,11 @@ export function useReviewFormState({
 
   const handleReviewFieldChange = (field: keyof ReviewFormValues, value: string) => {
     setReviewForm((current) => ({ ...current, [field]: value }));
-    if (field === "priceTaxTreatment" || field === "taxRateComposition") {
-      const nextPriceTaxTreatment =
-        field === "priceTaxTreatment" ? value : reviewForm.priceTaxTreatment;
-      const nextTaxRateComposition =
-        field === "taxRateComposition" ? value : reviewForm.taxRateComposition;
-      setReviewItems((current) =>
-        applyReviewItemsTaxPreview(
-          current.map((item) => {
-            if (
-              field !== "taxRateComposition" ||
-              (value !== "rate8" && value !== "rate10") ||
-              (!item.taxReviewReasons?.includes(ITEM_IDENTITY_CHANGED) &&
-                item.confirmedTaxRatePercent === undefined)
-            )
-              return item;
-            const rate = value === "rate8" ? 8 : 10;
-            return { ...confirmItemTaxRate(item, rate), confirmedTaxRatePercent: rate };
-          }),
-          {
-            ...buildReviewTaxEvidence(selectedReviewDraft),
-            paidTotalYen: Number(reviewForm.amountYen),
-            priceTaxTreatment: nextPriceTaxTreatment as ReviewFormValues["priceTaxTreatment"],
-            taxRateComposition: nextTaxRateComposition as ReviewFormValues["taxRateComposition"],
-          },
-        ),
-      );
-    }
     if (field === "amountYen") {
       setReviewItems((current) =>
         applyReviewItemsTaxPreview(current, {
           ...buildReviewTaxEvidence(selectedReviewDraft),
           paidTotalYen: Number(value),
-          priceTaxTreatment: reviewForm.priceTaxTreatment,
-          taxRateComposition: reviewForm.taxRateComposition,
         }),
       );
     }
@@ -244,8 +209,6 @@ export function useReviewFormState({
       return applyReviewItemsTaxPreview(updated, {
         ...buildReviewTaxEvidence(selectedReviewDraft),
         paidTotalYen: Number.isFinite(paidTotalYen) ? paidTotalYen : undefined,
-        priceTaxTreatment: reviewForm.priceTaxTreatment,
-        taxRateComposition: reviewForm.taxRateComposition,
       });
     });
   };
@@ -272,33 +235,9 @@ export function useReviewFormState({
             ? { ...item, categoryId: "", discountTargetItemId: undefined }
             : item,
         );
-      const selectedRate =
-        reviewForm.taxRateComposition === "rate8"
-          ? 8
-          : reviewForm.taxRateComposition === "rate10"
-            ? 10
-            : undefined;
-      const selectedBasis =
-        reviewForm.priceTaxTreatment === "excluded"
-          ? "tax_excluded"
-          : reviewForm.priceTaxTreatment === "included"
-            ? "tax_included"
-            : undefined;
-      // Keep receipt choices only when they do not overwrite a later item choice.
-      const preserveReceiptChoice = remaining.every(
-        (item) =>
-          (selectedRate === undefined || item.taxRatePercent === selectedRate) &&
-          (selectedBasis === undefined || item.amountBasis === selectedBasis),
-      );
       return applyReviewItemsTaxPreview(remaining, {
         ...buildReviewTaxEvidence(selectedReviewDraft),
         paidTotalYen: Number(reviewForm.amountYen),
-        ...(preserveReceiptChoice
-          ? {
-              priceTaxTreatment: reviewForm.priceTaxTreatment,
-              taxRateComposition: reviewForm.taxRateComposition,
-            }
-          : {}),
       });
     });
   };

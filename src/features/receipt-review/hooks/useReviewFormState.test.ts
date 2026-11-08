@@ -22,7 +22,7 @@ function item(id: string, rate: 8 | 10): ReviewItemValues {
 }
 
 describe("明細削除後の税条件", () => {
-  it("保存済み全体税選択を初期表示の再計算にも適用する", () => {
+  it("保存済み全体税選択を初期表示の明細へ適用しない", () => {
     const draft: AiExpenseDraft = {
       _id: "draft",
       status: "needs_review",
@@ -76,18 +76,15 @@ describe("明細削除後の税条件", () => {
         selectedReviewDraftDetails: null,
       }),
     );
-    expect(result.current.reviewForm).toMatchObject({
-      priceTaxTreatment: "excluded",
-      taxRateComposition: "rate8",
-    });
+    expect(result.current.reviewForm).not.toHaveProperty("priceTaxTreatment");
     expect(result.current.reviewItems[0]).toMatchObject({
-      normalizedAmountYen: 216,
-      allocatedTaxYen: 16,
-      taxAllocationStatus: "allocated",
+      normalizedAmountYen: 200,
+      allocatedTaxYen: 0,
+      taxAllocationStatus: "unallocated",
     });
   });
 
-  it.each([8, 10] as const)("全体8%%選択後の個別%d%%を保持する", (rate) => {
+  it.each([8, 10] as const)("明細削除後に個別%d%%を保持する", (rate) => {
     const { result } = renderHook(() =>
       useReviewFormState({
         selectedReviewDraftId: null,
@@ -100,8 +97,6 @@ describe("明細削除後の税条件", () => {
       result.current.setReviewForm((f) => ({
         ...f,
         amountYen: "216",
-        priceTaxTreatment: "excluded",
-        taxRateComposition: "rate8",
       }));
       result.current.setReviewItems([item("keep", rate), item("remove", 8)]);
     });
@@ -193,8 +188,6 @@ it("名前・行種別を変更した行だけ再確認を要求し、価格・�
   expect(result.current.reviewItems[1].taxReviewReasons ?? []).not.toContain(
     "item_identity_changed",
   );
-  act(() => result.current.handleReviewFieldChange("taxRateComposition", "rate8"));
-  expect(result.current.reviewItems[0].confirmedTaxRatePercent).toBe(8);
   act(() => result.current.handleReviewItemChange("edit", "itemName", "さらに変更"));
   expect(result.current.reviewItems[0].confirmedTaxRatePercent).toBeUndefined();
   expect(result.current.reviewItems[0].taxConfirmedFields).toEqual(["amountBasis"]);

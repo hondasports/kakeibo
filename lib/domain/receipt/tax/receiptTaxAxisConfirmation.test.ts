@@ -19,19 +19,14 @@ function guessed(): ReinterpretDraftTaxInput {
   return input;
 }
 
-it.each(["item-basis", "item-rate", "global-basis", "global-rate"])(
-  "%s片軸だけでは旧推定の他軸を確認済みにしない",
-  (kind) => {
-    const input = guessed();
-    input.items[0].amountBasis = "tax_included";
-    if (kind === "item-basis") input.override = { itemIndex: 0, amountBasis: "tax_included" };
-    if (kind === "item-rate") input.override = { itemIndex: 0, taxRatePercent: 10 };
-    if (kind === "global-basis") input.decisionOverride = { priceTaxTreatment: "included" };
-    if (kind === "global-rate") input.decisionOverride = { taxRateComposition: "rate10" };
-    const result = reinterpretDraftTax(input);
-    expect(result.itemFields[0].taxAllocationStatus).toBe("unallocated");
-  },
-);
+it.each(["item-basis", "item-rate"])("%s片軸だけでは旧推定の他軸を確認済みにしない", (kind) => {
+  const input = guessed();
+  input.items[0].amountBasis = "tax_included";
+  if (kind === "item-basis") input.override = { itemIndex: 0, amountBasis: "tax_included" };
+  if (kind === "item-rate") input.override = { itemIndex: 0, taxRatePercent: 10 };
+  const result = reinterpretDraftTax(input);
+  expect(result.itemFields[0].taxAllocationStatus).toBe("unallocated");
+});
 
 it.each([false, true])("逆順=%sでも個別の2操作を保存状態へ引き継いで確定する", (reverse) => {
   let input = guessed();

@@ -38,7 +38,6 @@ export function createDraftTaxInterpretationService(
         override: request.override,
         bulkUnresolvedOverride: request.bulkUnresolvedOverride,
         receiptTotalSource: request.receiptTotalSource,
-        decisionOverride: request.decisionOverride,
       });
       return {
         draft: draftDocToFields(result.draft),
