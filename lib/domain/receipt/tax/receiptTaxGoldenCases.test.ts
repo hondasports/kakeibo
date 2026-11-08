@@ -422,8 +422,11 @@ describe("Issue #1216 金額なし行の税証拠", () => {
     },
   ];
 
-  it.each([[17, 18], [17], [18]])("金額なし行 %s を税額の矛盾にしない", (...indexes) => {
-    const selected = indexes.flat();
+  it.each([
+    { name: "17・18行目", selected: [17, 18] },
+    { name: "17行目のみ", selected: [17] },
+    { name: "18行目のみ", selected: [18] },
+  ])("金額なし行 $name を税額の矛盾にしない", ({ selected }) => {
     const result = reinterpretDraftTax({
       ...input,
       rawObservationLines: [
