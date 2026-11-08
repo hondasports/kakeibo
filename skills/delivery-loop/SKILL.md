@@ -6,7 +6,7 @@ license: Apache-2.0
 
 # Delivery loop
 
-`AGENTS.md` のCore contract（完了地点に届くまでturnを終えない）の手順。用語（完了地点・finding・収束・再開情報）は `docs/development-process.md` の「用語」に従う。
+`AGENTS.md` の「開発ループ」の細部。骨組み（完了地点の種類・停止理由の一覧・報告の形）は `AGENTS.md` が正本で、このskillは書き写さずに例と手順を持つ。用語（完了地点・finding・収束・再開情報）は `docs/development-process.md` の「用語」に従う。
 
 ## 完了地点を決める
 
@@ -46,10 +46,10 @@ license: Apache-2.0
 
 親PR方式の手順:
 
-1. 分けると決めた時点で `origin/preview` から親branchを切り、親PR（base `preview`、draft可）を先に作る。更新履歴ブロックは親PRに書く。
-2. 子branchは親branchから切り、子PRのbaseは親branchにする。
-3. 子PRにはCI・E2Eが走らない（`ci.yml`・`e2e.yml` の `pull_request` は `main`・`preview` 向けだけ）。子はローカルのゲートで確かめ、CIは親PRで回す。
-4. 子PRはmerge commitで親へ入れる。子同士が積み重なっていても履歴が壊れない。
+1. 分けると決めた時点で `origin/preview` から親branchを切ってpushする。親PR（base `preview`）は、最初の子が親branchに入ってから作る。差分の無いbranchからはGitHubがPRを作れないため。更新履歴ブロックは親PRに書く。
+2. 子branchは親branchから切る。子をPRにするなら、baseは親branchにする。
+3. 子にはCI・E2Eが走らない（`ci.yml`・`e2e.yml` の `pull_request` は `main`・`preview` 向けだけ）。子はローカルのゲートで確かめ、CIは親PRで回す。
+4. 子を親branchへ入れるのは統合の作業で、完了地点の `merged`（`preview` へのマージ）とは別。親PR方式を選んだら、完了地点が `merge_ready` でも、ゲートを通した子を親へmerge commitで入れてよい（子PRのマージか、ローカルの `git merge --no-ff` と親branchのpush）。子同士が積み重なっていても履歴が壊れない。
 5. 挙動を変える修正が途中で見つかったら、親に積まず個別PRにする（`skills/codebase-audit` の進め方の案と同じ基準）。
 
 ## ループ
@@ -85,15 +85,18 @@ license: Apache-2.0
 - 再開の合図に時間切れがある仕組み（Monitor等）なら、切れたら張り直す。
 - 背景で待っている間に進められる別の対象があれば、それを進める。
 
-### マージ（完了地点が `merged` のときだけ）
+### マージ（`preview`・`main` へのマージは完了地点が `merged` のときだけ）
 
-- 最新HEADで、実行されたcheckがすべてsuccess（workflowの条件によるskipは可。failure・cancelled・pendingは不可）、未対応finding 0、未解決thread 0、conflictなしを、マージ直前に取り直す。GitHubがマージを拒否しないことを、条件を満たした根拠にしない。
+- マージ直前に、最新HEADで次をすべて取り直す。GitHubがマージを拒否しないことを、条件を満たした根拠にしない。
+  - 必要なcheckが揃っている。base `main` は `gh pr checks <番号> --required` の必須checkがすべてある。`preview` にはrulesetが無く必須checkが登録されないため、`ci.yml`・`e2e.yml`・`pr-update-spec.yml` のrunが最新HEADにあることを確かめる。
+  - 揃ったcheckがすべてsuccess（workflowの条件によるskipは可。failure・cancelled・pendingは不可）。
+  - 未対応finding 0、未解決thread 0、conflictなし。
 - マージ方式はユーザーの指定に従う。指定がなければ、同じbaseに直近でマージされたPRと同じ方式にする。
 - マージ後はPRのmerged状態とマージ先の新しいSHAを確認する。`preview` へのマージなら、続いて走る `preview-deploy.yml` の結果も報告に含める。
 
-## 止めてよい理由
+## 止めてよい理由の例
 
-完了地点の前でturnを終えてよいのは次のときだけ。
+停止理由の一覧は `AGENTS.md` の「開発ループ」が正本。それぞれの例:
 
 | 停止理由 | 例 |
 | --- | --- |
@@ -120,7 +123,7 @@ turnを終えるときは、完了でも停止でも次の形で返す。
 ```
 
 - 未到達のときは、`docs/development-process.md` の「用語」にある再開情報（branch・HEAD・未コミット作業・未解決finding・検証証跡・外部待ちの解除条件）を書く。
-- 範囲外にしたfollow-upはIssueにして番号を書く。起票してよいかを聞き返さない。
+- 範囲外にしたfollow-upは、Deliveryの作業ならIssueにして番号を書き、起票してよいかを聞き返さない。完了地点が回答（調査・相談）なら起票せず報告に書き、起票は依頼か承認を受けてから行う。`skills/codebase-audit` の点検は同skillの承認手順に従う。
 - 触ったworktreeに未コミット・未pushの変更が残っていないことを `git status` と `git log @{u}..` で確かめ、残っていればそう書く。
 - repository外に作ったworktree・一時ファイル・スクリプトも書く。
 - 検証結果の書き方は `skills/implementation` の「PR本文」に従う。

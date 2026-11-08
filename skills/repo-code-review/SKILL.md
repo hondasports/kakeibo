@@ -51,7 +51,8 @@ license: Apache-2.0
 
 「インラインでコメントして」等、PRへの投稿を頼まれたときだけ投稿する。頼まれていなければ所見を返すだけにする。言語は `AGENTS.md` の「指摘コメントの言語」に従う。
 
-- 投稿前に `node scripts/collect-pr-findings.mjs --pr <番号>` で既存の指摘を確かめ、同じ指摘を重ねて投稿しない。
+- 投稿前に既存の指摘を確かめ、同じ指摘を重ねて投稿しない。`node scripts/collect-pr-findings.mjs --pr <番号>` は未解決threadしか出さないため、解決済みのものは `gh api repos/{owner}/{repo}/pulls/<番号>/comments` でも見る。`bodyTruncated`・`commentsTruncated` の項目は記載URLの全文を読む。
+- diffの外の行など、inline commentにできない所見（GitHubは `422` で拒否する）は、`file:line` と理由を添えて `body` に書く。
 - 所見は1件ずつ該当行へのinline commentにし、レビュー全体を1回で送る: `gh api repos/{owner}/{repo}/pulls/<番号>/reviews --method POST --input <file>`。fileは `commit_id`（レビューしたHEAD）・`event: "COMMENT"`・`body`・`comments[]`（`path`・`line`・`side`・`body`）を持つJSON。
 - `body` には確認した範囲、所見の件数、変更とテストの対応表、独立Reviewerの要否を書く。実装を指示した側のレビューなら、独立レビューではないと書く。
 - 対応結果を既存threadへ返すときは `gh api repos/{owner}/{repo}/pulls/<番号>/comments/<comment id>/replies --method POST -f body=...` を使い、修正したcommitを書く。threadのresolveは `skills/delivery-loop` の「指摘の収集と照合」に従う。
