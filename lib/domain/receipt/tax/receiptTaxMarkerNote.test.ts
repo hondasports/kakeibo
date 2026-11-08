@@ -48,6 +48,15 @@ describe("軽減税率マーカーの説明", () => {
     },
   );
 
+  it("税と分類されたマーカー説明も税内訳の矛盾にしない", () => {
+    const result = reinterpretDraftTax({
+      ...input,
+      rawObservationLines: [...lines.slice(0, 3), { ...lines[3], lineRoleCandidates: ["tax"] }],
+    });
+    expect(result.interpretation.taxSummaries[0].status).toBe("verified");
+    expect(result.itemFields.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+  });
+
   it("印字税額が矛盾すれば注記があっても確定しない", () => {
     const badTax = { ...lines[1], rawText: "外税8% 20円", amountYen: 20, amountText: "20円" };
     const result = reinterpretDraftTax({

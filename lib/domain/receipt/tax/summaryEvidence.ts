@@ -66,6 +66,12 @@ export function independentSummaryLines(
       line.explicitlyPrinted &&
       !isReceiptCountLabel(line.rawText) &&
       !isMarkerExplanation(line) &&
+      (line.amountYen !== null ||
+        Boolean(line.amountText?.trim()) ||
+        isTaxRateDeclarationLine(line) ||
+        line.lineRoleCandidates.some(
+          (role) => role === "tax" || role === "subtotal" || role === "total",
+        )) &&
       !isItemOrDiscountOnly(line) &&
       !isNonTaxEvidenceLine(line, byIndex.get(line.sourceLineIndex)),
   );

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { interpretReceiptTax } from "./interpretReceiptTax";
+import { taxSummaryEvidenceLines } from "./summaryEvidence";
+import { observationLine } from "./fixtures/unprovenTargetReceipt";
 import type { ExtractedReceiptItem, ExtractedTaxSummary, ReceiptTaxInput } from "./types";
 import { receiptTaxBasisCases, receiptTaxBasisInput } from "./fixtures/receiptTaxBasisCases";
 import { EXPENSE_ENTRY_AMOUNT_MAX } from "../../expenseEntries/expenseEntryItem";
@@ -320,4 +322,15 @@ it("導出結果の再入力・順序変更でも印字証拠と商品合計を�
     expect(result.itemFields.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(437);
   }
   expect(input).toEqual(original);
+});
+
+it("金額なしの税率宣言は税率省略行の帰属を制限する", () => {
+  const target = observationLine("対象額 100円", 100, 1);
+  const declaration = { ...observationLine("税率8%", 0, 2), amountYen: null, amountText: null };
+  expect(taxSummaryEvidenceLines([target], 10, "target", { singleSummary: true })).toEqual([
+    target,
+  ]);
+  expect(
+    taxSummaryEvidenceLines([target, declaration], 10, "target", { singleSummary: true }),
+  ).toEqual([]);
 });
