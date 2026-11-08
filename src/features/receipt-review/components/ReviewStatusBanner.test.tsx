@@ -55,7 +55,7 @@ describe("ReviewStatusBanner", () => {
       onJump,
     );
     expect(within(banner).getByText("印字額と明細の金額が一致していません")).toBeInTheDocument();
-    expect(within(banner).getByText(/差額 8円/)).toBeInTheDocument();
+    expect(within(banner).getByText(/商品一覧の金額確認/)).toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "金額を確認する" }));
     expect(onJump).toHaveBeenCalledWith("items");
   });
@@ -190,7 +190,7 @@ describe("ReviewStatusBanner", () => {
       amount: { ...blocker, variant: "external" },
       taxRate: { ...blocker, rows: [] },
     });
-    expect(within(banner).getByText("レシートの税内訳を確認してください")).toBeInTheDocument();
+    expect(within(banner).getByText("商品の金額を確認してください")).toBeInTheDocument();
     expect(
       within(banner).queryByText("税設定の確認が必要な商品があります"),
     ).not.toBeInTheDocument();

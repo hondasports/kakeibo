@@ -1,25 +1,6 @@
 import { Alert, Box, Button, Stack, Typography } from "@mui/material";
-import { formatYen } from "../../../../lib/domain/common/currency";
 import type { ReviewGuidanceItem } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
-import type { ReviewAmountCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewAmountChecks";
 import type { ReviewChecks } from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
-
-function yen(value: number | undefined): string {
-  return value === undefined ? "未確定" : formatYen(value);
-}
-
-function amountMismatchLine(check: ReviewAmountCheck): string | undefined {
-  switch (check.mismatchStep) {
-    case "itemsVsSubtotal":
-      return `明細合計 ${yen(check.itemsPrintedTotalYen)} ／ 印字小計 ${yen(check.printedSubtotalYen)}`;
-    case "subtotalTaxVsPaid":
-      return `小計＋税額 ${yen(check.expectedPaidYen)} ／ 支払額 ${yen(check.paidTotalYen)}`;
-    case "itemsVsPaid":
-      return `明細合計 ${yen(check.itemsComparableTotalYen)} ／ 支払額 ${yen(check.paidTotalYen)}`;
-    default:
-      return undefined;
-  }
-}
 
 export function ReviewStatusBanner({
   checks,
@@ -63,9 +44,7 @@ export function ReviewStatusBanner({
         <Alert severity="error">
           <Typography variant="subtitle2">印字額と明細の金額が一致していません</Typography>
           <Typography variant="body2">
-            {amountMismatchLine(amount)}
-            {amount.differenceYen !== undefined &&
-              ` ／ 差額 ${formatYen(Math.abs(amount.differenceYen))}`}
+            商品一覧の金額確認と、商品の税込／税抜・税率を確認してください。
           </Typography>
           <Box>
             <Button
@@ -83,14 +62,14 @@ export function ReviewStatusBanner({
         <Alert severity="warning">
           <Typography variant="subtitle2">
             {sharedBlockerCode === "unverified-tax-summary"
-              ? "レシートの税内訳を確認してください"
+              ? "商品の金額を確認してください"
               : sharedBlockerCode === "basis-conflict"
                 ? "商品の税込／税抜設定が、レシートの税内訳と一致していません"
                 : "税設定の確認が必要な商品があります"}
           </Typography>
           <Typography variant="body2">
             {sharedBlockerCode === "unverified-tax-summary"
-              ? "対象額・税額・合計をレシート画像と照合してください。"
+              ? "商品の金額・税込／税抜・税率をレシートと照合してください。"
               : sharedBlockerCode === "basis-conflict"
                 ? `税込／税抜の設定が一致していない商品が${combinedItemCount}件あります。商品ごとに確認してください。`
                 : `税設定の確認が必要な商品が${combinedItemCount}件あります。商品ごとに確認してください。`}
@@ -151,7 +130,7 @@ export function ReviewStatusBanner({
         <Alert severity="warning">
           <Typography variant="subtitle2">
             {taxRate.blockerCode === "unverified-tax-summary"
-              ? "レシートの税内訳を確認してください"
+              ? "商品の金額を確認してください"
               : "商品の税率を確認してください"}
           </Typography>
           <Typography variant="body2">

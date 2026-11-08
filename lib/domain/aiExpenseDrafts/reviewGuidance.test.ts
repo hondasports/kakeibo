@@ -238,4 +238,12 @@ describe("確認推奨に直せない項目を出さない（Issue #1018）", ()
       expect.stringContaining("999円"),
     ]);
   });
+
+  it("金額の矛盾では商品の確認先を示す", () => {
+    const messages = summaryMessages(
+      singleRate({ status: "contradictory", reasons: ["tax_summary_amount_mismatch"] }),
+    );
+    expect(messages[0]).toContain("商品の金額・税込／税抜・税率を確認してください");
+    expect(messages[0]).not.toContain("対象額・税額");
+  });
 });

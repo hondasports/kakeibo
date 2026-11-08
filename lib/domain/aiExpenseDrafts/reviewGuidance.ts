@@ -66,13 +66,17 @@ export function getReviewGuidance(
       // 内部の再解釈状態や、ユーザーが触れない集計の読み取りは、確認推奨に出さない。
       const reasons = (summary.reasons ?? [])
         .filter((reason) => !NON_ACTIONABLE_SUMMARY_REASONS.has(reason))
-        .map(getTaxSummaryConflictLabel);
+        .map((reason) =>
+          reason === "tax_summary_amount_mismatch" || reason === "tax_included_amount_mismatch"
+            ? "レシートの金額が一致しません。商品の金額・税込／税抜・税率を確認してください"
+            : getTaxSummaryConflictLabel(reason),
+        );
       const unresolvedDeclaration =
         summary.taxMode === "unknown" || summary.taxableAmountBasis === "unknown";
       if (unresolvedDeclaration) reasons.push("商品の税率・税込／税抜を確認してください");
       if (row?.status === "mismatch")
         reasons.push(
-          `明細の対象額 ${formatYen(row.currentYen ?? 0)} ／ 税内訳 ${formatYen(summary.taxableAmountYen)}`,
+          `商品合計 ${formatYen(row.currentYen ?? 0)} ／ レシート ${formatYen(summary.taxableAmountYen)}。商品の税込／税抜・税率を確認してください`,
         );
       if (row?.blockerCode === "basis-conflict" && row.reason) reasons.push(row.reason);
       const unresolvedStatus =
