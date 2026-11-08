@@ -213,12 +213,13 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
       shouldApplyBulkOverride(original, draftItemToExtractedReceiptItem(original));
     if (override?.amountBasis !== undefined || bulk) confirmed.add("amountBasis");
     if (override?.taxRatePercent !== undefined || bulk) confirmed.add("taxRatePercent");
-    if (item.amountBasis === "unknown") confirmed.delete("amountBasis");
     if (item.taxRatePercent === null || needsRateConfirmation[index])
       confirmed.delete("taxRatePercent");
     return (["amountBasis", "taxRatePercent"] as const).filter((field) => confirmed.has(field));
   });
-  const itemTaxWasConfirmed = (index: number): boolean => confirmedFields[index].length === 2;
+  // 「不明」の選択は自動補完を止めるために記録するが、税額の確定には使わない。
+  const itemTaxWasConfirmed = (index: number): boolean =>
+    confirmedFields[index].length === 2 && items[index].amountBasis !== "unknown";
   const taxSummaries = deriveReceiptTaxSummaries({
     paidTotalConfirmed: input.receiptTotalSource === "user_confirmed",
     amountYen: input.amountYen,
