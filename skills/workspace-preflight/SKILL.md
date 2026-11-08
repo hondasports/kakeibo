@@ -47,7 +47,7 @@ FAILしたまま編集しない。既存差分をreset / stash / deleteして場
 - 設定ファイル
 - アプリコード
 
-clone元の `preview` をリモートへfast-forwardで同期するだけの操作は編集に当たらない。`skills/preview-promotion` の「A. ローカル preview の同期」の条件を満たせば、preflightのPASSなしで行ってよい。
+`preview` をcheckoutしているworktreeをリモートへfast-forwardで同期するだけの操作は編集に当たらない。`skills/preview-promotion` の「A. ローカル preview の同期」の条件を満たせば、preflightのPASSなしで行ってよい。
 
 pre-commitの `--staged` checkは最後の安全網で、編集前preflightの代わりにはならない。
 
@@ -60,6 +60,6 @@ pre-commitの `--staged` checkは最後の安全網で、編集前preflightの�
    - `git status --porcelain` が空
    - branchのHEADが、マージ済みPRの最終HEADと一致する（`gh pr list --head <branch> --state merged --json number,headRefOid`）
    - そのworktreeをcwdにしているprocessが無い（`lsof -a -d cwd | grep <path>`。権限等で確かめられなければ「未確認」として残す）
-3. `git status --ignored --short` でignoredファイルを確かめる。`.env.local` は正本（`preview` branchを持つworktreeの `.env.local`。`scripts/sync-e2e-env.mjs` が使うもの）と `cmp` で比べ、同じなら退避しない。違えば（local Convexを選んだ設定等）退避するか、ユーザーに確認する。`.convex/` 等のローカルデータは、残すかどうかが依頼から読めなければユーザー判断待ちで止める。
+3. `git status --ignored --short` でignoredファイルを確かめる。`.env.local` の正本は、`scripts/sync-e2e-env.mjs` と同じく、`KAKEIBO_E2E_ENV_CANONICAL` が設定されていればそのpath、無ければ `preview` branchを持つworktreeの `.env.local`。正本が候補のworktreeの中にあるなら、その候補は消さない。それ以外は正本と `cmp` で比べ、同じなら退避しない。違えば（local Convexを選んだ設定等）退避するか、ユーザーに確認する。`.convex/` 等のローカルデータは、残すかどうかが依頼から読めなければユーザー判断待ちで止める。
 4. `git worktree remove <path>` で消す。branchは、削除も依頼されたときだけ `git branch -d <branch>` で消す。
 5. `git worktree list --porcelain` から消えたこと、clone元の `git status` が変わっていないことを確認する。

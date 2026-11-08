@@ -275,7 +275,7 @@ CIで実行するbackendは共有cloud devではなく、ジョブごとの `CON
 
 ## 7. Review / Delivery
 
-ユーザー指定の完了地点に従い、GitHubの承認・branch保護条件を満たす。完了地点の決め方、PR指摘の収集・照合（`node scripts/collect-pr-findings.mjs`）、観測した最新HEADに対する対応のループ、マージ、止めてよい理由と報告の形は `skills/delivery-loop` を正本とする。`preview` の同期と `preview` → `main` の昇格は `skills/preview-promotion`、別Agentへの委譲は `skills/agent-handoff` に従う。
+ユーザー指定の完了地点に従い、GitHubの承認・branch保護条件を満たす。ループの骨組み（完了地点の種類・停止理由・報告の形）は `AGENTS.md` の「開発ループ」、細部（依頼の言い方と完了地点の対応、PR指摘の収集・照合（`node scripts/collect-pr-findings.mjs`）、マージの条件、PRの分け方）は `skills/delivery-loop` を正本とする。`preview` の同期と `preview` → `main` の昇格は `skills/preview-promotion`、別Agentへの委譲は `skills/agent-handoff` に従う。
 
 ## 8. CI / マージ条件
 
@@ -408,7 +408,7 @@ chore: 〜を整理
 
 ## 13. 完了
 
-完了地点ごとに確認すること、マージの条件、完了地点の前で止める条件と報告の形は `skills/delivery-loop` を正本とする。
+完了地点の種類・停止理由・報告の形は `AGENTS.md` の「開発ループ」、完了地点ごとに確認することとマージの条件は `skills/delivery-loop` を正本とする。
 
 ## 14. Hotfix
 

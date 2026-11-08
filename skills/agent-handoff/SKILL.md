@@ -12,7 +12,7 @@ license: Apache-2.0
 
 ## 置き場所
 
-依頼・報告ファイルは、作業するtask worktreeの `.tmp/handoff-<Issue番号またはtask名>/` に置く。`.tmp/` はgitignore済み。
+依頼・報告ファイルは、作業するtask worktreeの `.tmp/handoff-<Issue番号またはtask名>-<担当>/` に置く。委譲先ごとにディレクトリを分け、別の担当の `report.md` で完了と判定しないようにする。`.tmp/` はgitignore済み。
 
 | ファイル | 書く側 | 内容 |
 | --- | --- | --- |
@@ -42,12 +42,12 @@ license: Apache-2.0
 
 - ユーザーが送り先（cmuxのterminal等）を指定したら、そのCLIで送る。cmuxなら `cmux --skill` で使い方を確かめてから使う。画面操作（computer use等）で入力しない。
 - 送る本文は、依頼ファイルのpathと「このworktreeの外は編集しない」だけにする。依頼の中身を本文に書かず、ファイルを正本にする。
-- ユーザーが起動済みのterminalは、cwdがclone元のままのことが多い。task worktreeがsandboxの外になって承認待ちで止まるため、送る前にユーザーへ権限を広げてもらうか、本文に `cd <worktree>` を含める。
+- ユーザーが起動済みのterminalは、cwdがclone元のままのことが多い。task worktreeが委譲先の書き込み範囲の外になり、承認待ちで止まる。`cd` では書き込み範囲は広がらないので、送る前にユーザーへ権限を広げてもらうか、task worktreeをcwdにして起動し直してもらう。
 - 送ったら、委譲先が依頼を読んで動き始めたこと（terminalの出力・worktreeの変化）を1回確かめる。
 
 ## 報告を受け取る
 
-- 完了は `report.md` の最終行で判定する。terminalの画面を繰り返し読んで判定しない。
+- 完了は `report.md` の最終行で判定する。冒頭のround番号が今回の依頼と一致することも確かめる。terminalの画面を繰り返し読んで判定しない。
 - 待つ間は `skills/delivery-loop` の「待ち方」に従い、最終行が書かれたら再開する仕組みを仕掛ける。
 - 長く報告が更新されず、terminalの出力も進まないときは、止まっている（承認待ち・プロセス終了・端末のスリープ等）とみなして状態を確かめ、必要なら同じ依頼で再開させる。
 - 受け取ったら `git status` と `git stash list` も確かめる。禁止してもstashを使われたことがある。
