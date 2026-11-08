@@ -62,7 +62,7 @@ it("同じ軸の反復で両軸を確認済みにしない", () => {
   }
 });
 
-it.each(["rate", "basis"])("%sを不明へ戻したらその確認だけを除去する", (axis) => {
+it.each(["rate", "basis"])("%sを不明へ戻しても未配分のまま操作を保持する", (axis) => {
   const input = guessed();
   input.items[0] = {
     ...input.items[0],
@@ -76,7 +76,7 @@ it.each(["rate", "basis"])("%sを不明へ戻したらその確認だけを除�
   const result = reinterpretDraftTax({ ...input, override });
   expect(result.itemFields[0].taxAllocationStatus).toBe("unallocated");
   expect(result.itemFields[0].taxConfirmedFields).toEqual(
-    axis === "rate" ? ["amountBasis"] : ["taxRatePercent"],
+    axis === "rate" ? ["amountBasis"] : ["amountBasis", "taxRatePercent"],
   );
 });
 

@@ -110,3 +110,108 @@ it("ユーザーが明細の税込税抜を不明に戻した操作を維持す�
   expect(result.itemFields[0].amountBasis).toBe("unknown");
   expect(result.itemFields[0].taxAllocationStatus).toBe("unallocated");
 });
+
+it("不明への変更を再解釈とプレビュー後も維持して登録を拒否する", () => {
+  const items = mkItems("tax_excluded");
+  const input = {
+    amountYen: 842,
+    items,
+    taxSummaries: sourceTaxSummaries,
+    sourceTaxSummaries,
+    rawObservationLines: lines,
+    receiptLineClassifications: classifications,
+  };
+  const first = reinterpretDraftTax({
+    ...input,
+    override: { itemIndex: 0, amountBasis: "unknown" },
+  } as never);
+  expect(first.itemFields[0].taxConfirmedFields).toContain("amountBasis");
+  const saved = items.map((item: any, i: number) => ({ ...item, ...first.itemFields[i] }));
+  const repeated = reinterpretDraftTax({ ...input, items: saved } as never);
+  expect(repeated.itemFields[0]).toMatchObject({
+    amountBasis: "unknown",
+    taxAllocationStatus: "unallocated",
+  });
+  const preview = buildReviewTaxPreview(saved, {
+    paidTotalYen: 842,
+    taxSummaries: sourceTaxSummaries,
+    sourceTaxSummaries,
+    rawObservation: { source: "ai_ocr", lines } as any,
+    receiptLineClassifications: classifications,
+  });
+  expect(preview.items[0]).toMatchObject({
+    amountBasis: "unknown",
+    taxAllocationStatus: "unallocated",
+  });
+  const draft = {
+    amountYen: 842,
+    categoryId: "food",
+    taxSummaries: sourceTaxSummaries,
+    receiptInterpretation: {
+      values: { taxSummaries: sourceTaxSummaries, receiptLineClassifications: classifications },
+    },
+    rawObservation: { source: "ai_ocr", lines },
+  };
+  expect(() =>
+    buildDraftRegistrationItems(
+      draft as never,
+      saved.map((item: any) => ({
+        ...item,
+        amountYen: item.normalizedAmountYen,
+        categoryId: "food",
+      })) as never,
+    ),
+  ).toThrow(/未確定/);
+});
+
+it("不明に戻して保存した明細はプレビューでも不明のままになる", () => {
+  const items = mkItems("tax_excluded");
+  const first = reinterpretDraftTax({
+    amountYen: 842,
+    items,
+    taxSummaries: sourceTaxSummaries,
+    sourceTaxSummaries,
+    rawObservationLines: lines,
+    receiptLineClassifications: classifications,
+    override: { itemIndex: 0, amountBasis: "unknown" },
+  } as never);
+  const saved = items.map((item: any, index: number) => ({ ...item, ...first.itemFields[index] }));
+  const preview = buildReviewTaxPreview(saved, {
+    paidTotalYen: 842,
+    taxSummaries: sourceTaxSummaries,
+    sourceTaxSummaries,
+    rawObservation: { source: "ai_ocr", lines } as any,
+    receiptLineClassifications: classifications,
+  });
+  expect(preview.items[0]).toMatchObject({
+    amountBasis: "unknown",
+    taxAllocationStatus: "unallocated",
+  });
+});
+
+it("不明への変更後に税抜を選び直すと税抜で配分する", () => {
+  const items = mkItems("tax_excluded");
+  const input = {
+    amountYen: 842,
+    items,
+    taxSummaries: sourceTaxSummaries,
+    sourceTaxSummaries,
+    rawObservationLines: lines,
+    receiptLineClassifications: classifications,
+  };
+  const first = reinterpretDraftTax({
+    ...input,
+    override: { itemIndex: 0, amountBasis: "unknown" },
+  } as never);
+  const saved = items.map((item: any, i: number) => ({ ...item, ...first.itemFields[i] }));
+  const selected = reinterpretDraftTax({
+    ...input,
+    items: saved,
+    override: { itemIndex: 0, amountBasis: "tax_excluded" },
+  } as never);
+  expect(selected.itemFields[0]).toMatchObject({
+    amountBasis: "tax_excluded",
+    taxAllocationStatus: "allocated",
+    allocatedTaxYen: 13,
+  });
+});
