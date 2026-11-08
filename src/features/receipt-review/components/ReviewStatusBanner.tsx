@@ -156,6 +156,24 @@ export function ReviewStatusBanner({
       {checksAreMatched && issues.length === 0 && (
         <Alert severity="success">印字額と明細の金額が一致しています。</Alert>
       )}
+      {checksAreMatched && issues.length > 0 && (
+        <Box
+          aria-live="polite"
+          sx={{
+            position: "absolute",
+            width: "1px",
+            height: "1px",
+            padding: 0,
+            margin: "-1px",
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            border: 0,
+          }}
+        >
+          印字額と明細の金額が一致しています。
+        </Box>
+      )}
       {issues.length > 0 && (
         <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>
           {issues.map((issue) => (
