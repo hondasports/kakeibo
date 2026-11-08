@@ -1,6 +1,6 @@
 ---
 name: repo-code-review
-description: 差分・PRをレビューするとき（セルフレビューを含む）に使う。変更パスに応じて、security・stack・unit-test・E2Eのrepo固有チェックを読み分ける。
+description: 差分・PRをレビューするとき（セルフレビュー・PRへのinline投稿を含む）に使う。変更パスに応じて、security・stack・unit-test・E2Eのrepo固有チェックを読み分ける。
 license: Apache-2.0
 ---
 
@@ -46,3 +46,14 @@ license: Apache-2.0
 - 独立Reviewerの要否と理由。判定条件は `docs/development-process.md` の「Review / branch protection」と `skills/security-review` の「入力・起動」に従い、ここで条件を絞らない
 
 このskillによる確認はセルフレビューであり、独立レビューと呼ばない。
+
+## PRへ投稿するとき
+
+「インラインでコメントして」等、PRへの投稿を頼まれたときだけ投稿する。頼まれていなければ所見を返すだけにする。言語は `AGENTS.md` の「指摘コメントの言語」に従う。
+
+- 投稿前に既存の指摘を確かめ、同じ指摘を重ねて投稿しない。`node scripts/collect-pr-findings.mjs --pr <番号>` は未解決threadしか出さないため、解決済みのものは `gh api repos/{owner}/{repo}/pulls/<番号>/comments` でも見る。`bodyTruncated`・`commentsTruncated` の項目は記載URLの全文を読む。
+- diffの外の行など、inline commentにできない所見（GitHubは `422` で拒否する）は、`file:line` と理由を添えて `body` に書く。
+- 所見は1件ずつ該当行へのinline commentにし、レビュー全体を1回で送る: `gh api repos/{owner}/{repo}/pulls/<番号>/reviews --method POST --input <file>`。fileは `commit_id`（レビューしたHEAD）・`event: "COMMENT"`・`body`・`comments[]`（`path`・`line`・`side`・`body`）を持つJSON。
+- `body` には確認した範囲、所見の件数、変更とテストの対応表、独立Reviewerの要否を書く。実装を指示した側のレビューなら、独立レビューではないと書く。
+- 対応結果を既存threadへ返すときは `gh api repos/{owner}/{repo}/pulls/<番号>/comments/<comment id>/replies --method POST -f body=...` を使い、修正したcommitを書く。threadのresolveは `skills/delivery-loop` の「指摘の収集と照合」に従う。
+- 「コメントだけして」と頼まれたら、投稿で止めて修正しない。

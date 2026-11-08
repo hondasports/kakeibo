@@ -1,6 +1,6 @@
 ---
 name: workspace-preflight
-description: 編集前のpreflight（scripts/check-task-worktree.mjs）がFAILしたとき、またはtask worktreeを作るときに使う。PASS条件・FAIL時の対処・pure docsの例外の正本。
+description: 編集前のpreflight（scripts/check-task-worktree.mjs）がFAILしたとき、task worktreeを作るとき、マージ済みのworktreeを片付けるときに使う。PASS条件・FAIL時の対処・例外・worktreeの置き場所と削除条件の正本。
 license: Apache-2.0
 ---
 
@@ -23,11 +23,14 @@ scriptは「task identity == branch」や「差分が他task由来ではない�
 
 FAILしたまま編集しない。既存差分をreset / stash / deleteして場所を空けず、別worktreeへ分離する。
 
-1. 最新の `origin/preview` からtask branchとworktreeを作る（branch prefixはruntime固有の約束で固定しない）。
+1. 最新の `origin/preview` からtask branchとworktreeを作る（branch prefixはruntime固有の約束で固定しない）。置き場所は `docs/development-process.md` の「Worktree」の配置（`../kakeibo-worktrees/<name>`）にする。`/private/tmp` 等の一時領域に作らない。OSの掃除で消えると未pushのcommitやignoredファイルを失い、`git worktree list` に壊れた登録（prunable）が残るため。
+
+   相対pathはclone元（`git worktree list` の先頭）のrootを基準にする。別のtask worktreeから実行すると、その下に入れ子で作られる。
 
    ```bash
+   cd "$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
    git fetch origin preview
-   git worktree add <task-path> -b <task-branch> origin/preview
+   git worktree add ../kakeibo-worktrees/<name> -b <task-branch> origin/preview
    ```
 
 2. `docs/development-process.md` の「Worktree作成時セットアップ」（依存・hook・`.env.local`・indexion digest）を実行する。`.husky/_` が無いとhookが動かないままcommit・pushが通る。
@@ -44,4 +47,19 @@ FAILしたまま編集しない。既存差分をreset / stash / deleteして場
 - 設定ファイル
 - アプリコード
 
+`preview` をcheckoutしているworktreeをリモートへfast-forwardで同期するだけの操作は編集に当たらない。`skills/preview-promotion` の「A. ローカル preview の同期」の条件を満たせば、preflightのPASSなしで行ってよい。
+
 pre-commitの `--staged` checkは最後の安全網で、編集前preflightの代わりにはならない。
+
+## 後片付け
+
+マージ済みのworktreeは、ユーザーが削除を依頼したときだけ消す。候補を探すだけの依頼なら、一覧を返して止める。依頼が対象を名指ししていなければ（「不要なものを消して」等）、下の条件をすべて満たした候補と消えるローカルデータを示し、対象の承認を得てから消す（`AGENTS.md` の不可逆操作の契約）。
+
+1. `git fetch origin` の後、`git worktree list --porcelain` で候補を挙げる。clone元と、`preview` branchのworktree（`.env.local` の正本を持つ）は候補にしない。大きさや古さは優先度の目安で、削除してよい根拠ではない。
+2. 候補ごとに次をすべて確かめる。1つでも満たさなければ、その候補は残して理由を報告する。
+   - `git status --porcelain` が空
+   - branchのHEADが、マージ済みPRの最終HEADと一致する（`gh pr list --head <branch> --state merged --json number,headRefOid`）
+   - そのworktreeをcwdにしているprocessが無い（`lsof -a -d cwd | grep <path>`。権限等で確かめられなければ「未確認」として残す）
+3. `git status --ignored --short` でignoredファイルを確かめる。`.env.local` の正本は、`scripts/sync-e2e-env.mjs` と同じく、`KAKEIBO_E2E_ENV_CANONICAL` が設定されていればそのpath、無ければ `preview` branchを持つworktreeの `.env.local`。正本が候補のworktreeの中にあるなら、その候補は消さない。それ以外は正本と `cmp` で比べ、同じなら退避しない。違えば（local Convexを選んだ設定等）退避するか、ユーザーに確認する。`.convex/` 等のローカルデータは、残すかどうかが依頼から読めなければユーザー判断待ちで止める。
+4. `git worktree remove <path>` で消す。branchは、削除も依頼されたときだけ `git branch -d <branch>` で消す。
+5. `git worktree list --porcelain` から消えたこと、clone元の `git status` が変わっていないことを確認する。
