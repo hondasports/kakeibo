@@ -121,6 +121,33 @@ async function seed(t: ReturnType<typeof convexTest>) {
 }
 
 describe("registrationMode persistence and aggregation", () => {
+  it("旧クライアントの全体税設定を受け付けても明細設定を変更しない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const ids = await seed(t);
+    await t.run(async (ctx) => {
+      await ctx.db.patch(ids.draftId, { status: "needs_review" });
+      for (const id of [ids.foodItemId, ids.dailyItemId]) {
+        await ctx.db.patch(id, { amountBasis: "tax_included", taxRatePercent: 8 });
+      }
+    });
+    await t.withIdentity(identity).mutation(api.aiExpenseDrafts.mutations.updateForReview, {
+      draftId: ids.draftId,
+      documentType: "receipt",
+      shopName: "スーパー青葉",
+      date: "2026-08-26",
+      amountYen: 1200,
+      categoryId: ids.foodId,
+      priceTaxTreatment: "excluded",
+      taxRateComposition: "rate10",
+    });
+    const items = await t.run(async (ctx) => [
+      await ctx.db.get(ids.foodItemId),
+      await ctx.db.get(ids.dailyItemId),
+    ]);
+    expect(items).toEqual(
+      items.map(() => expect.objectContaining({ amountBasis: "tax_included", taxRatePercent: 8 })),
+    );
+  });
   it.each(["updateRegisteredDraft", "updateForReview"] as const)(
     "%s は101件の保存済み明細を全件使って登録済み支出を更新する",
     async (mutation) => {

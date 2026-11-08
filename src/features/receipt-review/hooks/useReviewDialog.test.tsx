@@ -245,8 +245,6 @@ describe("税修正応答と全体税設定の同期", () => {
           date: "2026-10-04",
           amountYen: 109,
           categoryId: "other",
-          priceTaxTreatment: undefined,
-          taxRateComposition: undefined,
           items: [expect.objectContaining({ itemName: "未保存の商品名", categoryId: "other" })],
         }),
         false,

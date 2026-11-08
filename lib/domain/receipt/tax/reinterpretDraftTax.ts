@@ -184,49 +184,6 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     classifications: input.receiptLineClassifications,
   });
 
-  const userItemPriceWasEdited =
-    input.override?.amountBasis !== undefined ||
-    input.bulkUnresolvedOverride?.amountBasis !== undefined;
-  const userPriceWasEdited =
-    userItemPriceWasEdited || input.decisionOverride?.priceTaxTreatment !== undefined;
-  const userRateWasEdited =
-    input.override?.taxRatePercent !== undefined ||
-    input.bulkUnresolvedOverride?.taxRatePercent !== undefined ||
-    input.decisionOverride?.taxRateComposition !== undefined;
-  const treatmentFromItems = (): PriceTaxTreatment => {
-    const bases = new Set(items.map((item) => item.amountBasis));
-    if (bases.has("unknown")) return "unknown";
-    if (bases.has("tax_included") && bases.has("tax_excluded")) return "perItem";
-    if (bases.has("tax_included")) return "included";
-    if (bases.has("tax_excluded")) return "excluded";
-    return "unknown";
-  };
-  const treatmentFromSummaries = (): PriceTaxTreatment => {
-    const bases = new Set(
-      taxSummaries.map((summary) => {
-        if (summary.taxableAmountBasis !== "unknown") return summary.taxableAmountBasis;
-        if (summary.taxMode === "included") return "tax_included" as const;
-        if (summary.taxMode === "external") return "tax_excluded" as const;
-        return "unknown" as const;
-      }),
-    );
-    if (bases.has("tax_included") && bases.has("tax_excluded")) return "perItem";
-    if (bases.has("tax_included")) return "included";
-    if (bases.has("tax_excluded")) return "excluded";
-    return "unknown";
-  };
-  const compositionFromItemsAndSummaries = (): TaxRateComposition => {
-    if (items.some((item) => item.taxRatePercent === null)) return "unknown";
-    const rates = new Set([
-      ...items.map((item) => item.taxRatePercent),
-      ...taxSummaries.map((summary) => summary.taxRatePercent),
-    ]);
-    if (rates.has(8) && rates.has(10)) return "mixed";
-    if (rates.has(8)) return "rate8";
-    if (rates.has(10)) return "rate10";
-    return "unknown";
-  };
-
   const interpretation = interpretReceiptTax({
     amountYen: input.amountYen,
     receiptTotalSource: input.receiptTotalSource,
@@ -237,18 +194,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     markerDefinitions: input.markerDefinitions,
     rawObservationLines,
     receiptLineClassifications: input.receiptLineClassifications,
-    userOverride:
-      userPriceWasEdited || userRateWasEdited
-        ? {
-            priceTaxTreatment: userPriceWasEdited
-              ? (input.decisionOverride?.priceTaxTreatment ??
-                (userItemPriceWasEdited ? treatmentFromItems() : treatmentFromSummaries()))
-              : undefined,
-            taxRateComposition: userRateWasEdited
-              ? (input.decisionOverride?.taxRateComposition ?? compositionFromItemsAndSummaries())
-              : undefined,
-          }
-        : undefined,
+    userOverride: input.decisionOverride,
   });
   const interpretedItems = interpretation.items;
   const amountsResolved =

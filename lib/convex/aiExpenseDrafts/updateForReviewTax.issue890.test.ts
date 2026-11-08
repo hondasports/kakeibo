@@ -156,19 +156,15 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
       ),
     ),
   )(
-    "$paidYen 円の片軸の全体設定を再保存しても印字税額・丸めを維持する ($choice)",
+    "$paidYen 円で旧引数を無視しても印字税額・丸めを維持する ($choice)",
     async ({ testCase, choice }) => {
       const env = setup(testCase);
       const printedSummary = structuredClone(env.getDraft().taxSummaries);
       await correctItems(env);
       await save(env, testCase, choice);
       const form = reopen(env);
-      expect(form.priceTaxTreatment).toBe(
-        "priceTaxTreatment" in choice ? choice.priceTaxTreatment : undefined,
-      );
-      expect(form.taxRateComposition).toBe(
-        "taxRateComposition" in choice ? choice.taxRateComposition : undefined,
-      );
+      expect(form.priceTaxTreatment).toBeUndefined();
+      expect(form.taxRateComposition).toBeUndefined();
       await save(env, testCase, form);
       await save(env, testCase, reopen(env));
       expect(env.getDraft().status).toBe("ready");
@@ -226,35 +222,32 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
     { taxRateComposition: "unknown" as const },
     { priceTaxTreatment: "unknown" as const, taxRateComposition: "unknown" as const },
   ])(
-    "全体の不明を明示した場合は合計だけ保存の選択を維持する ($priceTaxTreatment/$taxRateComposition)",
+    "旧引数の不明を送っても明細登録を維持する ($priceTaxTreatment/$taxRateComposition)",
     async (choice) => {
       const testCase = receiptTaxBasisCases[2];
       const env = setup(testCase);
       await correctItems(env);
       await save(env, testCase, choice);
       const form = reopen(env);
-      expect(form.priceTaxTreatment).toBe(
-        "priceTaxTreatment" in choice ? choice.priceTaxTreatment : undefined,
-      );
-      expect(form.taxRateComposition).toBe(
-        "taxRateComposition" in choice ? choice.taxRateComposition : undefined,
-      );
+      expect(form.priceTaxTreatment).toBeUndefined();
+      expect(form.taxRateComposition).toBeUndefined();
       await save(env, testCase, form);
-      expect(env.getDraft()).toMatchObject({ registrationMode: "totalOnly", status: "ready" });
-      expect(registrationItems(env)).toEqual([
-        expect.objectContaining({ amountYen: testCase.paidYen }),
-      ]);
+      expect(env.getDraft()).toMatchObject({ registrationMode: "detailed", status: "ready" });
+      expect(registrationItems(env).reduce((sum, item) => sum + item.amountYen, 0)).toBe(
+        testCase.paidYen,
+      );
     },
   );
 
-  it("両軸の全体設定を明示した場合は再表示・再保存でも維持する", async () => {
+  it("旧引数の両軸は再表示・再保存で明細に適用されない", async () => {
     const testCase = receiptTaxBasisCases[0];
     const env = setup(testCase);
-    await save(env, testCase, { priceTaxTreatment: "excluded", taxRateComposition: "rate8" });
+    await correctItems(env);
+    await save(env, testCase, { priceTaxTreatment: "included", taxRateComposition: "rate10" });
     const summary = structuredClone(env.getDraft().taxSummaries);
     expect(reopen(env)).toMatchObject({
-      priceTaxTreatment: "excluded",
-      taxRateComposition: "rate8",
+      priceTaxTreatment: undefined,
+      taxRateComposition: undefined,
     });
     await save(env, testCase, reopen(env));
     expect(env.getDraft().taxSummaries).toEqual(summary);
@@ -273,13 +266,18 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
       const testCase = receiptTaxBasisCases[2];
       const env = setup(testCase);
       await correctItems(env);
-      await save(env, testCase, choice);
       const override = env.getDraft().receiptUserOverride!;
       const choiceFields: readonly string[] = Object.values(RECEIPT_TAX_CHOICE_FIELDS);
       await env.ctx.db.patch(DRAFT_ID, {
+        registrationMode: "totalOnly",
+        receiptTaxDecision: { ...env.getDraft().receiptTaxDecision!, ...choice },
         receiptUserOverride: {
           ...override,
-          fields: override.fields.filter((field: string) => !choiceFields.includes(field)),
+          fields: [
+            ...override.fields.filter((field: string) => !choiceFields.includes(field)),
+            "receiptTaxDecision",
+            "taxSummaries",
+          ],
         },
       });
       expect(env.getDraft().receiptUserOverride!.fields).toEqual(

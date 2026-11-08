@@ -3,6 +3,26 @@ import { trialExternal8Fixture } from "../../receiptImageExtraction/fixtures/tax
 import { reinterpretDraftTax } from "./reinterpretDraftTax";
 
 describe("reinterpretDraftTax (user choice and overrides)", () => {
+  it("明細の税込と税率を編集しても全体判定に利用者の上書き根拠を付けない", () => {
+    const result = reinterpretDraftTax({
+      amountYen: 110,
+      items: [
+        {
+          itemName: "商品",
+          printedAmountYen: 110,
+          amountBasis: "unknown",
+          taxRatePercent: null,
+          markers: [],
+          warnings: [],
+        },
+      ],
+      taxSummaries: [],
+      override: { itemIndex: 0, amountBasis: "tax_included", taxRatePercent: 10 },
+    });
+    expect(
+      result.interpretation.decision.evidence.filter((e) => e.startsWith("user_override:")),
+    ).toEqual([]);
+  });
   it("初心者向けの2軸選択を全明細へ適用し、ユーザー判断を最優先にする", () => {
     const result = reinterpretDraftTax({
       amountYen: 1100,
@@ -246,7 +266,7 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
     expect(after.itemFields[1]?.taxResolutionStatus).toBe("unresolved");
     expect(after.itemFields[2]?.taxResolutionStatus).toBe("unresolved");
     expect(after.interpretation.decision).toMatchObject({
-      resolutionSource: "user",
+      resolutionSource: "ai",
       resolutionStatus: "ambiguous",
     });
   });
@@ -332,9 +352,9 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
     expect(result.interpretation.decision).toMatchObject({
       priceTaxTreatment: "included",
       taxRateComposition: "rate8",
-      resolutionSource: "explicitLabel",
+      resolutionSource: "ai",
     });
-    expect(result.interpretation.decision.evidence).toContain("user_override:composition");
+    expect(result.interpretation.decision.evidence).not.toContain("user_override:composition");
     expect(result.interpretation.decision.evidence).not.toContain("user_override:treatment");
   });
 });

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { updateForReviewHandler } from "../../../convex/aiExpenseDrafts/mutations";
+import {
+  updateForReviewHandler,
+  updateDraftItemTaxOverridesMutationHandler,
+} from "../../../convex/aiExpenseDrafts/mutations";
 import { applyReceiptTaxSettingsHandler } from "./applyReceiptTaxSettings";
 import { replaceDraftItemsForReview } from "./reviewValidation";
 import {
@@ -12,7 +15,7 @@ import {
 } from "./testHelpers";
 
 describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", () => {
-  it("税集計がなくても2段階選択を再計算してsnapshotへ保存する", async () => {
+  it("税情報がない下書きでは旧引数から税設定を作らない", async () => {
     const { ctx, getDraft, getItems } = createInMemoryMutationCtx({
       draft: {
         _id: DRAFT_ID,
@@ -56,20 +59,12 @@ describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", (
       taxRateComposition: "rate10",
     });
 
-    expect(getDraft()).toMatchObject({
-      receiptTaxDecision: {
-        priceTaxTreatment: "excluded",
-        taxRateComposition: "rate10",
-        resolutionSource: "user",
-      },
-      receiptUserOverride: {
-        fields: expect.arrayContaining(["receiptTaxDecision", "taxSummaries"]),
-      },
-    });
-    expect(getItems()[0]).toMatchObject({ allocatedTaxYen: 100, normalizedAmountYen: 1100 });
+    expect(getDraft().receiptTaxDecision).toBeUndefined();
+    expect(getItems()[0].amountBasis).toBeUndefined();
+    expect(getItems()[0].taxRatePercent).toBeUndefined();
   });
 
-  it("2段階の税選択を保存し、AI判定よりユーザー判断を優先する", async () => {
+  it("旧引数は明細や登録モードを変更しない", async () => {
     const { ctx, getDraft, getItems } = createInMemoryMutationCtx({
       draft: {
         _id: DRAFT_ID,
@@ -134,22 +129,13 @@ describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", (
       ],
     });
 
-    expect(getDraft().receiptTaxDecision).toMatchObject({
-      priceTaxTreatment: "excluded",
-      taxRateComposition: "rate10",
-      resolutionSource: "user",
-    });
-    expect(getDraft().receiptUserOverride).toMatchObject({
-      fields: expect.arrayContaining(["receiptTaxDecision", "taxSummaries"]),
-      values: expect.objectContaining({
-        receiptTaxDecision: expect.objectContaining({ resolutionSource: "user" }),
-      }),
-    });
-    expect(getItems()[0]).toMatchObject({
-      amountBasis: "tax_excluded",
-      taxRatePercent: 10,
-      normalizedAmountYen: 1100,
-    });
+    expect(getDraft().receiptUserOverride!.fields).not.toContain(
+      "receiptTaxDecision.priceTaxTreatment",
+    );
+    expect(getDraft().receiptUserOverride!.fields).not.toContain(
+      "receiptTaxDecision.taxRateComposition",
+    );
+    const before = { basis: getItems()[0].amountBasis, rate: getItems()[0].taxRatePercent };
 
     const totalOnly = await updateForReviewHandler(ctx, {
       draftId: DRAFT_ID,
@@ -162,15 +148,8 @@ describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", (
       priceTaxTreatment: "unknown",
       taxRateComposition: "unknown",
     });
-    expect(totalOnly).toMatchObject({
-      status: "ready",
-      registrationMode: "totalOnly",
-      receiptTaxDecision: {
-        priceTaxTreatment: "unknown",
-        taxRateComposition: "unknown",
-        resolutionSource: "user",
-      },
-    });
+    expect(totalOnly.registrationMode).toBe("detailed");
+    expect(getItems()[0]).toMatchObject({ amountBasis: before.basis, taxRatePercent: before.rate });
 
     const detailed = await updateForReviewHandler(ctx, {
       draftId: DRAFT_ID,
@@ -182,14 +161,7 @@ describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", (
       priceTaxTreatment: "excluded",
       taxRateComposition: "rate10",
     });
-    expect(detailed).toMatchObject({
-      registrationMode: "detailed",
-      receiptTaxDecision: {
-        priceTaxTreatment: "excluded",
-        taxRateComposition: "rate10",
-        resolutionSource: "user",
-      },
-    });
+    expect(detailed.registrationMode).toBe("detailed");
   });
 
   it("削除・並べ替え・追加後も税情報を元の itemId にだけ引き継ぐ", async () => {
@@ -319,6 +291,12 @@ describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", (
     });
 
     expect(result.status).toBe("needs_review");
+    await updateDraftItemTaxOverridesMutationHandler(ctx, {
+      draftId: DRAFT_ID,
+      itemId: getItems()[0]._id as Id<"aiExpenseDraftItems">,
+      amountBasis: "tax_excluded",
+      taxRatePercent: 8,
+    });
     const confirmed = await updateForReviewHandler(ctx, {
       draftId: DRAFT_ID,
       documentType: "receipt",
@@ -326,8 +304,6 @@ describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", (
       date: "2026-07-04",
       amountYen: 108,
       categoryId: CAT_ID,
-      priceTaxTreatment: "excluded",
-      taxRateComposition: "rate8",
     });
     expect(confirmed.status).toBe("ready");
     const items = getItems();

@@ -19,7 +19,6 @@ import {
   resolveRegistrationMode,
 } from "../../domain/aiExpenseDrafts/registrationItems";
 import {
-  RECEIPT_TAX_CHOICE_FIELDS,
   resolveReceiptTaxChoices,
   snapshotReceiptDraftValues,
   type AiExpenseRegistrationMode,
@@ -35,7 +34,6 @@ import { validatePositiveCategoryTotals } from "../../domain/aiExpenseDrafts/rev
 import { applyRecordPatch } from "../../domain/common/recordPatch";
 import { trimOptional } from "../../domain/common/string";
 import { resolveReceiptTotal } from "../../domain/receipt/tax/resolveReceiptTotal";
-import type { PriceTaxTreatment, TaxRateComposition } from "../../domain/receipt/tax/types";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import type { AiExpenseDraftDeps } from "./deps";
@@ -64,8 +62,6 @@ export type UpdateForReviewUsecaseArgs = {
   date: string;
   amountYen: number;
   registrationMode?: AiExpenseRegistrationMode;
-  priceTaxTreatment?: PriceTaxTreatment;
-  taxRateComposition?: TaxRateComposition;
   categoryId: string;
   items?: DraftReviewItemInput[];
 };
@@ -104,11 +100,7 @@ export async function updateAiExpenseDraftForReview(
     throw new ConvexError(getReviewUpdateReadyErrorMessage(readyCheck.error, args.documentType));
   }
 
-  const effectiveComposition =
-    args.taxRateComposition ??
-    (args.priceTaxTreatment === undefined
-      ? resolveReceiptTaxChoices(fields).taxRateComposition
-      : undefined);
+  const effectiveComposition = resolveReceiptTaxChoices(fields).taxRateComposition;
   const globalRate =
     effectiveComposition === "rate8" ? 8 : effectiveComposition === "rate10" ? 10 : undefined;
   if (
@@ -121,10 +113,8 @@ export async function updateAiExpenseDraftForReview(
   }
 
   const now = Date.now();
-  const hasTaxDecisionUpdate =
-    args.priceTaxTreatment !== undefined || args.taxRateComposition !== undefined;
   const originalItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
-  const shouldReinterpretTax = hasTaxDecisionUpdate || hasReceiptTaxMetadata(fields, originalItems);
+  const shouldReinterpretTax = hasReceiptTaxMetadata(fields, originalItems);
   // 読み込み済みの下書き・明細を引き回し、patch 内容をメモリ上で追跡して再読み込みを省く。
   let currentDraft = fields;
   if (!fields.receiptInterpretation && shouldReinterpretTax) {
@@ -210,12 +200,6 @@ export async function updateAiExpenseDraftForReview(
       draft: currentDraft,
       items: currentItems,
       receiptTotalSource: "user_confirmed",
-      decisionOverride: hasTaxDecisionUpdate
-        ? {
-            priceTaxTreatment: args.priceTaxTreatment,
-            taxRateComposition: args.taxRateComposition,
-          }
-        : undefined,
       preservedNonTaxReasons: nonTaxReviewReasons(classification.reviewReasons),
     });
     const updated = await deps.overrideSnapshots.persist({
@@ -224,13 +208,6 @@ export async function updateAiExpenseDraftForReview(
       fields: [
         ...REVIEW_OVERRIDE_FIELDS,
         "receiptTotalResolution",
-        ...(hasTaxDecisionUpdate ? ["receiptTaxDecision", "taxSummaries"] : []),
-        ...(args.priceTaxTreatment === undefined
-          ? []
-          : [RECEIPT_TAX_CHOICE_FIELDS.priceTaxTreatment]),
-        ...(args.taxRateComposition === undefined
-          ? []
-          : [RECEIPT_TAX_CHOICE_FIELDS.taxRateComposition]),
         ...(args.items === undefined ? [] : ["items"]),
       ],
       updatedAt: now,

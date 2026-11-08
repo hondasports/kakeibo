@@ -112,8 +112,6 @@ export function useReviewSubmit({
             amountYen,
             categoryId: submittedForm.categoryId,
             registrationMode: submittedForm.registrationMode,
-            priceTaxTreatment: submittedForm.priceTaxTreatment,
-            taxRateComposition: submittedForm.taxRateComposition,
             items: submittedItems.map((item) => ({
               itemName: item.itemName.trim(),
               confirmedTaxRatePercent: item.confirmedTaxRatePercent,
@@ -145,8 +143,6 @@ export function useReviewSubmit({
           amountYen,
           categoryId: submittedForm.categoryId as Id<"categories">,
           registrationMode: submittedForm.registrationMode,
-          priceTaxTreatment: submittedForm.priceTaxTreatment,
-          taxRateComposition: submittedForm.taxRateComposition,
           items: submittedItems.map((item) => ({
             ...(item.persistedItemId
               ? { itemId: item.persistedItemId as Id<"aiExpenseDraftItems"> }
