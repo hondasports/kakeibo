@@ -35,8 +35,10 @@ export const TAX_SUMMARY_CONFLICT_LABELS: Record<TaxSummaryConsistencyReason, st
     "内税として読み取りましたが、対象額は税抜として読み取られています",
   external_mode_with_tax_included_basis:
     "外税として読み取りましたが、対象額は税込として読み取られています",
-  tax_summary_amount_mismatch: "税率別対象額・税額・支払合計の金額が一致しません",
-  tax_included_amount_mismatch: "税込額と支払合計が一致しません",
+  tax_summary_amount_mismatch:
+    "レシートの金額が一致しません。商品の金額・税込／税抜・税率を確認してください",
+  tax_included_amount_mismatch:
+    "レシートの金額が一致しません。商品の金額・税込／税抜・税率を確認してください",
   reconciled_to_included: "税込対象額として再解釈しました",
   reconciled_to_external: "税抜対象額として再解釈しました",
   mixed_tax_mode: "内税と外税が混在しています",

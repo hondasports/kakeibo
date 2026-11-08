@@ -72,7 +72,7 @@ export function getReviewGuidance(
       if (unresolvedDeclaration) reasons.push("商品の税率・税込／税抜を確認してください");
       if (row?.status === "mismatch")
         reasons.push(
-          `明細の対象額 ${formatYen(row.currentYen ?? 0)} ／ 税内訳 ${formatYen(summary.taxableAmountYen)}`,
+          `商品合計 ${formatYen(row.currentYen ?? 0)} ／ レシートの${summary.taxRatePercent}%対象 ${formatYen(summary.taxableAmountYen)}。商品の税込／税抜・税率を確認してください`,
         );
       if (row?.blockerCode === "basis-conflict" && row.reason) reasons.push(row.reason);
       const unresolvedStatus =

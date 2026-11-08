@@ -353,7 +353,11 @@ export function ReviewDialog(props: ReviewDialogProps) {
                   busy={busy}
                   onJump={goTo}
                 />
-                <ReviewCheckCards amount={checks.amount} taxRate={checks.taxRate} />
+                <ReviewCheckCards
+                  amount={checks.amount}
+                  taxRate={checks.taxRate}
+                  evidence={sourceDraft?.receiptTaxDecision?.evidence}
+                />
                 <ReviewDialogItemsSection
                   items={items}
                   products={products}

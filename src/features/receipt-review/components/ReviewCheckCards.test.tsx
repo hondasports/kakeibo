@@ -76,9 +76,9 @@ function taxRateCheckOf(status: ReviewCheckStatus): ReviewTaxRateCheck {
 
 describe("ReviewCheckCards", () => {
   it.each<[ReviewCheckStatus, ReviewCheckStatus, string[]]>([
-    ["matched", "matched", []],
-    ["matched", "mismatch", ["税率別集計"]],
-    ["matched", "uncomparable", ["税率別集計"]],
+    ["matched", "matched", ["金額確認"]],
+    ["matched", "mismatch", ["金額確認", "税率別集計"]],
+    ["matched", "uncomparable", ["金額確認", "税率別集計"]],
     ["mismatch", "matched", ["金額確認"]],
     ["uncomparable", "matched", ["金額確認"]],
     ["mismatch", "mismatch", ["金額確認", "税率別集計"]],
@@ -110,15 +110,15 @@ describe("ReviewCheckCards", () => {
     },
   );
 
-  it("片方だけ表示のときカードは1枚だけで空のカード枠を残さない", () => {
+  it("金額と税率別の両方が比較不能なら両方を表示する", () => {
     render(
       <ReviewCheckCards
-        amount={amountCheckOf("matched")}
+        amount={amountCheckOf("uncomparable")}
         taxRate={taxRateCheckOf("uncomparable")}
       />,
     );
     const region = screen.getByRole("region", { name: "確認結果" });
-    expect(within(region).getAllByRole("heading", { level: 4 })).toHaveLength(1);
+    expect(within(region).getAllByRole("heading", { level: 4 })).toHaveLength(2);
     expect(within(region).getByText("税率別集計")).toBeVisible();
   });
 
@@ -126,7 +126,9 @@ describe("ReviewCheckCards", () => {
     const { rerender } = render(
       <ReviewCheckCards amount={amountCheckOf("matched")} taxRate={taxRateCheckOf("matched")} />,
     );
-    expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "確認結果" })).getByText("一致"),
+    ).toBeVisible();
 
     rerender(
       <ReviewCheckCards amount={amountCheckOf("mismatch")} taxRate={taxRateCheckOf("matched")} />,
@@ -138,7 +140,37 @@ describe("ReviewCheckCards", () => {
     rerender(
       <ReviewCheckCards amount={amountCheckOf("matched")} taxRate={taxRateCheckOf("matched")} />,
     );
-    expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "確認結果" })).getByText("一致"),
+    ).toBeVisible();
+  });
+
+  it("金額の状態だけを読み上げ、一致・差額・比較不能の更新を伝える", () => {
+    const { rerender } = render(
+      <ReviewCheckCards
+        amount={amountCheckOf("matched")}
+        taxRate={taxRateCheckOf("uncomparable")}
+      />,
+    );
+    const region = screen.getByRole("region", { name: "確認結果" });
+    expect(region).not.toHaveAttribute("aria-live");
+    const live = region.querySelector('[aria-live="polite"]')!;
+    expect(live).toHaveTextContent("商品の金額と支払額が一致しています");
+    expect(live).not.toHaveTextContent("税率別集計");
+    rerender(
+      <ReviewCheckCards
+        amount={amountCheckOf("mismatch")}
+        taxRate={taxRateCheckOf("uncomparable")}
+      />,
+    );
+    expect(live).toHaveTextContent("8円");
+    rerender(
+      <ReviewCheckCards
+        amount={amountCheckOf("uncomparable")}
+        taxRate={taxRateCheckOf("uncomparable")}
+      />,
+    );
+    expect(live).toHaveTextContent("比較できません");
   });
 
   it("不一致時は確定した差額だけを表示する", () => {

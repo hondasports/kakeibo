@@ -89,6 +89,9 @@ function AmountCheckLine({ label, value }: { label: string; value: number | unde
 }
 
 function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
+  if (check.status === "matched") {
+    return null;
+  }
   if (check.status === "uncomparable") {
     return (
       <Typography variant="body2" color="text.secondary">
@@ -152,8 +155,12 @@ function TaxRateCheckBody({ check }: { check: ReviewTaxRateCheck }) {
       {check.rows.map((row, index) => (
         <Box key={`${row.taxRatePercent}-${index}`}>
           <Stack
-            direction="row"
-            sx={{ justifyContent: "space-between", gap: 1, alignItems: "baseline" }}
+            direction={{ xs: "column", sm: "row" }}
+            sx={{
+              justifyContent: "space-between",
+              gap: 1,
+              alignItems: { xs: "stretch", sm: "baseline" },
+            }}
           >
             <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
               {row.taxRatePercent}%
@@ -163,7 +170,7 @@ function TaxRateCheckBody({ check }: { check: ReviewTaxRateCheck }) {
               variant="body2"
               sx={{
                 fontVariantNumeric: "tabular-nums",
-                whiteSpace: "nowrap",
+                overflowWrap: "anywhere",
                 textAlign: "right",
                 color: row.status === "mismatch" ? "error.main" : undefined,
               }}
@@ -194,31 +201,49 @@ function TaxRateCheckBody({ check }: { check: ReviewTaxRateCheck }) {
 export function ReviewCheckCards({
   amount,
   taxRate,
+  evidence,
 }: {
   amount: ReviewAmountCheck;
   taxRate: ReviewTaxRateCheck;
+  evidence?: string[];
 }) {
-  const showAmount = amount.status !== "matched";
   const showTaxRate = taxRate.status !== "matched";
-  if (!showAmount && !showTaxRate) return null;
+  const labels = [
+    evidence?.includes("explicit_label:excluded") ? "税抜" : null,
+    evidence?.includes("explicit_label:included") ? "税込" : null,
+  ].filter(Boolean);
   return (
     <Box
       component="section"
       aria-label="確認結果"
       sx={{
         display: "grid",
-        gridTemplateColumns:
-          showAmount && showTaxRate
-            ? { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }
-            : "minmax(0,1fr)",
+        gridTemplateColumns: showTaxRate
+          ? { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }
+          : "minmax(0,1fr)",
         gap: 1.5,
       }}
     >
-      {showAmount && (
-        <CheckCard title="金額確認" status={amount.status}>
-          <AmountCheckBody check={amount} />
-        </CheckCard>
-      )}
+      <CheckCard title="金額確認" status={amount.status}>
+        <Typography variant="body2" aria-live="polite">
+          {amount.status === "matched"
+            ? "商品の金額と支払額が一致しています"
+            : amount.status === "uncomparable"
+              ? "金額を比較できません"
+              : amount.differenceYen === undefined
+                ? "金額が一致していません"
+                : `金額が${formatYen(Math.abs(amount.differenceYen))}合いません`}
+        </Typography>
+        <AmountCheckBody check={amount} />
+        {amount.status === "mismatch" && (
+          <Typography variant="body2">商品の金額・税込／税抜・税率を確認してください</Typography>
+        )}
+        {labels.length > 0 && (
+          <Typography variant="body2" color="text.secondary">
+            レシートに{labels.map((label) => `「${label}」`).join("・")}の表記があります
+          </Typography>
+        )}
+      </CheckCard>
       {showTaxRate && (
         <CheckCard title="税率別集計" status={taxRate.status}>
           <TaxRateCheckBody check={taxRate} />

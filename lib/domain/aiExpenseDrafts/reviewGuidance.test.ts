@@ -235,7 +235,24 @@ describe("確認推奨に直せない項目を出さない（Issue #1018）", ()
 
   it("商品を直せば解消する矛盾（対象額の差）は具体的な金額つきで残す", () => {
     expect(summaryMessages(singleRate({ taxableAmountYen: 999 }))).toEqual([
-      expect.stringContaining("999円"),
+      expect.stringContaining("レシートの10%対象 999円"),
     ]);
+  });
+
+  it.each(["tax_summary_amount_mismatch", "tax_included_amount_mismatch"] as const)(
+    "%s は共通ラベルを表示する",
+    (reason) => {
+      expect(
+        summaryMessages(singleRate({ status: "contradictory", reasons: [reason] }))[0],
+      ).toContain("商品の金額・税込／税抜・税率を確認してください");
+    },
+  );
+
+  it("金額の矛盾では商品の確認先を示す", () => {
+    const messages = summaryMessages(
+      singleRate({ status: "contradictory", reasons: ["tax_summary_amount_mismatch"] }),
+    );
+    expect(messages[0]).toContain("商品の金額・税込／税抜・税率を確認してください");
+    expect(messages[0]).not.toContain("対象額・税額");
   });
 });

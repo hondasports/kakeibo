@@ -56,6 +56,99 @@ const props: ComponentProps<typeof ReviewDialog> = {
 };
 
 describe("下書きの修正導線", () => {
+  it("明細を税抜に変更すると商品一覧の金額確認が差額から一致に更新される", async () => {
+    const item = {
+      ...props.reviewItems[0],
+      persistedItemId: "food",
+      amountYen: "100",
+      printedAmountYen: 100,
+      amountBasis: "tax_included" as const,
+      taxRatePercent: 10 as const,
+      taxResolutionStatus: "resolved" as const,
+      taxResolutionSource: "item_explicit" as const,
+    };
+    const base = {
+      ...props,
+      reviewForm: {
+        ...props.reviewForm,
+        amountYen: "110",
+        priceTaxTreatment: undefined,
+        taxRateComposition: undefined,
+      },
+      reviewItems: [item],
+    };
+    const onAmountBasisChange = vi.fn();
+    const { rerender } = render(
+      <ReviewDialog {...base} onAmountBasisChange={onAmountBasisChange} />,
+    );
+    expect(
+      within(screen.getByRole("region", { name: "確認結果" })).getByText("10円"),
+    ).toBeVisible();
+    const row = screen.getByText("ホットケーキ").closest("details")!;
+    if (!row.hasAttribute("open")) await userEvent.click(row.querySelector("summary")!);
+    await userEvent.click(within(row).getByRole("combobox", { name: "ホットケーキの表示価格" }));
+    await userEvent.click(screen.getByRole("option", { name: "税抜" }));
+    expect(onAmountBasisChange).toHaveBeenCalledWith("food", "tax_excluded");
+    rerender(
+      <ReviewDialog
+        {...base}
+        onAmountBasisChange={onAmountBasisChange}
+        reviewItems={[
+          {
+            ...item,
+            amountBasis: "tax_excluded",
+            normalizedAmountYen: 110,
+            allocatedTaxYen: 10,
+            taxAllocationStatus: "allocated",
+          },
+        ]}
+      />,
+    );
+    expect(
+      within(screen.getByRole("region", { name: "確認結果" })).getByText("一致"),
+    ).toBeVisible();
+  });
+
+  it("明示された税込・税抜の根拠だけを表示する", () => {
+    const draft = {
+      ...props.selectedReviewDraft!,
+      receiptTaxDecision: {
+        priceTaxTreatment: "excluded" as const,
+        taxRateComposition: "rate8" as const,
+        resolutionStatus: "verified" as const,
+        resolutionSource: "explicitLabel" as const,
+        evidence: ["explicit_label:excluded"],
+        reasons: [],
+        candidates: [],
+        taxAmount: { roundingMethod: "round" as const, source: "unknown" as const },
+      },
+    };
+    const { rerender } = render(<ReviewDialog {...props} selectedReviewDraft={draft} />);
+    expect(screen.getByText("レシートに「税抜」の表記があります")).toBeVisible();
+    rerender(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={{
+          ...draft,
+          receiptTaxDecision: { ...draft.receiptTaxDecision, evidence: [] },
+        }}
+      />,
+    );
+    expect(screen.queryByText("レシートに「税抜」の表記があります")).not.toBeInTheDocument();
+    rerender(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={{
+          ...draft,
+          receiptTaxDecision: {
+            ...draft.receiptTaxDecision,
+            evidence: ["explicit_label:included"],
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("レシートに「税込」の表記があります")).toBeVisible();
+  });
   it.each([{ categoryId: "" }, { amountYen: "oops" }])(
     "割引対象が未選択でも必須エラーから割引行へ移動する",
     async (invalid) => {
@@ -184,7 +277,7 @@ describe("下書きの修正導線", () => {
       within(screen.getByRole("region", { name: "確認件数" })).getByText("確認推奨 1件"),
     ).toBeVisible();
     const banner = screen.getByRole("region", { name: "全体の確認状態" });
-    expect(within(banner).getByText("レシートの税内訳を確認してください")).toBeVisible();
+    expect(within(banner).getByText("商品の金額を確認してください")).toBeVisible();
     expect(
       within(banner).queryByText("税設定の確認が必要な商品があります"),
     ).not.toBeInTheDocument();
@@ -228,13 +321,15 @@ describe("下書きの修正導線", () => {
     expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
     expect(within(banner).getByText(/印字額と明細の金額が一致しています/)).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("金額が一致");
-    expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "確認結果" })).getByText("一致"),
+    ).toBeVisible();
   });
-  it("金額が一致し税率別が比較不能なら税率別集計カードだけを表示する", () => {
+  it("金額が一致し税率別が比較不能なら両方の状態を表示する", () => {
     render(<ReviewDialog {...props} />);
     const region = screen.getByRole("region", { name: "確認結果" });
     expect(within(region).getByText("税率別集計")).toBeVisible();
-    expect(within(region).queryByText("金額確認")).not.toBeInTheDocument();
+    expect(within(region).getByText("金額確認")).toBeVisible();
   });
   it("金額が比較不能で税率別が一致なら金額確認カードだけを表示する", () => {
     render(
@@ -288,7 +383,9 @@ describe("下書きの修正導線", () => {
     );
     const banner = screen.getByRole("region", { name: "全体の確認状態" });
     expect(within(banner).getByText("印字額と明細の金額が一致していません")).toBeVisible();
-    expect(within(banner).getByText(/差額 24円/)).toBeVisible();
+    expect(
+      within(screen.getByRole("region", { name: "確認結果" })).getByText("24円"),
+    ).toBeVisible();
     await user.click(within(banner).getByRole("button", { name: "金額を確認する" }));
     expect(screen.getByRole("region", { name: "確認結果" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "商品一覧" })).toBeVisible();
