@@ -8,6 +8,8 @@ license: Apache-2.0
 
 委譲しても、完了地点と検証の責任は依頼した側に残る（`skills/delivery-loop`）。
 
+このskillは、依頼側と委譲先が同じマシンのファイルシステムを共有する場合（cmuxのterminal等で動くCLI）を対象にする。共有しない委譲先（別の仮想マシンで動くクラウドのAgent等）には、依頼・報告ファイルの受け渡しを使わない。
+
 ## 置き場所
 
 依頼・報告ファイルは、作業するtask worktreeの `.tmp/handoff-<Issue番号またはtask名>/` に置く。`.tmp/` はgitignore済み。

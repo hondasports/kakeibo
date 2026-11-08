@@ -12,11 +12,11 @@ license: Apache-2.0
 
 clone元は `preview` のまま未追跡・未コミットのファイルを持つことが多く、preflightはFAILする。fast-forwardだけの同期は編集に当たらないため、次の条件を満たせばpreflightのPASSなしで行ってよい（`skills/workspace-preflight` の「例外」）。
 
-1. 進行中のmerge・rebase・cherry-pickが無いことを確認する。
-2. 保護する状態を記録する: `HEAD`、`git status --porcelain`、未追跡・未コミットの各pathのmodeとSHA-256。
+1. clone元（`git worktree list` の先頭）で、`git branch --show-current` が `preview` であること、進行中のmerge・rebase・cherry-pickが無いことを確認する。
+2. 保護する状態を記録する: `git status --porcelain --ignored` と、未追跡・未コミット・ignoredの各pathのmodeとSHA-256（`node_modules` 等の生成物は除いてよい）。`HEAD` は同期で変わるので保護対象に入れない。
 3. `git fetch origin preview` の後、`git merge-base --is-ancestor preview origin/preview` で一直線に進めることを確かめる。`git diff --name-only preview origin/preview` のpathが、2で記録したpathと重なれば止める。
-4. `git merge --ff-only origin/preview` だけを実行する。reset・stash・削除・上書きで場所を空けない。
-5. 保護した状態が変わっていないこと、`git rev-list --left-right --count preview...origin/preview` が `0 0` であることを確認する。
+4. `git merge --ff-only --no-overwrite-ignore origin/preview` だけを実行する。reset・stash・削除・上書きで場所を空けない。
+5. 保護した状態が変わっていないこと、`HEAD` が `origin/preview` と同じSHAになったこと、`git rev-list --left-right --count preview...origin/preview` が `0 0` であることを確認する。
 
 3〜5のどこかで条件を満たさなければ、何も変えずに止めて報告する（`skills/delivery-loop` の停止理由）。
 
