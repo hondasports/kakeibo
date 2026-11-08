@@ -24,8 +24,6 @@ function preview(input: ReinterpretDraftTaxInput) {
       ? { source: "ai_ocr", observedAt: 0, lines: input.rawObservationLines }
       : undefined,
     receiptLineClassifications: input.receiptLineClassifications,
-    priceTaxTreatment: input.decisionOverride?.priceTaxTreatment,
-    taxRateComposition: input.decisionOverride?.taxRateComposition,
   });
 }
 

@@ -1,4 +1,3 @@
-import { resolveReceiptTaxChoices } from "./receiptDataContract";
 import { resolveReviewItemDisplayAmountYen } from "./reviewItemAmounts";
 import { getDraftTitle } from "./title";
 import type {
@@ -9,7 +8,6 @@ import type {
 } from "./reviewTypes";
 
 export function mapDraftToReviewForm(draft: AiExpenseDraftJudgmentInput): ReviewFormValues {
-  const choices = resolveReceiptTaxChoices(draft);
   return {
     documentType: draft.documentType,
     shopName: getDraftTitle(draft, ""),
@@ -17,7 +15,6 @@ export function mapDraftToReviewForm(draft: AiExpenseDraftJudgmentInput): Review
     amountYen: draft.amountYen?.toString() ?? "",
     categoryId: draft.categoryId ?? "",
     registrationMode: draft.registrationMode ?? "detailed",
-    ...choices,
   };
 }
 

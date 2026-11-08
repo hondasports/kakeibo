@@ -201,10 +201,7 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
       });
     }
     await save(env, testCase);
-    expect(reopen(env)).toMatchObject({
-      priceTaxTreatment: undefined,
-      taxRateComposition: undefined,
-    });
+    expect(reopen(env)).not.toHaveProperty("priceTaxTreatment");
     await save(env, testCase, reopen(env));
     expect(env.getDraft()).toMatchObject({ registrationMode: "detailed", status: "needs_review" });
     expect(
@@ -245,10 +242,7 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
     await correctItems(env);
     await save(env, testCase, { priceTaxTreatment: "included", taxRateComposition: "rate10" });
     const summary = structuredClone(env.getDraft().taxSummaries);
-    expect(reopen(env)).toMatchObject({
-      priceTaxTreatment: undefined,
-      taxRateComposition: undefined,
-    });
+    expect(reopen(env)).not.toHaveProperty("priceTaxTreatment");
     await save(env, testCase, reopen(env));
     expect(env.getDraft().taxSummaries).toEqual(summary);
     expect(registrationItems(env).reduce((sum, item) => sum + item.amountYen, 0)).toBe(
@@ -285,18 +279,13 @@ describe("Issue #890: 補正・保存・再表示・登録境界", () => {
       );
       const printedSummary = structuredClone(env.getDraft().taxSummaries);
       const form = reopen(env);
-      expect(form.priceTaxTreatment).toBe(
-        "priceTaxTreatment" in choice ? choice.priceTaxTreatment : undefined,
-      );
-      expect(form.taxRateComposition).toBe(
-        "taxRateComposition" in choice ? choice.taxRateComposition : undefined,
-      );
+      expect(form).not.toHaveProperty("priceTaxTreatment");
+      expect(form).not.toHaveProperty("taxRateComposition");
       await save(env, testCase, form);
       await save(env, testCase, reopen(env));
       expect(env.getDraft()).toMatchObject({
         registrationMode: "totalOnly",
         status: "ready",
-        receiptTaxDecision: choice,
       });
       // 内訳の計算結果は、明細から導出した値として保存される。
       expect(env.getDraft().taxSummaries).toEqual(

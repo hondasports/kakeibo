@@ -82,9 +82,7 @@ export function useReviewSubmit({
     if (!selectedReviewDraftId) {
       return;
     }
-    const hasUnknownTaxChoice =
-      reviewForm.priceTaxTreatment === "unknown" || reviewForm.taxRateComposition === "unknown";
-    const effectiveRegistrationMode = hasUnknownTaxChoice ? "totalOnly" : registrationModeOverride;
+    const effectiveRegistrationMode = registrationModeOverride;
     const submittedForm = effectiveRegistrationMode
       ? { ...reviewForm, registrationMode: effectiveRegistrationMode }
       : reviewForm;

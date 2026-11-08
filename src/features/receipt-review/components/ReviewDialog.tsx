@@ -99,10 +99,8 @@ export function ReviewDialog(props: ReviewDialogProps) {
       buildReviewTaxPreview(sourceItems, {
         ...buildReviewTaxEvidence(sourceDraft),
         paidTotalYen,
-        priceTaxTreatment: form.priceTaxTreatment,
-        taxRateComposition: form.taxRateComposition,
       }),
-    [sourceItems, paidTotalYen, sourceDraft, form.priceTaxTreatment, form.taxRateComposition],
+    [sourceItems, paidTotalYen, sourceDraft],
   );
   // 税サマリのない応答では、個別修正で確定した登録額を再描画だけで上書きしない。
   const items = sourceDraft?.taxSummaries?.length ? preview.items : sourceItems;

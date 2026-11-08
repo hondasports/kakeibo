@@ -369,7 +369,6 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
       observationLine("8%対象0円", 0, 1),
       observationLine("内消費税8%0円", 0, 2),
     ];
-    input.decisionOverride = { priceTaxTreatment: "included", taxRateComposition: "rate10" };
     expect(allocated(input)).toBe(true);
   });
   it.each([{ taxYen: 0 }, { taxYen: 5 }])(

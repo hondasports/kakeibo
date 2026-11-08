@@ -179,25 +179,6 @@ describe("buildDerivedRegistration", () => {
 });
 
 describe("resolveReviewRegistrationMode", () => {
-  it("税判定が unknown なら totalOnly に強制する", () => {
-    expect(
-      resolveReviewRegistrationMode(
-        { priceTaxTreatment: "unknown" },
-        { registrationMode: "detailed" },
-      ),
-    ).toBe("totalOnly");
-    expect(
-      resolveReviewRegistrationMode(
-        { taxRateComposition: "unknown", registrationMode: "detailed" },
-        {},
-      ),
-    ).toBe("totalOnly");
-  });
-
-  it("税判定の明示更新があればデフォルト detailed になる", () => {
-    expect(resolveReviewRegistrationMode({ priceTaxTreatment: "included" }, {})).toBe("detailed");
-  });
-
   it("指定があればそれを優先し、無ければ下書きのモードを引き継ぐ", () => {
     expect(resolveReviewRegistrationMode({ registrationMode: "totalOnly" }, {})).toBe("totalOnly");
     expect(resolveReviewRegistrationMode({}, { registrationMode: "totalOnly" })).toBe("totalOnly");

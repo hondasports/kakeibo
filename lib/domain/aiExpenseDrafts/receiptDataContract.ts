@@ -89,7 +89,6 @@ export type ReceiptUserOverrideSnapshot<TCategoryId = string> = {
   values: ReceiptDraftValueSnapshot<TCategoryId>;
 };
 
-/** 全体設定で明示した軸を、商品・内訳補正から導かれた判定と区別する。 */
 export const RECEIPT_TAX_CHOICE_FIELDS = {
   priceTaxTreatment: "receiptTaxDecision.priceTaxTreatment",
   taxRateComposition: "receiptTaxDecision.taxRateComposition",
@@ -232,7 +231,7 @@ export function snapshotReceiptDraftValues<TCategoryId>(
   };
 }
 
-/** 補正対象は累積し、税判定を更新するときは全体設定の軸の記録を置き換える。 */
+/** 補正対象を累積する。 */
 export function buildReceiptUserOverride<TCategoryId>(args: {
   existingFields?: readonly string[];
   taxSummaryCorrections?: ExtractedTaxSummary[];
@@ -240,45 +239,14 @@ export function buildReceiptUserOverride<TCategoryId>(args: {
   updatedAt: number;
   values: ReceiptDraftValueSnapshot<TCategoryId>;
 }): ReceiptUserOverrideSnapshot<TCategoryId> {
-  const taxChoiceFields: readonly string[] = Object.values(RECEIPT_TAX_CHOICE_FIELDS);
-  const existingFields = args.fields.includes("receiptTaxDecision")
-    ? args.existingFields?.filter((field) => !taxChoiceFields.includes(field))
-    : args.existingFields;
   return {
     source: "user",
     ...(args.taxSummaryCorrections?.length
       ? { taxSummaryCorrections: args.taxSummaryCorrections }
       : {}),
     updatedAt: args.updatedAt,
-    fields: [...new Set([...(existingFields ?? []), ...args.fields])],
+    fields: [...new Set([...(args.existingFields ?? []), ...args.fields])],
     values: args.values,
-  };
-}
-
-export function resolveReceiptTaxChoices(draft: {
-  receiptUserOverride?: ReceiptUserOverrideSnapshot;
-  receiptTaxDecision?: ReceiptTaxDecision;
-  registrationMode?: AiExpenseRegistrationMode;
-}): {
-  priceTaxTreatment?: ReceiptTaxDecision["priceTaxTreatment"];
-  taxRateComposition?: ReceiptTaxDecision["taxRateComposition"];
-} {
-  const fields = draft.receiptUserOverride?.fields ?? [];
-  const legacyUnknown =
-    fields.includes("receiptTaxDecision") &&
-    (draft.registrationMode === "totalOnly" ||
-      (!fields.includes("items") && !fields.includes("taxSummaries")));
-  return {
-    priceTaxTreatment:
-      fields.includes(RECEIPT_TAX_CHOICE_FIELDS.priceTaxTreatment) ||
-      (legacyUnknown && draft.receiptTaxDecision?.priceTaxTreatment === "unknown")
-        ? draft.receiptTaxDecision?.priceTaxTreatment
-        : undefined,
-    taxRateComposition:
-      fields.includes(RECEIPT_TAX_CHOICE_FIELDS.taxRateComposition) ||
-      (legacyUnknown && draft.receiptTaxDecision?.taxRateComposition === "unknown")
-        ? draft.receiptTaxDecision?.taxRateComposition
-        : undefined,
   };
 }
 

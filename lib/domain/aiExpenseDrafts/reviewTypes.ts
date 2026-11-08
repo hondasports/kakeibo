@@ -2,11 +2,9 @@ import type { ReceiptItemTaxConfirmedField } from "../receipt/tax/types";
 import type {
   AmountBasis,
   ExtractedTaxSummary,
-  PriceTaxTreatment,
   ReceiptTaxDecision,
   ReceiptTotalResolution,
   TaxAllocationStatus,
-  TaxRateComposition,
   TaxRatePercent,
   TaxResolutionSource,
   TaxResolutionStatus,
@@ -129,8 +127,6 @@ export type ReviewFormValues = {
   amountYen: string;
   categoryId: string;
   registrationMode: AiExpenseRegistrationMode;
-  priceTaxTreatment?: PriceTaxTreatment;
-  taxRateComposition?: TaxRateComposition;
 };
 
 export type ReviewItemValues = AiExpenseItemTaxDetails & {
