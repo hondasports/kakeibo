@@ -21,6 +21,7 @@ license: Apache-2.0
 | 指定なし・指摘対応して | `merge_ready` |
 | マージまで・PRを監視してマージして | `merged` |
 
+- `pr_created` でも、最新HEADのCIの結果を報告に含める。`merge_ready` はrequired checks・承認・競合まで確かめる。
 - `merged` は、ユーザーがマージまでを明示したときだけ選ぶ。`merge_ready` に届いても、明示が無ければマージしない。
 - 「続行」「作業続行」は、直前に宣言した完了地点のまま再開する指示として扱う。
 
@@ -122,4 +123,10 @@ turnを終えるときは、完了でも停止でも次の形で返す。
 - 範囲外にしたfollow-upはIssueにして番号を書く。起票してよいかを聞き返さない。
 - 触ったworktreeに未コミット・未pushの変更が残っていないことを `git status` と `git log @{u}..` で確かめ、残っていればそう書く。
 - repository外に作ったworktree・一時ファイル・スクリプトも書く。
-- 実行した検証と未検証を分ける。checkの成否は終了コードかGitHubの状態で確かめる。
+- 検証結果の書き方は `skills/implementation` の「PR本文」に従う。
+
+## 他のskillとの関係
+
+- コミット前までの検証（対応表・red→green・終了コードでの確認）とPR本文の書き方は `skills/implementation`。このskillはPRを作った後から完了地点までを扱う。
+- PR本文の更新履歴ブロックは `skills/pr-update-spec`、レビューの観点とPRへの投稿は `skills/repo-code-review`。
+- `preview` の同期と `main` への昇格は `skills/preview-promotion`、別Agentへの委譲は `skills/agent-handoff`。

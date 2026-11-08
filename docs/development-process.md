@@ -45,7 +45,7 @@ Production
 
 preview向けPRの本文には `.github/pull_request_template.md` の更新履歴欄（`suzumemo-update` ブロック）に掲載方針と原稿または非掲載理由を必ず記入する。PR検証CIで欠落・不正はエラーになる。例外は更新履歴ブロックを持たないbot作成PR（dependabot等）のみで、マーカーを記入したbot PRは人間のPRと同じく検証される。
 
-`PR created` はcheckpointであり完了ではない。ユーザーが明示的に「PR作成まで」と指定しない限り、latest PR contentのCI・review・conflict・mergeabilityを確認する。
+`PR created` はcheckpointであり完了ではない。PR作成後にどこまで確認するかは完了地点で決まる（`skills/delivery-loop`）。
 
 公開前にstaged diffを確認し、タスク固有の作業ファイルや秘密値を含めない。
 
@@ -408,7 +408,7 @@ chore: 〜を整理
 
 ## 13. 完了
 
-ユーザー指定の完了地点を確認する。PR作成までならCI結果を伝え、merge_ready相当ならrequired checks・承認・競合まで確認する。マージはユーザーが明示したときだけ行う。完了地点の前で止めるときの条件と報告の形は `skills/delivery-loop` に従う。
+完了地点ごとに確認すること、マージの条件、完了地点の前で止める条件と報告の形は `skills/delivery-loop` を正本とする。
 
 ## 14. Hotfix
 
