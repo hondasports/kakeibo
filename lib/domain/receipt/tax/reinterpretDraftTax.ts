@@ -158,26 +158,25 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     extracted.warnings = extracted.warnings.filter(
       (warning) => warning !== "unresolved_tax_rate" && warning !== "unresolved_amount_basis",
     );
-    const decisionAdjusted = extracted;
     if (needsRateConfirmation[index]) {
       return {
-        ...decisionAdjusted,
+        ...extracted,
         amountBasis:
           input.override?.itemIndex === index
-            ? (input.override.amountBasis ?? decisionAdjusted.amountBasis)
-            : decisionAdjusted.amountBasis,
+            ? (input.override.amountBasis ?? extracted.amountBasis)
+            : extracted.amountBasis,
         taxRatePercent: null,
         markers: [],
       };
     }
     if (input.override?.itemIndex === index) {
       return {
-        ...decisionAdjusted,
+        ...extracted,
         taxRatePercent:
           input.override.taxRatePercent !== undefined
             ? input.override.taxRatePercent
-            : decisionAdjusted.taxRatePercent,
-        amountBasis: input.override.amountBasis ?? decisionAdjusted.amountBasis,
+            : extracted.taxRatePercent,
+        amountBasis: input.override.amountBasis ?? extracted.amountBasis,
       };
     }
     if (
@@ -186,12 +185,12 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
       input.override?.itemIndex !== index
     ) {
       return {
-        ...decisionAdjusted,
+        ...extracted,
         taxRatePercent: input.bulkUnresolvedOverride.taxRatePercent,
         amountBasis: input.bulkUnresolvedOverride.amountBasis,
       };
     }
-    return decisionAdjusted;
+    return extracted;
   });
 
   const sourceSummaries = input.sourceTaxSummaries ?? [];
