@@ -80,4 +80,5 @@ preflightの後、**最初の編集の前**に読む。コミット前にもう�
 ## 他のskillとの関係
 
 - 差分・PRのレビューは `skills/repo-code-review`。このskillは実装する側の手順。
+- PRを作った後の監視・指摘対応・マージと、完了地点の前で止めるときの報告は `skills/delivery-loop`。
 - 税計算は `skills/receipt-tax-domain`、E2E specの書き方は `skills/e2e-spec-authoring`、影響範囲は `skills/impact-analysis`。

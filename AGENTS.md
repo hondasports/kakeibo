@@ -23,6 +23,9 @@
 
 該当する行のskillを、その編集・操作の前に `skills/<name>/SKILL.md` から読む。作業テーマが別でも、触るpathや操作が該当すれば読む。複数該当すれば全て読む。
 
+- 複数のskillが同じことに触れていたら、各skillの「他のskillとの関係」が指す正本に従う。
+- 個人メモリやruntime固有のskill（`~/.codex/memories/` や `~/.claude/` 配下等）と、この表のskillの手順が重なったら、この表のskillを正本にする。個人側には手順を書き写さず、この表のskillへの参照だけを残す。
+
 | 該当したら読む（path・操作） | skill |
 | --- | --- |
 | preflightがFAILした、task worktreeを作る・片付ける | `skills/workspace-preflight` |
