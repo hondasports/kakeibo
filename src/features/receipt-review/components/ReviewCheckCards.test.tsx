@@ -76,7 +76,7 @@ function taxRateCheckOf(status: ReviewCheckStatus): ReviewTaxRateCheck {
 
 describe("ReviewCheckCards", () => {
   it.each<[ReviewCheckStatus, ReviewCheckStatus, string[]]>([
-    ["matched", "matched", ["金額確認"]],
+    ["matched", "matched", []],
     ["matched", "mismatch", ["金額確認", "税率別集計"]],
     ["matched", "uncomparable", ["金額確認", "税率別集計"]],
     ["mismatch", "matched", ["金額確認"]],
@@ -126,9 +126,7 @@ describe("ReviewCheckCards", () => {
     const { rerender } = render(
       <ReviewCheckCards amount={amountCheckOf("matched")} taxRate={taxRateCheckOf("matched")} />,
     );
-    expect(
-      within(screen.getByRole("region", { name: "確認結果" })).getByText("一致"),
-    ).toBeVisible();
+    expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
 
     rerender(
       <ReviewCheckCards amount={amountCheckOf("mismatch")} taxRate={taxRateCheckOf("matched")} />,
@@ -140,9 +138,7 @@ describe("ReviewCheckCards", () => {
     rerender(
       <ReviewCheckCards amount={amountCheckOf("matched")} taxRate={taxRateCheckOf("matched")} />,
     );
-    expect(
-      within(screen.getByRole("region", { name: "確認結果" })).getByText("一致"),
-    ).toBeVisible();
+    expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
   });
 
   it("金額の状態だけを読み上げ、一致・差額・比較不能の更新を伝える", () => {

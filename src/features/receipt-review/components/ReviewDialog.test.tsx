@@ -54,7 +54,7 @@ const props: ComponentProps<typeof ReviewDialog> = {
 };
 
 describe("下書きの修正導線", () => {
-  it("明細を税抜に変更すると商品一覧の金額確認が差額から一致に更新される", async () => {
+  it("明細を税抜に変更すると金額確認の差額が消え、上部の確認状態が一致に変わる", async () => {
     const item = {
       ...props.reviewItems[0],
       persistedItemId: "food",
@@ -102,9 +102,8 @@ describe("下書きの修正導線", () => {
         ]}
       />,
     );
-    expect(
-      within(screen.getByRole("region", { name: "確認結果" })).getByText("一致"),
-    ).toBeVisible();
+    expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("金額が一致");
   });
 
   it("明示された税込・税抜の根拠だけを表示する", () => {
@@ -315,9 +314,7 @@ describe("下書きの修正導線", () => {
     expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
     expect(within(banner).getByText(/印字額と明細の金額が一致しています/)).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("金額が一致");
-    expect(
-      within(screen.getByRole("region", { name: "確認結果" })).getByText("一致"),
-    ).toBeVisible();
+    expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
   });
   it("金額が一致し税率別が比較不能なら両方の状態を表示する", () => {
     render(<ReviewDialog {...props} />);

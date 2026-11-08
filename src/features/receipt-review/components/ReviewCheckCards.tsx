@@ -208,6 +208,8 @@ export function ReviewCheckCards({
   evidence?: string[];
 }) {
   const showTaxRate = taxRate.status !== "matched";
+  // すべて一致したら、一致の表示は上部の確認状態に任せて検算カードは出さない。
+  if (amount.status === "matched" && !showTaxRate) return null;
   const labels = [
     evidence?.includes("explicit_label:excluded") ? "税抜" : null,
     evidence?.includes("explicit_label:included") ? "税込" : null,
