@@ -367,3 +367,77 @@ it("税抜1000円と非課税500円・合計1600円の固定期待値を再現�
     "allocated",
   ]);
 });
+
+describe("Issue #1216 金額なし行の税証拠", () => {
+  const input = receiptTaxBasisInput({
+    amounts: [164, 143, 137, 168, 168],
+    taxYen: 62,
+    paidYen: 842,
+    allocations: [13, 12, 11, 13, 13],
+  });
+  const itemLines = input.items.map((item, index) => ({
+    ...observationLine(
+      `${item.itemName} *${item.printedAmountYen}`,
+      item.printedAmountYen,
+      index + 6,
+    ),
+    lineRoleCandidates: ["item" as const],
+  }));
+  const baseLines = [
+    ...itemLines,
+    observationLine("小計（税抜 8%） ¥780", 780, 11),
+    observationLine("消費税等（8%） ¥62", 62, 12),
+    observationLine("合計 ¥842", 842, 13),
+    observationLine("（税率8%対象 ¥842）", 842, 14),
+    observationLine("（内消費税等 8% ¥62）", 62, 15),
+    { ...observationLine("QUICPay支払 ¥842", 842, 16), lineRoleCandidates: ["payment" as const] },
+    { ...observationLine("金額 ¥842", 842, 20), lineRoleCandidates: ["unknown" as const] },
+  ];
+  const notes = [
+    {
+      ...observationLine("お買上明細は上記のとおりです。", 0, 17),
+      amountYen: null,
+      amountText: null,
+      lineRoleCandidates: ["unknown" as const],
+    },
+    {
+      ...observationLine("[*]マークは軽減税率対象です。", 0, 18),
+      amountYen: null,
+      amountText: null,
+      lineRoleCandidates: ["unknown" as const],
+    },
+  ];
+  const classifications = [
+    {
+      sourceLineIndex: 17,
+      status: "classified" as const,
+      candidates: [
+        { role: "totalCandidate" as const, score: 1, evidence: ["explicit_label:total"] },
+      ],
+    },
+    {
+      sourceLineIndex: 18,
+      status: "ambiguous" as const,
+      candidates: [{ role: "unknown" as const, score: 1, evidence: [] }],
+    },
+  ];
+
+  it.each([[17, 18], [17], [18]])("金額なし行 %s を税額の矛盾にしない", (...indexes) => {
+    const selected = indexes.flat();
+    const result = reinterpretDraftTax({
+      ...input,
+      rawObservationLines: [
+        ...baseLines,
+        ...notes.filter((line) => selected.includes(line.sourceLineIndex)),
+      ],
+      receiptLineClassifications: classifications.filter((entry) =>
+        selected.includes(entry.sourceLineIndex),
+      ),
+    });
+    expect(result.interpretation.taxSummaries[0].status).toBe("verified");
+    expect(result.itemFields.map((item) => item.taxAllocationStatus)).toEqual(
+      Array(5).fill("allocated"),
+    );
+    expect(result.itemFields.map((item) => item.allocatedTaxYen)).toEqual([13, 12, 11, 13, 13]);
+  });
+});

@@ -60,7 +60,7 @@ describe("軽減税率マーカーの説明", () => {
   });
 
   it("金額を読めない対象額行は矛盾として保持する", () => {
-    const missingTarget = { ...lines[0], amountYen: null, amountText: null };
+    const missingTarget = { ...lines[0], amountYen: null, amountText: "判読不能" };
     const summaries = deriveReceiptTaxSummaries({
       ...input,
       lines: [missingTarget, ...lines.slice(1)],
