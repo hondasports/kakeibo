@@ -88,7 +88,7 @@ license: Apache-2.0
 ### マージ（`preview`・`main` へのマージは完了地点が `merged` のときだけ）
 
 - マージ直前に、最新HEADで次をすべて取り直す。GitHubがマージを拒否しないことを、条件を満たした根拠にしない。
-  - 必要なcheckが揃っている。base `main` は `gh pr checks <番号> --required` の必須checkがすべてある。`preview` にはrulesetが無く必須checkが登録されないため、`ci.yml`・`e2e.yml`・`pr-update-spec.yml` のrunが最新HEADにあることを確かめる。
+  - 必要なcheckが揃っている。base `main` は、rulesetの必須checkの一覧（`gh api repos/{owner}/{repo}/rules/branches/main --jq '.[]|select(.type=="required_status_checks")|.parameters.required_status_checks[].context'`）を取り、最新HEADのcheck（`gh pr checks <番号> --json name,state`）にすべてあることを照合する。`gh pr checks --required` は報告済みのcheckから絞り込むだけなので、まだ登録されていない必須checkを見落とす。`preview` にはrulesetが無く必須checkが登録されないため、`ci.yml`・`e2e.yml`・`pr-update-spec.yml` のrunが最新HEADにあることを確かめる。
   - 揃ったcheckがすべてsuccess（workflowの条件によるskipは可。failure・cancelled・pendingは不可）。
   - 未対応finding 0、未解決thread 0、conflictなし。
 - マージ方式はユーザーの指定に従う。指定がなければ、同じbaseに直近でマージされたPRと同じ方式にする。

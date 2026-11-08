@@ -18,7 +18,7 @@ license: Apache-2.0
 | --- | --- | --- |
 | `request.md` | 依頼側 | 最初の依頼 |
 | `review-round<N>.md` | 依頼側 | N回目の差し戻し |
-| `report.md` | 委譲先 | 最新の報告。冒頭にround番号、最終行に `STATUS: DONE` か `STATUS: BLOCKED`（レビューの依頼なら `VERDICT: APPROVE` か `VERDICT: CHANGES_REQUESTED`） |
+| `report.md` | 委譲先 | 最新の報告。冒頭にround番号。最終行は、終えたら `STATUS: DONE`（レビューの依頼なら `VERDICT: APPROVE` か `VERDICT: CHANGES_REQUESTED`）、途中で止まったら依頼の種類によらず `STATUS: BLOCKED`。`BLOCKED` のときは本文に、停止理由（`AGENTS.md` の「開発ループ」の停止理由）と、何が揃えば再開できるかを書く |
 | `report-round<N>.md` | 依頼側 | 差し戻す前に、前回の `report.md` をこの名前へ移す |
 
 - 依頼側の実行環境の一時領域（scratchpad等）に置かない。委譲先のsandboxから読み書きできず、権限の追加待ちで止まるため。
