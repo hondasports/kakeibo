@@ -90,7 +90,7 @@ function AmountCheckLine({ label, value }: { label: string; value: number | unde
 
 function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
   if (check.status === "matched") {
-    return <Typography variant="body2">明細の金額と支払額が一致しています</Typography>;
+    return null;
   }
   if (check.status === "uncomparable") {
     return (
@@ -216,7 +216,6 @@ export function ReviewCheckCards({
     <Box
       component="section"
       aria-label="確認結果"
-      aria-live="polite"
       sx={{
         display: "grid",
         gridTemplateColumns: showTaxRate
@@ -226,6 +225,15 @@ export function ReviewCheckCards({
       }}
     >
       <CheckCard title="金額確認" status={amount.status}>
+        <Typography variant="body2" aria-live="polite">
+          {amount.status === "matched"
+            ? "商品の金額と支払額が一致しています"
+            : amount.status === "uncomparable"
+              ? "金額を比較できません"
+              : amount.differenceYen === undefined
+                ? "金額が一致していません"
+                : `金額が${formatYen(Math.abs(amount.differenceYen))}合いません`}
+        </Typography>
         <AmountCheckBody check={amount} />
         {amount.status === "mismatch" && (
           <Typography variant="body2">商品の金額・税込／税抜・税率を確認してください</Typography>

@@ -1,4 +1,5 @@
 import { Alert, Box, Button, Stack, Typography } from "@mui/material";
+import { formatYen } from "../../../../lib/domain/common/currency";
 import type { ReviewGuidanceItem } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
 import type { ReviewChecks } from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
 
@@ -44,7 +45,9 @@ export function ReviewStatusBanner({
         <Alert severity="error">
           <Typography variant="subtitle2">印字額と明細の金額が一致していません</Typography>
           <Typography variant="body2">
-            商品一覧の金額確認と、商品の税込／税抜・税率を確認してください。
+            {amount.differenceYen === undefined
+              ? "商品一覧の金額確認と、商品の税込／税抜・税率を確認してください。"
+              : `${amount.mismatchStep === "itemsVsSubtotal" ? "商品の合計とレシートの小計" : amount.mismatchStep === "subtotalTaxVsPaid" ? "レシートの小計と税額の合計と支払額" : "商品の合計と支払額"}が${formatYen(Math.abs(amount.differenceYen))}合いません。商品の税込／税抜・税率を確認してください。`}
           </Typography>
           <Box>
             <Button

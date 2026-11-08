@@ -55,9 +55,40 @@ describe("ReviewStatusBanner", () => {
       onJump,
     );
     expect(within(banner).getByText("印字額と明細の金額が一致していません")).toBeInTheDocument();
-    expect(within(banner).getByText(/商品一覧の金額確認/)).toBeInTheDocument();
+    expect(
+      within(banner).getByText(
+        "商品の合計とレシートの小計が8円合いません。商品の税込／税抜・税率を確認してください。",
+      ),
+    ).toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "金額を確認する" }));
     expect(onJump).toHaveBeenCalledWith("items");
+  });
+
+  it.each([
+    [
+      "itemsVsPaid",
+      "商品の合計と支払額が62円合いません。商品の税込／税抜・税率を確認してください。",
+    ],
+    [
+      "subtotalTaxVsPaid",
+      "レシートの小計と税額の合計と支払額が62円合いません。商品の税込／税抜・税率を確認してください。",
+    ],
+  ] as const)("%s の不一致は比較対象と差額を表示する", (mismatchStep, message) => {
+    const { banner } = renderBanner({
+      amount: { status: "mismatch", variant: "direct", mismatchStep, differenceYen: -62 },
+      taxRate: matchedChecks.taxRate,
+    });
+    expect(within(banner).getByText(message)).toBeInTheDocument();
+  });
+
+  it("差額が不明な不一致は商品一覧への確認案内を表示する", () => {
+    const { banner } = renderBanner({
+      amount: { status: "mismatch", variant: "direct" },
+      taxRate: matchedChecks.taxRate,
+    });
+    expect(
+      within(banner).getByText("商品一覧の金額確認と、商品の税込／税抜・税率を確認してください。"),
+    ).toBeInTheDocument();
   });
 
   it("税率設定の不一致は修正対象だけを案内する", async () => {

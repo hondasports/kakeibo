@@ -145,6 +145,34 @@ describe("ReviewCheckCards", () => {
     ).toBeVisible();
   });
 
+  it("金額の状態だけを読み上げ、一致・差額・比較不能の更新を伝える", () => {
+    const { rerender } = render(
+      <ReviewCheckCards
+        amount={amountCheckOf("matched")}
+        taxRate={taxRateCheckOf("uncomparable")}
+      />,
+    );
+    const region = screen.getByRole("region", { name: "確認結果" });
+    expect(region).not.toHaveAttribute("aria-live");
+    const live = region.querySelector('[aria-live="polite"]')!;
+    expect(live).toHaveTextContent("商品の金額と支払額が一致しています");
+    expect(live).not.toHaveTextContent("税率別集計");
+    rerender(
+      <ReviewCheckCards
+        amount={amountCheckOf("mismatch")}
+        taxRate={taxRateCheckOf("uncomparable")}
+      />,
+    );
+    expect(live).toHaveTextContent("8円");
+    rerender(
+      <ReviewCheckCards
+        amount={amountCheckOf("uncomparable")}
+        taxRate={taxRateCheckOf("uncomparable")}
+      />,
+    );
+    expect(live).toHaveTextContent("比較できません");
+  });
+
   it("不一致時は確定した差額だけを表示する", () => {
     render(
       <ReviewCheckCards
