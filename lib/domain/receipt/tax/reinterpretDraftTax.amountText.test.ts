@@ -93,11 +93,7 @@ describe("金額が amountText にだけ残る印字行（Issue #1018）", () =>
     expect(allocated(subtotalWithAmountTextOnly({ amountText: "￥4,000" }))).toBe(false);
   });
 
-  it.each([null, ""])("金額なしの小計は矛盾にしない: %s", (amountText) => {
-    expect(allocated(subtotalWithAmountTextOnly({ amountText }))).toBe(true);
-  });
-
-  it.each(["￥4,8?0", "小計 ￥4,810", "￥4,810 ￥437"])(
+  it.each([null, "", "￥4,8?0", "小計 ￥4,810", "￥4,810 ￥437"])(
     "金額として読めない amountText %s は証拠不足のまま止める",
     (amountText) => {
       expect(allocated(subtotalWithAmountTextOnly({ amountText }))).toBe(false);

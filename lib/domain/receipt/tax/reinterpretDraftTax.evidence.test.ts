@@ -87,7 +87,7 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
       input.rawObservationLines!.push({
         ...observationLine(rawText, 0, 3),
         amountYen: null,
-        amountText: "判読不能",
+        amountText: null,
       });
       expect(allocated(input)).toBe(false);
     },
@@ -493,7 +493,7 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
         input.rawObservationLines.push({
           ...observationLine("消費税 読取不能", 0, 2),
           amountYen: null,
-          amountText: "判読不能",
+          amountText: null,
         });
       expect(allocated(input)).toBe(false);
     },
@@ -673,7 +673,7 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
         input.rawObservationLines.push({
           ...observationLine("消費税 読取不能", 0, 3),
           amountYen: null,
-          amountText: "判読不能",
+          amountText: null,
         });
       if (problem === "不正な非課税税額")
         input.rawObservationLines.push(observationLine("0%消費税5円", 5, 3));
@@ -720,7 +720,7 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
     input.rawObservationLines[3] = {
       ...observationLine(label + "読取不能", 0, 3),
       amountYen: null,
-      amountText: "判読不能",
+      amountText: null,
     };
     expect(allocated(input)).toBe(false);
   });
