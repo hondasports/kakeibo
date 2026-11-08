@@ -102,20 +102,15 @@ export function reconcileTaxSummary({
   const expectedAmount = amountYen ?? summary.taxIncludedAmountYen;
   const modes = matchingModes(summary.taxableAmountYen, summary.taxYen, expectedAmount);
 
-  if (
-    amountYen !== undefined &&
-    summary.taxIncludedAmountYen !== undefined &&
-    summary.taxIncludedAmountYen !== amountYen
-  ) {
-    return { status: "contradictory", reasons: ["tax_included_amount_mismatch"] };
-  }
-
   const declared = taxMode === "included" || taxMode === "external" ? taxMode : undefined;
   const basis = modeFromBasis(taxableAmountBasis);
   if (
     declared &&
     basis &&
     declared !== basis &&
+    (amountYen === undefined ||
+      summary.taxIncludedAmountYen === undefined ||
+      summary.taxIncludedAmountYen === amountYen) &&
     modes.length === 1 &&
     (modes[0] === declared || modes[0] === basis)
   ) {
@@ -166,6 +161,14 @@ export function reconcileTaxSummary({
     };
   }
 
+  if (
+    amountYen !== undefined &&
+    summary.taxIncludedAmountYen !== undefined &&
+    summary.taxIncludedAmountYen !== amountYen
+  ) {
+    return { status: "contradictory", reasons: ["tax_included_amount_mismatch"] };
+  }
+
   if (expectedAmount === undefined || modes.includes(declaredMode)) {
     return { status: "verified", reasons: [] };
   }
@@ -200,18 +203,18 @@ export function normalizeTaxSummary(
   }
   const canonical = canonicalizeTaxSummaryDeclaration(summary, amountYen);
   const consistency = reconcileTaxSummary({ amountYen, summary: canonical });
-  const originalConsistency = reconcileTaxSummary({ amountYen, summary });
+  const repairedDeclaration =
+    modeFromBasis(summary.taxableAmountBasis) !== undefined &&
+    (summary.taxMode === "included" || summary.taxMode === "external") &&
+    summary.taxMode !== modeFromBasis(summary.taxableAmountBasis) &&
+    (canonical.taxMode !== summary.taxMode ||
+      canonical.taxableAmountBasis !== summary.taxableAmountBasis);
   return {
     ...canonical,
     status: consistency.status,
-    reasons:
-      modeFromBasis(summary.taxableAmountBasis) !== undefined &&
-      (summary.taxMode === "included" || summary.taxMode === "external") &&
-      summary.taxMode !== modeFromBasis(summary.taxableAmountBasis) &&
-      (canonical.taxMode !== summary.taxMode ||
-        canonical.taxableAmountBasis !== summary.taxableAmountBasis)
-        ? originalConsistency.reasons
-        : consistency.reasons,
+    reasons: repairedDeclaration
+      ? reconcileTaxSummary({ amountYen, summary }).reasons
+      : consistency.reasons,
   };
 }
 

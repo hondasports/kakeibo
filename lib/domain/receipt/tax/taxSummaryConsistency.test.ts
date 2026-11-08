@@ -24,6 +24,36 @@ function baseSummary(overrides: Partial<ExtractedTaxSummary> = {}): ExtractedTax
 
 describe("taxSummaryConsistency matrix", () => {
   it.each([
+    ["mixed", "tax_included", "ambiguous", ["mixed_tax_mode"]],
+    ["unknown", "tax_included", "ambiguous", ["reconciled_to_included"]],
+    ["included", "unknown", "ambiguous", ["reconciled_to_included"]],
+    ["included", "tax_included", "contradictory", ["tax_included_amount_mismatch"]],
+    [
+      "included",
+      "tax_excluded",
+      "contradictory",
+      ["included_mode_with_tax_excluded_basis", "tax_summary_amount_mismatch"],
+    ],
+    [
+      "external",
+      "tax_included",
+      "contradictory",
+      ["external_mode_with_tax_included_basis", "tax_summary_amount_mismatch"],
+    ],
+  ] as const)(
+    "税込合計と支払額が異なる %s / %s の従来の判定を維持する",
+    (taxMode, taxableAmountBasis, status, reasons) => {
+      const summary = baseSummary({
+        taxMode,
+        taxableAmountBasis,
+        taxableAmountYen: 1060,
+        taxIncludedAmountYen: 960,
+      });
+      expect(reconcileTaxSummary({ summary, amountYen: 1060 })).toEqual({ status, reasons });
+    },
+  );
+
+  it.each([
     ["included", "tax_excluded", 780, 62, 842, "external", "tax_excluded"],
     ["external", "tax_included", 842, 62, 842, "included", "tax_included"],
   ] as const)(
