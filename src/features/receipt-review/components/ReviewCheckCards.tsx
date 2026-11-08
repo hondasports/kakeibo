@@ -227,7 +227,7 @@ export function ReviewCheckCards({
       }}
     >
       <CheckCard title="金額確認" status={amount.status}>
-        <Typography variant="body2" aria-live="polite">
+        <Typography variant="body2" aria-live={amount.status === "matched" ? "polite" : undefined}>
           {amount.status === "matched"
             ? "商品の金額と支払額が一致しています"
             : amount.status === "uncomparable"

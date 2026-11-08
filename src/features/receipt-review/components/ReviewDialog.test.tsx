@@ -103,7 +103,7 @@ describe("下書きの修正導線", () => {
       />,
     );
     expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("金額が一致");
+    expect(screen.getByText("確認結果：計算した金額が一致しています。")).toBeVisible();
   });
 
   it("明示された税込・税抜の根拠だけを表示する", () => {
@@ -313,7 +313,7 @@ describe("下書きの修正導線", () => {
     const banner = screen.getByRole("region", { name: "全体の確認状態" });
     expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
     expect(within(banner).getByText(/印字額と明細の金額が一致しています/)).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("金額が一致");
+    expect(screen.getByText("確認結果：計算した金額が一致しています。")).toBeVisible();
     expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
   });
   it("金額が一致し税率別が比較不能なら両方の状態を表示する", () => {

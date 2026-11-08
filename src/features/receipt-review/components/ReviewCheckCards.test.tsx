@@ -1,6 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ReviewCheckCards } from "./ReviewCheckCards";
+import { ReviewStatusBanner } from "./ReviewStatusBanner";
+import { ReviewDialogActions } from "./ReviewDialogActions";
+import { vi } from "vitest";
 import type { ReviewAmountCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewAmountChecks";
 import type { ReviewCheckStatus } from "../../../../lib/domain/aiExpenseDrafts/reviewCheckUtils";
 import type { ReviewTaxRateCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewTaxChecks";
@@ -141,8 +144,66 @@ describe("ReviewCheckCards", () => {
     expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
   });
 
-  it("金額の状態だけを読み上げ、一致・差額・比較不能の更新を伝える", () => {
-    const { rerender } = render(
+  it("金額の状態を各状態で一つのライブ領域に通知する", () => {
+    function view(
+      amountStatus: ReviewCheckStatus,
+      taxStatus: ReviewCheckStatus,
+      hasIssues = false,
+    ) {
+      const amount = amountCheckOf(amountStatus);
+      const taxRate = taxRateCheckOf(taxStatus);
+      return (
+        <>
+          <ReviewStatusBanner
+            checks={{ amount, taxRate }}
+            issues={
+              hasIssues
+                ? [{ id: "required", message: "修正してください", target: "items", required: true }]
+                : []
+            }
+            unresolvedTaxItemCount={0}
+            busy={false}
+            onJump={vi.fn()}
+          />
+          <ReviewCheckCards amount={amount} taxRate={taxRate} />
+          <ReviewDialogActions
+            reviewError=""
+            busy={false}
+            requiredCount={hasIssues ? 1 : 0}
+            checkMismatchCount={amountStatus === "mismatch" || taxStatus === "mismatch" ? 1 : 0}
+            recommendationCount={
+              taxStatus === "uncomparable" || amountStatus === "uncomparable" ? 1 : 0
+            }
+            totalOnly={false}
+            onClose={vi.fn()}
+            onSubmit={vi.fn()}
+            onReviewRequired={vi.fn()}
+          />
+        </>
+      );
+    }
+    const amountLives = () =>
+      [...document.querySelectorAll('[role="alert"], [role="status"], [aria-live]')].filter(
+        (element) =>
+          /金額が8円合いません|8円合いません|金額を比較できません|金額と支払額が一致|印字額と明細の金額が一致|計算した金額が一致/.test(
+            element.textContent ?? "",
+          ),
+      );
+    const { rerender } = render(view("mismatch", "matched"));
+    expect(amountLives()).toHaveLength(1);
+    expect(amountLives()[0]).toHaveTextContent("8円");
+    rerender(view("uncomparable", "matched"));
+    expect(amountLives()).toHaveLength(1);
+    rerender(view("matched", "uncomparable"));
+    expect(amountLives()).toHaveLength(1);
+    rerender(view("matched", "matched"));
+    expect(amountLives()).toHaveLength(1);
+    rerender(view("matched", "matched", true));
+    expect(amountLives()).toHaveLength(1);
+  });
+
+  it("税率別だけ未一致なら金額一致の表示を維持する", () => {
+    render(
       <ReviewCheckCards
         amount={amountCheckOf("matched")}
         taxRate={taxRateCheckOf("uncomparable")}
@@ -153,20 +214,6 @@ describe("ReviewCheckCards", () => {
     const live = region.querySelector('[aria-live="polite"]')!;
     expect(live).toHaveTextContent("商品の金額と支払額が一致しています");
     expect(live).not.toHaveTextContent("税率別集計");
-    rerender(
-      <ReviewCheckCards
-        amount={amountCheckOf("mismatch")}
-        taxRate={taxRateCheckOf("uncomparable")}
-      />,
-    );
-    expect(live).toHaveTextContent("8円");
-    rerender(
-      <ReviewCheckCards
-        amount={amountCheckOf("uncomparable")}
-        taxRate={taxRateCheckOf("uncomparable")}
-      />,
-    );
-    expect(live).toHaveTextContent("比較できません");
   });
 
   it("不一致時は確定した差額だけを表示する", () => {
