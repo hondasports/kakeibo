@@ -55,7 +55,7 @@ preview向けPRの本文には `.github/pull_request_template.md` の更新履�
 
 コード、設定、migration、Agent process等のrepository changeは、task専用worktreeで行う。
 
-推奨配置:
+配置（`/private/tmp` 等の一時領域には作らない。理由は `skills/workspace-preflight`）:
 
 ```text
 <parent>/
@@ -275,7 +275,7 @@ CIで実行するbackendは共有cloud devではなく、ジョブごとの `CON
 
 ## 7. Review / Delivery
 
-ユーザー指定の完了地点に従う。PR指摘は `node scripts/collect-pr-findings.mjs` で機械収集して全件確認し（inlineスレッド・全stateの非空レビュー本文・PR会話コメント）、修正 or 棄却の根拠を残す。レビュー本文と会話コメントはresolve状態を持たないため、対応済みのfinding idと確認した候補のupdatedAtをIssue/PRの記録に残し、`--handled` で `unhandledCount: 0` を「指摘なし」と判定する（未解決threadはresolveまで常に未対応）。`bodyTruncated`・`commentsTruncated` の項目は記載URLの全文を読むまで確認済みとしない。指摘対応はまとめて1 pushで行い、pushごとのCI起動を抑える。観測した最新HEADに対して実行中は再観測、失敗は修正・再検証・push、新規指摘は修正ループ、必要承認だけ不足は人間待ち、必要条件充足はHEAD不変を再確認して完了とする。GitHubの承認・branch保護条件を満たす。
+ユーザー指定の完了地点に従い、GitHubの承認・branch保護条件を満たす。完了地点の決め方、PR指摘の収集・照合（`node scripts/collect-pr-findings.mjs`）、観測した最新HEADに対する対応のループ、マージ、止めてよい理由と報告の形は `skills/delivery-loop` を正本とする。`preview` の同期と `preview` → `main` の昇格は `skills/preview-promotion`、別Agentへの委譲は `skills/agent-handoff` に従う。
 
 ## 8. CI / マージ条件
 
@@ -408,7 +408,7 @@ chore: 〜を整理
 
 ## 13. 完了
 
-ユーザー指定の完了地点を確認する。PR作成までならCI結果を伝え、merge_ready相当ならrequired checks・承認・競合まで確認する。
+ユーザー指定の完了地点を確認する。PR作成までならCI結果を伝え、merge_ready相当ならrequired checks・承認・競合まで確認する。マージはユーザーが明示したときだけ行う。完了地点の前で止めるときの条件と報告の形は `skills/delivery-loop` に従う。
 
 ## 14. Hotfix
 
@@ -430,7 +430,7 @@ Hotfixも原則Pull Requestを経由する。
 - **不変条件（invariant）**: 変更の前後で維持すべき性質。
 - **必須確認（Required Controls）**: 変更の種別ごとに必要とされる確認。
 - **finding**: レビュー・指摘対応の管理単位。id・状態・根拠つきで追跡し、修正確認か棄却根拠で閉じる。
-- **完了地点**: ユーザー指定の終了ライン。`local_verified`（ローカル検証まで）/ `pr_created`（PR最新HEAD一致まで）/ `merge_ready`（CI・承認・競合まで）。
+- **完了地点**: ユーザー指定の終了ライン。`local_verified`（ローカル検証まで）/ `pr_created`（PR最新HEAD一致まで）/ `merge_ready`（CI・承認・競合まで）/ `merged`（ユーザーが明示したときだけ。マージ済みとマージ先SHAの確認まで）。
 - **Delivery**: 検証済みの変更を許可されたbranch / PRへ公開する工程。
 - **Checker chain**: 必須条件（セルフレビュー必須項目、policy・ユーザー指定のCIと承認）と補助観点（利用可能なボット指摘）に分けた確認系列。自己評価は独立レビューの代替にならない。
 - **収束（convergence）**: open findingが0件（全件に根拠あり）になった状態。受入条件を満たせない指摘の先送りは収束に数えない。
