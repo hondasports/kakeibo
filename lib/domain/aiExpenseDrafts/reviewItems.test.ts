@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  aggregateDraftItemsByCategory,
   getDraftItemAggregationErrorMessage,
   hasLowConfidenceItem,
   summarizeItems,
@@ -91,5 +92,40 @@ describe("getDraftItemAggregationErrorMessage", () => {
     ["non_positive_category_total", "Draft category total must be greater than zero"],
   ] as const)("%s -> %s", (error, expected) => {
     expect(getDraftItemAggregationErrorMessage(error)).toBe(expected);
+  });
+});
+
+describe("aggregateDraftItemsByCategory の割引行", () => {
+  const draft = { amountYen: 165, categoryId: "daily", documentType: "receipt" as const };
+  const product = {
+    itemName: "商品A",
+    amountYen: 179,
+    categoryId: "daily",
+    confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+  };
+  const discount = (itemName: string, lineType?: "discount" | "promotion_adjustment") => ({
+    itemName,
+    lineType,
+    amountYen: -14,
+    categoryId: "daily",
+    confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+  });
+
+  it.each([
+    ["行種別が割引なら品名に割引の語が無くても登録できる", discount("特売", "discount")],
+    ["行種別が販促の調整でも登録できる", discount("まとめ割", "promotion_adjustment")],
+    ["行種別の無い旧データは品名に割引の語があれば登録できる", discount("値引")],
+  ])("%s", (_caseName, discountItem) => {
+    expect(aggregateDraftItemsByCategory(draft, [product, discountItem])).toEqual({
+      success: true,
+      items: [{ itemName: "商品A、" + discountItem.itemName, amountYen: 165, categoryId: "daily" }],
+    });
+  });
+
+  it("行種別の無い旧データで品名に割引の語が無い負の明細は登録しない", () => {
+    expect(aggregateDraftItemsByCategory(draft, [product, discount("特売")])).toEqual({
+      success: false,
+      error: "invalid_item_amount",
+    });
   });
 });

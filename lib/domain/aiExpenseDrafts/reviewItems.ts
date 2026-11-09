@@ -2,7 +2,7 @@ import {
   AI_EXPENSE_DRAFT_CONFIDENCE_THRESHOLD,
   type AiExpenseDraftDocumentType,
 } from "./constants";
-import { isValidSignedLineItemAmount } from "../receipt/discountItems";
+import { isValidSignedLineItemAmount, type ReceiptItemLineType } from "../receipt/discountItems";
 import { resolveReceiptShopNameFromDraft } from "./shopName";
 
 export type ItemConfidence = {
@@ -100,6 +100,7 @@ export type DraftForAggregation = {
 
 export type DraftItemForAggregation = {
   itemName: string;
+  lineType?: ReceiptItemLineType;
   amountYen: number;
   normalizedAmountYen?: number;
   categoryId?: string;
@@ -136,7 +137,7 @@ export function aggregateDraftItemsByCategory(
   const categoryAmounts = new Map<string, number>();
   for (const item of items) {
     const registrationAmountYen = item.normalizedAmountYen ?? item.amountYen;
-    if (!isValidSignedLineItemAmount(item.itemName, registrationAmountYen)) {
+    if (!isValidSignedLineItemAmount(item.itemName, registrationAmountYen, item.lineType)) {
       return { success: false, error: "invalid_item_amount" };
     }
     if (item.categoryId === undefined) {
