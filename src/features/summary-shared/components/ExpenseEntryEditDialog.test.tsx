@@ -321,4 +321,72 @@ describe("ExpenseEntryEditDialog AI draft history", () => {
       ),
     );
   });
+  it.each([
+    ["読み込んだ金額のまま", undefined, -14],
+    ["負数を入力し直して", "-20", -20],
+  ])(
+    "detailedの行種別が割引の明細は、品名に割引の語が無くても%s保存できる",
+    async (_caseName, inputAmount, expectedAmountYen) => {
+      useQueryMock.mockReturnValue({
+        draft: { _id: "draft-1" },
+        items: [
+          {
+            _id: "item-1",
+            itemName: "商品",
+            lineType: "item",
+            amountYen: 179,
+            categoryId: "cat-daily",
+          },
+          {
+            _id: "item-2",
+            itemName: "特売",
+            lineType: "discount",
+            amountYen: -14,
+            categoryId: "cat-daily",
+          },
+        ],
+      });
+
+      render(
+        <ExpenseEntryEditDialog
+          categories={[{ _id: "cat-daily", name: "日用品" }]}
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+          open
+          receipt={{
+            _id: "entry-1",
+            date: "2026-11-08",
+            type: "expense",
+            shopName: "ホームセンター",
+            amountYen: 165,
+            categoryId: "cat-daily",
+            categoryName: "日用品",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry",
+            receiptShopName: "ホームセンター",
+            receiptTotalAmountYen: 165,
+            aiExpenseDraftId: "draft-1",
+            registrationMode: "detailed",
+          }}
+        />,
+      );
+
+      const discountAmountInput = await screen.findByLabelText("明細金額 2");
+      if (inputAmount !== undefined) {
+        fireEvent.change(discountAmountInput, { target: { value: inputAmount } });
+      }
+      fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+      await waitFor(() =>
+        expect(updateRegisteredDraftMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            items: [
+              expect.objectContaining({ itemId: "item-1", amountYen: 179 }),
+              expect.objectContaining({ itemId: "item-2", amountYen: expectedAmountYen }),
+            ],
+          }),
+        ),
+      );
+    },
+  );
 });

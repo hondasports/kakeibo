@@ -96,9 +96,9 @@ export function useExpenseEntryEditDialogState({
       receipt.aiExpenseDraftId &&
       registrationMode === "detailed" &&
       submittedItems.some(
-        (item) =>
+        (item, index) =>
           !item.itemName ||
-          !isValidSignedLineItemAmount(item.itemName, item.amountYen) ||
+          !isValidSignedLineItemAmount(item.itemName, item.amountYen, draftItems[index].lineType) ||
           !item.categoryId,
       )
     ) {

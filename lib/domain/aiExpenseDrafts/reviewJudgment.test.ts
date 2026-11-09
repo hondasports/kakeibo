@@ -224,7 +224,7 @@ function discountReceiptFixture(discount: { itemName: string; lineType: ReceiptI
   return { draftFields, itemFields, reviewDraft };
 }
 
-describe("一覧・確認画面で金額・税内訳が解決済みの下書きは、保存しても金額の理由で確認待ちに残らない（#1229）", () => {
+describe("一覧・確認画面で金額・税内訳が解決済みの下書きは、保存しても金額の理由で確認待ちに残らず、登録できる（#1229）", () => {
   const cases: Array<[string, ReturnType<typeof discountReceiptFixture>]> = [
     [
       "品名に割引の語が無い割引行（特売）",
@@ -258,5 +258,15 @@ describe("一覧・確認画面で金額・税内訳が解決済みの下書き�
 
     expect(plan.draftPatch.reviewReasons).not.toContain("amount_mismatch");
     expect(plan.draftPatch.status).toBe("ready");
+
+    const savedDraft = { ...draftFields, ...plan.draftPatch };
+    const savedItems = itemFields.map((item) => {
+      const patch = plan.itemPatches.find(({ itemId }) => itemId === item.id)?.patch;
+      return patch ? { ...item, ...patch } : item;
+    });
+    const registrationItems = buildDraftRegistrationItems(savedDraft, savedItems);
+    expect(registrationItems.reduce((sum, item) => sum + item.amountYen, 0)).toBe(
+      draftFields.amountYen,
+    );
   });
 });
