@@ -151,7 +151,7 @@ GitHub Environment `production` に以下を設定する。
 GitHub Environment `production` 側で設定するもの:
 
 - Required reviewers・Prevent self-review は設定しない。本番反映の承認は昇格PRのマージ（手動実行では実行操作そのもの）で行う。
-- Deployment branch rule は設定しない。実行できる ref は workflow の `Validate release inputs` で `main` と `release/*` に限定する。
+- Deployment branch rule で `main` または許可した `release/*` branch だけに絞る。
 - PROD 用の値は `production` environment にだけ置く。
 - 必要に応じて Wait timer を設定する。
 
