@@ -17,7 +17,7 @@ import type {
   TaxResolutionSource,
   TaxResolutionStatus,
 } from "../receipt/tax/types";
-import { classifyCreatedDraft, type CreatedDraftClassificationInput } from "./classification";
+import { classifyCreatedDraft } from "./classification";
 import type {
   AiExpenseDraftConfidence,
   AiExpenseDraftDocumentType,
@@ -117,7 +117,10 @@ export function buildExtractedDraftFields<TCategoryId extends string, TGroupId e
   args: ExtractedDraftInput<TCategoryId>,
   now: number,
 ) {
-  const classification = classifyCreatedDraft(args as CreatedDraftClassificationInput);
+  const classification = classifyCreatedDraft({
+    ...args,
+    items: args.items?.map((item) => ({ ...item, lineType: item.lineType })),
+  });
   const aiValues: ReceiptDraftValueSnapshot<TCategoryId> = {
     status: classification.status,
     documentType: args.documentType,

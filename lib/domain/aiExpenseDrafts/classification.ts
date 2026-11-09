@@ -23,7 +23,9 @@ export type AiExpenseDraftClassificationInput = {
   items?: Array<{
     itemName?: string;
     amountYen: number;
-    lineType?: ReceiptItemLineType;
+    // 省略可能（`lineType?:`）にはしない。渡し忘れると品名だけで割引行を推定し、
+    // 割引の語を含まない割引行を不正な金額として扱ってしまう（#1229）。
+    lineType: ReceiptItemLineType | undefined;
     categoryId?: unknown;
   }>;
 };

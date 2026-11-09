@@ -157,6 +157,7 @@ export function planDraftTaxInterpretation(
       : items.map((item, index) => ({
           itemName: item.itemName,
           amountYen: itemFields[index]?.normalizedAmountYen ?? item.amountYen,
+          lineType: item.lineType,
           categoryId: item.categoryId,
         })),
   });
