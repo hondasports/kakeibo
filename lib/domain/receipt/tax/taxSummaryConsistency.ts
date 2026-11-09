@@ -42,7 +42,7 @@ function basisFromMode(mode: ResolvedMode): ExtractedTaxSummary["taxableAmountBa
 
 /**
  * AIが mode または basis の片方だけを確定できた場合に、印字された税込合計との
- * 算術が矛盾しない範囲で欠けた側を補完する。明示値同士の矛盾は変更しない。
+ * 算術が矛盾しない範囲で欠けた側を補完する。明示値の食い違いは、算術で一意に決まる場合だけ修正する。
  */
 function canonicalizeTaxSummaryDeclaration(
   summary: ExtractedTaxSummary,
@@ -54,6 +54,13 @@ function canonicalizeTaxSummaryDeclaration(
     summary.taxMode === "included" || summary.taxMode === "external" ? summary.taxMode : undefined;
   const basisMode = modeFromBasis(summary.taxableAmountBasis);
   const canInferMode = summary.taxMode === "unknown";
+
+  if (declaredMode && basisMode && declaredMode !== basisMode) {
+    const consistency = reconcileTaxSummary({ summary, amountYen });
+    if (consistency.status === "verified" && modes.length === 1) {
+      return { ...summary, taxMode: modes[0], taxableAmountBasis: basisFromMode(modes[0]) };
+    }
+  }
 
   if (declaredMode && !basisMode && expectedAmount !== undefined && modes.includes(declaredMode)) {
     return { ...summary, taxableAmountBasis: basisFromMode(declaredMode) };
@@ -94,6 +101,21 @@ export function reconcileTaxSummary({
   const { taxMode, taxableAmountBasis } = summary;
   const expectedAmount = amountYen ?? summary.taxIncludedAmountYen;
   const modes = matchingModes(summary.taxableAmountYen, summary.taxYen, expectedAmount);
+
+  const declared = taxMode === "included" || taxMode === "external" ? taxMode : undefined;
+  const basis = modeFromBasis(taxableAmountBasis);
+  if (
+    declared &&
+    basis &&
+    declared !== basis &&
+    (amountYen === undefined ||
+      summary.taxIncludedAmountYen === undefined ||
+      summary.taxIncludedAmountYen === amountYen) &&
+    modes.length === 1 &&
+    (modes[0] === declared || modes[0] === basis)
+  ) {
+    return { status: "verified", reasons: [resolveReason(modes[0])] };
+  }
 
   if (taxMode === "included" && taxableAmountBasis === "tax_excluded") {
     return {
@@ -181,10 +203,18 @@ export function normalizeTaxSummary(
   }
   const canonical = canonicalizeTaxSummaryDeclaration(summary, amountYen);
   const consistency = reconcileTaxSummary({ amountYen, summary: canonical });
+  const repairedDeclaration =
+    modeFromBasis(summary.taxableAmountBasis) !== undefined &&
+    (summary.taxMode === "included" || summary.taxMode === "external") &&
+    summary.taxMode !== modeFromBasis(summary.taxableAmountBasis) &&
+    (canonical.taxMode !== summary.taxMode ||
+      canonical.taxableAmountBasis !== summary.taxableAmountBasis);
   return {
     ...canonical,
     status: consistency.status,
-    reasons: consistency.reasons,
+    reasons: repairedDeclaration
+      ? reconcileTaxSummary({ amountYen, summary }).reasons
+      : consistency.reasons,
   };
 }
 

@@ -9,11 +9,7 @@ export {
   resolveReceiptTotalSource,
   resolveReceiptTotalSupportingCandidates,
 } from "./receiptTotalEvidence";
-import {
-  snapshotReceiptDraftValues,
-  resolveReceiptTaxChoices,
-  resolveReceiptTaxCorrections,
-} from "./receiptDataContract";
+import { snapshotReceiptDraftValues, resolveReceiptTaxCorrections } from "./receiptDataContract";
 /**
  * 税再解釈を下書き・明細へ永続化するための計画を算出する純粋ルール。
  * DB 取得・patch は infra に委ねる。
@@ -32,7 +28,6 @@ import {
   reinterpretDraftTax,
   type BulkUnresolvedTaxOverride,
   type DraftTaxOverride,
-  type ReinterpretDraftTaxInput,
 } from "../receipt/tax/reinterpretDraftTax";
 
 export type TaxInterpretationEligibilityError =
@@ -58,10 +53,7 @@ export function getTaxInterpretationEligibilityErrorMessage(
 export function validateTaxInterpretationEligibility(
   draft: AiExpenseDraftFields | null,
   groupId: string,
-  _overrides?: Pick<
-    TaxInterpretationPlanArgs,
-    "decisionOverride" | "override" | "bulkUnresolvedOverride"
-  >,
+  _overrides?: Pick<TaxInterpretationPlanArgs, "override" | "bulkUnresolvedOverride">,
 ):
   | { success: true; draft: AiExpenseDraftFields & { amountYen: number } }
   | { success: false; error: TaxInterpretationEligibilityError } {
@@ -78,7 +70,6 @@ export type TaxInterpretationPlanArgs = {
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
   receiptTotalSource?: ReceiptTotalSource;
-  decisionOverride?: ReinterpretDraftTaxInput["decisionOverride"];
 };
 
 export type DraftItemTaxPatch = {
@@ -141,9 +132,6 @@ export function planDraftTaxInterpretation(
     items: items.map(mapDraftItemToTaxFields),
     override: args.override,
     bulkUnresolvedOverride: args.bulkUnresolvedOverride,
-    decisionOverride:
-      args.decisionOverride ??
-      (args.override || args.bulkUnresolvedOverride ? undefined : resolveReceiptTaxChoices(draft)),
   });
 
   const ignoresTaxDetails = draft.registrationMode === "totalOnly";

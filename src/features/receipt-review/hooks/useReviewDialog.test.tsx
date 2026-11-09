@@ -153,10 +153,7 @@ describe("税修正応答と全体税設定の同期", () => {
         }),
       );
       act(() => result.current.handleOpenReview("draft"));
-      expect(result.current.reviewForm).toMatchObject({
-        priceTaxTreatment: "excluded",
-        taxRateComposition: "rate8",
-      });
+      expect(result.current.reviewForm).not.toHaveProperty("priceTaxTreatment");
       act(() => {
         result.current.handleReviewFieldChange("shopName", "未保存の店名");
         result.current.handleReviewFieldChange("date", "2026-10-04");
@@ -187,8 +184,6 @@ describe("税修正応答と全体税設定の同期", () => {
       await waitFor(() => expect(mutation).toHaveBeenCalledOnce());
       await waitFor(() => expect(result.current.selectedReviewDraft).toEqual(updatedDraft));
       expect(result.current.reviewForm).toMatchObject({
-        priceTaxTreatment: undefined,
-        taxRateComposition: undefined,
         shopName: "未保存の店名",
         date: "2026-10-04",
         amountYen: "109",
@@ -245,8 +240,6 @@ describe("税修正応答と全体税設定の同期", () => {
           date: "2026-10-04",
           amountYen: 109,
           categoryId: "other",
-          priceTaxTreatment: undefined,
-          taxRateComposition: undefined,
           items: [expect.objectContaining({ itemName: "未保存の商品名", categoryId: "other" })],
         }),
         false,

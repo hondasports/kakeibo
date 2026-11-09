@@ -7,11 +7,7 @@ import { resolveReceiptTaxCorrections } from "./receiptDataContract";
 import type { ReceiptLineClassification } from "../receipt/observations";
 import { reinterpretDraftTax } from "../receipt/tax/reinterpretDraftTax";
 import type { DraftItemTaxFields } from "../receipt/tax/draftTaxMapping";
-import type {
-  ExtractedTaxSummary,
-  PriceTaxTreatment,
-  TaxRateComposition,
-} from "../receipt/tax/types";
+import type { ExtractedTaxSummary } from "../receipt/tax/types";
 import type { AiExpenseDraft, ReviewItemValues } from "./reviewTypes";
 
 function toExtractedTaxSummaries(
@@ -58,8 +54,6 @@ type ReviewTaxPreviewArgs = {
   taxSummaries?: AiExpenseDraft["taxSummaries"];
   sourceTaxSummaries?: AiExpenseDraft["taxSummaries"];
   markerDefinitions?: AiExpenseDraft["markerDefinitions"];
-  priceTaxTreatment?: PriceTaxTreatment;
-  taxRateComposition?: TaxRateComposition;
 };
 
 /** 税プレビューの証拠欄として draft から取り出すフィールドの最小形状。AiExpenseDraft と Convex Doc の両方を受けられる。 */
@@ -73,7 +67,7 @@ type ReviewTaxEvidenceSource = Pick<
   | "receiptUserOverride"
 >;
 
-/** buildReviewTaxPreview へ渡す証拠欄。支払額・全体税設定の上書きは呼び出し側が合成する。 */
+/** buildReviewTaxPreview へ渡す証拠欄。支払額は呼び出し側が合成する。 */
 export type ReviewTaxEvidence = Pick<
   ReviewTaxPreviewArgs,
   | "taxSummaries"
@@ -114,11 +108,7 @@ export function buildReviewTaxPreview(
   if (paidTotalYen === undefined || !Number.isFinite(paidTotalYen) || paidTotalYen < 1) {
     return unchanged;
   }
-  if (
-    !hasReceiptTaxMetadata(args, items) &&
-    args.priceTaxTreatment === undefined &&
-    args.taxRateComposition === undefined
-  ) {
+  if (!hasReceiptTaxMetadata(args, items)) {
     return unchanged;
   }
 
@@ -143,10 +133,6 @@ export function buildReviewTaxPreview(
     receiptLineClassifications: args.receiptLineClassifications,
     rawObservationLines:
       args.rawObservation?.source === "ai_ocr" ? args.rawObservation.lines : undefined,
-    decisionOverride: {
-      priceTaxTreatment: args.priceTaxTreatment,
-      taxRateComposition: args.taxRateComposition,
-    },
   });
 
   const previewItems = items.map((item, index) => {

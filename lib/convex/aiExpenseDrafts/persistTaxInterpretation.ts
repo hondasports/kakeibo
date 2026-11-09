@@ -4,7 +4,6 @@ import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type {
   BulkUnresolvedTaxOverride,
   DraftTaxOverride,
-  ReinterpretDraftTaxInput,
 } from "../../domain/receipt/tax/reinterpretDraftTax";
 import type { AiExpenseDraftReviewReason } from "../../../lib/domain/aiExpenseDrafts/constants";
 import type { AiExpenseDraftFields } from "../../../lib/domain/aiExpenseDrafts/aiExpenseDraft";
@@ -32,7 +31,6 @@ export type PersistDraftTaxInterpretationArgs = {
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
   receiptTotalSource?: "explicit_label" | "user_confirmed" | "ai_estimate";
-  decisionOverride?: ReinterpretDraftTaxInput["decisionOverride"];
 };
 
 export type PersistDraftTaxInterpretationResult = {
@@ -50,7 +48,6 @@ export async function persistDraftTaxInterpretation(
     draftDoc === null ? null : draftDocToFields(draftDoc),
     args.groupId,
     {
-      decisionOverride: args.decisionOverride,
       override: args.override,
       bulkUnresolvedOverride: args.bulkUnresolvedOverride,
     },

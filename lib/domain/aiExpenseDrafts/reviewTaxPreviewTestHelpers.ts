@@ -59,8 +59,6 @@ export function mixedTaxReviewFixture(): {
       amountYen: "1782",
       categoryId: "food",
       registrationMode: "detailed",
-      priceTaxTreatment: "perItem",
-      taxRateComposition: "mixed",
     },
     items: [95, 1060, 128, 99, 99, 248].map((amount, index) => ({
       id: `item-${index}`,

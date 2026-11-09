@@ -3,7 +3,27 @@ import { trialExternal8Fixture } from "../../receiptImageExtraction/fixtures/tax
 import { reinterpretDraftTax } from "./reinterpretDraftTax";
 
 describe("reinterpretDraftTax (user choice and overrides)", () => {
-  it("初心者向けの2軸選択を全明細へ適用し、ユーザー判断を最優先にする", () => {
+  it("明細の税込と税率を編集しても全体判定に利用者の上書き根拠を付けない", () => {
+    const result = reinterpretDraftTax({
+      amountYen: 110,
+      items: [
+        {
+          itemName: "商品",
+          printedAmountYen: 110,
+          amountBasis: "unknown",
+          taxRatePercent: null,
+          markers: [],
+          warnings: [],
+        },
+      ],
+      taxSummaries: [],
+      override: { itemIndex: 0, amountBasis: "tax_included", taxRatePercent: 10 },
+    });
+    expect(
+      result.interpretation.decision.evidence.filter((e) => e.startsWith("user_override:")),
+    ).toEqual([]);
+  });
+  it("未確定明細の一括補正を適用して税額を計算する", () => {
     const result = reinterpretDraftTax({
       amountYen: 1100,
       items: [
@@ -29,14 +49,10 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
           status: "verified",
         },
       ],
-      decisionOverride: { priceTaxTreatment: "excluded", taxRateComposition: "rate10" },
+      bulkUnresolvedOverride: { amountBasis: "tax_excluded", taxRatePercent: 10 },
     });
 
-    expect(result.interpretation.decision).toMatchObject({
-      priceTaxTreatment: "excluded",
-      taxRateComposition: "rate10",
-      resolutionSource: "user",
-    });
+    expect(result.interpretation.decision.evidence).not.toContain("user_override:treatment");
     expect(result.itemFields[0]).toMatchObject({
       amountBasis: "tax_excluded",
       taxRatePercent: 10,
@@ -49,7 +65,7 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
     });
   });
 
-  it("税集計がなくても2軸選択から税額と登録額を計算する", () => {
+  it("税集計がなくても未確定明細の補正から税額と登録額を計算する", () => {
     const result = reinterpretDraftTax({
       amountYen: 1100,
       items: [
@@ -63,7 +79,7 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
         },
       ],
       taxSummaries: [],
-      decisionOverride: { priceTaxTreatment: "excluded", taxRateComposition: "rate10" },
+      bulkUnresolvedOverride: { amountBasis: "tax_excluded", taxRatePercent: 10 },
     });
 
     expect(result.itemFields[0]).toMatchObject({
@@ -72,7 +88,7 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
       allocatedTaxYen: 100,
       normalizedAmountYen: 1100,
     });
-    expect(result.interpretation.decision).toMatchObject({ resolutionSource: "user" });
+    expect(result.interpretation.decision.evidence).not.toContain("user_override:treatment");
   });
 
   it("端数を明細へ配分し、明細税額の合計を丸め済み集計税額へ一致させる", () => {
@@ -97,7 +113,7 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
         },
       ],
       taxSummaries: [],
-      decisionOverride: { priceTaxTreatment: "excluded", taxRateComposition: "rate10" },
+      bulkUnresolvedOverride: { amountBasis: "tax_excluded", taxRatePercent: 10 },
     });
 
     expect(result.interpretation.taxSummaries[0]?.taxYen).toBe(1);
@@ -108,7 +124,7 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
     );
   });
 
-  it("分からないというユーザー判断をAI推測で上書きしない", () => {
+  it("税内訳と明細から全体の判定を作る", () => {
     const result = reinterpretDraftTax({
       amountYen: 108,
       items: [
@@ -134,13 +150,12 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
           status: "verified",
         },
       ],
-      decisionOverride: { priceTaxTreatment: "unknown", taxRateComposition: "unknown" },
     });
 
     expect(result.interpretation.decision).toMatchObject({
-      priceTaxTreatment: "unknown",
-      taxRateComposition: "unknown",
-      resolutionSource: "user",
+      priceTaxTreatment: "excluded",
+      taxRateComposition: "rate8",
+      resolutionSource: "reconciliation",
       resolutionStatus: "ambiguous",
     });
   });
@@ -246,12 +261,12 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
     expect(after.itemFields[1]?.taxResolutionStatus).toBe("unresolved");
     expect(after.itemFields[2]?.taxResolutionStatus).toBe("unresolved");
     expect(after.interpretation.decision).toMatchObject({
-      resolutionSource: "user",
+      resolutionSource: "ai",
       resolutionStatus: "ambiguous",
     });
   });
 
-  it("部分的な全体判断の後も明細単位の補正を優先する", () => {
+  it("明細単位の補正は別の明細を上書きしない", () => {
     const result = reinterpretDraftTax({
       amountYen: 1000,
       items: [
@@ -273,7 +288,6 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
         },
       ],
       taxSummaries: [],
-      decisionOverride: { priceTaxTreatment: "excluded", taxRateComposition: "mixed" },
       override: { itemIndex: 0, taxRatePercent: 8, amountBasis: "tax_included" },
     });
 
@@ -283,7 +297,7 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
       printedAmountYen: 500,
     });
     expect(result.itemFields[1]).toMatchObject({
-      amountBasis: "tax_excluded",
+      amountBasis: "unknown",
       taxRatePercent: null,
       printedAmountYen: 500,
     });
@@ -332,9 +346,9 @@ describe("reinterpretDraftTax (user choice and overrides)", () => {
     expect(result.interpretation.decision).toMatchObject({
       priceTaxTreatment: "included",
       taxRateComposition: "rate8",
-      resolutionSource: "explicitLabel",
+      resolutionSource: "ai",
     });
-    expect(result.interpretation.decision.evidence).toContain("user_override:composition");
+    expect(result.interpretation.decision.evidence).not.toContain("user_override:composition");
     expect(result.interpretation.decision.evidence).not.toContain("user_override:treatment");
   });
 });

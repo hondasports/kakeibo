@@ -10,7 +10,6 @@ import { useReviewDraftSelection } from "./useReviewDraftSelection";
 import { useReviewFormState } from "./useReviewFormState";
 import { useReviewSubmit } from "./useReviewSubmit";
 import { useReviewTaxOverrides } from "./useReviewTaxOverrides";
-import { mapDraftToReviewForm } from "../../../../lib/domain/aiExpenseDrafts/reviewDraftMapping";
 
 export function useReviewDialog({
   initialReviewDrafts,
@@ -52,13 +51,6 @@ export function useReviewDialog({
 
   const handleTaxDraftUpdate = (draft: AiExpenseDraft) => {
     draftSelection.setReviewDraftOverride(draft);
-    const { priceTaxTreatment, taxRateComposition } = mapDraftToReviewForm(draft);
-    // 税補正の最新の優先順位だけを同期し、他項目の未保存入力は保持する。
-    formState.setReviewForm((current) => ({
-      ...current,
-      priceTaxTreatment,
-      taxRateComposition,
-    }));
   };
 
   const taxOverrides = useReviewTaxOverrides({
