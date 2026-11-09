@@ -11,7 +11,7 @@
 - **PREVIEW**: `preview` branch の統合確認とPROD候補確認
 - **PROD**: Vercel Production環境 (本番用)
 
-PROD 反映は `.github/workflows/production-release.yml` を正規ルートとし、GitHub Environment `production` の承認後にだけ実行する。
+PROD 反映は `.github/workflows/production-release.yml` を正規ルートとし、`main` へのマージで承認待ちなしに実行する（詳細は `docs/production-release.md`）。
 
 ## 環境変数一覧
 
@@ -301,7 +301,7 @@ PR単位のE2EではGitHub Actions内に使い捨てlocal backendを起動し、
 
 ### Production リリース時の生成変数
 
-`production-release.yml` は承認前の preflight job で次の変数を生成し、Vercel Production ビルドに渡す。
+`production-release.yml` は preflight job で次の変数を生成し、Vercel Production ビルドに渡す。
 
 | 変数名 | 値例 | 用途 | 生成箇所 |
 | --- | --- | --- | --- |
@@ -315,7 +315,7 @@ PR単位のE2EではGitHub Actions内に使い捨てlocal backendを起動し、
 
 `preview` branch への push では、`preview-deploy.yml` が固定 Convex staging deployment を更新し、Vercel Preview へデプロイする。E2EはそのURLではなくCI内Viteを対象にし、staging Convexへ流すのは `@staging` だけにする。`@public` / `@smoke` の全件は同じworkflowの `local-e2e` job が匿名使い捨てbackendで実行する（詳細は `docs/development-process.md` の Functional E2E）。`local-e2e` は staging を使わないため、待機しない。staging を共有する `production-release.yml` のリリース候補E2Eが実行・待機している間は、`preview-deploy.yml` の `Wait for staging window` ジョブが待機してからデプロイする（直列化の詳細は `docs/production-release.md` の「固定 staging の同時使用制御」）。
 
-PROD 反映では、`main` への push で `production-release.yml` が自動起動する。preflight の後にGitHub Environment `Preview` の固定stagingとVercel release candidateでsmoke E2Eを実行し、成功後にGitHub Environment `production` の承認を待つ。承認後に Convex Production、Vercel Production、PROD smoke checklist の順で実行する。手動リリースや forward-fix では、同じ workflow を `workflow_dispatch` で実行してよい。
+PROD 反映では、`main` への push で `production-release.yml` が自動起動する。preflight の後にGitHub Environment `Preview` の固定stagingとVercel release candidateでsmoke E2Eを実行し、成功後に承認待ちなしで Convex Production、Vercel Production、PROD smoke checklist の順で実行する。手動リリースや forward-fix では、同じ workflow を `workflow_dispatch` で実行してよい。
 
 ### GitHub Actions Secretsに保存する項目
 

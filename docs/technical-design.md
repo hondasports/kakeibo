@@ -1615,7 +1615,7 @@ DEV / PREVIEW / PROD の3環境を分けて構築する。
 - DEVデータをPRODへ手動投入しない
 - PREVIEWデータをPRODへ手動投入しない
 - PRODの環境変数をローカル開発に流用しない
-- PROD反映は `production-release.yml` から手動承認後に実行し、Actions以外を正規ルートにしない
+- PROD反映は `production-release.yml` から実行し、Actions以外を正規ルートにしない。本番反映の承認は `preview -> main` 昇格PRのマージで行う
 
 ### 16.2 必要な環境変数
 
@@ -1644,8 +1644,8 @@ VercelにはPreview / Productionの環境変数を分けて登録する。Produc
 
 - PRまたは開発ブランチをDEV/PR Previewに紐づける
 - `preview` branch への push は `preview-deploy.yml` からPREVIEWへ自動デプロイする
-- `main` pushで `production-release.yml` が起動し、リリース候補E2E後に本番承認を待つ。手動実行は `main` / `release/*` refを受け付ける。正規手順は `docs/production-release.md` を参照する
-- PROD反映は GitHub Environment `production` の承認後に、Convex Production、Vercel Production、PROD smoke checklist の順で実行する
+- `main` pushで `production-release.yml` が起動し、リリース候補E2Eの成功後に承認待ちなしで本番へ反映する。手動実行は `main` / `release/*` refを受け付ける。正規手順は `docs/production-release.md` を参照する
+- PROD反映は Convex Production、Vercel Production、PROD smoke checklist の順で実行する
 - schema変更はまずDEV Convex deploymentで確認する
 - schema変更を含むリリース候補はPREVIEW Convex deploymentで代表データを使って確認する
 - Clerk設定変更もまずDEVで確認する
