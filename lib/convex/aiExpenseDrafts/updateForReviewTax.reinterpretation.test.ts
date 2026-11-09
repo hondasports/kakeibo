@@ -135,6 +135,9 @@ describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", (
     expect(getDraft().receiptUserOverride!.fields).not.toContain(
       "receiptTaxDecision.taxRateComposition",
     );
+    // 旧引数（税抜・10%）が明細へ書き込まれていれば、ここで検出できる。
+    expect(getItems()[0].amountBasis).not.toBe("tax_excluded");
+    expect(getItems()[0].taxRatePercent).not.toBe(10);
     const before = { basis: getItems()[0].amountBasis, rate: getItems()[0].taxRatePercent };
 
     const withLegacyUnknown = await updateForReviewHandler(ctx, {

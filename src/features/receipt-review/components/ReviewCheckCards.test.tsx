@@ -189,11 +189,18 @@ describe("ReviewCheckCards", () => {
             element.textContent ?? "",
           ),
       );
+    // 文言に依存せず、不一致・比較不能ではカードの中に通知元が無いことを確かめる。
+    const liveRegionsInCards = () =>
+      screen
+        .getByRole("region", { name: "確認結果" })
+        .querySelectorAll('[role="alert"], [role="status"], [aria-live]');
     const { rerender } = render(view("mismatch", "matched"));
     expect(amountLives()).toHaveLength(1);
     expect(amountLives()[0]).toHaveTextContent("8円");
+    expect(liveRegionsInCards()).toHaveLength(0);
     rerender(view("uncomparable", "matched"));
     expect(amountLives()).toHaveLength(1);
+    expect(liveRegionsInCards()).toHaveLength(0);
     rerender(view("matched", "uncomparable"));
     expect(amountLives()).toHaveLength(1);
     rerender(view("matched", "matched"));
