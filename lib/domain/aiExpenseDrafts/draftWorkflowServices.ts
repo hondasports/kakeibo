@@ -8,11 +8,7 @@ import type {
   BulkUnresolvedTaxOverride,
   DraftTaxOverride,
 } from "../receipt/tax/reinterpretDraftTax";
-import type {
-  ReceiptTotalSource,
-  PriceTaxTreatment,
-  TaxRateComposition,
-} from "../receipt/tax/types";
+import type { ReceiptTotalSource } from "../receipt/tax/types";
 import type { AiExpenseDraftReviewReason } from "./constants";
 import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields, DraftReviewItemInput } from "./aiExpenseDraftItem";
@@ -30,10 +26,6 @@ export type DraftTaxInterpretationRequest = {
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
   receiptTotalSource?: ReceiptTotalSource;
-  decisionOverride?: {
-    priceTaxTreatment?: PriceTaxTreatment;
-    taxRateComposition?: TaxRateComposition;
-  };
 };
 
 /** 税解釈を再計算し、下書き・明細へ永続化するサービス。 */

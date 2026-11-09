@@ -47,6 +47,14 @@ export function ReviewDialogActions({
             : recommendationCount > 0
               ? "確認事項があります。確認事項を残したまま下書きを保存できます。"
               : "確認結果：計算した金額が一致しています。";
+  // 一致は上部の成功表示が読み上げるので、ここでは重ねて通知しない。
+  const announcesStatus =
+    busy ||
+    requiredCount > 0 ||
+    checkMismatchCount > 0 ||
+    basisConflictItemCount > 0 ||
+    unresolvedTaxItemCount > 0 ||
+    recommendationCount > 0;
   const statusColor =
     requiredCount > 0 || checkMismatchCount > 0
       ? "error.main"
@@ -91,7 +99,7 @@ export function ReviewDialogActions({
       )}
       <Box sx={{ minHeight: 28, display: "flex", alignItems: "center" }}>
         <Typography
-          role="status"
+          role={announcesStatus ? "status" : undefined}
           variant="body2"
           color={statusColor}
           sx={{ display: { xs: "none", sm: "block" } }}

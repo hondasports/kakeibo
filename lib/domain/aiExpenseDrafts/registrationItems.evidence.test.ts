@@ -87,14 +87,7 @@ it.each(["missing", "stale"])(
     ];
     if (kind === "missing") draft.taxSummaries = [];
     else draft.taxSummaries![0].taxRatePercent = 8;
-    const plan = planDraftTaxInterpretation(
-      draft,
-      items,
-      {
-        decisionOverride: { priceTaxTreatment: "included", taxRateComposition: "rate10" },
-      },
-      1,
-    );
+    const plan = planDraftTaxInterpretation(draft, items, {}, 1);
     expect(plan.draftPatch.status).toBe("ready");
     const savedItems = items.map((item, index) => ({ ...item, ...plan.itemPatches[index].patch }));
     const savedDraft = { ...draft, ...plan.draftPatch };

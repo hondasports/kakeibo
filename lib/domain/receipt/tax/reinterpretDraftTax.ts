@@ -6,13 +6,12 @@ import {
 import { interpretReceiptTax } from "./interpretReceiptTax";
 import type {
   AmountBasis,
+  ExtractedReceiptItem,
   ExtractedTaxSummary,
   ReceiptMarkerDefinition,
   ReceiptTaxInput,
   ReceiptTotalSource,
   ReceiptTaxInterpretation,
-  PriceTaxTreatment,
-  TaxRateComposition,
   TaxRatePercent,
 } from "./types";
 import {
@@ -22,6 +21,8 @@ import {
 } from "../observations";
 import { ITEM_IDENTITY_CHANGED, getItemTaxConfirmedFields } from "./itemTaxConfirmation";
 import { deriveReceiptTaxSummaries } from "./deriveReceiptTaxSummaries";
+import { normalizeTaxSummary } from "./taxSummaryConsistency";
+import { taxSummaryEvidenceLines } from "./summaryEvidence";
 
 export type DraftTaxOverride = {
   itemIndex: number;
@@ -48,10 +49,6 @@ export type ReinterpretDraftTaxInput = {
   receiptLineClassifications?: ReceiptLineClassification[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
-  decisionOverride?: {
-    priceTaxTreatment?: PriceTaxTreatment;
-    taxRateComposition?: TaxRateComposition;
-  };
 };
 
 export type ReinterpretDraftTaxResult = {
@@ -73,6 +70,77 @@ function shouldApplyBulkOverride(
   return extracted.amountBasis === "unknown" && extracted.taxRatePercent === null;
 }
 
+function hasPrintedSummaryAmounts(
+  summary: ExtractedTaxSummary,
+  normalizedSources: ExtractedTaxSummary[],
+  input: ReinterpretDraftTaxInput,
+  lines: ReturnType<typeof resolveObservationAmounts>,
+): boolean {
+  const options = {
+    singleSummary: normalizedSources.length === 1,
+    classifications: input.receiptLineClassifications,
+  };
+  return (
+    taxSummaryEvidenceLines(lines, summary.taxRatePercent, "target", options).some(
+      (line) => line.amountYen === summary.taxableAmountYen,
+    ) &&
+    taxSummaryEvidenceLines(lines, summary.taxRatePercent, "tax", options).some(
+      (line) => line.amountYen === summary.taxYen,
+    )
+  );
+}
+
+function resolveReconciledItemBases(
+  items: ExtractedReceiptItem[],
+  normalizedSources: ExtractedTaxSummary[],
+  input: ReinterpretDraftTaxInput,
+  rawObservationLines: ReturnType<typeof resolveObservationAmounts>,
+): ExtractedReceiptItem[] {
+  const candidates = items.map((item, index) => {
+    if (
+      item.amountBasis !== "unknown" ||
+      getItemTaxConfirmedFields(input.items[index]).includes("amountBasis") ||
+      (input.override?.itemIndex === index && input.override.amountBasis !== undefined)
+    )
+      return item;
+    const matching = normalizedSources.filter(
+      (summary) =>
+        summary.taxRatePercent === item.taxRatePercent &&
+        summary.status === "verified" &&
+        summary.reasons?.some(
+          (reason) => reason === "reconciled_to_external" || reason === "reconciled_to_included",
+        ),
+    );
+    if (matching.length !== 1) return item;
+    return { ...item, amountBasis: matching[0].taxableAmountBasis };
+  });
+  if (!candidates.some((item, index) => item.amountBasis !== items[index].amountBasis))
+    return items;
+  const candidateSummaries = deriveReceiptTaxSummaries({
+    amountYen: input.amountYen,
+    items: candidates,
+    lines: rawObservationLines,
+    classifications: input.receiptLineClassifications,
+    correctedSummaries: input.correctedTaxSummaries,
+  });
+  const hasMatchingEvidence = normalizedSources.every((summary) => {
+    const derived = candidateSummaries.find(
+      (entry) => entry.taxRatePercent === summary.taxRatePercent,
+    );
+    return (
+      derived &&
+      derived.warnings.length === 0 &&
+      derived.taxableAmountYen === summary.taxableAmountYen &&
+      derived.taxYen === summary.taxYen &&
+      derived.taxableAmountBasis === summary.taxableAmountBasis &&
+      hasPrintedSummaryAmounts(summary, normalizedSources, input, rawObservationLines)
+    );
+  });
+  return hasMatchingEvidence && candidateSummaries.length === normalizedSources.length
+    ? candidates
+    : items;
+}
+
 export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): ReinterpretDraftTaxResult {
   const rawObservationLines = resolveObservationAmounts(input.rawObservationLines);
   const needsRateConfirmation = input.items.map(
@@ -84,48 +152,31 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
         shouldApplyBulkOverride(item, draftItemToExtractedReceiptItem(item))
       ),
   );
-  const items = input.items.map((item, index) => {
+  const adjustedItems = input.items.map((item, index) => {
     const extracted = draftItemToExtractedReceiptItem(item);
     // 前回の判定理由は再計算する。OCR由来の一般的な注意は保持する。
     extracted.warnings = extracted.warnings.filter(
       (warning) => warning !== "unresolved_tax_rate" && warning !== "unresolved_amount_basis",
     );
-    const decisionAmountBasis =
-      input.decisionOverride?.priceTaxTreatment === "included"
-        ? "tax_included"
-        : input.decisionOverride?.priceTaxTreatment === "excluded"
-          ? "tax_excluded"
-          : undefined;
-    const decisionTaxRate =
-      input.decisionOverride?.taxRateComposition === "rate8"
-        ? 8
-        : input.decisionOverride?.taxRateComposition === "rate10"
-          ? 10
-          : undefined;
-    const decisionAdjusted = {
-      ...extracted,
-      amountBasis: decisionAmountBasis ?? extracted.amountBasis,
-      taxRatePercent: decisionTaxRate ?? extracted.taxRatePercent,
-    };
     if (needsRateConfirmation[index]) {
       return {
-        ...decisionAdjusted,
+        ...extracted,
         amountBasis:
           input.override?.itemIndex === index
-            ? (input.override.amountBasis ?? decisionAdjusted.amountBasis)
-            : decisionAdjusted.amountBasis,
+            ? (input.override.amountBasis ?? extracted.amountBasis)
+            : extracted.amountBasis,
         taxRatePercent: null,
         markers: [],
       };
     }
     if (input.override?.itemIndex === index) {
       return {
-        ...decisionAdjusted,
+        ...extracted,
         taxRatePercent:
           input.override.taxRatePercent !== undefined
             ? input.override.taxRatePercent
-            : decisionAdjusted.taxRatePercent,
-        amountBasis: input.override.amountBasis ?? decisionAdjusted.amountBasis,
+            : extracted.taxRatePercent,
+        amountBasis: input.override.amountBasis ?? extracted.amountBasis,
       };
     }
     if (
@@ -134,13 +185,24 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
       input.override?.itemIndex !== index
     ) {
       return {
-        ...decisionAdjusted,
+        ...extracted,
         taxRatePercent: input.bulkUnresolvedOverride.taxRatePercent,
         amountBasis: input.bulkUnresolvedOverride.amountBasis,
       };
     }
-    return decisionAdjusted;
+    return extracted;
   });
+
+  const sourceSummaries = input.sourceTaxSummaries ?? [];
+  const normalizedSources = sourceSummaries.map((summary) =>
+    normalizeTaxSummary(summary, sourceSummaries.length === 1 ? input.amountYen : undefined),
+  );
+  const items = resolveReconciledItemBases(
+    adjustedItems,
+    normalizedSources,
+    input,
+    rawObservationLines,
+  );
 
   const confirmedFields = items.map((item, index) => {
     const original = input.items[index];
@@ -149,26 +211,15 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     const bulk =
       input.bulkUnresolvedOverride &&
       shouldApplyBulkOverride(original, draftItemToExtractedReceiptItem(original));
-    if (
-      override?.amountBasis !== undefined ||
-      bulk ||
-      input.decisionOverride?.priceTaxTreatment === "included" ||
-      input.decisionOverride?.priceTaxTreatment === "excluded"
-    )
-      confirmed.add("amountBasis");
-    if (
-      override?.taxRatePercent !== undefined ||
-      bulk ||
-      input.decisionOverride?.taxRateComposition === "rate8" ||
-      input.decisionOverride?.taxRateComposition === "rate10"
-    )
-      confirmed.add("taxRatePercent");
-    if (item.amountBasis === "unknown") confirmed.delete("amountBasis");
+    if (override?.amountBasis !== undefined || bulk) confirmed.add("amountBasis");
+    if (override?.taxRatePercent !== undefined || bulk) confirmed.add("taxRatePercent");
     if (item.taxRatePercent === null || needsRateConfirmation[index])
       confirmed.delete("taxRatePercent");
     return (["amountBasis", "taxRatePercent"] as const).filter((field) => confirmed.has(field));
   });
-  const itemTaxWasConfirmed = (index: number): boolean => confirmedFields[index].length === 2;
+  // 「不明」の選択は自動補完を止めるために記録するが、税額の確定には使わない。
+  const itemTaxWasConfirmed = (index: number): boolean =>
+    confirmedFields[index].length === 2 && items[index].amountBasis !== "unknown";
   const taxSummaries = deriveReceiptTaxSummaries({
     paidTotalConfirmed: input.receiptTotalSource === "user_confirmed",
     amountYen: input.amountYen,
@@ -184,49 +235,6 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     classifications: input.receiptLineClassifications,
   });
 
-  const userItemPriceWasEdited =
-    input.override?.amountBasis !== undefined ||
-    input.bulkUnresolvedOverride?.amountBasis !== undefined;
-  const userPriceWasEdited =
-    userItemPriceWasEdited || input.decisionOverride?.priceTaxTreatment !== undefined;
-  const userRateWasEdited =
-    input.override?.taxRatePercent !== undefined ||
-    input.bulkUnresolvedOverride?.taxRatePercent !== undefined ||
-    input.decisionOverride?.taxRateComposition !== undefined;
-  const treatmentFromItems = (): PriceTaxTreatment => {
-    const bases = new Set(items.map((item) => item.amountBasis));
-    if (bases.has("unknown")) return "unknown";
-    if (bases.has("tax_included") && bases.has("tax_excluded")) return "perItem";
-    if (bases.has("tax_included")) return "included";
-    if (bases.has("tax_excluded")) return "excluded";
-    return "unknown";
-  };
-  const treatmentFromSummaries = (): PriceTaxTreatment => {
-    const bases = new Set(
-      taxSummaries.map((summary) => {
-        if (summary.taxableAmountBasis !== "unknown") return summary.taxableAmountBasis;
-        if (summary.taxMode === "included") return "tax_included" as const;
-        if (summary.taxMode === "external") return "tax_excluded" as const;
-        return "unknown" as const;
-      }),
-    );
-    if (bases.has("tax_included") && bases.has("tax_excluded")) return "perItem";
-    if (bases.has("tax_included")) return "included";
-    if (bases.has("tax_excluded")) return "excluded";
-    return "unknown";
-  };
-  const compositionFromItemsAndSummaries = (): TaxRateComposition => {
-    if (items.some((item) => item.taxRatePercent === null)) return "unknown";
-    const rates = new Set([
-      ...items.map((item) => item.taxRatePercent),
-      ...taxSummaries.map((summary) => summary.taxRatePercent),
-    ]);
-    if (rates.has(8) && rates.has(10)) return "mixed";
-    if (rates.has(8)) return "rate8";
-    if (rates.has(10)) return "rate10";
-    return "unknown";
-  };
-
   const interpretation = interpretReceiptTax({
     amountYen: input.amountYen,
     receiptTotalSource: input.receiptTotalSource,
@@ -237,18 +245,6 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     markerDefinitions: input.markerDefinitions,
     rawObservationLines,
     receiptLineClassifications: input.receiptLineClassifications,
-    userOverride:
-      userPriceWasEdited || userRateWasEdited
-        ? {
-            priceTaxTreatment: userPriceWasEdited
-              ? (input.decisionOverride?.priceTaxTreatment ??
-                (userItemPriceWasEdited ? treatmentFromItems() : treatmentFromSummaries()))
-              : undefined,
-            taxRateComposition: userRateWasEdited
-              ? (input.decisionOverride?.taxRateComposition ?? compositionFromItemsAndSummaries())
-              : undefined,
-          }
-        : undefined,
   });
   const interpretedItems = interpretation.items;
   const amountsResolved =
@@ -286,6 +282,25 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
   );
   const resolvedInterpretation = {
     ...interpretation,
+    taxSummaries: interpretation.taxSummaries.map((summary) => {
+      const matching = normalizedSources.filter(
+        (entry) => entry.taxRatePercent === summary.taxRatePercent,
+      );
+      const source = matching.length === 1 ? matching[0] : undefined;
+      if (
+        summary.status !== "verified" ||
+        source?.status !== "verified" ||
+        source.taxableAmountYen !== summary.taxableAmountYen ||
+        source.taxYen !== summary.taxYen ||
+        source.taxableAmountBasis !== summary.taxableAmountBasis ||
+        !hasPrintedSummaryAmounts(summary, normalizedSources, input, rawObservationLines)
+      )
+        return summary;
+      return {
+        ...summary,
+        reasons: [...new Set([...(summary.reasons ?? []), ...(source.reasons ?? [])])],
+      };
+    }),
     items: effectiveItems,
     decision: hasTaxReadingCorrection
       ? {

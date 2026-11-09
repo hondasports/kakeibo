@@ -12,10 +12,16 @@ export async function updateForReviewHandler(
   args: UpdateForReviewArgs,
 ): Promise<Doc<"aiExpenseDrafts">> {
   const { groupId, userId } = await requireGroupMembership(ctx);
+  // 旧クライアントの送信を拒否しないため受け付けるが、明細を上書きしない。
+  const {
+    priceTaxTreatment: _priceTaxTreatment,
+    taxRateComposition: _taxRateComposition,
+    ...review
+  } = args;
   const result = await updateAiExpenseDraftForReview(
     { groupId, userId },
     createAiExpenseDraftDeps(ctx),
-    args,
+    review,
   );
   return draftFieldsToDoc(result);
 }

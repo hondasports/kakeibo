@@ -152,7 +152,7 @@ export function buildTaxRateCheck(args: {
         ...base,
         status: "uncomparable" as const,
         reason: summary.warnings.includes("contradictory_receipt_tax_evidence")
-          ? "税内訳の印字情報を確定できません。対象額・税額・合計をレシート画像と照合してください"
+          ? "商品の金額・税込／税抜・税率をレシートと照合してください"
           : "税額の根拠が不足しています。商品とレシート画像を確認してください",
         blockerCode: "unverified-tax-summary" as const,
         affectedItemIds: items

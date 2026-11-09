@@ -5,6 +5,7 @@ import {
   normalizeTaxSummary,
 } from "./taxSummaryConsistency";
 import type { ExtractedTaxSummary } from "./types";
+import { validateTaxSummaryConsistency } from "./taxSummaryConsistency";
 
 function baseSummary(overrides: Partial<ExtractedTaxSummary> = {}): ExtractedTaxSummary {
   return {
@@ -22,6 +23,108 @@ function baseSummary(overrides: Partial<ExtractedTaxSummary> = {}): ExtractedTax
 }
 
 describe("taxSummaryConsistency matrix", () => {
+  it.each([
+    ["mixed", "tax_included", "ambiguous", ["mixed_tax_mode"]],
+    ["unknown", "tax_included", "ambiguous", ["reconciled_to_included"]],
+    ["included", "unknown", "ambiguous", ["reconciled_to_included"]],
+    ["included", "tax_included", "contradictory", ["tax_included_amount_mismatch"]],
+    [
+      "included",
+      "tax_excluded",
+      "contradictory",
+      ["included_mode_with_tax_excluded_basis", "tax_summary_amount_mismatch"],
+    ],
+    [
+      "external",
+      "tax_included",
+      "contradictory",
+      ["external_mode_with_tax_included_basis", "tax_summary_amount_mismatch"],
+    ],
+  ] as const)(
+    "税込合計と支払額が異なる %s / %s の従来の判定を維持する",
+    (taxMode, taxableAmountBasis, status, reasons) => {
+      const summary = baseSummary({
+        taxMode,
+        taxableAmountBasis,
+        taxableAmountYen: 1060,
+        taxIncludedAmountYen: 960,
+      });
+      expect(reconcileTaxSummary({ summary, amountYen: 1060 })).toEqual({ status, reasons });
+    },
+  );
+
+  it.each([
+    ["included", "tax_excluded", 780, 62, 842, "external", "tax_excluded"],
+    ["external", "tax_included", 842, 62, 842, "included", "tax_included"],
+  ] as const)(
+    "算術で一意に決まる矛盾した宣言を照合する: %s / %s",
+    (mode, basis, taxable, tax, total, expectedMode, expectedBasis) => {
+      const summary = baseSummary({
+        taxMode: mode,
+        taxableAmountBasis: basis,
+        taxableAmountYen: taxable,
+        taxYen: tax,
+        taxIncludedAmountYen: total,
+      });
+      expect(reconcileTaxSummary({ summary, amountYen: total })).toEqual({
+        status: "verified",
+        reasons: [`reconciled_to_${expectedMode}`],
+      });
+      expect(normalizeTaxSummary(summary, total)).toMatchObject({
+        taxMode: expectedMode,
+        taxableAmountBasis: expectedBasis,
+        status: "verified",
+        reasons: [`reconciled_to_${expectedMode}`],
+      });
+    },
+  );
+
+  it.each([
+    [100, 0, 100],
+    [100, 8, 109],
+  ] as const)("算術が複数または不成立の矛盾した宣言を確定しない", (taxable, tax, total) => {
+    const result = normalizeTaxSummary(
+      baseSummary({
+        taxMode: "included",
+        taxableAmountBasis: "tax_excluded",
+        taxableAmountYen: taxable,
+        taxYen: tax,
+        taxIncludedAmountYen: total,
+      }),
+      total,
+    );
+    expect(result.status).toBe("contradictory");
+    expect(result.taxMode).toBe("included");
+    expect(result.taxableAmountBasis).toBe("tax_excluded");
+  });
+
+  it("2税率のうち算術が一致する食い違いだけを照合する", () => {
+    const summaries = [
+      baseSummary({
+        taxRatePercent: 8,
+        taxMode: "included",
+        taxableAmountBasis: "tax_excluded",
+        taxableAmountYen: 780,
+        taxYen: 62,
+        taxIncludedAmountYen: 842,
+      }),
+      baseSummary({
+        taxRatePercent: 10,
+        taxMode: "external",
+        taxableAmountBasis: "tax_excluded",
+        taxableAmountYen: 100,
+        taxYen: 10,
+        taxIncludedAmountYen: 110,
+      }),
+    ];
+    expect(
+      validateTaxSummaryConsistency({ amountYen: 952, taxSummaries: summaries }),
+    ).toMatchObject([
+      { status: "verified", taxMode: "external", reasons: ["reconciled_to_external"] },
+      { status: "verified", taxMode: "external" },
+    ]);
+  });
+
   it("legacy status は安全側のcanonical statusとして読む", () => {
     expect(isVerifiedTaxSummaryStatus("coherent")).toBe(true);
     expect(isVerifiedTaxSummaryStatus("reconcilable")).toBe(false);
@@ -68,11 +171,11 @@ describe("taxSummaryConsistency matrix", () => {
     expect(result.reasons).toContain("tax_summary_amount_mismatch");
   });
 
-  it("external / tax_included => contradictory", () => {
+  it("external / tax_included で算術が一致しない場合は contradictory", () => {
     const result = reconcileTaxSummary({
       summary: baseSummary({
         taxMode: "external",
-        taxableAmountYen: 1060,
+        taxableAmountYen: 1059,
         taxableAmountBasis: "tax_included",
         taxYen: 96,
         taxIncludedAmountYen: 1060,

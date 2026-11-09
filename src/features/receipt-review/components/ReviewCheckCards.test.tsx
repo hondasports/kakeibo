@@ -1,6 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ReviewCheckCards } from "./ReviewCheckCards";
+import { ReviewStatusBanner } from "./ReviewStatusBanner";
+import { ReviewDialogActions } from "./ReviewDialogActions";
+import { vi } from "vitest";
 import type { ReviewAmountCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewAmountChecks";
 import type { ReviewCheckStatus } from "../../../../lib/domain/aiExpenseDrafts/reviewCheckUtils";
 import type { ReviewTaxRateCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewTaxChecks";
@@ -77,8 +80,8 @@ function taxRateCheckOf(status: ReviewCheckStatus): ReviewTaxRateCheck {
 describe("ReviewCheckCards", () => {
   it.each<[ReviewCheckStatus, ReviewCheckStatus, string[]]>([
     ["matched", "matched", []],
-    ["matched", "mismatch", ["税率別集計"]],
-    ["matched", "uncomparable", ["税率別集計"]],
+    ["matched", "mismatch", ["金額確認", "税率別集計"]],
+    ["matched", "uncomparable", ["金額確認", "税率別集計"]],
     ["mismatch", "matched", ["金額確認"]],
     ["uncomparable", "matched", ["金額確認"]],
     ["mismatch", "mismatch", ["金額確認", "税率別集計"]],
@@ -110,15 +113,15 @@ describe("ReviewCheckCards", () => {
     },
   );
 
-  it("片方だけ表示のときカードは1枚だけで空のカード枠を残さない", () => {
+  it("金額と税率別の両方が比較不能なら両方を表示する", () => {
     render(
       <ReviewCheckCards
-        amount={amountCheckOf("matched")}
+        amount={amountCheckOf("uncomparable")}
         taxRate={taxRateCheckOf("uncomparable")}
       />,
     );
     const region = screen.getByRole("region", { name: "確認結果" });
-    expect(within(region).getAllByRole("heading", { level: 4 })).toHaveLength(1);
+    expect(within(region).getAllByRole("heading", { level: 4 })).toHaveLength(2);
     expect(within(region).getByText("税率別集計")).toBeVisible();
   });
 
@@ -139,6 +142,85 @@ describe("ReviewCheckCards", () => {
       <ReviewCheckCards amount={amountCheckOf("matched")} taxRate={taxRateCheckOf("matched")} />,
     );
     expect(screen.queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
+  });
+
+  it("金額の状態を各状態で一つのライブ領域に通知する", () => {
+    function view(
+      amountStatus: ReviewCheckStatus,
+      taxStatus: ReviewCheckStatus,
+      hasIssues = false,
+    ) {
+      const amount = amountCheckOf(amountStatus);
+      const taxRate = taxRateCheckOf(taxStatus);
+      return (
+        <>
+          <ReviewStatusBanner
+            checks={{ amount, taxRate }}
+            issues={
+              hasIssues
+                ? [{ id: "required", message: "修正してください", target: "items", required: true }]
+                : []
+            }
+            unresolvedTaxItemCount={0}
+            busy={false}
+            onJump={vi.fn()}
+          />
+          <ReviewCheckCards amount={amount} taxRate={taxRate} />
+          <ReviewDialogActions
+            reviewError=""
+            busy={false}
+            requiredCount={hasIssues ? 1 : 0}
+            checkMismatchCount={amountStatus === "mismatch" || taxStatus === "mismatch" ? 1 : 0}
+            recommendationCount={
+              taxStatus === "uncomparable" || amountStatus === "uncomparable" ? 1 : 0
+            }
+            totalOnly={false}
+            onClose={vi.fn()}
+            onSubmit={vi.fn()}
+            onReviewRequired={vi.fn()}
+          />
+        </>
+      );
+    }
+    const amountLives = () =>
+      [...document.querySelectorAll('[role="alert"], [role="status"], [aria-live]')].filter(
+        (element) =>
+          /金額が8円合いません|8円合いません|金額を比較できません|金額と支払額が一致|印字額と明細の金額が一致|計算した金額が一致/.test(
+            element.textContent ?? "",
+          ),
+      );
+    // 文言に依存せず、不一致・比較不能ではカードの中に通知元が無いことを確かめる。
+    const liveRegionsInCards = () =>
+      screen
+        .getByRole("region", { name: "確認結果" })
+        .querySelectorAll('[role="alert"], [role="status"], [aria-live]');
+    const { rerender } = render(view("mismatch", "matched"));
+    expect(amountLives()).toHaveLength(1);
+    expect(amountLives()[0]).toHaveTextContent("8円");
+    expect(liveRegionsInCards()).toHaveLength(0);
+    rerender(view("uncomparable", "matched"));
+    expect(amountLives()).toHaveLength(1);
+    expect(liveRegionsInCards()).toHaveLength(0);
+    rerender(view("matched", "uncomparable"));
+    expect(amountLives()).toHaveLength(1);
+    rerender(view("matched", "matched"));
+    expect(amountLives()).toHaveLength(1);
+    rerender(view("matched", "matched", true));
+    expect(amountLives()).toHaveLength(1);
+  });
+
+  it("税率別だけ未一致なら金額一致の表示を維持する", () => {
+    render(
+      <ReviewCheckCards
+        amount={amountCheckOf("matched")}
+        taxRate={taxRateCheckOf("uncomparable")}
+      />,
+    );
+    const region = screen.getByRole("region", { name: "確認結果" });
+    expect(region).not.toHaveAttribute("aria-live");
+    const live = region.querySelector('[aria-live="polite"]')!;
+    expect(live).toHaveTextContent("商品の金額と支払額が一致しています");
+    expect(live).not.toHaveTextContent("税率別集計");
   });
 
   it("不一致時は確定した差額だけを表示する", () => {

@@ -490,7 +490,7 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     expect(amountInputs[1]).toHaveValue("-110");
     const amountCheck = within(dialog).getByRole("region", { name: "確認結果" });
     expect(within(amountCheck).getByText("税率別集計")).toBeVisible();
-    expect(within(amountCheck).queryByText("金額確認")).not.toBeInTheDocument();
+    expect(within(amountCheck).getByText("商品の金額と支払額が一致しています")).toBeVisible();
 
     await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
 

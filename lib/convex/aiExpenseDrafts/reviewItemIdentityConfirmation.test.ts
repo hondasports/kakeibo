@@ -170,34 +170,32 @@ it("行種別だけの変更でも税率確認を外し、変更のない行は�
   expect(getItems()[0].taxAllocationStatus).toBe("unallocated");
 });
 
-it("古い全体税率と変更後の商品確認が食い違う保存は、更新前に拒否する", async () => {
+it("旧引数の全体税率と食い違っても変更後の商品の税率を保存する", async () => {
   const { ctx, getItems, getDraft } = fixture(false);
-  await expect(
-    updateForReviewHandler(ctx, {
-      draftId: DRAFT_ID,
-      documentType: "receipt",
-      shopName: "テスト店",
-      date: "2026-10-14",
-      amountYen: 540,
-      categoryId: CAT_ID,
-      priceTaxTreatment: "included",
-      taxRateComposition: "rate10",
-      items: [
-        {
-          itemId: getItems()[0]._id as Id<"aiExpenseDraftItems">,
-          itemName: "パン",
-          amountYen: 540,
-          categoryId: CAT_ID,
-          confirmedTaxRatePercent: 8,
-        },
-      ],
-    }),
-  ).rejects.toThrow(/conflicts/);
-  expect(getItems()[0]).toMatchObject({ itemName: "日用品", taxRatePercent: 10 });
+  await updateForReviewHandler(ctx, {
+    draftId: DRAFT_ID,
+    documentType: "receipt",
+    shopName: "テスト店",
+    date: "2026-10-14",
+    amountYen: 540,
+    categoryId: CAT_ID,
+    priceTaxTreatment: "included",
+    taxRateComposition: "rate10",
+    items: [
+      {
+        itemId: getItems()[0]._id as Id<"aiExpenseDraftItems">,
+        itemName: "パン",
+        amountYen: 540,
+        categoryId: CAT_ID,
+        confirmedTaxRatePercent: 8,
+      },
+    ],
+  });
+  expect(getItems()[0]).toMatchObject({ itemName: "パン", taxRatePercent: 8 });
   expect(getDraft().status).toBe("ready");
 });
 
-it("保存済み全体税率が再適用される旧callerでも、商品確認との競合を更新前に拒否する", async () => {
+it("保存済み全体税率があっても新しい商品の確認を保持する", async () => {
   const { ctx, getItems, getDraft } = fixture(false);
   await ctx.db.patch(DRAFT_ID, {
     receiptTaxDecision: {
@@ -224,25 +222,23 @@ it("保存済み全体税率が再適用される旧callerでも、商品確認�
       },
     },
   });
-  await expect(
-    updateForReviewHandler(ctx, {
-      draftId: DRAFT_ID,
-      documentType: "receipt",
-      shopName: "テスト店",
-      date: "2026-10-14",
-      amountYen: 540,
-      categoryId: CAT_ID,
-      items: [
-        {
-          itemId: getItems()[0]._id as Id<"aiExpenseDraftItems">,
-          itemName: "パン",
-          amountYen: 540,
-          categoryId: CAT_ID,
-          confirmedTaxRatePercent: 8,
-        },
-      ],
-    }),
-  ).rejects.toThrow(/conflicts/);
-  expect(getItems()[0]).toMatchObject({ itemName: "日用品", taxRatePercent: 10 });
-  expect(getDraft().receiptTaxDecision).toMatchObject({ taxRateComposition: "rate10" });
+  await updateForReviewHandler(ctx, {
+    draftId: DRAFT_ID,
+    documentType: "receipt",
+    shopName: "テスト店",
+    date: "2026-10-14",
+    amountYen: 540,
+    categoryId: CAT_ID,
+    items: [
+      {
+        itemId: getItems()[0]._id as Id<"aiExpenseDraftItems">,
+        itemName: "パン",
+        amountYen: 540,
+        categoryId: CAT_ID,
+        confirmedTaxRatePercent: 8,
+      },
+    ],
+  });
+  expect(getItems()[0]).toMatchObject({ itemName: "パン", taxRatePercent: 8 });
+  expect(getDraft().receiptTaxDecision).toMatchObject({ taxRateComposition: "rate8" });
 });
