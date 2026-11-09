@@ -55,7 +55,11 @@ it("読めない税額行がある場合は明細を自動確定しない", () =
     rawObservation: { source: "ai_ocr", lines: unreadable } as any,
     receiptLineClassifications: classifications,
   });
-  expect(preview.items.every((item) => item.taxAllocationStatus !== "allocated")).toBe(true);
+  expect(preview.items.map((item) => item.taxAllocationStatus)).toEqual(
+    Array(5).fill("unallocated"),
+  );
+  expect(preview.items.map((item) => item.amountBasis)).toEqual(Array(5).fill("unknown"));
+  expect(preview.taxSummaries.every((summary) => summary.status !== "verified")).toBe(true);
 });
 
 it("再解釈した保存値を登録ガードでも同じ税額として扱う", () => {

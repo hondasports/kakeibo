@@ -137,18 +137,17 @@ describe("updateForReviewHandler tax reinterpretation (tax reinterpretation)", (
     );
     const before = { basis: getItems()[0].amountBasis, rate: getItems()[0].taxRatePercent };
 
-    const totalOnly = await updateForReviewHandler(ctx, {
+    const withLegacyUnknown = await updateForReviewHandler(ctx, {
       draftId: DRAFT_ID,
       documentType: "receipt",
       shopName: "テスト店",
       date: "2026-08-27",
       amountYen: 1100,
       categoryId: CAT_ID,
-      registrationMode: "detailed",
       priceTaxTreatment: "unknown",
       taxRateComposition: "unknown",
     });
-    expect(totalOnly.registrationMode).toBe("detailed");
+    expect(withLegacyUnknown.registrationMode).toBe("detailed");
     expect(getItems()[0]).toMatchObject({ amountBasis: before.basis, taxRatePercent: before.rate });
 
     const detailed = await updateForReviewHandler(ctx, {
