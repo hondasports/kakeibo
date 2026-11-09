@@ -41,5 +41,5 @@ license: Apache-2.0
 - `main` はrequired checksに最新化を求め、未解決threadがあるとマージできない。前回の昇格のmerge commitが `preview` に無いと、PRは `BEHIND` になる。
 - `BEHIND` の解消は `gh pr update-branch <番号>`（`main` を `preview` へmergeするcommitをGitHubが作る）で行う。`preview` への書き込みになるため、ユーザーの明示承認を得てから実行する。承認が無ければ承認待ちで止める。
 - マージは、ユーザーが明示したときだけ行う（完了地点 `merged`）。マージ方式は直近の昇格PRと同じmerge commitにする。
-- 昇格PRのマージは本番反映の承認を兼ねる。`main` へのマージで `production-release.yml` が起動し、release candidate E2Eが成功すれば承認待ちなしでProductionへ反映される（`docs/production-release.md`）。マージの承認を求めるときは、本番に出ることを明示する。
+- 昇格PRのマージは本番反映の承認を兼ねる。`main` へのマージで `production-release.yml` が起動し、release candidate E2Eが成功すれば承認待ちなしでProductionへ反映される（`docs/production-release.md`）。マージは本番操作として扱う。マージの依頼が本番反映に触れていなければ、本番に出ることを伝えて明示承認を得てからマージする（承認待ち）。
 - マージ後は `main` の新しいSHAと、`production-release.yml` のrelease candidate E2E・Deploy Productionの結果を報告する。

@@ -3,7 +3,7 @@
 このドキュメントは、kakeibo のリリース経路を DEV / PREVIEW / PROD に分けて扱うための運用手順を定義する。
 
 PROD 反映の正規ルートは `.github/workflows/production-release.yml` とし、`main` への push で自動起動する。
-GitHub Environment `production` に承認者（required reviewers）は設定しない。リリース候補E2Eが成功すれば、承認待ちなしで本番反映まで進む。本番反映の承認は `preview -> main` 昇格PRのマージで行う。Actions 以外の Vercel Dashboard、Convex Dashboard、ローカル CLI からの直接 Production deploy は正規ルートにしない。
+GitHub Environment `production` に承認者（required reviewers）は設定しない。リリース候補E2Eが成功すれば、承認待ちなしで本番反映まで進む。本番反映の承認は、`main` push では `preview -> main` 昇格PRのマージ、手動実行（`workflow_dispatch`）では実行操作そのもので行う。Actions 以外の Vercel Dashboard、Convex Dashboard、ローカル CLI からの直接 Production deploy は正規ルートにしない。
 
 ## 環境の役割
 
@@ -150,9 +150,8 @@ GitHub Environment `production` に以下を設定する。
 
 GitHub Environment `production` 側で設定するもの:
 
-- Required reviewers を有効にする。
-- Prevent self-review を有効にする。
-- Deployment branch rule で `main` または許可した `release/*` branch だけに絞る。
+- Required reviewers・Prevent self-review は設定しない。本番反映の承認は昇格PRのマージ（手動実行では実行操作そのもの）で行う。
+- Deployment branch rule は設定しない。実行できる ref は workflow の `Validate release inputs` で `main` と `release/*` に限定する。
 - PROD 用の値は `production` environment にだけ置く。
 - 必要に応じて Wait timer を設定する。
 
@@ -172,7 +171,7 @@ Vercel Production Environment には Clerk Production instance と Convex Produc
 4. 掲載指定されたPRは `id: pr-{number}`、`title` = PRタイトル（conventional接頭辞は除去）、`summary` = `description`、`category` = `category` で下書き化する。`publish: false` は非掲載として理由とともに記録する。
 5. `src/content/product-updates.ts` の手動ドラフトとID単位で統合する（同一IDは手動優先）。
 6. 過去の更新と重複しないことを確認し、`src/generated/product-updates.json` と `.tmp/product-updates.current-release.json` を出力する。Release assetには `sourceRef` / `sourceSha` / `sourceMergedAt` と、対象PRごとの掲載・非掲載・例外判定（`pullRequestDecisions`）を保存する。
-7. 掲載予定内容と元PR対応・非掲載理由をActions Summaryへ出力する。掲載0件の場合も理由を確認できる。生成物は artifact 経由で `Deploy Production` Job へ受け渡される。承認待ちが無いため、掲載内容は昇格PRのマージ前に元PR本文のマーカー内で確定させる。
+7. 掲載予定内容と元PR対応・非掲載理由をActions Summaryへ出力する。掲載0件の場合も理由を確認できる。生成物は artifact 経由で `Deploy Production` Job へ受け渡される。承認待ちが無いため、掲載内容は昇格PRのマージ前に、元PRのタイトル・本文のマーカー内と、同じIDの手動draft（`src/content/product-updates.ts`）で確定させる。
 
 **エラー方針:** `SOURCE_REF` のSHA解決失敗・GitHub API失敗・範囲内PRのマーカー欠落や不正はすべてエラーで中断する。「変更なし」への黙った変換はしない。マージ済みPRにマーカーが無い場合の回収は、当該PR本文を編集してマーカーを追記するか、`src/content/product-updates.ts` に手動draftを追加する。
 

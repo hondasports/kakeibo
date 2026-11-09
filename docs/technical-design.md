@@ -1615,7 +1615,7 @@ DEV / PREVIEW / PROD の3環境を分けて構築する。
 - DEVデータをPRODへ手動投入しない
 - PREVIEWデータをPRODへ手動投入しない
 - PRODの環境変数をローカル開発に流用しない
-- PROD反映は `production-release.yml` から実行し、Actions以外を正規ルートにしない。本番反映の承認は `preview -> main` 昇格PRのマージで行う
+- PROD反映は `production-release.yml` から実行し、Actions以外を正規ルートにしない。本番反映の承認は `preview -> main` 昇格PRのマージ（手動実行では実行操作そのもの）で行う
 
 ### 16.2 必要な環境変数
 
