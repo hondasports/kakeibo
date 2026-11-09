@@ -156,6 +156,7 @@ export async function updateAiExpenseDraftForReview(
         ? args.items?.map((item) => ({
             itemName: item.itemName,
             amountYen: item.amountYen,
+            lineType: item.lineType,
             categoryId: item.categoryId,
           }))
         : undefined,
