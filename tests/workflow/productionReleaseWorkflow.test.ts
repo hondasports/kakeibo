@@ -60,7 +60,7 @@ describe("production-release workflow", () => {
     expect(yaml).toContain("cancel-in-progress: false");
   });
 
-  test("runs Vercel Preview smoke E2E before the production approval gate", () => {
+  test("runs Vercel Preview smoke E2E before the production deploy job", () => {
     const yaml = workflow();
     const releaseCandidateIndex = yaml.indexOf("Vercel release candidate E2E");
     const productionIndex = yaml.indexOf("name: Deploy Production");
@@ -127,7 +127,7 @@ describe("production-release workflow", () => {
     expect(yaml).toContain("published_at=");
   });
 
-  test("generates product updates in preflight before the production approval gate", () => {
+  test("generates product updates in preflight before the production deploy job", () => {
     const yaml = workflow();
     const generateIndex = yaml.indexOf("Generate product updates");
     const productionIndex = yaml.indexOf("name: Deploy Production");

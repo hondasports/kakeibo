@@ -3,7 +3,7 @@
 このドキュメントは、kakeibo のリリース経路を DEV / PREVIEW / PROD に分けて扱うための運用手順を定義する。
 
 PROD 反映の正規ルートは `.github/workflows/production-release.yml` とし、`main` への push で自動起動する。
-ただし、GitHub Environment `production` の承認後にだけ本番反映を行う。Actions 以外の Vercel Dashboard、Convex Dashboard、ローカル CLI からの直接 Production deploy は正規ルートにしない。
+GitHub Environment `production` に承認者（required reviewers）は設定しない。リリース候補E2Eが成功すれば、承認待ちなしで本番反映まで進む。本番反映の承認は `preview -> main` 昇格PRのマージで行う。Actions 以外の Vercel Dashboard、Convex Dashboard、ローカル CLI からの直接 Production deploy は正規ルートにしない。
 
 ## 環境の役割
 
@@ -28,9 +28,9 @@ PRをmainへmerge
   ↓
 production-release.yml が自動起動
   ↓
-preflight後、GitHub Environment: production の承認待ち
+preflight・リリース候補E2E
   ↓
-承認後にPRODへ反映
+成功後に承認待ちなしでPRODへ反映
 ```
 
 通常の PREVIEW デプロイは、`preview` branch への push で `preview-deploy.yml` が自動実行する。
@@ -46,7 +46,7 @@ preflight後、GitHub Environment: production の承認待ち
 
 1. `Wait for staging window` ジョブが、`preview-staging-deploy` グループの外で `scripts/wait-for-staging-window.mjs` をポーリング実行する。
 2. `production-release` の run のうち未完了のものについて、`Vercel release candidate E2E` ジョブが存在しないか未完了なら、リリース候補が staging を使う区間とみなしてデプロイを開始しない（ジョブログに待機中であることと対象 run を出力する）。
-3. リリース候補E2Eが完了した run（`production` 環境の承認待ち・本番デプロイ中）は staging を使わないため、待機の理由にしない。
+3. リリース候補E2Eが完了した run（本番デプロイ中）は staging を使わないため、待機の理由にしない。
 4. 窓が空いた後だけ `Deploy preview branch` ジョブが `preview-staging-deploy` グループに入る。
 
 待機中の `preview` への push は `Wait for staging window` ジョブ同士のグループ `preview-staging-wait`（cancel-in-progress: true）で最新 run のみ残るため、グループ外で待つ間にリリース候補の pending を押し出すことはない。`Deploy preview branch` は `cancel-in-progress: false` で、実行中のデプロイも実行中・待機中のリリース候補E2Eもキャンセルしない。preview 同士は実行中1件+待機1件で、待機は最新の run に置き換わる（最新の preview を常に優先する）。
@@ -99,9 +99,9 @@ main への merge で production-release.yml が自動起動
   ↓
 preflight（入力確認、APP_VERSION確定、Product Update 生成、build、artifact保存。lint/format/test は手動リリース時のみ）
   ↓
-GitHub Environment: production の承認待ち
+Vercel release candidate E2E（固定 staging）
   ↓
-承認後に artifact から生成済み Product Update を復元
+成功後に artifact から生成済み Product Update を復元
   ↓
 Convex Production へ反映
   ↓
@@ -118,7 +118,7 @@ Actions Summary に結果を残す
 
 `main` push では、merge commit の SHA を `source_ref` として扱い、
 `preview -> main` のブランチ運用により PREVIEW 確認済みとみなす。
-実際の Production 反映は GitHub Environment `production` の承認後にだけ実行される。
+承認待ちは無いため、昇格PRのマージが本番反映の承認になる。マージ後に止める場合は、`Deploy Production` ジョブが始まる前に run をキャンセルする。
 
 main push 時の preflight では lint / format / test を実行しない。同一 SHA が `preview -> main` の PR で CI 済みのため再検証しない。手動実行（workflow_dispatch）では `release/*` など PR CI を通っていない ref を扱えるため、従来どおり lint / format / test を実行する。
 
@@ -131,7 +131,7 @@ main push 時の preflight では lint / format / test を実行しない。同�
 | `db_schema_change_check` | `no_db_or_schema_change` | DB/schema 変更なし、または forward-fix 前提の確認済みを選ぶ |
 | `release_note` | `m15 PREVIEW URL確認済み` | PREVIEW evidence またはリリース意図の短いメモ |
 
-`preflight` job は GitHub Environment `production` の承認前に実行される。`production` job には必ず `environment: production` を設定し、GitHub 側の required reviewers / prevent self-review / branch rule で承認を強制する。
+`production` job には必ず `environment: production` を設定する。Production 用の secret・variable をこの job だけに渡すため。GitHub Environment `production` には承認者（required reviewers）を設定しない。
 
 ## Production に必要な設定
 
@@ -172,7 +172,7 @@ Vercel Production Environment には Clerk Production instance と Convex Produc
 4. 掲載指定されたPRは `id: pr-{number}`、`title` = PRタイトル（conventional接頭辞は除去）、`summary` = `description`、`category` = `category` で下書き化する。`publish: false` は非掲載として理由とともに記録する。
 5. `src/content/product-updates.ts` の手動ドラフトとID単位で統合する（同一IDは手動優先）。
 6. 過去の更新と重複しないことを確認し、`src/generated/product-updates.json` と `.tmp/product-updates.current-release.json` を出力する。Release assetには `sourceRef` / `sourceSha` / `sourceMergedAt` と、対象PRごとの掲載・非掲載・例外判定（`pullRequestDecisions`）を保存する。
-7. 掲載予定内容と元PR対応・非掲載理由をActions Summaryへ出力する。掲載0件の場合も理由を確認できる。生成物は artifact 経由で `Deploy Production` Job へ受け渡され、environment 承認前に内容を確認できる。
+7. 掲載予定内容と元PR対応・非掲載理由をActions Summaryへ出力する。掲載0件の場合も理由を確認できる。生成物は artifact 経由で `Deploy Production` Job へ受け渡される。承認待ちが無いため、掲載内容は昇格PRのマージ前に元PR本文のマーカー内で確定させる。
 
 **エラー方針:** `SOURCE_REF` のSHA解決失敗・GitHub API失敗・範囲内PRのマーカー欠落や不正はすべてエラーで中断する。「変更なし」への黙った変換はしない。マージ済みPRにマーカーが無い場合の回収は、当該PR本文を編集してマーカーを追記するか、`src/content/product-updates.ts` に手動draftを追加する。
 
@@ -220,7 +220,6 @@ Vercel Production Environment には Clerk Production instance と Convex Produc
 
 Actions で防ぐこと:
 
-- 承認なしの PROD deploy
 - `main` / 許可 branch 以外からの PROD deploy
 - test / lint / build 未通過の PROD deploy
 - PREVIEW 未確認の PROD deploy

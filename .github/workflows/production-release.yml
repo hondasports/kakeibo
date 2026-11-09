@@ -131,7 +131,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: pnpm test --run
 
-      # 承認待ちの時点で掲載予定の内容と元PRの対応をsummaryへ出力し、成果物はartifactでproduction jobへ受け渡す。
+      # 掲載予定の内容と元PRの対応をsummaryへ出力し、成果物はartifactでproduction jobへ受け渡す。
       - name: Generate product updates
         run: pnpm exec tsx scripts/generate-product-updates.ts
         env:
