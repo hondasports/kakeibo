@@ -21,7 +21,7 @@ license: Apache-2.0
 | 指定なし・指摘対応して | `merge_ready` |
 | マージまで・PRを監視してマージして | `merged` |
 
-- `pr_created` でも、最新HEADのCIの結果を報告に含める。`merge_ready` はrequired checks・承認・競合まで確かめる。
+- `local_verified` はローカルの検証まで、`pr_created` はPRのHEADが最新のcommitと一致するまで確かめる。`pr_created` でも、最新HEADのCIの結果を報告に含める。`merge_ready` はrequired checks・承認・競合まで確かめる。
 - `merged` は、ユーザーがマージまでを明示したときだけ選ぶ。`merge_ready` に届いても、明示が無ければマージしない。
 - 「続行」「作業続行」は、直前に宣言した完了地点のまま再開する指示として扱う。
 
