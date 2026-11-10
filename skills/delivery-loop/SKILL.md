@@ -1,6 +1,6 @@
 ---
 name: delivery-loop
-description: PR作成後の監視・指摘対応・マージ、複数のIssue・PRをまとめて進める依頼、完了地点より前でturnを終えるか迷ったときに使う。完了地点の決め方、観測→対応のループ、止めてよい理由と報告の形の正本。
+description: PR作成後の監視・指摘対応・マージ、複数のIssue・PRをまとめて進める依頼、完了地点の前でturnを終える・作業を区切って報告するときに使う。完了地点の決め方、観測→対応のループ、止めてよい理由と報告の形の正本。
 license: Apache-2.0
 ---
 
@@ -15,13 +15,13 @@ license: Apache-2.0
 | 依頼の言い方（例） | 完了地点 |
 | --- | --- |
 | 調べて・教えて・確認して・相談・話を詰めたい・計画して | 回答（repository fileを変更しない。「対応方法まで調査」も調査に含む） |
-| Issueを起票して・追記して | Issue・コメントの投稿と、投稿内容の読み直し |
+| Issueを起票して・追記して | 回答（repository fileを変更しない。Issue・コメントを投稿し、投稿内容を読み直してから報告する） |
 | ローカルで直して・commitまで | `local_verified` |
 | PR作成まで・PR発行まで・PR投げるまで | `pr_created` |
 | 指定なし・指摘対応して | `merge_ready` |
 | マージまで・PRを監視してマージして | `merged` |
 
-- `pr_created` でも、最新HEADのCIの結果を報告に含める。`merge_ready` はrequired checks・承認・競合まで確かめる。
+- `local_verified` はローカルの検証まで、`pr_created` はPRのHEADが最新のcommitと一致するまで確かめる。`pr_created` でも、最新HEADのCIの結果を報告に含める。`merge_ready` はrequired checks・承認・競合まで確かめる。
 - `merged` は、ユーザーがマージまでを明示したときだけ選ぶ。`merge_ready` に届いても、明示が無ければマージしない。
 - 「続行」「作業続行」は、直前に宣言した完了地点のまま再開する指示として扱う。
 
