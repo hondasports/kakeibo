@@ -2,7 +2,8 @@ import {
   AI_EXPENSE_DRAFT_CONFIDENCE_THRESHOLD,
   type AiExpenseDraftDocumentType,
 } from "./constants";
-import { isValidSignedLineItemAmount, type ReceiptItemLineType } from "../receipt/discountItems";
+import type { ReceiptItemLineType } from "../receipt/discountItems";
+import { analyzeRegistrationAmounts } from "./draftAmountTaxJudgment";
 import { resolveReceiptShopNameFromDraft } from "./shopName";
 
 export type ItemConfidence = {
@@ -133,13 +134,11 @@ export function aggregateDraftItemsByCategory(
     };
   }
 
-  let itemTotal = 0;
+  const arithmetic = analyzeRegistrationAmounts(draft.amountYen, items);
   const categoryAmounts = new Map<string, number>();
-  for (const item of items) {
+  for (const [index, item] of items.entries()) {
     const registrationAmountYen = item.normalizedAmountYen ?? item.amountYen;
-    if (!isValidSignedLineItemAmount(item.itemName, registrationAmountYen, item.lineType)) {
-      return { success: false, error: "invalid_item_amount" };
-    }
+    if (arithmetic.invalidItems[index]) return { success: false, error: "invalid_item_amount" };
     if (item.categoryId === undefined) {
       return { success: false, error: "missing_category" };
     }
@@ -147,19 +146,15 @@ export function aggregateDraftItemsByCategory(
       return { success: false, error: "low_confidence" };
     }
 
-    itemTotal += registrationAmountYen;
     categoryAmounts.set(
       item.categoryId,
       (categoryAmounts.get(item.categoryId) ?? 0) + registrationAmountYen,
     );
   }
 
-  if (itemTotal !== draft.amountYen) {
-    return { success: false, error: "amount_mismatch" };
-  }
-  if ([...categoryAmounts.values()].some((amountYen) => amountYen <= 0)) {
+  if (arithmetic.amountMismatch) return { success: false, error: "amount_mismatch" };
+  if (arithmetic.nonPositiveCategoryTotal)
     return { success: false, error: "non_positive_category_total" };
-  }
 
   const itemNamesByCategory = new Map<string, string[]>();
   for (const item of items) {

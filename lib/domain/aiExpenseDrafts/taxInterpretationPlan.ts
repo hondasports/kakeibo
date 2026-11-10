@@ -17,13 +17,14 @@ import { snapshotReceiptDraftValues, resolveReceiptTaxCorrections } from "./rece
 import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
 import { classifyAiExpenseDraft } from "./classification";
+import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
 import type { AiExpenseDraftReviewReason } from "./constants";
 import {
   filterNonInterpretationWarnings,
   mergeReviewReasons,
   nonTaxReviewReasons,
 } from "./reviewReasons";
-import { deriveTaxReviewReasons, mapDraftItemToTaxFields } from "../receipt/tax/draftTaxMapping";
+import { mapDraftItemToTaxFields } from "../receipt/tax/draftTaxMapping";
 import {
   reinterpretDraftTax,
   type BulkUnresolvedTaxOverride,
@@ -135,9 +136,7 @@ export function planDraftTaxInterpretation(
   });
 
   const ignoresTaxDetails = draft.registrationMode === "totalOnly";
-  const taxReviewReasons = ignoresTaxDetails ? [] : deriveTaxReviewReasons(interpretation);
   const preservedReasons = args.preservedNonTaxReasons ?? nonTaxReviewReasons(draft.reviewReasons);
-  const mergedTaxReasons = mergeReviewReasons(taxReviewReasons, preservedReasons);
   const classification = classifyAiExpenseDraft({
     documentType: draft.documentType,
     shopName: draft.shopName,
@@ -161,8 +160,6 @@ export function planDraftTaxInterpretation(
           categoryId: item.categoryId,
         })),
   });
-  const reviewReasons = mergeReviewReasons(classification.reviewReasons, mergedTaxReasons);
-  const status = reviewReasons.length === 0 ? "ready" : "needs_review";
 
   const itemPatches: TaxInterpretationPlan["itemPatches"] = [];
   for (const [index, item] of items.entries()) {
@@ -190,6 +187,22 @@ export function planDraftTaxInterpretation(
     });
   }
 
+  const judgment = judgeDraftAmountAndTax(
+    {
+      ...draft,
+      taxSummaries: items.length === 0 ? draft.taxSummaries : interpretation.taxSummaries,
+      receiptTotalResolution: interpretation.receiptTotalResolution,
+      receiptTaxDecision: interpretation.decision,
+      items: items.map((item, index) => ({ ...item, ...itemPatches[index]?.patch, _id: item.id })),
+    },
+    { interpretation },
+  );
+  const reviewReasons = mergeReviewReasons(
+    classification.reviewReasons,
+    mergeReviewReasons(judgment.reasons, preservedReasons),
+  );
+  const status = reviewReasons.length === 0 ? "ready" : "needs_review";
+
   const nonInterpretationWarnings = filterNonInterpretationWarnings(draft.warnings ?? []);
 
   return {
@@ -201,7 +214,7 @@ export function planDraftTaxInterpretation(
         interpretedAt: now,
         values: snapshotReceiptDraftValues(draft, items),
       },
-      taxSummaries: interpretation.taxSummaries,
+      taxSummaries: items.length === 0 ? draft.taxSummaries : interpretation.taxSummaries,
       receiptTotalResolution: interpretation.receiptTotalResolution,
       receiptTaxDecision: interpretation.decision,
       warnings: [...new Set([...nonInterpretationWarnings, ...interpretation.warnings])],

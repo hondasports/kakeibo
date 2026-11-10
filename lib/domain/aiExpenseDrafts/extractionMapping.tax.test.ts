@@ -1,3 +1,4 @@
+import { buildExtractedDraftFields } from "./createFromExtraction";
 import { describe, expect, it } from "vitest";
 import {
   ishimoriExternalMisreadFixture,
@@ -304,7 +305,10 @@ describe("mapExtractionToDraftArgs tax normalization (tax resolution)", () => {
       ],
     };
     const mapped = mapExtractionToDraftArgs(source, [foodCategory]);
-    expect(mapped.reviewReasons).toContain("user_confirmation_required");
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("user_confirmation_required");
     expect(mapped.items?.every((item) => item.taxResolutionStatus === "unresolved")).toBe(true);
     expect(mapped.items?.every((item) => item.taxRatePercent === null)).toBe(true);
     expect(mapped.warnings).toContain("unresolved_tax_rate:items[0]");
@@ -331,8 +335,14 @@ describe("mapExtractionToDraftArgs tax normalization (tax resolution)", () => {
         .every((item) => item.taxResolutionStatus === "unresolved"),
     ).toBe(true);
     expect(mapped.warnings).toContain("ambiguous_receipt_total");
-    expect(mapped.reviewReasons).toContain("amount_mismatch");
-    expect(mapped.reviewReasons).toContain("user_confirmation_required");
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("amount_mismatch");
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("user_confirmation_required");
     expect(mapped.items?.[2]?.taxResolutionStatus).toBe("unresolved");
     expect(mapped.items?.[2]?.taxRatePercent).toBeNull();
   });

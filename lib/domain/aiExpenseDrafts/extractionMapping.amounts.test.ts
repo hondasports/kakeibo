@@ -1,3 +1,4 @@
+import { buildExtractedDraftFields } from "./createFromExtraction";
 import { describe, expect, it } from "vitest";
 import {
   conveniencePaymentFixture,
@@ -43,7 +44,10 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
       "unallocated",
       "unallocated",
     ]);
-    expect(mapped.reviewReasons).toContain("user_confirmation_required");
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("user_confirmation_required");
   });
 
   it("範囲外の明細は税額を配分せず、ユーザー確認へ送る", () => {
@@ -76,7 +80,10 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
     expect(mapped.items?.map((item) => item.printedAmountYen)).toEqual(amounts);
     expect(mapped.items?.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
     expect(mapped.items?.every((item) => item.allocatedTaxYen === 0)).toBe(true);
-    expect(mapped.reviewReasons).toContain("user_confirmation_required");
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("user_confirmation_required");
   });
 
   it("不確実な負額行だけを警告付きで保持し、他の抽出項目を失わない", () => {
@@ -113,7 +120,10 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
       printedAmountYen: -16,
       warnings: expect.arrayContaining(["negative_amount_line_type_uncertain"]),
     });
-    expect(mapped.reviewReasons).toContain("user_confirmation_required");
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("user_confirmation_required");
   });
 
   it("金額不整合をwarningとamount_mismatchへ送る", () => {
@@ -121,7 +131,10 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
       foodCategory,
     ]);
     expect(mapped.warnings).toContain("normalized_amount_mismatch");
-    expect(mapped.reviewReasons).toContain("amount_mismatch");
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("amount_mismatch");
   });
 
   it("支払方法金額は明細から外し、袋代はfeeとして残す", () => {
@@ -202,7 +215,10 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
       status: "ambiguous",
       candidates: [expect.objectContaining({ role: "unknown" })],
     });
-    expect(mapped.reviewReasons).toContain("user_confirmation_required");
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("user_confirmation_required");
     expect(mapped.warnings).toContain("ambiguous_receipt_line:4");
   });
 
@@ -265,9 +281,10 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
       taxResolutionStatus: "unresolved",
     });
     expect(mapped.warnings).toContain("ambiguous_receipt_total");
-    expect(mapped.reviewReasons).toEqual(
-      expect.arrayContaining(["amount_mismatch", "user_confirmation_required"]),
-    );
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toEqual(expect.arrayContaining(["amount_mismatch", "user_confirmation_required"]));
   });
 
   it("明細0件でも支払総額と抽出根拠を下書きへ渡す", () => {

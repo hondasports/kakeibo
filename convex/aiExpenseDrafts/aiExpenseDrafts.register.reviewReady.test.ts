@@ -59,6 +59,44 @@ describe("aiExpenseDrafts (register) (review ready flow)", () => {
     );
   });
 
+  it("明細を省略して保存しても保存済み明細の不一致を確認対象にする", async () => {
+    const ctx = createMutationCtx(createIdentity(), {
+      getDocById: {
+        "draft-owned": ownedDraft,
+        "cat-food": { groupId: GROUP_ID, isActive: true },
+      },
+      items: [
+        {
+          _id: "old-item-1",
+          _creationTime: 1,
+          groupId: GROUP_ID,
+          draftId: "draft-owned",
+          itemName: "商品",
+          amountYen: 100,
+          categoryId: "cat-food",
+          confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    });
+    await updateForReviewHandler(ctx, {
+      draftId: "draft-owned" as Id<"aiExpenseDrafts">,
+      documentType: "receipt",
+      shopName: "店",
+      date: "2026-06-02",
+      amountYen: 101,
+      categoryId: "cat-food" as Id<"categories">,
+    });
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "draft-owned",
+      expect.objectContaining({
+        status: "needs_review",
+        reviewReasons: expect.arrayContaining(["amount_mismatch"]),
+      }),
+    );
+  });
+
   it("確認下書きの明細を置き換えて登録準備OKへ戻す", async () => {
     const ctx = createMutationCtx(createIdentity(), {
       getDocById: {

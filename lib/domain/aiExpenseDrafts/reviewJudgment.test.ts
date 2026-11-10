@@ -4,6 +4,7 @@ import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
 import { buildDraftListSummary } from "./listSummary";
 import { buildDraftRegistrationItems } from "./registrationItems";
+import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
 import { buildReviewChecks, countActionableUncomparable } from "./reviewChecks";
 import { mapDraftItemsToReviewItems, mapDraftToReviewForm } from "./reviewDraftMapping";
 import { getReviewGuidance } from "./reviewGuidance";
@@ -264,6 +265,12 @@ describe("一覧・確認画面で金額・税内訳が解決済みの下書き�
       const patch = plan.itemPatches.find(({ itemId }) => itemId === item.id)?.patch;
       return patch ? { ...item, ...patch } : item;
     });
+    expect(
+      judgeDraftAmountAndTax({
+        ...savedDraft,
+        items: savedItems.map((item) => ({ ...item, _id: item.id })),
+      }),
+    ).toMatchObject({ status: "resolved" });
     const registrationItems = buildDraftRegistrationItems(savedDraft, savedItems);
     expect(registrationItems.reduce((sum, item) => sum + item.amountYen, 0)).toBe(
       draftFields.amountYen,

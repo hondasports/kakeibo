@@ -231,7 +231,7 @@ describe("AI expense draft model", () => {
     });
   });
 
-  it("明細合計と下書き金額が一致しない場合は確認が必要に分類する", () => {
+  it("明細合計の検証は分類で行わない", () => {
     expect(
       classifyAiExpenseDraft({
         documentType: "receipt",
@@ -261,8 +261,8 @@ describe("AI expense draft model", () => {
         ],
       }),
     ).toEqual({
-      status: "needs_review",
-      reviewReasons: ["amount_mismatch"],
+      status: "ready",
+      reviewReasons: [],
     });
   });
 
@@ -331,7 +331,7 @@ describe("AI expense draft model", () => {
     });
   });
 
-  it("割引後のカテゴリ正味額が0円以下なら確認が必要に分類する", () => {
+  it("カテゴリの判定は金額の判定と独立する", () => {
     expect(
       classifyAiExpenseDraft({
         documentType: "receipt",
@@ -355,11 +355,11 @@ describe("AI expense draft model", () => {
       }),
     ).toEqual({
       status: "needs_review",
-      reviewReasons: ["multiple_categories", "amount_mismatch"],
+      reviewReasons: ["multiple_categories"],
     });
   });
 
-  it("0円明細がある場合は確認が必要に分類する", () => {
+  it("0円明細の検証は分類で行わない", () => {
     expect(
       classifyAiExpenseDraft({
         documentType: "receipt",
@@ -381,8 +381,8 @@ describe("AI expense draft model", () => {
         ],
       }),
     ).toEqual({
-      status: "needs_review",
-      reviewReasons: ["amount_mismatch"],
+      status: "ready",
+      reviewReasons: [],
     });
   });
 });

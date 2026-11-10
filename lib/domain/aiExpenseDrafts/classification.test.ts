@@ -28,7 +28,7 @@ describe("classifyAiExpenseDraft signed items", () => {
     expect(result.reviewReasons).not.toContain("amount_mismatch");
   });
 
-  it("通常商品または不明行の負額をready扱いにしない", () => {
+  it("明細金額の判定は分類では行わない", () => {
     for (const lineType of ["item", "unknown"] as const) {
       const result = classifyAiExpenseDraft({
         ...completeDraft,
@@ -37,8 +37,8 @@ describe("classifyAiExpenseDraft signed items", () => {
           { itemName: "不明な負額", amountYen: -10, categoryId: "food", lineType },
         ],
       });
-      expect(result).toMatchObject({ status: "needs_review" });
-      expect(result.reviewReasons).toContain("amount_mismatch");
+      expect(result).toMatchObject({ status: "ready" });
+      expect(result.reviewReasons).not.toContain("amount_mismatch");
     }
   });
 });

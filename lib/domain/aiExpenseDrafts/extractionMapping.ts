@@ -26,10 +26,7 @@ import {
   withoutReceiptAmount,
 } from "./receiptItemEvidence";
 import { buildCategoryCandidates, resolveCategoryIdFromCandidates } from "../categories/candidate";
-import {
-  deriveTaxReviewReasons,
-  interpretedItemToDraftFields,
-} from "../receipt/tax/draftTaxMapping";
+import { interpretedItemToDraftFields } from "../receipt/tax/draftTaxMapping";
 import { interpretReceiptTax } from "../receipt/tax/interpretReceiptTax";
 import { interpretReceiptTaxDecision } from "../receipt/tax/interpretReceiptTaxDecision";
 import { resolveReceiptTotal } from "../receipt/tax/resolveReceiptTotal";
@@ -405,7 +402,6 @@ export function mapExtractionToDraftArgs<TId>(
     };
   });
 
-  const taxReviewReasons = deriveTaxReviewReasons(interpretation);
   const ambiguousStructuralLines = receiptLineClassifications.filter(
     (classification) =>
       classification.status === "ambiguous" &&
@@ -415,7 +411,6 @@ export function mapExtractionToDraftArgs<TId>(
       ),
   );
   const reviewReasons = [
-    ...taxReviewReasons,
     ...(ambiguousStructuralLines.length > 0 ||
     ambiguousExtractedItemIndexes.length > 0 ||
     effectiveItems.some(
@@ -426,7 +421,7 @@ export function mapExtractionToDraftArgs<TId>(
       : []),
   ];
 
-  return {
+  const mapped = {
     documentType: extracted.documentType,
     shopName: extracted.shopName || undefined,
     paymentPlace: extracted.paymentPlace || undefined,
@@ -466,4 +461,5 @@ export function mapExtractionToDraftArgs<TId>(
     reviewReasons: reviewReasons.length > 0 ? [...new Set(reviewReasons)] : undefined,
     items,
   };
+  return mapped;
 }
