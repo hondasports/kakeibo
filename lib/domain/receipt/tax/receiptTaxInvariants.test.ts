@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { receipt1224 } from "./fixtures/receipt1224";
+import { reinterpretDraftTax } from "./reinterpretDraftTax";
 import { interpretReceiptTax } from "./interpretReceiptTax";
 import { taxSummaryEvidenceLines } from "./summaryEvidence";
 import { observationLine } from "./fixtures/unprovenTargetReceipt";
@@ -333,4 +335,21 @@ it("金額なしの税率宣言は税率省略行の帰属を制限する", () =
   expect(
     taxSummaryEvidenceLines([target, declaration], 10, "target", { singleSummary: true }),
   ).toEqual([]);
+});
+
+it("0%の対象額のみの印字でも配分税額と支払合計を保存する", () => {
+  const input = receipt1224();
+  const result = reinterpretDraftTax(input as never);
+  expect(result.itemFields.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(62);
+  expect(result.itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0)).toBe(
+    input.amountYen,
+  );
+});
+
+it("0%の印字対象額が不一致なら未確定明細に税を配分しない", () => {
+  const result = reinterpretDraftTax(receipt1224(101) as never);
+  const items = result.itemFields.slice(0, 5);
+  expect(items.every((item) => item.amountBasis === "unknown")).toBe(true);
+  expect(items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+  expect(items.every((item) => item.allocatedTaxYen === 0)).toBe(true);
 });

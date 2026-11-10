@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { receipt1224 } from "./fixtures/receipt1224";
 import { interpretReceiptTax } from "./interpretReceiptTax";
 import { reinterpretDraftTax } from "./reinterpretDraftTax";
 import { observationLine, unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";
@@ -442,5 +443,34 @@ describe("Issue #1216 金額なし行の税証拠", () => {
       Array(5).fill("allocated"),
     );
     expect(result.itemFields.map((item) => item.allocatedTaxYen)).toEqual([13, 12, 11, 13, 13]);
+  });
+});
+
+describe("Issue #1224 0%の税額行がないケース", () => {
+  it("8%明細を税抜として配分し支払合計を再現する", () => {
+    const result = reinterpretDraftTax(receipt1224() as never);
+    expect(result.itemFields.map((item) => item.amountBasis)).toEqual(
+      Array(6).fill("tax_excluded"),
+    );
+    expect(result.itemFields.map((item) => item.taxAllocationStatus)).toEqual(
+      Array(6).fill("allocated"),
+    );
+    expect(result.itemFields.map((item) => item.allocatedTaxYen)).toEqual([13, 12, 11, 13, 13, 0]);
+    expect(result.itemFields.map((item) => item.normalizedAmountYen)).toEqual([
+      177, 155, 148, 181, 181, 100,
+    ]);
+  });
+
+  it("0%の対象額の不一致では8%明細を未確定のまま保つ", () => {
+    const result = reinterpretDraftTax(receipt1224(101) as never);
+    expect(result.itemFields.slice(0, 5).map((item) => item.amountBasis)).toEqual(
+      Array(5).fill("unknown"),
+    );
+    expect(result.itemFields.slice(0, 5).map((item) => item.taxAllocationStatus)).toEqual(
+      Array(5).fill("unallocated"),
+    );
+    expect(result.itemFields.slice(0, 5).map((item) => item.allocatedTaxYen)).toEqual([
+      0, 0, 0, 0, 0,
+    ]);
   });
 });
