@@ -97,11 +97,14 @@ export function judgeDraftAmountAndTax(
     return { status: "unresolved", reasons: ["amount_mismatch"], checks, unresolvedTaxItemCount };
   }
   const form = mapDraftToReviewForm(draft);
-  const sourceItems = mapDraftItemsToReviewItems(draftItems).map((item) =>
-    isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId
-      ? { ...item, discountTargetItemId: item.id }
-      : item,
-  );
+  const sourceItems = mapDraftItemsToReviewItems(draftItems).map((item, index) => ({
+    ...item,
+    printedAmountYen: draftItems[index].printedAmountYen ?? draftItems[index].amountYen,
+    discountTargetItemId:
+      isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId
+        ? item.id
+        : item.discountTargetItemId,
+  }));
   const preview = buildReviewTaxPreview(sourceItems, {
     ...buildReviewTaxEvidence(draft),
     paidTotalYen: draft.amountYen,

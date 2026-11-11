@@ -27,7 +27,10 @@ export function useReviewTaxOverrides({
   selectedReviewDraftId: string | null;
   reviewItems: ReviewItemValues[];
   setReviewItems: Dispatch<SetStateAction<ReviewItemValues[]>>;
-  setReviewDraftOverride: (draft: AiExpenseDraft) => void;
+  setReviewDraftOverride: (
+    draft: AiExpenseDraft,
+    items: NonNullable<AiExpenseDraft["items"]>,
+  ) => void;
   setReviewError: (error: string) => void;
 }) {
   const [taxUpdatingItemId, setTaxUpdatingItemId] = useState<string | null>(null);
@@ -67,7 +70,7 @@ export function useReviewTaxOverrides({
       if (requestId !== taxOverrideRequestIdRef.current) {
         return;
       }
-      setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft));
+      setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft), result.items);
       setReviewItems((current) =>
         applyReviewItemsTaxPreview(
           mergeReviewTaxItems(
@@ -109,7 +112,7 @@ export function useReviewTaxOverrides({
       if (requestId !== taxOverrideRequestIdRef.current) {
         return;
       }
-      setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft));
+      setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft), result.items);
       setReviewItems((current) =>
         applyReviewItemsTaxPreview(
           mergeReviewTaxItems(

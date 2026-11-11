@@ -1,5 +1,7 @@
+import legacyCases from "./draftAmountTaxLegacyCases.json";
 import { describe, expect, it } from "vitest";
 import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
+import { buildDraftRegistrationItems } from "./registrationItems";
 import type { AiExpenseDraftJudgmentInput } from "./reviewTypes";
 
 const base: AiExpenseDraftJudgmentInput = {
@@ -403,3 +405,23 @@ it("保存されていない割引対象は推定せず割引自身の税率で�
     }).status,
   ).toBe("unresolved");
 });
+
+it.each(legacyCases)(
+  "印字額欠落の保存明細を旧登録経路と同じ金額で判定する %#",
+  ({ draft, items }) => {
+    const saved = { ...draft, documentType: "receipt" as const, items } as unknown as Parameters<
+      typeof judgeDraftAmountAndTax
+    >[0];
+    const judgment = judgeDraftAmountAndTax(saved, {
+      itemScope: "all_items",
+      taxVerification: "stored_amounts",
+    });
+    expect(judgment.status).toBe("resolved");
+    expect(() =>
+      buildDraftRegistrationItems(
+        draft as unknown as Parameters<typeof buildDraftRegistrationItems>[0],
+        items as unknown as Parameters<typeof buildDraftRegistrationItems>[1],
+      ),
+    ).not.toThrow();
+  },
+);

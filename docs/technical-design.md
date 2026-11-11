@@ -1707,6 +1707,18 @@ ready / needs_review の下書き一覧は明細読み取り（N+1）を避け�
 2. `pnpm exec convex run aiExpenseDraftListSummaryMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
 3. `pnpm exec convex run aiExpenseDraftListSummaryMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること）
 
+#### 下書きの金額差異理由の再計算（一回限りの内部 migration）
+
+`convex/aiExpenseDraftAmountTaxMigration.ts` は `ready` / `needs_review` のうち `amount_mismatch` を持ち、`judgeDraftAmountAndTax` が解決済みと判定した下書きだけを更新する。理由から `amount_mismatch` を除き、残る理由の有無で status を決め、同じ書き込みで `listSummary` を保存する。未解決の理由なし下書きには `amount_mismatch` を追加しない。税未確定は金額差異を意味しないためである。ほかの理由、明細、金額、税値、`updatedAt` と対象外 status は変更しない。下書きに対応する同一グループの明細を作成順に最大100件読み、テーブルを25件ずつ cursor で走査する。`executeBatch` は自己再スケジュールし、再実行しても同じ結果になる。支出は作成しない。
+
+運用前に非本番で以下を確認する。本番操作は対象 deployment と操作の明示承認を得た運用者が行う。復旧に備え、実行前に対象 deployment のバックアップを取得し、対象・時刻・検証結果を記録する。バックアップの取得や復元も別途承認した手順で行う。
+
+1. `pnpm exec convex run aiExpenseDraftAmountTaxMigration:dryRun '{}'` を実行し、`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` を渡して続行する。全ページの `needsUpdate` の合計を確認する。
+2. 件数が妥当と確認できたら `pnpm exec convex run aiExpenseDraftAmountTaxMigration:executeBatch '{}'` を1回実行し、最終ページの `done=true` をログで確認する。
+3. 再び `dryRun` を全ページ実行し、`needsUpdate` の合計が0であることを確認する。並行更新がある場合はその影響も調査する。
+
+コードの revert だけでは書き込み済みデータは戻らない。問題があればバッチの継続と関係する書き込みを止め、実行前バックアップと実行後の変更を照合する。以後の利用者編集を上書きしないよう個別の復旧対象と方法を決め、承認を得て復旧する。理由の一律再追加は、元から理由のない下書きと区別できないため行わない。
+
 #### aiExpenseDraftItems の printedAmountYen 欠落行（据え置き・backfill 不実施）
 
 2026-11-01 の本番件数取得（件数のみ・read-only）で、`printedAmountYen` を持たない `aiExpenseDraftItems` が 21 行存在することを確認した。これらは `printedAmountYen` 追加前の書き込み経路、または同フィールドを書かなかった過去の明細置換 writer で作られた可能性がある行である。行単位の作成経路・同値性は件数集計では証明できない。

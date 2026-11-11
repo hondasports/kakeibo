@@ -48,6 +48,7 @@ export type ReviewDialogProps = {
   reviewError: string;
   reviewForm: ReviewFormValues;
   reviewItems: ReviewItemValues[];
+  persistedReviewItems?: AiExpenseDraft["items"];
   isCategorySplit: boolean;
   reviewSubmitting: boolean;
   onClose: () => void;
@@ -130,7 +131,10 @@ export function ReviewDialog(props: ReviewDialogProps) {
   );
   const totalOnly = effectiveReviewMode(form) === "totalOnly";
   const judgment = judgeReviewFormAmountAndTax(
-    sourceDraft ?? { documentType: form.documentType, reviewReasons: [] },
+    {
+      ...(sourceDraft ?? { documentType: form.documentType, reviewReasons: [] }),
+      items: props.persistedReviewItems ?? sourceDraft?.items,
+    },
     form,
     sourceItems,
   );

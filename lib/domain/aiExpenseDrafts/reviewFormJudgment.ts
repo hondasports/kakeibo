@@ -1,5 +1,6 @@
 import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
 import { prepareReviewItemsForSubmit } from "./reviewItemCategories";
+import { buildReplacementDraftItemFields } from "./reviewItemReplace";
 import type {
   AiExpenseDraftJudgmentInput,
   ReviewFormValues,
@@ -21,12 +22,49 @@ export function judgeReviewFormAmountAndTax(
     amountYen,
     categoryId: form.categoryId,
     registrationMode: form.registrationMode,
-    items: submittedItems.map((item) => ({
-      ...item,
-      _id: item.id,
-      amountYen: item.amountYen.trim() === "" ? Number.NaN : Number(item.amountYen),
-      printedAmountYen: item.amountYen.trim() === "" ? undefined : Number(item.amountYen),
-      normalizedAmountYen: item.amountYen.trim() === "" ? undefined : item.normalizedAmountYen,
-    })),
+    items: submittedItems.map((item) => {
+      const amount = item.amountYen.trim() === "" ? Number.NaN : Number(item.amountYen);
+      if (draft.items === undefined)
+        return {
+          ...item,
+          _id: item.id,
+          amountYen: amount,
+          printedAmountYen: Number.isFinite(amount) ? amount : undefined,
+          normalizedAmountYen: Number.isFinite(amount) ? item.normalizedAmountYen : undefined,
+        };
+      const saved = item.persistedItemId
+        ? draft.items.find((entry) => entry._id === item.persistedItemId)
+        : undefined;
+      const previous = saved && {
+        ...saved,
+        groupId: "",
+        draftId: "",
+        confidence: saved.confidence ?? {},
+        createdAt: 0,
+        updatedAt: 0,
+      };
+      const replacement = buildReplacementDraftItemFields({
+        groupId: "",
+        draftId: "",
+        now: 0,
+        previous,
+        item: {
+          itemName: item.itemName,
+          lineType: item.lineType,
+          amountYen: amount,
+          categoryId: item.categoryId,
+          confirmedTaxRatePercent: item.confirmedTaxRatePercent,
+        },
+      });
+      return replacement.success
+        ? { ...replacement.fields, _id: item.id, discountTargetItemId: item.discountTargetItemId }
+        : {
+            ...item,
+            _id: item.id,
+            amountYen: amount,
+            printedAmountYen: undefined,
+            normalizedAmountYen: undefined,
+          };
+    }),
   });
 }
