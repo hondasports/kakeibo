@@ -8,7 +8,6 @@ import type {
 import type { AiExpenseDraftReviewReason } from "../../../lib/domain/aiExpenseDrafts/constants";
 import type { AiExpenseDraftFields } from "../../../lib/domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../../lib/domain/aiExpenseDrafts/aiExpenseDraftItem";
-import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
 import { applyRecordPatch, diffRecordPatch } from "../../../lib/domain/common/recordPatch";
 import {
   getTaxInterpretationEligibilityErrorMessage,
@@ -101,11 +100,7 @@ export async function persistDraftTaxInterpretation(
         ) as unknown as Doc<"aiExpenseDraftItems">);
   });
 
-  const listSummary = buildDraftListSummary(
-    draftDocToFields(updatedDraft),
-    updatedItems.map(draftItemDocToFields),
-    plan.amountAndTaxResolved,
-  );
+  const listSummary = plan.listSummary;
   await ctx.db.patch(args.draftId, {
     ...plan.draftPatch,
     receiptInterpretation: plan.draftPatch

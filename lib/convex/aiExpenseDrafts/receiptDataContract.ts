@@ -11,7 +11,7 @@ import {
   type ReceiptUserOverrideSnapshot,
 } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { resetReceiptToAiInterpretation } from "../../usecase/aiExpenseDrafts/resetReceiptToAiInterpretation";
-import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
+import { buildDraftReviewState } from "../../domain/aiExpenseDrafts/draftReviewState";
 import {
   DRAFT_JUDGMENT_ITEM_LIMIT,
   takeDraftJudgmentItems,
@@ -75,12 +75,22 @@ export async function persistReceiptUserOverrideSnapshot(
     updatedAt,
   }) as unknown as Doc<"aiExpenseDrafts">;
   // 一覧用の保存サマリは override 適用後の下書きと明細から計算して同じ patch に載せる。
-  const listSummary = buildDraftListSummary(
+  const state = buildDraftReviewState(
     draftDocToFields(updatedDraft),
     items.map(draftItemDocToFields),
+    { reasons: updatedDraft.reviewReasons },
   );
-  await ctx.db.patch(args.draftId, { receiptUserOverride, updatedAt, listSummary });
-  return { ...updatedDraft, listSummary };
+  const reviewPatch =
+    updatedDraft.status === "ready" || updatedDraft.status === "needs_review"
+      ? { status: state.status, reviewReasons: state.reviewReasons }
+      : {};
+  await ctx.db.patch(args.draftId, {
+    receiptUserOverride,
+    updatedAt,
+    ...reviewPatch,
+    listSummary: state.listSummary,
+  });
+  return { ...updatedDraft, ...reviewPatch, listSummary: state.listSummary };
 }
 
 /** ハンドラ互換のグルー。実装は lib/usecase/aiExpenseDrafts/resetReceiptToAiInterpretation。 */

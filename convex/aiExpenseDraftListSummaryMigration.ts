@@ -4,7 +4,7 @@ import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../lib/domain/aiExpenseDrafts/judgmentItemWindow";
-import { buildDraftListSummary } from "../lib/domain/aiExpenseDrafts/listSummary";
+import { buildDraftReviewState } from "../lib/domain/aiExpenseDrafts/draftReviewState";
 import {
   draftDocToFields,
   draftItemDocToFields,
@@ -82,10 +82,11 @@ export const executeBatch = internalMutation({
         )
         .order("asc")
         .take(DRAFT_JUDGMENT_ITEM_LIMIT);
-      const listSummary = buildDraftListSummary(
+      const listSummary = buildDraftReviewState(
         draftDocToFields(draft),
         items.map(draftItemDocToFields),
-      );
+        { reasons: draft.reviewReasons, mode: "migration" },
+      ).listSummary;
       // updatedAt は変えない（更新時刻は書き込み経路の意味論に従う）。
       await ctx.db.patch(draft._id, { listSummary });
       backfilled += 1;

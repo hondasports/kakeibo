@@ -12,6 +12,7 @@ import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpens
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { ReceiptDraftItemSnapshot } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
+import { buildDraftReviewState } from "../../domain/aiExpenseDrafts/draftReviewState";
 import {
   buildExtractedDraftFields,
   buildExtractedDraftItemFields,
@@ -105,12 +106,12 @@ async function persistExtractedDraft(
   const draftId = await ctx.db.insert("aiExpenseDrafts", draft);
 
   const insertedItems = await insertDraftItems(ctx, actor.groupId, draftId, values.items, now);
-  // 一覧用の保存サマリは採番済みの明細を含む最終状態から計算する。
-  const listSummary = buildDraftListSummary(
+  const { status, reviewReasons, listSummary } = buildDraftReviewState(
     { ...draft, id: draftId } as AiExpenseDraftFields,
     insertedItems,
+    { reasons: draft.reviewReasons, preserveUserConfirmation: true },
   );
-  await ctx.db.patch(draftId, { listSummary, reviewReasons: draft.reviewReasons, updatedAt: now });
+  await ctx.db.patch(draftId, { status, reviewReasons, listSummary, updatedAt: now });
 
   const created = await ctx.db.get(draftId);
   if (created === null) {

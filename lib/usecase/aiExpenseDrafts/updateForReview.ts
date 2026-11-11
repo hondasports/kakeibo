@@ -10,9 +10,7 @@ import type {
 } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftDocumentType } from "../../domain/aiExpenseDrafts/constants";
 import { classifyAiExpenseDraft } from "../../domain/aiExpenseDrafts/classification";
-import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
-import { judgeDraftAmountAndTax } from "../../domain/aiExpenseDrafts/draftAmountTaxJudgment";
-import { mergeReviewReasons } from "../../domain/aiExpenseDrafts/reviewReasons";
+import { buildDraftReviewState } from "../../domain/aiExpenseDrafts/draftReviewState";
 import {
   buildRegistrationPatchFields,
   resolveRegisteredAt,
@@ -208,32 +206,26 @@ export async function updateAiExpenseDraftForReview(
     return await reconcileRegisteredDraft(updated, reinterpreted.items);
   }
 
-  const amountTaxJudgment = judgeDraftAmountAndTax({
-    ...currentDraft,
-    items: currentItems.map((item) => ({ ...item, _id: item.id })),
-  });
-  const reviewReasons = mergeReviewReasons(classification.reviewReasons, amountTaxJudgment.reasons);
-  const statusPatchBase = {
-    status: reviewReasons.length === 0 ? ("ready" as const) : ("needs_review" as const),
-    receiptTotalResolution: resolveReceiptTotal({
-      amountYen: args.amountYen,
-      source: "user_confirmed",
-      confidence: reviewConfidence.amountYen,
-      supportingCandidates: fields.receiptTotalResolution?.candidates.filter(
-        (candidate) => candidate.source !== "user_confirmed",
-      ),
-      taxSummaries: [],
-    }),
-    reviewReasons,
-    updatedAt: now,
-  };
-  const statusPatch = {
-    ...statusPatchBase,
-    listSummary: buildDraftListSummary(
-      { ...currentDraft, ...statusPatchBase },
-      currentItems,
-      amountTaxJudgment.status === "resolved",
+  const receiptTotalResolution = resolveReceiptTotal({
+    amountYen: args.amountYen,
+    source: "user_confirmed",
+    confidence: reviewConfidence.amountYen,
+    supportingCandidates: fields.receiptTotalResolution?.candidates.filter(
+      (candidate) => candidate.source !== "user_confirmed",
     ),
+    taxSummaries: [],
+  });
+  const { status, reviewReasons, listSummary } = buildDraftReviewState(
+    { ...currentDraft, receiptTotalResolution },
+    currentItems,
+    { reasons: classification.reviewReasons },
+  );
+  const statusPatch = {
+    status,
+    reviewReasons,
+    listSummary,
+    receiptTotalResolution,
+    updatedAt: now,
   };
   await deps.drafts.patch(args.draftId, statusPatch);
   currentDraft = applyRecordPatch(

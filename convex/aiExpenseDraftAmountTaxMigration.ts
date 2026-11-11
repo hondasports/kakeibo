@@ -4,8 +4,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../lib/domain/aiExpenseDrafts/judgmentItemWindow";
-import { judgeDraftAmountAndTax } from "../lib/domain/aiExpenseDrafts/draftAmountTaxJudgment";
-import { buildDraftListSummary } from "../lib/domain/aiExpenseDrafts/listSummary";
+import { buildDraftReviewState } from "../lib/domain/aiExpenseDrafts/draftReviewState";
 import {
   draftDocToFields,
   draftItemDocToFields,
@@ -26,24 +25,22 @@ async function updateForDraft(ctx: ReadCtx, draft: Doc<"aiExpenseDrafts">) {
       .take(DRAFT_JUDGMENT_ITEM_LIMIT)
   ).map(draftItemDocToFields);
   const fields = draftDocToFields(draft);
-  const judgment = judgeDraftAmountAndTax({
-    ...fields,
-    items: items.map((item) => ({ ...item, _id: item.id })),
+  const state = buildDraftReviewState(fields, items, {
+    reasons: draft.reviewReasons,
+    mode: "migration",
   });
-  const listSummary = buildDraftListSummary(fields, items, judgment.status === "resolved");
-  const removeReason =
-    judgment.status === "resolved" && draft.reviewReasons.includes("amount_mismatch");
+  const listSummary = state.listSummary;
+  const removeReason = state.reviewReasons.length !== draft.reviewReasons.length;
   const summaryChanged =
     draft.listSummary === undefined ||
     JSON.stringify(convexToJson(draft.listSummary)) !== JSON.stringify(convexToJson(listSummary));
   if (!removeReason && !summaryChanged) return null;
   if (!removeReason) return { kind: "summaryOnly" as const, patch: { listSummary } };
-  const reviewReasons = draft.reviewReasons.filter((reason) => reason !== "amount_mismatch");
   return {
     kind: "reasonRemoval" as const,
     patch: {
-      reviewReasons,
-      status: reviewReasons.length ? ("needs_review" as const) : ("ready" as const),
+      reviewReasons: state.reviewReasons,
+      status: state.status,
       listSummary,
     },
   };
