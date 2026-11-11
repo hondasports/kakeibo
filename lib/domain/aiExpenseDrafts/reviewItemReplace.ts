@@ -99,6 +99,7 @@ export function buildReplacementDraftItemFields(args: {
       draftId,
       itemName,
       lineType,
+      discountTargetItemId: previous?.discountTargetItemId,
       amountYen: amounts.amountYen,
       printedAmountYen: amounts.printedAmountYen,
       categoryId: item.categoryId,

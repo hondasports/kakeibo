@@ -17,6 +17,7 @@ import {
   applyReceiptCategory,
   assignCategoryToItems,
   assignDiscountTarget,
+  clearDiscountTargetsForItem,
   initializeReviewCategoryState,
   prepareReviewItemsForSubmit,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewItemCategories";
@@ -187,6 +188,15 @@ export function useReviewFormState({
       });
 
       if (field === "itemName" || field === "lineType") {
+        const edited = updated.find((item) => item.id === itemId);
+        if (
+          targetItem &&
+          edited &&
+          !isDiscountLine(targetItem.itemName, targetItem.lineType) &&
+          isDiscountLine(edited.itemName, edited.lineType)
+        ) {
+          updated = clearDiscountTargetsForItem(updated, itemId);
+        }
         updated = updated.map((item) => {
           if (item.id !== itemId || !targetItem || !hasReceiptTaxMetadata({}, [item])) return item;
           const changed =
@@ -228,13 +238,10 @@ export function useReviewFormState({
 
   const handleRemoveReviewItem = (itemId: string) => {
     setReviewItems((current) => {
-      const remaining = current
-        .filter((item) => item.id !== itemId)
-        .map((item) =>
-          item.discountTargetItemId === itemId
-            ? { ...item, categoryId: "", discountTargetItemId: undefined }
-            : item,
-        );
+      const remaining = clearDiscountTargetsForItem(
+        current.filter((item) => item.id !== itemId),
+        itemId,
+      );
       return applyReviewItemsTaxPreview(remaining, {
         ...buildReviewTaxEvidence(selectedReviewDraft),
         paidTotalYen: Number(reviewForm.amountYen),

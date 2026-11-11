@@ -89,6 +89,13 @@ export const updateForReview = mutation({
       v.array(
         v.object({
           itemId: v.optional(v.id("aiExpenseDraftItems")),
+          discountTarget: v.optional(
+            v.union(
+              v.null(),
+              v.object({ itemId: v.id("aiExpenseDraftItems") }),
+              v.object({ itemIndex: v.number() }),
+            ),
+          ),
           confirmedTaxRatePercent: v.optional(receiptItemTaxRatePercentValidator),
           itemName: v.string(),
           lineType: v.optional(receiptItemLineTypeValidator),

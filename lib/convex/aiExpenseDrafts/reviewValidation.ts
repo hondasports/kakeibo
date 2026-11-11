@@ -1,3 +1,4 @@
+import { isDiscountLine } from "../../domain/receipt/discountItems";
 import type { DraftReviewItemInput } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import { applyRecordPatch, diffRecordPatch } from "../../domain/common/recordPatch";
 import { ConvexError } from "convex/values";
@@ -137,6 +138,50 @@ export async function replaceDraftItemsForReview(
     throw new ConvexError(getReviewItemReplaceErrorMessage(idsResult.error));
   }
 
+  const targetIndexes = items.map((item) => {
+    const previous = item.itemId === undefined ? undefined : existingItemsById.get(item.itemId);
+    const target =
+      item.discountTarget === undefined
+        ? previous?.discountTargetItemId
+          ? { itemId: previous.discountTargetItemId }
+          : null
+        : item.discountTarget;
+    if (target === null) return undefined;
+    const targetIndex =
+      "itemId" in target
+        ? items.findIndex((candidate) => candidate.itemId === target.itemId)
+        : target.itemIndex;
+    if (
+      item.discountTarget === undefined &&
+      (targetIndex === -1 ||
+        !isDiscountLine(item.itemName, item.lineType ?? previous?.lineType) ||
+        isDiscountLine(
+          items[targetIndex].itemName,
+          items[targetIndex].lineType ??
+            (items[targetIndex].itemId
+              ? existingItemsById.get(items[targetIndex].itemId!)?.lineType
+              : undefined),
+        ))
+    )
+      return undefined;
+    if (
+      !Number.isInteger(targetIndex) ||
+      targetIndex < 0 ||
+      targetIndex >= items.length ||
+      !isDiscountLine(item.itemName, item.lineType ?? previous?.lineType) ||
+      isDiscountLine(
+        items[targetIndex].itemName,
+        items[targetIndex].lineType ??
+          (items[targetIndex].itemId
+            ? existingItemsById.get(items[targetIndex].itemId!)?.lineType
+            : undefined),
+      )
+    ) {
+      throw new ConvexError("Invalid discount target");
+    }
+    return targetIndex;
+  });
+
   const submittedItemIds = new Set(
     items
       .map((item) => item.itemId)
@@ -150,6 +195,7 @@ export async function replaceDraftItemsForReview(
 
   const keptById = new Map<Id<"aiExpenseDraftItems">, Doc<"aiExpenseDraftItems">>();
   const insertedDocs: Doc<"aiExpenseDraftItems">[] = [];
+  const submittedDocs: Doc<"aiExpenseDraftItems">[] = [];
   for (const item of items) {
     const previous = item.itemId === undefined ? undefined : existingItemsById.get(item.itemId);
     const built = buildReplacementDraftItemFields({
@@ -170,7 +216,9 @@ export async function replaceDraftItemsForReview(
     } = draftItemFieldsToDoc(built.fields);
     if (previous === undefined) {
       const newId = await ctx.db.insert("aiExpenseDraftItems", targetFields);
-      insertedDocs.push({ _id: newId, _creationTime: now, ...targetFields });
+      const doc = { _id: newId, _creationTime: now, ...targetFields };
+      insertedDocs.push(doc);
+      submittedDocs.push(doc);
       continue;
     }
     // previous にあって built.fields に無いキーはフィールド削除として扱う。
@@ -186,16 +234,26 @@ export async function replaceDraftItemsForReview(
     ]);
     if (diff === null) {
       keptById.set(previous._id, previous);
+      submittedDocs.push(previous);
       continue;
     }
     await ctx.db.patch(previous._id, diff);
-    keptById.set(
-      previous._id,
-      applyRecordPatch(
-        previous as unknown as Record<string, unknown>,
-        patch,
-      ) as unknown as Doc<"aiExpenseDraftItems">,
-    );
+    const updated = applyRecordPatch(
+      previous as unknown as Record<string, unknown>,
+      patch,
+    ) as unknown as Doc<"aiExpenseDraftItems">;
+    keptById.set(previous._id, updated);
+    submittedDocs.push(updated);
+  }
+
+  for (const [index, doc] of submittedDocs.entries()) {
+    const targetIndex = targetIndexes[index];
+    const targetId = targetIndex === undefined ? undefined : submittedDocs[targetIndex]._id;
+    if (doc.discountTargetItemId !== targetId) {
+      await ctx.db.patch(doc._id, { discountTargetItemId: targetId });
+      if (targetId === undefined) delete doc.discountTargetItemId;
+      else doc.discountTargetItemId = targetId;
+    }
   }
 
   return [
