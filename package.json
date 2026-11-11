@@ -38,7 +38,7 @@
     "verify:prepush": "node scripts/verify-prepush.mjs"
   },
   "dependencies": {
-    "@clerk/backend": "^3.26.5",
+    "@clerk/backend": "^3.27.0",
     "@clerk/react": "^6.17.8",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
