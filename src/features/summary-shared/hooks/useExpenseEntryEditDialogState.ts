@@ -2,7 +2,7 @@ import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { isValidSignedLineItemAmount } from "../../../../lib/domain/receipt/discountItems";
+import { analyzeRegistrationAmounts } from "../../../../lib/domain/aiExpenseDrafts/draftAmountTaxJudgment";
 import {
   getExpenseItemFieldErrorMessage,
   parseExpenseAmountString,
@@ -95,12 +95,11 @@ export function useExpenseEntryEditDialogState({
     if (
       receipt.aiExpenseDraftId &&
       registrationMode === "detailed" &&
-      submittedItems.some(
-        (item, index) =>
-          !item.itemName ||
-          !isValidSignedLineItemAmount(item.itemName, item.amountYen, draftItems[index].lineType) ||
-          !item.categoryId,
-      )
+      (submittedItems.some((item) => !item.itemName || !item.categoryId) ||
+        analyzeRegistrationAmounts(
+          parsedAmount,
+          submittedItems.map((item, index) => ({ ...item, lineType: draftItems[index].lineType })),
+        ).invalidItems.some(Boolean))
     ) {
       setError("明細名、明細金額、カテゴリを確認してください。");
       return;

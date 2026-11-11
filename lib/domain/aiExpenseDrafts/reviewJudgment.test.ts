@@ -9,7 +9,7 @@ import { buildReviewChecks, countActionableUncomparable } from "./reviewChecks";
 import { mapDraftItemsToReviewItems, mapDraftToReviewForm } from "./reviewDraftMapping";
 import { getReviewGuidance } from "./reviewGuidance";
 import { buildReviewTaxPreview } from "./reviewItemsTaxPreview";
-import { isAmountAndTaxResolved, isUnrelatedToAmountTaxGuidanceId } from "./reviewJudgment";
+import { isUnrelatedToAmountTaxGuidanceId } from "./reviewJudgment";
 import { initializeReviewCategoryState } from "./reviewItemCategories";
 import type { AiExpenseDraftItem, AiExpenseDraftJudgmentInput } from "./reviewTypes";
 import { legacyTaxSummaryVariants, mixedTaxReviewFixture } from "./reviewTaxPreviewTestHelpers";
@@ -92,7 +92,7 @@ describe("旧形式の税内訳5パターンの解決（Issue #1015 / #1125）",
       const { draftFields, itemFields, reviewDraft } = fixtureFor(taxSummaries);
 
       // 一覧の「金額・税内訳の確認が必要」を出すかどうかの判定（queue 表示の正本）
-      expect(isAmountAndTaxResolved(reviewDraft)).toBe(true);
+      expect(isResolvedForTest(reviewDraft)).toBe(true);
       expect(buildDraftListSummary(draftFields, itemFields).amountAndTaxResolved).toBe(true);
 
       // ダイアログと同じ再解釈で、保存値ではなく商品から内訳を導く
@@ -248,7 +248,7 @@ describe("一覧・確認画面で金額・税内訳が解決済みの下書き�
   ];
 
   it.each(cases)("%s", (_caseName, { draftFields, itemFields, reviewDraft }) => {
-    expect(isAmountAndTaxResolved(reviewDraft)).toBe(true);
+    expect(isResolvedForTest(reviewDraft)).toBe(true);
 
     const plan = planDraftTaxInterpretation(
       { ...draftFields, amountYen: draftFields.amountYen! },
@@ -277,3 +277,7 @@ describe("一覧・確認画面で金額・税内訳が解決済みの下書き�
     );
   });
 });
+
+function isResolvedForTest(draft: Parameters<typeof judgeDraftAmountAndTax>[0]) {
+  return judgeDraftAmountAndTax(draft).status === "resolved";
+}

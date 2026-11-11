@@ -1,4 +1,8 @@
-import { isValidSignedLineItemAmount, type ReceiptItemLineType } from "../receipt/discountItems";
+import {
+  isDiscountLine,
+  isValidSignedLineItemAmount,
+  type ReceiptItemLineType,
+} from "../receipt/discountItems";
 import type { ExtractedTaxSummary, ReceiptTaxInterpretation } from "../receipt/tax/types";
 import {
   deriveTaxReviewReasons,
@@ -11,9 +15,9 @@ import {
   resolveReceiptTotalSupportingCandidates,
 } from "./receiptTotalEvidence";
 import { resolveReceiptTaxCorrections } from "./receiptDataContract";
-import { buildReviewChecks } from "./reviewChecks";
+import { buildReviewChecks, type ReviewChecks } from "./reviewChecks";
+import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
 import { getReviewGuidance } from "./reviewGuidance";
-import { inferReviewDiscountTargets } from "./reviewItemCategories";
 import { mapDraftItemsToReviewItems, mapDraftToReviewForm } from "./reviewDraftMapping";
 import { buildReviewTaxEvidence, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
 import { isUnrelatedToAmountTaxGuidanceId } from "./reviewJudgment";
@@ -21,7 +25,7 @@ import { validateReviewInput } from "./reviewValidation";
 import { takeDraftJudgmentItems } from "./judgmentItemWindow";
 import type { AiExpenseDraftJudgmentInput } from "./reviewTypes";
 
-export type DraftAmountTaxJudgment =
+export type DraftAmountTaxJudgment = (
   | { status: "not_applicable"; reasons: [] }
   | { status: "resolved"; reasons: [] }
   | {
@@ -29,7 +33,8 @@ export type DraftAmountTaxJudgment =
       reasons: Array<"amount_mismatch" | "user_confirmation_required">;
       amountError?: "invalid_item_amount" | "amount_mismatch" | "non_positive_category_total";
       taxRegistrationBlocked?: boolean;
-    };
+    }
+) & { checks: ReviewChecks; unresolvedTaxItemCount: number };
 
 export function analyzeRegistrationAmounts(
   amountYen: number | undefined,
@@ -76,14 +81,27 @@ export function judgeDraftAmountAndTax(
     options.itemScope === "all_items"
       ? (draft.items ?? [])
       : takeDraftJudgmentItems(draft.items ?? []);
-  if (draft.registrationMode === "totalOnly") return { status: "not_applicable", reasons: [] };
-  if (draftItems.length === 0) {
-    return hasReceiptTaxMetadata(draft, draftItems)
-      ? { status: "unresolved", reasons: ["amount_mismatch"] }
-      : { status: "not_applicable", reasons: [] };
+  if (draft.registrationMode === "totalOnly" || draftItems.length === 0) {
+    const checks = buildReviewChecks({
+      items: mapDraftItemsToReviewItems(draftItems),
+      paidTotalYen: draft.amountYen,
+      taxSummaries: draft.taxSummaries,
+      rawObservation: draft.rawObservation,
+      receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
+    });
+    const unresolvedTaxItemCount = mapDraftItemsToReviewItems(draftItems).filter(
+      (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
+    ).length;
+    if (draft.registrationMode === "totalOnly" || !hasReceiptTaxMetadata(draft, draftItems))
+      return { status: "not_applicable", reasons: [], checks, unresolvedTaxItemCount };
+    return { status: "unresolved", reasons: ["amount_mismatch"], checks, unresolvedTaxItemCount };
   }
   const form = mapDraftToReviewForm(draft);
-  const sourceItems = inferReviewDiscountTargets(mapDraftItemsToReviewItems(draftItems));
+  const sourceItems = mapDraftItemsToReviewItems(draftItems).map((item) =>
+    isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId
+      ? { ...item, discountTargetItemId: item.id }
+      : item,
+  );
   const preview = buildReviewTaxPreview(sourceItems, {
     ...buildReviewTaxEvidence(draft),
     paidTotalYen: draft.amountYen,
@@ -95,6 +113,9 @@ export function judgeDraftAmountAndTax(
     rawObservation: draft.rawObservation,
     receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
   });
+  const unresolvedTaxItemCount = preview.items.filter(
+    (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
+  ).length;
   const validation = validateReviewInput(form, preview.items);
   const guidance = getReviewGuidance(form, preview.items, {
     ...draft,
@@ -174,8 +195,10 @@ export function judgeDraftAmountAndTax(
     ? {
         status: "unresolved",
         reasons,
+        checks,
+        unresolvedTaxItemCount,
         ...(amountError ? { amountError } : {}),
         ...(storedTaxMismatch ? { taxRegistrationBlocked: true } : {}),
       }
-    : { status: "resolved", reasons: [] };
+    : { status: "resolved", reasons: [], checks, unresolvedTaxItemCount };
 }

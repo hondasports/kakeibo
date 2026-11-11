@@ -8,6 +8,7 @@ import type {
 import type { AiExpenseDraftReviewReason } from "../../../lib/domain/aiExpenseDrafts/constants";
 import type { AiExpenseDraftFields } from "../../../lib/domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../../lib/domain/aiExpenseDrafts/aiExpenseDraftItem";
+import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
 import { applyRecordPatch, diffRecordPatch } from "../../../lib/domain/common/recordPatch";
 import {
   getTaxInterpretationEligibilityErrorMessage,
@@ -86,15 +87,6 @@ export async function persistDraftTaxInterpretation(
     }
   }
 
-  await ctx.db.patch(args.draftId, {
-    ...plan.draftPatch,
-    receiptInterpretation: plan.draftPatch
-      .receiptInterpretation as Doc<"aiExpenseDrafts">["receiptInterpretation"],
-  });
-
-  // DB に書いた diff と同じものをメモリ上で doc に適用して組み立て、再読み込みを省く。
-  // 一覧用の保存サマリ（listSummary）はここでは書かない。呼び出し側は全て直後に
-  // overrideSnapshots.persist を呼び、最終状態から計算して同じ patch に載せる。
   const updatedDraft = applyRecordPatch(
     draftDoc as unknown as Record<string, unknown>,
     plan.draftPatch as Record<string, unknown>,
@@ -109,5 +101,16 @@ export async function persistDraftTaxInterpretation(
         ) as unknown as Doc<"aiExpenseDraftItems">);
   });
 
-  return { draft: updatedDraft, items: updatedItems };
+  const listSummary = buildDraftListSummary(
+    draftDocToFields(updatedDraft),
+    updatedItems.map(draftItemDocToFields),
+    plan.amountAndTaxResolved,
+  );
+  await ctx.db.patch(args.draftId, {
+    ...plan.draftPatch,
+    receiptInterpretation: plan.draftPatch
+      .receiptInterpretation as Doc<"aiExpenseDrafts">["receiptInterpretation"],
+    listSummary,
+  });
+  return { draft: { ...updatedDraft, listSummary }, items: updatedItems };
 }

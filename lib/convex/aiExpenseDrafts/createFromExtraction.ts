@@ -110,7 +110,7 @@ async function persistExtractedDraft(
     { ...draft, id: draftId } as AiExpenseDraftFields,
     insertedItems,
   );
-  await ctx.db.patch(draftId, { listSummary, updatedAt: now });
+  await ctx.db.patch(draftId, { listSummary, reviewReasons: draft.reviewReasons, updatedAt: now });
 
   const created = await ctx.db.get(draftId);
   if (created === null) {

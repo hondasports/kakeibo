@@ -62,18 +62,6 @@ function inferDiscountTargetItemId(
   );
 }
 
-export function inferReviewDiscountTargets(items: ReviewItemValues[]): ReviewItemValues[] {
-  return items.map((item, index) =>
-    isProductItem(item)
-      ? item
-      : {
-          ...item,
-          discountTargetItemId:
-            item.discountTargetItemId ?? inferDiscountTargetItemId(items, index, item.categoryId),
-        },
-  );
-}
-
 export function initializeReviewCategoryState(
   items: ReviewItemValues[],
   receiptCategoryId: string,

@@ -101,6 +101,7 @@ export type DraftTaxInterpretationPatch = {
 };
 
 export type TaxInterpretationPlan = {
+  amountAndTaxResolved: boolean;
   itemPatches: Array<{ itemId: string; patch: DraftItemTaxPatch }>;
   draftPatch: DraftTaxInterpretationPatch;
 };
@@ -207,6 +208,7 @@ export function planDraftTaxInterpretation(
 
   return {
     itemPatches,
+    amountAndTaxResolved: judgment.status === "resolved",
     draftPatch: {
       status,
       receiptInterpretation: draft.receiptInterpretation ?? {

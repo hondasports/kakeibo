@@ -82,11 +82,10 @@ export function summarizeItems(
 export function validatePositiveCategoryTotals(
   items: Array<{ categoryId: string; amountYen: number }>,
 ): boolean {
-  const totals = new Map<string, number>();
-  for (const item of items) {
-    totals.set(item.categoryId, (totals.get(item.categoryId) ?? 0) + item.amountYen);
-  }
-  return [...totals.values()].every((amountYen) => amountYen > 0);
+  return !analyzeRegistrationAmounts(
+    undefined,
+    items.map((item) => ({ ...item, itemName: "" })),
+  ).nonPositiveCategoryTotal;
 }
 
 export type DraftForAggregation = {

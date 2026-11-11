@@ -1,3 +1,4 @@
+import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
 import { describe, expect, it } from "vitest";
 import {
   receiptTaxBasisCases,
@@ -12,7 +13,6 @@ import { buildDraftRegistrationItems } from "./registrationItems";
 import { buildReviewChecks, countActionableUncomparable } from "./reviewChecks";
 import { resolvedItem, summary } from "./reviewChecksTestHelpers";
 import { applyReviewItemsTaxPreview, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
-import { isAmountAndTaxResolved } from "./reviewJudgment";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
 
 const unverifiedStatuses = ["ambiguous", "contradictory", "reconcilable", "conflicting"] as const;
@@ -269,7 +269,7 @@ describe("呼び出し元の再解釈後の挙動", () => {
       }));
 
       expect(
-        isAmountAndTaxResolved({
+        isResolvedForTest({
           ...draft,
           items: items.map(({ id, ...item }) => ({ ...item, _id: id! })),
         }),
@@ -282,3 +282,7 @@ describe("呼び出し元の再解釈後の挙動", () => {
     },
   );
 });
+
+function isResolvedForTest(draft: Parameters<typeof judgeDraftAmountAndTax>[0]) {
+  return judgeDraftAmountAndTax(draft).status === "resolved";
+}

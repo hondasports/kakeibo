@@ -1,10 +1,10 @@
+import { judgeDraftAmountAndTax } from "../../domain/aiExpenseDrafts/draftAmountTaxJudgment";
 import { describe, expect, it, vi } from "vitest";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { ExtractedDraftItemInput } from "../../domain/aiExpenseDrafts/createFromExtraction";
 import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
-import { isAmountAndTaxResolved } from "../../domain/aiExpenseDrafts/reviewJudgment";
 import type {
   AiExpenseDraftItem,
   DraftListSummary,
@@ -502,7 +502,7 @@ describe("解析結果からの作成", () => {
       { draftId: "new-draft-id" },
     );
     expect(view?.items).toHaveLength(JUDGMENT_WINDOW);
-    const viewJudgment = isAmountAndTaxResolved({
+    const viewJudgment = isResolvedForTest({
       ...persistedDraft,
       items: view!.items.map(({ id, ...rest }) => ({ ...rest, _id: id }) as AiExpenseDraftItem),
     });
@@ -535,3 +535,7 @@ describe("解析結果からの作成", () => {
     });
   });
 });
+
+function isResolvedForTest(draft: Parameters<typeof judgeDraftAmountAndTax>[0]) {
+  return judgeDraftAmountAndTax(draft).status === "resolved";
+}

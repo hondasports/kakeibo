@@ -1,8 +1,6 @@
+import { judgeDraftAmountAndTax } from "../../../../lib/domain/aiExpenseDrafts/draftAmountTaxJudgment";
 import { describe, expect, it } from "vitest";
-import {
-  isAmountAndTaxResolved,
-  isUnrelatedToAmountTaxGuidanceId,
-} from "../../../../lib/domain/aiExpenseDrafts/reviewJudgment";
+import { isUnrelatedToAmountTaxGuidanceId } from "../../../../lib/domain/aiExpenseDrafts/reviewJudgment";
 import {
   mapDraftItemsToReviewItems,
   mapDraftToReviewForm,
@@ -338,22 +336,25 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
     } as AiExpenseDraft;
   }
 
-  it("ダイアログで解決済みの金額・税内訳は、一覧に古い理由を残さない（#997）", () => {
+  it("解決済みでも保存された理由をそのまま一覧に表示する", () => {
     const draft = summary892Draft({ listSummary: { amountAndTaxResolved: true } });
-    expect(isAmountAndTaxResolved(draft)).toBe(true);
-    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual(["user_confirmation_required"]);
-  });
-
-  it("listSummary が無い下書きは明細があっても再判定せず未解決として扱う", () => {
-    const draft = summary892Draft();
-    expect(isAmountAndTaxResolved(draft)).toBe(true);
+    expect(isResolvedForTest(draft)).toBe(true);
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
       "user_confirmation_required",
       "amount_mismatch",
     ]);
   });
 
-  it("解決済みなら保存時の明細差額を残さず、確認の優先度を上げない", () => {
+  it("listSummary が無い下書きは明細があっても再判定せず未解決として扱う", () => {
+    const draft = summary892Draft();
+    expect(isResolvedForTest(draft)).toBe(true);
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
+      "user_confirmation_required",
+      "amount_mismatch",
+    ]);
+  });
+
+  it("解決済みでも保存された明細差額を一覧に表示する", () => {
     const itemSummary = {
       itemTotalYen: 1729,
       itemDifferenceYen: 53,
@@ -365,8 +366,8 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
       summary892Draft({ itemSummary, listSummary: { amountAndTaxResolved: true } }),
       {},
     );
-    expect(resolved.itemDifferenceYen).toBe(0);
-    expect(getReviewPriority(resolved)).not.toBe(0);
+    expect(resolved.itemDifferenceYen).toBe(53);
+    expect(getReviewPriority(resolved)).toBe(0);
 
     const conflict = summary892Draft({
       itemSummary,
@@ -407,7 +408,7 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
       roleConfidence: 1,
       explicitlyPrinted: true,
     });
-    expect(isAmountAndTaxResolved(draft)).toBe(false);
+    expect(isResolvedForTest(draft)).toBe(false);
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
       "user_confirmation_required",
       "amount_mismatch",
@@ -433,6 +434,7 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
       listSummary: { amountAndTaxResolved: true },
     });
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
+      "amount_mismatch",
       "low_confidence",
       "ambiguous_category",
     ]);
@@ -466,7 +468,7 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
         categoryId: "food",
       },
     ];
-    expect(isAmountAndTaxResolved(draft)).toBe(true);
+    expect(isResolvedForTest(draft)).toBe(true);
   });
 
   it("税以外の明細不備（金額0円）が残る間は金額の理由を外さない", () => {
@@ -483,12 +485,15 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
       items: undefined,
       listSummary: { amountAndTaxResolved: true },
     });
-    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual(["user_confirmation_required"]);
+    expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
+      "user_confirmation_required",
+      "amount_mismatch",
+    ]);
   });
 
   it("保存済み判定が未解決なら明細が解決可能でも理由を残す（保存値優先）", () => {
     const draft = summary892Draft({ listSummary: { amountAndTaxResolved: false } });
-    expect(isAmountAndTaxResolved(draft)).toBe(true);
+    expect(isResolvedForTest(draft)).toBe(true);
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
       "user_confirmation_required",
       "amount_mismatch",
@@ -532,7 +537,7 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
 
     const withSaved = mapDraftToQueueItem({ ...draft, items: undefined, listSummary: saved }, {});
     expect(saved.amountAndTaxResolved).toBe(true);
-    expect(withSaved.reviewReasons).toEqual(["user_confirmation_required"]);
+    expect(withSaved.reviewReasons).toEqual(["user_confirmation_required", "amount_mismatch"]);
   });
 });
 
@@ -546,3 +551,7 @@ describe("isUnrelatedToAmountTaxGuidanceId", () => {
     }
   });
 });
+
+function isResolvedForTest(draft: Parameters<typeof judgeDraftAmountAndTax>[0]) {
+  return judgeDraftAmountAndTax(draft).status === "resolved";
+}

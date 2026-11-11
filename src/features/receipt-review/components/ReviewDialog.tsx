@@ -30,11 +30,8 @@ import {
   getReviewGuidance,
   effectiveReviewMode,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
-import {
-  buildReviewChecks,
-  countActionableUncomparable,
-} from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
-import { buildTaxContextFromReviewItem } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
+import { countActionableUncomparable } from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
+import { judgeReviewFormAmountAndTax } from "../../../../lib/domain/aiExpenseDrafts/reviewFormJudgment";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 import {
@@ -132,16 +129,13 @@ export function ReviewDialog(props: ReviewDialogProps) {
       (issue.required && issue.target !== "items" && !itemTargets.has(issue.target)),
   );
   const totalOnly = effectiveReviewMode(form) === "totalOnly";
-  const checks = buildReviewChecks({
-    items,
-    paidTotalYen,
-    taxSummaries: draft?.taxSummaries,
-    rawObservation: draft?.rawObservation,
-    receiptLineClassifications: draft?.receiptInterpretation?.values.receiptLineClassifications,
-  });
-  const unresolvedTaxItemCount = items.filter(
-    (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
-  ).length;
+  const judgment = judgeReviewFormAmountAndTax(
+    sourceDraft ?? { documentType: form.documentType, reviewReasons: [] },
+    form,
+    sourceItems,
+  );
+  const checks = judgment.checks;
+  const unresolvedTaxItemCount = judgment.unresolvedTaxItemCount;
   const basisConflictItemCount = new Set([
     ...(checks.amount.blockerCode === "basis-conflict"
       ? (checks.amount.affectedItemIds ?? [])
@@ -155,7 +149,16 @@ export function ReviewDialog(props: ReviewDialogProps) {
   ).length;
   const checkUncomparableCount = countActionableUncomparable(checks, recommendations);
   const fixCount = required.length + checkMismatchCount;
-  const recommendationCount = recommendations.length + checkUncomparableCount;
+  const recommendationCount =
+    recommendations.length +
+    checkUncomparableCount +
+    (judgment.status === "unresolved" &&
+    required.length === 0 &&
+    checkMismatchCount === 0 &&
+    recommendations.length === 0 &&
+    checkUncomparableCount === 0
+      ? 1
+      : 0);
   const busy = props.reviewSubmitting || props.taxUpdatingItemId != null;
   const unavailable = isReviewDraftLoading || isReviewDraftNotFound || categories.length === 0;
   const products = items.filter((item) => !isDiscountLine(item.itemName, item.lineType));
@@ -345,6 +348,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                 />
                 <ReviewStatusBanner
                   checks={checks}
+                  amountTaxResolved={judgment.status !== "unresolved"}
                   issues={bannerGuidance}
                   unresolvedTaxItemCount={unresolvedTaxItemCount}
                   receiptIssues={receiptGuidance}

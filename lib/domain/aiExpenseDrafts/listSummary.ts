@@ -1,7 +1,7 @@
 import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
 import { takeDraftJudgmentItems } from "./judgmentItemWindow";
-import { isAmountAndTaxResolved } from "./reviewJudgment";
+import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
 import { summarizeItems } from "./reviewItems";
 import type { AiExpenseDraftItem, DraftListSummary } from "./reviewTypes";
 
@@ -15,6 +15,7 @@ import type { AiExpenseDraftItem, DraftListSummary } from "./reviewTypes";
 export function buildDraftListSummary(
   draft: AiExpenseDraftFields,
   items: AiExpenseDraftItemFields[],
+  amountAndTaxResolved?: boolean,
 ): DraftListSummary {
   const judgmentItems = takeDraftJudgmentItems(items);
   const reviewItems: AiExpenseDraftItem[] = judgmentItems.map((item) => {
@@ -24,7 +25,8 @@ export function buildDraftListSummary(
   const judgmentDraft = { ...draft, items: reviewItems };
   const itemSummary = summarizeItems(draft, judgmentItems);
   return {
-    amountAndTaxResolved: isAmountAndTaxResolved(judgmentDraft),
+    amountAndTaxResolved:
+      amountAndTaxResolved ?? judgeDraftAmountAndTax(judgmentDraft).status === "resolved",
     ...(itemSummary === undefined ? {} : { itemSummary }),
   };
 }

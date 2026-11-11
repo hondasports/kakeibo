@@ -10,6 +10,7 @@ import type {
 } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftDocumentType } from "../../domain/aiExpenseDrafts/constants";
 import { classifyAiExpenseDraft } from "../../domain/aiExpenseDrafts/classification";
+import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
 import { judgeDraftAmountAndTax } from "../../domain/aiExpenseDrafts/draftAmountTaxJudgment";
 import { mergeReviewReasons } from "../../domain/aiExpenseDrafts/reviewReasons";
 import {
@@ -207,12 +208,12 @@ export async function updateAiExpenseDraftForReview(
     return await reconcileRegisteredDraft(updated, reinterpreted.items);
   }
 
-  const amountTaxReasons = judgeDraftAmountAndTax({
+  const amountTaxJudgment = judgeDraftAmountAndTax({
     ...currentDraft,
     items: currentItems.map((item) => ({ ...item, _id: item.id })),
-  }).reasons;
-  const reviewReasons = mergeReviewReasons(classification.reviewReasons, amountTaxReasons);
-  const statusPatch = {
+  });
+  const reviewReasons = mergeReviewReasons(classification.reviewReasons, amountTaxJudgment.reasons);
+  const statusPatchBase = {
     status: reviewReasons.length === 0 ? ("ready" as const) : ("needs_review" as const),
     receiptTotalResolution: resolveReceiptTotal({
       amountYen: args.amountYen,
@@ -225,6 +226,14 @@ export async function updateAiExpenseDraftForReview(
     }),
     reviewReasons,
     updatedAt: now,
+  };
+  const statusPatch = {
+    ...statusPatchBase,
+    listSummary: buildDraftListSummary(
+      { ...currentDraft, ...statusPatchBase },
+      currentItems,
+      amountTaxJudgment.status === "resolved",
+    ),
   };
   await deps.drafts.patch(args.draftId, statusPatch);
   currentDraft = applyRecordPatch(

@@ -328,3 +328,78 @@ it("明細なしで税の証拠があると保存と登録の両方が未解決�
   });
   expect(() => buildDraftRegistrationItems({ ...draft, ...plan.draftPatch }, [])).toThrow(/未確定/);
 });
+
+it("保存されていない割引対象は推定せず割引自身の税率で照合する", () => {
+  const draft = {
+    ...base,
+    amountYen: 198,
+    taxSummaries: [
+      {
+        taxRatePercent: 8 as const,
+        taxMode: "included" as const,
+        taxableAmountYen: 100,
+        taxableAmountBasis: "tax_included" as const,
+        taxYen: 7,
+        roundingMethod: "unknown" as const,
+        status: "verified" as const,
+        warnings: [],
+      },
+      {
+        taxRatePercent: 10 as const,
+        taxMode: "included" as const,
+        taxableAmountYen: 98,
+        taxableAmountBasis: "tax_included" as const,
+        taxYen: 9,
+        roundingMethod: "unknown" as const,
+        status: "verified" as const,
+        warnings: [],
+      },
+    ],
+    items: [
+      {
+        ...base.items![0],
+        _id: "a",
+        amountYen: 100,
+        printedAmountYen: 100,
+        normalizedAmountYen: 100,
+        taxRatePercent: 8 as const,
+        categoryId: "other",
+      },
+      {
+        ...base.items![1],
+        _id: "b",
+        amountYen: -10,
+        printedAmountYen: -10,
+        normalizedAmountYen: -10,
+        taxRatePercent: 10 as const,
+        categoryId: "other",
+      },
+      {
+        ...base.items![0],
+        _id: "c",
+        amountYen: 108,
+        printedAmountYen: 108,
+        normalizedAmountYen: 108,
+        taxRatePercent: 10 as const,
+        categoryId: "food",
+      },
+    ],
+  };
+  expect(judgeDraftAmountAndTax(draft).status).toBe("resolved");
+  expect(
+    judgeDraftAmountAndTax({
+      ...draft,
+      items: draft.items.map((item, i) =>
+        i === 1 ? { ...item, discountTargetItemId: "c" } : item,
+      ),
+    }).status,
+  ).toBe("resolved");
+  expect(
+    judgeDraftAmountAndTax({
+      ...draft,
+      items: draft.items.map((item, i) =>
+        i === 1 ? { ...item, discountTargetItemId: "a" } : item,
+      ),
+    }).status,
+  ).toBe("unresolved");
+});

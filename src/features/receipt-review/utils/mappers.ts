@@ -1,7 +1,6 @@
 import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { getImageCaptureFailureHint } from "../../../../lib/domain/aiExpenseDrafts/failure";
 import { getDraftTitle } from "../../../../lib/domain/aiExpenseDrafts/title";
-import { dropResolvedAmountTaxReasons } from "../../../../lib/domain/aiExpenseDrafts/reviewFeedback";
 import type {
   AiExpenseDraft,
   AiExpenseDraftStatus,
@@ -25,8 +24,6 @@ export function mapDraftToQueueItem(
   categories?: Array<{ _id: Id<"categories"> | string; name: string }>,
   previewImageDataUrl?: string,
 ): AiExpenseQueueItem {
-  // 保存済みサマリの判定を使う。無い下書きは未解決として扱う（一覧は明細を持たないため再判定しない）。
-  const amountAndTaxResolved = draft.listSummary?.amountAndTaxResolved ?? false;
   const categoryName = categories?.find((c) => c._id === draft.categoryId)?.name;
   const categoryAggregates = draft.itemSummary?.categoryAggregates.map((aggregate) => ({
     ...aggregate,
@@ -44,13 +41,9 @@ export function mapDraftToQueueItem(
     amountYen: draft.amountYen,
     date: draft.date,
     categoryName,
-    reviewReasons: dropResolvedAmountTaxReasons(draft.reviewReasons, amountAndTaxResolved),
+    reviewReasons: draft.reviewReasons,
     itemTotalYen: draft.itemSummary?.itemTotalYen,
-    // 解決済みなら保存時の合計との差は残さない（確認の優先度を不要に上げない）。
-    itemDifferenceYen:
-      amountAndTaxResolved && draft.itemSummary?.itemDifferenceYen !== undefined
-        ? 0
-        : draft.itemSummary?.itemDifferenceYen,
+    itemDifferenceYen: draft.itemSummary?.itemDifferenceYen,
     hasUncategorizedItems: draft.itemSummary?.hasUncategorizedItems,
     hasLowConfidenceItems: draft.itemSummary?.hasLowConfidenceItems,
     categoryAggregates,
