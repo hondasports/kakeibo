@@ -101,6 +101,7 @@ export type AiExpenseItemTaxDetails = {
 
 export type AiExpenseDraftItem = AiExpenseItemTaxDetails & {
   _id?: string;
+  discountTargetItemId?: string;
   itemName: string;
   lineType?: ReceiptItemLineType;
   amountYen: number;

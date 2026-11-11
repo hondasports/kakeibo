@@ -27,6 +27,7 @@ export function mapDraftItemsToReviewItems(
     return {
       id: item._id ?? `item-${index}`,
       persistedItemId: item._id,
+      discountTargetItemId: item.discountTargetItemId,
       itemName: item.itemName,
       lineType: item.lineType,
       amountYen: displayAmountYen.toString(),

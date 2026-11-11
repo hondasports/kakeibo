@@ -20,6 +20,7 @@ import type { ReceiptLineClassification } from "../receipt/observations";
 import type { ReceiptItemLineType } from "../receipt/discountItems";
 
 export type ReceiptDraftItemSnapshot<TCategoryId = string> = {
+  discountTargetItemIndex?: number;
   itemName: string;
   lineType?: ReceiptItemLineType;
   amountYen: number;
@@ -181,7 +182,12 @@ export type ReceiptDraftSnapshotSource<TCategoryId = string> = Omit<
 /** draft・明細からスナップショットを構築する純粋射影。 */
 export function snapshotReceiptDraftValues<TCategoryId>(
   draft: ReceiptDraftSnapshotSource<TCategoryId>,
-  items: readonly ReceiptDraftItemSnapshot<TCategoryId>[],
+  items: readonly (ReceiptDraftItemSnapshot<TCategoryId> & {
+    id?: string;
+    _id?: string;
+    discountTargetItemId?: string;
+  })[],
+  options?: { includeDiscountTargets?: boolean },
 ): ReceiptDraftValueSnapshot<TCategoryId> {
   return {
     status: draft.status,
@@ -203,6 +209,14 @@ export function snapshotReceiptDraftValues<TCategoryId>(
     warnings: draft.warnings ?? [],
     reviewReasons: draft.reviewReasons,
     items: items.map((item) => ({
+      ...(options?.includeDiscountTargets && item.discountTargetItemId
+        ? (() => {
+            const index = items.findIndex(
+              (target) => (target.id ?? target._id) === item.discountTargetItemId,
+            );
+            return index < 0 ? {} : { discountTargetItemIndex: index };
+          })()
+        : {}),
       itemName: item.itemName,
       lineType: item.lineType,
       amountYen: item.amountYen,

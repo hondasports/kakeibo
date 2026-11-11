@@ -170,3 +170,22 @@ export function prepareReviewItemsForSubmit(items: ReviewItemValues[], receiptCa
     ),
   );
 }
+
+export function clearDiscountTargetsForItem(items: ReviewItemValues[], itemId: string) {
+  return items.map((item) =>
+    item.discountTargetItemId === itemId
+      ? { ...item, categoryId: "", discountTargetItemId: undefined }
+      : item,
+  );
+}
+
+export function getReviewDiscountTargetForSubmit(
+  items: ReviewItemValues[],
+  item: ReviewItemValues,
+) {
+  if (!item.discountTargetItemId || isProductItem(item)) return null;
+  const itemIndex = items.findIndex((target) => target.id === item.discountTargetItemId);
+  const target = items[itemIndex];
+  if (!target || !isProductItem(target)) return null;
+  return target.persistedItemId ? { itemId: target.persistedItemId } : { itemIndex };
+}

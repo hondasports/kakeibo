@@ -9,7 +9,10 @@ import type {
   ReviewItemValues,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueuePanelProps } from "../../../types/aiExpenseQueue";
-import { prepareReviewItemsForSubmit } from "../../../../lib/domain/aiExpenseDrafts/reviewItemCategories";
+import {
+  getReviewDiscountTargetForSubmit,
+  prepareReviewItemsForSubmit,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewItemCategories";
 import { formatReviewSaveMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewFeedback";
 
 export function useReviewSubmit({
@@ -145,6 +148,10 @@ export function useReviewSubmit({
             ...(item.persistedItemId
               ? { itemId: item.persistedItemId as Id<"aiExpenseDraftItems"> }
               : {}),
+            discountTarget: getReviewDiscountTargetForSubmit(submittedItems, item) as
+              | { itemId: Id<"aiExpenseDraftItems"> }
+              | { itemIndex: number }
+              | null,
             itemName: item.itemName.trim(),
             confirmedTaxRatePercent: item.confirmedTaxRatePercent,
             lineType: item.lineType,

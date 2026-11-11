@@ -38,10 +38,11 @@ export async function resetReceiptToAiInterpretation(
   const now = Date.now();
   const insertedItems: AiExpenseDraftItemFields[] = [];
   for (const item of values.items) {
+    const { discountTargetItemIndex: _targetIndex, ...itemValues } = item;
     const itemFields: Omit<AiExpenseDraftItemFields, "id" | "creationTime"> = {
       groupId: ctx.groupId,
       draftId: args.draftId,
-      ...item,
+      ...itemValues,
       createdAt: now,
       updatedAt: now,
     };

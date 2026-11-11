@@ -28,7 +28,7 @@ export function snapshotReceiptDraftValues(
   draft: Doc<"aiExpenseDrafts">,
   items: Doc<"aiExpenseDraftItems">[],
 ): ReceiptDraftValueSnapshot<Id<"categories">> {
-  return snapshotReceiptDraftValuesDomain(draft, items);
+  return snapshotReceiptDraftValuesDomain(draft, items, { includeDiscountTargets: true });
 }
 
 export async function persistReceiptUserOverrideSnapshot(
