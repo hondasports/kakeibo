@@ -69,7 +69,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.5",
     "chrome-devtools-mcp": "^1.12.0",
-    "clerk": "^3.4.1",
+    "clerk": "^4.1.0",
     "convex-test": "0.0.56",
     "dotenv": "^18.0.5",
     "husky": "^9.1.7",
