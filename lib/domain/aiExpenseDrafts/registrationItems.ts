@@ -82,7 +82,7 @@ export function buildDraftRegistrationItems(
       reviewReasons: [],
       items: items.map((item) => ({ ...item, _id: item.id })),
     },
-    { itemScope: "all_items", taxVerification: "stored_amounts" },
+    { itemScope: "all_items" },
   );
   if (judgment.status === "unresolved" && judgment.taxRegistrationBlocked) {
     throw new Error(

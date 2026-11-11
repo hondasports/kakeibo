@@ -1,4 +1,5 @@
 import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
+import { buildDraftRegistrationItems } from "./registrationItems";
 import { describe, expect, it } from "vitest";
 import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
@@ -47,11 +48,19 @@ function fixtureFields(overrides: Partial<AiExpenseDraftFields> = {}): {
 }
 
 describe("buildDraftListSummary", () => {
-  it("金額・税内訳が解決済みなら amountAndTaxResolved=true と itemSummary を返す", () => {
+  it("保存登録額の合計が異なる下書きは一覧でも登録時も未解決になる", () => {
+    const { draft, items } = fixtureFields();
+    expect(buildDraftListSummary(draft, items)).toMatchObject({
+      amountAndTaxResolved: false,
+      itemSummary: { itemTotalYen: 1729, itemDifferenceYen: 53 },
+    });
+    expect(() => buildDraftRegistrationItems(draft, items)).toThrow();
+  });
+  it("保存された金額に差があれば未解決と itemSummary を返す", () => {
     const { draft, items } = fixtureFields();
 
     expect(buildDraftListSummary(draft, items)).toEqual({
-      amountAndTaxResolved: true,
+      amountAndTaxResolved: false,
       itemSummary: {
         itemTotalYen: 1729,
         itemDifferenceYen: 53,
@@ -72,7 +81,7 @@ describe("buildDraftListSummary", () => {
     expect(buildDraftListSummary(draft, items).amountAndTaxResolved).toBe(
       isResolvedForTest(reviewDraft),
     );
-    expect(isResolvedForTest(reviewDraft)).toBe(true);
+    expect(isResolvedForTest(reviewDraft)).toBe(false);
   });
 
   it("税率衝突などの真の不一致は未解決になる", () => {

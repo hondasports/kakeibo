@@ -285,7 +285,7 @@ it("判定窓と全件の対象範囲を明示的に選べる", () => {
   });
 });
 
-it("保存額の検証を選ぶと再計算額と異なる保存済み金額を拒否する", () => {
+it("保存値は再計算額と異なる保存済み金額を拒否する", () => {
   const draft = {
     ...base,
     items: base.items!.map((item, index) =>
@@ -294,11 +294,10 @@ it("保存額の検証を選ぶと再計算額と異なる保存済み金額を�
   };
   const interpreted = judgeDraftAmountAndTax(draft, {
     itemScope: "all_items",
-    taxVerification: "interpretation",
+    inputKind: "form",
   });
   const stored = judgeDraftAmountAndTax(draft, {
     itemScope: "all_items",
-    taxVerification: "stored_amounts",
   });
   expect(interpreted.status).toBe("resolved");
   expect(stored).toMatchObject({
@@ -414,7 +413,6 @@ it.each(legacyCases)(
     >[0];
     const judgment = judgeDraftAmountAndTax(saved, {
       itemScope: "all_items",
-      taxVerification: "stored_amounts",
     });
     expect(judgment.status).toBe("resolved");
     expect(() =>

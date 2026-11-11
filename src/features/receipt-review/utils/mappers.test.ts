@@ -336,9 +336,9 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
     } as AiExpenseDraft;
   }
 
-  it("解決済みでも保存された理由をそのまま一覧に表示する", () => {
+  it("保存済み解決フラグがあっても理由をそのまま一覧に表示する", () => {
     const draft = summary892Draft({ listSummary: { amountAndTaxResolved: true } });
-    expect(isResolvedForTest(draft)).toBe(true);
+    expect(isResolvedForTest(draft)).toBe(false);
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
       "user_confirmation_required",
       "amount_mismatch",
@@ -347,7 +347,7 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
 
   it("listSummary が無い下書きは明細があっても再判定せず未解決として扱う", () => {
     const draft = summary892Draft();
-    expect(isResolvedForTest(draft)).toBe(true);
+    expect(isResolvedForTest(draft)).toBe(false);
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
       "user_confirmation_required",
       "amount_mismatch",
@@ -440,7 +440,7 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
     ]);
   });
 
-  it("割引対象を推論してから照合する（ダイアログと同じ初期化）", () => {
+  it("割引行があっても保存額の不一致は未解決になる", () => {
     const draft = summary892Draft();
     draft.items = [
       ...(draft.items ?? []),
@@ -468,7 +468,7 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
         categoryId: "food",
       },
     ];
-    expect(isResolvedForTest(draft)).toBe(true);
+    expect(isResolvedForTest(draft)).toBe(false);
   });
 
   it("税以外の明細不備（金額0円）が残る間は金額の理由を外さない", () => {
@@ -491,16 +491,16 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
     ]);
   });
 
-  it("保存済み判定が未解決なら明細が解決可能でも理由を残す（保存値優先）", () => {
+  it("保存済み判定が未解決なら理由を残す（保存値優先）", () => {
     const draft = summary892Draft({ listSummary: { amountAndTaxResolved: false } });
-    expect(isResolvedForTest(draft)).toBe(true);
+    expect(isResolvedForTest(draft)).toBe(false);
     expect(mapDraftToQueueItem(draft, {}).reviewReasons).toEqual([
       "user_confirmation_required",
       "amount_mismatch",
     ]);
   });
 
-  it("一覧の保存値と確認画面の判定が同じ入力で一致する（#997）", () => {
+  it("一覧の保存値と保存明細の判定が同じ入力で一致する（#997）", () => {
     const draft = summary892Draft();
     const draftFields: AiExpenseDraftFields = {
       id: draft._id,
@@ -536,7 +536,7 @@ describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
     const saved = buildDraftListSummary(draftFields, itemFields);
 
     const withSaved = mapDraftToQueueItem({ ...draft, items: undefined, listSummary: saved }, {});
-    expect(saved.amountAndTaxResolved).toBe(true);
+    expect(saved.amountAndTaxResolved).toBe(false);
     expect(withSaved.reviewReasons).toEqual(["user_confirmation_required", "amount_mismatch"]);
   });
 });

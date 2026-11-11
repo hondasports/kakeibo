@@ -4,6 +4,13 @@ import { makeFunctionReference } from "convex/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
+import { mixedTaxReviewFixture } from "../lib/domain/aiExpenseDrafts/reviewTaxPreviewTestHelpers";
+import {
+  draftDocToFields,
+  draftItemDocToFields,
+} from "../lib/convex/aiExpenseDrafts/draftRecordMapping";
+import { buildDraftListSummary } from "../lib/domain/aiExpenseDrafts/listSummary";
+import { buildDraftRegistrationItems } from "../lib/domain/aiExpenseDrafts/registrationItems";
 
 const dryRun = makeFunctionReference<"query">("aiExpenseDraftAmountTaxMigration:dryRun");
 const execute = makeFunctionReference<"mutation">("aiExpenseDraftAmountTaxMigration:executeBatch");
@@ -11,6 +18,76 @@ const execute = makeFunctionReference<"mutation">("aiExpenseDraftAmountTaxMigrat
 describe("金額差異の移行", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
+  it("再計算額だけが一致する保存済み混在税では差異を外さない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const fixture = mixedTaxReviewFixture();
+    const id = await t.run(async ({ db }) => {
+      const groupId = await db.insert("groups", {
+        name: "a",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const categoryId = await db.insert("categories", {
+        groupId,
+        name: "food",
+        color: "#000",
+        isActive: true,
+        sortOrder: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const draftId = await db.insert("aiExpenseDrafts", {
+        groupId,
+        status: "needs_review",
+        sourceType: "image_upload",
+        documentType: "receipt",
+        shopName: "店",
+        date: "2026-11-01",
+        amountYen: 1782,
+        categoryId,
+        taxSummaries: fixture.draft.taxSummaries?.map((s) => ({ ...s, confidence: {} })),
+        rawObservation: fixture.draft.rawObservation,
+        reviewReasons: ["amount_mismatch"],
+        confidence: {},
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      for (const item of fixture.items)
+        await db.insert("aiExpenseDraftItems", {
+          groupId,
+          draftId,
+          itemName: item.itemName,
+          amountYen: Number(item.amountYen),
+          printedAmountYen: item.printedAmountYen,
+          amountBasis: item.amountBasis,
+          taxRatePercent: item.taxRatePercent,
+          taxResolutionStatus: item.taxResolutionStatus,
+          taxResolutionSource: item.taxResolutionSource,
+          categoryId,
+          confidence: {},
+          createdAt: 1,
+          updatedAt: 1,
+        });
+      return draftId;
+    });
+    const before = await t.run(async ({ db }) => ({
+      draft: (await db.get(id))!,
+      items: await db
+        .query("aiExpenseDraftItems")
+        .withIndex("by_draft_id", (q) => q.eq("draftId", id))
+        .collect(),
+    }));
+    const draft = draftDocToFields(before.draft);
+    const items = before.items.map(draftItemDocToFields);
+    expect(buildDraftListSummary(draft, items)).toMatchObject({
+      amountAndTaxResolved: false,
+      itemSummary: { itemDifferenceYen: 53 },
+    });
+    expect(() => buildDraftRegistrationItems(draft, items)).toThrow();
+    expect(await t.mutation(execute, {})).toMatchObject({ updated: 0 });
+    expect(await t.run(({ db }) => db.get(id))).toEqual(before.draft);
+  });
   it("解決済みの理由だけを除去し、対象外・他グループ・未解決を守り冪等に実行する", async () => {
     const t = convexTest(schema, convexTestModules);
     const ids = await t.run(async ({ db }) => {
@@ -130,7 +207,7 @@ describe("金額差異の移行", () => {
     expect(after[0]).toMatchObject({
       status: "ready",
       reviewReasons: [],
-      listSummary: { amountAndTaxResolved: true },
+      listSummary: { amountAndTaxResolved: true, itemSummary: { itemDifferenceYen: 0 } },
       updatedAt: 1,
     });
     expect(after[1]).toMatchObject({ status: "needs_review", reviewReasons: ["low_confidence"] });

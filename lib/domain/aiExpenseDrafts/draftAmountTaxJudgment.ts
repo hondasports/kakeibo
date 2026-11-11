@@ -73,7 +73,7 @@ export function judgeDraftAmountAndTax(
   draft: AiExpenseDraftJudgmentInput,
   options: {
     itemScope?: "judgment_window" | "all_items";
-    taxVerification?: "interpretation" | "stored_amounts";
+    inputKind?: "stored" | "form";
     interpretation?: ReceiptTaxInterpretation;
   } = {},
 ): DraftAmountTaxJudgment {
@@ -126,11 +126,13 @@ export function judgeDraftAmountAndTax(
   });
   const arithmetic = analyzeRegistrationAmounts(
     draft.amountYen,
-    preview.items.map((item) => ({
-      ...item,
-      amountYen: Number(item.amountYen),
-      categoryId: item.categoryId || undefined,
-    })),
+    options.inputKind === "form"
+      ? preview.items.map((item) => ({
+          ...item,
+          amountYen: Number(item.amountYen),
+          categoryId: item.categoryId || undefined,
+        }))
+      : draftItems,
   );
   const amountError =
     validation.some((issue) => issue.code === "itemName" || issue.code === "itemAmount") ||
@@ -178,7 +180,7 @@ export function judgeDraftAmountAndTax(
     });
     currentInterpretation ??= interpretation;
     storedTaxMismatch =
-      options.taxVerification === "stored_amounts" &&
+      options.inputKind !== "form" &&
       (interpretation.taxSummaries.some((summary) => summary.status !== "verified") ||
         itemFields.some(
           (item, index) =>

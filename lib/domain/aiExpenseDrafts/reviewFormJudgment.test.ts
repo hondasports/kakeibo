@@ -84,11 +84,14 @@ it("保存済み明細の印字額と編集額を置換時と同じ方法で判�
   });
   expect(replacement.success).toBe(true);
   if (!replacement.success) return;
-  const server = judgeDraftAmountAndTax({
-    ...draft,
-    amountYen: 110,
-    categoryId: "food",
-    items: [{ ...replacement.fields, _id: "saved" }],
-  });
+  const server = judgeDraftAmountAndTax(
+    {
+      ...draft,
+      amountYen: 110,
+      categoryId: "food",
+      items: [{ ...replacement.fields, _id: "saved" }],
+    },
+    { inputKind: "form" },
+  );
   expect(judgeReviewFormAmountAndTax(draft, formWithTotal, [row])).toEqual(server);
 });

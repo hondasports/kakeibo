@@ -506,8 +506,8 @@ describe("解析結果からの作成", () => {
       ...persistedDraft,
       items: view!.items.map(({ id, ...rest }) => ({ ...rest, _id: id }) as AiExpenseDraftItem),
     });
-    // 先頭100件では解決済み・101件目を含めると未解決になる入力であること（偽の一致を防ぐ）。
-    expect(viewJudgment).toBe(true);
+    // 保存額は再解釈前の税抜額なので、表示用の再計算額が一致しても未解決。
+    expect(viewJudgment).toBe(false);
     expect(saved.amountAndTaxResolved).toBe(viewJudgment);
   });
 

@@ -32,6 +32,7 @@ import {
 } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
 import { countActionableUncomparable } from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
 import { judgeReviewFormAmountAndTax } from "../../../../lib/domain/aiExpenseDrafts/reviewFormJudgment";
+import { isUnrelatedToAmountTaxGuidanceId } from "../../../../lib/domain/aiExpenseDrafts/reviewJudgment";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 import {
@@ -124,11 +125,6 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");
   const specificGuidance = guidance.filter((issue) => issue.scope !== "receipt");
   const itemTargets = new Set(items.map((item) => item.id));
-  const bannerGuidance = specificGuidance.filter(
-    (issue) =>
-      issue.taxSummaryIndex !== undefined ||
-      (issue.required && issue.target !== "items" && !itemTargets.has(issue.target)),
-  );
   const totalOnly = effectiveReviewMode(form) === "totalOnly";
   const judgment = judgeReviewFormAmountAndTax(
     {
@@ -139,6 +135,16 @@ export function ReviewDialog(props: ReviewDialogProps) {
     sourceItems,
   );
   const checks = judgment.checks;
+  const matchedButUnresolved =
+    judgment.status === "unresolved" &&
+    checks.amount.status === "matched" &&
+    checks.taxRate.status === "matched";
+  const bannerGuidance = specificGuidance.filter(
+    (issue) =>
+      issue.taxSummaryIndex !== undefined ||
+      (issue.required && issue.target !== "items" && !itemTargets.has(issue.target)) ||
+      (matchedButUnresolved && !isUnrelatedToAmountTaxGuidanceId(issue.id)),
+  );
   const unresolvedTaxItemCount = judgment.unresolvedTaxItemCount;
   const basisConflictItemCount = new Set([
     ...(checks.amount.blockerCode === "basis-conflict"
@@ -153,16 +159,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
   ).length;
   const checkUncomparableCount = countActionableUncomparable(checks, recommendations);
   const fixCount = required.length + checkMismatchCount;
-  const recommendationCount =
-    recommendations.length +
-    checkUncomparableCount +
-    (judgment.status === "unresolved" &&
-    required.length === 0 &&
-    checkMismatchCount === 0 &&
-    recommendations.length === 0 &&
-    checkUncomparableCount === 0
-      ? 1
-      : 0);
+  const recommendationCount = recommendations.length + checkUncomparableCount;
   const busy = props.reviewSubmitting || props.taxUpdatingItemId != null;
   const unavailable = isReviewDraftLoading || isReviewDraftNotFound || categories.length === 0;
   const products = items.filter((item) => !isDiscountLine(item.itemName, item.lineType));
