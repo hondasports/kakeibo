@@ -1709,13 +1709,13 @@ ready / needs_review の下書き一覧は明細読み取り（N+1）を避け�
 
 #### 下書きの金額差異理由の再計算（一回限りの内部 migration）
 
-`convex/aiExpenseDraftAmountTaxMigration.ts` は `ready` / `needs_review` の全下書きについて、`judgeDraftAmountAndTax` と `buildDraftListSummary` で一覧サマリを再計算し、保存値と異なる場合は更新する。加えて `amount_mismatch` を持ち正本で解決済みの下書きだけ、その理由を除き、残る理由の有無で status を決める。両者が該当する場合は同じ書き込みで更新する。未解決の理由なし下書きには `amount_mismatch` を追加しない。税未確定は金額差異を意味しないためである。ほかの理由、明細、金額、税値、`updatedAt` と対象外 status は変更しない。下書きに対応する同一グループの明細を作成順に最大100件読み、テーブルを25件ずつ cursor で走査する。`executeBatch` は自己再スケジュールし、再実行しても同じ結果になる。支出は作成しない。既存 `aiExpenseDraftListSummaryMigration` は未設定だけを補完するため、保存済みの古いサマリの更新には使えない。
+`convex/aiExpenseDraftAmountTaxMigration.ts` は `ready` / `needs_review` の全下書きについて、`judgeDraftAmountAndTax` と `buildDraftListSummary` で一覧サマリを再計算し、保存値と異なる場合は更新する。加えて明細が100件以下で `amount_mismatch` を持ち正本で解決済みの下書きだけ、その理由を除き、残る理由の有無で status を決める。101件以上では理由と status を変更しない。両者が該当する場合は同じ書き込みで更新する。未解決の理由なし下書きには `amount_mismatch` を追加しない。税未確定は金額差異を意味しないためである。ほかの理由、明細、金額、税値、`updatedAt` と対象外 status は変更しない。下書きに対応する同一グループの明細を作成順に最大101件読み、判定とサマリには先頭100件を使い、101件目は理由除去の見送り判定に使う。テーブルを25件ずつ cursor で走査する。`executeBatch` は自己再スケジュールし、再実行しても同じ結果になる。支出は作成しない。既存 `aiExpenseDraftListSummaryMigration` は未設定だけを補完するため、保存済みの古いサマリの更新には使えない。
 
 運用前に非本番で以下を確認する。本番操作は対象 deployment と操作の明示承認を得た運用者が行う。復旧に備え、実行前に対象 deployment のバックアップを取得し、対象・時刻・検証結果を記録する。バックアップの取得や復元も別途承認した手順で行う。
 
-1. `pnpm exec convex run aiExpenseDraftAmountTaxMigration:dryRun '{}'` を実行し、`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` を渡して続行する。全ページの `needsReasonRemoval`（理由を外す件数）と `needsSummaryOnly`（理由を変更せずサマリだけを更新する件数）の合計を確認する。`needsUpdate` は両者の合計である。
-2. 件数が妥当と確認できたら `pnpm exec convex run aiExpenseDraftAmountTaxMigration:executeBatch '{}'` を1回実行し、最終ページの `done=true` と `reasonRemoved` / `summaryUpdatedOnly` をログで確認する。
-3. 再び `dryRun` を全ページ実行し、`needsReasonRemoval` と `needsSummaryOnly` の合計がそれぞれ0であることを確認する。並行更新がある場合はその影響も調査する。
+1. `pnpm exec convex run aiExpenseDraftAmountTaxMigration:dryRun '{}'` を実行し、`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` を渡して続行する。全ページの `needsReasonRemoval`（理由を外す件数）と `needsSummaryOnly`（理由を変更せずサマリだけを更新する件数）の合計を確認する。`needsUpdate` は両者の合計である。`reasonRemovalSkippedOverLimit` は、先頭100件では理由を外せるが101件目があるため見送る件数で、サマリ更新の有無を問わず計上する。
+2. 件数が妥当と確認できたら `pnpm exec convex run aiExpenseDraftAmountTaxMigration:executeBatch '{}'` を1回実行し、最終ページのログの `done=true` と `reasonRemoved` / `summaryUpdatedOnly` を確認する（戻り値は `isDone`）。
+3. 再び `dryRun` を全ページ実行し、`needsReasonRemoval` と `needsSummaryOnly` の合計がそれぞれ0であることを確認する。`reasonRemovalSkippedOverLimit` は残るため、件数と対象の扱いを別途確認する。並行更新がある場合はその影響も調査する。
 
 コードの revert だけでは書き込み済みデータは戻らない。問題があればバッチの継続と関係する書き込みを止め、実行前バックアップと実行後の変更を照合する。以後の利用者編集を上書きしないよう個別の復旧対象と方法を決め、承認を得て復旧する。理由の一律再追加は、元から理由のない下書きと区別できないため行わない。
 

@@ -77,7 +77,7 @@ export async function persistReceiptUserOverrideSnapshot(
   // 一覧用の保存サマリは override 適用後の下書きと明細から計算して同じ patch に載せる。
   const state = buildDraftReviewState(
     draftDocToFields(updatedDraft),
-    items.map(draftItemDocToFields),
+    args.items ?? items.map(draftItemDocToFields),
     { reasons: updatedDraft.reviewReasons },
   );
   const reviewPatch =
