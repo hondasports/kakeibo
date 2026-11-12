@@ -10,6 +10,8 @@ import { useReviewDraftSelection } from "./useReviewDraftSelection";
 import { useReviewFormState } from "./useReviewFormState";
 import { useReviewSubmit } from "./useReviewSubmit";
 import { useReviewTaxOverrides } from "./useReviewTaxOverrides";
+import { isDraftWithItems } from "../utils/mappers";
+import { useState } from "react";
 
 export function useReviewDialog({
   initialReviewDrafts,
@@ -28,6 +30,9 @@ export function useReviewDialog({
     initialReviewDrafts,
     initialReviewDraftItems,
   });
+  const [taxPersistedItems, setTaxPersistedItems] = useState<
+    { draftId: string; items: AiExpenseDraftItem[] } | undefined
+  >();
 
   const formState = useReviewFormState({
     selectedReviewDraftId: draftSelection.selectedReviewDraftId,
@@ -49,8 +54,9 @@ export function useReviewDialog({
     setReviewForm: formState.setReviewForm,
   });
 
-  const handleTaxDraftUpdate = (draft: AiExpenseDraft) => {
+  const handleTaxDraftUpdate = (draft: AiExpenseDraft, items: AiExpenseDraftItem[]) => {
     draftSelection.setReviewDraftOverride(draft);
+    setTaxPersistedItems({ draftId: draft._id, items });
   };
 
   const taxOverrides = useReviewTaxOverrides({
@@ -62,6 +68,7 @@ export function useReviewDialog({
   });
 
   const handleOpenReview = (itemId: string) => {
+    setTaxPersistedItems(undefined);
     draftSelection.setReviewDraftOverride(null);
     draftSelection.setSelectedReviewDraftId(itemId);
     formState.prepareForDraft();
@@ -73,14 +80,24 @@ export function useReviewDialog({
       return;
     }
     draftSelection.clearSelection();
+    setTaxPersistedItems(undefined);
     formState.resetForm();
     submit.clearReviewError();
   };
 
+  const persistedItems =
+    (taxPersistedItems?.draftId === draftSelection.selectedReviewDraftId
+      ? taxPersistedItems.items
+      : undefined) ??
+    draftSelection.localReviewItems ??
+    (isDraftWithItems(draftSelection.selectedReviewDraftDetails)
+      ? draftSelection.selectedReviewDraftDetails.items
+      : undefined);
   return {
     selectedReviewDraftId: draftSelection.selectedReviewDraftId,
     initializedReviewDraftId: formState.initializedReviewDraftId,
     selectedReviewDraft: draftSelection.selectedReviewDraft,
+    persistedReviewItems: persistedItems,
     isReviewDraftLoading: draftSelection.isReviewDraftLoading,
     isReviewDraftNotFound: draftSelection.isReviewDraftNotFound,
     reviewForm: formState.reviewForm,

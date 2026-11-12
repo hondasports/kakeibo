@@ -20,6 +20,7 @@ export type AiExpenseDraftItemFields = {
   draftId: string;
   itemName: string;
   lineType?: ReceiptItemLineType;
+  discountTargetItemId?: string;
   amountYen: number;
   printedAmountYen?: number;
   amountBasis?: AmountBasis;
@@ -52,6 +53,7 @@ export type AiExpenseDraftItemFields = {
 export type DraftReviewItemInput = {
   confirmedTaxRatePercent?: TaxRatePercent | null;
   itemId?: string;
+  discountTarget?: { itemId: string } | { itemIndex: number } | null;
   itemName: string;
   lineType?: ReceiptItemLineType;
   amountYen: number;

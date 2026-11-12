@@ -56,7 +56,7 @@ export type AiExpenseDraft = {
   registrationMode?: AiExpenseRegistrationMode;
   derivedRegistration?: DerivedRegistrationSnapshot;
   markerDefinitions?: Array<{ marker: string; description: string }>;
-  /** 金額・税内訳判定の入力となる明細。一覧の取得では付与せず、判定（isAmountAndTaxResolved / buildDraftListSummary）で使う。 */
+  /** 金額・税内訳判定の入力となる明細。一覧の取得では付与せず、判定（judgeDraftAmountAndTax / buildDraftListSummary）で使う。 */
   items?: AiExpenseDraftItem[];
   itemSummary?: ItemSummary;
   /** 一覧用に永続化された判定サマリ。無い下書きは一覧で未解決として扱う（明細から再判定しない）。 */
@@ -69,7 +69,7 @@ export type AiExpenseDraft = {
  * 全書き込み経路で最新化する（組み立ては buildDraftListSummary だけが担う）。
  */
 export type DraftListSummary = {
-  /** 金額・税内訳が解決済みか（isAmountAndTaxResolved と同じ入力・同じ結果）。 */
+  /** 金額・税内訳が解決済みか（judgeDraftAmountAndTax と同じ入力・同じ結果）。 */
   amountAndTaxResolved: boolean;
   /** 明細集計（summarizeItems と同じ。明細0件なら省略）。 */
   itemSummary?: ItemSummary;
@@ -101,6 +101,7 @@ export type AiExpenseItemTaxDetails = {
 
 export type AiExpenseDraftItem = AiExpenseItemTaxDetails & {
   _id?: string;
+  discountTargetItemId?: string;
   itemName: string;
   lineType?: ReceiptItemLineType;
   amountYen: number;

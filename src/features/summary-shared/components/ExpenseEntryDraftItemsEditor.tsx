@@ -3,7 +3,10 @@ import { useEffect } from "react";
 import { Button, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import { useQuery } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { sanitizeSignedYenInput } from "../../../../lib/domain/receipt/discountItems";
+import {
+  sanitizeSignedYenInput,
+  type ReceiptItemLineType,
+} from "../../../../lib/domain/receipt/discountItems";
 
 export type CategoryOption = {
   _id: string;
@@ -13,6 +16,7 @@ export type CategoryOption = {
 export type EditableDraftItem = {
   itemId?: Id<"aiExpenseDraftItems">;
   itemName: string;
+  lineType?: ReceiptItemLineType;
   amountYen: string;
   categoryId: string;
 };
@@ -33,6 +37,7 @@ export function DraftItemsLoader({
       (draftDetails?.items ?? []).map((item) => ({
         itemId: item._id,
         itemName: item.itemName,
+        lineType: item.lineType,
         amountYen: String(item.printedAmountYen ?? item.normalizedAmountYen ?? item.amountYen),
         categoryId: item.categoryId ?? "",
       })),
@@ -97,6 +102,7 @@ export function DraftItemsEditor({
                           amountYen: sanitizeSignedYenInput(
                             currentItem.itemName,
                             event.target.value,
+                            currentItem.lineType,
                           ),
                         }
                       : currentItem,

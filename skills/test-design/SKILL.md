@@ -1,6 +1,6 @@
 ---
 name: test-design
-description: 振る舞いの変更やテストの追加・修正・見直しで、unit・component・server結合・E2Eの役割とシナリオ、依存の置き換えを決める。
+description: 振る舞いの変更に伴うテスト設計、テストの追加・修正・削除・統合・見直し、テストの選定・実行範囲の変更で使う。unit・component・server結合・E2Eの役割とシナリオ、依存の置き換えを決める。
 license: Apache-2.0
 ---
 

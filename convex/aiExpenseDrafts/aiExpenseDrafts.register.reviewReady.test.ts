@@ -59,6 +59,44 @@ describe("aiExpenseDrafts (register) (review ready flow)", () => {
     );
   });
 
+  it("明細を省略して保存しても保存済み明細の不一致を確認対象にする", async () => {
+    const ctx = createMutationCtx(createIdentity(), {
+      getDocById: {
+        "draft-owned": ownedDraft,
+        "cat-food": { groupId: GROUP_ID, isActive: true },
+      },
+      items: [
+        {
+          _id: "old-item-1",
+          _creationTime: 1,
+          groupId: GROUP_ID,
+          draftId: "draft-owned",
+          itemName: "商品",
+          amountYen: 100,
+          categoryId: "cat-food",
+          confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    });
+    await updateForReviewHandler(ctx, {
+      draftId: "draft-owned" as Id<"aiExpenseDrafts">,
+      documentType: "receipt",
+      shopName: "店",
+      date: "2026-06-02",
+      amountYen: 101,
+      categoryId: "cat-food" as Id<"categories">,
+    });
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "draft-owned",
+      expect.objectContaining({
+        status: "needs_review",
+        reviewReasons: expect.arrayContaining(["amount_mismatch"]),
+      }),
+    );
+  });
+
   it("確認下書きの明細を置き換えて登録準備OKへ戻す", async () => {
     const ctx = createMutationCtx(createIdentity(), {
       getDocById: {
@@ -191,6 +229,49 @@ describe("aiExpenseDrafts (register) (review ready flow)", () => {
         categoryId: "cat-daily",
       }),
     );
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "draft-owned",
+      expect.objectContaining({ status: "ready", reviewReasons: [] }),
+    );
+  });
+
+  it("品名に割引の語が無くても、行種別が割引の明細は負数のまま登録準備OKにする", async () => {
+    const ctx = createMutationCtx(createIdentity(), {
+      getDocById: {
+        "draft-owned": ownedDraft,
+        "cat-daily": {
+          groupId: GROUP_ID,
+          isActive: true,
+        },
+      },
+      insertedIds: ["new-item-1", "new-item-2"],
+    });
+
+    await updateForReviewHandler(ctx, {
+      draftId: "draft-owned" as Id<"aiExpenseDrafts">,
+      documentType: "receipt",
+      shopName: "ホームセンター",
+      date: "2026-11-08",
+      amountYen: 165,
+      categoryId: "cat-daily" as Id<"categories">,
+      items: [
+        {
+          itemName: "ポリ袋",
+          lineType: "item",
+          amountYen: 179,
+          categoryId: "cat-daily" as Id<"categories">,
+          confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+        },
+        {
+          itemName: "特売",
+          lineType: "discount",
+          amountYen: -14,
+          categoryId: "cat-daily" as Id<"categories">,
+          confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+        },
+      ],
+    });
+
     expect(ctx.db.patch).toHaveBeenCalledWith(
       "draft-owned",
       expect.objectContaining({ status: "ready", reviewReasons: [] }),

@@ -1,16 +1,4 @@
-import {
-  resolveReceiptTotalSource,
-  resolveReceiptTotalSupportingCandidates,
-} from "./receiptTotalEvidence";
-import { resolveReceiptTaxCorrections } from "./receiptDataContract";
-/**
- * 下書き → 支出エントリ/レシート登録用の明細構築に関するドメイン知識。
- * totalOnly 時の合計確認・税解釈の確定状態の検証を行う。
- * 失敗時は Error を投げる（ユースケース層で ConvexError へ変換する）。
- */
-import { reinterpretDraftTax } from "../receipt/tax/reinterpretDraftTax";
-import { hasReceiptTaxMetadata, mapDraftItemToTaxFields } from "../receipt/tax/draftTaxMapping";
-import type { ExtractedTaxSummary, ReceiptMarkerDefinition } from "../receipt/tax/types";
+import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
 import type { AiExpenseRegistrationMode } from "./receiptDataContract";
 import { resolveReceiptShopNameFromDraft } from "./shopName";
 import { aggregateDraftItemsByCategory, getDraftItemAggregationErrorMessage } from "./reviewItems";
@@ -87,36 +75,19 @@ export function buildDraftRegistrationItems(
       },
     ];
   }
-  if (hasReceiptTaxMetadata(draft, items)) {
-    const { itemFields, interpretation } = reinterpretDraftTax({
-      receiptTotalSource: resolveReceiptTotalSource(draft),
-      receiptTotalSupportingCandidates: resolveReceiptTotalSupportingCandidates(draft),
-      amountYen: draft.amountYen!,
-      receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
-      items: items.map(mapDraftItemToTaxFields),
-      rawObservationLines:
-        draft.rawObservation?.source === "ai_ocr" ? draft.rawObservation.lines : undefined,
-      taxSummaries: (draft.taxSummaries ?? []) as ExtractedTaxSummary[],
-      sourceTaxSummaries: draft.receiptInterpretation?.values.taxSummaries,
-      correctedTaxSummaries: resolveReceiptTaxCorrections(
-        draft.receiptUserOverride,
-        draft.receiptInterpretation?.values.taxSummaries,
-      ),
-      markerDefinitions: draft.markerDefinitions as ReceiptMarkerDefinition[] | undefined,
-    });
-    if (
-      interpretation.taxSummaries.some((summary) => summary.status !== "verified") ||
-      itemFields.some(
-        (item, index) =>
-          item.taxAllocationStatus !== "allocated" ||
-          item.normalizedAmountYen !== (items[index].normalizedAmountYen ?? items[index].amountYen),
-      ) ||
-      itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0) !== draft.amountYen
-    ) {
-      throw new Error(
-        "税額または税込登録額が未確定です。税内訳と明細を確認して下書きを保存してください。",
-      );
-    }
+  const judgment = judgeDraftAmountAndTax(
+    {
+      ...draft,
+      documentType: draft.documentType ?? "receipt",
+      reviewReasons: [],
+      items: items.map((item) => ({ ...item, _id: item.id })),
+    },
+    { itemScope: "all_items" },
+  );
+  if (judgment.status === "unresolved" && judgment.taxRegistrationBlocked) {
+    throw new Error(
+      "税額または税込登録額が未確定です。税内訳と明細を確認して下書きを保存してください。",
+    );
   }
   const result = aggregateDraftItemsByCategory(
     {
@@ -132,6 +103,11 @@ export function buildDraftRegistrationItems(
   );
   if (!result.success) {
     throw new Error(getDraftItemAggregationErrorMessage(result.error));
+  }
+  if (judgment.status === "unresolved") {
+    throw new Error(
+      "税額または税込登録額が未確定です。税内訳と明細を確認して下書きを保存してください。",
+    );
   }
   return result.items;
 }

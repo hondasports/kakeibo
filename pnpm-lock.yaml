@@ -48,8 +48,8 @@ importers:
   .:
     dependencies:
       '@clerk/backend':
-        specifier: ^3.26.5
-        version: 3.26.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: ^3.27.0
+        version: 3.27.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@clerk/react':
         specifier: ^6.17.8
         version: 6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -93,21 +93,21 @@ importers:
         specifier: ^7.18.3
         version: 7.18.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       resend:
-        specifier: 6.30.0
-        version: 6.30.0(@react-email/render@2.2.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))
+        specifier: 6.37.0
+        version: 6.37.0(@react-email/render@2.2.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))
       valibot:
         specifier: ^1.5.0
         version: 1.5.0(typescript@7.0.2)
     devDependencies:
       '@clerk/testing':
-        specifier: ^2.2.53
-        version: 2.2.53(@playwright/test@1.64.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: ^2.2.55
+        version: 2.2.55(@playwright/test@1.65.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@edge-runtime/vm':
         specifier: 5.0.0
         version: 5.0.0
       '@playwright/test':
-        specifier: ^1.64.0
-        version: 1.64.0
+        specifier: ^1.65.0
+        version: 1.65.0
       '@testing-library/jest-dom':
         specifier: ^7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.5)
@@ -136,8 +136,8 @@ importers:
         specifier: ^1.12.0
         version: 1.12.0
       clerk:
-        specifier: ^3.4.1
-        version: 3.4.1
+        specifier: ^4.1.0
+        version: 4.1.0
       convex-test:
         specifier: 0.0.56
         version: 0.0.56(convex@1.44.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8))
@@ -239,6 +239,10 @@ packages:
     resolution: {integrity: sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA==}
     engines: {node: '>=6.9.0'}
 
+  '@babel/runtime@7.29.13':
+    resolution: {integrity: sha512-v+oN26xP4YIlQsbQ/CbTH1WG5m/l/DjKKZNy/Kp3f/AFvbgt7Em/D0FeMM3O2hX0YzeN2M16W8lOpyhIkfCBcQ==}
+    engines: {node: '>=6.9.0'}
+
   '@babel/runtime@7.29.7':
     resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
     engines: {node: '>=6.9.0'}
@@ -290,55 +294,51 @@ packages:
   '@bytecodealliance/preview2-shim@0.17.6':
     resolution: {integrity: sha512-n3cM88gTen5980UOBAD6xDcNNL3ocTK8keab21bpx1ONdA+ARj7uD1qoFxOWCyKlkpSi195FH+GeAut7Oc6zZw==}
 
-  '@clerk/backend@3.26.5':
-    resolution: {integrity: sha512-znLhEv811EFbYvPjFQSGVFCaCQq6j6nz0H7UqvKXONVAoz0T9T9CVjz1j7Ii9EbjFyQikZ1uxV84WfDiDNiTeQ==}
+  '@clerk/backend@3.27.0':
+    resolution: {integrity: sha512-pmhVVP9EsAOL1rlRU4xR0XSL1BJczxGAJIqv8c+C9fRz7TYzCndGUMSSE/Zg7i2QOA24ExJbEJUiOjILdUL2EQ==}
     engines: {node: '>=20.9.0'}
 
-  '@clerk/backend@3.26.6':
-    resolution: {integrity: sha512-tm2ZWWFW+qBzW9SkdR0RxL++hww/ArtTzrtsu8k2cCXJIVGKaIMl/5tKi+4wy7iouvgk33Bs22fv3vKJ0RRrHg==}
-    engines: {node: '>=20.9.0'}
-
-  '@clerk/cli-darwin-arm64@3.4.1':
-    resolution: {integrity: sha512-5okFr1Q3X7H7mV8uYmko77sg3IqZGZJ8ME5FbjaEptxz5VtLHDB8OdvG3x9hEp89DmRJzoEawI+qHNms5SLPhQ==}
+  '@clerk/cli-darwin-arm64@4.1.0':
+    resolution: {integrity: sha512-Xuolf0EnJoNAQ6CP3sHhkJOHiU76pf26ZBtdt9gds7Ye7MFizOlza57fKyizOtRfk6GX9xIT9EoUYuFMrUKJYw==}
     cpu: [arm64]
     os: [darwin]
 
-  '@clerk/cli-darwin-x64@3.4.1':
-    resolution: {integrity: sha512-CjjhlkdGI7aSSAvbI+3+OI8wXawI2+h2RubHYzrAg9qUuH1Me+oXmQBU8+NpAC1JiIja6Z7U8bcP06uJyVGfaw==}
+  '@clerk/cli-darwin-x64@4.1.0':
+    resolution: {integrity: sha512-4qSEEZr6LOY2egOJmkplavrs1aZ/dHOkrmUO16KK6nOkjE2/SjWfLPr/6+MDzIhVS9Vl1njYn5sKnij12lqKWw==}
     cpu: [x64]
     os: [darwin]
 
-  '@clerk/cli-linux-arm64-musl@3.4.1':
-    resolution: {integrity: sha512-0M5vfxiIksGvnrkficO6wpT18EpPJL2IGPJANW6FvXf/Id4OkUcdUpPb07vRzRpHecgsLZlwTyzbUi8nHSD9Yw==}
+  '@clerk/cli-linux-arm64-musl@4.1.0':
+    resolution: {integrity: sha512-RC93Agfh6o1LtTczU7yC+GLCRsWY7eFkRUL1npSDkKzFNLVtalPMtYcDN7UepaJCksZ75G4N6OdqnbFOEUYoEg==}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@clerk/cli-linux-arm64@3.4.1':
-    resolution: {integrity: sha512-q/lzt+E5iQcOk2fqYaU8dkbf/GJRdm9cXH9kjfqKJ2DmIrP//mBQfiVS+Sy1WiQTcQ4Sx+qnzFNNV8TMjcyNfg==}
+  '@clerk/cli-linux-arm64@4.1.0':
+    resolution: {integrity: sha512-rIzDZiPR0KadFwGdtI8X8rOM6q3Wdv1pTvZJ6b/fgZEe2CFwfq5aIKWCFoXtsK/qQXgO6KszfSIVwyJ9PYqzKg==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@clerk/cli-linux-x64-musl@3.4.1':
-    resolution: {integrity: sha512-MDUmbZGXKutLpSUQXPOxF2DdCvsrA+bt5LR29HuhGVaPusCa04iDZrzgVw0oDwuW493qVqgt9DV5YyKKd86iqA==}
+  '@clerk/cli-linux-x64-musl@4.1.0':
+    resolution: {integrity: sha512-f9tsefNhfdnLS1qIrVE80+gb8R6nvF3eo3sXWScut7x8ge9bBjwI7daYRKnSiy6My+lVM2HiYkwCVw0WhOy/Kw==}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@clerk/cli-linux-x64@3.4.1':
-    resolution: {integrity: sha512-RHAegbuF1/zPq1b8Zk9oHsQUqh4TlQsY8imkK1U2NfZNn7AHQKYwiDbVYwe74vHU4CfxJxr0lmF26DOV914MXQ==}
+  '@clerk/cli-linux-x64@4.1.0':
+    resolution: {integrity: sha512-7xXOy9pZrI01vcrGMkNKZD9YAD8pr2bzdi1f3RuDVUeRNViAIcyNAf/1RYFuKhMzjR0JhzT9Ll9AEmNCur0xog==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@clerk/cli-win32-arm64@3.4.1':
-    resolution: {integrity: sha512-dVrYfgN8b/XlwtGYoW4pAkQK+ZATVG3XzIPnY8YxUjwrviMzDfTtfTKU6RAJohylL6cUz/hmMQDwKKYEeDnKog==}
+  '@clerk/cli-win32-arm64@4.1.0':
+    resolution: {integrity: sha512-2s3MtvD/RRYWPgtUBSMwHD20h/JfmI89YSSCbNe4YO6tW+YiCe/feY6jPjjVWonDiaXlP8TjQG2SMO9JXEDSKg==}
     cpu: [arm64]
     os: [win32]
 
-  '@clerk/cli-win32-x64@3.4.1':
-    resolution: {integrity: sha512-IYmKdf4AAPGTA15pkkdZUDSCvnZIJyT0R6NEk8Z0eBeZJUAZC6g2+uGB4q6W75JlIF7avQ2taehmTBlBPKSdHw==}
+  '@clerk/cli-win32-x64@4.1.0':
+    resolution: {integrity: sha512-G1H8ZizVfTg61vaivBPEXpRAQoBZnnMAcrALSXgpsOcZZjV5vQvRs3jLi/WHrDFPzdRdStNCV1+jJSO+xocseg==}
     cpu: [x64]
     os: [win32]
 
@@ -361,8 +361,8 @@ packages:
       react-dom:
         optional: true
 
-  '@clerk/shared@4.44.0':
-    resolution: {integrity: sha512-cSkplKEZZStBciwo+4iJZOg44rfs/C2jlMPwim4t6dVn2wykUts5NVr0HVote7XNAXP5s0A+UzV1n6pkz4CCHg==}
+  '@clerk/shared@4.44.1':
+    resolution: {integrity: sha512-c06U6GtlLJNOKj900rHDSqjVRz0/0zb3RZXVGKUqTulfQxr4Ym543JE6cbOnZVJZCbm0fGPhdRKvHq6fO/SvVw==}
     engines: {node: '>=20.9.0'}
     peerDependencies:
       react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
@@ -373,8 +373,8 @@ packages:
       react-dom:
         optional: true
 
-  '@clerk/testing@2.2.53':
-    resolution: {integrity: sha512-WWyYNNnihwn5TS+IumRVsqQcs4CVzMebEanTINsX+7uwlM99Ig7Tz7LTB+hSsWjq7dpu1FLjHRR+5ERaASodAw==}
+  '@clerk/testing@2.2.55':
+    resolution: {integrity: sha512-vweZKxMby+3gFrsAXPdjfg9CjbqRCuCs2oYGvUXX+PUGYSlNNYR25MVIkxhzycxiG8AToE28pv+6GPXWTqsN+Q==}
     engines: {node: '>=20.9.0'}
     peerDependencies:
       '@playwright/test': ^1
@@ -1613,8 +1613,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@playwright/test@1.64.0':
-    resolution: {integrity: sha512-oTN9FNYuN6bqQMwiho6jJKLCG2/QOYCixGXuCjRmzOq23eODeukuY2XiAVoVpAECbuezMt1MHQjAiQxK8F+Y+g==}
+  '@playwright/test@1.65.0':
+    resolution: {integrity: sha512-iGURLGuKDLakSEl7Pgfv8h7f+XLT+V861Wfhz0zlEl5nyFuKUopdkFBPKqTllTUp06aOwPuH8iuUEb3yp3MpbQ==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -1836,6 +1836,9 @@ packages:
 
   '@tanstack/query-core@5.104.5':
     resolution: {integrity: sha512-Q94gI8Opd+CbdVNOdj8ZCyV8WqLYitrDq1t96Xc8WZT6lY0r5iRnJLXYDxMex7EEf2v+mXvn4FcjaBKSxXZQ9A==}
+
+  '@tanstack/query-core@5.107.1':
+    resolution: {integrity: sha512-PSyAik11oQBEVOiVy5hjZWHmoUqOXqK1WYy4v55mcxozEfKaQgpUMsgnXhWjuESzSht8JfzqMS1m6M/9CpNgvg==}
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -2516,8 +2519,8 @@ packages:
   cjs-module-lexer@1.2.3:
     resolution: {integrity: sha512-0TNiGstbQmCFwt4akjjBg5pLRTSyj/PkWQ1ZoO2zntmg9yLqSRxwEa4iCfQLGjqhiqBfOJa7W/E8wfGrTDmlZQ==}
 
-  clerk@3.4.1:
-    resolution: {integrity: sha512-J/T3FeadGA/XGW/e4DDfjHcQaMw9PXw+JSpsjroWlJ/u3nyXXAZs7VOr3rTzwif+GQ+LbDSAI6Vr0tZTKQkO2w==}
+  clerk@4.1.0:
+    resolution: {integrity: sha512-Kftof3j1VdoeXknZyxaDv/n9/TzyBDhBGBKP0uNngMiC516lbTEq4Q7/bjoJeFJWskTe+ejLKnqzdTi/G1IaTw==}
     engines: {node: '>=20.0.0'}
     hasBin: true
 
@@ -3511,13 +3514,13 @@ packages:
     resolution: {integrity: sha512-0Z++uU8mvB0EvCPAEUq9BGiPcSravzJ+RPdXfjYlzXffqsogisiKRQqI6ctrSSJ6n985vxrgKtQ5n4sRINcJZg==}
     engines: {node: '>=18.0.0'}
 
-  playwright-core@1.64.0:
-    resolution: {integrity: sha512-T9r+MZkTECl2+oUcZ26YgZzTrYidTsIhYYkJix+6iDOymOb1FB2RLLSOxRGnZGv5DStt+aduIVbt+E8WygXYpg==}
+  playwright-core@1.65.0:
+    resolution: {integrity: sha512-vNSKgH6YqtN7cdT/L334zo0a+YwkrpicyrHJlWWPIm/Q+Nn2SWInil01oT0mbu96U4GgoRtCYQD9CzJQgju+lA==}
     engines: {node: '>=20'}
     hasBin: true
 
-  playwright@1.64.0:
-    resolution: {integrity: sha512-kVzTnYFYEyQ9RGzBjNCd2+yEqWmVbxl3AHPynv3qQ6JTjv4a+kwRcnqQwIpuP3NnrnIrE/Q6wWAIAvMfIE2/Yg==}
+  playwright@1.65.0:
+    resolution: {integrity: sha512-F3AMWcR44qMBt4kq+6Kb6mX7bjGXshktKFOPULd7reED6ZJWevjbNRqysP7q+AATE9kdPEZBibex1BYsvpVoeA==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -3640,8 +3643,8 @@ packages:
   reselect@5.3.0:
     resolution: {integrity: sha512-XGoLeRAVzUTcJ1qkxPQhDJyIZ5d6zzZD9nT7AEZOaaU9UbWclhycElmhO+VD5bFeLuzhPBaOV2oXC8uG35ZSpg==}
 
-  resend@6.30.0:
-    resolution: {integrity: sha512-rED9rVw8N6cUvjmpYQwfZKBzd/cgWT+jURekVxtjFV2+YyK2/Tu2JOnE68sgqXlMBSYRoWgI6R0xlx3ANc/xeA==}
+  resend@6.37.0:
+    resolution: {integrity: sha512-iYNhmhfXVomZr+TMIxf6oqj7kTeGqPDE+wGcYw1H4g8WMBR59NsbShnUz43dSYpStW16iEA6dZs+egqQmdm0zA==}
     engines: {node: '>=20'}
     peerDependencies:
       '@react-email/render': '*'
@@ -3915,6 +3918,9 @@ packages:
 
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
+
+  tslib@2.9.1:
+    resolution: {integrity: sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA==}
 
   tsx@4.21.0:
     resolution: {integrity: sha512-5C1sg4USs1lfG0GFb2RLXsdpXqBSEhAaA/0kPL01wxzpMqLILNxIxIOKiILz+cdg/pLnOUxFYOR5yhHU666wbw==}
@@ -4278,6 +4284,8 @@ snapshots:
 
   '@babel/runtime@7.29.10': {}
 
+  '@babel/runtime@7.29.13': {}
+
   '@babel/runtime@7.29.7': {}
 
   '@babel/template@7.29.7':
@@ -4345,44 +4353,36 @@ snapshots:
 
   '@bytecodealliance/preview2-shim@0.17.6': {}
 
-  '@clerk/backend@3.26.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@clerk/backend@3.27.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@clerk/shared': 4.44.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@clerk/shared': 4.44.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       standardwebhooks: 1.1.1
     transitivePeerDependencies:
       - react
       - react-dom
 
-  '@clerk/backend@3.26.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
-    dependencies:
-      '@clerk/shared': 4.44.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      standardwebhooks: 1.1.1
-    transitivePeerDependencies:
-      - react
-      - react-dom
-
-  '@clerk/cli-darwin-arm64@3.4.1':
+  '@clerk/cli-darwin-arm64@4.1.0':
     optional: true
 
-  '@clerk/cli-darwin-x64@3.4.1':
+  '@clerk/cli-darwin-x64@4.1.0':
     optional: true
 
-  '@clerk/cli-linux-arm64-musl@3.4.1':
+  '@clerk/cli-linux-arm64-musl@4.1.0':
     optional: true
 
-  '@clerk/cli-linux-arm64@3.4.1':
+  '@clerk/cli-linux-arm64@4.1.0':
     optional: true
 
-  '@clerk/cli-linux-x64-musl@3.4.1':
+  '@clerk/cli-linux-x64-musl@4.1.0':
     optional: true
 
-  '@clerk/cli-linux-x64@3.4.1':
+  '@clerk/cli-linux-x64@4.1.0':
     optional: true
 
-  '@clerk/cli-win32-arm64@3.4.1':
+  '@clerk/cli-win32-arm64@4.1.0':
     optional: true
 
-  '@clerk/cli-win32-x64@3.4.1':
+  '@clerk/cli-win32-x64@4.1.0':
     optional: true
 
   '@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
@@ -4402,9 +4402,9 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@clerk/shared@4.44.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@clerk/shared@4.44.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@tanstack/query-core': 5.104.5
+      '@tanstack/query-core': 5.107.1
       dequal: 2.0.3
       glob-to-regexp: 0.4.1
       js-cookie: 3.0.8
@@ -4412,13 +4412,13 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@clerk/testing@2.2.53(@playwright/test@1.64.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@clerk/testing@2.2.55(@playwright/test@1.65.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@clerk/backend': 3.26.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@clerk/shared': 4.44.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@clerk/backend': 3.27.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@clerk/shared': 4.44.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       dotenv: 17.2.2
     optionalDependencies:
-      '@playwright/test': 1.64.0
+      '@playwright/test': 1.65.0
     transitivePeerDependencies:
       - react
       - react-dom
@@ -4468,17 +4468,17 @@ snapshots:
   '@emnapi/core@1.11.1':
     dependencies:
       '@emnapi/wasi-threads': 1.2.2
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@emnapi/runtime@1.11.1':
     dependencies:
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@emnapi/wasi-threads@1.2.2':
     dependencies:
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@emotion/babel-plugin@11.13.5':
@@ -5284,9 +5284,9 @@ snapshots:
   '@oxlint/binding-win32-x64-msvc@1.82.0':
     optional: true
 
-  '@playwright/test@1.64.0':
+  '@playwright/test@1.65.0':
     dependencies:
-      playwright: 1.64.0
+      playwright: 1.65.0
 
   '@popperjs/core@2.11.8': {}
 
@@ -5412,10 +5412,12 @@ snapshots:
 
   '@tanstack/query-core@5.104.5': {}
 
+  '@tanstack/query-core@5.107.1': {}
+
   '@testing-library/dom@10.4.1':
     dependencies:
       '@babel/code-frame': 7.29.7
-      '@babel/runtime': 7.29.10
+      '@babel/runtime': 7.29.13
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
       dom-accessibility-api: 0.5.16
@@ -6227,16 +6229,16 @@ snapshots:
 
   cjs-module-lexer@1.2.3: {}
 
-  clerk@3.4.1:
+  clerk@4.1.0:
     optionalDependencies:
-      '@clerk/cli-darwin-arm64': 3.4.1
-      '@clerk/cli-darwin-x64': 3.4.1
-      '@clerk/cli-linux-arm64': 3.4.1
-      '@clerk/cli-linux-arm64-musl': 3.4.1
-      '@clerk/cli-linux-x64': 3.4.1
-      '@clerk/cli-linux-x64-musl': 3.4.1
-      '@clerk/cli-win32-arm64': 3.4.1
-      '@clerk/cli-win32-x64': 3.4.1
+      '@clerk/cli-darwin-arm64': 4.1.0
+      '@clerk/cli-darwin-x64': 4.1.0
+      '@clerk/cli-linux-arm64': 4.1.0
+      '@clerk/cli-linux-arm64-musl': 4.1.0
+      '@clerk/cli-linux-x64': 4.1.0
+      '@clerk/cli-linux-x64-musl': 4.1.0
+      '@clerk/cli-win32-arm64': 4.1.0
+      '@clerk/cli-win32-x64': 4.1.0
 
   clsx@2.1.1: {}
 
@@ -7208,11 +7210,11 @@ snapshots:
 
   picospinner@3.1.2: {}
 
-  playwright-core@1.64.0: {}
+  playwright-core@1.65.0: {}
 
-  playwright@1.64.0:
+  playwright@1.65.0:
     dependencies:
-      playwright-core: 1.64.0
+      playwright-core: 1.65.0
 
   postal-mime@2.7.6: {}
 
@@ -7346,7 +7348,7 @@ snapshots:
 
   reselect@5.3.0: {}
 
-  resend@6.30.0(@react-email/render@2.2.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)):
+  resend@6.37.0(@react-email/render@2.2.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)):
     dependencies:
       postal-mime: 2.7.6
       standardwebhooks: 1.1.1
@@ -7643,6 +7645,9 @@ snapshots:
       strip-bom: 3.0.0
 
   tslib@2.8.1: {}
+
+  tslib@2.9.1:
+    optional: true
 
   tsx@4.21.0:
     dependencies:

@@ -1,3 +1,4 @@
+import { buildExtractedDraftFields } from "./createFromExtraction";
 import { describe, expect, it } from "vitest";
 import { item, Row, map, check } from "./testHelpers";
 
@@ -191,7 +192,11 @@ describe("raw 観測行の数量・コード行は直前の商品明細へ束ね
       ],
       7462,
     );
-    check(result, 37, 7462);
+    check(result, 37, 7462, true);
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, result, 0).draft
+        .reviewReasons,
+    ).toContain("amount_mismatch");
     expect(
       result.items!.filter((i) => i.printedAmountYen! < 0).map((i) => i.printedAmountYen),
     ).toEqual([-43, -16, -10]);

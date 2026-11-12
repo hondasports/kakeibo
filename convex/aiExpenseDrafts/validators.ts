@@ -279,6 +279,7 @@ export const receiptDraftItemFields = {
 
 export const receiptDraftItemSnapshotValidator = v.object({
   ...receiptDraftItemFields,
+  discountTargetItemIndex: v.optional(v.number()),
   taxConfirmedFields: v.optional(taxConfirmedFieldsValidator),
 });
 

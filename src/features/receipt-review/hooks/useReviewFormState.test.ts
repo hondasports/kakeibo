@@ -202,3 +202,32 @@ it("名前・行種別を変更した行だけ再確認を要求し、価格・�
     "taxRatePercent",
   ]);
 });
+
+it("品名の変更で商品が割引行になったら、その商品を参照する対象とカテゴリを解除する", () => {
+  const { result } = renderHook(() =>
+    useReviewFormState({
+      selectedReviewDraftId: null,
+      selectedReviewDraft: null,
+      localReviewItems: undefined,
+      selectedReviewDraftDetails: null,
+    }),
+  );
+  act(() =>
+    result.current.setReviewItems([
+      { id: "product", itemName: "商品", amountYen: "100", categoryId: "cat" },
+      {
+        id: "discount",
+        itemName: "値引",
+        lineType: "discount",
+        amountYen: "-10",
+        categoryId: "cat",
+        discountTargetItemId: "product",
+      },
+    ]),
+  );
+  act(() => result.current.handleReviewItemChange("product", "itemName", "クーポン"));
+  expect(result.current.reviewItems[1]).toMatchObject({
+    categoryId: "",
+    discountTargetItemId: undefined,
+  });
+});

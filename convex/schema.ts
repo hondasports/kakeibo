@@ -568,6 +568,7 @@ export default defineSchema({
     .index("by_group_id_and_status_and_registered_at", ["groupId", "status", "registeredAt"]),
 
   aiExpenseDraftItems: defineTable({
+    discountTargetItemId: v.optional(v.id("aiExpenseDraftItems")),
     groupId: v.id("groups"),
     draftId: v.id("aiExpenseDrafts"),
     ...receiptDraftItemFields,

@@ -4,7 +4,7 @@ import {
   type AiExpenseDraftFields,
 } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
-import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
+import { buildDraftReviewState } from "../../domain/aiExpenseDrafts/draftReviewState";
 import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
 import { applyRecordPatch } from "../../domain/common/recordPatch";
 import type { UsecaseGroupContext } from "../context";
@@ -38,10 +38,11 @@ export async function resetReceiptToAiInterpretation(
   const now = Date.now();
   const insertedItems: AiExpenseDraftItemFields[] = [];
   for (const item of values.items) {
+    const { discountTargetItemIndex: _targetIndex, ...itemValues } = item;
     const itemFields: Omit<AiExpenseDraftItemFields, "id" | "creationTime"> = {
       groupId: ctx.groupId,
       draftId: args.draftId,
-      ...item,
+      ...itemValues,
       createdAt: now,
       updatedAt: now,
     };
@@ -74,8 +75,12 @@ export async function resetReceiptToAiInterpretation(
     fields as unknown as Record<string, unknown>,
     draftPatch,
   ) as unknown as AiExpenseDraftFields;
-  const listSummary = buildDraftListSummary(patchedFields, insertedItems);
-  await deps.drafts.patch(args.draftId, { ...draftPatch, listSummary });
+  const { status, reviewReasons, listSummary } = buildDraftReviewState(
+    patchedFields,
+    insertedItems,
+    { reasons: values.reviewReasons, preserveUserConfirmation: true },
+  );
+  await deps.drafts.patch(args.draftId, { ...draftPatch, status, reviewReasons, listSummary });
   const updatedDraft = await deps.drafts.findById(args.draftId);
   if (updatedDraft === null) {
     throw new ConvexError("AI expense draft not found after reset");

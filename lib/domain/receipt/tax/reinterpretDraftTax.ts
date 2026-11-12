@@ -75,6 +75,7 @@ function hasPrintedSummaryAmounts(
   normalizedSources: ExtractedTaxSummary[],
   input: ReinterpretDraftTaxInput,
   lines: ReturnType<typeof resolveObservationAmounts>,
+  requireTaxAmount = true,
 ): boolean {
   const options = {
     singleSummary: normalizedSources.length === 1,
@@ -84,9 +85,10 @@ function hasPrintedSummaryAmounts(
     taxSummaryEvidenceLines(lines, summary.taxRatePercent, "target", options).some(
       (line) => line.amountYen === summary.taxableAmountYen,
     ) &&
-    taxSummaryEvidenceLines(lines, summary.taxRatePercent, "tax", options).some(
-      (line) => line.amountYen === summary.taxYen,
-    )
+    (!requireTaxAmount ||
+      taxSummaryEvidenceLines(lines, summary.taxRatePercent, "tax", options).some(
+        (line) => line.amountYen === summary.taxYen,
+      ))
   );
 }
 
@@ -133,7 +135,17 @@ function resolveReconciledItemBases(
       derived.taxableAmountYen === summary.taxableAmountYen &&
       derived.taxYen === summary.taxYen &&
       derived.taxableAmountBasis === summary.taxableAmountBasis &&
-      hasPrintedSummaryAmounts(summary, normalizedSources, input, rawObservationLines)
+      hasPrintedSummaryAmounts(
+        summary,
+        normalizedSources,
+        input,
+        rawObservationLines,
+        candidates.some(
+          (item, index) =>
+            item.taxRatePercent === summary.taxRatePercent &&
+            item.amountBasis !== items[index].amountBasis,
+        ),
+      )
     );
   });
   return hasMatchingEvidence && candidateSummaries.length === normalizedSources.length

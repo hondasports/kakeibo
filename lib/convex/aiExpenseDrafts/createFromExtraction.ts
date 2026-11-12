@@ -1,3 +1,4 @@
+import { isDiscountLine } from "../../domain/receipt/discountItems";
 import { ConvexError } from "convex/values";
 import type { MutationCtx } from "../../../convex/_generated/server";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -9,7 +10,9 @@ import {
 import { deleteDraftAndItems } from "./draftRepository";
 import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
+import type { ReceiptDraftItemSnapshot } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
+import { buildDraftReviewState } from "../../domain/aiExpenseDrafts/draftReviewState";
 import {
   buildExtractedDraftFields,
   buildExtractedDraftItemFields,
@@ -18,7 +21,6 @@ import {
   DRAFT_NOT_FOUND_AFTER_CREATION_MESSAGE,
   validateDraftCategoryOwnership,
   type ExtractedDraftInput,
-  type ExtractedDraftItemInput,
 } from "../../domain/aiExpenseDrafts/createFromExtraction";
 
 export type CreateFromExtractionArgs = ExtractedDraftInput<Id<"categories">> & {
@@ -61,7 +63,7 @@ async function insertDraftItems(
   ctx: Pick<MutationCtx, "db">,
   groupId: Id<"groups">,
   draftId: Id<"aiExpenseDrafts">,
-  items: ExtractedDraftItemInput<Id<"categories">>[],
+  items: ReceiptDraftItemSnapshot<Id<"categories">>[],
   now: number,
 ): Promise<AiExpenseDraftItemFields[]> {
   const inserted: AiExpenseDraftItemFields[] = [];
@@ -70,6 +72,23 @@ async function insertDraftItems(
     const fields = buildExtractedDraftItemFields(groupId, draftId, item, now);
     const id = await ctx.db.insert("aiExpenseDraftItems", fields);
     inserted.push({ ...fields, id });
+  }
+  for (const [index, item] of items.entries()) {
+    const targetIndex = item.discountTargetItemIndex;
+    if (
+      targetIndex === undefined ||
+      !Number.isInteger(targetIndex) ||
+      targetIndex < 0 ||
+      targetIndex >= items.length ||
+      !isDiscountLine(item.itemName, item.lineType) ||
+      isDiscountLine(items[targetIndex].itemName, items[targetIndex].lineType)
+    )
+      continue;
+    const targetId = inserted[targetIndex].id as Id<"aiExpenseDraftItems">;
+    await ctx.db.patch(inserted[index].id as Id<"aiExpenseDraftItems">, {
+      discountTargetItemId: targetId,
+    });
+    inserted[index].discountTargetItemId = targetId;
   }
   return inserted;
 }
@@ -87,12 +106,12 @@ async function persistExtractedDraft(
   const draftId = await ctx.db.insert("aiExpenseDrafts", draft);
 
   const insertedItems = await insertDraftItems(ctx, actor.groupId, draftId, values.items, now);
-  // 一覧用の保存サマリは採番済みの明細を含む最終状態から計算する。
-  const listSummary = buildDraftListSummary(
+  const { status, reviewReasons, listSummary } = buildDraftReviewState(
     { ...draft, id: draftId } as AiExpenseDraftFields,
     insertedItems,
+    { reasons: draft.reviewReasons, preserveUserConfirmation: true },
   );
-  await ctx.db.patch(draftId, { listSummary, updatedAt: now });
+  await ctx.db.patch(draftId, { status, reviewReasons, listSummary, updatedAt: now });
 
   const created = await ctx.db.get(draftId);
   if (created === null) {

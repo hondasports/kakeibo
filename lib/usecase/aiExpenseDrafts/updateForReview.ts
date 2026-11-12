@@ -10,6 +10,7 @@ import type {
 } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { AiExpenseDraftDocumentType } from "../../domain/aiExpenseDrafts/constants";
 import { classifyAiExpenseDraft } from "../../domain/aiExpenseDrafts/classification";
+import { buildDraftReviewState } from "../../domain/aiExpenseDrafts/draftReviewState";
 import {
   buildRegistrationPatchFields,
   resolveRegisteredAt,
@@ -156,6 +157,7 @@ export async function updateAiExpenseDraftForReview(
         ? args.items?.map((item) => ({
             itemName: item.itemName,
             amountYen: item.amountYen,
+            lineType: item.lineType,
             categoryId: item.categoryId,
           }))
         : undefined,
@@ -204,18 +206,25 @@ export async function updateAiExpenseDraftForReview(
     return await reconcileRegisteredDraft(updated, reinterpreted.items);
   }
 
+  const receiptTotalResolution = resolveReceiptTotal({
+    amountYen: args.amountYen,
+    source: "user_confirmed",
+    confidence: reviewConfidence.amountYen,
+    supportingCandidates: fields.receiptTotalResolution?.candidates.filter(
+      (candidate) => candidate.source !== "user_confirmed",
+    ),
+    taxSummaries: [],
+  });
+  const { status, reviewReasons, listSummary } = buildDraftReviewState(
+    { ...currentDraft, receiptTotalResolution },
+    currentItems,
+    { reasons: classification.reviewReasons },
+  );
   const statusPatch = {
-    status: classification.status,
-    receiptTotalResolution: resolveReceiptTotal({
-      amountYen: args.amountYen,
-      source: "user_confirmed",
-      confidence: reviewConfidence.amountYen,
-      supportingCandidates: fields.receiptTotalResolution?.candidates.filter(
-        (candidate) => candidate.source !== "user_confirmed",
-      ),
-      taxSummaries: [],
-    }),
-    reviewReasons: classification.reviewReasons,
+    status,
+    reviewReasons,
+    listSummary,
+    receiptTotalResolution,
     updatedAt: now,
   };
   await deps.drafts.patch(args.draftId, statusPatch);

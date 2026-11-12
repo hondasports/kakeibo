@@ -148,6 +148,7 @@ export function QueuePanelDialogs({ categories = [] }: { categories?: AiExpenseQ
         reviewError={queue.reviewError}
         reviewForm={queue.reviewForm}
         reviewItems={queue.reviewItems}
+        persistedReviewItems={queue.persistedReviewItems}
         isCategorySplit={queue.isCategorySplit}
         reviewSubmitting={queue.reviewSubmitting}
         onAddItem={queue.handleAddReviewItem}

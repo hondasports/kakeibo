@@ -3,11 +3,12 @@ import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
 import { buildDraftListSummary } from "./listSummary";
 import { buildDraftRegistrationItems } from "./registrationItems";
+import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
 import { buildReviewChecks, countActionableUncomparable } from "./reviewChecks";
 import { mapDraftItemsToReviewItems, mapDraftToReviewForm } from "./reviewDraftMapping";
 import { getReviewGuidance } from "./reviewGuidance";
 import { buildReviewTaxPreview } from "./reviewItemsTaxPreview";
-import { isAmountAndTaxResolved, isUnrelatedToAmountTaxGuidanceId } from "./reviewJudgment";
+import { isUnrelatedToAmountTaxGuidanceId } from "./reviewJudgment";
 import { initializeReviewCategoryState } from "./reviewItemCategories";
 import type { AiExpenseDraftItem, AiExpenseDraftJudgmentInput } from "./reviewTypes";
 import { legacyTaxSummaryVariants, mixedTaxReviewFixture } from "./reviewTaxPreviewTestHelpers";
@@ -90,8 +91,8 @@ describe("旧形式の税内訳5パターンの解決（Issue #1015 / #1125）",
       const { draftFields, itemFields, reviewDraft } = fixtureFor(taxSummaries);
 
       // 一覧の「金額・税内訳の確認が必要」を出すかどうかの判定（queue 表示の正本）
-      expect(isAmountAndTaxResolved(reviewDraft)).toBe(true);
-      expect(buildDraftListSummary(draftFields, itemFields).amountAndTaxResolved).toBe(true);
+      expect(isResolvedForTest(reviewDraft)).toBe(false);
+      expect(buildDraftListSummary(draftFields, itemFields).amountAndTaxResolved).toBe(false);
 
       // ダイアログと同じ再解釈で、保存値ではなく商品から内訳を導く
       const form = mapDraftToReviewForm(reviewDraft);
@@ -145,9 +146,14 @@ describe("旧形式の税内訳5パターンの解決（Issue #1015 / #1125）",
         const patch = plan.itemPatches.find(({ itemId }) => itemId === item.id)?.patch;
         return patch ? { ...item, ...patch } : item;
       });
+      expect(buildDraftListSummary(savedDraft, savedItems).amountAndTaxResolved).toBe(true);
       const registrationItems = buildDraftRegistrationItems(savedDraft, savedItems);
       expect(registrationItems).toHaveLength(1);
       expect(registrationItems[0]).toMatchObject({ categoryId: "food", amountYen: 1782 });
     },
   );
 });
+
+function isResolvedForTest(draft: Parameters<typeof judgeDraftAmountAndTax>[0]) {
+  return judgeDraftAmountAndTax(draft).status === "resolved";
+}

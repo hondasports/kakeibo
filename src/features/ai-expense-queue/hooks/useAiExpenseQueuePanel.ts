@@ -110,6 +110,7 @@ export function useAiExpenseQueuePanel({
     reviewSaveFeedback: reviewDialog.reviewSaveFeedback,
     reviewForm: reviewDialog.reviewForm,
     reviewItems: reviewDialog.reviewItems,
+    persistedReviewItems: reviewDialog.persistedReviewItems,
     isCategorySplit: reviewDialog.isCategorySplit,
     reviewSubmitting: reviewDialog.reviewSubmitting,
     selectedReadyIds: bulkRegister.selectedReadyIds,

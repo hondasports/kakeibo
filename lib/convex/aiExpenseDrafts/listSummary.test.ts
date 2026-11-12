@@ -4,11 +4,7 @@ import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpens
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { ExtractedDraftItemInput } from "../../domain/aiExpenseDrafts/createFromExtraction";
 import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
-import { isAmountAndTaxResolved } from "../../domain/aiExpenseDrafts/reviewJudgment";
-import type {
-  AiExpenseDraftItem,
-  DraftListSummary,
-} from "../../domain/aiExpenseDrafts/reviewTypes";
+import type { DraftListSummary } from "../../domain/aiExpenseDrafts/reviewTypes";
 import { getAiExpenseDraftWithItems } from "../../usecase/aiExpenseDrafts/getDraftWithItems";
 import {
   CAT_ID,
@@ -357,7 +353,7 @@ describe("解析結果からの作成", () => {
     expect((summaryPatch![1] as { listSummary: unknown }).listSummary).toEqual(expected);
   });
 
-  it("createFromExtraction: 明細が101件でも保存値は先頭100件の判定窓と一致する", async () => {
+  it("createFromExtraction: 明細が101件なら保存値は全明細で計算する", async () => {
     // 判定窓の仕様値。定数参照ではなく件数そのものを固定する。
     const JUDGMENT_WINDOW = 100;
     const windowItem = (index: number): ExtractedDraftItemInput<Id<"categories">> => ({
@@ -477,11 +473,10 @@ describe("解析結果からの作成", () => {
     expect(summaryPatch).toBeDefined();
     const saved = (summaryPatch![1] as { listSummary: DraftListSummary }).listSummary;
 
-    // 保存値は下書き確認と同じ「先頭100件」の明細で計算した値と一致しなければならない。
-    const expected = buildDraftListSummary(draftFields, allItems.slice(0, JUDGMENT_WINDOW));
+    const expected = buildDraftListSummary(draftFields, allItems, undefined, "all_items");
     expect(saved).toEqual(expected);
 
-    // 実際の読み取り経路（getWithItems）が返す明細での判定とも一致する。
+    // 確認画面は引き続き先頭100件だけを読み取る。
     const persistedDraft = { ...draftFields, listSummary: saved };
     const view = await getAiExpenseDraftWithItems(
       { groupId: GROUP_ID },
@@ -502,13 +497,8 @@ describe("解析結果からの作成", () => {
       { draftId: "new-draft-id" },
     );
     expect(view?.items).toHaveLength(JUDGMENT_WINDOW);
-    const viewJudgment = isAmountAndTaxResolved({
-      ...persistedDraft,
-      items: view!.items.map(({ id, ...rest }) => ({ ...rest, _id: id }) as AiExpenseDraftItem),
-    });
-    // 先頭100件では解決済み・101件目を含めると未解決になる入力であること（偽の一致を防ぐ）。
-    expect(viewJudgment).toBe(true);
-    expect(saved.amountAndTaxResolved).toBe(viewJudgment);
+    // 保存額は再解釈前の税抜額なので、表示用の再計算額が一致しても未解決。
+    expect(saved.amountAndTaxResolved).toBe(false);
   });
 
   it("createFailedDraftFromImageAnalysis: 失敗下書きも未解決の保存値を持つ", async () => {

@@ -1,3 +1,4 @@
+import { buildExtractedDraftFields } from "./createFromExtraction";
 import { describe, expect, it } from "vitest";
 import {
   ishimoriExternalMisreadFixture,
@@ -5,6 +6,15 @@ import {
 } from "../receiptImageExtraction/fixtures/taxFixtures";
 import { mapExtractionToDraftArgs } from "./extractionMapping";
 import { foodCategory } from "./testHelpers";
+import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
+
+function judgeMapped(mapped: ReturnType<typeof mapExtractionToDraftArgs>) {
+  const { draft } = buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0);
+  return judgeDraftAmountAndTax({
+    ...draft,
+    items: mapped.items?.map((item, index) => ({ ...item, _id: String(index) })),
+  });
+}
 
 describe("mapExtractionToDraftArgs tax normalization (tax resolution)", () => {
   it("8%内税と10%外税の混在を率別に解決して支払総額へ一致させる", () => {
@@ -56,6 +66,7 @@ describe("mapExtractionToDraftArgs tax normalization (tax resolution)", () => {
     );
     expect(mapped.items?.map((item) => item.normalizedAmountYen)).toEqual([100, 220]);
     expect(mapped.items?.reduce((sum, item) => sum + (item.normalizedAmountYen ?? 0), 0)).toBe(320);
+    expect(judgeMapped(mapped)).toMatchObject({ status: "resolved", reasons: [] });
     expect(mapped.taxSummaries?.[1]).toMatchObject({
       taxMode: "external",
       taxableAmountBasis: "tax_excluded",
@@ -304,8 +315,15 @@ describe("mapExtractionToDraftArgs tax normalization (tax resolution)", () => {
       ],
     };
     const mapped = mapExtractionToDraftArgs(source, [foodCategory]);
-    expect(mapped.reviewReasons).toContain("user_confirmation_required");
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("user_confirmation_required");
     expect(mapped.items?.every((item) => item.taxResolutionStatus === "unresolved")).toBe(true);
+    expect(judgeMapped(mapped)).toMatchObject({
+      status: "unresolved",
+      reasons: expect.arrayContaining(["user_confirmation_required"]),
+    });
     expect(mapped.items?.every((item) => item.taxRatePercent === null)).toBe(true);
     expect(mapped.warnings).toContain("unresolved_tax_rate:items[0]");
   });
@@ -331,8 +349,18 @@ describe("mapExtractionToDraftArgs tax normalization (tax resolution)", () => {
         .every((item) => item.taxResolutionStatus === "unresolved"),
     ).toBe(true);
     expect(mapped.warnings).toContain("ambiguous_receipt_total");
-    expect(mapped.reviewReasons).toContain("amount_mismatch");
-    expect(mapped.reviewReasons).toContain("user_confirmation_required");
+    expect(judgeMapped(mapped)).toMatchObject({
+      status: "unresolved",
+      reasons: expect.arrayContaining(["user_confirmation_required"]),
+    });
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("amount_mismatch");
+    expect(
+      buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
+        .reviewReasons,
+    ).toContain("user_confirmation_required");
     expect(mapped.items?.[2]?.taxResolutionStatus).toBe("unresolved");
     expect(mapped.items?.[2]?.taxRatePercent).toBeNull();
   });

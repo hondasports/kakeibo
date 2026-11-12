@@ -38,7 +38,7 @@
     "verify:prepush": "node scripts/verify-prepush.mjs"
   },
   "dependencies": {
-    "@clerk/backend": "^3.26.5",
+    "@clerk/backend": "^3.27.0",
     "@clerk/react": "^6.17.8",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -53,13 +53,13 @@
     "react-dom": "^19.2.8",
     "react-email": "6.11.6",
     "react-router-dom": "^7.18.3",
-    "resend": "6.30.0",
+    "resend": "6.37.0",
     "valibot": "^1.5.0"
   },
   "devDependencies": {
-    "@clerk/testing": "^2.2.53",
+    "@clerk/testing": "^2.2.55",
     "@edge-runtime/vm": "5.0.0",
-    "@playwright/test": "^1.64.0",
+    "@playwright/test": "^1.65.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
@@ -69,7 +69,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.5",
     "chrome-devtools-mcp": "^1.12.0",
-    "clerk": "^3.4.1",
+    "clerk": "^4.1.0",
     "convex-test": "0.0.56",
     "dotenv": "^18.0.5",
     "husky": "^9.1.7",
