@@ -17,13 +17,11 @@ import { snapshotReceiptDraftValues, resolveReceiptTaxCorrections } from "./rece
 import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
 import { classifyAiExpenseDraft } from "./classification";
+import { buildDraftReviewState } from "./draftReviewState";
+import type { DraftListSummary } from "./reviewTypes";
 import type { AiExpenseDraftReviewReason } from "./constants";
-import {
-  filterNonInterpretationWarnings,
-  mergeReviewReasons,
-  nonTaxReviewReasons,
-} from "./reviewReasons";
-import { deriveTaxReviewReasons, mapDraftItemToTaxFields } from "../receipt/tax/draftTaxMapping";
+import { filterNonInterpretationWarnings, nonTaxReviewReasons } from "./reviewReasons";
+import { mapDraftItemToTaxFields } from "../receipt/tax/draftTaxMapping";
 import {
   reinterpretDraftTax,
   type BulkUnresolvedTaxOverride,
@@ -100,6 +98,8 @@ export type DraftTaxInterpretationPatch = {
 };
 
 export type TaxInterpretationPlan = {
+  amountAndTaxResolved: boolean;
+  listSummary: DraftListSummary;
   itemPatches: Array<{ itemId: string; patch: DraftItemTaxPatch }>;
   draftPatch: DraftTaxInterpretationPatch;
 };
@@ -135,9 +135,7 @@ export function planDraftTaxInterpretation(
   });
 
   const ignoresTaxDetails = draft.registrationMode === "totalOnly";
-  const taxReviewReasons = ignoresTaxDetails ? [] : deriveTaxReviewReasons(interpretation);
   const preservedReasons = args.preservedNonTaxReasons ?? nonTaxReviewReasons(draft.reviewReasons);
-  const mergedTaxReasons = mergeReviewReasons(taxReviewReasons, preservedReasons);
   const classification = classifyAiExpenseDraft({
     documentType: draft.documentType,
     shopName: draft.shopName,
@@ -161,8 +159,6 @@ export function planDraftTaxInterpretation(
           categoryId: item.categoryId,
         })),
   });
-  const reviewReasons = mergeReviewReasons(classification.reviewReasons, mergedTaxReasons);
-  const status = reviewReasons.length === 0 ? "ready" : "needs_review";
 
   const itemPatches: TaxInterpretationPlan["itemPatches"] = [];
   for (const [index, item] of items.entries()) {
@@ -191,22 +187,30 @@ export function planDraftTaxInterpretation(
   }
 
   const nonInterpretationWarnings = filterNonInterpretationWarnings(draft.warnings ?? []);
-
+  const draftPatchBase = {
+    receiptInterpretation: draft.receiptInterpretation ?? {
+      source: "legacy_projection" as const,
+      interpretedAt: now,
+      values: snapshotReceiptDraftValues(draft, items),
+    },
+    taxSummaries: items.length === 0 ? draft.taxSummaries : interpretation.taxSummaries,
+    receiptTotalResolution: interpretation.receiptTotalResolution,
+    receiptTaxDecision: interpretation.decision,
+    warnings: [...new Set([...nonInterpretationWarnings, ...interpretation.warnings])],
+    updatedAt: now,
+  };
+  const finalItems = items.map((item, index) => ({ ...item, ...itemPatches[index]?.patch }));
+  const state = buildDraftReviewState({ ...draft, ...draftPatchBase }, finalItems, {
+    reasons: [...classification.reviewReasons, ...preservedReasons],
+  });
   return {
     itemPatches,
+    amountAndTaxResolved: state.judgment.status === "resolved",
+    listSummary: state.listSummary,
     draftPatch: {
-      status,
-      receiptInterpretation: draft.receiptInterpretation ?? {
-        source: "legacy_projection",
-        interpretedAt: now,
-        values: snapshotReceiptDraftValues(draft, items),
-      },
-      taxSummaries: interpretation.taxSummaries,
-      receiptTotalResolution: interpretation.receiptTotalResolution,
-      receiptTaxDecision: interpretation.decision,
-      warnings: [...new Set([...nonInterpretationWarnings, ...interpretation.warnings])],
-      reviewReasons,
-      updatedAt: now,
+      ...draftPatchBase,
+      status: state.status,
+      reviewReasons: state.reviewReasons,
     },
   };
 }

@@ -30,11 +30,9 @@ import {
   getReviewGuidance,
   effectiveReviewMode,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
-import {
-  buildReviewChecks,
-  countActionableUncomparable,
-} from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
-import { buildTaxContextFromReviewItem } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
+import { countActionableUncomparable } from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
+import { judgeReviewFormAmountAndTax } from "../../../../lib/domain/aiExpenseDrafts/reviewFormJudgment";
+import { isUnrelatedToAmountTaxGuidanceId } from "../../../../lib/domain/aiExpenseDrafts/reviewJudgment";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
 import {
@@ -51,6 +49,7 @@ export type ReviewDialogProps = {
   reviewError: string;
   reviewForm: ReviewFormValues;
   reviewItems: ReviewItemValues[];
+  persistedReviewItems?: AiExpenseDraft["items"];
   isCategorySplit: boolean;
   reviewSubmitting: boolean;
   onClose: () => void;
@@ -126,22 +125,27 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const receiptGuidance = guidance.filter((issue) => issue.scope === "receipt");
   const specificGuidance = guidance.filter((issue) => issue.scope !== "receipt");
   const itemTargets = new Set(items.map((item) => item.id));
+  const totalOnly = effectiveReviewMode(form) === "totalOnly";
+  const judgment = judgeReviewFormAmountAndTax(
+    {
+      ...(sourceDraft ?? { documentType: form.documentType, reviewReasons: [] }),
+      items: props.persistedReviewItems ?? sourceDraft?.items,
+    },
+    form,
+    sourceItems,
+  );
+  const checks = judgment.checks;
+  const matchedButUnresolved =
+    judgment.status === "unresolved" &&
+    checks.amount.status === "matched" &&
+    checks.taxRate.status === "matched";
   const bannerGuidance = specificGuidance.filter(
     (issue) =>
       issue.taxSummaryIndex !== undefined ||
-      (issue.required && issue.target !== "items" && !itemTargets.has(issue.target)),
+      (issue.required && issue.target !== "items" && !itemTargets.has(issue.target)) ||
+      (matchedButUnresolved && !isUnrelatedToAmountTaxGuidanceId(issue.id)),
   );
-  const totalOnly = effectiveReviewMode(form) === "totalOnly";
-  const checks = buildReviewChecks({
-    items,
-    paidTotalYen,
-    taxSummaries: draft?.taxSummaries,
-    rawObservation: draft?.rawObservation,
-    receiptLineClassifications: draft?.receiptInterpretation?.values.receiptLineClassifications,
-  });
-  const unresolvedTaxItemCount = items.filter(
-    (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
-  ).length;
+  const unresolvedTaxItemCount = judgment.unresolvedTaxItemCount;
   const basisConflictItemCount = new Set([
     ...(checks.amount.blockerCode === "basis-conflict"
       ? (checks.amount.affectedItemIds ?? [])
@@ -345,6 +349,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                 />
                 <ReviewStatusBanner
                   checks={checks}
+                  amountTaxResolved={judgment.status !== "unresolved"}
                   issues={bannerGuidance}
                   unresolvedTaxItemCount={unresolvedTaxItemCount}
                   receiptIssues={receiptGuidance}

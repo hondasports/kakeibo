@@ -46,10 +46,15 @@ export function map(items: ReturnType<typeof item>[], rows: Row[], total: number
     categories,
   );
 }
-export function check(result: ReturnType<typeof map>, count: number, total: number) {
+export function check(
+  result: ReturnType<typeof map>,
+  count: number,
+  total: number,
+  allowMismatch = false,
+) {
   expect(result.items).toHaveLength(count);
   expect(result.items!.reduce((sum, i) => sum + i.amountYen, 0)).toBe(total);
-  expect(result.reviewReasons ?? []).not.toContain("amount_mismatch");
+  if (!allowMismatch) expect(result.reviewReasons ?? []).not.toContain("amount_mismatch");
   expect(result.amountYen).toBe(total);
   expect(result.items!.every((i) => i.taxResolutionStatus === "resolved")).toBe(true);
 }

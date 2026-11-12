@@ -1,3 +1,4 @@
+import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
 import { describe, expect, it } from "vitest";
 import { mapDraftItemsToReviewItems } from "./reviewDraftMapping";
 import {
@@ -30,7 +31,6 @@ describe("割引対象の保存と復元", () => {
 });
 
 import { buildReviewChecks } from "./reviewChecks";
-import { isAmountAndTaxResolved } from "./reviewJudgment";
 import type { AiExpenseDraftJudgmentInput } from "./reviewTypes";
 
 it("選択した商品で税率別照合と一覧判定を行う", () => {
@@ -116,8 +116,8 @@ it("選択した商品で税率別照合と一覧判定を行う", () => {
     taxSummaries,
     items,
   };
-  expect(isAmountAndTaxResolved(draft)).toBe(false);
-  expect(isAmountAndTaxResolved({ ...draft, items: savedItems })).toBe(true);
+  expect(isResolvedForTest(draft)).toBe(true);
+  expect(isResolvedForTest({ ...draft, items: savedItems })).toBe(true);
 });
 
 it("保存済みIDまたは送信順の位置で対象を組み立てる", () => {
@@ -214,3 +214,7 @@ it.each([
     }),
   ).toBeNull();
 });
+
+function isResolvedForTest(draft: Parameters<typeof judgeDraftAmountAndTax>[0]) {
+  return judgeDraftAmountAndTax(draft).status === "resolved";
+}

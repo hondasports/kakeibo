@@ -54,6 +54,86 @@ const props: ComponentProps<typeof ReviewDialog> = {
 };
 
 describe("下書きの修正導線", () => {
+  it("照合が一致しても割引対象の税率差を案内し、全体一致を表示しない", () => {
+    const common = {
+      categoryId: "food",
+      amountBasis: "tax_included" as const,
+      taxAllocationStatus: "allocated" as const,
+      taxResolutionStatus: "resolved" as const,
+      taxResolutionSource: "item_explicit" as const,
+    };
+    const saved = [
+      {
+        ...common,
+        _id: "a",
+        itemName: "商品A",
+        lineType: "item" as const,
+        amountYen: 110,
+        printedAmountYen: 110,
+        normalizedAmountYen: 110,
+        taxRatePercent: 10 as const,
+      },
+      {
+        ...common,
+        _id: "b",
+        itemName: "商品B",
+        lineType: "item" as const,
+        amountYen: 216,
+        printedAmountYen: 216,
+        normalizedAmountYen: 216,
+        taxRatePercent: 8 as const,
+      },
+      {
+        ...common,
+        _id: "c",
+        itemName: "クーポン",
+        lineType: "discount" as const,
+        amountYen: -1,
+        printedAmountYen: -1,
+        normalizedAmountYen: -1,
+        taxRatePercent: 10 as const,
+      },
+    ];
+    render(
+      <ReviewDialog
+        {...props}
+        persistedReviewItems={saved}
+        selectedReviewDraft={{
+          ...props.selectedReviewDraft!,
+          taxSummaries: [
+            {
+              taxRatePercent: 10,
+              taxMode: "included",
+              taxableAmountYen: 325,
+              taxableAmountBasis: "tax_included",
+              taxYen: 29,
+              roundingMethod: "unknown",
+              status: "verified",
+              warnings: [],
+            },
+          ],
+        }}
+        reviewForm={{ ...props.reviewForm, amountYen: "325" }}
+        reviewItems={saved.map((item) => ({
+          ...item,
+          id: item._id,
+          persistedItemId: item._id,
+          amountYen: String(item.amountYen),
+          ...(item._id === "c" ? { discountTargetItemId: "b" } : {}),
+        }))}
+      />,
+    );
+    expect(
+      within(screen.getByRole("region", { name: "全体の確認状態" })).getByText(
+        /割引の対象税率が対象商品（8%）と異なります/,
+      ),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole("region", { name: "全体の確認状態" })).queryByText(
+        /印字額と明細の金額が一致しています/,
+      ),
+    ).not.toBeInTheDocument();
+  });
   it("明細を税抜に変更すると金額確認の差額が消え、上部の確認状態が一致に変わる", async () => {
     const item = {
       ...props.reviewItems[0],

@@ -129,3 +129,85 @@ describe("aggregateDraftItemsByCategory の割引行", () => {
     });
   });
 });
+
+describe("登録額の算術とエラーの優先順位", () => {
+  const good = {
+    itemName: "商品",
+    lineType: "item" as const,
+    amountYen: 100,
+    categoryId: "food",
+    confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+  };
+  it("税額が未配分でも登録額の合計不一致を拒否する", () => {
+    const item = {
+      ...good,
+      itemName: "クーポン",
+      normalizedAmountYen: 108,
+      amountBasis: "tax_excluded" as const,
+      taxRatePercent: 8 as const,
+      taxAllocationStatus: "unallocated" as const,
+    };
+    expect(aggregateDraftItemsByCategory({ amountYen: 109, categoryId: "food" }, [item])).toEqual({
+      success: false,
+      error: "amount_mismatch",
+    });
+  });
+  it("合計不一致をカテゴリ別合計より先に返す", () => {
+    expect(
+      aggregateDraftItemsByCategory({ amountYen: 95, categoryId: "food" }, [
+        good,
+        { ...good, itemName: "割引", lineType: "discount", amountYen: -10, categoryId: "other" },
+      ]),
+    ).toEqual({ success: false, error: "amount_mismatch" });
+  });
+  it("先の明細のカテゴリ欠落を後の明細の符号不正より先に返す", () => {
+    expect(
+      aggregateDraftItemsByCategory({ amountYen: 90, categoryId: "food" }, [
+        { ...good, categoryId: undefined },
+        { ...good, amountYen: -10 },
+      ]),
+    ).toEqual({ success: false, error: "missing_category" });
+  });
+});
+
+it("余分な税フィールドを含む乱数明細も成功時は登録額・符号・カテゴリ合計が正しい", async () => {
+  const { isValidSignedLineItemAmount } = await import("../receipt/discountItems");
+  let seed = 31977;
+  const rnd = (n: number) => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return Math.floor((seed / 4294967296) * n);
+  };
+  let successful = 0;
+  for (let iteration = 0; iteration < 5000; iteration++) {
+    const items = Array.from({ length: 1 + rnd(4) }, () => ({
+      itemName: rnd(2) ? "商品" : "特売",
+      lineType: (["item", "discount", "unknown"] as const)[rnd(3)],
+      amountYen: [-10, 0, 10, 100][rnd(4)],
+      normalizedAmountYen: [undefined, -10, 10, 100, 108][rnd(5)],
+      categoryId: (["food", "other", undefined] as const)[rnd(3)],
+      confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+      amountBasis: (["tax_included", "tax_excluded", "unknown"] as const)[rnd(3)],
+      taxRatePercent: 8,
+      taxAllocationStatus: (["allocated", "unallocated"] as const)[rnd(2)],
+    }));
+    const total = items.reduce((s, i) => s + (i.normalizedAmountYen ?? i.amountYen), 0);
+    const amountYen = total + rnd(3) - 1;
+    const result = aggregateDraftItemsByCategory({ amountYen, categoryId: "food" }, items);
+    if (!result.success) continue;
+    successful++;
+    expect(total).toBe(amountYen);
+    expect(
+      items.every((i) =>
+        isValidSignedLineItemAmount(i.itemName, i.normalizedAmountYen ?? i.amountYen, i.lineType),
+      ),
+    ).toBe(true);
+    const totals = new Map<string, number>();
+    for (const item of items)
+      totals.set(
+        item.categoryId!,
+        (totals.get(item.categoryId!) ?? 0) + (item.normalizedAmountYen ?? item.amountYen),
+      );
+    expect([...totals.values()].every((amount) => amount > 0)).toBe(true);
+  }
+  expect(successful).toBeGreaterThan(0);
+});

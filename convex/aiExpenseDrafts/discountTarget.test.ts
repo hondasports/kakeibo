@@ -1,13 +1,21 @@
+import { draftItemDocToFields } from "../../lib/convex/aiExpenseDrafts/draftRecordMapping";
+import { judgeReviewFormAmountAndTax } from "../../lib/domain/aiExpenseDrafts/reviewFormJudgment";
+import { getReviewGuidance } from "../../lib/domain/aiExpenseDrafts/reviewGuidance";
+import { buildDraftRegistrationItems } from "../../lib/domain/aiExpenseDrafts/registrationItems";
+import { judgeDraftAmountAndTax } from "../../lib/domain/aiExpenseDrafts/draftAmountTaxJudgment";
 /// <reference types="vite/client" />
 import { act, renderHook } from "@testing-library/react";
 import { useReviewFormState } from "../../src/features/receipt-review/hooks/useReviewFormState";
-import { getReviewDiscountTargetForSubmit } from "../../lib/domain/aiExpenseDrafts/reviewItemCategories";
+import {
+  assignDiscountTarget,
+  prepareReviewItemsForSubmit,
+  getReviewDiscountTargetForSubmit,
+} from "../../lib/domain/aiExpenseDrafts/reviewItemCategories";
 import type { Id } from "../_generated/dataModel";
 import { getReviewSubmitErrorMessage } from "../../lib/domain/aiExpenseDrafts/reviewValidation";
 import { buildReviewChecks } from "../../lib/domain/aiExpenseDrafts/reviewChecks";
 import { mapDraftItemsToReviewItems } from "../../lib/domain/aiExpenseDrafts/reviewDraftMapping";
 import { initializeReviewCategoryState } from "../../lib/domain/aiExpenseDrafts/reviewItemCategories";
-import { isAmountAndTaxResolved } from "../../lib/domain/aiExpenseDrafts/reviewJudgment";
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import type { FunctionArgs } from "convex/server";
@@ -193,6 +201,11 @@ describe("割引対象の保存", () => {
       rows.find((row) => row.itemName === "商品C")?._id,
     );
     expect(rows.find((row) => row.itemName === "商品C")?._id).not.toBe(ids.productId);
+    const judgment = judgeDraftAmountAndTax({ ...recreated, items: rows });
+    expect(recreated.reviewReasons.includes("amount_mismatch")).toBe(
+      judgment.reasons.includes("amount_mismatch"),
+    );
+    expect(recreated.listSummary?.amountAndTaxResolved).toBe(judgment.status === "resolved");
     expect(
       recreated.receiptInterpretation?.values.items[0].discountTargetItemIndex,
     ).toBeUndefined();
@@ -219,6 +232,17 @@ describe("割引対象の保存", () => {
     });
     expect((await t.run(({ db }) => db.get(ids.discountId)))?.discountTargetItemId).toBe(
       ids.productId,
+    );
+    const saved = (await t.run(({ db }) => db.get(ids.draftId)))!;
+    const rows = await t.run(({ db }) =>
+      db
+        .query("aiExpenseDraftItems")
+        .withIndex("by_draft_id", (q) => q.eq("draftId", ids.draftId))
+        .collect(),
+    );
+    expect(saved.status).toBe("registered");
+    expect(saved.listSummary?.amountAndTaxResolved).toBe(
+      judgeDraftAmountAndTax({ ...saved, items: rows }).status === "resolved",
     );
   });
   it("選択した対象の保存後も税率別照合と一覧判定が一致する", async () => {
@@ -282,9 +306,66 @@ describe("割引対象の保存", () => {
         updatedAt: 1,
       });
     });
+    const initialRows = await t.run(({ db }) =>
+      db
+        .query("aiExpenseDraftItems")
+        .withIndex("by_draft_id", (q) => q.eq("draftId", ids.draftId))
+        .collect(),
+    );
+    const initializedBeforeSave = initializeReviewCategoryState(
+      mapDraftItemsToReviewItems(initialRows),
+      ids.categoryId,
+    );
+    const selected = assignDiscountTarget(initializedBeforeSave.items, ids.discountId, thirdId);
+    const prepared = prepareReviewItemsForSubmit(selected, ids.categoryId);
+    const form = {
+      documentType: "receipt" as const,
+      shopName: "store",
+      date: "2026-11-01",
+      amountYen: "198",
+      categoryId: ids.categoryId,
+      registrationMode: "detailed" as const,
+    };
+    const formJudgment = judgeReviewFormAmountAndTax(
+      { documentType: "receipt", reviewReasons: [], taxSummaries },
+      form,
+      selected,
+    );
+    expect(formJudgment.status).toBe("resolved");
+    expect(formJudgment.unresolvedTaxItemCount).toBe(0);
+    expect(
+      getReviewGuidance(form, selected, {
+        documentType: "receipt",
+        reviewReasons: [],
+        taxSummaries,
+      }).filter((issue) => issue.required),
+    ).toHaveLength(0);
+    expect(formJudgment.checks).toMatchObject({
+      amount: { status: "matched" },
+      taxRate: { status: "matched" },
+    });
+    expect(buildReviewChecks({ items: prepared, paidTotalYen: 198, taxSummaries })).toMatchObject({
+      amount: { status: "matched" },
+      taxRate: { status: "matched" },
+    });
+    expect(
+      getReviewSubmitErrorMessage(
+        {
+          documentType: "receipt",
+          shopName: "store",
+          date: "2026-11-01",
+          amountYen: "198",
+          categoryId: ids.categoryId,
+          registrationMode: "detailed",
+        },
+        prepared,
+      ),
+    ).toBeNull();
+    const discountForm = prepared.find((item) => item.id === ids.discountId)!;
+    expect(getReviewDiscountTargetForSubmit(prepared, discountForm)).toEqual({ itemId: thirdId });
     await save([
       product,
-      { ...discount, discountTarget: { itemId: thirdId } },
+      { ...discount, discountTarget: getReviewDiscountTargetForSubmit(prepared, discountForm) },
       { ...added, itemId: thirdId },
     ]);
     const { draft, rows } = await t.run(async ({ db }) => ({
@@ -305,8 +386,17 @@ describe("割引対象の保存", () => {
       buildReviewChecks({ items: initialized.items, paidTotalYen: 198, taxSummaries }).taxRate
         .status,
     ).toBe("matched");
-    expect(isAmountAndTaxResolved({ ...draft, items: rows })).toBe(true);
+    expect(isResolvedForTest({ ...draft, items: rows })).toBe(true);
+    expect(draft.reviewReasons).not.toContain("amount_mismatch");
+    expect(draft.reviewReasons).not.toContain("user_confirmation_required");
+    expect(draft.status).toBe("ready");
     expect(draft.listSummary?.amountAndTaxResolved).toBe(true);
+    expect(
+      buildDraftRegistrationItems(draft, rows.map(draftItemDocToFields)).reduce(
+        (sum, item) => sum + item.amountYen,
+        0,
+      ),
+    ).toBe(198);
   });
   it("対象商品を割引へ変えたら選択を解除し、選び直して保存できる", async () => {
     const { t, ids, save, product, discount, added } = await setup();
@@ -461,3 +551,7 @@ describe("割引対象の保存", () => {
     }
   });
 });
+
+function isResolvedForTest(draft: Parameters<typeof judgeDraftAmountAndTax>[0]) {
+  return judgeDraftAmountAndTax(draft).status === "resolved";
+}

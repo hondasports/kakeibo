@@ -1,0 +1,329 @@
+[
+  {
+    "draft": {
+      "id": "draft",
+      "groupId": "g",
+      "sourceType": "image_upload",
+      "status": "needs_review",
+      "documentType": "receipt",
+      "shopName": "店",
+      "date": "2026-11-01",
+      "amountYen": 220,
+      "categoryId": "food",
+      "confidence": {
+        "documentType": 1,
+        "shopName": 1,
+        "date": 1,
+        "amountYen": 1,
+        "categoryId": 1
+      },
+      "warnings": [],
+      "reviewReasons": [],
+      "createdAt": 0,
+      "updatedAt": 0,
+      "taxSummaries": [
+        {
+          "taxRatePercent": 8,
+          "taxMode": "included",
+          "taxableAmountYen": 0,
+          "taxableAmountBasis": "tax_included",
+          "taxYen": 0,
+          "roundingMethod": "unknown",
+          "status": "verified",
+          "confidence": {},
+          "warnings": []
+        },
+        {
+          "taxRatePercent": 10,
+          "taxMode": "unknown",
+          "taxableAmountYen": 220,
+          "taxableAmountBasis": "tax_included",
+          "taxYen": 20,
+          "roundingMethod": "unknown",
+          "status": "verified",
+          "confidence": {},
+          "warnings": []
+        }
+      ]
+    },
+    "items": [
+      {
+        "id": "i0",
+        "groupId": "g",
+        "draftId": "draft",
+        "itemName": "牛乳",
+        "amountYen": 200,
+        "categoryId": "food",
+        "confidence": {
+          "itemName": 1,
+          "amountYen": 1,
+          "categoryId": 1
+        },
+        "createdAt": 0,
+        "updatedAt": 0,
+        "lineType": "discount",
+        "amountBasis": "tax_excluded",
+        "taxRatePercent": 10,
+        "taxAllocationStatus": "allocated",
+        "taxResolutionSource": "item_explicit",
+        "normalizedAmountYen": 220
+      }
+    ]
+  },
+  {
+    "draft": {
+      "id": "draft",
+      "groupId": "g",
+      "sourceType": "image_upload",
+      "status": "needs_review",
+      "documentType": "receipt",
+      "shopName": "店",
+      "date": "2026-11-01",
+      "amountYen": 11,
+      "categoryId": "food",
+      "confidence": {
+        "documentType": 1,
+        "shopName": 1,
+        "date": 1,
+        "amountYen": 1,
+        "categoryId": 1
+      },
+      "warnings": [],
+      "reviewReasons": [],
+      "createdAt": 0,
+      "updatedAt": 0,
+      "taxSummaries": [
+        {
+          "taxRatePercent": 8,
+          "taxMode": "included",
+          "taxableAmountYen": 1,
+          "taxableAmountBasis": "unknown",
+          "taxYen": 0,
+          "roundingMethod": "unknown",
+          "status": "ambiguous",
+          "confidence": {},
+          "warnings": []
+        }
+      ]
+    },
+    "items": [
+      {
+        "id": "i0",
+        "groupId": "g",
+        "draftId": "draft",
+        "itemName": "牛乳",
+        "amountYen": 10,
+        "categoryId": "food",
+        "confidence": {
+          "itemName": 1,
+          "amountYen": 1,
+          "categoryId": 1
+        },
+        "createdAt": 0,
+        "updatedAt": 0,
+        "lineType": "unknown",
+        "amountBasis": "tax_excluded",
+        "taxRatePercent": 10,
+        "taxAllocationStatus": "allocated",
+        "normalizedAmountYen": 11
+      }
+    ]
+  },
+  {
+    "draft": {
+      "id": "draft",
+      "groupId": "g",
+      "sourceType": "image_upload",
+      "status": "needs_review",
+      "documentType": "receipt",
+      "shopName": "店",
+      "date": "2026-11-01",
+      "amountYen": 117,
+      "categoryId": "food",
+      "confidence": {
+        "documentType": 1,
+        "shopName": 1,
+        "date": 1,
+        "amountYen": 1,
+        "categoryId": 1
+      },
+      "warnings": [],
+      "reviewReasons": ["amount_mismatch"],
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    "items": [
+      {
+        "id": "i0",
+        "groupId": "g",
+        "draftId": "draft",
+        "itemName": "特売",
+        "amountYen": 108,
+        "categoryId": "food",
+        "confidence": {
+          "itemName": 1,
+          "amountYen": 1,
+          "categoryId": 1
+        },
+        "createdAt": 0,
+        "updatedAt": 0,
+        "lineType": "discount",
+        "amountBasis": "tax_excluded",
+        "taxRatePercent": 8,
+        "taxResolutionStatus": "resolved",
+        "normalizedAmountYen": 116
+      },
+      {
+        "id": "i1",
+        "groupId": "g",
+        "draftId": "draft",
+        "itemName": "牛乳",
+        "amountYen": 1,
+        "categoryId": "food",
+        "confidence": {
+          "itemName": 1,
+          "amountYen": 1,
+          "categoryId": 1
+        },
+        "createdAt": 0,
+        "updatedAt": 0,
+        "lineType": "unknown",
+        "printedAmountYen": 1,
+        "amountBasis": "tax_included",
+        "taxRatePercent": 10,
+        "taxAllocationStatus": "allocated",
+        "taxResolutionStatus": "resolved",
+        "normalizedAmountYen": 1
+      }
+    ]
+  },
+  {
+    "draft": {
+      "id": "draft",
+      "groupId": "g",
+      "sourceType": "image_upload",
+      "status": "needs_review",
+      "documentType": "receipt",
+      "shopName": "店",
+      "date": "2026-11-01",
+      "amountYen": 237,
+      "categoryId": "food",
+      "confidence": {
+        "documentType": 1,
+        "shopName": 1,
+        "date": 1,
+        "amountYen": 1,
+        "categoryId": 1
+      },
+      "warnings": [],
+      "reviewReasons": [],
+      "createdAt": 0,
+      "updatedAt": 0,
+      "taxSummaries": [
+        {
+          "taxRatePercent": 8,
+          "taxMode": "unknown",
+          "taxableAmountYen": 0,
+          "taxableAmountBasis": "unknown",
+          "taxYen": 0,
+          "roundingMethod": "unknown",
+          "status": "contradictory",
+          "confidence": {},
+          "warnings": []
+        },
+        {
+          "taxRatePercent": 10,
+          "taxMode": "external",
+          "taxableAmountYen": 238,
+          "taxableAmountBasis": "tax_included",
+          "taxYen": 21,
+          "roundingMethod": "unknown",
+          "status": "verified",
+          "confidence": {},
+          "warnings": []
+        }
+      ]
+    },
+    "items": [
+      {
+        "id": "i0",
+        "groupId": "g",
+        "draftId": "draft",
+        "itemName": "牛乳",
+        "amountYen": 216,
+        "categoryId": "food",
+        "confidence": {
+          "itemName": 1,
+          "amountYen": 1,
+          "categoryId": 1
+        },
+        "createdAt": 0,
+        "updatedAt": 0,
+        "amountBasis": "tax_excluded",
+        "taxRatePercent": 10,
+        "taxAllocationStatus": "unallocated",
+        "taxResolutionStatus": "resolved",
+        "normalizedAmountYen": 237
+      }
+    ]
+  },
+  {
+    "draft": {
+      "id": "draft",
+      "groupId": "g",
+      "sourceType": "image_upload",
+      "status": "needs_review",
+      "documentType": "receipt",
+      "shopName": "店",
+      "date": "2026-11-01",
+      "amountYen": 108,
+      "categoryId": "food",
+      "confidence": {
+        "documentType": 1,
+        "shopName": 1,
+        "date": 1,
+        "amountYen": 1,
+        "categoryId": 1
+      },
+      "warnings": [],
+      "reviewReasons": [],
+      "createdAt": 0,
+      "updatedAt": 0,
+      "taxSummaries": [
+        {
+          "taxRatePercent": 10,
+          "taxMode": "included",
+          "taxableAmountYen": 0,
+          "taxableAmountBasis": "tax_included",
+          "taxYen": 0,
+          "roundingMethod": "unknown",
+          "status": "contradictory",
+          "confidence": {},
+          "warnings": []
+        }
+      ]
+    },
+    "items": [
+      {
+        "id": "i0",
+        "groupId": "g",
+        "draftId": "draft",
+        "itemName": "値引",
+        "amountYen": 100,
+        "categoryId": "other",
+        "confidence": {
+          "itemName": 1,
+          "amountYen": 1,
+          "categoryId": 1
+        },
+        "createdAt": 0,
+        "updatedAt": 0,
+        "lineType": "promotion_adjustment",
+        "amountBasis": "tax_excluded",
+        "taxRatePercent": 8,
+        "taxResolutionSource": "item_explicit",
+        "normalizedAmountYen": 108
+      }
+    ]
+  }
+]

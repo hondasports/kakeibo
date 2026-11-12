@@ -1,4 +1,4 @@
-import { isValidSignedLineItemAmount, type ReceiptItemLineType } from "../receipt/discountItems";
+import type { ReceiptItemLineType } from "../receipt/discountItems";
 import {
   AI_EXPENSE_DRAFT_CONFIDENCE_THRESHOLD,
   AI_EXPENSE_DRAFT_REVIEW_REASONS,
@@ -94,31 +94,8 @@ function hasRequiredCounterparty(input: AiExpenseDraftClassificationInput) {
   return hasText(input.shopName) || hasText(input.payeeName) || hasText(input.paymentPlace);
 }
 
-function hasAmountMismatch(input: AiExpenseDraftClassificationInput) {
-  if (input.amountYen === undefined || input.items === undefined || input.items.length === 0) {
-    return false;
-  }
-
-  const itemTotal = input.items.reduce((sum, item) => sum + item.amountYen, 0);
-  return itemTotal !== input.amountYen;
-}
-
 function hasAmbiguousItemCategory(input: AiExpenseDraftClassificationInput) {
   return input.items?.some((item) => item.categoryId === undefined) ?? false;
-}
-
-function hasNonPositiveCategoryTotal(input: AiExpenseDraftClassificationInput) {
-  if (!input.items || input.items.length === 0) {
-    return false;
-  }
-  const totals = new Map<unknown, number>();
-  for (const item of input.items) {
-    if (item.categoryId === undefined) {
-      continue;
-    }
-    totals.set(item.categoryId, (totals.get(item.categoryId) ?? 0) + item.amountYen);
-  }
-  return [...totals.values()].some((amountYen) => amountYen <= 0);
 }
 
 function hasMultipleItemCategories(input: AiExpenseDraftClassificationInput) {
@@ -126,16 +103,6 @@ function hasMultipleItemCategories(input: AiExpenseDraftClassificationInput) {
     input.items?.flatMap((item) => (item.categoryId === undefined ? [] : [item.categoryId])) ?? [],
   );
   return categoryIds.size > 1;
-}
-
-function hasInvalidItemAmount(input: AiExpenseDraftClassificationInput) {
-  return (
-    input.items?.some(
-      (item) =>
-        !item.itemName ||
-        !isValidSignedLineItemAmount(item.itemName, item.amountYen, item.lineType),
-    ) ?? false
-  );
 }
 
 function addReason(reasons: Set<AiExpenseDraftReviewReason>, reason: AiExpenseDraftReviewReason) {
@@ -176,14 +143,6 @@ export function classifyAiExpenseDraft(input: AiExpenseDraftClassificationInput)
     input.warnings.length > 0
   ) {
     addReason(reasons, "low_confidence");
-  }
-
-  if (
-    hasAmountMismatch(input) ||
-    hasNonPositiveCategoryTotal(input) ||
-    hasInvalidItemAmount(input)
-  ) {
-    addReason(reasons, "amount_mismatch");
   }
 
   const reviewReasons = AI_EXPENSE_DRAFT_REVIEW_REASONS.filter((reason) => reasons.has(reason));

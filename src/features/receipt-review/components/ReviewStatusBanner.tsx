@@ -5,6 +5,7 @@ import type { ReviewChecks } from "../../../../lib/domain/aiExpenseDrafts/review
 
 export function ReviewStatusBanner({
   checks,
+  amountTaxResolved = true,
   issues,
   unresolvedTaxItemCount,
   receiptIssues = [],
@@ -12,6 +13,7 @@ export function ReviewStatusBanner({
   onJump,
 }: {
   checks: ReviewChecks;
+  amountTaxResolved?: boolean;
   /** 明細・基本情報など特定箇所への確認・修正項目 */
   issues: ReviewGuidanceItem[];
   /** 税率または税込／税抜が未確定の明細数 */
@@ -22,7 +24,8 @@ export function ReviewStatusBanner({
   onJump: (target: string) => void;
 }) {
   const { amount, taxRate } = checks;
-  const checksAreMatched = amount.status === "matched" && taxRate.status === "matched";
+  const checksAreMatched =
+    amountTaxResolved && amount.status === "matched" && taxRate.status === "matched";
   const sharedBlockerCode =
     amount.status === "uncomparable" &&
     taxRate.status === "uncomparable" &&
