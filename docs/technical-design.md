@@ -1689,9 +1689,9 @@ cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` �
 
 運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の `needsBackfill` が既存の登録済み下書き数と妥当に一致することを確認してから `executeBatch` を実行する。**
 
-1. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` / `skippedOverLimit` を確認）
+1. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` を確認）
 2. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
-3. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること、`skippedOverLimit` を別途確認）
+3. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること）
 
 #### 下書き一覧の保存サマリ（listSummary）補完（一回限りの内部 backfill）
 

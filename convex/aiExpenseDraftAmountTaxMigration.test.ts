@@ -404,7 +404,7 @@ describe("金額差異の移行", () => {
     const second = await t.mutation(execute, { cursor: first.continueCursor });
     expect(second).toMatchObject({ isDone: true, updated: 0 });
   });
-  it("一覧の判定窓は100件で、窓外の明細は登録時の全件検証に残る", async () => {
+  it("明細が101件以上の下書きは移行で変えず、登録時の全件検証で拒否される", async () => {
     const t = convexTest(schema, convexTestModules);
     const id = await t.run(async ({ db }) => {
       const groupId = await db.insert("groups", {

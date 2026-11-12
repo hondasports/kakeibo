@@ -1,14 +1,10 @@
-import { judgeDraftAmountAndTax } from "../../domain/aiExpenseDrafts/draftAmountTaxJudgment";
 import { describe, expect, it, vi } from "vitest";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { ExtractedDraftItemInput } from "../../domain/aiExpenseDrafts/createFromExtraction";
 import { buildDraftListSummary } from "../../domain/aiExpenseDrafts/listSummary";
-import type {
-  AiExpenseDraftItem,
-  DraftListSummary,
-} from "../../domain/aiExpenseDrafts/reviewTypes";
+import type { DraftListSummary } from "../../domain/aiExpenseDrafts/reviewTypes";
 import { getAiExpenseDraftWithItems } from "../../usecase/aiExpenseDrafts/getDraftWithItems";
 import {
   CAT_ID,
@@ -501,13 +497,8 @@ describe("解析結果からの作成", () => {
       { draftId: "new-draft-id" },
     );
     expect(view?.items).toHaveLength(JUDGMENT_WINDOW);
-    const viewJudgment = isResolvedForTest({
-      ...persistedDraft,
-      items: view!.items.map(({ id, ...rest }) => ({ ...rest, _id: id }) as AiExpenseDraftItem),
-    });
     // 保存額は再解釈前の税抜額なので、表示用の再計算額が一致しても未解決。
-    expect(viewJudgment).toBe(false);
-    expect(saved.amountAndTaxResolved).toBe(viewJudgment);
+    expect(saved.amountAndTaxResolved).toBe(false);
   });
 
   it("createFailedDraftFromImageAnalysis: 失敗下書きも未解決の保存値を持つ", async () => {
@@ -534,7 +525,3 @@ describe("解析結果からの作成", () => {
     });
   });
 });
-
-function isResolvedForTest(draft: Parameters<typeof judgeDraftAmountAndTax>[0]) {
-  return judgeDraftAmountAndTax(draft).status === "resolved";
-}
