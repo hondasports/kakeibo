@@ -57,6 +57,16 @@
   ],
   "src/features/yearly-summary/**": ["e2e/yearly-summary.spec.ts"],
   "src/router.tsx": ["e2e/navigation.spec.ts", "e2e/auth.spec.ts"],
+  "convex/aiExpenseDraftAmountTaxMigration*.ts": [
+    "e2e/ai-expense-queue.spec.ts",
+    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
+    "e2e/ai-expense-tax-allocation.spec.ts"
+  ],
+  "convex/aiExpenseDraftListSummaryMigration.ts": [
+    "e2e/ai-expense-queue.spec.ts",
+    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
+    "e2e/ai-expense-tax-allocation.spec.ts"
+  ],
   "convex/aiExpenseDrafts/**": [
     "e2e/ai-expense-queue.spec.ts",
     "e2e/ai-expense-queue.tax-summary-state.spec.ts",

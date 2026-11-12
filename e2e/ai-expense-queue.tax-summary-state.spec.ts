@@ -17,7 +17,7 @@ async function seedLegacySummaryDraft(page: Page) {
   await page.reload();
   const queue = page.locator(".input-workbench--expense");
   const item = queue.locator(".ai-expense-queue-item").filter({ hasText: "E2E税内訳補完店" });
-  await expect(item).not.toContainText("金額・税内訳の確認が必要");
+  await expect(item).toContainText("金額・税内訳の確認が必要");
   await item.getByRole("button", { name: "確認する", exact: true }).click();
   return { queue, dialog: page.getByRole("dialog", { name: "下書き確認" }) };
 }
@@ -50,6 +50,7 @@ test.describe("Issue #1015 旧形式の税内訳", () => {
       .locator(".ai-expense-queue-item")
       .filter({ hasText: "E2E税内訳補完店" });
     await expect(ready).toContainText("1,782円");
+    await expect(ready).not.toContainText("金額・税内訳の確認が必要");
     await ready.getByRole("button", { name: "修正する", exact: true }).click();
     await expectResolved(dialog);
     await expect(dialog.getByLabel("合計金額", { exact: true })).toHaveValue("1782");
