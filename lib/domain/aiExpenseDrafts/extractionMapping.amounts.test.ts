@@ -8,6 +8,15 @@ import { mapExtractionToDraftArgs } from "./extractionMapping";
 import { foodCategory } from "./testHelpers";
 import { EXPENSE_ENTRY_AMOUNT_MAX } from "../expenseEntries/expenseEntryItem";
 import { parseExtractionPayload } from "../receipt/extraction";
+import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
+
+function judgeMapped(mapped: ReturnType<typeof mapExtractionToDraftArgs>) {
+  const { draft } = buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0);
+  return judgeDraftAmountAndTax({
+    ...draft,
+    items: mapped.items?.map((item, index) => ({ ...item, _id: String(index) })),
+  });
+}
 
 describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
   it("抽出された明細の税込換算が上限を超えた場合は税率群全体を未配分で下書きに渡す", () => {
@@ -44,6 +53,10 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
       "unallocated",
       "unallocated",
     ]);
+    expect(judgeMapped(mapped)).toMatchObject({
+      status: "unresolved",
+      reasons: expect.arrayContaining(["user_confirmation_required"]),
+    });
     expect(
       buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
         .reviewReasons,
@@ -80,6 +93,10 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
     expect(mapped.items?.map((item) => item.printedAmountYen)).toEqual(amounts);
     expect(mapped.items?.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
     expect(mapped.items?.every((item) => item.allocatedTaxYen === 0)).toBe(true);
+    expect(judgeMapped(mapped)).toMatchObject({
+      status: "unresolved",
+      reasons: expect.arrayContaining(["user_confirmation_required"]),
+    });
     expect(
       buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
         .reviewReasons,
@@ -119,6 +136,10 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
       lineType: "unknown",
       printedAmountYen: -16,
       warnings: expect.arrayContaining(["negative_amount_line_type_uncertain"]),
+    });
+    expect(judgeMapped(mapped)).toMatchObject({
+      status: "unresolved",
+      reasons: expect.arrayContaining(["amount_mismatch"]),
     });
     expect(
       buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
@@ -215,6 +236,7 @@ describe("mapExtractionToDraftArgs tax normalization (amount handling)", () => {
       status: "ambiguous",
       candidates: [expect.objectContaining({ role: "unknown" })],
     });
+    expect(judgeMapped(mapped)).toMatchObject({ status: "not_applicable", reasons: [] });
     expect(
       buildExtractedDraftFields({ userId: "user", groupId: "group" }, mapped, 0).draft
         .reviewReasons,

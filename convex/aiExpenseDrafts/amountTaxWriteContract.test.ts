@@ -57,6 +57,83 @@ async function setup() {
 const confidence = { documentType: 1, shopName: 1, date: 1, amountYen: 1, categoryId: 1 };
 
 describe("金額・税の書込契約", () => {
+  it("窓外の未確定税は税上書き後も確認待ちに残る", async () => {
+    const { t, ids } = await setup();
+    const { draftId, firstId } = await t.run(async ({ db }) => {
+      const draftId = await db.insert("aiExpenseDrafts", {
+        groupId: ids.groupId,
+        sourceType: "image_upload",
+        status: "needs_review",
+        documentType: "receipt",
+        shopName: "店",
+        date: "2026-11-01",
+        amountYen: 100,
+        categoryId: ids.categoryId,
+        confidence,
+        warnings: [],
+        reviewReasons: ["user_confirmation_required"],
+        createdAt: 1,
+        updatedAt: 1,
+        taxSummaries: [
+          {
+            taxRatePercent: 10,
+            taxMode: "included",
+            taxableAmountYen: 100,
+            taxableAmountBasis: "tax_included",
+            taxYen: 9,
+            roundingMethod: "unknown",
+            status: "verified",
+            confidence: {},
+            warnings: [],
+          },
+        ],
+      });
+      let firstId: Id<"aiExpenseDraftItems"> | undefined;
+      for (let i = 0; i < 102; i++) {
+        const unresolved = i === 100;
+        const discount = i === 101;
+        const amountYen = discount ? -1 : 1;
+        const id = await db.insert("aiExpenseDraftItems", {
+          groupId: ids.groupId,
+          draftId,
+          itemName: discount ? "値引" : "商品",
+          ...(discount ? { lineType: "discount" as const } : {}),
+          amountYen,
+          printedAmountYen: amountYen,
+          normalizedAmountYen: amountYen,
+          amountBasis: unresolved ? "unknown" : "tax_included",
+          taxRatePercent: unresolved ? null : 10,
+          taxResolutionStatus: unresolved ? "unresolved" : "resolved",
+          ...(unresolved ? {} : { taxResolutionSource: "item_explicit" as const }),
+          taxAllocationStatus: unresolved ? "unallocated" : "allocated",
+          categoryId: ids.categoryId,
+          confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        firstId ??= id;
+      }
+      return { draftId, firstId: firstId! };
+    });
+    await t
+      .withIdentity(identity)
+      .mutation(api.aiExpenseDrafts.mutations.updateDraftItemTaxOverrides, {
+        draftId,
+        itemId: firstId,
+        taxRatePercent: 10,
+        amountBasis: "tax_included",
+      });
+    const saved = (await t.run(({ db }) => db.get(draftId)))!;
+    expect(saved.status).toBe("needs_review");
+    expect(saved.reviewReasons).toContain("user_confirmation_required");
+    await expect(
+      t
+        .withIdentity(identity)
+        .mutation(api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries, {
+          draftIds: [draftId],
+        }),
+    ).rejects.toThrow();
+  });
   it.each(["updateRegisteredDraft", "updateForReview"] as const)(
     "登録済みの %s は status と一覧判定を保つ",
     async (operation) => {

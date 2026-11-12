@@ -326,9 +326,24 @@ describe("金額・税の保存とフォーム契約", () => {
       expect(savedJudgment.status).toBe(expectedSaved);
       expect(saved.listSummary?.amountAndTaxResolved).toBe(savedJudgment.status === "resolved");
       if (savedJudgment.status === "resolved") {
-        expect(() =>
-          buildDraftRegistrationItems(draftDocToFields(saved), rows.map(draftItemDocToFields)),
-        ).not.toThrow();
+        const registrationItems = buildDraftRegistrationItems(
+          draftDocToFields(saved),
+          rows.map(draftItemDocToFields),
+        );
+        const expectedTotals = new Map<string, number>();
+        for (const row of rows)
+          if (row.categoryId)
+            expectedTotals.set(
+              row.categoryId,
+              (expectedTotals.get(row.categoryId) ?? 0) +
+                (row.normalizedAmountYen ?? row.amountYen),
+            );
+        expect(registrationItems.reduce((sum, item) => sum + item.amountYen, 0)).toBe(
+          saved.amountYen,
+        );
+        expect(
+          registrationItems.map(({ categoryId, amountYen }) => [categoryId, amountYen]).sort(),
+        ).toEqual([...expectedTotals.entries()].sort());
         expect(saved.listSummary?.itemSummary?.itemDifferenceYen).toBe(0);
       }
       if (savedJudgment.reasons.includes("amount_mismatch"))

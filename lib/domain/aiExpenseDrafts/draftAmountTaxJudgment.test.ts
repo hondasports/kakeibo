@@ -405,21 +405,29 @@ it("保存されていない割引対象は推定せず割引自身の税率で�
   ).toBe("unresolved");
 });
 
-it.each(legacyCases)(
-  "印字額欠落の保存明細を旧登録経路と同じ金額で判定する %#",
-  ({ draft, items }) => {
-    const saved = { ...draft, documentType: "receipt" as const, items } as unknown as Parameters<
-      typeof judgeDraftAmountAndTax
-    >[0];
-    const judgment = judgeDraftAmountAndTax(saved, {
-      itemScope: "all_items",
-    });
-    expect(judgment.status).toBe("resolved");
-    expect(() =>
-      buildDraftRegistrationItems(
-        draft as unknown as Parameters<typeof buildDraftRegistrationItems>[0],
-        items as unknown as Parameters<typeof buildDraftRegistrationItems>[1],
-      ),
-    ).not.toThrow();
-  },
-);
+it.each(
+  legacyCases.map((testCase, index) => ({
+    ...testCase,
+    expected: [
+      [{ categoryId: "food", amountYen: 220 }],
+      [{ categoryId: "food", amountYen: 11 }],
+      [{ categoryId: "food", amountYen: 117 }],
+      [{ categoryId: "food", amountYen: 237 }],
+      [{ categoryId: "other", amountYen: 108 }],
+    ][index],
+  })),
+)("印字額欠落の保存明細を旧登録経路と同じ金額で判定する %#", ({ draft, items, expected }) => {
+  const saved = { ...draft, documentType: "receipt" as const, items } as unknown as Parameters<
+    typeof judgeDraftAmountAndTax
+  >[0];
+  const judgment = judgeDraftAmountAndTax(saved, {
+    itemScope: "all_items",
+  });
+  expect(judgment.status).toBe("resolved");
+  expect(
+    buildDraftRegistrationItems(
+      draft as unknown as Parameters<typeof buildDraftRegistrationItems>[0],
+      items as unknown as Parameters<typeof buildDraftRegistrationItems>[1],
+    ).map(({ categoryId, amountYen }) => ({ categoryId, amountYen })),
+  ).toEqual(expected);
+});

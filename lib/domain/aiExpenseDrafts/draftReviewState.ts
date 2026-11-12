@@ -42,10 +42,25 @@ export function buildDraftReviewState(
       fullAmounts.invalidItems.some(Boolean))
       ? ["amount_mismatch" as const]
       : [];
+  const fullJudgmentReasons =
+    options.mode !== "migration" &&
+    items.length > DRAFT_JUDGMENT_ITEM_LIMIT &&
+    draft.registrationMode !== "totalOnly"
+      ? judgeDraftAmountAndTax(
+          { ...draft, items: items.map((item) => ({ ...item, _id: item.id })) },
+          { itemScope: "all_items" },
+        ).reasons
+      : [];
   const reviewReasons =
     options.mode === "migration"
       ? options.reasons.filter((reason) => !removeMismatch || reason !== "amount_mismatch")
-      : mergeReviewReasons(preserved, mergeReviewReasons(judgment.reasons, fullAmountReasons));
+      : mergeReviewReasons(
+          preserved,
+          mergeReviewReasons(
+            judgment.reasons,
+            mergeReviewReasons(fullAmountReasons, fullJudgmentReasons),
+          ),
+        );
   const status =
     options.mode === "migration" && !removeMismatch
       ? draft.status === "ready"
