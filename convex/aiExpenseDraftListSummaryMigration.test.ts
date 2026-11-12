@@ -60,6 +60,53 @@ describe("aiExpenseDraftListSummaryMigration", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
+  it("101件以上はサマリを補完せず見送り件数に数える", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await seedGroup(t);
+    const ids = await t.run(async ({ db }) => {
+      const result: Id<"aiExpenseDrafts">[] = [];
+      for (const count of [100, 101]) {
+        const id = await db.insert("aiExpenseDrafts", {
+          groupId,
+          sourceType: "image_upload",
+          status: "ready",
+          documentType: "receipt",
+          amountYen: count,
+          reviewReasons: [],
+          confidence: {},
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        for (let i = 0; i < count; i++)
+          await db.insert("aiExpenseDraftItems", {
+            groupId,
+            draftId: id,
+            itemName: "商品",
+            amountYen: 1,
+            confidence: {},
+            createdAt: 1,
+            updatedAt: 1,
+          });
+        result.push(id);
+      }
+      return result;
+    });
+    const before = await t.run(({ db }) => db.get(ids[1]));
+    expect(await t.query(internal.aiExpenseDraftListSummaryMigration.dryRun, {})).toMatchObject({
+      needsBackfill: 1,
+      skippedOverLimit: 1,
+    });
+    expect(
+      await t.mutation(internal.aiExpenseDraftListSummaryMigration.executeBatch, {}),
+    ).toMatchObject({ backfilled: 1, skippedOverLimit: 1 });
+    expect(await t.run(({ db }) => db.get(ids[1]))).toEqual(before);
+    expect((await t.run(({ db }) => db.get(ids[0])))?.listSummary).toBeDefined();
+    expect(await t.query(internal.aiExpenseDraftListSummaryMigration.verify, {})).toMatchObject({
+      remaining: 0,
+      skippedOverLimit: 1,
+    });
+  });
+
   it("listSummary 未設定の ready / needs_review 下書きを補完し、対象外と updatedAt に触れず、冪等に再実行できる", async () => {
     const t = convexTest(schema, convexTestModules);
     const groupId = await seedGroup(t);

@@ -449,7 +449,12 @@ describe("金額差異の移行", () => {
         });
       return draftId;
     });
-    expect(await t.mutation(execute, {})).toMatchObject({ summaryUpdatedOnly: 1 });
+    const before = await t.run(({ db }) => db.get(id));
+    expect(await t.query(dryRun, {})).toMatchObject({ skippedOverLimit: 1, needsUpdate: 0 });
+    expect(await t.mutation(execute, {})).toMatchObject({
+      summaryUpdatedOnly: 0,
+      skippedOverLimit: 1,
+    });
     const result = await t.run(async ({ db }) => ({
       draft: (await db.get(id))!,
       rows: await db
@@ -457,13 +462,7 @@ describe("金額差異の移行", () => {
         .withIndex("by_draft_id", (q) => q.eq("draftId", id))
         .collect(),
     }));
-    expect(result.draft).toMatchObject({
-      reviewReasons: ["low_confidence"],
-      listSummary: {
-        amountAndTaxResolved: true,
-        itemSummary: { itemTotalYen: 100, itemDifferenceYen: 0 },
-      },
-    });
+    expect(result.draft).toEqual(before);
     expect(() =>
       buildDraftRegistrationItems(
         draftDocToFields(result.draft),

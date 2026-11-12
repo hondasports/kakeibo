@@ -12,6 +12,7 @@ import {
   draftItemDocToFields,
 } from "../../lib/convex/aiExpenseDrafts/draftRecordMapping";
 import type { Id } from "../_generated/dataModel";
+import { persistReceiptUserOverrideSnapshot } from "../../lib/convex/aiExpenseDrafts/receiptDataContract";
 
 const identity = {
   tokenIdentifier: "contract-user",
@@ -57,6 +58,106 @@ async function setup() {
 const confidence = { documentType: 1, shopName: 1, date: 1, amountYen: 1, categoryId: 1 };
 
 describe("金額・税の書込契約", () => {
+  it("全明細未取得で101件以上の override 保存は判定とサマリを変更しない", async () => {
+    const { t, ids } = await setup();
+    const draftId = await t.run(async ({ db }) => {
+      const id = await db.insert("aiExpenseDrafts", {
+        groupId: ids.groupId,
+        sourceType: "image_upload",
+        status: "needs_review",
+        documentType: "receipt",
+        shopName: "店",
+        date: "2026-11-01",
+        amountYen: 101,
+        categoryId: ids.categoryId,
+        confidence,
+        reviewReasons: ["amount_mismatch"],
+        listSummary: { amountAndTaxResolved: false },
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      for (let i = 0; i < 101; i++)
+        await db.insert("aiExpenseDraftItems", {
+          groupId: ids.groupId,
+          draftId: id,
+          itemName: "商品",
+          amountYen: 1,
+          categoryId: ids.categoryId,
+          confidence: {},
+          createdAt: 1,
+          updatedAt: 1,
+        });
+      return id;
+    });
+    const before = (await t.run(({ db }) => db.get(draftId)))!;
+    await t.run((ctx) =>
+      persistReceiptUserOverrideSnapshot(ctx, {
+        draftId,
+        groupId: ids.groupId,
+        fields: ["shopName"],
+      }),
+    );
+    const after = (await t.run(({ db }) => db.get(draftId)))!;
+    expect(after.status).toBe(before.status);
+    expect(after.reviewReasons).toEqual(before.reviewReasons);
+    expect(after.listSummary).toEqual(before.listSummary);
+    expect(after.receiptUserOverride).toBeDefined();
+  });
+  it("101件すべてが一致する下書きは全明細で保存し登録できる", async () => {
+    const { t, ids } = await setup();
+    const draftId = await t.run(async ({ db }) => {
+      const id = await db.insert("aiExpenseDrafts", {
+        groupId: ids.groupId,
+        sourceType: "image_upload",
+        status: "needs_review",
+        documentType: "receipt",
+        shopName: "店",
+        date: "2026-11-01",
+        amountYen: 101,
+        categoryId: ids.categoryId,
+        confidence,
+        reviewReasons: ["amount_mismatch"],
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      for (let i = 0; i < 101; i++)
+        await db.insert("aiExpenseDraftItems", {
+          groupId: ids.groupId,
+          draftId: id,
+          itemName: "商品",
+          amountYen: 1,
+          categoryId: ids.categoryId,
+          confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
+          createdAt: 1,
+          updatedAt: 1,
+        });
+      return id;
+    });
+    await t.withIdentity(identity).mutation(api.aiExpenseDrafts.mutations.updateForReview, {
+      draftId,
+      documentType: "receipt",
+      shopName: "店",
+      date: "2026-11-01",
+      amountYen: 101,
+      categoryId: ids.categoryId,
+    });
+    const saved = await t.run(({ db }) => db.get(draftId));
+    expect(saved).toMatchObject({
+      status: "ready",
+      reviewReasons: [],
+      listSummary: {
+        amountAndTaxResolved: true,
+        itemSummary: { itemTotalYen: 101, itemDifferenceYen: 0 },
+      },
+    });
+    expect(
+      await t
+        .withIdentity(identity)
+        .mutation(api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries, {
+          draftIds: [draftId],
+        }),
+    ).toMatchObject({ registeredDraftIds: [draftId] });
+  });
   it("窓外の未確定税は税上書き後も確認待ちに残る", async () => {
     const { t, ids } = await setup();
     const { draftId, firstId } = await t.run(async ({ db }) => {
@@ -358,6 +459,7 @@ describe("金額・税の書込契約", () => {
           categoryId: ids.categoryId,
           confidence,
           reviewReasons: ["amount_mismatch"],
+          ...(count === 101 ? { listSummary: { amountAndTaxResolved: false } } : {}),
           createdAt: 1,
           updatedAt: 1,
         });
@@ -380,9 +482,10 @@ describe("金額・税の書込契約", () => {
     const execute = makeFunctionReference<"mutation">(
       "aiExpenseDraftAmountTaxMigration:executeBatch",
     );
+    const beforeOver = await t.run(({ db }) => db.get(drafts[1]));
     expect(await t.query(dryRun, {})).toMatchObject({
       needsReasonRemoval: 1,
-      reasonRemovalSkippedOverLimit: 1,
+      skippedOverLimit: 1,
     });
     await t.mutation(execute, {});
     const [within, over] = await t.run(({ db }) => Promise.all(drafts.map((id) => db.get(id))));
@@ -390,11 +493,11 @@ describe("金額・税の書込契約", () => {
     expect(over).toMatchObject({
       status: "needs_review",
       reviewReasons: ["amount_mismatch"],
-      listSummary: { amountAndTaxResolved: true },
     });
+    expect(over).toEqual(beforeOver);
     expect(await t.query(dryRun, {})).toMatchObject({
       needsUpdate: 0,
-      reasonRemovalSkippedOverLimit: 1,
+      skippedOverLimit: 1,
     });
     await expect(
       t

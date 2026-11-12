@@ -48,7 +48,7 @@ export async function persistReceiptUserOverrideSnapshot(
   if (draft === null || draft.groupId !== args.groupId) {
     throw new Error("AI expense draft not found while saving user override");
   }
-  const items =
+  const loadedItems =
     args.items !== undefined
       ? takeDraftJudgmentItems(args.items).map(draftItemFieldsToDoc)
       : await ctx.db
@@ -57,7 +57,8 @@ export async function persistReceiptUserOverrideSnapshot(
             q.eq("groupId", args.groupId).eq("draftId", args.draftId),
           )
           .order("asc")
-          .take(DRAFT_JUDGMENT_ITEM_LIMIT);
+          .take(DRAFT_JUDGMENT_ITEM_LIMIT + 1);
+  const items = takeDraftJudgmentItems(loadedItems);
   const updatedAt = args.updatedAt ?? Date.now();
   const receiptUserOverride: ReceiptUserOverrideSnapshot<Id<"categories">> =
     buildReceiptUserOverride({
@@ -74,6 +75,10 @@ export async function persistReceiptUserOverrideSnapshot(
     receiptUserOverride,
     updatedAt,
   }) as unknown as Doc<"aiExpenseDrafts">;
+  if (args.items === undefined && loadedItems.length > DRAFT_JUDGMENT_ITEM_LIMIT) {
+    await ctx.db.patch(args.draftId, { receiptUserOverride, updatedAt });
+    return updatedDraft;
+  }
   // 一覧用の保存サマリは override 適用後の下書きと明細から計算して同じ patch に載せる。
   const state = buildDraftReviewState(
     draftDocToFields(updatedDraft),

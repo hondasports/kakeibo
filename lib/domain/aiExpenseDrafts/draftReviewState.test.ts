@@ -59,6 +59,29 @@ const item = (
 });
 
 describe("100件を超える下書きの税理由", () => {
+  it.each([100, 101])("明細%s件すべての合計が支払額と一致すれば保存状態も解決済み", (count) => {
+    const items = Array.from({ length: count }, (_, i) =>
+      item(i, {
+        amountBasis: undefined,
+        taxRatePercent: undefined,
+        taxAllocationStatus: undefined,
+        taxResolutionStatus: undefined,
+        taxResolutionSource: undefined,
+      }),
+    );
+    const input = { ...draft, amountYen: count, taxSummaries: [], reviewReasons: [] };
+    const state = buildDraftReviewState(input, items, { reasons: [] });
+    expect(state.status).toBe("ready");
+    expect(state.reviewReasons).toEqual([]);
+    expect(state.listSummary).toMatchObject({
+      amountAndTaxResolved: true,
+      itemSummary: { itemTotalYen: count, itemDifferenceYen: 0 },
+    });
+    if (count === 100) {
+      const windowInput = { ...input, items: items.map((row) => ({ ...row, _id: row.id })) };
+      expect(state.judgment).toEqual(judgeDraftAmountAndTax(windowInput));
+    }
+  });
   it("窓外に未確定税がある場合は金額が全件一致しても確認理由を残す", () => {
     const items = [
       ...Array.from({ length: 100 }, (_, i) => item(i)),

@@ -357,7 +357,7 @@ describe("解析結果からの作成", () => {
     expect((summaryPatch![1] as { listSummary: unknown }).listSummary).toEqual(expected);
   });
 
-  it("createFromExtraction: 明細が101件でも保存値は先頭100件の判定窓と一致する", async () => {
+  it("createFromExtraction: 明細が101件なら保存値は全明細で計算する", async () => {
     // 判定窓の仕様値。定数参照ではなく件数そのものを固定する。
     const JUDGMENT_WINDOW = 100;
     const windowItem = (index: number): ExtractedDraftItemInput<Id<"categories">> => ({
@@ -477,11 +477,10 @@ describe("解析結果からの作成", () => {
     expect(summaryPatch).toBeDefined();
     const saved = (summaryPatch![1] as { listSummary: DraftListSummary }).listSummary;
 
-    // 保存値は下書き確認と同じ「先頭100件」の明細で計算した値と一致しなければならない。
-    const expected = buildDraftListSummary(draftFields, allItems.slice(0, JUDGMENT_WINDOW));
+    const expected = buildDraftListSummary(draftFields, allItems, undefined, "all_items");
     expect(saved).toEqual(expected);
 
-    // 実際の読み取り経路（getWithItems）が返す明細での判定とも一致する。
+    // 確認画面は引き続き先頭100件だけを読み取る。
     const persistedDraft = { ...draftFields, listSummary: saved };
     const view = await getAiExpenseDraftWithItems(
       { groupId: GROUP_ID },
