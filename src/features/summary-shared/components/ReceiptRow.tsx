@@ -18,6 +18,7 @@ export function ReceiptRow({
   onEdit,
   showCategory = true,
   isDetail = false,
+  combinedShopName,
   selectionEnabled = false,
   selected = false,
   previewCategory = null,
@@ -28,6 +29,7 @@ export function ReceiptRow({
   onEdit?: (receipt: ReceiptItem) => void;
   showCategory?: boolean;
   isDetail?: boolean;
+  combinedShopName?: string;
   selectionEnabled?: boolean;
   selected?: boolean;
   previewCategory?: CategoryPreview | null;
@@ -35,7 +37,7 @@ export function ReceiptRow({
 }) {
   const displayName =
     receipt.type === "income" ? (receipt.bankName ?? "不明") : (receipt.shopName ?? "不明");
-  const actionLabelSuffix = `${displayName}（${formatDateForDisplay(receipt.date)}）`;
+  const actionLabelSuffix = `${combinedShopName ?? displayName}（${formatDateForDisplay(receipt.date)}）`;
   const categoryName = selected && previewCategory ? previewCategory.name : receipt.categoryName;
   const categoryColor =
     selected && previewCategory?.color ? previewCategory.color : receipt.categoryColor;
@@ -66,7 +68,7 @@ export function ReceiptRow({
       </Typography>
       <Box className="receipt-row-name" role="cell">
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          {!isDetail && receipt.type && (
+          {!isDetail && (receipt.type || combinedShopName) && (
             <Chip
               label={receipt.type === "income" ? "収入" : "支出"}
               size="small"
@@ -77,10 +79,15 @@ export function ReceiptRow({
           {!isDetail && receipt.registrationMode === "totalOnly" ? (
             <Chip label="合計だけで保存" size="small" variant="outlined" />
           ) : null}
-          <Typography sx={{ fontWeight: 700 }} noWrap>
-            {isDetail ? (receipt.itemName ?? "内訳情報なし") : displayName}
-          </Typography>
+          {!isDetail && (
+            <Typography sx={{ fontWeight: 700 }} noWrap>
+              {combinedShopName ?? displayName}
+            </Typography>
+          )}
         </Stack>
+        {(isDetail || combinedShopName) && (
+          <MemoExpandableText kind="item" memo={receipt.itemName ?? "内訳情報なし"} />
+        )}
         {showCategory && receipt.type !== "income" && (
           <Stack
             className="receipt-row-category"
@@ -108,7 +115,10 @@ export function ReceiptRow({
       <Typography className="receipt-row-amount" role="cell" sx={{ fontWeight: 700 }}>
         {formatYen(receipt.amountYen)}
       </Typography>
-      <Box className="receipt-row-memo" role="cell">
+      <Box
+        className={`receipt-row-memo${!receipt.memo && receipt.type !== "income" ? " receipt-row-memo--empty" : ""}`}
+        role="cell"
+      >
         {receipt.memo ? (
           <MemoExpandableText memo={receipt.memo} />
         ) : (

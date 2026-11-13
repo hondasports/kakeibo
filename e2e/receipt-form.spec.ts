@@ -690,7 +690,7 @@ test.describe("複数カテゴリ別支出項目入力フロー（Issue #102 受
     // 支出一覧: 各項目行が項目名とカテゴリ名を表示する
     const receiptGroup = page.getByTestId("receipt-group").filter({ hasText: "テストスーパー" });
     await expect(receiptGroup).toHaveCount(1, { timeout: 15_000 });
-    await expect(receiptGroup.getByText("内訳: 食料品、日用品")).toBeVisible();
+    await expect(receiptGroup.getByText("内訳: 食料品、日用品")).toHaveCount(0);
     const receiptRows = receiptGroup.getByTestId("receipt-row");
     await expect(receiptRows).toHaveCount(2);
     const foodRow = receiptRows.filter({ hasText: "食料品" });

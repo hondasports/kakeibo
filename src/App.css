@@ -755,12 +755,8 @@
   border-bottom: 0;
 }
 
-.receipt-row--detail {
-  padding-left: var(--space-lg);
-}
-
 .receipt-row--detail .receipt-row-name {
-  padding-left: var(--space-sm);
+  padding-left: calc(var(--space-lg) + var(--space-sm));
 }
 
 .receipt-row-amount {
@@ -1046,6 +1042,7 @@
 
   .receipt-list--selectable .receipt-row-select {
     grid-area: select;
+    align-self: start;
   }
 
   .receipt-row-date {
@@ -1057,10 +1054,27 @@
   .receipt-row-amount {
     grid-area: amount;
   }
+  .receipt-list:not(.receipt-list--income) .receipt-row-date,
+  .receipt-list:not(.receipt-list--income) .receipt-row-amount {
+    align-self: start;
+  }
+
   .receipt-row-memo {
     grid-area: memo;
     min-width: 0;
   }
+  .receipt-row-memo--empty {
+    display: none;
+  }
+
+  .receipt-row:has(.receipt-row-memo--empty) {
+    grid-template-areas: "date name amount" "actions actions actions";
+  }
+
+  .receipt-list--selectable .receipt-row:has(.receipt-row-memo--empty) {
+    grid-template-areas: "select date name amount" "select actions actions actions";
+  }
+
   .receipt-row-actions {
     grid-area: actions;
   }
@@ -1107,10 +1121,6 @@
 
   .receipt-group-header .receipt-row-actions {
     display: none;
-  }
-
-  .receipt-row--detail {
-    padding-left: 0;
   }
 
   .receipt-row--detail .receipt-row-name {

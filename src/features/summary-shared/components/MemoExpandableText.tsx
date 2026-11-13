@@ -35,7 +35,19 @@ function measureMemoNeedsCollapse(measureElement: HTMLSpanElement): boolean {
  * 支出一覧のメモ表示。3行以上（改行または折り返し）のときだけ「もっと見る / 閉じる」を出す。
  * 文字数での slice は使わないため、絵文字・結合文字もそのまま全文を描画する。
  */
-export function MemoExpandableText({ memo }: { memo: string }) {
+export function MemoExpandableText({
+  memo,
+  kind = "memo",
+}: {
+  memo: string;
+  kind?: "memo" | "item";
+}) {
+  const isItem = kind === "item";
+  const textSx = isItem
+    ? { ...memoTypographySx, fontWeight: 700, overflowWrap: "anywhere" as const }
+    : memoTypographySx;
+  const variant = isItem ? "body1" : "caption";
+  const color = isItem ? "text.primary" : "text.secondary";
   const needsCollapseByLines = memoNeedsCollapseByLineCount(memo);
   const [expanded, setExpanded] = useState(false);
   const [needsCollapse, setNeedsCollapse] = useState(needsCollapseByLines);
@@ -77,32 +89,33 @@ export function MemoExpandableText({ memo }: { memo: string }) {
 
   return (
     <Stack
-      data-testid="memo-expandable-text"
+      data-testid={isItem ? "item-expandable-text" : "memo-expandable-text"}
       spacing={0.25}
-      sx={{ mt: 0.5, maxWidth: "100%", position: "relative" }}
+      sx={{ mt: isItem ? 0 : 0.5, maxWidth: "100%", minWidth: 0, position: "relative" }}
     >
       {!needsCollapseByLines && (
         <Typography
           ref={measureRef}
           aria-hidden
-          color="text.secondary"
+          color={color}
           component="span"
-          data-testid="memo-expand-measure"
-          sx={hiddenMeasureSx}
-          variant="caption"
+          data-testid={isItem ? "item-expand-measure" : "memo-expand-measure"}
+          sx={{ ...hiddenMeasureSx, ...textSx }}
+          variant={variant}
         >
           {memo}
         </Typography>
       )}
       <Typography
-        color="text.secondary"
-        data-testid="memo-expandable-content"
+        color={color}
+        data-testid={isItem ? "item-expandable-content" : "memo-expandable-content"}
+        title={isItem ? memo : undefined}
         id={contentId}
         sx={{
-          ...memoTypographySx,
+          ...textSx,
           ...(needsCollapse && !expanded ? getMemoLineClampSx(MEMO_COLLAPSED_MAX_LINES) : {}),
         }}
-        variant="caption"
+        variant={variant}
       >
         {memo}
       </Typography>
@@ -112,7 +125,7 @@ export function MemoExpandableText({ memo }: { memo: string }) {
             aria-controls={contentId}
             aria-expanded={expanded}
             color="primary"
-            data-testid="memo-expand-toggle"
+            data-testid={isItem ? "item-expand-toggle" : "memo-expand-toggle"}
             endIcon={
               expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />
             }
