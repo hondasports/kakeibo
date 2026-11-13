@@ -141,6 +141,8 @@
   "convex/notifications/**": ["e2e/notifications.spec.ts"],
   "convex/notificationSettings.ts": ["e2e/notifications.spec.ts"],
   "convex/receiptAnalysisJobs/**": ["e2e/ai-expense-queue.spec.ts"],
+  "lib/convex/receiptAnalysisJobs/**": ["e2e/ai-expense-queue.spec.ts"],
+  "lib/usecase/receiptAnalysisJobs/**": ["e2e/ai-expense-queue.spec.ts"],
   "convex/receiptImageExtraction/**": ["e2e/ai-expense-queue.spec.ts"],
   "convex/receipts/**": ["e2e/receipt-form.spec.ts", "e2e/ai-expense-queue*.spec.ts"],
   "convex/users/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],

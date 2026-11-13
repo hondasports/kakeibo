@@ -1,3 +1,5 @@
+import { ConvexError } from "convex/values";
+import { getReviewItemReplaceErrorMessage } from "../../domain/aiExpenseDrafts/reviewItemReplace";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../../convex/_generated/server";
 import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
@@ -12,10 +14,7 @@ import {
 } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import { resetReceiptToAiInterpretation } from "../../usecase/aiExpenseDrafts/resetReceiptToAiInterpretation";
 import { buildDraftReviewState } from "../../domain/aiExpenseDrafts/draftReviewState";
-import {
-  DRAFT_JUDGMENT_ITEM_LIMIT,
-  takeDraftJudgmentItems,
-} from "../../domain/aiExpenseDrafts/judgmentItemWindow";
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
 import { createAiExpenseDraftDeps } from "./draftUsecaseDeps";
 import {
   draftDocToFields,
@@ -38,7 +37,6 @@ export async function persistReceiptUserOverrideSnapshot(
     groupId: Id<"groups">;
     fields: string[];
     updatedAt?: number;
-    /** 既に読み込んだ（または直前の永続化結果の）下書き・明細。渡せば DB 再取得を省略する。 */
     draft?: AiExpenseDraftFields;
     items?: AiExpenseDraftItemFields[];
   },
@@ -48,17 +46,20 @@ export async function persistReceiptUserOverrideSnapshot(
   if (draft === null || draft.groupId !== args.groupId) {
     throw new Error("AI expense draft not found while saving user override");
   }
-  const loadedItems =
-    args.items !== undefined
-      ? takeDraftJudgmentItems(args.items).map(draftItemFieldsToDoc)
-      : await ctx.db
-          .query("aiExpenseDraftItems")
-          .withIndex("by_group_id_and_draft_id", (q) =>
-            q.eq("groupId", args.groupId).eq("draftId", args.draftId),
-          )
-          .order("asc")
-          .take(DRAFT_JUDGMENT_ITEM_LIMIT + 1);
-  const items = takeDraftJudgmentItems(loadedItems);
+  const storedItems = await ctx.db
+    .query("aiExpenseDraftItems")
+    .withIndex("by_group_id_and_draft_id", (q) =>
+      q.eq("groupId", args.groupId).eq("draftId", args.draftId),
+    )
+    .order("asc")
+    .take(DRAFT_JUDGMENT_ITEM_LIMIT + 1);
+  if (
+    storedItems.length > DRAFT_JUDGMENT_ITEM_LIMIT ||
+    (args.items?.length ?? 0) > DRAFT_JUDGMENT_ITEM_LIMIT
+  ) {
+    throw new ConvexError(getReviewItemReplaceErrorMessage("existing_items_exceed_window"));
+  }
+  const items = args.items !== undefined ? args.items.map(draftItemFieldsToDoc) : storedItems;
   const updatedAt = args.updatedAt ?? Date.now();
   const receiptUserOverride: ReceiptUserOverrideSnapshot<Id<"categories">> =
     buildReceiptUserOverride({
@@ -75,10 +76,6 @@ export async function persistReceiptUserOverrideSnapshot(
     receiptUserOverride,
     updatedAt,
   }) as unknown as Doc<"aiExpenseDrafts">;
-  if (args.items === undefined && loadedItems.length > DRAFT_JUDGMENT_ITEM_LIMIT) {
-    await ctx.db.patch(args.draftId, { receiptUserOverride, updatedAt });
-    return updatedDraft;
-  }
   // 一覧用の保存サマリは override 適用後の下書きと明細から計算して同じ patch に載せる。
   const state = buildDraftReviewState(
     draftDocToFields(updatedDraft),

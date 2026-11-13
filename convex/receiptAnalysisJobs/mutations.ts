@@ -1,3 +1,5 @@
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../lib/domain/aiExpenseDrafts/judgmentItemWindow";
+import { getReviewItemReplaceErrorMessage } from "../../lib/domain/aiExpenseDrafts/reviewItemReplace";
 import { ConvexError, v } from "convex/values";
 import { mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
@@ -47,6 +49,18 @@ export async function createBatchHandler(
 
 export async function retryImageJobHandler(ctx: MutationCtx, args: RetryImageJobArgs) {
   const { groupId } = await requireGroupMembership(ctx);
+  const job = await ctx.db.get(args.jobId);
+  if (job?.groupId === groupId && job.draftId) {
+    const items = await ctx.db
+      .query("aiExpenseDraftItems")
+      .withIndex("by_group_id_and_draft_id", (q) =>
+        q.eq("groupId", groupId).eq("draftId", job.draftId!),
+      )
+      .take(DRAFT_JUDGMENT_ITEM_LIMIT + 1);
+    if (items.length > DRAFT_JUDGMENT_ITEM_LIMIT) {
+      throw new ConvexError(getReviewItemReplaceErrorMessage("existing_items_exceed_window"));
+    }
+  }
   try {
     await retryReceiptAnalysisJob(
       createReceiptAnalysisMutationDeps(ctx).store,

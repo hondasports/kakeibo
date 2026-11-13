@@ -1,3 +1,4 @@
+import { getDraftItemWindowErrorMessage } from "../utils/draftItemWindowError";
 import { api } from "../../../../convex/_generated/api";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation } from "convex/react";
@@ -70,7 +71,8 @@ export function useReviewSubmit({
       resetForm();
     } catch (error) {
       console.error("AI expense queue review failed", error);
-      const message = getAiExpenseQueueReviewErrorMessage();
+      const message =
+        getDraftItemWindowErrorMessage(error) ?? getAiExpenseQueueReviewErrorMessage();
       setReviewError(message);
       setReviewSaveFeedback({ message, severity: "error" });
     } finally {
@@ -190,7 +192,8 @@ export function useReviewSubmit({
       }
     } catch (error) {
       console.error("AI expense queue review failed", error);
-      const message = getAiExpenseQueueReviewErrorMessage();
+      const message =
+        getDraftItemWindowErrorMessage(error) ?? getAiExpenseQueueReviewErrorMessage();
       setReviewError(message);
       setReviewSaveFeedback({ message, severity: "error" });
     } finally {

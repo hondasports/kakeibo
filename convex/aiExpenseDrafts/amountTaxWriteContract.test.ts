@@ -58,7 +58,7 @@ async function setup() {
 const confidence = { documentType: 1, shopName: 1, date: 1, amountYen: 1, categoryId: 1 };
 
 describe("金額・税の書込契約", () => {
-  it("全明細未取得で101件以上の override 保存は判定とサマリを変更しない", async () => {
+  it("全明細未取得で101件以上の override 保存は拒否され判定とサマリを変更しない", async () => {
     const { t, ids } = await setup();
     const draftId = await t.run(async ({ db }) => {
       const id = await db.insert("aiExpenseDrafts", {
@@ -90,20 +90,22 @@ describe("金額・税の書込契約", () => {
       return id;
     });
     const before = (await t.run(({ db }) => db.get(draftId)))!;
-    await t.run((ctx) =>
-      persistReceiptUserOverrideSnapshot(ctx, {
-        draftId,
-        groupId: ids.groupId,
-        fields: ["shopName"],
-      }),
-    );
+    await expect(
+      t.run((ctx) =>
+        persistReceiptUserOverrideSnapshot(ctx, {
+          draftId,
+          groupId: ids.groupId,
+          fields: ["shopName"],
+        }),
+      ),
+    ).rejects.toThrow("Draft contains more than 100 items");
     const after = (await t.run(({ db }) => db.get(draftId)))!;
     expect(after.status).toBe(before.status);
     expect(after.reviewReasons).toEqual(before.reviewReasons);
     expect(after.listSummary).toEqual(before.listSummary);
-    expect(after.receiptUserOverride).toBeDefined();
+    expect(after.receiptUserOverride).toEqual(before.receiptUserOverride);
   });
-  it("101件すべてが一致する下書きは全明細で保存し登録できる", async () => {
+  it("101件すべてが一致する下書きも保存を拒否する", async () => {
     const { t, ids } = await setup();
     const draftId = await t.run(async ({ db }) => {
       const id = await db.insert("aiExpenseDrafts", {
@@ -133,32 +135,20 @@ describe("金額・税の書込契約", () => {
         });
       return id;
     });
-    await t.withIdentity(identity).mutation(api.aiExpenseDrafts.mutations.updateForReview, {
-      draftId,
-      documentType: "receipt",
-      shopName: "店",
-      date: "2026-11-01",
-      amountYen: 101,
-      categoryId: ids.categoryId,
-    });
-    const saved = await t.run(({ db }) => db.get(draftId));
-    expect(saved).toMatchObject({
-      status: "ready",
-      reviewReasons: [],
-      listSummary: {
-        amountAndTaxResolved: true,
-        itemSummary: { itemTotalYen: 101, itemDifferenceYen: 0 },
-      },
-    });
-    expect(
-      await t
-        .withIdentity(identity)
-        .mutation(api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries, {
-          draftIds: [draftId],
-        }),
-    ).toMatchObject({ registeredDraftIds: [draftId] });
+    const before = await t.run(({ db }) => db.get(draftId));
+    await expect(
+      t.withIdentity(identity).mutation(api.aiExpenseDrafts.mutations.updateForReview, {
+        draftId,
+        documentType: "receipt",
+        shopName: "店",
+        date: "2026-11-01",
+        amountYen: 101,
+        categoryId: ids.categoryId,
+      }),
+    ).rejects.toThrow("Draft contains more than 100 items");
+    expect(await t.run(({ db }) => db.get(draftId))).toEqual(before);
   });
-  it("窓外の未確定税は税上書き後も確認待ちに残る", async () => {
+  it("窓外に未確定税があれば税上書きを拒否し確認待ちを維持する", async () => {
     const { t, ids } = await setup();
     const { draftId, firstId } = await t.run(async ({ db }) => {
       const draftId = await db.insert("aiExpenseDrafts", {
@@ -216,14 +206,14 @@ describe("金額・税の書込契約", () => {
       }
       return { draftId, firstId: firstId! };
     });
-    await t
-      .withIdentity(identity)
-      .mutation(api.aiExpenseDrafts.mutations.updateDraftItemTaxOverrides, {
+    await expect(
+      t.withIdentity(identity).mutation(api.aiExpenseDrafts.mutations.updateDraftItemTaxOverrides, {
         draftId,
         itemId: firstId,
         taxRatePercent: 10,
         amountBasis: "tax_included",
-      });
+      }),
+    ).rejects.toThrow("Draft contains more than 100 items");
     const saved = (await t.run(({ db }) => db.get(draftId)))!;
     expect(saved.status).toBe("needs_review");
     expect(saved.reviewReasons).toContain("user_confirmation_required");
@@ -342,7 +332,7 @@ describe("金額・税の書込契約", () => {
       );
     },
   );
-  it("101件の再解析とリセットは窓外の不一致理由を消さない", async () => {
+  it("101件の下書きはリセットを拒否し窓外の不一致理由を消さない", async () => {
     const { t, ids } = await setup();
     const item = {
       itemName: "商品",
@@ -371,16 +361,19 @@ describe("金額・税の書込契約", () => {
     await t.run(({ db }) =>
       db.patch(draft._id, { receiptInterpretation: { source: "ai", interpretedAt: 1, values } }),
     );
-    await t
-      .withIdentity(identity)
-      .mutation(api.aiExpenseDrafts.mutations.resetReceiptToAiInterpretation, {
-        draftId: draft._id,
-      });
-    expect((await t.run(({ db }) => db.get(draft._id)))?.reviewReasons).toContain(
-      "amount_mismatch",
-    );
+    const before = await t.run(({ db }) => db.get(draft._id));
+    await expect(
+      t
+        .withIdentity(identity)
+        .mutation(api.aiExpenseDrafts.mutations.resetReceiptToAiInterpretation, {
+          draftId: draft._id,
+        }),
+    ).rejects.toThrow("Draft contains more than 100 items");
+    const after = await t.run(({ db }) => db.get(draft._id));
+    expect(after).toEqual(before);
+    expect(after?.reviewReasons).toContain("amount_mismatch");
   });
-  it("101件の税上書きと税再取得でも窓外の不一致理由を消さない", async () => {
+  it("101件の税上書きと税再取得を拒否し窓外の不一致理由を消さない", async () => {
     const { t, ids } = await setup();
     const item = {
       itemName: "商品",
@@ -423,25 +416,25 @@ describe("金額・税の書込契約", () => {
         .withIndex("by_draft_id", (q) => q.eq("draftId", draft._id))
         .first(),
     ))!;
-    await t
-      .withIdentity(identity)
-      .mutation(api.aiExpenseDrafts.mutations.updateDraftItemTaxOverrides, {
+    const before = await t.run(({ db }) => db.get(draft._id));
+    await expect(
+      t.withIdentity(identity).mutation(api.aiExpenseDrafts.mutations.updateDraftItemTaxOverrides, {
         draftId: draft._id,
         itemId: row._id,
         taxRatePercent: 10,
         amountBasis: "tax_included",
-      });
-    expect((await t.run(({ db }) => db.get(draft._id)))?.reviewReasons).toContain(
-      "amount_mismatch",
-    );
-    await t.withIdentity(identity).mutation(api.aiExpenseDrafts.mutations.applyReceiptTaxSettings, {
-      draftId: draft._id,
-      taxRatePercent: 10,
-      amountBasis: "tax_included",
-    });
-    expect((await t.run(({ db }) => db.get(draft._id)))?.reviewReasons).toContain(
-      "amount_mismatch",
-    );
+      }),
+    ).rejects.toThrow("Draft contains more than 100 items");
+    expect(await t.run(({ db }) => db.get(draft._id))).toEqual(before);
+    await expect(
+      t.withIdentity(identity).mutation(api.aiExpenseDrafts.mutations.applyReceiptTaxSettings, {
+        draftId: draft._id,
+        taxRatePercent: 10,
+        amountBasis: "tax_included",
+      }),
+    ).rejects.toThrow("Draft contains more than 100 items");
+    expect(await t.run(({ db }) => db.get(draft._id))).toEqual(before);
+    expect(before?.reviewReasons).toContain("amount_mismatch");
   });
   it("移行は101件目がある場合に理由を残し、100件なら理由を外して登録できる", async () => {
     const { t, ids } = await setup();

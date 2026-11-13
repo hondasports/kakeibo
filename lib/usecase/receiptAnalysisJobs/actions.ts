@@ -16,12 +16,12 @@ export async function analyzeReceiptImageJob(
   // 有料解析の前に job の状態を確認する。upload/retry 経路では必ず queued になっており、
   // それ以外の重複・遅延呼び出しは解析せず終了する（クライアントへエラーは返さない）。
   if (!canAnalyzeReceiptAnalysisJob(job.status)) return;
-  const startResult = await runner.startAttempt(args.jobId, job.draftId ?? null);
-  if (startResult?.applied === false) return;
-  await runner.waitForMockExtractor();
   const isRetry = job.draftId !== undefined;
   const preserved =
     isRetry && job.draftId ? await runner.loadPreservedUserOverride(job.draftId, group.id) : null;
+  const startResult = await runner.startAttempt(args.jobId, job.draftId ?? null);
+  if (startResult?.applied === false) return;
+  await runner.waitForMockExtractor();
   let draft;
   let jobFailed = false;
   try {

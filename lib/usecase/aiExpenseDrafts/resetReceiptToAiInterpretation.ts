@@ -6,6 +6,7 @@ import {
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import { buildDraftReviewState } from "../../domain/aiExpenseDrafts/draftReviewState";
 import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
+import { getReviewItemReplaceErrorMessage } from "../../domain/aiExpenseDrafts/reviewItemReplace";
 import { applyRecordPatch } from "../../domain/common/recordPatch";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
@@ -31,7 +32,14 @@ export async function resetReceiptToAiInterpretation(
   }
   const values = draft.persisted.receiptInterpretation!.values;
 
-  const currentItems = await deps.draftItems.listAllByDraft(ctx.groupId, args.draftId);
+  const currentItems = await deps.draftItems.listByDraftAsc(
+    ctx.groupId,
+    args.draftId,
+    DRAFT_JUDGMENT_ITEM_LIMIT + 1,
+  );
+  if (currentItems.length > DRAFT_JUDGMENT_ITEM_LIMIT) {
+    throw new ConvexError(getReviewItemReplaceErrorMessage("existing_items_exceed_window"));
+  }
   for (const item of currentItems) {
     await deps.draftItems.delete(item.id!);
   }

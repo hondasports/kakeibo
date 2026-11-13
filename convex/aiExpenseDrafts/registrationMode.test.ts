@@ -149,7 +149,7 @@ describe("registrationMode persistence and aggregation", () => {
     );
   });
   it.each(["updateRegisteredDraft", "updateForReview"] as const)(
-    "%s は101件の保存済み明細を全件使って登録済み支出を更新する",
+    "%s は101件の保存済み明細を拒否し登録済み支出を維持する",
     async (mutation) => {
       const t = convexTest(schema, convexTestModules);
       const ids = await seed(t);
@@ -176,26 +176,25 @@ describe("registrationMode persistence and aggregation", () => {
         shopName: "スーパー青葉",
         registrationMode: "detailed" as const,
       };
-      if (mutation === "updateRegisteredDraft") {
-        await authed.mutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft, base);
-      } else {
-        await authed.mutation(api.aiExpenseDrafts.mutations.updateForReview, {
-          ...base,
-          documentType: "receipt",
-        });
-      }
-
-      const entries = await t.run(async (ctx) =>
-        ctx.db
-          .query("expenseEntries")
-          .withIndex("by_group_id_and_ai_expense_draft_id", (q) =>
-            q.eq("groupId", ids.groupId).eq("aiExpenseDraftId", ids.draftId),
-          )
-          .collect(),
-      );
-      expect(entries).toHaveLength(2);
-      expect(entries.find((entry) => entry.categoryId === ids.foodId)?.amount).toBe(900);
-      expect(entries.find((entry) => entry.categoryId === ids.dailyId)?.amount).toBe(1290);
+      const readEntries = () =>
+        t.run(async (ctx) =>
+          ctx.db
+            .query("expenseEntries")
+            .withIndex("by_group_id_and_ai_expense_draft_id", (q) =>
+              q.eq("groupId", ids.groupId).eq("aiExpenseDraftId", ids.draftId),
+            )
+            .collect(),
+        );
+      const before = await readEntries();
+      const call =
+        mutation === "updateRegisteredDraft"
+          ? authed.mutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft, base)
+          : authed.mutation(api.aiExpenseDrafts.mutations.updateForReview, {
+              ...base,
+              documentType: "receipt",
+            });
+      await expect(call).rejects.toThrow("Draft contains more than 100 items");
+      expect(await readEntries()).toEqual(before);
     },
   );
 

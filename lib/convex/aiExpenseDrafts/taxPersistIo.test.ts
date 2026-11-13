@@ -122,7 +122,7 @@ describe("税再解釈系mutationのDatabase I/O", () => {
     },
   );
 
-  it("updateDraftItemTaxOverrides は下書きを1回・明細一覧を1回だけ読む", async () => {
+  it("updateDraftItemTaxOverrides は下書きを1回・明細一覧を2回読む", async () => {
     const { ctx, getItems } = createInMemoryMutationCtx({
       draft: { ...draftSeed },
       items: itemSeeds.map((item) => ({ ...item })),
@@ -139,7 +139,7 @@ describe("税再解釈系mutationのDatabase I/O", () => {
     );
 
     expect(getCallsFor(ctx, DRAFT_ID)).toHaveLength(1);
-    expect(itemReadCalls(ctx)).toHaveLength(1);
+    expect(itemReadCalls(ctx)).toHaveLength(2);
   });
 
   it("persistDraftTaxInterpretation は税関連フィールドが変わらない明細をpatchしない", async () => {
@@ -304,7 +304,7 @@ describe("updateForReview の明細差分更新", () => {
     );
   });
 
-  it("updateForReview は下書きを1回・明細一覧を1回だけ読む", async () => {
+  it("updateForReview は下書きを1回・明細一覧を2回読む", async () => {
     const { ctx } = createInMemoryMutationCtx({
       draft: { ...noTaxDraftSeed, amountYen: 300 },
       items: noTaxItemSeeds.map((item) => ({ ...item })),
@@ -326,6 +326,6 @@ describe("updateForReview の明細差分更新", () => {
     });
 
     expect(getCallsFor(ctx, DRAFT_ID)).toHaveLength(1);
-    expect(itemReadCalls(ctx)).toHaveLength(1);
+    expect(itemReadCalls(ctx)).toHaveLength(2);
   });
 });
