@@ -264,7 +264,7 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
     page,
   }) => {
     const shopName = `QAメモ359wrap_${Date.now()}`;
-    const wrappedMemo = "メモ確認用の長文テスト。".repeat(8);
+    const wrappedMemo = "メモ確認用の長文テスト。".repeat(20);
 
     await saveExpense(page, shopName, "1600", { memo: wrappedMemo });
 
@@ -324,10 +324,14 @@ test.describe("週次サマリーパネル（Issue #15 受け入れ確認）", (
     expect(Math.abs((chartBounds?.y ?? 0) - (categoryBounds?.y ?? 0))).toBeLessThan(2);
     expect(chartBounds?.x ?? 0).toBeLessThan(categoryBounds?.x ?? 0);
 
-    for (const label of ["日付", "店名・内訳", "金額（円）", "メモ", "操作"]) {
-      await expect(page.locator(".receipt-list-header").getByText(label)).toBeVisible();
+    const expenseHeader = page
+      .getByRole("table", { name: "週次サマリーの支出一覧" })
+      .locator(".receipt-list-header");
+    for (const label of ["日付", "店名・内訳", "金額（円）", "操作"]) {
+      await expect(expenseHeader.getByText(label)).toBeVisible();
     }
-    await expect(page.locator(".receipt-list-header").getByText("カテゴリ")).toHaveCount(0);
+    await expect(expenseHeader.getByText("カテゴリ")).toHaveCount(0);
+    await expect(expenseHeader.getByText("メモ")).toHaveCount(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.locator(".receipt-list-header")).toBeHidden();

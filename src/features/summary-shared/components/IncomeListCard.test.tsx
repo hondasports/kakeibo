@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { renderWithProviders } from "../../../test/render";
@@ -25,6 +25,29 @@ describe("IncomeListCard", () => {
     await user.click(showMore);
 
     expect(screen.getAllByTestId("receipt-row")).toHaveLength(7);
+  });
+
+  it("収入は従来どおりメモ列と空メモを表示する", () => {
+    renderWithProviders(
+      <IncomeListCard count={1} isLoading={false} incomes={incomes.slice(0, 1)} />,
+    );
+    const table = screen.getByRole("table");
+    expect(within(table).getByRole("columnheader", { name: "メモ" })).toBeInTheDocument();
+    expect(within(table).getByText("—")).toBeInTheDocument();
+    expect(within(screen.getByTestId("receipt-row")).getAllByRole("cell")).toHaveLength(5);
+  });
+
+  it("収入のメモは従来の独立したセルに表示する", () => {
+    renderWithProviders(
+      <IncomeListCard
+        count={1}
+        isLoading={false}
+        incomes={[{ ...incomes[0], memo: "入金メモ" }]}
+      />,
+    );
+    const row = screen.getByTestId("receipt-row");
+    expect(within(row).getAllByRole("cell")[3]).toHaveTextContent("入金メモ");
+    expect(within(row).queryByText("メモ:")).not.toBeInTheDocument();
   });
 
   it("収入がないとき空状態を表示する", () => {

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
@@ -54,11 +54,33 @@ describe("ReceiptListCard", () => {
       <ReceiptListCard count={1} isLoading={false} receipts={receipts.slice(0, 1)} />,
     );
 
-    for (const label of ["日付", "店名・内訳", "金額（円）", "メモ", "操作"]) {
+    for (const label of ["日付", "店名・内訳", "金額（円）", "操作"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByRole("columnheader", { name: "メモ" })).not.toBeInTheDocument();
     expect(screen.queryByText("カテゴリ")).not.toBeInTheDocument();
   });
+
+  it.each([false, true])(
+    "見出しと親行・明細行のセル数が一致する（選択可能: %s）",
+    (selectionEnabled) => {
+      const item = { ...receipts[0], itemName: "牛乳", receiptTotalAmountYen: 1200 };
+      renderWithProviders(
+        <ReceiptListCard
+          count={1}
+          isLoading={false}
+          receipts={[item]}
+          selectionEnabled={selectionEnabled}
+        />,
+      );
+      const table = screen.getByRole("table");
+      const rows = within(table).getAllByRole("row");
+      const columns = within(rows[0]).getAllByRole("columnheader").length;
+      for (const row of rows.slice(1)) {
+        expect(within(row).getAllByRole("cell", { hidden: true })).toHaveLength(columns);
+      }
+    },
+  );
 
   it("同じレシートの明細を店舗ごとにまとめ、明細のカテゴリーを表示する", () => {
     const groupedReceipts: ReceiptItem[] = [
@@ -120,6 +142,7 @@ describe("ReceiptListCard", () => {
       />,
     );
     expect(screen.getAllByTestId("receipt-row")).toHaveLength(1);
+    expect(within(screen.getByTestId("receipt-row")).getAllByRole("cell")).toHaveLength(5);
     expect(screen.getByText("スーパー北浜")).toBeInTheDocument();
     expect(screen.getByTitle(item.itemName)).toHaveTextContent(item.itemName);
     expect(screen.getAllByText("1,000円")).toHaveLength(1);
@@ -130,6 +153,26 @@ describe("ReceiptListCard", () => {
     expect(onDelete).toHaveBeenCalledWith(item);
     expect(onToggleSelection).toHaveBeenCalledWith(item, true);
   });
+
+  it.each([1000, 1200])(
+    "合計だけで保存した行は店名とChipを折り返し可能な領域に置く（合計: %s）",
+    (total) => {
+      const item = {
+        ...receipts[0],
+        itemName: "牛乳",
+        receiptShopName: "長い店舗名",
+        receiptTotalAmountYen: total,
+        registrationMode: "totalOnly" as const,
+      };
+      renderWithProviders(
+        <ReceiptListCard count={1} isLoading={false} receipts={[item]} selectionEnabled />,
+      );
+      const identity = screen.getByText("長い店舗名").closest(".receipt-row-identity");
+      expect(identity).toContainElement(screen.getByText("合計だけで保存"));
+      expect(identity).toContainElement(screen.getByText("支出"));
+      expect(identity?.closest('[role="cell"]')).toBeInTheDocument();
+    },
+  );
 
   it("単一明細でも金額が異なれば親行と明細行を表示する", () => {
     const item = { ...receipts[0], itemName: "牛乳", receiptTotalAmountYen: 1200 };

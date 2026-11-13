@@ -118,7 +118,16 @@ describe("ReceiptRow", () => {
   it("短いメモは全文を表示する", () => {
     renderWithProviders(<ReceiptRow receipt={{ ...sampleReceipt, memo: "夕食の買い物" }} />);
 
-    expect(screen.getByTestId("memo-expandable-content")).toHaveTextContent("夕食の買い物");
+    const nameCell = screen.getByText("食費").closest('[role="cell"]');
+    expect(nameCell).toContainElement(screen.getByTestId("memo-expandable-content"));
+    expect(
+      screen
+        .getByText("食費")
+        .compareDocumentPosition(screen.getByTestId("memo-expandable-content")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByTestId("memo-expandable-content")).toHaveTextContent("メモ: 夕食の買い物");
+    expect(screen.getByTestId("memo-expand-measure")).toHaveTextContent("メモ: 夕食の買い物");
     expect(screen.queryByRole("button", { name: "もっと見る" })).not.toBeInTheDocument();
   });
 
@@ -128,23 +137,22 @@ describe("ReceiptRow", () => {
 
     renderWithProviders(<ReceiptRow receipt={{ ...sampleReceipt, memo: multiLineMemo }} />);
 
-    expect(screen.getByTestId("memo-expandable-content").textContent).toContain("あ");
+    expect(screen.getByTestId("memo-expandable-content").textContent).toContain("メモ: あ\nい");
     expect(screen.getByTestId("memo-expandable-content").textContent).toContain("お");
-    expect(screen.getByRole("button", { name: "もっと見る" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "もっと見る" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
 
     await user.click(screen.getByRole("button", { name: "もっと見る" }));
 
-    expect(screen.getByRole("button", { name: "閉じる" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "閉じる" })).toHaveAttribute("aria-expanded", "true");
   });
 
-  it("メモがない場合はプレースホルダーを表示する", () => {
+  it("支出にメモがない場合はラベルやプレースホルダーを表示しない", () => {
     renderWithProviders(<ReceiptRow receipt={sampleReceipt} />);
-
-    expect(screen.getByText("—")).toBeInTheDocument();
-    expect(screen.getByText("—").closest(".receipt-row-memo")).toHaveClass(
-      "receipt-row-memo--empty",
-    );
-    expect(screen.queryByRole("button", { name: "もっと見る" })).not.toBeInTheDocument();
-    expect(screen.queryByText("メモあり")).not.toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.queryByText("メモ:")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("memo-expandable-content")).not.toBeInTheDocument();
   });
 });

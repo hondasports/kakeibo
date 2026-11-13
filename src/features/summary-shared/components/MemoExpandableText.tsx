@@ -38,9 +38,11 @@ function measureMemoNeedsCollapse(measureElement: HTMLSpanElement): boolean {
 export function MemoExpandableText({
   memo,
   kind = "memo",
+  prefix = "",
 }: {
   memo: string;
   kind?: "memo" | "item";
+  prefix?: string;
 }) {
   const isItem = kind === "item";
   const textSx = isItem
@@ -48,7 +50,8 @@ export function MemoExpandableText({
     : memoTypographySx;
   const variant = isItem ? "body1" : "caption";
   const color = isItem ? "text.primary" : "text.secondary";
-  const needsCollapseByLines = memoNeedsCollapseByLineCount(memo);
+  const displayText = `${prefix}${memo}`;
+  const needsCollapseByLines = memoNeedsCollapseByLineCount(displayText);
   const [expanded, setExpanded] = useState(false);
   const [needsCollapse, setNeedsCollapse] = useState(needsCollapseByLines);
   const measureRef = useRef<HTMLSpanElement>(null);
@@ -85,7 +88,7 @@ export function MemoExpandableText({
     return () => {
       window.removeEventListener("resize", updateNeedsCollapse);
     };
-  }, [memo, needsCollapseByLines]);
+  }, [displayText, needsCollapseByLines]);
 
   return (
     <Stack
@@ -103,7 +106,7 @@ export function MemoExpandableText({
           sx={{ ...hiddenMeasureSx, ...textSx }}
           variant={variant}
         >
-          {memo}
+          {displayText}
         </Typography>
       )}
       <Typography
@@ -117,7 +120,7 @@ export function MemoExpandableText({
         }}
         variant={variant}
       >
-        {memo}
+        {displayText}
       </Typography>
       {needsCollapse && (
         <Box>

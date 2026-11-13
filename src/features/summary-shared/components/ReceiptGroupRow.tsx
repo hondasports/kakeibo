@@ -56,7 +56,13 @@ export function ReceiptGroupRow({
           {formatDateForDisplay(group.date)}
         </Typography>
         <Box className="receipt-row-name" role="cell">
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <Stack
+            className="receipt-row-identity"
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: "center" }}
+            useFlexGap
+          >
             <Chip label="支出" size="small" variant="outlined" />
             {singleItem?.registrationMode === "totalOnly" ? (
               <Chip label="合計だけで保存" size="small" variant="outlined" />
@@ -69,7 +75,6 @@ export function ReceiptGroupRow({
         <Typography className="receipt-row-amount" role="cell" sx={{ fontWeight: 700 }}>
           {formatYen(group.amountYen)}
         </Typography>
-        <Box className="receipt-row-memo" role="cell" />
         <Box className="receipt-row-actions" role="cell" />
       </Box>
 

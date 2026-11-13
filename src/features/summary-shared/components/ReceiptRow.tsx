@@ -67,7 +67,13 @@ export function ReceiptRow({
         {isDetail ? "" : formatDateForDisplay(receipt.date)}
       </Typography>
       <Box className="receipt-row-name" role="cell">
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <Stack
+          className={receipt.type === "income" ? undefined : "receipt-row-identity"}
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: "center" }}
+          useFlexGap={receipt.type !== "income"}
+        >
           {!isDetail && (receipt.type || combinedShopName) && (
             <Chip
               label={receipt.type === "income" ? "収入" : "支出"}
@@ -111,22 +117,26 @@ export function ReceiptRow({
             </Typography>
           </Stack>
         )}
+        {receipt.type !== "income" && receipt.memo && (
+          <Box className="receipt-row-memo">
+            <MemoExpandableText memo={receipt.memo} prefix="メモ: " />
+          </Box>
+        )}
       </Box>
       <Typography className="receipt-row-amount" role="cell" sx={{ fontWeight: 700 }}>
         {formatYen(receipt.amountYen)}
       </Typography>
-      <Box
-        className={`receipt-row-memo${!receipt.memo && receipt.type !== "income" ? " receipt-row-memo--empty" : ""}`}
-        role="cell"
-      >
-        {receipt.memo ? (
-          <MemoExpandableText memo={receipt.memo} />
-        ) : (
-          <Typography color="text.secondary" variant="caption">
-            —
-          </Typography>
-        )}
-      </Box>
+      {receipt.type === "income" && (
+        <Box className="receipt-row-memo" role="cell">
+          {receipt.memo ? (
+            <MemoExpandableText memo={receipt.memo} />
+          ) : (
+            <Typography color="text.secondary" variant="caption">
+              —
+            </Typography>
+          )}
+        </Box>
+      )}
       <Box className="receipt-row-actions" role="cell">
         {(onEdit || onDelete) && (
           <Stack direction="row" spacing={0.5}>

@@ -181,7 +181,6 @@ export function ReceiptListCard({
                   <span role="columnheader">日付</span>
                   <span role="columnheader">店名・内訳</span>
                   <span role="columnheader">金額（円）</span>
-                  <span role="columnheader">メモ</span>
                   <span role="columnheader">操作</span>
                 </Box>
                 {visibleReceiptGroups.map((group) => (
