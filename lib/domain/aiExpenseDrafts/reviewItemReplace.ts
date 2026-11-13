@@ -14,12 +14,14 @@ import { DRAFT_JUDGMENT_ITEM_LIMIT } from "./judgmentItemWindow";
 import { resolveReviewItemAmountsForReplace } from "./reviewItemAmounts";
 
 export type ReviewItemReplaceError =
+  | "existing_items_exceed_window"
   | "too_many_items"
   | "duplicate_item_id"
   | "item_not_in_draft"
   | "name_or_amount_required";
 
 const reviewItemReplaceErrorMessages: Record<ReviewItemReplaceError, string> = {
+  existing_items_exceed_window: `Draft contains more than ${DRAFT_JUDGMENT_ITEM_LIMIT} items`,
   too_many_items: `Draft items must be ${DRAFT_JUDGMENT_ITEM_LIMIT} or fewer`,
   duplicate_item_id: "Draft item ID must not be duplicated",
   item_not_in_draft: "Draft item does not belong to the current draft",

@@ -1,3 +1,6 @@
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
+import { getReviewItemReplaceErrorMessage } from "../../domain/aiExpenseDrafts/reviewItemReplace";
+import type { AiExpenseDraftItemReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftItemRepository";
 import { ConvexError } from "convex/values";
 import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
@@ -26,6 +29,7 @@ export async function applyReceiptTaxSettings(
   ctx: Pick<UsecaseGroupContext, "groupId">,
   deps: {
     drafts: AiExpenseDraftReadRepository;
+    draftItems: AiExpenseDraftItemReadRepository;
     taxInterpretation: DraftTaxInterpretationService;
     overrideSnapshots: DraftOverrideSnapshotService;
   },
@@ -52,10 +56,18 @@ export async function applyReceiptTaxSettings(
     throw new ConvexError(getBulkTaxSettingsErrorMessage(settingsResult.error));
   }
 
+  const items = await deps.draftItems.listByDraftAsc(
+    ctx.groupId,
+    args.draftId,
+    DRAFT_JUDGMENT_ITEM_LIMIT + 1,
+  );
+  if (items.length > DRAFT_JUDGMENT_ITEM_LIMIT)
+    throw new ConvexError(getReviewItemReplaceErrorMessage("existing_items_exceed_window"));
   const result = await deps.taxInterpretation.persistInterpretation({
     draftId: args.draftId,
     groupId: ctx.groupId,
     draft: draft.persisted,
+    items,
     bulkUnresolvedOverride: {
       taxRatePercent: settingsResult.taxRatePercent as TaxRatePercent,
       amountBasis: settingsResult.amountBasis,

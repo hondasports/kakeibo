@@ -15,7 +15,10 @@ import type {
   ReviewItemValues,
   AiExpenseDraft,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
-import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
+import {
+  getDraftItemWindowErrorMessage,
+  getAiExpenseQueueReviewErrorMessage,
+} from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 
 export function useReviewTaxOverrides({
   selectedReviewDraftId,
@@ -89,7 +92,9 @@ export function useReviewTaxOverrides({
         return;
       }
       console.error("AI expense queue review failed", error);
-      setReviewError(getAiExpenseQueueReviewErrorMessage());
+      setReviewError(
+        getDraftItemWindowErrorMessage(error) ?? getAiExpenseQueueReviewErrorMessage(),
+      );
     } finally {
       if (requestId === taxOverrideRequestIdRef.current) {
         setTaxUpdatingItemId(null);
@@ -136,7 +141,9 @@ export function useReviewTaxOverrides({
         return;
       }
       console.error("AI expense queue review failed", error);
-      setReviewError(getAiExpenseQueueReviewErrorMessage());
+      setReviewError(
+        getDraftItemWindowErrorMessage(error) ?? getAiExpenseQueueReviewErrorMessage(),
+      );
     } finally {
       if (requestId === taxOverrideRequestIdRef.current) {
         setIsApplyingReceiptTax(false);

@@ -3,7 +3,10 @@ import { useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
-import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
+import {
+  getDraftItemWindowErrorMessage,
+  getAiExpenseQueueReviewErrorMessage,
+} from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 import type {
   ReviewFormValues,
   ReviewItemValues,
@@ -70,7 +73,8 @@ export function useReviewSubmit({
       resetForm();
     } catch (error) {
       console.error("AI expense queue review failed", error);
-      const message = getAiExpenseQueueReviewErrorMessage();
+      const message =
+        getDraftItemWindowErrorMessage(error) ?? getAiExpenseQueueReviewErrorMessage();
       setReviewError(message);
       setReviewSaveFeedback({ message, severity: "error" });
     } finally {
@@ -190,7 +194,8 @@ export function useReviewSubmit({
       }
     } catch (error) {
       console.error("AI expense queue review failed", error);
-      const message = getAiExpenseQueueReviewErrorMessage();
+      const message =
+        getDraftItemWindowErrorMessage(error) ?? getAiExpenseQueueReviewErrorMessage();
       setReviewError(message);
       setReviewSaveFeedback({ message, severity: "error" });
     } finally {

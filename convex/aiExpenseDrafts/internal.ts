@@ -137,7 +137,7 @@ export const getForReanalysis = internalQuery({
         q.eq("groupId", args.groupId).eq("draftId", args.draftId),
       )
       .order("asc")
-      .take(DRAFT_JUDGMENT_ITEM_LIMIT);
+      .take(DRAFT_JUDGMENT_ITEM_LIMIT + 1);
     return { draft, items };
   },
 });

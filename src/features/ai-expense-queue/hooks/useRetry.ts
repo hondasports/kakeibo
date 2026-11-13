@@ -1,3 +1,4 @@
+import { getDraftItemWindowErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 import { api } from "../../../../convex/_generated/api";
 import { useRef, useState, type ChangeEvent } from "react";
 import { useAction, useMutation } from "convex/react";
@@ -37,7 +38,10 @@ export function useRetry({
       await retryImageJob({ jobId: job._id });
       await analyzeImageJob({ jobId: job._id, imageDataUrl });
     } catch (err) {
-      setRetryError(err instanceof Error ? err.message : "再試行に失敗しました");
+      setRetryError(
+        getDraftItemWindowErrorMessage(err) ??
+          (err instanceof Error ? err.message : "再試行に失敗しました"),
+      );
     } finally {
       setRetryingItemId(null);
     }

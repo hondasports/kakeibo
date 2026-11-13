@@ -1,3 +1,4 @@
+import { getDraftItemWindowErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useMutation } from "convex/react";
@@ -158,8 +159,11 @@ export function useExpenseEntryEditDialogState({
       }
       onSaved();
       onClose();
-    } catch {
-      setError("保存に失敗しました。入力内容を確認して再度お試しください。");
+    } catch (error) {
+      setError(
+        getDraftItemWindowErrorMessage(error) ??
+          "保存に失敗しました。入力内容を確認して再度お試しください。",
+      );
     } finally {
       setSaving(false);
     }

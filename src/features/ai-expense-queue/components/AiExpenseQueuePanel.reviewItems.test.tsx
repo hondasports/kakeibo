@@ -1,6 +1,7 @@
+import { ConvexError } from "convex/values";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import "./AiExpenseQueuePanelTestMocks";
 import { renderWithProviders } from "../../../test/render";
 import { AiExpenseQueuePanel } from "./AiExpenseQueuePanel";
@@ -107,6 +108,44 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     await user.click(within(dialog).getByRole("button", { name: resetLabel }));
 
     expect(resetReceiptToAiInterpretationMock).toHaveBeenCalledWith({ draftId: "draft-review" });
+  });
+
+  it("AI判定へのリセットが明細上限で拒否されたら理由を表示する", async () => {
+    const user = userEvent.setup();
+    resetReceiptToAiInterpretationMock.mockRejectedValueOnce(
+      new ConvexError("Draft contains more than 100 items"),
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      useQueryMock.mockImplementation((reference: string, args: { draftId?: string } | "skip") => {
+        if (reference !== "aiExpenseDrafts.queries.getWithItems" || args === "skip") return [];
+        return {
+          draft: {
+            _id: args.draftId,
+            status: "needs_review",
+            documentType: "receipt",
+            shopName: "店舗",
+            date: "2026-06-01",
+            amountYen: 803,
+            categoryId: "cat-daily",
+            reviewReasons: [],
+            receiptInterpretation: { source: "ai", interpretedAt: 1, values: {} },
+            receiptUserOverride: { source: "user", updatedAt: 2, fields: ["items"], values: {} },
+          },
+          items: [],
+        };
+      });
+      renderWithProviders(
+        <AiExpenseQueuePanel initialItems={[queueItems[1]]} categories={categories} />,
+      );
+      await user.click(screen.getByRole("button", { name: "確認する" }));
+      const dialog = screen.getByRole("dialog", { name: "下書き確認" });
+      await user.click(within(dialog).getByRole("button", { name: "AI判定へ戻す" }));
+      expect(await within(dialog).findByText(/明細が100件を超える/)).toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("明細あり下書きは状態を簡潔に表示し、明細は折りたたみで確認できる", async () => {
