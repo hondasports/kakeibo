@@ -1,4 +1,4 @@
-import { getDraftItemWindowErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
+import { getDraftItemWindowErrorMessage } from "../../receipt-review/utils/draftItemWindowError";
 import { api } from "../../../../convex/_generated/api";
 import { useRef, useState, type ChangeEvent } from "react";
 import { useAction, useMutation } from "convex/react";

@@ -1,12 +1,10 @@
+import { getDraftItemWindowErrorMessage } from "../utils/draftItemWindowError";
 import { api } from "../../../../convex/_generated/api";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { getReviewSubmitErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
-import {
-  getDraftItemWindowErrorMessage,
-  getAiExpenseQueueReviewErrorMessage,
-} from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
+import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 import type {
   ReviewFormValues,
   ReviewItemValues,

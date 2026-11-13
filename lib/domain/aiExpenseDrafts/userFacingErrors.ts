@@ -1,4 +1,3 @@
-import { ConvexError } from "convex/values";
 import { DRAFT_JUDGMENT_ITEM_LIMIT } from "./judgmentItemWindow";
 import { getReviewItemReplaceErrorMessage } from "./reviewItemReplace";
 
@@ -18,11 +17,8 @@ export function getAiExpenseQueueReviewErrorMessage(): string {
   return "保存に失敗しました。入力内容を確認して再度お試しください。";
 }
 
-export function getDraftItemWindowErrorMessage(error: unknown): string | undefined {
-  if (
-    error instanceof ConvexError &&
-    error.data === getReviewItemReplaceErrorMessage("existing_items_exceed_window")
-  ) {
+export function getDraftItemWindowErrorMessage(errorData: unknown): string | undefined {
+  if (errorData === getReviewItemReplaceErrorMessage("existing_items_exceed_window")) {
     return `明細が${DRAFT_JUDGMENT_ITEM_LIMIT}件を超えるため、この下書きは保存・再解析できません。`;
   }
   return undefined;

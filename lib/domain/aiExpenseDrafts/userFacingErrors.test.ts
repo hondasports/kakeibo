@@ -1,4 +1,3 @@
-import { ConvexError } from "convex/values";
 import { getReviewItemReplaceErrorMessage } from "./reviewItemReplace";
 import { describe, expect, it } from "vitest";
 import {
@@ -16,10 +15,10 @@ describe("AI 下書きキューのユーザー向けエラーメッセージ", (
   });
 });
 
-it("判定窓超過の ConvexError だけ理由を表示する", () => {
+it("判定窓超過のエラー内容だけ理由を表示する", () => {
   expect(
     getDraftItemWindowErrorMessage(
-      new ConvexError(getReviewItemReplaceErrorMessage("existing_items_exceed_window")),
+      getReviewItemReplaceErrorMessage("existing_items_exceed_window"),
     ),
   ).toContain("100件を超える");
   expect(getDraftItemWindowErrorMessage(new Error("unexpected"))).toBeUndefined();

@@ -1,3 +1,4 @@
+import { getDraftItemWindowErrorMessage } from "../utils/draftItemWindowError";
 import { api } from "../../../../convex/_generated/api";
 import {
   applyReviewItemsTaxPreview,
@@ -15,10 +16,7 @@ import type {
   ReviewItemValues,
   AiExpenseDraft,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
-import {
-  getDraftItemWindowErrorMessage,
-  getAiExpenseQueueReviewErrorMessage,
-} from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
+import { getAiExpenseQueueReviewErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
 
 export function useReviewTaxOverrides({
   selectedReviewDraftId,
