@@ -62,7 +62,7 @@ export function deriveReceiptTaxSummaries(args: {
     if (isTaxRateDeclarationLine(line)) return false;
     if (taxSummaryLineKind(line.rawText) === undefined) {
       return (
-        !isReceiptTotalLabel(line.rawText) &&
+        !isReceiptTotalLabel(line.rawText, line.amountText) &&
         !/subtotal/i.test(line.rawText) &&
         (line.lineRoleCandidates.includes("tax") || line.lineRoleCandidates.includes("subtotal"))
       );
@@ -85,7 +85,7 @@ export function deriveReceiptTaxSummaries(args: {
   });
   const totalConflict = lines.some(
     (line) =>
-      isReceiptTotalLabel(line.rawText) &&
+      isReceiptTotalLabel(line.rawText, line.amountText) &&
       taxSummaryLineKind(line.rawText) === undefined &&
       line.amountYen !== args.amountYen,
   );
@@ -180,7 +180,7 @@ export function deriveReceiptTaxSummaries(args: {
         [Math.floor(exactTax), Math.ceil(exactTax)].includes(paidTax) &&
         lines.some(
           (line) =>
-            isReceiptTotalLabel(line.rawText) &&
+            isReceiptTotalLabel(line.rawText, line.amountText) &&
             taxSummaryLineKind(line.rawText) === undefined &&
             line.amountYen === args.amountYen,
         ) &&
@@ -255,7 +255,7 @@ export function deriveReceiptTaxSummaries(args: {
             args.paidTotalConfirmed ||
             lines.some(
               (line) =>
-                isReceiptTotalLabel(line.rawText) &&
+                isReceiptTotalLabel(line.rawText, line.amountText) &&
                 taxSummaryLineKind(line.rawText) === undefined &&
                 line.amountYen === args.amountYen,
             ))

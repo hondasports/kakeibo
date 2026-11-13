@@ -220,4 +220,24 @@ describe("isReceiptTotalLabel", () => {
 
     expect(result.candidates.map((candidate) => candidate.role)).not.toContain("totalCandidate");
   });
+
+  it.each(["5P", "10pt", "3ポイント", "5pt(10%)"])(
+    "分離されたポイント額 %s を合計候補にしない",
+    (amountText) => {
+      const [result] = classifyReceiptLines([
+        { ...line("今回お買上げポイント", null, 14), amountText },
+      ]);
+      expect(result.candidates.map((candidate) => candidate.role)).not.toContain("totalCandidate");
+    },
+  );
+
+  it.each(["¥288(5pt)", "288円(5P)", "¥288(5pt(10%))"])(
+    "ポイント注記付き金額 %s は合計候補にする",
+    (amountText) => {
+      const [result] = classifyReceiptLines([
+        { ...line("ポイント利用後合計", 287, 14), amountText },
+      ]);
+      expect(result.candidates.map((candidate) => candidate.role)).toContain("totalCandidate");
+    },
+  );
 });
