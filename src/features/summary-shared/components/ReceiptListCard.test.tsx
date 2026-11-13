@@ -174,6 +174,43 @@ describe("ReceiptListCard", () => {
     },
   );
 
+  it("店名と同じ品名の単一明細は重複表示せず、メモと操作を残す", () => {
+    const item = {
+      ...receipts[0],
+      shopName: "スーパー北浜",
+      itemName: "  スーパー北浜  ",
+      receiptShopName: "スーパー北浜",
+      receiptTotalAmountYen: 1000,
+      memo: "メモ本文",
+    };
+    renderWithProviders(
+      <ReceiptListCard
+        count={1}
+        isLoading={false}
+        receipts={[item]}
+        selectionEnabled
+        onEditReceipt={vi.fn()}
+        onDeleteReceipt={vi.fn()}
+        onToggleSelection={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByText("スーパー北浜")).toHaveLength(1);
+    expect(screen.queryByTestId("item-expandable-text")).not.toBeInTheDocument();
+    expect(screen.getByText("食費")).toBeInTheDocument();
+    expect(screen.getByTestId("memo-expandable-content")).toHaveTextContent("メモ本文");
+    expect(screen.getByRole("button", { name: "スーパー北浜（6/21）を編集" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "スーパー北浜（6/21）を削除" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "スーパー北浜（6/21）を選択" }),
+    ).toBeInTheDocument();
+  });
+
+  it("店名と同じ品名でも金額が異なれば明細行に表示する", () => {
+    const item = { ...receipts[0], itemName: "店舗1", receiptTotalAmountYen: 1200 };
+    renderWithProviders(<ReceiptListCard count={1} isLoading={false} receipts={[item]} />);
+    expect(screen.getByTestId("item-expandable-content")).toHaveTextContent("店舗1");
+  });
+
   it("単一明細でも金額が異なれば親行と明細行を表示する", () => {
     const item = { ...receipts[0], itemName: "牛乳", receiptTotalAmountYen: 1200 };
     renderWithProviders(<ReceiptListCard count={1} isLoading={false} receipts={[item]} />);

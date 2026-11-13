@@ -38,6 +38,9 @@ export function ReceiptRow({
   const displayName =
     receipt.type === "income" ? (receipt.bankName ?? "不明") : (receipt.shopName ?? "不明");
   const actionLabelSuffix = `${combinedShopName ?? displayName}（${formatDateForDisplay(receipt.date)}）`;
+  const showItemName =
+    isDetail ||
+    (combinedShopName !== undefined && receipt.itemName?.trim() !== combinedShopName.trim());
   const categoryName = selected && previewCategory ? previewCategory.name : receipt.categoryName;
   const categoryColor =
     selected && previewCategory?.color ? previewCategory.color : receipt.categoryColor;
@@ -91,7 +94,7 @@ export function ReceiptRow({
             </Typography>
           )}
         </Stack>
-        {(isDetail || combinedShopName) && (
+        {showItemName && (
           <MemoExpandableText kind="item" memo={receipt.itemName ?? "内訳情報なし"} />
         )}
         {showCategory && receipt.type !== "income" && (

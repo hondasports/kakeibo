@@ -127,6 +127,7 @@ export function MemoExpandableText({
           <Button
             aria-controls={contentId}
             aria-expanded={expanded}
+            aria-label={isItem ? (expanded ? "品名を閉じる" : "品名をもっと見る") : undefined}
             color="primary"
             data-testid={isItem ? "item-expand-toggle" : "memo-expand-toggle"}
             endIcon={

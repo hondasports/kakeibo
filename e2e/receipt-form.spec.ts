@@ -351,7 +351,7 @@ test.describe("週次サマリーパネル（Issue #15 受け入れ確認）", (
       const bounds = await button.boundingBox();
       expect(bounds?.height ?? 0).toBeGreaterThanOrEqual(44);
     }
-    await expect(receiptRow.getByRole("button", { name: "もっと見る" })).toBeVisible();
+    await expect(receiptRow.getByRole("button", { name: "もっと見る", exact: true })).toBeVisible();
   });
 
   test("@smoke [Issue #45] 週次サマリーを前後週ナビゲーションで切り替えられる", async ({
