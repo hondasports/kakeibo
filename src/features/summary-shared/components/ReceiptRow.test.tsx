@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
@@ -51,10 +51,110 @@ describe("ReceiptRow", () => {
     expect(onDelete).toHaveBeenCalledWith(sampleReceipt);
   });
 
+  it("明細の長い品名は全文を参照できる", () => {
+    const itemName = "牛乳、パン、卵、ヨーグルト、野菜、果物、その他の長い品名";
+    renderWithProviders(<ReceiptRow isDetail receipt={{ ...sampleReceipt, itemName }} />);
+    expect(screen.getByTitle(itemName)).toHaveTextContent(itemName);
+  });
+
+  it("2行を超える品名はキーボードで展開・折りたたみできる", async () => {
+    const user = userEvent.setup();
+    const itemName = "牛乳\nパン\n卵";
+    renderWithProviders(<ReceiptRow isDetail receipt={{ ...sampleReceipt, itemName }} />);
+    const toggle = screen.getByRole("button", { name: "品名をもっと見る" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    toggle.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "品名を閉じる" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByTestId("item-expandable-content")).toHaveTextContent("卵");
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "品名をもっと見る" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("改行がなくても折り返しで3行になる品名を展開できる", async () => {
+    const height = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(60);
+    const original = window.getComputedStyle;
+    const style = vi.spyOn(window, "getComputedStyle").mockImplementation((element, pseudo) => {
+      const result = original(element, pseudo);
+      if (element.getAttribute("data-testid") === "item-expand-measure") {
+        Object.defineProperty(result, "lineHeight", { value: "20px", configurable: true });
+      }
+      return result;
+    });
+    try {
+      renderWithProviders(
+        <ReceiptRow
+          isDetail
+          receipt={{ ...sampleReceipt, itemName: "折り返しが必要な長い品名" }}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "品名をもっと見る" })).toHaveAttribute(
+          "aria-expanded",
+          "false",
+        ),
+      );
+      await userEvent.setup().click(screen.getByRole("button", { name: "品名をもっと見る" }));
+      expect(screen.getByRole("button", { name: "品名を閉じる" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+    } finally {
+      height.mockRestore();
+      style.mockRestore();
+    }
+  });
+
+  it("品名とメモのトグルは名前で区別でき、品名だけ開閉する", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ReceiptRow
+        isDetail
+        receipt={{ ...sampleReceipt, itemName: "牛乳\nパン\n卵", memo: "一行目\n二行目\n三行目" }}
+      />,
+    );
+    const itemToggle = screen.getByRole("button", { name: "品名をもっと見る" });
+    const memoToggle = screen.getByRole("button", { name: /^もっと見る$/ });
+    expect(itemToggle).toHaveTextContent("もっと見る");
+    await user.click(itemToggle);
+    expect(screen.getByRole("button", { name: "品名を閉じる" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(memoToggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(screen.getByRole("button", { name: "品名を閉じる" }));
+    expect(screen.getByRole("button", { name: "品名をもっと見る" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("2行以内の品名に展開ボタンを出さない", () => {
+    renderWithProviders(
+      <ReceiptRow isDetail receipt={{ ...sampleReceipt, itemName: "牛乳\nパン" }} />,
+    );
+    expect(screen.queryByRole("button", { name: "品名をもっと見る" })).not.toBeInTheDocument();
+  });
+
   it("短いメモは全文を表示する", () => {
     renderWithProviders(<ReceiptRow receipt={{ ...sampleReceipt, memo: "夕食の買い物" }} />);
 
-    expect(screen.getByTestId("memo-expandable-content")).toHaveTextContent("夕食の買い物");
+    const nameCell = screen.getByText("食費").closest('[role="cell"]');
+    expect(nameCell).toContainElement(screen.getByTestId("memo-expandable-content"));
+    expect(
+      screen
+        .getByText("食費")
+        .compareDocumentPosition(screen.getByTestId("memo-expandable-content")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByTestId("memo-expandable-content")).toHaveTextContent("メモ: 夕食の買い物");
+    expect(screen.getByTestId("memo-expand-measure")).toHaveTextContent("メモ: 夕食の買い物");
     expect(screen.queryByRole("button", { name: "もっと見る" })).not.toBeInTheDocument();
   });
 
@@ -64,20 +164,22 @@ describe("ReceiptRow", () => {
 
     renderWithProviders(<ReceiptRow receipt={{ ...sampleReceipt, memo: multiLineMemo }} />);
 
-    expect(screen.getByTestId("memo-expandable-content").textContent).toContain("あ");
+    expect(screen.getByTestId("memo-expandable-content").textContent).toContain("メモ: あ\nい");
     expect(screen.getByTestId("memo-expandable-content").textContent).toContain("お");
-    expect(screen.getByRole("button", { name: "もっと見る" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "もっと見る" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
 
     await user.click(screen.getByRole("button", { name: "もっと見る" }));
 
-    expect(screen.getByRole("button", { name: "閉じる" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "閉じる" })).toHaveAttribute("aria-expanded", "true");
   });
 
-  it("メモがない場合はプレースホルダーを表示する", () => {
+  it("支出にメモがない場合はラベルやプレースホルダーを表示しない", () => {
     renderWithProviders(<ReceiptRow receipt={sampleReceipt} />);
-
-    expect(screen.getByText("—")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "もっと見る" })).not.toBeInTheDocument();
-    expect(screen.queryByText("メモあり")).not.toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.queryByText("メモ:")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("memo-expandable-content")).not.toBeInTheDocument();
   });
 });

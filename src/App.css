@@ -714,7 +714,7 @@
 .receipt-row,
 .receipt-group-header {
   display: grid;
-  grid-template-columns: 88px minmax(200px, 1.4fr) 104px minmax(140px, 1fr) 184px;
+  grid-template-columns: 88px minmax(200px, 1fr) 104px 184px;
   gap: var(--space-md);
   align-items: center;
   padding: var(--space-sm) var(--space-xs);
@@ -724,7 +724,7 @@
 .receipt-list--selectable .receipt-list-header,
 .receipt-list--selectable .receipt-row,
 .receipt-list--selectable .receipt-group-header {
-  grid-template-columns: 44px 88px minmax(200px, 1.4fr) 104px minmax(140px, 1fr) 184px;
+  grid-template-columns: 44px 88px minmax(200px, 1fr) 104px 184px;
 }
 
 .receipt-row-select {
@@ -746,6 +746,16 @@
   min-width: 0;
 }
 
+.receipt-row-identity {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.receipt-row-identity > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
 .receipt-group {
   border-bottom: 1px solid var(--color-border-subtle);
 }
@@ -755,12 +765,8 @@
   border-bottom: 0;
 }
 
-.receipt-row--detail {
-  padding-left: var(--space-lg);
-}
-
 .receipt-row--detail .receipt-row-name {
-  padding-left: var(--space-sm);
+  padding-left: calc(var(--space-lg) + var(--space-sm));
 }
 
 .receipt-row-amount {
@@ -1046,6 +1052,7 @@
 
   .receipt-list--selectable .receipt-row-select {
     grid-area: select;
+    align-self: start;
   }
 
   .receipt-row-date {
@@ -1057,10 +1064,23 @@
   .receipt-row-amount {
     grid-area: amount;
   }
+  .receipt-list:not(.receipt-list--income) .receipt-row-date,
+  .receipt-list:not(.receipt-list--income) .receipt-row-amount {
+    align-self: start;
+  }
+
   .receipt-row-memo {
     grid-area: memo;
     min-width: 0;
   }
+  .receipt-list:not(.receipt-list--income) .receipt-row {
+    grid-template-areas: "date name amount" "actions actions actions";
+  }
+
+  .receipt-list--selectable:not(.receipt-list--income) .receipt-row {
+    grid-template-areas: "select date name amount" "select actions actions actions";
+  }
+
   .receipt-row-actions {
     grid-area: actions;
   }
@@ -1075,18 +1095,22 @@
 
   .receipt-group-header {
     grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      "date name amount"
-      "memo memo actions";
+    grid-template-areas: "date name amount";
     gap: var(--space-xs) var(--space-sm);
     padding: var(--space-md) 0 var(--space-sm);
   }
 
   .receipt-list--selectable .receipt-group-header {
     grid-template-columns: 44px auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      "select date name amount"
-      "select memo memo actions";
+    grid-template-areas: "select date name amount";
+  }
+
+  .receipt-list:not(.receipt-list--income) .receipt-group-header {
+    grid-template-areas: "date name amount";
+  }
+
+  .receipt-list--selectable:not(.receipt-list--income) .receipt-group-header {
+    grid-template-areas: "select date name amount";
   }
 
   .receipt-group-header .receipt-row-date {
@@ -1101,16 +1125,8 @@
     grid-area: amount;
   }
 
-  .receipt-group-header .receipt-row-memo {
-    display: none;
-  }
-
   .receipt-group-header .receipt-row-actions {
     display: none;
-  }
-
-  .receipt-row--detail {
-    padding-left: 0;
   }
 
   .receipt-row--detail .receipt-row-name {

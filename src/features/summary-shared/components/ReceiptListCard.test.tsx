@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
@@ -54,11 +54,33 @@ describe("ReceiptListCard", () => {
       <ReceiptListCard count={1} isLoading={false} receipts={receipts.slice(0, 1)} />,
     );
 
-    for (const label of ["日付", "店名・内訳", "金額（円）", "メモ", "操作"]) {
+    for (const label of ["日付", "店名・内訳", "金額（円）", "操作"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByRole("columnheader", { name: "メモ" })).not.toBeInTheDocument();
     expect(screen.queryByText("カテゴリ")).not.toBeInTheDocument();
   });
+
+  it.each([false, true])(
+    "見出しと親行・明細行のセル数が一致する（選択可能: %s）",
+    (selectionEnabled) => {
+      const item = { ...receipts[0], itemName: "牛乳", receiptTotalAmountYen: 1200 };
+      renderWithProviders(
+        <ReceiptListCard
+          count={1}
+          isLoading={false}
+          receipts={[item]}
+          selectionEnabled={selectionEnabled}
+        />,
+      );
+      const table = screen.getByRole("table");
+      const rows = within(table).getAllByRole("row");
+      const columns = within(rows[0]).getAllByRole("columnheader").length;
+      for (const row of rows.slice(1)) {
+        expect(within(row).getAllByRole("cell", { hidden: true })).toHaveLength(columns);
+      }
+    },
+  );
 
   it("同じレシートの明細を店舗ごとにまとめ、明細のカテゴリーを表示する", () => {
     const groupedReceipts: ReceiptItem[] = [
@@ -86,13 +108,116 @@ describe("ReceiptListCard", () => {
 
     expect(screen.getByText("支出一覧（1件）")).toBeInTheDocument();
     expect(screen.getByText("スーパー北浜")).toBeInTheDocument();
-    expect(screen.getByText("内訳: 食料品、洗剤")).toBeInTheDocument();
-    expect(screen.getByText("食料品")).toBeInTheDocument();
-    expect(screen.getByText("洗剤")).toBeInTheDocument();
+    expect(screen.queryByText(/内訳:/)).not.toBeInTheDocument();
+    expect(screen.getByTitle("食料品")).toBeInTheDocument();
+    expect(screen.getByTitle("洗剤")).toBeInTheDocument();
     expect(screen.getByText("食費")).toBeInTheDocument();
     expect(screen.getByText("日用品")).toBeInTheDocument();
+    expect(screen.getAllByTestId("receipt-row")).toHaveLength(2);
     expect(screen.getByText("3,000円")).toBeInTheDocument();
     expect(screen.getByTestId("receipt-group")).toBeInTheDocument();
+  });
+
+  it("金額が一致する単一明細を1行にまとめて明細を操作する", async () => {
+    const user = userEvent.setup();
+    const item = {
+      ...receipts[0],
+      type: "expense" as const,
+      itemName: "長い品名、牛乳、パン",
+      receiptShopName: "スーパー北浜",
+      receiptTotalAmountYen: 1000,
+    };
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+    const onToggleSelection = vi.fn();
+    renderWithProviders(
+      <ReceiptListCard
+        count={1}
+        isLoading={false}
+        receipts={[item]}
+        selectionEnabled
+        onEditReceipt={onEdit}
+        onDeleteReceipt={onDelete}
+        onToggleSelection={onToggleSelection}
+      />,
+    );
+    expect(screen.getAllByTestId("receipt-row")).toHaveLength(1);
+    expect(within(screen.getByTestId("receipt-row")).getAllByRole("cell")).toHaveLength(5);
+    expect(screen.getByText("スーパー北浜")).toBeInTheDocument();
+    expect(screen.getByTitle(item.itemName)).toHaveTextContent(item.itemName);
+    expect(screen.getAllByText("1,000円")).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "スーパー北浜（6/21）を編集" }));
+    await user.click(screen.getByRole("button", { name: "スーパー北浜（6/21）を削除" }));
+    await user.click(screen.getByRole("checkbox", { name: "スーパー北浜（6/21）を選択" }));
+    expect(onEdit).toHaveBeenCalledWith(item);
+    expect(onDelete).toHaveBeenCalledWith(item);
+    expect(onToggleSelection).toHaveBeenCalledWith(item, true);
+  });
+
+  it.each([1000, 1200])(
+    "合計だけで保存した行は店名とChipを折り返し可能な領域に置く（合計: %s）",
+    (total) => {
+      const item = {
+        ...receipts[0],
+        itemName: "牛乳",
+        receiptShopName: "長い店舗名",
+        receiptTotalAmountYen: total,
+        registrationMode: "totalOnly" as const,
+      };
+      renderWithProviders(
+        <ReceiptListCard count={1} isLoading={false} receipts={[item]} selectionEnabled />,
+      );
+      const identity = screen.getByText("長い店舗名").closest(".receipt-row-identity");
+      expect(identity).toContainElement(screen.getByText("合計だけで保存"));
+      expect(identity).toContainElement(screen.getByText("支出"));
+      expect(identity?.closest('[role="cell"]')).toBeInTheDocument();
+    },
+  );
+
+  it("店名と同じ品名の単一明細は重複表示せず、メモと操作を残す", () => {
+    const item = {
+      ...receipts[0],
+      shopName: "スーパー北浜",
+      itemName: "  スーパー北浜  ",
+      receiptShopName: "スーパー北浜",
+      receiptTotalAmountYen: 1000,
+      memo: "メモ本文",
+    };
+    renderWithProviders(
+      <ReceiptListCard
+        count={1}
+        isLoading={false}
+        receipts={[item]}
+        selectionEnabled
+        onEditReceipt={vi.fn()}
+        onDeleteReceipt={vi.fn()}
+        onToggleSelection={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByText("スーパー北浜")).toHaveLength(1);
+    expect(screen.queryByTestId("item-expandable-text")).not.toBeInTheDocument();
+    expect(screen.getByText("食費")).toBeInTheDocument();
+    expect(screen.getByTestId("memo-expandable-content")).toHaveTextContent("メモ本文");
+    expect(screen.getByRole("button", { name: "スーパー北浜（6/21）を編集" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "スーパー北浜（6/21）を削除" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "スーパー北浜（6/21）を選択" }),
+    ).toBeInTheDocument();
+  });
+
+  it("店名と同じ品名でも金額が異なれば明細行に表示する", () => {
+    const item = { ...receipts[0], itemName: "店舗1", receiptTotalAmountYen: 1200 };
+    renderWithProviders(<ReceiptListCard count={1} isLoading={false} receipts={[item]} />);
+    expect(screen.getByTestId("item-expandable-content")).toHaveTextContent("店舗1");
+  });
+
+  it("単一明細でも金額が異なれば親行と明細行を表示する", () => {
+    const item = { ...receipts[0], itemName: "牛乳", receiptTotalAmountYen: 1200 };
+    renderWithProviders(<ReceiptListCard count={1} isLoading={false} receipts={[item]} />);
+    expect(screen.getByTestId("receipt-group")).toBeInTheDocument();
+    expect(screen.getByText("1,200円")).toBeInTheDocument();
+    expect(screen.getByText("1,000円")).toBeInTheDocument();
+    expect(screen.queryByText(/内訳:/)).not.toBeInTheDocument();
   });
 
   it("内訳のない単一支出は従来どおりカテゴリー付きで1行表示する", () => {

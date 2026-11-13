@@ -24,14 +24,15 @@ export function ReceiptGroupRow({
   const singleItem = group.items[0];
   const hasBreakdown =
     group.items.length > 1 || group.items.some((item) => item.itemName !== undefined);
-  const itemNames = group.items
-    .map((item) => item.itemName?.trim())
-    .filter((itemName): itemName is string => Boolean(itemName));
 
-  if (singleItem && !hasBreakdown) {
+  if (
+    singleItem &&
+    (!hasBreakdown || (group.items.length === 1 && singleItem.amountYen === group.amountYen))
+  ) {
     return (
       <ReceiptRow
         receipt={singleItem}
+        combinedShopName={hasBreakdown ? group.shopName : undefined}
         onDelete={onDelete}
         onEdit={onEdit}
         previewCategory={previewCategory}
@@ -55,7 +56,13 @@ export function ReceiptGroupRow({
           {formatDateForDisplay(group.date)}
         </Typography>
         <Box className="receipt-row-name" role="cell">
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <Stack
+            className="receipt-row-identity"
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: "center" }}
+            useFlexGap
+          >
             <Chip label="支出" size="small" variant="outlined" />
             {singleItem?.registrationMode === "totalOnly" ? (
               <Chip label="合計だけで保存" size="small" variant="outlined" />
@@ -64,19 +71,10 @@ export function ReceiptGroupRow({
               {group.shopName}
             </Typography>
           </Stack>
-          <Typography
-            color="text.secondary"
-            noWrap
-            title={itemNames.length > 0 ? `内訳: ${itemNames.join("、")}` : "内訳情報なし"}
-            variant="caption"
-          >
-            {itemNames.length > 0 ? `内訳: ${itemNames.join("、")}` : "内訳情報なし"}
-          </Typography>
         </Box>
         <Typography className="receipt-row-amount" role="cell" sx={{ fontWeight: 700 }}>
           {formatYen(group.amountYen)}
         </Typography>
-        <Box className="receipt-row-memo" role="cell" />
         <Box className="receipt-row-actions" role="cell" />
       </Box>
 
