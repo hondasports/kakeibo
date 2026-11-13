@@ -1,3 +1,6 @@
+import { ConvexError } from "convex/values";
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
+import { getReviewItemReplaceErrorMessage } from "../../domain/aiExpenseDrafts/reviewItemReplace";
 import { api, internal } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { ActionCtx } from "../../../convex/_generated/server";
@@ -45,6 +48,9 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
         draftId: draftId as Id<"aiExpenseDrafts">,
         groupId: groupId as Id<"groups">,
       });
+      if ((bundle?.items.length ?? 0) > DRAFT_JUDGMENT_ITEM_LIMIT) {
+        throw new ConvexError(getReviewItemReplaceErrorMessage("existing_items_exceed_window"));
+      }
       const draft = bundle?.draft ?? null;
       if (!draft) return null;
       const value: ReceiptUserOverrideSnapshot<Id<"categories">> | undefined =

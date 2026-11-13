@@ -1,3 +1,4 @@
+import { getDraftItemWindowErrorMessage } from "../utils/draftItemWindowError";
 import { api } from "../../../../convex/_generated/api";
 import {
   applyReviewItemsTaxPreview,
@@ -89,7 +90,9 @@ export function useReviewTaxOverrides({
         return;
       }
       console.error("AI expense queue review failed", error);
-      setReviewError(getAiExpenseQueueReviewErrorMessage());
+      setReviewError(
+        getDraftItemWindowErrorMessage(error) ?? getAiExpenseQueueReviewErrorMessage(),
+      );
     } finally {
       if (requestId === taxOverrideRequestIdRef.current) {
         setTaxUpdatingItemId(null);
@@ -136,7 +139,9 @@ export function useReviewTaxOverrides({
         return;
       }
       console.error("AI expense queue review failed", error);
-      setReviewError(getAiExpenseQueueReviewErrorMessage());
+      setReviewError(
+        getDraftItemWindowErrorMessage(error) ?? getAiExpenseQueueReviewErrorMessage(),
+      );
     } finally {
       if (requestId === taxOverrideRequestIdRef.current) {
         setIsApplyingReceiptTax(false);

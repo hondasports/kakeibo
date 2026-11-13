@@ -320,7 +320,7 @@ describe("updateForReviewHandler tax reinterpretation (user overrides)", () => {
     ]);
   });
 
-  it("101件以上の明細を持つ下書きのリセットは全件削除してからスナップショットを復元する", async () => {
+  it("101件以上の明細を持つ下書きのリセットは拒否し明細を保持する", async () => {
     const aiValues = {
       status: "needs_review" as const,
       documentType: "receipt" as const,
@@ -365,12 +365,10 @@ describe("updateForReviewHandler tax reinterpretation (user overrides)", () => {
       items: staleItems,
     });
 
-    await resetReceiptToAiInterpretationHandler(ctx, { draftId: DRAFT_ID }, GROUP_ID);
-
-    const items = getItems();
-    expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ itemName: "AI商品", amountYen: 803 });
-    expect(items.every((item) => !item.itemName.startsWith("旧明細"))).toBe(true);
+    await expect(
+      resetReceiptToAiInterpretationHandler(ctx, { draftId: DRAFT_ID }, GROUP_ID),
+    ).rejects.toThrow("Draft contains more than 100 items");
+    expect(getItems()).toEqual(staleItems);
   });
 
   it("外税一括適用後に印字金額を変えず保存すると ready になり得る", async () => {

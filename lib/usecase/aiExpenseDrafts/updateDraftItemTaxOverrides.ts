@@ -1,3 +1,5 @@
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
+import { getReviewItemReplaceErrorMessage } from "../../domain/aiExpenseDrafts/reviewItemReplace";
 import { ConvexError } from "convex/values";
 import {
   AiExpenseDraft,
@@ -37,7 +39,13 @@ export async function updateDraftItemTaxOverrides(
   // persistInterpretation 内の validateTaxInterpretationEligibility に委譲する。
   const draft = await loadEditableDraft(deps, ctx.groupId, args.draftId);
 
-  const items = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
+  const items = await deps.draftItems.listByDraftAsc(
+    ctx.groupId,
+    args.draftId,
+    DRAFT_JUDGMENT_ITEM_LIMIT + 1,
+  );
+  if (items.length > DRAFT_JUDGMENT_ITEM_LIMIT)
+    throw new ConvexError(getReviewItemReplaceErrorMessage("existing_items_exceed_window"));
   const itemIndex = items.findIndex((item) => item.id === args.itemId);
   if (itemIndex < 0) {
     throw new ConvexError("AI expense draft item not found");

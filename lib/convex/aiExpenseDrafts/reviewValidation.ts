@@ -131,7 +131,10 @@ export async function replaceDraftItemsForReview(
       .query("aiExpenseDraftItems")
       .withIndex("by_group_id_and_draft_id", (q) => q.eq("groupId", groupId).eq("draftId", draftId))
       .order("asc")
-      .take(DRAFT_JUDGMENT_ITEM_LIMIT));
+      .take(DRAFT_JUDGMENT_ITEM_LIMIT + 1));
+  if (existingItems.length > DRAFT_JUDGMENT_ITEM_LIMIT) {
+    throw new ConvexError(getReviewItemReplaceErrorMessage("existing_items_exceed_window"));
+  }
   const existingItemsById = new Map(existingItems.map((item) => [item._id, item]));
   const idsResult = validateReviewItemIds(items, new Set<string>(existingItemsById.keys()));
   if (!idsResult.success) {

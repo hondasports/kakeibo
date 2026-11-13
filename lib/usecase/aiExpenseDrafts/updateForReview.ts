@@ -1,3 +1,5 @@
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
+import { getReviewItemReplaceErrorMessage } from "../../domain/aiExpenseDrafts/reviewItemReplace";
 import { hasReceiptTaxMetadata } from "../../domain/receipt/tax/draftTaxMapping";
 import { ConvexError } from "convex/values";
 import {
@@ -101,7 +103,14 @@ export async function updateAiExpenseDraftForReview(
   }
 
   const now = Date.now();
-  const originalItems = await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId);
+  const originalItems = await deps.draftItems.listByDraftAsc(
+    ctx.groupId,
+    args.draftId,
+    DRAFT_JUDGMENT_ITEM_LIMIT + 1,
+  );
+  if (originalItems.length > DRAFT_JUDGMENT_ITEM_LIMIT) {
+    throw new ConvexError(getReviewItemReplaceErrorMessage("existing_items_exceed_window"));
+  }
   const shouldReinterpretTax = hasReceiptTaxMetadata(fields, originalItems);
   // 読み込み済みの下書き・明細を引き回し、patch 内容をメモリ上で追跡して再読み込みを省く。
   let currentDraft = fields;

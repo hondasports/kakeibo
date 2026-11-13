@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import { useState } from "react";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -412,6 +413,40 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
       await user.click(screen.getByRole("button", { name: "下書きを保存" }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
       expect(updateForReviewMock).toHaveBeenCalledTimes(2);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("明細が100件を超える保存エラーの理由を表示する", async () => {
+    const user = userEvent.setup();
+    updateForReviewMock.mockRejectedValueOnce(
+      new ConvexError("Draft contains more than 100 items"),
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      renderWithProviders(
+        <AiExpenseQueuePanel
+          initialItems={[queueItems[1]]}
+          categories={categories}
+          initialReviewDrafts={{
+            "draft-review": {
+              _id: "draft-review",
+              status: "needs_review",
+              documentType: "receipt",
+              shopName: "スーパー青葉",
+              date: "2026-06-01",
+              amountYen: 1680,
+              categoryId: "cat-food",
+              reviewReasons: ["amount_mismatch"],
+            },
+          }}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "確認する" }));
+      await user.click(screen.getByRole("button", { name: "下書きを保存" }));
+      expect(await screen.findAllByText(/明細が100件を超える/)).not.toHaveLength(0);
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
     } finally {
       consoleError.mockRestore();
     }

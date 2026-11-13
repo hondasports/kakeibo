@@ -1,3 +1,5 @@
+import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
+import { getReviewItemReplaceErrorMessage } from "../../domain/aiExpenseDrafts/reviewItemReplace";
 import { ConvexError } from "convex/values";
 import {
   AiExpenseDraft,
@@ -84,6 +86,14 @@ export async function updateRegisteredAiExpenseDraft(
   }
   await assertActiveCategoryForDraft(deps.categories, args.categoryId, ctx.groupId);
 
+  const existingItems = await deps.draftItems.listByDraftAsc(
+    ctx.groupId,
+    args.draftId,
+    DRAFT_JUDGMENT_ITEM_LIMIT + 1,
+  );
+  if (existingItems.length > DRAFT_JUDGMENT_ITEM_LIMIT) {
+    throw new ConvexError(getReviewItemReplaceErrorMessage("existing_items_exceed_window"));
+  }
   const now = Date.now();
   if (args.items !== undefined) {
     if (args.registrationMode === "detailed" && !validatePositiveCategoryTotals(args.items)) {
@@ -93,8 +103,14 @@ export async function updateRegisteredAiExpenseDraft(
   // 読み込み済みの下書き・明細を引き回し、persist 側での読み直しを省く。
   const items =
     args.items === undefined
-      ? await deps.draftItems.listByDraftAsc(ctx.groupId, args.draftId)
-      : await deps.itemReplace.replaceForReview(args.draftId, ctx.groupId, args.items, now);
+      ? existingItems
+      : await deps.itemReplace.replaceForReview(
+          args.draftId,
+          ctx.groupId,
+          args.items,
+          now,
+          existingItems,
+        );
   const draftPatch = {
     date: args.date,
     amountYen: args.amountYen,

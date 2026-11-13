@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExpenseEntryEditDialog } from "./ExpenseEntryEditDialog";
@@ -96,6 +97,33 @@ describe("ExpenseEntryEditDialog AI draft history", () => {
       }),
     );
     expect(updateExpenseEntryMock).not.toHaveBeenCalled();
+  });
+
+  it("登録済み下書きの明細上限エラーを表示する", async () => {
+    updateRegisteredDraftMock.mockRejectedValueOnce(
+      new ConvexError("Draft contains more than 100 items"),
+    );
+    render(
+      <ExpenseEntryEditDialog
+        categories={[{ _id: "cat-food", name: "食費" }]}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        open
+        receipt={{
+          _id: "entry-1",
+          date: "2026-08-26",
+          type: "expense",
+          shopName: "スーパー青葉",
+          amountYen: 1500,
+          categoryId: "cat-food",
+          recordType: "expenseEntry",
+          aiExpenseDraftId: "draft-1",
+          registrationMode: "totalOnly",
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(await screen.findByText(/明細が100件を超える/)).toBeInTheDocument();
   });
 
   it.each([
