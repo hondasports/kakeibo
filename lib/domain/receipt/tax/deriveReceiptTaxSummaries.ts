@@ -83,12 +83,6 @@ export function deriveReceiptTaxSummaries(args: {
         !isAggregateTaxLine(text))
     );
   });
-  const totalConflict = lines.some(
-    (line) =>
-      isReceiptTotalLabel(line.rawText, line.amountText) &&
-      taxSummaryLineKind(line.rawText) === undefined &&
-      line.amountYen !== args.amountYen,
-  );
   const buckets = rates.map((rate) => {
     const group = items.filter((item) => item.taxRatePercent === rate);
     const basis = group[0].amountBasis;
@@ -127,6 +121,27 @@ export function deriveReceiptTaxSummaries(args: {
       exactTax,
     };
   });
+  const isUnclassifiedTotalLabel = (line: (typeof lines)[number]) =>
+    isReceiptTotalLabel(line.rawText, line.amountText) &&
+    taxSummaryLineKind(line.rawText) === undefined;
+  const printedTaxes = buckets
+    .filter((bucket) => bucket.rate !== 0)
+    .map(
+      (bucket) => bucket.correctedTax ?? (bucket.taxes.length === 1 ? bucket.taxes[0] : undefined),
+    );
+  const printedTaxTotal = printedTaxes.every((tax) => tax !== undefined)
+    ? printedTaxes.reduce<number>((sum, tax) => sum + (tax ?? 0), 0)
+    : undefined;
+  const hasIndependentPaidTotal = lines.some(
+    (line) => isUnclassifiedTotalLabel(line) && line.amountYen === args.amountYen,
+  );
+  // 税額と同額の「税込合計」行は、支払合計が別に印字されているときだけ矛盾から外す（独立した支払合計が無い行を信用しない）。
+  const totalConflict = lines.some(
+    (line) =>
+      isUnclassifiedTotalLabel(line) &&
+      line.amountYen !== args.amountYen &&
+      !(hasIndependentPaidTotal && printedTaxes.length > 0 && line.amountYen === printedTaxTotal),
+  );
   const estimatedExternal = buckets.filter(
     (bucket) =>
       bucket.rate !== 0 &&
