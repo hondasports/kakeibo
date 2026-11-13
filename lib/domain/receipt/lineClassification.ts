@@ -89,9 +89,13 @@ const EXPLICIT_PAYMENT_TOTAL_LABEL = /(?:ご請求額|お支払(?:額|合計)|�
  * 今回分の期間語（今月・当月）と明示的な支払ラベルの組合せだけ対象にする。
  * 「先月ご請求額」「累計お支払合計」は今回の支払額ではないため、支払ラベルがあっても除外する。
  */
-function isNonPaymentTotalLabel(rawText: string): boolean {
+function isNonPaymentTotalLabel(rawText: string, amountText?: string | null): boolean {
   const text = normalizeText(rawText);
-  const pointAmount = /\d(?:pt|p|ポイント)(?:$|\()/i.test(text);
+  const pointAmount =
+    /\d(?:pt|p|ポイント)(?:$|\()/.test(text) ||
+    /^\d+(?:pt|p|ポイント)(?:\(.*\))?$/.test(
+      (amountText ?? "").normalize("NFKC").replace(/\s/g, "").toLowerCase(),
+    );
   const earnedOrBalance =
     /(?:付与|獲得|加算|進呈|残高|保有)/.test(text) && !/(?:お支払|ご請求|今回支払額)/.test(text);
   const periodTotal =
@@ -101,12 +105,12 @@ function isNonPaymentTotalLabel(rawText: string): boolean {
 }
 
 /** 構造分類と税内訳の照合で共通の支払合計ラベルを使う。 */
-export function isReceiptTotalLabel(rawText: string): boolean {
+export function isReceiptTotalLabel(rawText: string, amountText?: string | null): boolean {
   const text = normalizeText(rawText);
   return (
     (/(?:合計|総計|お買上|total)/i.test(text) || EXPLICIT_PAYMENT_TOTAL_LABEL.test(text)) &&
     !isReceiptCountLabel(rawText) &&
-    !isNonPaymentTotalLabel(rawText) &&
+    !isNonPaymentTotalLabel(rawText, amountText) &&
     !/(?:小計|値引|割引|subtotal)/i.test(text)
   );
 }
@@ -150,7 +154,7 @@ function addLabelCandidates(
   ) {
     addCandidate(candidates, "tax", 0.8, "partial_label:tax");
   }
-  if (isReceiptTotalLabel(line.rawText)) {
+  if (isReceiptTotalLabel(line.rawText, line.amountText)) {
     addCandidate(candidates, "totalCandidate", 0.94, "explicit_label:total");
   }
   if (/(?:クーポン|coupon)/i.test(text)) {
