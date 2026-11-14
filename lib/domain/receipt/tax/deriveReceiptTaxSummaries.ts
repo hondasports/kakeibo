@@ -1,5 +1,5 @@
 import { isDiscountLine } from "../discountItems";
-import { isReceiptTotalLabel } from "../lineClassification";
+import { EXPLICIT_PAYMENT_TOTAL_LABEL, isReceiptTotalLabel } from "../lineClassification";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
 import type { ExtractedReceiptItem, ExtractedTaxSummary, TaxRatePercent } from "./types";
 import {
@@ -83,12 +83,6 @@ export function deriveReceiptTaxSummaries(args: {
         !isAggregateTaxLine(text))
     );
   });
-  const totalConflict = lines.some(
-    (line) =>
-      isReceiptTotalLabel(line.rawText, line.amountText) &&
-      taxSummaryLineKind(line.rawText) === undefined &&
-      line.amountYen !== args.amountYen,
-  );
   const buckets = rates.map((rate) => {
     const group = items.filter((item) => item.taxRatePercent === rate);
     const basis = group[0].amountBasis;
@@ -127,6 +121,36 @@ export function deriveReceiptTaxSummaries(args: {
       exactTax,
     };
   });
+  const isUnclassifiedTotalLabel = (line: (typeof lines)[number]) =>
+    isReceiptTotalLabel(line.rawText, line.amountText) &&
+    taxSummaryLineKind(line.rawText) === undefined;
+  const printedTaxes = buckets
+    .filter((bucket) => bucket.rate !== 0)
+    .map(
+      (bucket) => bucket.correctedTax ?? (bucket.taxes.length === 1 ? bucket.taxes[0] : undefined),
+    );
+  const printedTaxTotal = printedTaxes.every((tax) => tax !== undefined)
+    ? printedTaxes.reduce<number>((sum, tax) => sum + (tax ?? 0), 0)
+    : undefined;
+  const hasIndependentPaidTotal = lines.some(
+    (line) => isUnclassifiedTotalLabel(line) && line.amountYen === args.amountYen,
+  );
+  // 「税込合計」のように税額と混同しうる行だけ除外する。「お支払合計」や「税」を含まない「合計」は支払合計そのものなので、税額と同額でも矛盾に残す。
+  const isTaxConfusableTotalLabel = (line: (typeof lines)[number]) => {
+    const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
+    return text.includes("税") && !EXPLICIT_PAYMENT_TOTAL_LABEL.test(text);
+  };
+  const totalConflict = lines.some(
+    (line) =>
+      isUnclassifiedTotalLabel(line) &&
+      line.amountYen !== args.amountYen &&
+      !(
+        hasIndependentPaidTotal &&
+        printedTaxes.length > 0 &&
+        line.amountYen === printedTaxTotal &&
+        isTaxConfusableTotalLabel(line)
+      ),
+  );
   const estimatedExternal = buckets.filter(
     (bucket) =>
       bucket.rate !== 0 &&
