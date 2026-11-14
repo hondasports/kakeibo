@@ -752,4 +752,66 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
       expect(allocated(input)).toBe(true);
     },
   );
+  describe("税額と同額の「税込合計」ラベル行", () => {
+    function externalTaxReceipt(taxLabelAmountYen = 29, withPaidTotalLines = true) {
+      const input = unprovenTargetReceipt();
+      input.amountYen = 401;
+      input.items = [78, 98, 108, 88].map((printedAmountYen, index) => ({
+        itemName: `商品${index + 1}`,
+        printedAmountYen,
+        amountBasis: "tax_excluded",
+        taxRatePercent: 8,
+        taxResolutionStatus: "resolved",
+        taxResolutionSource: "item_explicit",
+        warnings: [],
+      }));
+      input.taxSummaries = [];
+      const lines = [
+        { ...observationLine("￥401-", 401, 2), lineRoleCandidates: ["total"] },
+        observationLine("（消費税等 29円を含みます）", 29, 3),
+        { ...observationLine("小計/ 4点 ¥372", 372, 8), lineRoleCandidates: ["subtotal"] },
+        observationLine("8%外税 タイショウ ¥372", 372, 9),
+        observationLine("8%外税 ¥29", 29, 10),
+        observationLine("（税込合計 ¥29）", taxLabelAmountYen, 11),
+        { ...observationLine("合計 ¥401", 401, 12), lineRoleCandidates: ["total"] },
+      ];
+      input.rawObservationLines = withPaidTotalLines
+        ? lines
+        : lines.filter((line) => ![2, 12].includes(line.sourceLineIndex));
+      return input;
+    }
+
+    it("支払合計が別に印字され税額と一致するなら矛盾にせず全明細へ配分する", () => {
+      const result = reinterpretDraftTax(externalTaxReceipt());
+      expect(result.interpretation.taxSummaries[0]).toMatchObject({
+        taxableAmountYen: 372,
+        taxYen: 29,
+        status: "verified",
+      });
+      expect(result.itemFields.every((item) => item.taxAllocationStatus === "allocated")).toBe(
+        true,
+      );
+      expect(result.itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0)).toBe(401);
+      expect(result.itemFields.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(29);
+    });
+
+    it.each(["お支払合計 ¥29", "合計 ¥29"])(
+      "税額の表記と混同しにくい合計ラベル「%s」は税額と同額でも矛盾として保持する",
+      (rawText) => {
+        const input = externalTaxReceipt();
+        input.rawObservationLines = input.rawObservationLines!.map((line) =>
+          line.sourceLineIndex === 11 ? observationLine(rawText, 29, 11) : line,
+        );
+        expect(allocated(input)).toBe(false);
+      },
+    );
+
+    it("金額が税額と違う合計ラベル行は矛盾として保持する", () => {
+      expect(allocated(externalTaxReceipt(30))).toBe(false);
+    });
+
+    it("支払額と同額の合計ラベル行が無ければ矛盾として保持する", () => {
+      expect(allocated(externalTaxReceipt(29, false))).toBe(false);
+    });
+  });
 });
