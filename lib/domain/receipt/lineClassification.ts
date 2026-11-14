@@ -79,7 +79,7 @@ export function isReceiptCountLabel(rawText: string): boolean {
  * 支払合計を明示するラベル。合計・お買上・total のような汎用語を含まないため、
  * 期間語を含む行を除外するかの判定にも共通で使う。
  */
-const EXPLICIT_PAYMENT_TOTAL_LABEL = /(?:ご請求額|お支払(?:額|合計)|今回支払額)/;
+export const EXPLICIT_PAYMENT_TOTAL_LABEL = /(?:ご請求額|お支払(?:額|合計)|今回支払額)/;
 
 /**
  * 「今回お買上げポイント 9P」や「今月購入金額合計」のように、合計の語を含むが今回の支払額ではない行。

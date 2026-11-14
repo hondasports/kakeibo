@@ -795,6 +795,17 @@ describe("確認済み明細と独立した印字証拠からの税計算", () =
       expect(result.itemFields.reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(29);
     });
 
+    it.each(["お支払合計 ¥29", "合計 ¥29"])(
+      "税額の表記と混同しにくい合計ラベル「%s」は税額と同額でも矛盾として保持する",
+      (rawText) => {
+        const input = externalTaxReceipt();
+        input.rawObservationLines = input.rawObservationLines!.map((line) =>
+          line.sourceLineIndex === 11 ? observationLine(rawText, 29, 11) : line,
+        );
+        expect(allocated(input)).toBe(false);
+      },
+    );
+
     it("金額が税額と違う合計ラベル行は矛盾として保持する", () => {
       expect(allocated(externalTaxReceipt(30))).toBe(false);
     });

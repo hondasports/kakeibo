@@ -1,5 +1,5 @@
 import { isDiscountLine } from "../discountItems";
-import { isReceiptTotalLabel } from "../lineClassification";
+import { EXPLICIT_PAYMENT_TOTAL_LABEL, isReceiptTotalLabel } from "../lineClassification";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
 import type { ExtractedReceiptItem, ExtractedTaxSummary, TaxRatePercent } from "./types";
 import {
@@ -135,12 +135,21 @@ export function deriveReceiptTaxSummaries(args: {
   const hasIndependentPaidTotal = lines.some(
     (line) => isUnclassifiedTotalLabel(line) && line.amountYen === args.amountYen,
   );
-  // 税額と同額の「税込合計」行は、支払合計が別に印字されているときだけ矛盾から外す（独立した支払合計が無い行を信用しない）。
+  // 「税込合計」のように税額と混同しうる行だけ除外する。「お支払合計」や「税」を含まない「合計」は支払合計そのものなので、税額と同額でも矛盾に残す。
+  const isTaxConfusableTotalLabel = (line: (typeof lines)[number]) => {
+    const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
+    return text.includes("税") && !EXPLICIT_PAYMENT_TOTAL_LABEL.test(text);
+  };
   const totalConflict = lines.some(
     (line) =>
       isUnclassifiedTotalLabel(line) &&
       line.amountYen !== args.amountYen &&
-      !(hasIndependentPaidTotal && printedTaxes.length > 0 && line.amountYen === printedTaxTotal),
+      !(
+        hasIndependentPaidTotal &&
+        printedTaxes.length > 0 &&
+        line.amountYen === printedTaxTotal &&
+        isTaxConfusableTotalLabel(line)
+      ),
   );
   const estimatedExternal = buckets.filter(
     (bucket) =>
