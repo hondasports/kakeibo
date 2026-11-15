@@ -112,27 +112,6 @@ export async function getResolvedMemberships(ctx: Pick<QueryCtx, "auth" | "db">)
   return { memberships: activeMemberships, activeMembership };
 }
 
-export async function findNextActiveGroupIdForUser(
-  ctx: Pick<QueryCtx, "db">,
-  userId: string,
-  excludedGroupId: Id<"groups">,
-): Promise<Id<"groups"> | undefined> {
-  const deps = createMembershipKernelDeps(ctx);
-  const memberships = await deps.memberships.listByUser(userId);
-
-  for (const membership of memberships) {
-    if ((membership.groupId as Id<"groups">) === excludedGroupId) {
-      continue;
-    }
-    const group = await deps.groups.get(membership.groupId);
-    if (group !== null && !isGroupDeleted(group)) {
-      return membership.groupId as Id<"groups">;
-    }
-  }
-
-  return undefined;
-}
-
 /**
  * 認証済みユーザーのグループメンバーシップを取得する。
  * グループ未所属の場合は ConvexError を throw する。

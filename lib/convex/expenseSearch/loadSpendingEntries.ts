@@ -133,14 +133,3 @@ export async function loadHistoryEntriesForSearch(
     truncated: newEntryResult.truncated || receiptResult.truncated,
   };
 }
-
-/** 支出だけを扱う既存caller向けの互換ラッパー。 */
-export async function loadSpendingEntriesForSearch(
-  ctx: QueryCtx,
-  groupId: Id<"groups">,
-  startDate?: string,
-  endDate?: string,
-): Promise<{ entries: SpendingEntry[]; truncated: boolean }> {
-  const result = await loadHistoryEntriesForSearch(ctx, groupId, startDate, endDate);
-  return { entries: result.entries, truncated: result.truncated };
-}

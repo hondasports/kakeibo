@@ -1,6 +1,5 @@
 /**
  * 削除影響プレビューの集計（query 側ユースケース）。
- * 既存 groupDeletionImpact.countGroupDeletionImpact の移植 —
  * 各テーブルを PREVIEW_LIMIT+1 件だけ走査して件数と精度を返す。
  */
 import {
