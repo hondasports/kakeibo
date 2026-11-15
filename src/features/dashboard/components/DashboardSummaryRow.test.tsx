@@ -1,8 +1,9 @@
 import type { ComponentProps } from "react";
 import { screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
+import { DEFAULT_TEST_VIEWPORT_WIDTH, stubViewportWidth } from "../../../test/viewport";
 import { DashboardSummaryRow } from "./DashboardSummaryRow";
 
 function renderSummaryRow(props: ComponentProps<typeof DashboardSummaryRow>) {
@@ -13,21 +14,9 @@ function renderSummaryRow(props: ComponentProps<typeof DashboardSummaryRow>) {
   );
 }
 
-function setCompactViewport(matches: boolean) {
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn().mockImplementation((query: string) => ({
-      matches,
-      media: query,
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(() => false),
-    })),
-  );
-}
+beforeEach(() => {
+  stubViewportWidth(DEFAULT_TEST_VIEWPORT_WIDTH);
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -103,7 +92,7 @@ describe("DashboardSummaryRow", () => {
   });
 
   it("コンパクト表示では明細数と前週比を下段に表示する", () => {
-    setCompactViewport(true);
+    stubViewportWidth(390);
 
     renderSummaryRow({
       count: 3,

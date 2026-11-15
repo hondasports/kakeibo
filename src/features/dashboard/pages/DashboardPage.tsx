@@ -18,7 +18,7 @@ import { getCurrentYear } from "../../../../lib/domain/common/year";
 export function DashboardPage() {
   const { weekSession, sessionError } = useWeekSession();
   const theme = useTheme();
-  const isCompact = useMediaQuery(theme.breakpoints.down("md"));
+  const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const currentMonth = getCurrentMonth();
   const currentYear = getCurrentYear();
 

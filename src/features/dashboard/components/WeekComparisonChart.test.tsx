@@ -1,9 +1,18 @@
 import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
+import { DEFAULT_TEST_VIEWPORT_WIDTH, stubViewportWidth } from "../../../test/viewport";
 import { WeekComparisonChart } from "./WeekComparisonChart";
 
 describe("WeekComparisonChart", () => {
+  beforeEach(() => {
+    stubViewportWidth(DEFAULT_TEST_VIEWPORT_WIDTH);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("前週と今週の比較グラフと差額を表示する", () => {
     renderWithProviders(
       <WeekComparisonChart
