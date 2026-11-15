@@ -11,7 +11,6 @@
 import type * as accountDeletion from "../accountDeletion.js";
 import type * as accountDeletionActions from "../accountDeletionActions.js";
 import type * as aiExpenseDraftAmountTaxMigration from "../aiExpenseDraftAmountTaxMigration.js";
-import type * as aiExpenseDraftListSummaryMigration from "../aiExpenseDraftListSummaryMigration.js";
 import type * as aiExpenseDraftRegisteredAtMigration from "../aiExpenseDraftRegisteredAtMigration.js";
 import type * as aiExpenseDrafts_actions from "../aiExpenseDrafts/actions.js";
 import type * as aiExpenseDrafts_e2eDraftFixtures from "../aiExpenseDrafts/e2eDraftFixtures.js";
@@ -28,7 +27,6 @@ import type * as categories_normalize from "../categories/normalize.js";
 import type * as categories_queries from "../categories/queries.js";
 import type * as categories_testHelpers from "../categories/testHelpers.js";
 import type * as crons from "../crons.js";
-import type * as deprecatedFieldCounts from "../deprecatedFieldCounts.js";
 import type * as e2eHttp_e2eAuth from "../e2eHttp/e2eAuth.js";
 import type * as e2eHttp_e2eCleanup from "../e2eHttp/e2eCleanup.js";
 import type * as e2eHttp_e2eSeedDraft from "../e2eHttp/e2eSeedDraft.js";
@@ -141,7 +139,6 @@ declare const fullApi: ApiFromModules<{
   accountDeletion: typeof accountDeletion;
   accountDeletionActions: typeof accountDeletionActions;
   aiExpenseDraftAmountTaxMigration: typeof aiExpenseDraftAmountTaxMigration;
-  aiExpenseDraftListSummaryMigration: typeof aiExpenseDraftListSummaryMigration;
   aiExpenseDraftRegisteredAtMigration: typeof aiExpenseDraftRegisteredAtMigration;
   "aiExpenseDrafts/actions": typeof aiExpenseDrafts_actions;
   "aiExpenseDrafts/e2eDraftFixtures": typeof aiExpenseDrafts_e2eDraftFixtures;
@@ -158,7 +155,6 @@ declare const fullApi: ApiFromModules<{
   "categories/queries": typeof categories_queries;
   "categories/testHelpers": typeof categories_testHelpers;
   crons: typeof crons;
-  deprecatedFieldCounts: typeof deprecatedFieldCounts;
   "e2eHttp/e2eAuth": typeof e2eHttp_e2eAuth;
   "e2eHttp/e2eCleanup": typeof e2eHttp_e2eCleanup;
   "e2eHttp/e2eSeedDraft": typeof e2eHttp_e2eSeedDraft;
