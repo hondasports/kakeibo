@@ -23,7 +23,7 @@ describe("ai-expense-queue responsive styles", () => {
   it("入力ワークベンチは display: contents に依存しない", () => {
     expect(css).not.toMatch(/\.input-workbench[\s\S]*display:\s*contents/);
     expect(css).not.toMatch(
-      /@media \(max-width: 899px\)[\s\S]*\.input-workbench-queue[\s\S]*display:\s*contents/,
+      /@media not all and \(min-width: 900px\)[\s\S]*\.input-workbench-queue[\s\S]*display:\s*contents/,
     );
   });
 
@@ -43,7 +43,7 @@ describe("ai-expense-queue responsive styles", () => {
 
   it("SPでは1カラム grid-template-areas でヘッダー→アクティブ→フォーム→登録済みの順に並べる", () => {
     expect(css).toMatch(
-      /@media \(max-width: 899px\)[\s\S]*grid-template-areas:\s*[^;]*"queue-header"[^;]*"queue-active"[^;]*"form"[^;]*"queue-registered"/,
+      /@media not all and \(min-width: 900px\)[\s\S]*grid-template-areas:\s*[^;]*"queue-header"[^;]*"queue-active"[^;]*"form"[^;]*"queue-registered"/,
     );
   });
 });

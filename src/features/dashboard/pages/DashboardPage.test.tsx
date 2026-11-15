@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_TEST_VIEWPORT_WIDTH, stubViewportWidth } from "../../../test/viewport";
 import { DashboardPage } from "./DashboardPage";
 
 const useQueryMock = vi.fn();
@@ -29,23 +30,8 @@ import { useWeekSession } from "../hooks/useWeekSession";
 const useWeekSessionMock = vi.mocked(useWeekSession);
 
 describe("DashboardPage", () => {
-  function setCompactViewport(matches: boolean) {
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn().mockImplementation((query: string) => ({
-        matches,
-        media: query,
-        onchange: null,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        dispatchEvent: vi.fn(() => false),
-      })),
-    );
-  }
-
   beforeEach(() => {
+    stubViewportWidth(DEFAULT_TEST_VIEWPORT_WIDTH);
     useQueryMock.mockReset();
     useWeekSessionMock.mockReturnValue({
       sessionError: "",
@@ -125,7 +111,7 @@ describe("DashboardPage", () => {
   });
 
   it("コンパクト表示では期間行と月次リンクを表示する", () => {
-    setCompactViewport(true);
+    stubViewportWidth(390);
     useQueryMock.mockReturnValue({
       byCategory: [
         {

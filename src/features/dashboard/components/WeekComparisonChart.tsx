@@ -136,7 +136,7 @@ export function WeekComparisonChart({
   isLoading = false,
 }: WeekComparisonChartProps) {
   const theme = useTheme();
-  const isCompact = useMediaQuery(theme.breakpoints.down("md"));
+  const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const diff = calcPrevWeekDiff(currentTotalAmountYen, prevWeekTotalAmountYen);
   const rate = calcPrevWeekRate(currentTotalAmountYen, prevWeekTotalAmountYen);
   const diffSummary = formatDiffSummary(diff, rate);
