@@ -428,9 +428,9 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   `deleteAllGroupScopedData`）、テーブル横断の ctx.db/scheduler/storage アクセスは
   `lib/convex/groupDeletion/` のアダプタ（`GroupDeletionJobStore`・
   `GroupDeletionPurgeStore`・`GroupDeletionRecipientStore`・`GroupDeletionScheduler`）
-  へ隔離した。`convex/groups/lib/groupDeletion*.ts` は export 名・シグネチャを
-  維持した互換シムとなり、internal endpoint 名・ステージ順序・削除カウント・
-  通知 dedupe キー・エラーメッセージは不変。
+  へ隔離した。`convex/groups/lib/` の削除ハンドラはユースケースへ委譲し、
+  internal endpoint 名・ステージ順序・削除カウント・通知 dedupe キー・
+  エラーメッセージを維持する。
 - `convex/groups/e2e.ts`（E2E 専用フィクスチャ）は層移行の対象外とするが、
   `deleteAllGroupScopedData` 内部はユースケースへ委譲済み。
 
