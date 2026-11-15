@@ -10,8 +10,6 @@
 
 import type * as accountDeletion from "../accountDeletion.js";
 import type * as accountDeletionActions from "../accountDeletionActions.js";
-import type * as aiExpenseDraftAmountTaxMigration from "../aiExpenseDraftAmountTaxMigration.js";
-import type * as aiExpenseDraftRegisteredAtMigration from "../aiExpenseDraftRegisteredAtMigration.js";
 import type * as aiExpenseDrafts_actions from "../aiExpenseDrafts/actions.js";
 import type * as aiExpenseDrafts_e2eDraftFixtures from "../aiExpenseDrafts/e2eDraftFixtures.js";
 import type * as aiExpenseDrafts_internal from "../aiExpenseDrafts/internal.js";
@@ -82,7 +80,6 @@ import type * as groups_queries from "../groups/queries.js";
 import type * as groups_testHelpers from "../groups/testHelpers.js";
 import type * as groups_validators from "../groups/validators.js";
 import type * as http from "../http.js";
-import type * as legacyGroupDeletionAuditMigration from "../legacyGroupDeletionAuditMigration.js";
 import type * as lineLink_actions from "../lineLink/actions.js";
 import type * as lineLink_internal from "../lineLink/internal.js";
 import type * as lineLink_model from "../lineLink/model.js";
@@ -104,7 +101,6 @@ import type * as notifications_lineActions from "../notifications/lineActions.js
 import type * as notifications_model from "../notifications/model.js";
 import type * as notifications_mutations from "../notifications/mutations.js";
 import type * as notifications_queries from "../notifications/queries.js";
-import type * as orphanedLineLinkMigration from "../orphanedLineLinkMigration.js";
 import type * as receiptAnalysisJobs_actions from "../receiptAnalysisJobs/actions.js";
 import type * as receiptAnalysisJobs_internal from "../receiptAnalysisJobs/internal.js";
 import type * as receiptAnalysisJobs_mutations from "../receiptAnalysisJobs/mutations.js";
@@ -145,8 +141,6 @@ import type {
 declare const fullApi: ApiFromModules<{
   accountDeletion: typeof accountDeletion;
   accountDeletionActions: typeof accountDeletionActions;
-  aiExpenseDraftAmountTaxMigration: typeof aiExpenseDraftAmountTaxMigration;
-  aiExpenseDraftRegisteredAtMigration: typeof aiExpenseDraftRegisteredAtMigration;
   "aiExpenseDrafts/actions": typeof aiExpenseDrafts_actions;
   "aiExpenseDrafts/e2eDraftFixtures": typeof aiExpenseDrafts_e2eDraftFixtures;
   "aiExpenseDrafts/internal": typeof aiExpenseDrafts_internal;
@@ -217,7 +211,6 @@ declare const fullApi: ApiFromModules<{
   "groups/testHelpers": typeof groups_testHelpers;
   "groups/validators": typeof groups_validators;
   http: typeof http;
-  legacyGroupDeletionAuditMigration: typeof legacyGroupDeletionAuditMigration;
   "lineLink/actions": typeof lineLink_actions;
   "lineLink/internal": typeof lineLink_internal;
   "lineLink/model": typeof lineLink_model;
@@ -239,7 +232,6 @@ declare const fullApi: ApiFromModules<{
   "notifications/model": typeof notifications_model;
   "notifications/mutations": typeof notifications_mutations;
   "notifications/queries": typeof notifications_queries;
-  orphanedLineLinkMigration: typeof orphanedLineLinkMigration;
   "receiptAnalysisJobs/actions": typeof receiptAnalysisJobs_actions;
   "receiptAnalysisJobs/internal": typeof receiptAnalysisJobs_internal;
   "receiptAnalysisJobs/mutations": typeof receiptAnalysisJobs_mutations;

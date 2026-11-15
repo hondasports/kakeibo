@@ -1,6 +1,5 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
-import { makeFunctionReference } from "convex/server";
 import { describe, expect, it } from "vitest";
 import { api, internal } from "../_generated/api";
 import schema from "../schema";
@@ -436,7 +435,7 @@ describe("金額・税の書込契約", () => {
     expect(await t.run(({ db }) => db.get(draft._id))).toEqual(before);
     expect(before?.reviewReasons).toContain("amount_mismatch");
   });
-  it("移行は101件目がある場合に理由を残し、100件なら理由を外して登録できる", async () => {
+  it("100件の下書きは登録でき、101件は登録を拒否する", async () => {
     const { t, ids } = await setup();
     const drafts = await t.run(async ({ db }) => {
       const result: Id<"aiExpenseDrafts">[] = [];
@@ -471,27 +470,7 @@ describe("金額・税の書込契約", () => {
       }
       return result;
     });
-    const dryRun = makeFunctionReference<"query">("aiExpenseDraftAmountTaxMigration:dryRun");
-    const execute = makeFunctionReference<"mutation">(
-      "aiExpenseDraftAmountTaxMigration:executeBatch",
-    );
-    const beforeOver = await t.run(({ db }) => db.get(drafts[1]));
-    expect(await t.query(dryRun, {})).toMatchObject({
-      needsReasonRemoval: 1,
-      skippedOverLimit: 1,
-    });
-    await t.mutation(execute, {});
-    const [within, over] = await t.run(({ db }) => Promise.all(drafts.map((id) => db.get(id))));
-    expect(within).toMatchObject({ status: "ready", reviewReasons: [] });
-    expect(over).toMatchObject({
-      status: "needs_review",
-      reviewReasons: ["amount_mismatch"],
-    });
-    expect(over).toEqual(beforeOver);
-    expect(await t.query(dryRun, {})).toMatchObject({
-      needsUpdate: 0,
-      skippedOverLimit: 1,
-    });
+    await t.run(({ db }) => db.patch(drafts[0], { status: "ready", reviewReasons: [] }));
     await expect(
       t
         .withIdentity(identity)
@@ -720,7 +699,7 @@ describe("金額・税の書込契約", () => {
       expect(draft.receiptInterpretation?.values).toEqual(values);
     },
   );
-  it("移行後にリセットしても古い金額理由が復活しない", async () => {
+  it("リセットしても古い金額理由が復活しない", async () => {
     const { t, ids } = await setup();
     const item = {
       itemName: "商品",
@@ -765,11 +744,6 @@ describe("金額・税の書込契約", () => {
       });
       return draftId;
     });
-    await t.mutation(
-      makeFunctionReference<"mutation">("aiExpenseDraftAmountTaxMigration:executeBatch"),
-      {},
-    );
-    expect((await t.run(({ db }) => db.get(id)))?.reviewReasons).not.toContain("amount_mismatch");
     await t
       .withIdentity(identity)
       .mutation(api.aiExpenseDrafts.mutations.resetReceiptToAiInterpretation, { draftId: id });
