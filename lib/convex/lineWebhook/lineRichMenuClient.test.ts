@@ -2,11 +2,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  LINE_RICH_MENU_NAME,
-  buildLineRichMenuObject,
-} from "../../lib/domain/lineSummary/richMenu";
-import { applyLineDefaultRichMenu } from "../../lib/convex/lineWebhook/lineRichMenuClient";
+import { LINE_RICH_MENU_NAME, buildLineRichMenuObject } from "../../domain/lineSummary/richMenu";
+import { applyLineDefaultRichMenu } from "./lineRichMenuClient";
 
 function setEnvironment(values: Record<string, string | undefined>) {
   const original = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));
@@ -24,7 +21,10 @@ function setEnvironment(values: Record<string, string | undefined>) {
 
 function readMenuImage(): Uint8Array {
   return readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), "../../docs/line/rich-menu-readonly-summary.png"),
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../docs/line/rich-menu-readonly-summary.png",
+    ),
   );
 }
 
