@@ -274,7 +274,6 @@ convex/
   legacyGroupDeletionAuditMigration.ts
   orphanedLineLinkMigration.ts   # 退会済みユーザーに残った LINE 連携データの一回限り内部 migration（§16.4）
   aiExpenseDraftRegisteredAtMigration.ts # 登録済み下書きの registeredAt を補完する一回限り内部 backfill（§16.4）
-  aiExpenseDraftListSummaryMigration.ts # 下書き一覧用の保存サマリ（listSummary）を補完する一回限り内部 backfill（§16.4）
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
@@ -1695,21 +1694,11 @@ cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` �
 
 #### 下書き一覧の保存サマリ（listSummary）補完（一回限りの内部 backfill）
 
-ready / needs_review の下書き一覧は明細読み取り（N+1）を避けるため `listSummary` を読む（Issue #1062 Phase 2）。フィールド追加前の下書きは `listSummary` を持たなかったため、追加当初は一覧側が明細から再計算するフォールバックを置いていた。本番での backfill 完了（2026-10-20、verify の `remaining=0`）を確認し、Phase 3b でフォールバックを除去した。現在は `listSummary` を持たない下書きに `itemSummary` を付けずに返し、クライアント側でも保存値が無い場合は明細から再判定せず「金額・税内訳が未解決」と同じ扱いにする。
-
-`convex/aiExpenseDraftListSummaryMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`status === "ready" | "needs_review"` かつ `listSummary` 未設定の `aiExpenseDrafts` に `listSummary` を書き込む。値は `buildDraftListSummary`（`lib/domain/aiExpenseDrafts/listSummary.ts`）に、同一グループの明細を作成順に最大101件まで読み、100件以下のときに全件を渡して計算する。101件以上では `listSummary` を補完せず、`skippedOverLimit` に数える。`listSummary` を既に持つ下書き・対象外 status の下書き・`updatedAt` には触れない。
-
-走査はテーブル全体の pagination を 1 batch 25 件で行い、`executeBatch` は自分自身を再スケジュールして最後まで進む。冪等なので再実行してよい。戻り値・ログは件数のみで、ユーザー識別子を含まない。
-
-運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の `needsBackfill` と `skippedOverLimit` の合計が `listSummary` 未設定の ready / needs_review 下書き数と妥当に一致することを確認してから `executeBatch` を実行する。**
-
-1. `pnpm exec convex run aiExpenseDraftListSummaryMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` / `skippedOverLimit` を確認）
-2. `pnpm exec convex run aiExpenseDraftListSummaryMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
-3. `pnpm exec convex run aiExpenseDraftListSummaryMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること、`skippedOverLimit` を別途確認）
+2026-10-20 に本番で完了し、verify の `remaining=0` を確認した。
 
 #### 下書きの金額差異理由の再計算（一回限りの内部 migration）
 
-`convex/aiExpenseDraftAmountTaxMigration.ts` は `ready` / `needs_review` かつ明細100件以下の下書きについて、`judgeDraftAmountAndTax` と `buildDraftListSummary` で一覧サマリを再計算し、保存値と異なる場合は更新する。加えて明細が100件以下で `amount_mismatch` を持ち正本で解決済みの下書きだけ、その理由を除き、残る理由の有無で status を決める。101件以上では理由・status・listSummary のいずれも変更しない。両者が該当する場合は同じ書き込みで更新する。未解決の理由なし下書きには `amount_mismatch` を追加しない。税未確定は金額差異を意味しないためである。ほかの理由、明細、金額、税値、`updatedAt` と対象外 status は変更しない。下書きに対応する同一グループの明細を作成順に最大101件読み、100件以下のときのみ判定とサマリを計算し、101件目があれば更新を見送る。テーブルを25件ずつ cursor で走査する。`executeBatch` は自己再スケジュールし、再実行しても同じ結果になる。支出は作成しない。既存 `aiExpenseDraftListSummaryMigration` は未設定だけを補完するため、保存済みの古いサマリの更新には使えない。
+`convex/aiExpenseDraftAmountTaxMigration.ts` は `ready` / `needs_review` かつ明細100件以下の下書きについて、`judgeDraftAmountAndTax` と `buildDraftListSummary` で一覧サマリを再計算し、保存値と異なる場合は更新する。加えて明細が100件以下で `amount_mismatch` を持ち正本で解決済みの下書きだけ、その理由を除き、残る理由の有無で status を決める。101件以上では理由・status・listSummary のいずれも変更しない。両者が該当する場合は同じ書き込みで更新する。未解決の理由なし下書きには `amount_mismatch` を追加しない。税未確定は金額差異を意味しないためである。ほかの理由、明細、金額、税値、`updatedAt` と対象外 status は変更しない。下書きに対応する同一グループの明細を作成順に最大101件読み、100件以下のときのみ判定とサマリを計算し、101件目があれば更新を見送る。テーブルを25件ずつ cursor で走査する。`executeBatch` は自己再スケジュールし、再実行しても同じ結果になる。支出は作成しない。
 
 運用前に非本番で以下を確認する。本番操作は対象 deployment と操作の明示承認を得た運用者が行う。復旧に備え、実行前に対象 deployment のバックアップを取得し、対象・時刻・検証結果を記録する。バックアップの取得や復元も別途承認した手順で行う。
 
