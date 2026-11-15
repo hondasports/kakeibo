@@ -28,6 +28,7 @@
   "scripts/generate-product-updates.ts": ["tests/workflow/productionReleaseWorkflow.test.ts"],
   "skills/local-dev-env/SKILL.md": ["tests/workflow/localConvexWorkflow.test.ts"],
   "src/App.css": [
+    "src/App.breakpoints.test.ts",
     "src/features/ai-expense-queue/components/QueueContent.responsive.test.ts",
     "src/features/summary-shared/components/ReceiptListCard.responsive.test.ts"
   ],
