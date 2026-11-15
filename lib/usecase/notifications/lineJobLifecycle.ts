@@ -1,3 +1,4 @@
+import { resolveActiveLink } from "../../domain/lineLink/activeLink";
 import { isActiveAccountDeletionStatus } from "../../domain/accountDeletion/status";
 import { isGroupDeleted } from "../../domain/groups/lifecycle";
 import {
@@ -55,9 +56,10 @@ async function evaluateSuppressionErrorCode(
   if (!decision.enabled) return "notification_disabled";
 
   const activeLinks = await deps.links.listActiveByUserId(job.userId);
-  if (activeLinks.length === 0) return "user_unlinked";
-  if (activeLinks.length !== 1) return "link_changed";
-  const link = activeLinks[0];
+  const activeLink = resolveActiveLink(activeLinks);
+  if (activeLink.kind === "none") return "user_unlinked";
+  if (activeLink.kind === "multiple") return "link_changed";
+  const link = activeLink.link;
   if (
     link.id !== job.linkId ||
     link.linkedAt !== job.linkedAtSnapshot ||

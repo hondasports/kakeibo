@@ -1,3 +1,4 @@
+import { resolveActiveLink } from "../../domain/lineLink/activeLink";
 import type {
   LineAccountLinkReader,
   LineAccountLinkStore,
@@ -8,9 +9,11 @@ export async function getLineLinkStatus(
   accountLinks: LineAccountLinkReader,
   userId: string,
 ): Promise<{ status: "unlinked" } | { status: "linked"; linkedAt: number }> {
-  const activeLink = await accountLinks.findLatestActiveByUserId(userId);
+  const activeLink = resolveActiveLink(await accountLinks.listActiveByUserId(userId, 2));
   // LINE userIdはクライアントへ返さない。
-  return activeLink ? { status: "linked", linkedAt: activeLink.linkedAt } : { status: "unlinked" };
+  return activeLink.kind === "single"
+    ? { status: "linked", linkedAt: activeLink.link.linkedAt }
+    : { status: "unlinked" };
 }
 
 export async function unlinkLineAccount(
