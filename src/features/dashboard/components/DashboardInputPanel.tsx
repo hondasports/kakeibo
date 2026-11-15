@@ -19,7 +19,7 @@ export function DashboardInputPanel({
   weekStartDate,
 }: DashboardInputPanelProps) {
   const theme = useTheme();
-  const isCompact = useMediaQuery(theme.breakpoints.down("md"));
+  const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const isCompleted = status === "completed";
   const primaryLabel = isCompleted
     ? "今週のサマリーを見る"

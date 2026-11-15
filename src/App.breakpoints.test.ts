@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { theme } from "./theme";
 
@@ -27,5 +27,18 @@ describe("App.css のレスポンシブ境界", () => {
       "max-width: 320px",
     ]);
     expect([...new Set(mediaWidths)].filter((width) => !allowed.has(width))).toEqual([]);
+  });
+
+  it('本番コードはMUIのbreakpoints.down("md")を使わない（899.95pxまでしか一致せず、シェルと切替幅がずれるため。PC側のup("md")の否定で判定する）', () => {
+    const sourceRoot = resolve(process.cwd(), "src");
+    const productionFiles = (
+      readdirSync(sourceRoot, { recursive: true, encoding: "utf8" }) as string[]
+    ).filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file));
+    const offenders = productionFiles.filter((file) =>
+      /breakpoints\.down\(\s*["']md["']\s*\)/.test(readFileSync(join(sourceRoot, file), "utf8")),
+    );
+
+    expect(productionFiles.length).toBeGreaterThan(0);
+    expect(offenders).toEqual([]);
   });
 });

@@ -188,7 +188,7 @@ export function DashboardSummaryRow({
   weekStartDate,
 }: DashboardSummaryRowProps) {
   const theme = useTheme();
-  const isCompact = useMediaQuery(theme.breakpoints.down("md"));
+  const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
 
   if (isCompact) {
     return (

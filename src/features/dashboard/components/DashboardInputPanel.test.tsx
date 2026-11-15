@@ -1,8 +1,9 @@
 import type { ComponentProps } from "react";
 import { screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
+import { DEFAULT_TEST_VIEWPORT_WIDTH, stubViewportWidth } from "../../../test/viewport";
 import { DashboardInputPanel } from "./DashboardInputPanel";
 
 function renderPanel(props: ComponentProps<typeof DashboardInputPanel>) {
@@ -14,6 +15,24 @@ function renderPanel(props: ComponentProps<typeof DashboardInputPanel>) {
 }
 
 describe("DashboardInputPanel", () => {
+  beforeEach(() => {
+    stubViewportWidth(DEFAULT_TEST_VIEWPORT_WIDTH);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    { width: 899, compact: true },
+    { width: 900, compact: false },
+  ])("幅$widthpxではコンパクト表示は$compact（境界はMUIのmd＝900px）", ({ width, compact }) => {
+    stubViewportWidth(width);
+    const { container } = renderPanel({ count: 12, status: "draft", weekStartDate: "2026-06-15" });
+
+    expect(!!container.querySelector(".dashboard-input-panel--compact")).toBe(compact);
+  });
+
   it("入力中かつ件数がある場合は入力を再開を表示する", () => {
     renderPanel({ count: 12, status: "draft", weekStartDate: "2026-06-15" });
 
