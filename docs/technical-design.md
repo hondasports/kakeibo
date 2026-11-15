@@ -221,7 +221,6 @@ convex/
     mutations.ts
     receipts.test.ts
     summaries.ts
-    spendingEntries.ts         # lib/convex/receipts/spendingEntries.ts への re-export ラッパー
   expenseEntries/
     mutations.ts
     internal.ts
@@ -529,8 +528,8 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   `sendUnlinkedGuide`・`sendSummaryReply`・`buildLinkedImageReply`/
   `processLinkedImage`（リトライ規則を含む）。
 - **インフラ**（`lib/convex/lineWebhook/`）: 各ポートの Convex 実装、
-  LINE Messaging API / Rich Menu クライアント（旧 `client.ts`/
-  `richMenuClient.ts` の本体）、action ランナー、deps 組み立て。
+  LINE Messaging API / Rich Menu クライアント（`lineMessagingClient.ts` /
+  `lineRichMenuClient.ts`）、action ランナー、deps 組み立て。
 - **プレゼンテーション**: `convex/lineWebhook/*.ts` は endpoint 宣言・
   validator・互換 export シムのみ。`webhook.ts` は HTTP 境界（raw body・
   署名・payload 解析・413/401/400/200 応答）を担当し、mutation 呼び出しは
@@ -1256,7 +1255,7 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 `receipts` は支出と収入の両方を扱う schema 互換として残る。新規手入力は `expenseEntries` を正本とし、
 収入は `entryType: "income"`、カテゴリなし、入力内容を `title` に保存する。
 
-集計は `lib/convex/receipts/spendingEntries.ts` が `expenseEntries` と `receipts` を統合する（`convex/receipts/spendingEntries.ts` は re-export ラッパー）。
+集計は `lib/convex/receipts/spendingEntries.ts` が `expenseEntries` と `receipts` を統合する。
 
 ### 10.3 weekSessions
 
@@ -1977,7 +1976,7 @@ M18では、既存MVP利用者向けに、家計簿の中心を `receipts` か�
 ### 21.7 互換境界
 
 - `receipts` は互換層として維持する。手入力・AI 登録は `expenseEntries` を正本とする。
-- 集計の正本ロジックは `lib/convex/receipts/spendingEntries.ts` に集約する。`convex/receipts/spendingEntries.ts` は `lib/convex/receipts/spendingEntries.ts` への re-export ラッパーとして残す。
+- 集計の正本ロジックは `lib/convex/receipts/spendingEntries.ts` に集約する。
 - M18 の後続 Issue は `expenseEntries` を正本として扱える。
 
 ## 22. N2. P1 LINE連携基盤

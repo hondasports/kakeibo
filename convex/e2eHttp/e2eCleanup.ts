@@ -1,3 +1,4 @@
+import { normalizeEmail } from "../../lib/domain/users/email";
 import { httpAction } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
@@ -392,7 +393,7 @@ export const e2eCleanupHandler = httpAction(async (ctx, req) => {
     }
 
     const displayName = body.seedGroupMember.displayName?.trim();
-    const memberEmail = body.seedGroupMember.email?.trim().toLowerCase();
+    const memberEmail = normalizeEmail(body.seedGroupMember.email);
     if (!displayName || !memberEmail) {
       return new Response(
         JSON.stringify({ error: "seedGroupMember.displayName and email are required." }),

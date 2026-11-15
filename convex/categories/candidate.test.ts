@@ -4,7 +4,7 @@ import {
   CATEGORY_CANDIDATE_MAX,
   buildCategoryCandidates,
   resolveCategoryIdFromCandidates,
-} from "./candidate";
+} from "../../lib/domain/categories/candidate";
 
 // ---------------------------------------------------------------------------
 // テスト用カテゴリリスト

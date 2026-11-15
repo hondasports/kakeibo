@@ -6,7 +6,7 @@ import {
   LINE_RICH_MENU_NAME,
   buildLineRichMenuObject,
 } from "../../lib/domain/lineSummary/richMenu";
-import { applyLineDefaultRichMenu } from "./richMenuClient";
+import { applyLineDefaultRichMenu } from "../../lib/convex/lineWebhook/lineRichMenuClient";
 
 function setEnvironment(values: Record<string, string | undefined>) {
   const original = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));

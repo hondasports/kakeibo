@@ -745,7 +745,7 @@ LINE Login channel secret、Messaging API channel secret、Messaging API channel
 
 ### 13.4 Messaging API channel の default Rich Menu
 
-読み取り専用サマリーのコマンドを、手入力せずに選べるようにする。セル定義の正本は `lib/domain/lineSummary/richMenu.ts`、画像は `docs/line/rich-menu-readonly-summary.png`、設置処理は `convex/lineWebhook/richMenuClient.ts` である。画像を作り直す場合は Pillow を入れたうえで `python3 scripts/generate-line-rich-menu-image.py` を使う。
+読み取り専用サマリーのコマンドを、手入力せずに選べるようにする。セル定義の正本は `lib/domain/lineSummary/richMenu.ts`、画像は `docs/line/rich-menu-readonly-summary.png`、設置処理は `lib/convex/lineWebhook/lineRichMenuClient.ts` である。画像を作り直す場合は Pillow を入れたうえで `python3 scripts/generate-line-rich-menu-image.py` を使う。
 
 対象は Messaging API channel だけである。LINE Login channel には置かない。実行時アプリやCIから Rich Menu API を呼ばない。Development / Preview の専用channelへ人間が設置し、Production への適用は Release Manager と人間承認を経て別途行う。
 

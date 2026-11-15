@@ -5,7 +5,7 @@ import {
   MOCK_LINE_IMAGE_BYTES,
   getLineMessageContent,
   sendLineTextReply,
-} from "./client";
+} from "../../lib/convex/lineWebhook/lineMessagingClient";
 import {
   LineImageContentTooLargeError,
   MAX_LINE_IMAGE_RAW_BYTES,

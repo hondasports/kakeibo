@@ -3,9 +3,9 @@ import {
   AI_EXPENSE_DRAFT_CONFIDENCE_THRESHOLD,
   AI_EXPENSE_DRAFT_REVIEW_REASONS,
   AI_EXPENSE_DRAFT_STATUSES,
-  classifyAiExpenseDraft,
-  resolveReceiptShopNameFromDraft,
-} from "./model";
+} from "./validators";
+import { classifyAiExpenseDraft } from "../../lib/domain/aiExpenseDrafts/classification";
+import { resolveReceiptShopNameFromDraft } from "../../lib/domain/aiExpenseDrafts/shopName";
 
 describe("AI expense draft model", () => {
   it("下書き状態はキューから登録済みまでの固定状態に限定する", () => {
