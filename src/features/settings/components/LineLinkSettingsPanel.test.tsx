@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
@@ -168,6 +168,31 @@ describe("LineLinkSettingsPanel", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("LINE連携を確認してください")).toBeInTheDocument();
+    expect(screen.queryByText("LINEアカウントを連携しました")).not.toBeInTheDocument();
+  });
+
+  it("別の操作で複数連携が解除されても古い成功メッセージを表示しない", () => {
+    useQueryMock.mockReturnValue({ status: "multiple" });
+    const panel = (
+      <MemoryRouter
+        initialEntries={[{ pathname: "/settings", state: { lineLinkFeedback: "success" } }]}
+      >
+        <LineLinkSettingsPanel />
+      </MemoryRouter>
+    );
+    const { rerender } = render(panel);
+    expect(screen.getByText("LINE連携を確認してください")).toBeInTheDocument();
+    expect(screen.queryByText("LINEアカウントを連携しました")).not.toBeInTheDocument();
+
+    useQueryMock.mockReturnValue({ status: "unlinked" });
+    rerender(
+      <MemoryRouter
+        initialEntries={[{ pathname: "/settings", state: { lineLinkFeedback: "success" } }]}
+      >
+        <LineLinkSettingsPanel />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("LINEアカウントは連携されていません")).toBeInTheDocument();
     expect(screen.queryByText("LINEアカウントを連携しました")).not.toBeInTheDocument();
   });
 

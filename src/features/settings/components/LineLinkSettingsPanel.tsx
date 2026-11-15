@@ -173,7 +173,7 @@ export function LineLinkSettingsPanel() {
         </Stack>
       </Box>
 
-      {feedback && !(multiple && feedback === "success") ? (
+      {feedback && (feedback !== "success" || linked) ? (
         <Alert
           aria-live="polite"
           onClose={() => setFeedback(null)}
