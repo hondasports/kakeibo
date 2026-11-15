@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { IncomeListEntry, SpendingEntry } from "../../domain/receipt/spendingEntry";
 import type { YearlyMonthSource } from "../../domain/receipt/yearlySummary";
 import {
-  getDailySpendingTrend,
   getFourWeeksSummary,
-  getMonthlyExpensesSummary,
   getMonthSummaryWithCategories,
   getWeekSummary,
   getWeekSummaryWithCategories,
@@ -42,11 +40,9 @@ function makeStore(overrides: StoreOverrides = {}): SummaryStore {
   return {
     getWeekSpendingEntries: async () => [],
     getWeekIncomeEntries: async () => [],
-    getDateSpendingEntries: async () => [],
     getMonthSpendingEntries: async () => [],
     getMonthIncomeEntries: async () => [],
     getYearAggregationEntries: async () => [],
-    getMonthlyIncome: async () => undefined,
     buildCategoryInfoMap: async () => new Map(),
     ...overrides,
   };
@@ -125,43 +121,6 @@ describe("getFourWeeksSummary", () => {
       "2025-01-06",
     ]);
     expect(result.weekCount).toBe(3);
-  });
-});
-
-describe("getDailySpendingTrend", () => {
-  it("当週・前週の7日分を日付順に返す", async () => {
-    const dates: string[] = [];
-    const store = makeStore({
-      getDateSpendingEntries: async (_g, date) => {
-        dates.push(date);
-        return [entry({ amountYen: 10 })];
-      },
-    });
-    const result = await getDailySpendingTrend(store, GROUP, { weekStartDate: "2025-01-06" });
-    expect(result.currentWeek).toHaveLength(7);
-    expect(result.previousWeek).toHaveLength(7);
-    expect(result.currentWeek[0].date).toBe("2025-01-06");
-    expect(result.currentWeek[6].date).toBe("2025-01-12");
-    expect(result.previousWeek[0].date).toBe("2024-12-30");
-    expect(result.previousWeek[6].date).toBe("2025-01-05");
-    expect(result.currentWeek[0].totalAmountYen).toBe(10);
-    // 前週初日から当週末日まで順序どおり14回問い合わせ
-    expect(dates).toHaveLength(14);
-  });
-});
-
-describe("getMonthlyExpensesSummary", () => {
-  it("monthlyIncomeを渡して月次集計する", async () => {
-    const store = makeStore({
-      getMonthSpendingEntries: async () => [entry({ date: "2025-01-10", amountYen: 700 })],
-      getMonthlyIncome: async () => 200000,
-    });
-    const result = await getMonthlyExpensesSummary(store, GROUP, "u1", {
-      monthStartDate: "2025-01-01",
-    });
-    expect(result.totalExpensesYen).toBe(700);
-    expect(result.monthlyIncome).toBe(200000);
-    expect(result.remainingBalanceYen).toBe(199300);
   });
 });
 

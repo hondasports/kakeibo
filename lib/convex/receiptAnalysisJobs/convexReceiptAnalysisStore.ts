@@ -140,14 +140,6 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
         ...(groupId === undefined ? {} : { groupId: groupId as Id<"groups"> }),
       });
     },
-    async listBatchesByGroup(groupId, limit) {
-      const docs = await ctx.db
-        .query("receiptAnalysisBatches")
-        .withIndex("by_group_id_and_created_at", (q) => q.eq("groupId", groupId as Id<"groups">))
-        .order("desc")
-        .take(limit);
-      return docs.map(toBatchRecord);
-    },
     async takeBatchesByGroupAndUser(groupId, userId, limit) {
       const docs = await ctx.db
         .query("receiptAnalysisBatches")
@@ -263,14 +255,6 @@ export function createReceiptAnalysisReader(ctx: Pick<QueryCtx, "db">): ReceiptA
     async getBatch(id) {
       const doc = await ctx.db.get(id as Id<"receiptAnalysisBatches">);
       return doc === null ? null : toBatchRecord(doc);
-    },
-    async listBatchesByGroup(groupId, limit) {
-      const docs = await ctx.db
-        .query("receiptAnalysisBatches")
-        .withIndex("by_group_id_and_created_at", (q) => q.eq("groupId", groupId as Id<"groups">))
-        .order("desc")
-        .take(limit);
-      return docs.map(toBatchRecord);
     },
     async getJob(id) {
       const doc = await ctx.db.get(id as Id<"receiptAnalysisImageJobs">);

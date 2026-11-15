@@ -6,7 +6,6 @@ import { UserDomainError } from "../../lib/domain/users/rules";
 import { createUserStore } from "../../lib/convex/users/convexUserStore";
 import {
   acceptReceiptImageExternalApiConsent as acceptReceiptImageExternalApiConsentUsecase,
-  updateMonthlyIncome as updateMonthlyIncomeUsecase,
   updateWeeklyDays as updateWeeklyDaysUsecase,
   upsertUser as upsertUserUsecase,
 } from "../../lib/usecase/users";
@@ -64,27 +63,6 @@ export async function acceptReceiptImageExternalApiConsentHandler(ctx: MutationC
 export const acceptReceiptImageExternalApiConsent = mutation({
   args: {},
   handler: acceptReceiptImageExternalApiConsentHandler,
-});
-
-/** updateMonthlyIncome mutation の handler ロジック（テスト用に export） */
-export async function updateMonthlyIncomeHandler(
-  ctx: MutationCtx,
-  args: { monthlyIncome: number | null },
-) {
-  const userId = await requireAuthenticatedUserId(ctx);
-
-  try {
-    await updateMonthlyIncomeUsecase(createUserStore(ctx), userId, args.monthlyIncome, Date.now());
-  } catch (error) {
-    convexError(error);
-  }
-}
-
-export const updateMonthlyIncome = mutation({
-  args: {
-    monthlyIncome: v.union(v.null(), v.number()),
-  },
-  handler: updateMonthlyIncomeHandler,
 });
 
 /** updateWeeklyDays mutation の handler ロジック（テスト用に export） */

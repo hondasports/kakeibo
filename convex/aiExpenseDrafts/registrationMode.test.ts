@@ -278,9 +278,6 @@ describe("registrationMode persistence and aggregation", () => {
     const month = await authed.query(api.receipts.summaries.getMonthSummaryWithCategories, {
       month: "2026-08",
     });
-    const budget = await authed.query(api.receipts.summaries.getMonthlyExpensesSummary, {
-      monthStartDate: "2026-08-01",
-    });
     expect(week).toMatchObject({ count: 1, totalAmountYen: 1500 });
     expect(week.byCategory).toEqual([
       expect.objectContaining({ categoryId: ids.foodId, totalAmountYen: 1500, count: 1 }),
@@ -291,7 +288,6 @@ describe("registrationMode persistence and aggregation", () => {
     });
     expect(week.receipts[0]).not.toHaveProperty("itemName");
     expect(month).toMatchObject({ count: 1, totalAmountYen: 1500 });
-    expect(budget).toMatchObject({ totalExpensesYen: 1500 });
 
     await expect(
       authed.mutation(api.aiExpenseDrafts.mutations.updateRegisteredDraft, {

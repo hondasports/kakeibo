@@ -2,7 +2,6 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { deleteAllGroupScopedData } from "./lib/deleteGroupPhysically";
 import { normalizeEmail } from "./lib/groupEmailMatching";
 import { readQueryDoc, readQueryDocs } from "./lib/groupQueryHelpers";
 import { isGroupDeleted } from "../../lib/domain/groups/lifecycle";
@@ -209,26 +208,6 @@ export async function getGroupIdByUserIdHandler(ctx: QueryCtx, args: { userId: s
   return memberships[0]?.groupId ?? null;
 }
 
-export async function setGroupClerkOrganizationIdHandler(
-  ctx: MutationCtx,
-  args: { groupId: Id<"groups">; clerkOrganizationId: string },
-) {
-  const { groupId, clerkOrganizationId } = args;
-  const group = await ctx.db.get(groupId);
-  if (group === null) {
-    throw new ConvexError("Group not found");
-  }
-
-  await ctx.db.patch(groupId, {
-    clerkOrganizationId,
-    updatedAt: Date.now(),
-  });
-}
-
-export async function deleteGroupForE2eHandler(ctx: MutationCtx, args: { groupId: Id<"groups"> }) {
-  await deleteAllGroupScopedData(ctx, args.groupId);
-}
-
 export const deleteGroupMembershipsByUser = internalMutation({
   args: { userId: v.string(), groupId: v.union(v.id("groups"), v.null()) },
   returns: v.object({ deletedCount: v.number() }),
@@ -282,9 +261,4 @@ export const normalizeGroupId = internalQuery({
   args: { groupId: v.string() },
   returns: v.union(v.id("groups"), v.null()),
   handler: async (ctx, args) => ctx.db.normalizeId("groups", args.groupId),
-});
-
-export const deleteGroupForE2e = internalMutation({
-  args: { groupId: v.id("groups") },
-  handler: deleteGroupForE2eHandler,
 });

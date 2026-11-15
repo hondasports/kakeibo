@@ -1,3 +1,6 @@
+import { ConvexError } from "convex/values";
+import { describe, expect, it, vi } from "vitest";
+import { MAX_RECEIPT_ANALYSIS_BATCH_FILES } from "../../lib/domain/receiptAnalysisJobs/rules";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import {
@@ -13,8 +16,7 @@ import {
   updateJobStatusHandler,
 } from "./internal";
 import { cancelImageJobHandler, createBatchHandler, retryImageJobHandler } from "./mutations";
-import { listBatchesHandler, listJobsByBatchHandler } from "./queries";
-import { MAX_RECEIPT_ANALYSIS_BATCH_FILES } from "../../lib/domain/receiptAnalysisJobs/rules";
+import { listJobsByBatchHandler } from "./queries";
 import {
   GROUP_ID,
   createIdentity,
@@ -22,8 +24,6 @@ import {
   createMutationCtx,
   createQueryCtx,
 } from "./testHelpers";
-import { ConvexError } from "convex/values";
-import { describe, expect, it, vi } from "vitest";
 
 describe("createBatchHandler", () => {
   it("未認証ユーザーは実行できない", async () => {
@@ -90,13 +90,6 @@ describe("createBatchHandler", () => {
       }),
     ).rejects.toMatchObject({ data: "一度に解析できるのは10枚までです" });
     expect(ctx.db.insert).not.toHaveBeenCalled();
-  });
-});
-
-describe("listBatchesHandler", () => {
-  it("未認証ユーザーは実行できない", async () => {
-    const ctx = createQueryCtx(null);
-    await expect(listBatchesHandler(ctx)).rejects.toThrow(ConvexError);
   });
 });
 

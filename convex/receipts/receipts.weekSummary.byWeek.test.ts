@@ -1,69 +1,8 @@
-import { getReceiptsByDateHandler, getReceiptsByWeekHandler } from "./crud";
-import { getWeekSummaryHandler } from "./summaries";
 import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
+import { getWeekSummaryHandler } from "./summaries";
 import type { ExpenseEntryDoc, ReceiptDoc } from "./testHelpers";
-import {
-  GROUP_ID,
-  OTHER_GROUP_ID,
-  OTHER_USER_ID,
-  USER_ID,
-  createIdentity,
-  createQueryCtx,
-  sampleReceipt,
-} from "./testHelpers";
-
-describe("getReceiptsByWeek", () => {
-  it("正常系: 指定週のレシートが返される", async () => {
-    const identity = createIdentity({ tokenIdentifier: USER_ID });
-    const docs = [sampleReceipt];
-    const ctx = createQueryCtx(identity, docs);
-
-    const result = await getReceiptsByWeekHandler(ctx, {
-      weekStartDate: "2024-01-08",
-    });
-
-    expect(result).toEqual(docs);
-  });
-
-  it("別グループのレシートが返らない", async () => {
-    const identity = createIdentity({ tokenIdentifier: OTHER_USER_ID });
-    // OTHER_GROUP_ID のコンテキストでは queryDocs を空にして別グループのデータが混入しないことを表現
-    const ctx = createQueryCtx(identity, [], [], OTHER_GROUP_ID);
-
-    const result = await getReceiptsByWeekHandler(ctx, {
-      weekStartDate: "2024-01-08",
-    });
-
-    // GROUP_ID のレシートは含まれない
-    expect(result).not.toContainEqual(expect.objectContaining({ groupId: GROUP_ID }));
-    expect(result).toHaveLength(0);
-  });
-
-  it("未認証時: ConvexError が throw される", async () => {
-    const ctx = createQueryCtx(null);
-
-    await expect(
-      getReceiptsByWeekHandler(ctx, { weekStartDate: "2024-01-08" }),
-    ).rejects.toBeInstanceOf(ConvexError);
-
-    await expect(
-      getReceiptsByWeekHandler(ctx, { weekStartDate: "2024-01-08" }),
-    ).rejects.toMatchObject({ data: "Not authenticated" });
-  });
-});
-
-describe("getReceiptsByDate", () => {
-  it("正常系: 指定日のレシートが返される", async () => {
-    const identity = createIdentity({ tokenIdentifier: USER_ID });
-    const docs = [sampleReceipt];
-    const ctx = createQueryCtx(identity, docs);
-
-    const result = await getReceiptsByDateHandler(ctx, { date: "2024-01-10" });
-
-    expect(result).toEqual(docs);
-  });
-});
+import { GROUP_ID, USER_ID, createIdentity, createQueryCtx, sampleReceipt } from "./testHelpers";
 
 describe("getWeekSummary", () => {
   it("レシートが0件のとき: 空の集計と前週データなしを返す", async () => {

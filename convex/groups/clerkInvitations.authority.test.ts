@@ -1,13 +1,15 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 
+import { acceptGroupInvitationHandler } from "./invitations";
+
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, internal } from "../_generated/api";
+import { inviteMemberHandler } from "../../lib/convex/groups/clerkInvitationLib/inviteActions";
+import { internal } from "../_generated/api";
 import type { ActionCtx } from "../_generated/server";
 import schema from "../schema";
 import { convexTestModules } from "../test.setup";
-import { inviteMemberHandler } from "../../lib/convex/groups/clerkInvitationLib/inviteActions";
 
 const owner = "https://issuer.example|owner";
 const recipient = "https://issuer.example|recipient";
@@ -143,7 +145,7 @@ describe("招待の予約・確定の認可", () => {
         await expect(
           s.t
             .withIdentity(identity(recipient))
-            .mutation(api.groups.invitations.acceptGroupInvitation, { token }),
+            .run((ctx) => acceptGroupInvitationHandler(ctx, { token })),
         ).rejects.toThrow();
       } finally {
         warn.mockRestore();
@@ -156,15 +158,15 @@ describe("招待の予約・確定の認可", () => {
     await s.authed.mutation(internal.groups.invitations.createGroupInvitationRecord, s.record);
     const receiver = s.t.withIdentity(identity(recipient));
     await expect(
-      receiver.mutation(api.groups.invitations.acceptGroupInvitation, { token }),
+      receiver.run((ctx) => acceptGroupInvitationHandler(ctx, { token })),
     ).rejects.toThrow();
     await s.authed.mutation(internal.groups.invitations.createGroupInvitationRecord, {
       ...s.record,
       clerkInvitationId: "clerk-invite",
     });
-    await expect(
-      receiver.mutation(api.groups.invitations.acceptGroupInvitation, { token }),
-    ).resolves.toBe(s.groupId);
+    await expect(receiver.run((ctx) => acceptGroupInvitationHandler(ctx, { token }))).resolves.toBe(
+      s.groupId,
+    );
   });
 
   it("active group が切り替わっても開始時の対象に owner として確定する", async () => {
@@ -216,7 +218,7 @@ describe("招待の予約・確定の認可", () => {
       await expect(
         s.t
           .withIdentity(identity(recipient))
-          .mutation(api.groups.invitations.acceptGroupInvitation, { token }),
+          .run((ctx) => acceptGroupInvitationHandler(ctx, { token })),
       ).rejects.toThrow();
     },
   );
@@ -303,7 +305,7 @@ describe("招待の予約・確定の認可", () => {
       await expect(
         s.t
           .withIdentity(identity(recipient))
-          .mutation(api.groups.invitations.acceptGroupInvitation, { token }),
+          .run((ctx) => acceptGroupInvitationHandler(ctx, { token })),
       ).rejects.toThrow();
       expect(warn.mock.calls).toEqual([
         ["[groups.clerkInvitations.inviteMember] failed to clean up reserved invitation", "Error"],
@@ -326,7 +328,7 @@ describe("招待の予約・確定の認可", () => {
     ).resolves.toBeNull();
     await s.t
       .withIdentity(identity(recipient))
-      .mutation(api.groups.invitations.acceptGroupInvitation, { token });
+      .run((ctx) => acceptGroupInvitationHandler(ctx, { token }));
     await expect(
       s.authed.mutation(cleanup, { token, clerkInvitationId: "clerk-invite" }),
     ).resolves.toBeNull();
@@ -379,7 +381,7 @@ describe("招待の予約・確定の認可", () => {
     await expect(
       s.t
         .withIdentity(identity(recipient))
-        .mutation(api.groups.invitations.acceptGroupInvitation, { token }),
+        .run((ctx) => acceptGroupInvitationHandler(ctx, { token })),
     ).resolves.toBe(s.groupId);
   });
 });

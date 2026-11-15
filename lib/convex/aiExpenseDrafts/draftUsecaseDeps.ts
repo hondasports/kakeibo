@@ -16,7 +16,6 @@ import {
   createDraftExpenseEntryReconcileService,
   createDraftItemReplaceService,
   createDraftOverrideSnapshotService,
-  createDraftReceiptInsertService,
   createDraftTaxInterpretationService,
 } from "./convexDraftWorkflowServices";
 
@@ -29,7 +28,6 @@ export function createAiExpenseDraftDeps(ctx: MutationCtx) {
     overrideSnapshots: createDraftOverrideSnapshotService(ctx),
     itemReplace: createDraftItemReplaceService(ctx),
     expenseEntryReconcile: createDraftExpenseEntryReconcileService(ctx),
-    receiptInsert: createDraftReceiptInsertService(ctx),
   };
 }
 

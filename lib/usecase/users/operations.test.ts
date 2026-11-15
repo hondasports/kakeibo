@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NewUserFields, UserPatch, UserRecord, UserStore } from "../../domain/users/store";
-import {
-  acceptReceiptImageExternalApiConsent,
-  updateMonthlyIncome,
-  updateWeeklyDays,
-  upsertUser,
-} from "./operations";
+import { acceptReceiptImageExternalApiConsent, updateWeeklyDays, upsertUser } from "./operations";
 import { getReceiptImageConsent, getUserProfile } from "./queries";
 import { getWeeklyStartDayForUser } from "./weeklySettings";
 
@@ -90,33 +85,6 @@ describe("acceptReceiptImageExternalApiConsent", () => {
     const { store } = makeStore(null);
     await expect(acceptReceiptImageExternalApiConsent(store, "u1", 200)).rejects.toThrow(
       "User not found",
-    );
-  });
-});
-
-describe("updateMonthlyIncome", () => {
-  it("整数なら patch する", async () => {
-    const { store, calls } = makeStore(makeUser({ id: "ex1" }));
-    await updateMonthlyIncome(store, "u1", 300000, 100);
-    expect(calls.patches).toEqual([
-      { id: "ex1", patch: { monthlyIncome: 300000, updatedAt: 100 } },
-    ]);
-  });
-
-  it("null なら undefined でクリアする", async () => {
-    const { store, calls } = makeStore(makeUser({ id: "ex1", monthlyIncome: 1 }));
-    await updateMonthlyIncome(store, "u1", null, 100);
-    expect(calls.patches[0].patch.monthlyIncome).toBeUndefined();
-    expect("monthlyIncome" in calls.patches[0].patch).toBe(true);
-  });
-
-  it("負数・小数はエラー", async () => {
-    const { store } = makeStore(makeUser());
-    await expect(updateMonthlyIncome(store, "u1", -1, 0)).rejects.toThrow(
-      "月収入は0以上の整数で入力してください",
-    );
-    await expect(updateMonthlyIncome(store, "u1", 1.5, 0)).rejects.toThrow(
-      "月収入は0以上の整数で入力してください",
     );
   });
 });

@@ -19,7 +19,6 @@ import {
   createFailedDraftFromImageAnalysisHandler,
   createFromExtractionForUserHandler,
   createFromExtractionHandler,
-  deleteOrphanedDraftHandler,
 } from "../../lib/convex/aiExpenseDrafts/createFromExtraction";
 import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../lib/domain/aiExpenseDrafts/judgmentItemWindow";
 import {
@@ -36,7 +35,6 @@ export {
   createFromExtractionForUserHandler,
   createFailedDraftFromImageAnalysisHandler,
   createFailedDraftFromImageAnalysisForUserHandler,
-  deleteOrphanedDraftHandler,
 } from "../../lib/convex/aiExpenseDrafts/createFromExtraction";
 export {
   deleteDraftsByUserBatchHandler,
@@ -112,13 +110,6 @@ export const createFailedDraftFromImageAnalysisForUser = internalMutation({
     imageFileName: v.optional(v.string()),
   },
   handler: createFailedDraftFromImageAnalysisForUserHandler,
-});
-
-export const deleteOrphanedDraft = internalMutation({
-  args: {
-    draftId: v.id("aiExpenseDrafts"),
-  },
-  handler: deleteOrphanedDraftHandler,
 });
 
 export const getForReanalysis = internalQuery({

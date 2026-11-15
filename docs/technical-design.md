@@ -202,7 +202,7 @@ convex/
     membership.ts
     mutations.ts
     queries.ts
-    members.ts                 # addMemberByEmail, removeMember 等
+    members.ts                 # removeMember 等
     invitations.ts             # 招待API登録とハンドラへの委譲
     clerkInvitations.ts
     deletion.ts
@@ -380,7 +380,7 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   `lib/convex/*Repository.ts` が `Id<>` と `string` の写像を吸収する。
 - 互換性のため `*Handler` のエクスポート名・`(ctx, args)` シグネチャ・
   エラーメッセージは維持する（既存テスト・aiExpenseDrafts 連携が依存）。
-- `convex/receipts/mutations.ts` の `deleteReceiptsByUser`（E2E 用内部 API）は
+- `convex/receipts/crud.ts` の `deleteReceiptsByUser`（E2E 用内部 API）は
   インデックス走査を伴うユーティリティであり、ドメイン層には移さない。
 
 `aiExpenseDrafts` ではこれに加えて次のパターンを使う。
@@ -388,8 +388,7 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 - **ワークフローサービス・ポート**（`lib/domain/aiExpenseDrafts/draftWorkflowServices.ts`）:
   税再解釈の永続化（`DraftTaxInterpretationService`）、ユーザー上書きスナップショット
   （`DraftOverrideSnapshotService`）、明細置換（`DraftItemReplaceService`）、
-  支出エントリのリコンサイル（`DraftExpenseEntryReconcileService`）、
-  receipt 登録（`DraftReceiptInsertService`）のように、複数テーブルにまたがる
+  支出エントリのリコンサイル（`DraftExpenseEntryReconcileService`）のように、複数テーブルにまたがる
   永続化オーケストレーションをドメインが定義する interface として宣言し、
   `lib/convex/aiExpenseDrafts/convexDraftWorkflowServices.ts` が既存の
   永続化関数（`persistDraftTaxInterpretation` 等）へ ctx を束縛して実装する。
@@ -619,9 +618,9 @@ candidate・CategoryRepository port）を再利用し、endpoint 向けの完全
   `./normalize` ラッパ）のみ。endpoint名、args/returns、エラー文言、seed 分岐、
   上限判定、E2E挙動は不変とする。
 
-`users`（Clerk認証由来のプロフィール upsert・consent・monthlyIncome・
+`users`（Clerk認証由来のプロフィール upsert・consent・
 weekly settings・internal user lookup）も4層へ移行済み。既存の
-`lib/domain/users/`（clerkProfile・displayName・email・monthlyIncome）と
+`lib/domain/users/`（clerkProfile・displayName・email）と
 `lib/domain/week/weekDates.ts` を再利用し、endpoint 向けのストアポートと
 フィールド構築ルールを追加した。
 
@@ -629,8 +628,7 @@ weekly settings・internal user lookup）も4層へ移行済み。既存の
   ポート）と `rules.ts`（identity 由来の insert/patch フィールド構築・
   displayName 解決・User not found 検証）。
 - **ユースケース**（`lib/usecase/users/`）: upsertUser（insert/patch 分岐）、
-  consent（既設定時刻を保持する冪等 patch）、updateMonthlyIncome（null で
-  undefined クリア）、updateWeeklyDays（weeklyEndDay は開始曜日から導出）、
+  consent（既設定時刻を保持する冪等 patch）、updateWeeklyDays（weeklyEndDay は開始曜日から導出）、
   getUserProfile/getReceiptImageConsent、internal upsert/getUserIdByEmail/
   getUserById/clearUserMonthlyIncome、共有 `getWeeklyStartDayForUser`。
 - **インフラ**（`lib/convex/users/`）: `UserStore` の Convex 実装
@@ -642,16 +640,15 @@ weekly settings・internal user lookup）も4層へ移行済み。既存の
   endpoint名、args/returns、エラー文言、undefined クリア挙動、consent 冪等性、
   internal upsert の email trim+小文字化（空文字保持）は不変とする。
 
-`weekSessions`（週次セッションの get-or-create・reviewMemo 更新・complete・
-E2E reset・取得）も4層へ移行済み。週の日付計算は既存 `lib/domain/week/weekDates.ts`
+`weekSessions`（週次セッションの get-or-create・E2E reset）も4層へ移行済み。週の日付計算は既存 `lib/domain/week/weekDates.ts`
 を再利用する。
 
 - **純粋関数**（`lib/domain/weekSessions/`）: `store.ts`（`WeekSessionRecord`・
   `WeekSessionStore` ポート）と `rules.ts`（
-  新規 draft フィールド構築、complete patch（reviewMemo は指定時のみキー含有）、
-  reset patch（reviewMemo を undefined で明示クリア）、not found / retrieve 失敗検証）。
+  新規 draft フィールド構築、reset patch（reviewMemo を undefined で明示クリア）、
+  retrieve 失敗検証）。
 - **ユースケース**（`lib/usecase/weekSessions/`）: getOrCreate（既存返却・無ければ
-  insert→get）、updateReviewMemo・complete（patch→get）、reset（`{reset}` 返却）、get。
+  insert→get）、reset（`{reset}` 返却）。
 - **インフラ**（`lib/convex/weekSessions/`）: `WeekSessionStore` の Convex 実装
   （`createWeekSessionStore`）と query 用 `createWeekSessionReader`、Doc/Record 変換。
   by_group_id_and_week_start_date インデックス利用を隔離する。
@@ -668,7 +665,7 @@ OpenAI 応答 envelope の取り出し・mock 結果は `lib/convex/receiptImage
 - **純粋関数**（`lib/domain/receiptImageExtraction/`）: 既存 `mode.ts` に加え、
   `rules.ts`（imageDataUrl 検証、抽出計画解決: mode → real は production 限定 →
   mock → OPENAI_API_KEY 必須、グループ選択・同意検証）と `ports.ts`（環境読み取り・
-  mock/real extractor・group/consent/categories 読み取りポート）、
+  mock/real extractor ポート）、
   `extractionRequest.ts`（抽出リクエスト構築: `ReceiptCategoryHint`/`CategoryInput` 型、
   BiDi制御文字 sanitize・重複排除 `normalizeCategories`、プロンプト構築
   `buildReceiptExtractionPrompt`、JSONスキーマ `buildReceiptExtractionJsonSchema`、
@@ -695,13 +692,11 @@ OpenAI 応答 envelope の取り出し・mock 結果は `lib/convex/receiptImage
   `lib/domain/dependencyDirection.test.ts` が lib/domain → convex 参照の
   逆依存再導入を検査する。
 - **ユースケース**（`lib/usecase/receiptImageExtraction/`）: `extractReceiptFields`
-  （検証 → 計画 → mock/real）と `extractReceiptFieldsForCurrentGroup`
-  （group → consent+categories 並列取得 → 抽出）。
+  （検証 → 計画 → mock/real）。
 - **インフラ**（`lib/convex/receiptImageExtraction/extractorDeps.ts`）: process.env を
-  呼出時に読む環境スナップショット、`getMockResult`/`callOpenAIReceiptExtractor` の合成、
-  `runQuery` ベースのコンテキスト読み取り。
-- **プレゼンテーション**: `convex/receiptImageExtraction/extraction.ts` は action・
-  validator・`requireAuthenticatedUserId`・互換export（`extractReceiptFieldsFromImage`・
+  呼出時に読む環境スナップショットと、`getMockResult`/`callOpenAIReceiptExtractor` の合成。
+- **プレゼンテーション**: `convex/receiptImageExtraction/extraction.ts` は
+  `requireAuthenticatedUserId`・互換export（`extractReceiptFieldsFromImage`・
   `extractReceiptFieldsHandler`・型/関数再export）のみ。ドメインエラーだけを
   ConvexError へ変換し、判定順序と全エラー文言は不変とする。
 
@@ -967,7 +962,7 @@ Convex関数を実装する時点で、未認証の場合に拒否されるこ�
 この運用では、次の制約を前提にする。
 
 - 1ユーザーは同時に複数グループへ所属できる。
-- `acceptGroupInvitation` は、招待メールとログイン中ユーザーのメールが一致する場合だけ所属を追加する。
+- 招待受諾はトークンと認証ユーザーのメール候補を照合して所属を追加する。
 - `setActiveGroup` は、ログイン中ユーザーが所属しているグループだけを active にできる。
 - `removeMember` はユーザー本人の `users` レコードや Clerk アカウントは削除しない。
 - `requestGroupDeletion` はjob作成、`groups.status = deleting`、依頼者の`activeGroupId`解除を同一transactionで行い、bounded workerへ委譲する。Clerk アカウントや`users`レコードは削除しない（#224）。
@@ -1106,7 +1101,7 @@ active record が確認できない場合は fail closed にする。
 | confidence          | object                                                             | 主要フィールドごとのAI信頼度          |
 | warnings            | string[] (optional)                                                | 解析時の警告                          |
 | reviewReasons       | fixed enum array                                                   | 確認が必要な理由                      |
-| registeredReceiptId | Id<"receipts"> (optional)                                          | レガシー `registerReadyDrafts` 用。主導線では未設定 |
+| registeredReceiptId | Id<"receipts"> (optional)                                          | 旧登録経路の保存済みデータ用。主導線では未設定 |
 | createdAt           | number                                                             | 作成日時                              |
 | updatedAt           | number                                                             | 更新日時                              |
 
@@ -1241,15 +1236,11 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 
 ### 10.2 receipts（互換層）
 
-- `receipts.crud.createReceipt(input)`（レガシー。本番入力 UI では未使用）
 - `receipts.crud.updateReceipt(id, input)`
 - `receipts.crud.deleteReceipt(id)`
-- `receipts.summaries.getReceiptsByWeek(weekStartDate)`
 - `receipts.summaries.getWeekSummary(weekStartDate)`
 - `receipts.summaries.getWeekSummaryWithCategories(weekStartDate)`
 - `receipts.summaries.getFourWeeksSummary()`
-- `receipts.summaries.getDailySpendingTrend(weekStartDate)`
-- `receipts.summaries.getMonthlyExpensesSummary(month?)`
 - `receipts.crud.deleteReceiptsByUser(groupId, userId)`（internal。指定ユーザーの作成データだけを対象）
 
 `receipts` は支出と収入の両方を扱う schema 互換として残る。新規手入力は `expenseEntries` を正本とし、
@@ -1261,9 +1252,6 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 
 - `weekSessions.mutations.getOrCreateCurrentWeekSession()`
 - `weekSessions.mutations.getOrCreateWeekSession(weekStartDate)`
-- `weekSessions.queries.getWeekSession(weekStartDate)`
-- `weekSessions.mutations.updateReviewMemo(weekStartDate, reviewMemo)`
-- `weekSessions.mutations.completeWeekSession(weekStartDate)`
 - `weekSessions.internal.resetWeekSessionForUser(groupId)`（internal）
 
 ### 10.4 categories
@@ -1299,7 +1287,6 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `users.queries.getUserProfile()`
 - `users.queries.getReceiptImageConsent()`
 - `users.mutations.acceptReceiptImageExternalApiConsent()`
-- `users.mutations.updateMonthlyIncome(monthlyIncome)`
 - `users.mutations.updateWeeklyDays(weeklyStartDay, weeklyEndDay)`
 - `users.internal.clearUserMonthlyIncome(userId)`（internal）
 
@@ -1331,8 +1318,6 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `aiExpenseDrafts.mutations.updateDraftItemTaxOverrides(draftId, itemId, taxRatePercent?, amountBasis?)`
 - `aiExpenseDrafts.mutations.applyReceiptTaxSettings(draftId, taxRatePercent?, amountBasis?)`
 - `aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries(draftIds)`（主導線）
-- `aiExpenseDrafts.mutations.registerReadyDrafts(draftIds)`（レガシー。`receipts` へ登録し `registeredReceiptId` を設定）
-- `aiExpenseDrafts.actions.analyzeReceiptImageToDraft(input)`
 - `aiExpenseDrafts.internal.createFromExtraction(input)`（internal）
 - `aiExpenseDrafts.internal.createFailedDraftFromImageAnalysis(input)`（internal）
 
@@ -1355,7 +1340,6 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 ### 10.9 receipt analysis jobs
 
 - `receiptAnalysisJobs.mutations.createBatch(input)`
-- `receiptAnalysisJobs.queries.listBatches()`
 - `receiptAnalysisJobs.queries.listJobsByBatch(batchId)`
 - `receiptAnalysisJobs.queries.listActiveJobs()`
 - `receiptAnalysisJobs.queries.listJobsByDraftIds(draftIds)`
@@ -1422,7 +1406,7 @@ active group を解決する。`draftId` や `categoryId` を受け取る処理�
 | `unknown` | 確認が必要な下書きとして扱い、登録前にユーザーが必要項目を確定する。 |
 
 主導線の `registerReadyDraftsAsExpenseEntries` は `expenseEntries` を作成し、下書きを `status: "registered"` に更新する。
-`registeredReceiptId` は設定しない。レガシーの `registerReadyDrafts` のみ `receipts` を作成し `registeredReceiptId` を保存する。
+`registeredReceiptId` は現行の登録経路では設定しない。
 
 既存データへの migration / backfill は不要とする。新しい下書きテーブルの追加のみで、
 既存 `receipts`、`categories`、`weekSessions` の必須項目は変更しないため、既存データの読み取りは
@@ -1571,7 +1555,7 @@ CSV生成関数、CSVダウンロード処理はいずれも未実装である�
 - 同意が保存されていない場合は、Convex Action を呼ばず、画像データも送信しない。
 - 画像は Convex Storage や `receipts` テーブルへ保存しない。
 - 抽出結果はフォーム候補であり、自動保存しない。
-- ユーザーが `保存して次へ` を押した時点で、既存の `receipts.createReceipt` を使って通常の receipt として保存する。
+- 現行の登録経路は確認済み下書きを支出エントリとして保存する。
 
 ### 14.2 失敗時と拒否時
 

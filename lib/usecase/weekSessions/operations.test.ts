@@ -5,13 +5,7 @@ import type {
   WeekSessionRecord,
   WeekSessionStore,
 } from "../../domain/weekSessions/store";
-import {
-  completeWeekSession,
-  getOrCreateWeekSession,
-  getWeekSession,
-  resetWeekSession,
-  updateReviewMemo,
-} from "./operations";
+import { getOrCreateWeekSession, resetWeekSession } from "./operations";
 
 function makeSession(overrides: Partial<WeekSessionRecord> = {}): WeekSessionRecord {
   return {
@@ -89,58 +83,6 @@ describe("getOrCreateWeekSession", () => {
   });
 });
 
-describe("updateReviewMemo", () => {
-  it("無ければ Week session not found", async () => {
-    const { store } = makeStore({ found: null });
-    await expect(
-      updateReviewMemo(store, "g1", { weekStartDate: "2024-01-08", reviewMemo: "m" }, now),
-    ).rejects.toThrow("Week session not found");
-  });
-
-  it("patch して get で返す", async () => {
-    const updated = makeSession({ reviewMemo: "m" });
-    const { store, calls } = makeStore({ found: makeSession(), got: updated });
-    expect(
-      await updateReviewMemo(store, "g1", { weekStartDate: "2024-01-08", reviewMemo: "m" }, now),
-    ).toBe(updated);
-    expect(calls.patches).toEqual([{ id: "s1", patch: { reviewMemo: "m", updatedAt: 500 } }]);
-  });
-
-  it("get が null なら updated 文言で失敗する", async () => {
-    const { store } = makeStore({ found: makeSession(), got: null });
-    await expect(
-      updateReviewMemo(store, "g1", { weekStartDate: "2024-01-08", reviewMemo: "m" }, now),
-    ).rejects.toThrow("Failed to retrieve updated week session");
-  });
-});
-
-describe("completeWeekSession", () => {
-  it("reviewMemo 未指定なら patch にキーを含めない", async () => {
-    const done = makeSession({ status: "completed" });
-    const { store, calls } = makeStore({ found: makeSession(), got: done });
-    expect(await completeWeekSession(store, "g1", { weekStartDate: "2024-01-08" }, now)).toBe(done);
-    expect(calls.patches[0].patch).toEqual({ status: "completed", updatedAt: 500 });
-    expect("reviewMemo" in calls.patches[0].patch).toBe(false);
-  });
-
-  it("reviewMemo 指定時は patch に含める", async () => {
-    const { store, calls } = makeStore({ found: makeSession(), got: makeSession() });
-    await completeWeekSession(store, "g1", { weekStartDate: "2024-01-08", reviewMemo: "x" }, now);
-    expect(calls.patches[0].patch).toEqual({
-      status: "completed",
-      updatedAt: 500,
-      reviewMemo: "x",
-    });
-  });
-
-  it("無ければ Week session not found", async () => {
-    const { store } = makeStore({ found: null });
-    await expect(
-      completeWeekSession(store, "g1", { weekStartDate: "2024-01-08" }, now),
-    ).rejects.toThrow("Week session not found");
-  });
-});
-
 describe("resetWeekSession", () => {
   it("無ければ reset:false", async () => {
     const { store, calls } = makeStore({ found: null });
@@ -155,15 +97,5 @@ describe("resetWeekSession", () => {
       { id: "s1", patch: { status: "draft", reviewMemo: undefined, updatedAt: 500 } },
     ]);
     expect("reviewMemo" in calls.patches[0].patch).toBe(true);
-  });
-});
-
-describe("getWeekSession", () => {
-  it("groupId と weekStartDate で検索した結果をそのまま返す", async () => {
-    const found = makeSession();
-    const { store, calls } = makeStore({ found });
-    expect(await getWeekSession(store, "g1", "2024-01-08")).toBe(found);
-    expect(calls.finds).toEqual([["g1", "2024-01-08"]]);
-    expect(await getWeekSession(makeStore({ found: null }).store, "g1", "x")).toBeNull();
   });
 });

@@ -5,11 +5,6 @@
  */
 import { isValidIsoDateString } from "../week/weekDates";
 import {
-  buildDraftExpenseEntry,
-  getDraftExpenseEntryErrorMessage,
-  type DraftExpenseEntryInput,
-} from "./createFromDraft";
-import {
   validateExpenseAmount,
   validateExpenseMemo,
   validateExpenseTitle,
@@ -60,16 +55,6 @@ export type ManualIncomeInput = {
   date: string;
   amountYen: number;
   title: string;
-};
-
-/** AI 下書き明細からの支出エントリ作成入力。 */
-export type DraftExpenseEntryCreateInput = {
-  groupId: string;
-  createdByUserId: string;
-  draftId: string;
-  draftDate: string;
-  draftCategoryId?: string;
-  item: DraftExpenseEntryInput;
 };
 
 /** 更新入力（未指定フィールドは変更しない）。 */
@@ -151,27 +136,6 @@ export class ExpenseEntry {
       title: titleResult.title,
       entryType: "income",
       source: "manual",
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-
-  /** AI 下書き明細から支出エントリを構築する。 */
-  static createFromDraftItem(input: DraftExpenseEntryCreateInput, now: number): ExpenseEntry {
-    const buildResult = buildDraftExpenseEntry(input.item, input.draftCategoryId);
-    if (!buildResult.success) {
-      throw new Error(getDraftExpenseEntryErrorMessage(buildResult.error));
-    }
-    return new ExpenseEntry({
-      groupId: input.groupId,
-      createdByUserId: input.createdByUserId,
-      aiExpenseDraftId: input.draftId,
-      date: input.draftDate,
-      amount: buildResult.entry.amount,
-      categoryId: buildResult.entry.categoryId,
-      title: buildResult.entry.title,
-      entryType: "expense",
-      source: "ai_suggested",
       createdAt: now,
       updatedAt: now,
     });

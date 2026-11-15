@@ -8,7 +8,6 @@ import type {
   DraftExpenseEntryReconcileService,
   DraftItemReplaceService,
   DraftOverrideSnapshotService,
-  DraftReceiptInsertService,
   DraftTaxInterpretationService,
 } from "../../domain/aiExpenseDrafts/draftWorkflowServices";
 import type { UpdateForReviewItem } from "./reviewValidation";
@@ -16,7 +15,6 @@ import { persistDraftTaxInterpretation } from "./persistTaxInterpretation";
 import { persistReceiptUserOverrideSnapshot } from "./receiptDataContract";
 import { replaceDraftItemsForReview } from "./reviewValidation";
 import { reconcileDraftExpenseEntries } from "./reconcileExpenseEntries";
-import { insertReceiptForGroup } from "../receipts/insert";
 import {
   draftDocToFields,
   draftFieldsToDoc,
@@ -96,26 +94,6 @@ export function createDraftExpenseEntryReconcileService(
         memoUpdate: args.memoUpdate,
         now: args.now,
       });
-    },
-  };
-}
-
-export function createDraftReceiptInsertService(ctx: MutationCtx): DraftReceiptInsertService {
-  return {
-    async insert(args) {
-      return await insertReceiptForGroup(
-        ctx,
-        args.groupId as Id<"groups">,
-        {
-          type: "expense",
-          date: args.fields.date,
-          shopName: args.fields.shopName,
-          amountYen: args.fields.amountYen,
-          categoryId: args.fields.categoryId as Id<"categories">,
-        },
-        1,
-        args.userId,
-      );
     },
   };
 }

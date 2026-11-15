@@ -155,9 +155,9 @@ AIの結果は、最初から確定値として扱うのではなく、信頼度
 既存の `kakeibo`（UI ブランド: Suzumemo）には、支出AI登録へ拡張できる土台がある。
 
 - `convex/receiptImageExtraction/extraction.ts`
-  - public action の薄いラッパー。OpenAI 呼び出し本体は `lib/convex/receiptImageExtraction/`
+  - 共有抽出処理。OpenAI 呼び出し本体は `lib/convex/receiptImageExtraction/`
 - `lib/convex/receiptImageExtraction/analyzeReceiptImageCore.ts`
-  - 画像解析から下書き作成までの共通コア（`aiExpenseDrafts/actions` と `receiptAnalysisJobs/actions` から利用）
+  - 画像解析から下書き作成までの共通コア（`receiptAnalysisJobs/actions` から利用）
 - `convex/aiExpenseDrafts/`
   - AI 支出下書きの query/mutation/action。ビジネスロジックの多くは `lib/convex/aiExpenseDrafts/`
 - `convex/expenseEntries/`

@@ -3,26 +3,10 @@ import { requireGroupMembership } from "../../../../convex/groups/membership";
 import { ConvexError } from "convex/values";
 import { normalizeMonth } from "../../../domain/common/month";
 import {
-  getMonthlyExpensesSummary,
   getMonthSummaryWithCategories,
   type MonthlySummaryWithCategoriesResult,
 } from "../../../usecase/receipts/summaries";
 import { createSummaryStore } from "./summaryStore";
-
-export { type MonthlyExpensesSummary } from "../../../domain/receipt/monthlySummary";
-
-type GetMonthlyExpensesSummaryArgs = {
-  monthStartDate: string;
-};
-
-/** getMonthlyExpensesSummary query の handler ロジック（テスト用に export） */
-export async function getMonthlyExpensesSummaryHandler(
-  ctx: QueryCtx,
-  args: GetMonthlyExpensesSummaryArgs,
-) {
-  const { groupId, userId } = await requireGroupMembership(ctx);
-  return getMonthlyExpensesSummary(createSummaryStore(ctx), groupId, userId, args);
-}
 
 type GetMonthSummaryWithCategoriesArgs = {
   month: string;

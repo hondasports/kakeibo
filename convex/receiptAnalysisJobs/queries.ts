@@ -8,14 +8,10 @@ import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { requireGroupMembership } from "../groups/membership";
-import {
-  batchRecordToDoc,
-  jobRecordToDoc,
-} from "../../lib/convex/receiptAnalysisJobs/convexReceiptAnalysisStore";
+import { jobRecordToDoc } from "../../lib/convex/receiptAnalysisJobs/convexReceiptAnalysisStore";
 import { createReceiptAnalysisQueryDeps } from "../../lib/convex/receiptAnalysisJobs/receiptAnalysisDeps";
 import {
   listReceiptAnalysisJobsByDraftIds,
-  listReceiptAnalysisBatches,
   listActiveReceiptAnalysisJobs,
   listReceiptAnalysisJobsByBatch,
 } from "../../lib/usecase/receiptAnalysisJobs/queries";
@@ -32,13 +28,6 @@ function convexError(error: unknown): never {
   // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
   if (error instanceof ReceiptAnalysisJobDomainError) throw new ConvexError(error.message);
   throw error;
-}
-
-export async function listBatchesHandler(ctx: QueryCtx) {
-  const { groupId } = await requireGroupMembership(ctx);
-  return (
-    await listReceiptAnalysisBatches(createReceiptAnalysisQueryDeps(ctx).reader, groupId)
-  ).map(batchRecordToDoc);
 }
 
 export async function listActiveJobsHandler(ctx: QueryCtx) {
@@ -83,7 +72,6 @@ export async function listJobsByDraftIdsHandler(
   ).map(jobRecordToDoc);
 }
 
-export const listBatches = query({ args: {}, handler: listBatchesHandler });
 export const listActiveJobs = query({ args: {}, handler: listActiveJobsHandler });
 export const listJobsByBatch = query({
   args: { batchId: v.id("receiptAnalysisBatches") },

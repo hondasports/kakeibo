@@ -12,7 +12,6 @@ import type * as accountDeletion from "../accountDeletion.js";
 import type * as accountDeletionActions from "../accountDeletionActions.js";
 import type * as aiExpenseDraftAmountTaxMigration from "../aiExpenseDraftAmountTaxMigration.js";
 import type * as aiExpenseDraftRegisteredAtMigration from "../aiExpenseDraftRegisteredAtMigration.js";
-import type * as aiExpenseDrafts_actions from "../aiExpenseDrafts/actions.js";
 import type * as aiExpenseDrafts_e2eDraftFixtures from "../aiExpenseDrafts/e2eDraftFixtures.js";
 import type * as aiExpenseDrafts_internal from "../aiExpenseDrafts/internal.js";
 import type * as aiExpenseDrafts_model from "../aiExpenseDrafts/model.js";
@@ -106,7 +105,6 @@ import type * as receiptAnalysisJobs_testHelpers from "../receiptAnalysisJobs/te
 import type * as receiptImageExtraction_extraction from "../receiptImageExtraction/extraction.js";
 import type * as receiptImageExtraction_testHelpers from "../receiptImageExtraction/testHelpers.js";
 import type * as receipts_crud from "../receipts/crud.js";
-import type * as receipts_mutations from "../receipts/mutations.js";
 import type * as receipts_spendingEntries from "../receipts/spendingEntries.js";
 import type * as receipts_summaries from "../receipts/summaries.js";
 import type * as receipts_testHelpers from "../receipts/testHelpers.js";
@@ -126,7 +124,6 @@ import type * as users_testHelpers from "../users/testHelpers.js";
 import type * as users_weeklySettings from "../users/weeklySettings.js";
 import type * as weekSessions_internal from "../weekSessions/internal.js";
 import type * as weekSessions_mutations from "../weekSessions/mutations.js";
-import type * as weekSessions_queries from "../weekSessions/queries.js";
 import type * as weekSessions_testHelpers from "../weekSessions/testHelpers.js";
 
 import type {
@@ -140,7 +137,6 @@ declare const fullApi: ApiFromModules<{
   accountDeletionActions: typeof accountDeletionActions;
   aiExpenseDraftAmountTaxMigration: typeof aiExpenseDraftAmountTaxMigration;
   aiExpenseDraftRegisteredAtMigration: typeof aiExpenseDraftRegisteredAtMigration;
-  "aiExpenseDrafts/actions": typeof aiExpenseDrafts_actions;
   "aiExpenseDrafts/e2eDraftFixtures": typeof aiExpenseDrafts_e2eDraftFixtures;
   "aiExpenseDrafts/internal": typeof aiExpenseDrafts_internal;
   "aiExpenseDrafts/model": typeof aiExpenseDrafts_model;
@@ -234,7 +230,6 @@ declare const fullApi: ApiFromModules<{
   "receiptImageExtraction/extraction": typeof receiptImageExtraction_extraction;
   "receiptImageExtraction/testHelpers": typeof receiptImageExtraction_testHelpers;
   "receipts/crud": typeof receipts_crud;
-  "receipts/mutations": typeof receipts_mutations;
   "receipts/spendingEntries": typeof receipts_spendingEntries;
   "receipts/summaries": typeof receipts_summaries;
   "receipts/testHelpers": typeof receipts_testHelpers;
@@ -254,7 +249,6 @@ declare const fullApi: ApiFromModules<{
   "users/weeklySettings": typeof users_weeklySettings;
   "weekSessions/internal": typeof weekSessions_internal;
   "weekSessions/mutations": typeof weekSessions_mutations;
-  "weekSessions/queries": typeof weekSessions_queries;
   "weekSessions/testHelpers": typeof weekSessions_testHelpers;
 }>;
 

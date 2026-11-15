@@ -11,11 +11,7 @@ import {
   createWeekSessionStore,
   weekSessionRecordToDoc,
 } from "../../lib/convex/weekSessions/convexWeekSessionStore";
-import {
-  completeWeekSession as completeWeekSessionUsecase,
-  getOrCreateWeekSession as getOrCreateWeekSessionUsecase,
-  updateReviewMemo as updateReviewMemoUsecase,
-} from "../../lib/usecase/weekSessions";
+import { getOrCreateWeekSession as getOrCreateWeekSessionUsecase } from "../../lib/usecase/weekSessions";
 
 function convexError(error: unknown): never {
   if (error instanceof ConvexError) throw error;
@@ -61,60 +57,4 @@ export async function getOrCreateWeekSessionHandler(
 export const getOrCreateWeekSession = mutation({
   args: { weekStartDate: v.string() },
   handler: getOrCreateWeekSessionHandler,
-});
-
-/** updateReviewMemo mutation の handler ロジック（テスト用に export） */
-export async function updateReviewMemoHandler(
-  ctx: MutationCtx,
-  args: { weekStartDate: string; reviewMemo: string },
-) {
-  const { groupId } = await requireGroupMembership(ctx);
-
-  try {
-    const session = await updateReviewMemoUsecase(
-      createWeekSessionStore(ctx),
-      groupId,
-      args,
-      Date.now,
-    );
-    return weekSessionRecordToDoc(session);
-  } catch (error) {
-    convexError(error);
-  }
-}
-
-export const updateReviewMemo = mutation({
-  args: {
-    weekStartDate: v.string(),
-    reviewMemo: v.string(),
-  },
-  handler: updateReviewMemoHandler,
-});
-
-/** completeWeekSession mutation の handler ロジック（テスト用に export） */
-export async function completeWeekSessionHandler(
-  ctx: MutationCtx,
-  args: { weekStartDate: string; reviewMemo?: string },
-) {
-  const { groupId } = await requireGroupMembership(ctx);
-
-  try {
-    const session = await completeWeekSessionUsecase(
-      createWeekSessionStore(ctx),
-      groupId,
-      args,
-      Date.now,
-    );
-    return weekSessionRecordToDoc(session);
-  } catch (error) {
-    convexError(error);
-  }
-}
-
-export const completeWeekSession = mutation({
-  args: {
-    weekStartDate: v.string(),
-    reviewMemo: v.optional(v.string()),
-  },
-  handler: completeWeekSessionHandler,
 });

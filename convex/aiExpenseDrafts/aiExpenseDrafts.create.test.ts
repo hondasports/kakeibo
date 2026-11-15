@@ -1,22 +1,7 @@
-import type { Id } from "../_generated/dataModel";
-import { analyzeReceiptImageToDraftHandler } from "./actions";
-import {
-  createFailedDraftFromImageAnalysisHandler,
-  createFromExtractionHandler,
-  deleteOrphanedDraftHandler,
-} from "./internal";
-import { registerReadyDraftsHandler } from "./mutations";
-import {
-  GROUP_ID,
-  createActionCtx,
-  createIdentity,
-  createMutationCtx,
-  ownedDraft,
-  readyDraft,
-  readyDraftItems,
-  withEnv,
-} from "./testHelpers";
 import { describe, expect, it, vi } from "vitest";
+import type { Id } from "../_generated/dataModel";
+import { createFailedDraftFromImageAnalysisHandler, createFromExtractionHandler } from "./internal";
+import { GROUP_ID, createIdentity, createMutationCtx, ownedDraft } from "./testHelpers";
 
 describe("aiExpenseDrafts (create)", () => {
   it("画像解析成功時に抽出結果を receipt ではなく AI 支出下書きとして保存する", async () => {
@@ -500,26 +485,6 @@ describe("aiExpenseDrafts (create)", () => {
     ).rejects.toMatchObject({ data: "AI expense draft was not found after creation" });
   });
 
-  it("孤立した下書きと明細を同じグループから削除する", async () => {
-    const ctx = createMutationCtx(createIdentity(), {
-      getDocById: {
-        "draft-orphan": { ...ownedDraft, _id: "draft-orphan" },
-      },
-      items: [
-        {
-          ...readyDraftItems[0],
-          _id: "item-orphan",
-          draftId: "draft-orphan",
-        },
-      ],
-    });
-
-    await deleteOrphanedDraftHandler(ctx, { draftId: "draft-orphan" as Id<"aiExpenseDrafts"> });
-
-    expect(ctx.db.delete).toHaveBeenCalledWith("item-orphan");
-    expect(ctx.db.delete).toHaveBeenCalledWith("draft-orphan");
-  });
-
   it("未認証ユーザーは下書きを作成できない", async () => {
     const ctx = createMutationCtx(null);
 
@@ -532,123 +497,5 @@ describe("aiExpenseDrafts (create)", () => {
         reviewReasons: ["missing_required_field"],
       }),
     ).rejects.toMatchObject({ data: "Not authenticated" });
-  });
-
-  it("同意がない場合は画像解析を実行せず、下書きも作成しない", async () => {
-    const ctx = createActionCtx(createIdentity(), false);
-
-    await expect(
-      analyzeReceiptImageToDraftHandler(ctx, {
-        imageDataUrl: "data:image/jpeg;base64,AAA",
-      }),
-    ).rejects.toMatchObject({ data: "Receipt image external API consent is required" });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(ctx.runMutation as any as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
-  });
-
-  it("解析成功後の下書き保存失敗は解析失敗として握りつぶさない", async () => {
-    await withEnv({ RECEIPT_IMAGE_EXTRACTOR_MODE: "mock", APP_ENV: "development" }, async () => {
-      const runMutation = vi.fn().mockRejectedValue(new Error("draft insert failed"));
-      const ctx = createActionCtx(createIdentity(), true, { runMutation });
-
-      await expect(
-        analyzeReceiptImageToDraftHandler(ctx, {
-          imageDataUrl: "data:image/jpeg;base64,AAA",
-        }),
-      ).rejects.toThrow("draft insert failed");
-
-      expect(runMutation).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it("mock 解析結果から documentType 付きで下書きを作成する", async () => {
-    await withEnv({ RECEIPT_IMAGE_EXTRACTOR_MODE: "mock", APP_ENV: "development" }, async () => {
-      const runMutation = vi.fn().mockResolvedValue({
-        _id: "draft-mock",
-        status: "needs_review",
-      });
-      const ctx = createActionCtx(createIdentity(), true, { runMutation });
-
-      await analyzeReceiptImageToDraftHandler(ctx, {
-        imageDataUrl: "data:image/jpeg;base64,AAA",
-      });
-
-      expect(runMutation).toHaveBeenCalledTimes(1);
-      const [, callArgs] = runMutation.mock.calls[0];
-      expect(callArgs).toEqual(
-        expect.objectContaining({
-          documentType: "receipt",
-          confidence: expect.objectContaining({
-            documentType: expect.any(Number),
-            shopName: expect.any(Number),
-            date: expect.any(Number),
-            amountYen: expect.any(Number),
-          }),
-        }),
-      );
-    });
-  });
-
-  it("カテゴリ名マッチングで categoryId を解決する", async () => {
-    await withEnv({ RECEIPT_IMAGE_EXTRACTOR_MODE: "mock", APP_ENV: "development" }, async () => {
-      const runQuery = vi
-        .fn()
-        .mockResolvedValueOnce({
-          hasAcceptedExternalApiConsent: true,
-          acceptedAt: 1234567890,
-        })
-        .mockResolvedValueOnce({ _id: GROUP_ID })
-        .mockResolvedValueOnce([
-          { _id: "cat-food", name: "食費", color: "#F4A27A", isActive: true, sortOrder: 1 },
-        ]);
-      const runMutation = vi.fn().mockResolvedValue({
-        _id: "draft-matched",
-        status: "needs_review",
-      });
-
-      const ctx = createActionCtx(createIdentity(), true, { runQuery, runMutation });
-
-      await analyzeReceiptImageToDraftHandler(ctx, {
-        imageDataUrl: "data:image/jpeg;base64,AAA",
-      });
-
-      expect(runMutation).toHaveBeenCalledTimes(1);
-      const [, callArgs2] = runMutation.mock.calls[0];
-      expect(callArgs2).toEqual(
-        expect.objectContaining({
-          categoryId: "cat-food",
-        }),
-      );
-    });
-  });
-
-  it.each([1, 101])("税サマリーなしの%d件目の課税明細も本登録前に検証する", async (count) => {
-    const items = Array.from({ length: count }, (_, index) => ({
-      _id: "item-" + index,
-      _creationTime: index,
-      groupId: GROUP_ID,
-      draftId: "draft-ready",
-      itemName: "商品",
-      amountYen: 1,
-      printedAmountYen: 1,
-      normalizedAmountYen: 1,
-      amountBasis: "tax_included",
-      taxRatePercent: index === count - 1 ? 8 : 0,
-      taxResolutionStatus: index === count - 1 ? "unresolved" : "resolved",
-      taxAllocationStatus: "unallocated",
-      categoryId: "cat-food",
-      confidence: {},
-      createdAt: 0,
-      updatedAt: 0,
-    }));
-    const ctx = createMutationCtx(createIdentity(), {
-      getDocById: { "draft-ready": { ...readyDraft, amountYen: count } },
-      items,
-    });
-    await expect(
-      registerReadyDraftsHandler(ctx, { draftIds: ["draft-ready" as Id<"aiExpenseDrafts">] }),
-    ).rejects.toThrow("税額または税込登録額が未確定");
-    expect(ctx.db.insert).not.toHaveBeenCalled();
   });
 });
