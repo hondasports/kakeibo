@@ -40,10 +40,14 @@ license: Apache-2.0
 委譲: 該当skill（あれば）
 ```
 
-末尾に必ず次の2つを付ける。
+末尾に必ず次の3つを付ける。
 
 - 変更とテストの対応表（`references/unit-test.md` の形式）
 - 独立Reviewerの要否と理由。判定条件は `docs/development-process.md` の「Review / branch protection」と `skills/security-review` の「入力・起動」に従い、ここで条件を絞らない
+- 最終行に判定を1行で付ける: `VERDICT: CLEAN` または `VERDICT: NEEDS_FIX`
+  - CLEAN: 指摘なし、または残る指摘がすべて Minor 以下でマージを止めない場合に限る。判定の根拠（通したチェックとその結果）を2〜3行で添える
+  - NEEDS_FIX: Blocker / Major が1件でも残る場合。未解決の指摘一覧への参照を添える
+  - 判定行がない・途中で切れた・曖昧な表現の出力は CLEAN とみなさない（NEEDS_FIX 扱い）
 
 このskillによる確認はセルフレビューであり、独立レビューと呼ばない。
 
@@ -54,6 +58,15 @@ license: Apache-2.0
 - 投稿前に既存の指摘を確かめ、同じ指摘を重ねて投稿しない。`node scripts/collect-pr-findings.mjs --pr <番号>` は未解決threadしか出さないため、解決済みのものは `gh api repos/{owner}/{repo}/pulls/<番号>/comments` でも見る。`bodyTruncated`・`commentsTruncated` の項目は記載URLの全文を読む。
 - diffの外の行など、inline commentにできない所見（GitHubは `422` で拒否する）は、`file:line` と理由を添えて `body` に書く。
 - 所見は1件ずつ該当行へのinline commentにし、レビュー全体を1回で送る: `gh api repos/{owner}/{repo}/pulls/<番号>/reviews --method POST --input <file>`。fileは `commit_id`（レビューしたHEAD）・`event: "COMMENT"`・`body`・`comments[]`（`path`・`line`・`side`・`body`）を持つJSON。
-- `body` には確認した範囲、所見の件数、変更とテストの対応表、独立Reviewerの要否を書く。実装を指示した側のレビューなら、独立レビューではないと書く。
+- `body` には確認した範囲、所見の件数、VERDICT、変更とテストの対応表、独立Reviewerの要否を書く。実装を指示した側のレビューなら、独立レビューではないと書く。
 - 対応結果を既存threadへ返すときは `gh api repos/{owner}/{repo}/pulls/<番号>/comments/<comment id>/replies --method POST -f body=...` を使い、修正したcommitを書く。threadのresolveは `skills/delivery-loop` の「指摘の収集と照合」に従う。
 - 「コメントだけして」と頼まれたら、投稿で止めて修正しない。
+- レビューを完了したら、PR本文に次の証跡欄を残す（検証結果ブロックは `skills/implementation` の「PR本文」に従い、この欄はその隣に置く）。VERDICT は上の「判断と出力」の判定を転記する。
+
+```markdown
+## Review verdict
+- VERDICT: CLEAN / NEEDS_FIX（最終レビュー時点のもの。更新したら日時と HEAD SHA を添えて書き換える）
+- 実施したレビュー: セルフレビュー / Devin Review / Codex Review / CodeRabbit（実施したものだけ）
+- 指摘件数: 未対応 N 件（内訳 Blocker n / Major n / Minor n）
+- 証跡: 各レビューの確認先 URL（Devin Review は https://app.devin.ai/review/hondasports/kakeibo/pull/<番号>）
+```
