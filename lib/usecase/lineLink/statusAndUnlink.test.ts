@@ -16,7 +16,7 @@ describe("getLineLinkStatus", () => {
   it.each([
     [[], { status: "unlinked" }],
     [[link], { status: "linked", linkedAt: 100 }],
-    [[link, { ...link, id: "link-b" }], { status: "unlinked" }],
+    [[link, { ...link, id: "link-b" }], { status: "multiple" }],
   ])("有効連携の件数に応じた状態を返す", async (links, expected) => {
     const accountLinks = {
       listActiveByUserId: vi.fn().mockResolvedValue(links),

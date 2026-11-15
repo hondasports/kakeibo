@@ -86,6 +86,7 @@ export function LineLinkSettingsPanel() {
   }
 
   const linked = status.status === "linked";
+  const multiple = status.status === "multiple";
   const beginLink = async () => {
     setStarting(true);
     setFeedback(null);
@@ -129,15 +130,21 @@ export function LineLinkSettingsPanel() {
         >
           <Box>
             <Typography sx={{ fontWeight: 700 }} variant="body2">
-              {linked ? "LINEアカウントは連携されています" : "LINEアカウントは連携されていません"}
+              {multiple
+                ? "LINE連携を確認してください"
+                : linked
+                  ? "LINEアカウントは連携されています"
+                  : "LINEアカウントは連携されていません"}
             </Typography>
             <Typography color="text.secondary" variant="body2">
-              {linked
-                ? "解除すると、LINEからこの家計簿を参照できなくなります。"
-                : "連携時にLINE Loginの認証画面へ移動します。"}
+              {multiple
+                ? "LINE通知を受け取れません。一度連携を解除してから、もう一度連携してください。"
+                : linked
+                  ? "解除すると、LINEからこの家計簿を参照できなくなります。"
+                  : "連携時にLINE Loginの認証画面へ移動します。"}
             </Typography>
           </Box>
-          {linked ? (
+          {linked || multiple ? (
             <Button
               disabled={unlinking}
               onClick={() => setConfirmOpen(true)}
@@ -166,7 +173,7 @@ export function LineLinkSettingsPanel() {
         </Stack>
       </Box>
 
-      {feedback ? (
+      {feedback && !(multiple && feedback === "success") ? (
         <Alert
           aria-live="polite"
           onClose={() => setFeedback(null)}

@@ -8,8 +8,11 @@ import type { LineLinkAuditLogStore } from "../../domain/lineLink/auditLogStore"
 export async function getLineLinkStatus(
   accountLinks: LineAccountLinkReader,
   userId: string,
-): Promise<{ status: "unlinked" } | { status: "linked"; linkedAt: number }> {
+): Promise<
+  { status: "unlinked" } | { status: "multiple" } | { status: "linked"; linkedAt: number }
+> {
   const activeLink = resolveActiveLink(await accountLinks.listActiveByUserId(userId, 2));
+  if (activeLink.kind === "multiple") return { status: "multiple" };
   // LINE userIdはクライアントへ返さない。
   return activeLink.kind === "single"
     ? { status: "linked", linkedAt: activeLink.link.linkedAt }
