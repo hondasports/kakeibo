@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SMARTPHONE_QUERY = "@media (max-width: 899px)";
+const SMARTPHONE_QUERY = "@media not all and (min-width: 900px)";
 
-/** `@media (max-width: 899px)` ブロックの本体だけを集め、残りをPC用のCSSとして分ける */
+/** `@media not all and (min-width: 900px)` ブロックの本体だけを集め、残りをPC用のCSSとして分ける */
 function splitSmartphoneStyles(source: string) {
   let desktop = "";
   let mobile = "";
@@ -18,9 +18,12 @@ function splitSmartphoneStyles(source: string) {
     const bodyStart = source.indexOf("{", start) + 1;
     let depth = 1;
     let end = bodyStart;
-    while (depth > 0) {
+    while (depth > 0 && end < source.length) {
       depth += source[end] === "{" ? 1 : source[end] === "}" ? -1 : 0;
       end += 1;
+    }
+    if (depth !== 0) {
+      throw new Error(`${SMARTPHONE_QUERY} ブロックの波括弧が閉じていません`);
     }
     mobile += source.slice(bodyStart, end - 1);
     cursor = end;

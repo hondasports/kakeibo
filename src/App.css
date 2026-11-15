@@ -557,7 +557,7 @@
   }
 }
 
-@media (max-width: 899px) {
+@media not all and (min-width: 900px) {
   .input-workbench--expense {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -909,7 +909,7 @@
   margin-top: var(--space-md);
 }
 
-@media (max-width: 899px) {
+@media not all and (min-width: 900px) {
   .settings-ledger-section {
     padding: var(--space-md);
   }
@@ -946,7 +946,7 @@
   }
 }
 
-@media (max-width: 899px) {
+@media not all and (min-width: 900px) {
   .workbench-grid {
     grid-template-columns: 1fr;
   }
@@ -956,7 +956,7 @@
   }
 }
 
-@media (max-width: 899px) {
+@media not all and (min-width: 900px) {
   .app-main {
     width: min(calc(100% - var(--layout-shell-inset-md)), var(--layout-content-max-width));
     padding: var(--space-panel) 0;

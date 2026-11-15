@@ -9,15 +9,18 @@ describe("App.css のレスポンシブ境界", () => {
     (match) => `${match[1]}-width: ${match[2]}px`,
   );
 
-  it("スマートフォンとPCの境界はMUIのmd（900px）と同じ値を使う", () => {
+  it("スマートフォンとPCの境界はMUIのmd（900px）で、スマートフォン側はPC側の補集合で書く", () => {
     expect(theme.breakpoints.values.md).toBe(900);
-    expect(mediaWidths).toContain("max-width: 899px");
+    expect(css).toContain("@media not all and (min-width: 900px)");
     expect(mediaWidths).toContain("min-width: 900px");
   });
 
-  it("境界は900/899px・小型スマホ向けの390/320px・PCの列調整の1199px以外を使わない（シェルと一覧の切替幅がずれるため）", () => {
+  it("max-width: 899px を使わない（899pxと900pxの間の小数幅でシェルと一覧の切替がずれるため）", () => {
+    expect(mediaWidths).not.toContain("max-width: 899px");
+  });
+
+  it("境界は900px・小型スマホ向けの390/320px・PCの列調整の1199px以外を使わない（シェルと一覧の切替幅がずれるため）", () => {
     const allowed = new Set([
-      "max-width: 899px",
       "min-width: 900px",
       "max-width: 1199px",
       "max-width: 390px",
