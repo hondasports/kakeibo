@@ -281,7 +281,7 @@ describe("LINE 連携の保存・認可", () => {
     });
   });
 
-  it("active linkが重複しても最新状態を返し、解除で全件をrevokedにする", async () => {
+  it("active linkが重複すると複数連携状態を返し、解除で全件をrevokedにする", async () => {
     const t = convexTest(schema, convexTestModules);
     await t.run(async (ctx) => {
       await ctx.db.insert("lineAccountLinks", {
@@ -304,7 +304,7 @@ describe("LINE 連携の保存・認可", () => {
 
     await expect(
       t.withIdentity(identity("user-a")).query(api.lineLink.queries.getStatus, {}),
-    ).resolves.toEqual({ status: "linked", linkedAt: 200 });
+    ).resolves.toEqual({ status: "multiple" });
     await expect(
       t.withIdentity(identity("user-a")).mutation(api.lineLink.mutations.unlink, {}),
     ).resolves.toEqual({ status: "unlinked" });
