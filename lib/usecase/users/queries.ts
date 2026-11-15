@@ -3,6 +3,7 @@
  * 認証は presentation 層で済んでいる前提で userId を受け取る。
  */
 import { getWeekEndDay, normalizeWeekStartDay } from "../../domain/week/weekDates";
+import { hasReceiptImageConsent } from "../../domain/receiptImageExtraction/rules";
 import type { UserStore } from "../../domain/users/store";
 
 export type UserProfile = {
@@ -43,7 +44,7 @@ export async function getReceiptImageConsent(
   const acceptedAt = user?.receiptImageExternalApiConsentAcceptedAt ?? null;
 
   return {
-    hasAcceptedExternalApiConsent: acceptedAt !== null,
+    hasAcceptedExternalApiConsent: hasReceiptImageConsent(acceptedAt),
     acceptedAt,
   };
 }

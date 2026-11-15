@@ -15,6 +15,22 @@ describe("analyzeImageJobHandler", () => {
     vi.clearAllMocks();
   });
 
+  it("未同意なら解析前に同意エラーを返す", async () => {
+    const ctx = createActionCtx(createIdentity(), {
+      runQueryResults: {
+        "api.users.queries.getReceiptImageConsent": { hasAcceptedExternalApiConsent: false },
+      },
+    });
+    await expect(
+      analyzeImageJobHandler(ctx, {
+        jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
+        imageDataUrl: VALID_IMAGE_DATA_URL,
+      }),
+    ).rejects.toMatchObject({ data: "Receipt image external API consent is required" });
+    expect(ctx.runQuery).toHaveBeenCalledTimes(1);
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+  });
+
   it("未認証ユーザーは実行できない", async () => {
     await withEnv({ RECEIPT_IMAGE_EXTRACTOR_MODE: "mock", APP_ENV: "development" }, async () => {
       const ctx = createActionCtx(null, {
