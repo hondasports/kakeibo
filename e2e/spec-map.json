@@ -62,11 +62,6 @@
     "e2e/ai-expense-queue.tax-summary-state.spec.ts",
     "e2e/ai-expense-tax-allocation.spec.ts"
   ],
-  "convex/aiExpenseDraftListSummaryMigration.ts": [
-    "e2e/ai-expense-queue.spec.ts",
-    "e2e/ai-expense-queue.tax-summary-state.spec.ts",
-    "e2e/ai-expense-tax-allocation.spec.ts"
-  ],
   "convex/aiExpenseDrafts/**": [
     "e2e/ai-expense-queue.spec.ts",
     "e2e/ai-expense-queue.tax-summary-state.spec.ts",

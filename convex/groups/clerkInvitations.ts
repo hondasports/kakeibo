@@ -4,6 +4,7 @@ import { action, type ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { ConvexError, v } from "convex/values";
 import type { GroupInvitationPreview } from "../../lib/domain/groups/groupInvitation";
+import { normalizeEmail } from "../../lib/domain/users/email";
 import type { Id } from "../_generated/dataModel";
 import {
   cancelPendingGroupInvitationHandler,
@@ -56,11 +57,12 @@ async function resolveInvitationRecipient(ctx: ActionCtx) {
   }
 
   const acceptedEmails = new Set<string>();
+  // 空メールを undefined に変えると、従来の候補とプロフィールの値が変わる。
   if (identity.email) {
-    acceptedEmails.add(identity.email.trim().toLowerCase());
+    acceptedEmails.add(normalizeEmail(identity.email) ?? "");
   }
   let displayName = identity.name ?? identity.email ?? "ユーザー";
-  let profileEmail = identity.email?.trim().toLowerCase();
+  let profileEmail = identity.email == null ? undefined : (normalizeEmail(identity.email) ?? "");
 
   try {
     const clerk = getClerkClient();

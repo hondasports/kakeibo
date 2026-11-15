@@ -1,7 +1,6 @@
 import type { UserIdentity } from "convex/server";
 import { ConvexError } from "convex/values";
 import type { QueryCtx } from "../_generated/server";
-import { resolveDisplayName } from "../../lib/domain/users/displayName";
 
 type AuthContext = Pick<QueryCtx, "auth">;
 
@@ -14,14 +13,6 @@ export type AuthState =
       isAuthenticated: true;
       userId: string;
     };
-
-export function getIdentityDisplayName(identity: UserIdentity, existingDisplayName?: string) {
-  return resolveDisplayName({
-    name: identity.name,
-    email: identity.email,
-    existingDisplayName,
-  });
-}
 
 export function getAuthStateFromIdentity(identity: UserIdentity | null): AuthState {
   if (identity === null) {

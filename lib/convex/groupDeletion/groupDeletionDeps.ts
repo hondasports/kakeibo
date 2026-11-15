@@ -17,14 +17,6 @@ import { createGroupRepository, createGroupReadRepository } from "../groups/conv
 import { createUserDirectory, createUserDirectoryRead } from "../groups/convexUserDirectory";
 import { createGroupEmailNotificationQueue } from "../groups/convexGroupEmailNotifications";
 
-/** purge のみ必要な軽量コンテキスト向け（deleteSimpleDocuments 等の shim 用）。 */
-export function createGroupDeletionPurgeDeps(ctx: MutationCtx) {
-  return {
-    purge: createGroupDeletionPurgeStore(ctx),
-    users: createUserDirectory(ctx),
-  };
-}
-
 export function createGroupDeletionMutationDeps(ctx: MutationCtx) {
   return {
     jobs: createGroupDeletionJobStore(ctx),

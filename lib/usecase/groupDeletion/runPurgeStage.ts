@@ -1,7 +1,6 @@
 /**
  * purge ステージの1バッチ実行（内部ステップ）。
  * 対象テーブルを BATCH_SIZE 件削除し、storage ファイル・ユーザー activeGroupId の副作用を伴う。
- * 既存 groupDeletionStagePurge.deleteStageBatch の移植（progress は戻り値で返す）。
  */
 import { BATCH_SIZE } from "../../domain/groupDeletion/constants";
 import type { PurgeStage } from "../../domain/groupDeletion/stages";
