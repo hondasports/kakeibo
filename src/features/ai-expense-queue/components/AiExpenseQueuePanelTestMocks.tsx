@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, vi } from "vitest";
 const {
   registerReadyDraftsAsExpenseEntriesMock,
-  legacyRegisterReadyDraftsMock,
   updateForReviewMock,
   resetReceiptToAiInterpretationMock,
   createBatchMock,
@@ -15,7 +14,6 @@ const {
   useQueriesMock,
 } = vi.hoisted(() => ({
   registerReadyDraftsAsExpenseEntriesMock: vi.fn(),
-  legacyRegisterReadyDraftsMock: vi.fn(),
   updateForReviewMock: vi.fn(),
   resetReceiptToAiInterpretationMock: vi.fn(),
   createBatchMock: vi.fn(),
@@ -37,7 +35,6 @@ vi.mock("../../../../convex/_generated/api", () => ({
         listByStatusPaginated: "aiExpenseDrafts.queries.listByStatusPaginated",
       },
       mutations: {
-        registerReadyDrafts: "aiExpenseDrafts.mutations.registerReadyDrafts",
         registerReadyDraftsAsExpenseEntries:
           "aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries",
         updateForReview: "aiExpenseDrafts.mutations.updateForReview",
@@ -81,9 +78,6 @@ vi.mock("convex/react", () => ({
     if (reference === "aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries") {
       return registerReadyDraftsAsExpenseEntriesMock;
     }
-    if (reference === "aiExpenseDrafts.mutations.registerReadyDrafts") {
-      return legacyRegisterReadyDraftsMock;
-    }
     if (reference === "aiExpenseDrafts.mutations.deleteDraft") return deleteDraftMock;
     if (reference === "receiptAnalysisJobs.mutations.createBatch") return createBatchMock;
     if (reference === "receiptAnalysisJobs.mutations.retryImageJob") return retryImageJobMock;
@@ -121,8 +115,6 @@ beforeEach(() => {
   } as unknown as ImageBitmap);
   registerReadyDraftsAsExpenseEntriesMock.mockReset();
   registerReadyDraftsAsExpenseEntriesMock.mockResolvedValue(undefined);
-  legacyRegisterReadyDraftsMock.mockReset();
-  legacyRegisterReadyDraftsMock.mockResolvedValue(undefined);
   updateForReviewMock.mockReset();
   updateForReviewMock.mockResolvedValue({ status: "ready", reviewReasons: [] });
   resetReceiptToAiInterpretationMock.mockReset();
@@ -170,17 +162,16 @@ beforeEach(() => {
 });
 
 export {
-  registerReadyDraftsAsExpenseEntriesMock,
-  legacyRegisterReadyDraftsMock,
-  updateForReviewMock,
-  resetReceiptToAiInterpretationMock,
-  createBatchMock,
-  analyzeImageJobMock,
-  retryImageJobMock,
-  cancelImageJobMock,
-  deleteDraftMock,
   acceptReceiptImageExternalApiConsentMock,
-  useQueryMock,
+  analyzeImageJobMock,
+  cancelImageJobMock,
+  createBatchMock,
+  deleteDraftMock,
+  registerReadyDraftsAsExpenseEntriesMock,
+  resetReceiptToAiInterpretationMock,
+  retryImageJobMock,
+  updateForReviewMock,
   usePaginatedQueryMock,
   useQueriesMock,
+  useQueryMock,
 };

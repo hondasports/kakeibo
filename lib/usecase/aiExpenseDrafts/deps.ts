@@ -8,7 +8,6 @@ import type {
   DraftExpenseEntryReconcileService,
   DraftItemReplaceService,
   DraftOverrideSnapshotService,
-  DraftReceiptInsertService,
   DraftTaxInterpretationService,
 } from "../../domain/aiExpenseDrafts/draftWorkflowServices";
 
@@ -20,5 +19,4 @@ export type AiExpenseDraftDeps = {
   overrideSnapshots: DraftOverrideSnapshotService;
   itemReplace: DraftItemReplaceService;
   expenseEntryReconcile: DraftExpenseEntryReconcileService;
-  receiptInsert: DraftReceiptInsertService;
 };

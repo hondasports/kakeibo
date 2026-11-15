@@ -1,9 +1,4 @@
-export {
-  acceptReceiptImageExternalApiConsent,
-  updateMonthlyIncome,
-  updateWeeklyDays,
-  upsertUser,
-} from "./operations";
+export { acceptReceiptImageExternalApiConsent, updateWeeklyDays, upsertUser } from "./operations";
 export {
   getReceiptImageConsent,
   getUserProfile,

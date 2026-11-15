@@ -21,35 +21,20 @@ function toRecord(doc: Doc<"lineAccountLinks">): LineAccountLinkRecord {
 
 export function createLineAccountLinkReader(ctx: Pick<QueryCtx, "db">): LineAccountLinkReader {
   return {
-    async listActiveByLineUserId(lineUserId) {
-      const docs = await ctx.db
+    async listActiveByLineUserId(lineUserId, limit) {
+      const query = ctx.db
         .query("lineAccountLinks")
         .withIndex("by_line_user_id_and_status", (q) =>
           q.eq("lineUserId", lineUserId).eq("status", "active"),
-        )
-        .collect();
+        );
+      const docs = limit === undefined ? await query.collect() : await query.take(limit);
       return docs.map(toRecord);
     },
-    async listActiveByUserId(userId) {
-      const docs = await ctx.db
+    async listActiveByUserId(userId, limit) {
+      const query = ctx.db
         .query("lineAccountLinks")
-        .withIndex("by_user_id_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
-        .collect();
-      return docs.map(toRecord);
-    },
-    async findLatestActiveByUserId(userId) {
-      const doc = await ctx.db
-        .query("lineAccountLinks")
-        .withIndex("by_user_id_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
-        .order("desc")
-        .first();
-      return doc === null ? null : toRecord(doc);
-    },
-    async takeByUserId(userId, limit) {
-      const docs = await ctx.db
-        .query("lineAccountLinks")
-        .withIndex("by_user_id_and_status", (q) => q.eq("userId", userId))
-        .take(limit);
+        .withIndex("by_user_id_and_status", (q) => q.eq("userId", userId).eq("status", "active"));
+      const docs = limit === undefined ? await query.collect() : await query.take(limit);
       return docs.map(toRecord);
     },
   };
@@ -58,6 +43,13 @@ export function createLineAccountLinkReader(ctx: Pick<QueryCtx, "db">): LineAcco
 export function createLineAccountLinkStore(ctx: Pick<MutationCtx, "db">): LineAccountLinkStore {
   return {
     ...createLineAccountLinkReader(ctx),
+    async takeByUserId(userId, limit) {
+      const docs = await ctx.db
+        .query("lineAccountLinks")
+        .withIndex("by_user_id_and_status", (q) => q.eq("userId", userId))
+        .take(limit);
+      return docs.map(toRecord);
+    },
     async insert(fields) {
       await ctx.db.insert("lineAccountLinks", fields);
     },

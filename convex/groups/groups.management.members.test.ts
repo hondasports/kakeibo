@@ -1,6 +1,6 @@
-import type { Id } from "../_generated/dataModel";
-import { addMemberByEmailHandler, removeMemberHandler } from "./members";
 import { describe, expect, it, vi } from "vitest";
+import type { Id } from "../_generated/dataModel";
+import { removeMemberHandler } from "./members";
 import { createIdentity, createMockDb } from "./testHelpers";
 
 describe("groups (management) (member management)", () => {
@@ -71,40 +71,6 @@ describe("groups (management) (member management)", () => {
     expect(ctx.db.patch).toHaveBeenCalledWith(
       "user-member",
       expect.objectContaining({ activeGroupId: "group-002" }),
-    );
-  });
-
-  it("addMemberByEmailHandler は member ロールの呼び出しを拒否する", async () => {
-    const memberId = "https://issuer.example|member";
-    const ctx = createMockDb({
-      users: [
-        {
-          _id: "user-member" as Id<"users">,
-          userId: memberId,
-          displayName: "メンバー",
-          email: "member@example.com",
-          activeGroupId: "group-001" as Id<"groups">,
-          createdAt: 1000,
-          updatedAt: 1000,
-        },
-      ],
-      groupMembers: [
-        {
-          _id: "member-only" as Id<"groupMembers">,
-          groupId: "group-001" as Id<"groups">,
-          userId: memberId,
-          role: "member",
-          createdAt: 1000,
-          updatedAt: 1000,
-        },
-      ],
-    });
-    ctx.auth.getUserIdentity = vi
-      .fn()
-      .mockResolvedValue(createIdentity(memberId, "member@example.com"));
-
-    await expect(addMemberByEmailHandler(ctx, { email: "new@example.com" })).rejects.toThrow(
-      "グループオーナーのみ実行できます",
     );
   });
 

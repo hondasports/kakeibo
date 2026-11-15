@@ -1,1 +1,1 @@
-export { extractReceiptFields, extractReceiptFieldsForCurrentGroup } from "./extractReceiptFields";
+export { extractReceiptFields } from "./extractReceiptFields";

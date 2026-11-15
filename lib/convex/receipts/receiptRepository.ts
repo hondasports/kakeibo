@@ -18,13 +18,6 @@ export function createReceiptRepository(ctx: Pick<MutationCtx, "db">): ReceiptRe
       const doc = await ctx.db.get(id as Id<"receipts">);
       return doc === null ? null : toFields(doc);
     },
-    async insert(fields) {
-      return await ctx.db.insert("receipts", {
-        ...fields,
-        groupId: fields.groupId as Id<"groups">,
-        categoryId: fields.categoryId as Id<"categories">,
-      });
-    },
     async patch(id, patch: ReceiptUpdatePatch & { updatedAt: number }) {
       // Convex の patch は undefined を「フィールド削除」と解釈するため、
       // 指定のなかったキーは patch オブジェクトに含めてはいけない。

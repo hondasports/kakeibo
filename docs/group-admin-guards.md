@@ -119,7 +119,6 @@ Clerk API を呼ぶ action は DB コンテキストを持たないため、`api
 
 | 機能 | Convex | UI |
 | --- | --- | --- |
-| メンバー追加 | `addMemberByEmail` + `requireGroupOwner` | `GroupSettingsPanel` 招待フォーム |
 | メンバー解除 | `removeMember` + 共通ガード | `GroupSettingsPanel` + 確認ダイアログ |
 | ロール変更 | `changeMemberRole` + 共通ガード | `GroupMemberList` + 確認ダイアログ |
 | オーナー権限譲渡 | `transferGroupOwnership` + 共通ガード | `GroupSettingsPanel` 危険な操作 + 確認ダイアログ |

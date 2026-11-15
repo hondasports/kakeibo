@@ -8,6 +8,7 @@ export const getStatus = query({
   args: {},
   returns: v.union(
     v.object({ status: v.literal("unlinked") }),
+    v.object({ status: v.literal("multiple") }),
     v.object({ status: v.literal("linked"), linkedAt: v.number() }),
   ),
   handler: async (ctx) => {

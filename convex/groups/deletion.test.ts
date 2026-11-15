@@ -1,6 +1,8 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 
+import { acceptGroupInvitationHandler } from "./invitations";
+
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api } from "../_generated/api";
@@ -274,9 +276,7 @@ describe("owner group deletion public API", () => {
     await expect(
       t
         .withIdentity({ tokenIdentifier: "issuer|invitee", email: "invitee@example.test" })
-        .mutation(api.groups.invitations.acceptGroupInvitation, {
-          token: "deleting-group-token",
-        }),
+        .run((ctx) => acceptGroupInvitationHandler(ctx, { token: "deleting-group-token" })),
     ).rejects.toThrow("このグループは削除処理中です");
   });
 });

@@ -101,7 +101,6 @@ function makeDeps({
     users: { findByUserId: vi.fn().mockResolvedValue(user) },
     links: {
       listActiveByUserId: vi.fn().mockResolvedValue(links),
-      findLatestActiveByUserId: vi.fn().mockResolvedValue(links[0] ?? null),
     },
     batches: { getBatch: vi.fn().mockResolvedValue(batch) },
     groups: { get: vi.fn().mockResolvedValue(group) },

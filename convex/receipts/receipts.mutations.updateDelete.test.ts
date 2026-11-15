@@ -1,7 +1,12 @@
-import { deleteReceiptHandler, updateReceiptHandler } from "./crud";
-import { createReceipt, deleteReceipt, deleteReceiptsByUser, updateReceipt } from "./mutations";
 import { ConvexError } from "convex/values";
 import { describe, expect, it, vi } from "vitest";
+import {
+  deleteReceipt,
+  deleteReceiptHandler,
+  deleteReceiptsByUser,
+  updateReceipt,
+  updateReceiptHandler,
+} from "./crud";
 import type { CategoryDoc, ReceiptDoc } from "./testHelpers";
 import {
   GROUP_ID,
@@ -302,18 +307,6 @@ describe("deleteReceipt", () => {
 describe("registered receipt mutations", () => {
   it("登録済みmutationのhandlerを通して通常処理を呼び出す", async () => {
     const identity = createIdentity({ tokenIdentifier: USER_ID });
-    const createCtx = createMutationCtx(identity, {
-      getDocById: { "cat-001": sampleCategory },
-      insertedDoc: sampleReceipt,
-    });
-    await invokeRegisteredMutation(createReceipt, createCtx, {
-      date: "2024-01-10",
-      amountYen: 1000,
-      categoryId: "cat-001",
-      type: "expense",
-      shopName: "店",
-    });
-
     const updateCtx = createMutationCtx(identity, {
       getDocById: { "receipt-001": sampleReceipt },
       updatedDoc: sampleReceipt,
@@ -334,7 +327,6 @@ describe("registered receipt mutations", () => {
       userId: USER_ID,
     });
 
-    expect(createCtx.db.insert).toHaveBeenCalled();
     expect(updateCtx.db.patch).toHaveBeenCalled();
     expect(deleteCtx.db.delete).toHaveBeenCalledWith("receipt-001");
   });

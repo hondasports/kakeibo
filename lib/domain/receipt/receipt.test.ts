@@ -3,41 +3,6 @@ import { Receipt } from "./receipt";
 
 const GROUP_ID = "group-001";
 
-describe("Receipt.create", () => {
-  it("支出レシートを構築し weekStartDate を計算する", () => {
-    // 2025-01-10 は金曜日。週開始=月曜(1)なら weekStartDate は 2025-01-06
-    const receipt = Receipt.create(
-      {
-        date: "2025-01-10",
-        shopName: "  スーパー  ",
-        amountYen: 1500,
-        categoryId: "cat-1",
-      },
-      { groupId: GROUP_ID, createdByUserId: "user-1", weeklyStartDay: 1 },
-      1000,
-    );
-    const fields = receipt.toInsertFields();
-    expect(fields.shopName).toBe("スーパー");
-    expect(fields.weekStartDate).toBe("2025-01-06");
-    expect(fields.createdAt).toBe(1000);
-  });
-
-  it("収入レシートは bankName が必須", () => {
-    expect(() =>
-      Receipt.create(
-        {
-          type: "income",
-          date: "2025-01-10",
-          amountYen: 1000,
-          categoryId: "cat-1",
-        },
-        { groupId: GROUP_ID, createdByUserId: "user-1", weeklyStartDay: 1 },
-        1000,
-      ),
-    ).toThrow("bankName is required for income receipts");
-  });
-});
-
 describe("Receipt.buildUpdatePatch", () => {
   const receipt = Receipt.fromPersisted({
     id: "receipt-1",
