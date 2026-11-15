@@ -832,11 +832,13 @@
   border-left: none;
 }
 
-.receipt-list--income .receipt-list-header--income,
-.receipt-list--income .receipt-row {
-  grid-template-columns:
-    88px minmax(156px, 1.3fr) 104px minmax(140px, 1fr)
-    184px;
+@media (min-width: 761px) {
+  .receipt-list--income .receipt-list-header--income,
+  .receipt-list--income .receipt-row {
+    grid-template-columns:
+      88px minmax(156px, 1.3fr) 104px minmax(140px, 1fr)
+      184px;
+  }
 }
 
 .weekly-summary-analysis-grid {

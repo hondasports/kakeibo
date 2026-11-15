@@ -15,10 +15,14 @@ describe("ReceiptListCard responsive styles", () => {
     );
   });
 
-  it("収入一覧は独立したメモ列の幅を維持する", () => {
+  it("収入一覧は独立したメモ列の幅をスマートフォン幅の外でだけ維持する", () => {
     expect(css).toMatch(
-      /\.receipt-list--income \.receipt-list-header--income,\s*\.receipt-list--income \.receipt-row\s*\{[^}]*88px minmax\(156px, 1\.3fr\) 104px minmax\(140px, 1fr\)\s*184px/,
+      /@media \(min-width: 761px\)\s*\{\s*\.receipt-list--income \.receipt-list-header--income,\s*\.receipt-list--income \.receipt-row\s*\{[^}]*88px minmax\(156px, 1\.3fr\) 104px minmax\(140px, 1fr\)\s*184px/,
     );
+  });
+
+  it("収入一覧のPC用の列指定をメディアクエリの外に置かない（スマートフォンの縦積みを詳細度で上書きして横スクロールを出すため）", () => {
+    expect(css).not.toMatch(/^\.receipt-list--income \.receipt-(?:list-header--income|row)\b/m);
   });
 
   it("長い店名でもグリッド列からはみ出さない", () => {
