@@ -16,11 +16,8 @@ describe("analyzeImageJobHandler", () => {
   });
 
   it("未同意なら解析前に同意エラーを返す", async () => {
-    const ctx = createActionCtx(createIdentity(), {
-      runQueryResults: {
-        "api.users.queries.getReceiptImageConsent": { hasAcceptedExternalApiConsent: false },
-      },
-    });
+    const ctx = createActionCtx(createIdentity());
+    ctx.runQuery = vi.fn().mockResolvedValueOnce({ hasAcceptedExternalApiConsent: false });
     await expect(
       analyzeImageJobHandler(ctx, {
         jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
