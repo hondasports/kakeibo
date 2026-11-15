@@ -12,7 +12,7 @@ import {
 } from "../../domain/lineWebhook/claimPlanning";
 import { MAX_EVENTS_PER_REQUEST } from "../../domain/lineWebhook/payload";
 import type { LineWebhookEventInput } from "../../domain/lineWebhook/payload";
-import type { LineAccountLinkReader } from "../../domain/lineWebhook/accountLinkReader";
+import type { LineAccountLinkReader } from "../../domain/lineLink/accountLinkStore";
 import type { LineWebhookScheduler } from "../../domain/lineWebhook/scheduler";
 import type { LineImageJobStore } from "../../domain/lineWebhook/imageJobStore";
 import type { LineWebhookEventStore } from "../../domain/lineWebhook/webhookEventStore";

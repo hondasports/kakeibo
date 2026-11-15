@@ -1,10 +1,11 @@
+import { resolveActiveLink } from "../../domain/lineLink/activeLink";
 /**
  * 画像処理に必要なコンテキスト（連携一意性・同意・グループ解決・カテゴリ）の組み立て。
  */
 import { MAX_CATEGORIES_PER_GROUP } from "../../domain/categories/defaults";
 import { hasReceiptImageConsent } from "../../domain/receiptImageExtraction/rules";
 import type { LineActiveGroupResolver } from "../../domain/lineWebhook/activeGroupResolver";
-import type { LineAccountLinkReader } from "../../domain/lineWebhook/accountLinkReader";
+import type { LineAccountLinkReader } from "../../domain/lineLink/accountLinkStore";
 import type { LineImageProcessingContext } from "../../domain/lineWebhook/actionRunner";
 import type { LineSummaryDataReader } from "../../domain/lineWebhook/summaryDataReader";
 import type { LineWebhookUserReader } from "../../domain/lineWebhook/userReader";
@@ -21,7 +22,7 @@ export async function loadImageProcessingContext(
   userId: string,
 ): Promise<LineImageProcessingContext> {
   const activeLinks = await deps.accountLinks.listActiveByUserId(userId, 2);
-  const hasUniqueActiveLink = activeLinks.length === 1;
+  const hasUniqueActiveLink = resolveActiveLink(activeLinks).kind === "single";
 
   const consentAcceptedAt = await deps.users.findReceiptImageConsentAcceptedAt(userId);
   const hasConsent = hasReceiptImageConsent(consentAcceptedAt);

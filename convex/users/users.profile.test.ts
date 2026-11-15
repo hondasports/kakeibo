@@ -1,17 +1,13 @@
 import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
+import { acceptReceiptImageExternalApiConsentHandler, updateWeeklyDaysHandler } from "./mutations";
 import { getReceiptImageConsentHandler, getUserProfileHandler } from "./queries";
-import {
-  acceptReceiptImageExternalApiConsentHandler,
-  updateMonthlyIncomeHandler,
-  updateWeeklyDaysHandler,
-} from "./mutations";
 import type { Doc } from "./testHelpers";
 import {
-  createIdentity,
-  createQueryCtxForUsers,
-  createMutationCtxForUpdate,
   BASE_DOC,
+  createIdentity,
+  createMutationCtxForUpdate,
+  createQueryCtxForUsers,
 } from "./testHelpers";
 
 describe("getUserProfile", () => {
@@ -138,89 +134,6 @@ describe("receipt image external API consent", () => {
     expect(patchCalls[0][1]).toMatchObject({
       receiptImageExternalApiConsentAcceptedAt: expect.any(Number),
       updatedAt: expect.any(Number),
-    });
-  });
-});
-
-describe("updateMonthlyIncome", () => {
-  it("未認証時は ConvexError を throw する", async () => {
-    const ctx = createMutationCtxForUpdate(null);
-
-    await expect(updateMonthlyIncomeHandler(ctx, { monthlyIncome: 100000 })).rejects.toBeInstanceOf(
-      ConvexError,
-    );
-    await expect(updateMonthlyIncomeHandler(ctx, { monthlyIncome: 100000 })).rejects.toMatchObject({
-      data: "Not authenticated",
-    });
-  });
-
-  it("正の整数を保存できる", async () => {
-    const identity = createIdentity({ tokenIdentifier: "https://issuer.example|user-001" });
-    const ctx = createMutationCtxForUpdate(identity, BASE_DOC);
-
-    await updateMonthlyIncomeHandler(ctx, { monthlyIncome: 300000 });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const patchCalls = (ctx.db as any).patch.mock.calls;
-    expect(patchCalls[0][0]).toBe("doc-001");
-    expect(patchCalls[0][1]).toMatchObject({ monthlyIncome: 300000 });
-  });
-
-  it("0を保存できる", async () => {
-    const identity = createIdentity({ tokenIdentifier: "https://issuer.example|user-001" });
-    const ctx = createMutationCtxForUpdate(identity, BASE_DOC);
-
-    await updateMonthlyIncomeHandler(ctx, { monthlyIncome: 0 });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const patchCalls = (ctx.db as any).patch.mock.calls;
-    expect(patchCalls[0][1]).toMatchObject({ monthlyIncome: 0 });
-  });
-
-  it("nullで monthlyIncome を削除（undefined にパッチ）できる", async () => {
-    const identity = createIdentity({ tokenIdentifier: "https://issuer.example|user-001" });
-    const ctx = createMutationCtxForUpdate(identity, BASE_DOC);
-
-    await updateMonthlyIncomeHandler(ctx, { monthlyIncome: null });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const patchCalls = (ctx.db as any).patch.mock.calls;
-    expect(patchCalls[0][1]).toMatchObject({ monthlyIncome: undefined });
-  });
-
-  it("負の値で ConvexError を throw する", async () => {
-    const identity = createIdentity({ tokenIdentifier: "https://issuer.example|user-001" });
-    const ctx = createMutationCtxForUpdate(identity, BASE_DOC);
-
-    await expect(updateMonthlyIncomeHandler(ctx, { monthlyIncome: -1 })).rejects.toBeInstanceOf(
-      ConvexError,
-    );
-    await expect(updateMonthlyIncomeHandler(ctx, { monthlyIncome: -1 })).rejects.toMatchObject({
-      data: "月収入は0以上の整数で入力してください",
-    });
-  });
-
-  it("非整数で ConvexError を throw する", async () => {
-    const identity = createIdentity({ tokenIdentifier: "https://issuer.example|user-001" });
-    const ctx = createMutationCtxForUpdate(identity, BASE_DOC);
-
-    await expect(updateMonthlyIncomeHandler(ctx, { monthlyIncome: 100.5 })).rejects.toBeInstanceOf(
-      ConvexError,
-    );
-    await expect(updateMonthlyIncomeHandler(ctx, { monthlyIncome: 100.5 })).rejects.toMatchObject({
-      data: "月収入は0以上の整数で入力してください",
-    });
-  });
-
-  it("userが見つからない場合は ConvexError を throw する", async () => {
-    const identity = createIdentity({ tokenIdentifier: "https://issuer.example|user-ghost" });
-    const ctx = createMutationCtxForUpdate(identity, null);
-
-    await expect(updateMonthlyIncomeHandler(ctx, { monthlyIncome: 100000 })).rejects.toBeInstanceOf(
-      ConvexError,
-    );
-    await expect(updateMonthlyIncomeHandler(ctx, { monthlyIncome: 100000 })).rejects.toMatchObject({
-      data: "User not found",
     });
   });
 });

@@ -4,7 +4,6 @@ import { assertGroupOwnerRole } from "./adminGuards";
 import { internalMutation, internalQuery, mutation } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { setGroupClerkOrganizationIdHandler } from "./e2e";
 import { assertEmailCanBeInvitedToGroup as assertEmailCanBeInvitedToGroupUsecase } from "../../lib/usecase/groups/assertEmailCanBeInvitedToGroup";
 import { createGroupInvitationRecord as createGroupInvitationRecordUsecase } from "../../lib/usecase/groups/createGroupInvitationRecord";
 import { deletePendingGroupInvitationRecordByToken as deletePendingGroupInvitationRecordByTokenUsecase } from "../../lib/usecase/groups/deletePendingGroupInvitationRecordByToken";
@@ -32,12 +31,11 @@ export {
   acceptGroupInvitationHandler,
 } from "../../lib/convex/groups/invitationHandlers/accept";
 
-import { cancelPendingGroupInvitationHandler } from "../../lib/convex/groups/invitationHandlers/revoke";
 import {
   previewGroupInvitationForVerifiedEmailsHandler,
   acceptGroupInvitationForVerifiedEmailsHandler,
-  acceptGroupInvitationHandler,
 } from "../../lib/convex/groups/invitationHandlers/accept";
+import { cancelPendingGroupInvitationHandler } from "../../lib/convex/groups/invitationHandlers/revoke";
 
 /** 所属チェックと承認済み（まだ所属中）チェック。pending の無効化は呼び出し前に revoke すること。 */
 export async function assertEmailCanBeInvitedToGroupHandler(
@@ -102,21 +100,6 @@ export const createGroupInvitationRecord = internalMutation({
 export const deletePendingGroupInvitationRecordByToken = internalMutation({
   args: { token: v.string(), clerkInvitationId: v.optional(v.string()) },
   handler: deletePendingGroupInvitationRecordByTokenHandler,
-});
-
-export const setGroupClerkOrganizationId = internalMutation({
-  args: { groupId: v.id("groups"), clerkOrganizationId: v.string() },
-  handler: setGroupClerkOrganizationIdHandler,
-});
-
-export const acceptGroupInvitation = mutation({
-  args: {
-    token: v.string(),
-    switchActiveGroup: v.optional(v.boolean()),
-    expectedActiveGroupId: v.optional(v.id("groups")),
-  },
-  returns: v.id("groups"),
-  handler: acceptGroupInvitationHandler,
 });
 
 export const acceptGroupInvitationForVerifiedEmails = internalMutation({

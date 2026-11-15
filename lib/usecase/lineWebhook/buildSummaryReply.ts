@@ -1,3 +1,4 @@
+import { resolveActiveLink } from "../../domain/lineLink/activeLink";
 /**
  * LINE サマリ応答の組み立てユースケース。
  * コマンド解析→グループ解決→週次集計→応答文生成の分岐順序はベースと同一。
@@ -8,7 +9,7 @@ import { isGroupDeleted } from "../../domain/groups/lifecycle";
 import type { GroupReadRepository } from "../../domain/groups/groupRepository";
 import type { UserSettingsRepository } from "../../domain/users/userSettingsRepository";
 import type { LineActiveGroupResolver } from "../../domain/lineWebhook/activeGroupResolver";
-import type { LineAccountLinkReader } from "../../domain/lineWebhook/accountLinkReader";
+import type { LineAccountLinkReader } from "../../domain/lineLink/accountLinkStore";
 import type { LineSummaryDataReader } from "../../domain/lineWebhook/summaryDataReader";
 import type { SummaryReplyJobArgs } from "../../domain/lineWebhook/scheduler";
 import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../domain/lineWebhook/reply";
@@ -80,12 +81,12 @@ export async function buildSummaryReply(
   args: Omit<SummaryReplyJobArgs, "replyToken">,
 ): Promise<{ replyText: string; replyKind: LineReplyKind }> {
   const activeLinks = await deps.accountLinks.listActiveByUserId(args.userId, 2);
-  const activeLink = activeLinks[0];
+  const resolution = resolveActiveLink(activeLinks);
   if (
-    activeLinks.length !== 1 ||
-    activeLink?.id !== args.linkId ||
-    activeLink.userId !== args.userId ||
-    activeLink.lineUserId !== args.lineUserId
+    resolution.kind !== "single" ||
+    resolution.link.id !== args.linkId ||
+    resolution.link.userId !== args.userId ||
+    resolution.link.lineUserId !== args.lineUserId
   ) {
     return reply("unlinked", LINE_UNLINKED_GUIDANCE_MESSAGE);
   }

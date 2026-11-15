@@ -2,7 +2,6 @@
  * lineWebhook ドメインのレコード型。
  * Convex ドキュメントIDは string、document メタデータは含まない。
  */
-import type { LineLinkStatus } from "../lineLink/records";
 import type { LineWebhookEventType } from "./payload";
 
 /** webhook イベントの連携状態別配送区分の全値。 */
@@ -58,10 +57,3 @@ export type LineImageJobFields = {
 };
 
 export type LineImageJobRecord = LineImageJobFields & { id: string };
-
-export type LineAccountLinkRecord = {
-  id: string;
-  userId: string;
-  lineUserId: string;
-  status: LineLinkStatus;
-};

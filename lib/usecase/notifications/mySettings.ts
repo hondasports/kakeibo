@@ -1,3 +1,4 @@
+import { resolveActiveLink } from "../../domain/lineLink/activeLink";
 import { ConvexError } from "convex/values";
 import { isActiveAccountDeletionStatus } from "../../domain/accountDeletion/status";
 import {
@@ -48,7 +49,7 @@ export async function getMyNotificationSettings(
     lineEnabled:
       prefs?.aiReviewRequiredLineEnabled ??
       DEFAULT_USER_NOTIFICATION_PREFERENCES.aiReviewRequiredLineEnabled,
-    lineLinked: activeLinks.length === 1,
+    lineLinked: resolveActiveLink(activeLinks).kind === "single",
     emailGloballyEnabled:
       emailSetting?.enabled ??
       defaultNotificationEnabled(AI_REVIEW_REQUIRED_NOTIFICATION_TYPE, "email"),
@@ -68,7 +69,7 @@ export async function updateMyNotificationPreference(
 
   if (args.channel === "line" && args.enabled) {
     const activeLinks = await deps.links.listActiveByUserId(userId);
-    if (activeLinks.length !== 1) {
+    if (resolveActiveLink(activeLinks).kind !== "single") {
       throw new ConvexError("LINE通知を有効にするにはLINE連携が必要です");
     }
   }

@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  assertRetrieved,
-  assertWeekSessionFound,
-  buildCompletePatch,
-  buildNewWeekSessionFields,
-  buildResetPatch,
-  WeekSessionDomainError,
-} from "./rules";
+import { assertRetrieved, buildNewWeekSessionFields, buildResetPatch } from "./rules";
 
 describe("buildNewWeekSessionFields", () => {
   it("draft・createdAt=updatedAt=now で構築する", () => {
@@ -28,21 +21,6 @@ describe("buildNewWeekSessionFields", () => {
   });
 });
 
-describe("buildCompletePatch", () => {
-  it("reviewMemo 未指定ならキーを含めない", () => {
-    const patch = buildCompletePatch(undefined, 5);
-    expect(patch).toEqual({ status: "completed", updatedAt: 5 });
-    expect("reviewMemo" in patch).toBe(false);
-  });
-  it("reviewMemo 指定時はキーを含める（空文字も含む）", () => {
-    expect(buildCompletePatch("", 5)).toEqual({
-      status: "completed",
-      updatedAt: 5,
-      reviewMemo: "",
-    });
-  });
-});
-
 describe("buildResetPatch", () => {
   it("reviewMemo を undefined で明示クリアする", () => {
     const patch = buildResetPatch(9);
@@ -52,10 +30,6 @@ describe("buildResetPatch", () => {
 });
 
 describe("assert helpers", () => {
-  it("assertWeekSessionFound は null で Week session not found を投げる", () => {
-    expect(() => assertWeekSessionFound(null)).toThrow(WeekSessionDomainError);
-    expect(() => assertWeekSessionFound(null)).toThrow("Week session not found");
-  });
   it("assertRetrieved は kind に応じた文言を投げる", () => {
     expect(() => assertRetrieved(null, "created")).toThrow(
       "Failed to retrieve created week session",

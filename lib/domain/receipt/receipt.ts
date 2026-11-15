@@ -5,12 +5,7 @@
  */
 import { calculateWeekStartDate } from "../week/weekDates";
 import type { EntryKind } from "../common/entryKind";
-import {
-  normalizeCreateReceiptArgs,
-  normalizeUpdateReceiptPatch,
-  type CreateReceiptInput,
-  type UpdateReceiptInput,
-} from "./normalize";
+import { normalizeUpdateReceiptPatch, type UpdateReceiptInput } from "./normalize";
 import { isExpenseReceiptType } from "../spending/bulkSpending";
 
 /** receipts ドキュメントのフィールド。id は永続化済みの場合のみ存在する。 */
@@ -51,32 +46,6 @@ export class Receipt {
   /** 永続化済みドキュメントから復元する（再検証しない）。 */
   static fromPersisted(fields: ReceiptFields): Receipt {
     return new Receipt(fields);
-  }
-
-  /**
-   * レシートを構築する。入力の検証・正規化と weekStartDate 計算をここで確定する。
-   * 失敗時は Error を投げる。
-   */
-  static create(
-    input: CreateReceiptInput,
-    context: { groupId: string; createdByUserId: string; weeklyStartDay: number },
-    now: number,
-  ): Receipt {
-    const normalized = normalizeCreateReceiptArgs(input);
-    return new Receipt({
-      groupId: context.groupId,
-      createdByUserId: context.createdByUserId,
-      date: normalized.date,
-      type: normalized.type,
-      shopName: normalized.shopName,
-      bankName: normalized.bankName,
-      amountYen: normalized.amountYen,
-      categoryId: normalized.categoryId,
-      memo: normalized.memo,
-      weekStartDate: calculateWeekStartDate(normalized.date, context.weeklyStartDay),
-      createdAt: now,
-      updatedAt: now,
-    });
   }
 
   get id(): string | undefined {
