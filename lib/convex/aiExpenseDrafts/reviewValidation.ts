@@ -4,10 +4,6 @@ import { applyRecordPatch, diffRecordPatch } from "../../domain/common/recordPat
 import { ConvexError } from "convex/values";
 import type { MutationCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
-import {
-  getReviewUpdateReadyErrorMessage,
-  validateReviewUpdateCanBecomeReady,
-} from "../../../lib/domain/aiExpenseDrafts/review";
 import { type AiExpenseDraftDocumentType } from "../../../lib/domain/aiExpenseDrafts/constants";
 import type { AiExpenseRegistrationMode } from "../../../lib/domain/aiExpenseDrafts/receiptDataContract";
 import type { PriceTaxTreatment, TaxRateComposition } from "../../domain/receipt/tax/types";
@@ -26,7 +22,6 @@ import { draftItemDocToFields, draftItemFieldsToDoc } from "./draftRecordMapping
 import {
   aggregateDraftItemsByCategory as aggregateDraftItemsByCategoryDomain,
   getDraftItemAggregationErrorMessage,
-  validatePositiveCategoryTotals,
 } from "../../../lib/domain/aiExpenseDrafts/reviewItems";
 
 export { resolveReviewItemAmountsForReplace } from "../../../lib/domain/aiExpenseDrafts/reviewItemAmounts";
@@ -56,13 +51,6 @@ export type UpdateForReviewArgs = {
   items?: UpdateForReviewItem[];
 };
 
-export function assertReviewUpdateCanBecomeReady(args: UpdateForReviewArgs) {
-  const result = validateReviewUpdateCanBecomeReady(args);
-  if (result.success) return;
-
-  throw new ConvexError(getReviewUpdateReadyErrorMessage(result.error, args.documentType));
-}
-
 export async function assertActiveCategoryBelongsToGroup(
   ctx: Pick<MutationCtx, "db">,
   categoryId: Id<"categories">,
@@ -72,12 +60,6 @@ export async function assertActiveCategoryBelongsToGroup(
   const result = validateReviewCategory(category, groupId);
   if (!result.success) {
     throw new ConvexError(getReviewCategoryErrorMessage(result.error));
-  }
-}
-
-export function assertPositiveCategoryTotals(items: NonNullable<UpdateForReviewArgs["items"]>) {
-  if (!validatePositiveCategoryTotals(items)) {
-    throw new ConvexError("Draft category total must be greater than zero");
   }
 }
 
