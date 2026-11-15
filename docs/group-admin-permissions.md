@@ -176,7 +176,7 @@ group admin から他ユーザーの Clerk アカウントを削除する機能�
 | --- | --- |
 | 有効な pending | グループ×メールあたり実質 1 件。再送時は古い pending を `revoked` にしてから新規作成する |
 | 一覧表示 | `listPendingGroupInvitations` は同一メール（Gmail alias 含む）を最新 1 件にまとめて返す |
-| 受け入れ | `acceptGroupInvitation` 成功後、同一メールの他 pending も `revoked` にする |
+| 受け入れ | `groups.clerkInvitations.acceptInvitation` が `acceptGroupInvitationForVerifiedEmails` で受け入れた後、同一メールの他 pending も `revoked` にする |
 | メンバー解除 | `removeMember` 時に対象メールの pending と、所属外となった accepted を `revoked` にする |
 | 再参加 | 上記により削除済みメンバーへ再招待可能 |
 
