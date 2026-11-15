@@ -2,6 +2,7 @@
  * 画像処理に必要なコンテキスト（連携一意性・同意・グループ解決・カテゴリ）の組み立て。
  */
 import { MAX_CATEGORIES_PER_GROUP } from "../../domain/categories/defaults";
+import { hasReceiptImageConsent } from "../../domain/receiptImageExtraction/rules";
 import type { LineActiveGroupResolver } from "../../domain/lineWebhook/activeGroupResolver";
 import type { LineAccountLinkReader } from "../../domain/lineWebhook/accountLinkReader";
 import type { LineImageProcessingContext } from "../../domain/lineWebhook/actionRunner";
@@ -23,7 +24,7 @@ export async function loadImageProcessingContext(
   const hasUniqueActiveLink = activeLinks.length === 1;
 
   const consentAcceptedAt = await deps.users.findReceiptImageConsentAcceptedAt(userId);
-  const hasConsent = consentAcceptedAt !== undefined;
+  const hasConsent = hasReceiptImageConsent(consentAcceptedAt);
 
   const groupResolution = await deps.activeGroup.resolve(userId);
   if (groupResolution.status !== "resolved") {
