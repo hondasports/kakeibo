@@ -33,14 +33,8 @@ export function getSafeFailureWarning(err: unknown) {
   return GENERIC_FAILURE_WARNING;
 }
 
-export async function assertReceiptImageConsent(ctx: ActionCtx) {
-  const consent: { hasAcceptedExternalApiConsent: boolean } = await ctx.runQuery(
-    api.users.queries.getReceiptImageConsent,
-    {},
-  );
-  if (!consent.hasAcceptedExternalApiConsent) {
-    throw new ConvexError("Receipt image external API consent is required");
-  }
+export async function readReceiptImageConsent(ctx: ActionCtx) {
+  return await ctx.runQuery(api.users.queries.getReceiptImageConsent, {});
 }
 
 export async function analyzeReceiptImageToDraftCore(
