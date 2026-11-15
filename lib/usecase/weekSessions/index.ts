@@ -1,7 +1,1 @@
-export {
-  completeWeekSession,
-  getOrCreateWeekSession,
-  getWeekSession,
-  resetWeekSession,
-  updateReviewMemo,
-} from "./operations";
+export { getOrCreateWeekSession, resetWeekSession } from "./operations";

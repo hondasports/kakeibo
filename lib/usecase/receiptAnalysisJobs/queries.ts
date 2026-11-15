@@ -1,9 +1,6 @@
 import type { ReceiptAnalysisReader } from "../../domain/receiptAnalysisJobs/store";
 import { ReceiptAnalysisJobDomainError } from "../../domain/receiptAnalysisJobs/rules";
 
-export const listReceiptAnalysisBatches = (reader: ReceiptAnalysisReader, groupId: string) =>
-  reader.listBatchesByGroup(groupId, 50);
-
 export const listActiveReceiptAnalysisJobs = (reader: ReceiptAnalysisReader, groupId: string) =>
   reader.listActiveJobsByGroup(groupId, 100);
 

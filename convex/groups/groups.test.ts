@@ -1,12 +1,12 @@
+import { describe, expect, it, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { seedGroupMemberForE2eHandler } from "./e2e";
 import { cancelPendingGroupInvitationHandler } from "./invitations";
-import { addMemberByEmailHandler, removeMemberHandler } from "./members";
+import { removeMemberHandler } from "./members";
 import { updateGroupNameHandler } from "./mutations";
 import { listMyGroupsHandler, listPendingGroupInvitationsHandler } from "./queries";
 import { createIdentity, createMockDb } from "./testHelpers";
-import { describe, expect, it, vi } from "vitest";
 
 describe("Phase1 owner-only permissions", () => {
   const OWNER_ONLY_ERROR = "グループオーナーのみ実行できます";
@@ -69,10 +69,6 @@ describe("Phase1 owner-only permissions", () => {
       "removeMember",
       (ctx: MutationCtx) =>
         removeMemberHandler(ctx, { targetUserId: "https://issuer.example|other-member" }),
-    ],
-    [
-      "addMemberByEmail",
-      (ctx: MutationCtx) => addMemberByEmailHandler(ctx, { email: "new@example.com" }),
     ],
     ["listPendingGroupInvitations", (ctx: QueryCtx) => listPendingGroupInvitationsHandler(ctx)],
     [

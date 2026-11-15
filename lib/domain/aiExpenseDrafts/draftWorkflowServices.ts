@@ -75,18 +75,3 @@ export interface DraftExpenseEntryReconcileService {
     now: number;
   }): Promise<string[]>;
 }
-
-/** 下書き内容から receipts レコードを作成するサービス。 */
-export interface DraftReceiptInsertService {
-  insert(args: {
-    groupId: string;
-    userId: string;
-    fields: {
-      type: "expense";
-      date: string;
-      shopName: string;
-      amountYen: number;
-      categoryId: string;
-    };
-  }): Promise<string>;
-}

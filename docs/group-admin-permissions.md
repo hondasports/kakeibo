@@ -70,7 +70,7 @@
 | メンバー一覧の閲覧 | 可 | 可（既存 UI） | Phase1 整備（#216） | 管理画面向け表示は owner 向けに整備 |
 | pending 招待一覧の閲覧 | 可 | 不可 | Phase1（#218） | mutation でも拒否 |
 | グループ名変更 | 可 | 不可 | Phase1（#215） | |
-| メンバー招待（Clerk invitation） | 可 | 不可 | 既存 | `addMemberByEmail` 等 |
+| メンバー招待（Clerk invitation） | 可 | 不可 | 既存 | `inviteMember` |
 | pending 招待取り消し | 可 | 不可 | Phase1（#219） | |
 | メンバーのグループ解除 | 可 | 不可 | Phase1（#217） | 対象は `member` のみ（後述）。`group_membership_removed` メール通知を送信 |
 | active group の切り替え | 可 | 可 | 既存 | 自分が所属するグループに限る |
@@ -191,7 +191,7 @@ group admin から他ユーザーの Clerk アカウントを削除する機能�
 | 1 グループの pending 招待 | 20 件 | `MAX_PENDING_GROUP_INVITATIONS` | 同一メールへの再招待は旧 pending を `revoked` にしてから数えるため、上限到達時も可能。取り消し・承諾で枠が空く |
 | 1 ユーザーが owner のグループ数 | 10 個 | `MAX_OWNED_GROUPS_PER_USER` | `member` として参加しているだけのグループは数えない。`assertOwnedGroupLimit` が `groupMembers` の `by_user_id_and_role` インデックスで owner 行だけを上限件数まで読んで判定する。`createGroup`・owner への昇格（`changeMemberRole`）・グループ owner によるオーナー譲渡に適用 |
 | 招待メールアドレス長 | 254 文字 | `MAX_EMAIL_LENGTH` | ローカル部は 64 文字まで |
-| 招待メールアドレス形式 | `@` が 1 つ、空白なし、ドメインは 2 ラベル以上 | `validateInvitationEmail` | `inviteMember` は DB 予約・Clerk 呼び出しより前に検証。`addMemberByEmail` も同じ検証を使う |
+| 招待メールアドレス形式 | `@` が 1 つ、空白なし、ドメインは 2 ラベル以上 | `validateInvitationEmail` | `inviteMember` は DB 予約・Clerk 呼び出しより前に検証 |
 
 **owner 数上限の適用範囲**: 上限はグループ作成、グループ owner による owner への昇格（`changeMemberRole`）、グループ owner によるオーナー譲渡（`transferGroupOwnership`）にだけ適用する。システム管理者のロール操作（`change_role` / `transfer_owner`、`lib/usecase/systemAdmin/roleOperation.ts`）とオーナー不在グループの復旧（`lib/usecase/systemAdmin/ownerlessRecovery.ts`）は、監査ログを残す特権操作であるため意図的に対象外とする。
 
@@ -254,7 +254,7 @@ group admin から他ユーザーの Clerk アカウントを削除する機能�
 
 | 機能 | ファイル | owner 検証 | 備考 |
 | --- | --- | --- | --- |
-| メンバー追加 | `convex/groups/members.ts` `addMemberByEmail` | あり | |
+| メンバー追加 | `convex/groups/clerkInvitations.ts` `inviteMember` | あり | |
 | メンバー解除 | `convex/groups/members.ts` `removeMember` | あり | owner 対象拒否・自己操作拒否・users 非削除を実装済み（#217） |
 | ロール変更 | `convex/groups/members.ts` `changeMemberRole` | あり | 最後の owner 保護・監査ログ（#223, #225） |
 | 支出一括カテゴリ変更・削除の監査 | `lib/convex/spending/bulkOpsHandlers.ts` | 記録はメンバー可、閲覧は owner | `spending_bulk_category_changed` / `spending_bulk_deleted`。金額・店名は残さない（#550） |

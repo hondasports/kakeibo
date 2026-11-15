@@ -20,10 +20,3 @@ export interface ReceiptExtractorDeps<TResult> {
   extractMock(): TResult;
   extractReal(args: ExtractReceiptFieldsInput & { apiKey: string }): Promise<TResult>;
 }
-
-/** 公開 action が必要とするグループ・同意・カテゴリの読み取りポート。 */
-export interface ReceiptExtractionContextReader<TGroup> {
-  getMyGroup(): Promise<TGroup | null>;
-  getReceiptImageConsent(): Promise<{ hasAcceptedExternalApiConsent: boolean }>;
-  listActiveCategories(): Promise<ReceiptCategoryHint[]>;
-}

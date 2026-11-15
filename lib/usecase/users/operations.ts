@@ -9,7 +9,6 @@ import {
   UserDomainError,
   type UserIdentityInput,
 } from "../../domain/users/rules";
-import { validateMonthlyIncome } from "../../domain/users/monthlyIncome";
 import { getWeekEndDay, validateWeekDay } from "../../domain/week/weekDates";
 import type { UserStore } from "../../domain/users/store";
 
@@ -38,27 +37,6 @@ export async function acceptReceiptImageExternalApiConsent(
 
   await store.patch(user.id, {
     receiptImageExternalApiConsentAcceptedAt: user.receiptImageExternalApiConsentAcceptedAt ?? now,
-    updatedAt: now,
-  });
-}
-
-export async function updateMonthlyIncome(
-  store: UserStore,
-  userId: string,
-  monthlyIncome: number | null,
-  now: number,
-): Promise<void> {
-  if (monthlyIncome !== null) {
-    const result = validateMonthlyIncome(monthlyIncome);
-    if (!result.success) {
-      throw new UserDomainError("月収入は0以上の整数で入力してください");
-    }
-  }
-
-  const user = assertUserFound(await store.findByUserId(userId));
-
-  await store.patch(user.id, {
-    monthlyIncome: monthlyIncome ?? undefined,
     updatedAt: now,
   });
 }

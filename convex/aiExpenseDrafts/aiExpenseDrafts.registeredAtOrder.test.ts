@@ -209,35 +209,6 @@ describe("登録済み下書き一覧の登録日時降順", () => {
 });
 
 describe("登録・登録済み編集の各経路でトップレベル registeredAt を derivedRegistration と同じ値にする", () => {
-  it("registerReadyDrafts（receipt 登録）も登録日時を書く", async () => {
-    const t = convexTest(schema, convexTestModules);
-    const { groupId, categoryId } = await seedGroup(t);
-    const readyDraftId = await t.run(async (ctx) =>
-      ctx.db.insert(
-        "aiExpenseDrafts",
-        draftSeed(groupId, {
-          status: "ready",
-          shopName: "レシート登録する下書き",
-          date: "2026-10-01",
-          amountYen: 1200,
-          categoryId,
-          createdAt: 1,
-          updatedAt: 1,
-        }),
-      ),
-    );
-
-    await t.withIdentity(identity).mutation(api.aiExpenseDrafts.mutations.registerReadyDrafts, {
-      draftIds: [readyDraftId],
-    });
-
-    const doc = await t.run(async (ctx) => await ctx.db.get(readyDraftId));
-    expect(doc?.status).toBe("registered");
-    expect(doc?.registeredReceiptId).toBeDefined();
-    expect(doc?.registeredAt).toEqual(expect.any(Number));
-    expect(doc?.registeredAt).toBe(doc?.derivedRegistration?.registeredAt);
-  });
-
   it.each(["updateRegisteredDraft", "updateForReview"] as const)(
     "%s は既存の登録日時を保持し、フィールド未設定の登録済み下書きにも同じ値を書く",
     async (mutation) => {
