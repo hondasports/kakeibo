@@ -67,6 +67,10 @@ export function assertGroupSelected<T>(group: T | null): T {
   return group;
 }
 
+export function hasReceiptImageConsent(acceptedAt: number | null | undefined): boolean {
+  return acceptedAt != null;
+}
+
 export function assertReceiptImageConsent(consent: {
   hasAcceptedExternalApiConsent: boolean;
 }): void {

@@ -15,20 +15,17 @@ describe("analyzeImageJobHandler", () => {
     vi.clearAllMocks();
   });
 
-  it("未認証ユーザーは実行できない", async () => {
-    await withEnv({ RECEIPT_IMAGE_EXTRACTOR_MODE: "mock", APP_ENV: "development" }, async () => {
-      const ctx = createActionCtx(null, {
-        runQueryResults: {
-          "api.users.queries.getReceiptImageConsent": { hasAcceptedExternalApiConsent: true },
-        },
-      });
-      await expect(
-        analyzeImageJobHandler(ctx, {
-          jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
-          imageDataUrl: VALID_IMAGE_DATA_URL,
-        }),
-      ).rejects.toThrow(ConvexError);
-    });
+  it("未同意なら解析前に同意エラーを返す", async () => {
+    const ctx = createActionCtx(createIdentity());
+    ctx.runQuery = vi.fn().mockResolvedValueOnce({ hasAcceptedExternalApiConsent: false });
+    await expect(
+      analyzeImageJobHandler(ctx, {
+        jobId: "job-1" as Id<"receiptAnalysisImageJobs">,
+        imageDataUrl: VALID_IMAGE_DATA_URL,
+      }),
+    ).rejects.toMatchObject({ data: "Receipt image external API consent is required" });
+    expect(ctx.runQuery).toHaveBeenCalledTimes(1);
+    expect(ctx.runMutation).not.toHaveBeenCalled();
   });
 
   it("mock extractor で成功し draft と job を更新する", async () => {
@@ -45,10 +42,7 @@ describe("analyzeImageJobHandler", () => {
         status: "ready",
       } as Doc<"aiExpenseDrafts">;
 
-      const ctx = createActionCtx(createIdentity(), {
-        runQueryResults: {},
-        runMutationResults: {},
-      });
+      const ctx = createActionCtx(createIdentity());
 
       ctx.runQuery = vi
         .fn()

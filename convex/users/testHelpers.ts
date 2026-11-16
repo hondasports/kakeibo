@@ -92,7 +92,7 @@ export function createQueryCtxForUsers(
 }
 
 /**
- * updateMonthlyIncomeHandler が必要とする MutationCtx の最小モックを生成する。
+ * ユーザー設定更新が必要とする MutationCtx の最小モックを生成する。
  * existingDoc が null のとき user が存在しない場合、Doc のとき更新対象がある場合を再現する。
  */
 export function createMutationCtxForUpdate(

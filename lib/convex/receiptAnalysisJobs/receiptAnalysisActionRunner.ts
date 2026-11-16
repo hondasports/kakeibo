@@ -1,13 +1,14 @@
 import { ConvexError } from "convex/values";
 import { DRAFT_JUDGMENT_ITEM_LIMIT } from "../../domain/aiExpenseDrafts/judgmentItemWindow";
 import { getReviewItemReplaceErrorMessage } from "../../domain/aiExpenseDrafts/reviewItemReplace";
+import { assertReceiptImageConsent } from "../../domain/receiptImageExtraction/rules";
 import { api, internal } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { ActionCtx } from "../../../convex/_generated/server";
 import { snapshotReceiptDraftValues } from "../aiExpenseDrafts/receiptDataContract";
 import {
   analyzeReceiptImageToDraftCore,
-  assertReceiptImageConsent,
+  readReceiptImageConsent,
   getSafeFailureWarning,
 } from "../receiptImageExtraction/analyzeReceiptImageCore";
 import { getExtractorMode } from "../receiptImageExtraction/mode";
@@ -18,7 +19,9 @@ import { toJobRecord } from "./convexReceiptAnalysisStore";
 
 export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalysisActionRunner {
   return {
-    assertConsent: () => assertReceiptImageConsent(ctx),
+    async assertConsent() {
+      assertReceiptImageConsent(await readReceiptImageConsent(ctx));
+    },
     async getMyGroup() {
       const group: { _id: Id<"groups"> } | null = await ctx.runQuery(
         api.groups.queries.getMyGroup,

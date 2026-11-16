@@ -19,7 +19,6 @@ vi.mock("../../../../convex/_generated/api", () => ({
     aiExpenseDrafts: {
       mutations: {
         deleteDraft: "aiExpenseDrafts.mutations.deleteDraft",
-        registerReadyDrafts: "aiExpenseDrafts.mutations.registerReadyDrafts",
       },
       queries: {
         listByStatus: "aiExpenseDrafts.queries.listByStatus",
@@ -63,9 +62,6 @@ vi.mock("convex/react", () => ({
     }
     if (functionRef === "aiExpenseDrafts.mutations.deleteDraft") {
       return vi.fn().mockResolvedValue({ deleted: true });
-    }
-    if (functionRef === "aiExpenseDrafts.mutations.registerReadyDrafts") {
-      return vi.fn().mockResolvedValue(undefined);
     }
     if (functionRef === "receiptAnalysisJobs.mutations.createBatch") {
       return vi.fn().mockResolvedValue({ batch: { _id: "batch-1" }, jobs: [] });
@@ -134,4 +130,4 @@ beforeEach(() => {
   aiExpenseDraftsByStatusQueryMock.mockReturnValue([]);
 });
 
-export { createExpenseEntriesMock, createIncomeEntryMock, aiExpenseDraftsByStatusQueryMock };
+export { aiExpenseDraftsByStatusQueryMock, createExpenseEntriesMock, createIncomeEntryMock };

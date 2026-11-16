@@ -15,7 +15,7 @@ import { readQueryDocs } from "../../../convex/groups/lib/groupQueryHelpers";
 type GroupScopedTable = Extract<TableNames, PurgeStage>;
 type GroupDoc = Doc<GroupScopedTable>;
 
-/** バッチ purge（take）で使うインデックス名。既存 groupDeletionStagePurge の対応を維持。 */
+/** バッチ purge（take）で使うインデックス名。 */
 const STAGE_INDEX: Record<PurgeStage, string> = {
   receiptAnalysisImageJobs: "by_group_id_and_status",
   aiExpenseDraftItems: "by_group_id_and_draft_id",

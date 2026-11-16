@@ -1,3 +1,4 @@
+import { resolveActiveLink } from "../../domain/lineLink/activeLink";
 import { isActiveAccountDeletionStatus } from "../../domain/accountDeletion/status";
 import { isGroupDeleted } from "../../domain/groups/lifecycle";
 import {
@@ -75,16 +76,17 @@ export async function enqueueAiReviewNotifications(
     personalEnabled: user.notificationPreferences?.aiReviewRequiredLineEnabled,
   });
 
+  const activeLink = resolveActiveLink(activeLinks);
   let outcome: "queued" | "skipped" = "queued";
   let skipReason: string | undefined;
   if (existingLineJob) outcome = "queued";
   else if (!lineDecision.enabled) {
     outcome = "skipped";
     skipReason = "notification_disabled";
-  } else if (activeLinks.length === 0) {
+  } else if (activeLink.kind === "none") {
     outcome = "skipped";
     skipReason = "user_unlinked";
-  } else if (activeLinks.length !== 1) {
+  } else if (activeLink.kind === "multiple") {
     outcome = "skipped";
     skipReason = "link_ambiguous";
   }
@@ -104,9 +106,10 @@ export async function enqueueAiReviewNotifications(
   await deps.batches.patchBatch(args.batchId, {
     aiReviewLineNotificationConsumedAt: now,
   });
-  if (existingLineEvent || existingLineJob || outcome === "skipped") return;
+  if (existingLineEvent || existingLineJob || outcome === "skipped" || activeLink.kind !== "single")
+    return;
 
-  const link = activeLinks[0];
+  const link = activeLink.link;
   const lineJobId = await deps.lineJobs.insert({
     userId: batch.createdByUserId,
     batchId: args.batchId,

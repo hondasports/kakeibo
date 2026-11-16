@@ -147,19 +147,9 @@ export function createQueryCtx(
   } as unknown as QueryCtx;
 }
 
-export function createActionCtx(
-  identity: UserIdentity | null,
-  opts: {
-    runQueryResults?: Record<string, unknown>;
-    runMutationResults?: Record<string, unknown>;
-  } = {},
-): ActionCtx {
-  const runQueryMock = vi.fn().mockImplementation(async (_ref: unknown, _args: unknown) => {
-    return opts.runQueryResults ?? {};
-  });
-  const runMutationMock = vi.fn().mockImplementation(async (_ref: unknown, _args: unknown) => {
-    return opts.runMutationResults ?? {};
-  });
+export function createActionCtx(identity: UserIdentity | null): ActionCtx {
+  const runQueryMock = vi.fn().mockResolvedValue({});
+  const runMutationMock = vi.fn().mockResolvedValue({});
 
   return {
     auth: {

@@ -20,7 +20,7 @@ export async function upsertUserProfile(
   args: UpsertUserProfileInput,
   now: number,
 ): Promise<void> {
-  const email = args.email?.trim().toLowerCase();
+  const email = args.email === undefined ? undefined : (normalizeEmail(args.email) ?? "");
   const displayName = resolveProfileDisplayName(args.displayName, email);
   const existing = await store.findByUserId(args.userId);
 

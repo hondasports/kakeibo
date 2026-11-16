@@ -43,7 +43,7 @@ import {
   receiptUserOverrideSnapshotValidator,
   taxConfirmedFieldsValidator,
   taxSummaryValidator,
-} from "./aiExpenseDrafts/model";
+} from "./aiExpenseDrafts/validators";
 import {
   managementAuditActionValidator,
   managementAuditTargetKindValidator,

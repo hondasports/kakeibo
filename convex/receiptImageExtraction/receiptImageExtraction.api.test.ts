@@ -1,6 +1,6 @@
-import { extractReceiptFieldsHandler, toPublicExtractReceiptFieldsResult } from "./extraction";
 import { ConvexError } from "convex/values";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { extractReceiptFieldsHandler } from "./extraction";
 import { VALID_IMAGE_DATA_URL, createActionCtx, createIdentity, withEnv } from "./testHelpers";
 
 describe("real モード - OpenAI API 呼び出し", () => {
@@ -774,61 +774,5 @@ describe("real モード - OpenAI API 呼び出し", () => {
         ).rejects.toThrow(ConvexError);
       },
     );
-  });
-});
-
-describe("toPublicExtractReceiptFieldsResult", () => {
-  it("公開 action 応答に旧クライアント向け amountYen / taxMarker を再構成する", () => {
-    const result = toPublicExtractReceiptFieldsResult({
-      shopName: "店",
-      date: "2024-01-01",
-      amountYen: 100,
-      documentType: "receipt",
-      items: [
-        {
-          itemName: "商品A",
-          lineType: "item",
-          printedAmountYen: 100,
-          markers: ["※"],
-          confidence: {},
-          warnings: [],
-        },
-        {
-          itemName: "商品B",
-          printedAmountYen: 200,
-          markers: [],
-          confidence: {},
-          warnings: [],
-        },
-      ],
-      confidence: { shopName: 1, date: 1, amountYen: 1 },
-      warnings: [],
-    });
-    expect(result.items).toEqual([
-      expect.objectContaining({
-        printedAmountYen: 100,
-        amountYen: 100,
-        markers: ["※"],
-        taxMarker: "※",
-      }),
-      expect.objectContaining({
-        printedAmountYen: 200,
-        amountYen: 200,
-        markers: [],
-        taxMarker: "",
-      }),
-    ]);
-  });
-
-  it("items がない応答はそのまま返す", () => {
-    const result = toPublicExtractReceiptFieldsResult({
-      shopName: "店",
-      date: "2024-01-01",
-      amountYen: null,
-      documentType: "unknown",
-      confidence: { shopName: 1, date: 1, amountYen: 1 },
-      warnings: [],
-    });
-    expect(result.items).toBeUndefined();
   });
 });

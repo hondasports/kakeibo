@@ -344,7 +344,7 @@ describe("runPrepush", () => {
     const unitCall = calls.find((c) => c.includes("vitest related"));
     expect(unitCall).toContain("docs/line/rich-menu-readonly-summary.png");
     expect(unitCall).toContain("lib/domain/lineSummary/richMenu.test.ts");
-    expect(unitCall).toContain("convex/lineWebhook/richMenuClient.test.ts");
+    expect(unitCall).toContain("lib/convex/lineWebhook/lineRichMenuClient.test.ts");
   });
 
   test(".mdのみの変更でもmapに当たればunit stepが走る", async () => {

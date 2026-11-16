@@ -2,29 +2,26 @@ import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 import {
   createExpenseEntries,
-  createExpenseEntriesFromDraft,
+  createExpenseEntriesHandler,
   createIncomeEntry,
   createIncomeEntryHandler,
-  createExpenseEntriesHandler,
   deleteExpenseEntry,
   updateExpenseEntry,
 } from "./mutations";
 import type { CategoryDoc } from "./testHelpers";
 import {
-  catFoodId,
+  activeDailyCategory,
+  activeFoodCategory,
+  baseExpenseEntry,
   catDailyId,
-  draftReadyId,
-  sourceDocumentId,
-  entryId,
-  GROUP_ID,
-  OTHER_GROUP_ID,
-  invokeRegisteredMutation,
+  catFoodId,
   createIdentity,
   createMutationCtx,
-  activeFoodCategory,
-  activeDailyCategory,
-  readyDraft,
-  baseExpenseEntry,
+  entryId,
+  GROUP_ID,
+  invokeRegisteredMutation,
+  OTHER_GROUP_ID,
+  sourceDocumentId,
 } from "./testHelpers";
 
 describe("createExpenseEntriesHandler", () => {
@@ -316,14 +313,6 @@ describe("registered expense entry mutations", () => {
       items: [{ categoryId: catFoodId, amountYen: 1000, title: "食料品" }],
     });
 
-    const draftCtx = createMutationCtx(createIdentity(), {
-      getDocById: { "draft-ready": readyDraft, "cat-food": activeFoodCategory },
-    });
-    await invokeRegisteredMutation(createExpenseEntriesFromDraft, draftCtx, {
-      draftId: draftReadyId,
-      items: [{ itemName: "食料品", amountYen: 1000, categoryId: catFoodId }],
-    });
-
     const updateCtx = createMutationCtx(createIdentity(), {
       getDocById: { "entry-001": baseExpenseEntry },
     });
@@ -339,7 +328,6 @@ describe("registered expense entry mutations", () => {
 
     expect(incomeCtx.db.insert).toHaveBeenCalled();
     expect(expenseCtx.db.insert).toHaveBeenCalled();
-    expect(draftCtx.db.insert).toHaveBeenCalled();
     expect(updateCtx.db.patch).toHaveBeenCalled();
     expect(deleteCtx.db.delete).toHaveBeenCalledWith("entry-001");
   });

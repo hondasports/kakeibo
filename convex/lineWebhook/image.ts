@@ -2,7 +2,7 @@ import { internalAction } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { createLineWebhookActionDeps } from "../../lib/convex/lineWebhook/lineWebhookDeps";
-import { getLineMessageContent } from "./client";
+import { getLineMessageContent } from "../../lib/convex/lineWebhook/lineMessagingClient";
 import {
   buildLinkedImageReply as buildLinkedImageReplyUseCase,
   processLinkedImage as processLinkedImageUseCase,

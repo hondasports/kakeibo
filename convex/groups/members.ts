@@ -4,16 +4,10 @@ import type { MutationCtx } from "../_generated/server";
 import type { GroupRole } from "../../lib/domain/groups/role";
 import { groupRoleValidator } from "./validators";
 import { requireGroupOwner } from "./membership";
-import { addMemberByEmail as addMemberByEmailUsecase } from "../../lib/usecase/groups/addMemberByEmail";
 import { removeMember as removeMemberUsecase } from "../../lib/usecase/groups/removeMember";
 import { changeMemberRole as changeMemberRoleUsecase } from "../../lib/usecase/groups/changeMemberRole";
 import { transferGroupOwnership as transferGroupOwnershipUsecase } from "../../lib/usecase/groups/transferGroupOwnership";
 import { createGroupMutationDeps } from "../../lib/convex/groups/groupUsecaseDeps";
-
-export async function addMemberByEmailHandler(ctx: MutationCtx, args: { email: string }) {
-  const { groupId } = await requireGroupOwner(ctx);
-  return await addMemberByEmailUsecase({ groupId }, createGroupMutationDeps(ctx), args);
-}
 
 export async function removeMemberHandler(ctx: MutationCtx, args: { targetUserId: string }) {
   const { groupId, userId } = await requireGroupOwner(ctx);
@@ -39,12 +33,6 @@ export async function transferGroupOwnershipHandler(
     args,
   );
 }
-
-export const addMemberByEmail = mutation({
-  args: { email: v.string() },
-  returns: v.null(),
-  handler: addMemberByEmailHandler,
-});
 
 export const removeMember = mutation({
   args: { targetUserId: v.string() },

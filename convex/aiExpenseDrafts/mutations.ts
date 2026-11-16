@@ -9,12 +9,11 @@ import {
   amountBasisValidator,
   receiptItemLineTypeValidator,
   receiptItemTaxRatePercentValidator,
-} from "./model";
+} from "./validators";
 import { requireGroupMembership } from "../groups/membership";
 import { deleteAiExpenseDraft } from "../../lib/usecase/aiExpenseDrafts/deleteDraft";
 import { createAiExpenseDraftDeps } from "../../lib/convex/aiExpenseDrafts/draftUsecaseDeps";
 import { updateDraftItemTaxOverridesHandler } from "../../lib/convex/aiExpenseDrafts/updateItemTaxOverrides";
-import { registerReadyDraftsHandler } from "../../lib/convex/aiExpenseDrafts/registerToReceipts";
 import { registerReadyDraftsAsExpenseEntriesHandler } from "../../lib/convex/aiExpenseDrafts/registerToExpenseEntries";
 import { applyReceiptTaxSettingsHandler } from "../../lib/convex/aiExpenseDrafts/applyReceiptTaxSettings";
 import { updateForReviewHandler } from "../../lib/convex/aiExpenseDrafts/updateForReview";
@@ -136,13 +135,6 @@ export const resetReceiptToAiInterpretation = mutation({
   handler: resetReceiptToAiInterpretationMutationHandler,
 });
 
-export const registerReadyDrafts = mutation({
-  args: {
-    draftIds: v.array(v.id("aiExpenseDrafts")),
-  },
-  handler: registerReadyDraftsHandler,
-});
-
 export const registerReadyDraftsAsExpenseEntries = mutation({
   args: {
     draftIds: v.array(v.id("aiExpenseDrafts")),
@@ -178,7 +170,6 @@ export const updateRegisteredDraft = mutation({
 
 export {
   registerReadyDraftsAsExpenseEntriesHandler,
-  registerReadyDraftsHandler,
   updateForReviewHandler,
   updateRegisteredDraftHandler,
 };

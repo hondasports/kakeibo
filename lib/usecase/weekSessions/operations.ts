@@ -5,8 +5,6 @@
 import { calculateWeekEndDate } from "../../domain/week/weekDates";
 import {
   assertRetrieved,
-  assertWeekSessionFound,
-  buildCompletePatch,
   buildNewWeekSessionFields,
   buildResetPatch,
 } from "../../domain/weekSessions/rules";
@@ -31,36 +29,6 @@ export async function getOrCreateWeekSession(
   return assertRetrieved(await store.get(sessionId), "created");
 }
 
-export async function updateReviewMemo(
-  store: WeekSessionStore,
-  groupId: string,
-  args: { weekStartDate: string; reviewMemo: string },
-  now: () => number,
-): Promise<WeekSessionRecord> {
-  const session = assertWeekSessionFound(
-    await store.findByGroupAndWeekStart(groupId, args.weekStartDate),
-  );
-
-  await store.patch(session.id, { reviewMemo: args.reviewMemo, updatedAt: now() });
-
-  return assertRetrieved(await store.get(session.id), "updated");
-}
-
-export async function completeWeekSession(
-  store: WeekSessionStore,
-  groupId: string,
-  args: { weekStartDate: string; reviewMemo?: string },
-  now: () => number,
-): Promise<WeekSessionRecord> {
-  const session = assertWeekSessionFound(
-    await store.findByGroupAndWeekStart(groupId, args.weekStartDate),
-  );
-
-  await store.patch(session.id, buildCompletePatch(args.reviewMemo, now()));
-
-  return assertRetrieved(await store.get(session.id), "updated");
-}
-
 export async function resetWeekSession(
   store: WeekSessionStore,
   groupId: string,
@@ -74,12 +42,4 @@ export async function resetWeekSession(
 
   await store.patch(session.id, buildResetPatch(now()));
   return { reset: true };
-}
-
-export async function getWeekSession(
-  store: Pick<WeekSessionStore, "findByGroupAndWeekStart">,
-  groupId: string,
-  weekStartDate: string,
-): Promise<WeekSessionRecord | null> {
-  return await store.findByGroupAndWeekStart(groupId, weekStartDate);
 }

@@ -1,4 +1,3 @@
-import { addDays } from "../../domain/common/date";
 import {
   summarizeByCategory,
   summarizeReceipts,
@@ -11,10 +10,6 @@ import {
 } from "../../domain/receipt/summaryEntries";
 import { getMonthStartDate } from "../../domain/common/month";
 import {
-  summarizeMonthlyExpenses,
-  type MonthlyExpensesSummary,
-} from "../../domain/receipt/monthlySummary";
-import {
   summarizeYearlyTrend,
   type YearlyMonthSource,
   type YearlySummary,
@@ -25,11 +20,9 @@ import { calculateRelativeWeekStartDate } from "../../domain/week/weekDates";
 export type SummaryStore = {
   getWeekSpendingEntries: (groupId: string, weekStartDate: string) => Promise<SpendingEntry[]>;
   getWeekIncomeEntries: (groupId: string, weekStartDate: string) => Promise<IncomeListEntry[]>;
-  getDateSpendingEntries: (groupId: string, date: string) => Promise<SpendingEntry[]>;
   getMonthSpendingEntries: (groupId: string, monthStartDate: string) => Promise<SpendingEntry[]>;
   getMonthIncomeEntries: (groupId: string, monthStartDate: string) => Promise<IncomeListEntry[]>;
   getYearAggregationEntries: (groupId: string, year: string) => Promise<YearlyMonthSource[]>;
-  getMonthlyIncome: (userId: string) => Promise<number | undefined>;
   buildCategoryInfoMap: (groupId: string, categoryIds: string[]) => Promise<CategoryInfoMap>;
 };
 
@@ -158,17 +151,6 @@ export async function getFourWeeksSummary(
   return { weeks, weekCount };
 }
 
-export async function getMonthlyExpensesSummary(
-  store: SummaryStore,
-  groupId: string,
-  userId: string,
-  args: { monthStartDate: string },
-): Promise<MonthlyExpensesSummary> {
-  const monthlyReceipts = await store.getMonthSpendingEntries(groupId, args.monthStartDate);
-  const monthlyIncome = await store.getMonthlyIncome(userId);
-  return summarizeMonthlyExpenses(monthlyReceipts, monthlyIncome);
-}
-
 export type MonthlySummaryWithCategoriesResult = {
   count: number;
   totalAmountYen: number;
@@ -229,41 +211,4 @@ export async function getYearSummary(
     months: monthSources,
     categoryInfoMap,
   });
-}
-
-export type DailySpendingTrendResult = {
-  currentWeek: Array<{
-    date: string;
-    totalAmountYen: number;
-  }>;
-  previousWeek: Array<{
-    date: string;
-    totalAmountYen: number;
-  }>;
-};
-
-export async function getDailySpendingTrend(
-  store: SummaryStore,
-  groupId: string,
-  args: { weekStartDate: string },
-): Promise<DailySpendingTrendResult> {
-  async function getTotalForDate(targetDate: string): Promise<number> {
-    const receipts = await store.getDateSpendingEntries(groupId, targetDate);
-    return receipts.reduce((sum, r) => sum + r.amountYen, 0);
-  }
-
-  const currentWeekStart = args.weekStartDate;
-  const previousWeekStart = calculateRelativeWeekStartDate(args.weekStartDate, -1);
-
-  const currentWeek: DailySpendingTrendResult["currentWeek"] = [];
-  const previousWeek: DailySpendingTrendResult["previousWeek"] = [];
-
-  for (let i = 0; i < 7; i++) {
-    const currentDate = addDays(currentWeekStart, i);
-    const previousDate = addDays(previousWeekStart, i);
-    currentWeek.push({ date: currentDate, totalAmountYen: await getTotalForDate(currentDate) });
-    previousWeek.push({ date: previousDate, totalAmountYen: await getTotalForDate(previousDate) });
-  }
-
-  return { currentWeek, previousWeek };
 }

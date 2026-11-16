@@ -26,25 +26,9 @@ export function buildNewWeekSessionFields(args: {
   };
 }
 
-/** complete 用 patch。reviewMemo は指定時のみキーを含める。 */
-export function buildCompletePatch(reviewMemo: string | undefined, now: number): WeekSessionPatch {
-  const patch: WeekSessionPatch = { status: "completed", updatedAt: now };
-  if (reviewMemo !== undefined) {
-    patch.reviewMemo = reviewMemo;
-  }
-  return patch;
-}
-
 /** reset 用 patch。reviewMemo は undefined を明示してクリアする。 */
 export function buildResetPatch(now: number): WeekSessionPatch {
   return { status: "draft", reviewMemo: undefined, updatedAt: now };
-}
-
-export function assertWeekSessionFound(session: WeekSessionRecord | null): WeekSessionRecord {
-  if (session === null) {
-    throw new WeekSessionDomainError("Week session not found");
-  }
-  return session;
 }
 
 export function assertRetrieved(

@@ -6,7 +6,6 @@ import type {
 
 export interface ReceiptAnalysisReader {
   getBatch(id: string): Promise<ReceiptAnalysisBatchRecord | null>;
-  listBatchesByGroup(groupId: string, limit: number): Promise<ReceiptAnalysisBatchRecord[]>;
   getJob(id: string): Promise<ReceiptAnalysisJobRecord | null>;
   listJobsByBatch(batchId: string, limit?: number): Promise<ReceiptAnalysisJobRecord[]>;
   listActiveJobsByGroup(groupId: string, limit: number): Promise<ReceiptAnalysisJobRecord[]>;

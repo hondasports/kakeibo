@@ -3,11 +3,9 @@ import { ConvexError } from "convex/values";
 import type { MutationCtx } from "../../../convex/_generated/server";
 import type { Id } from "../../../convex/_generated/dataModel";
 import {
-  requireGroupMembership,
   requireGroupMembershipForGroup,
   requireGroupMembershipForUserInGroup,
 } from "../../../convex/groups/membership";
-import { deleteDraftAndItems } from "./draftRepository";
 import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 import type { ReceiptDraftItemSnapshot } from "../../domain/aiExpenseDrafts/receiptDataContract";
@@ -173,12 +171,4 @@ export async function createFailedDraftFromImageAnalysisForUserHandler(
 ) {
   const membership = await requireGroupMembershipForUserInGroup(ctx, args.userId, args.groupId);
   return persistFailedDraft(ctx, { userId: args.userId, groupId: membership.groupId }, args);
-}
-
-export async function deleteOrphanedDraftHandler(
-  ctx: MutationCtx,
-  args: { draftId: Id<"aiExpenseDrafts"> },
-) {
-  const { groupId } = await requireGroupMembership(ctx);
-  await deleteDraftAndItems(ctx, args.draftId, groupId);
 }

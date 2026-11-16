@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
@@ -131,6 +131,69 @@ describe("LineLinkSettingsPanel", () => {
 
     await waitFor(() => expect(unlink).toHaveBeenCalledWith({}));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("連携が複数ある場合は通知不可と解除後の再連携を案内し、解除できる", async () => {
+    const user = userEvent.setup();
+    const unlink = vi.fn().mockResolvedValue({ status: "unlinked" });
+    useQueryMock.mockReturnValue({ status: "multiple" });
+    useMutationMock.mockReturnValue(unlink);
+
+    renderWithProviders(
+      <MemoryRouter>
+        <LineLinkSettingsPanel />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("LINE連携を確認してください")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "LINE通知を受け取れません。一度連携を解除してから、もう一度連携してください。",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("LINEアカウントは連携されています")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "LINEと連携する" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "連携を解除する" }));
+    await user.click(screen.getByRole("button", { name: "解除する" }));
+    await waitFor(() => expect(unlink).toHaveBeenCalledWith({}));
+  });
+
+  it("複数連携のときは古い連携成功メッセージを表示しない", () => {
+    useQueryMock.mockReturnValue({ status: "multiple" });
+    renderWithProviders(
+      <MemoryRouter
+        initialEntries={[{ pathname: "/settings", state: { lineLinkFeedback: "success" } }]}
+      >
+        <LineLinkSettingsPanel />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("LINE連携を確認してください")).toBeInTheDocument();
+    expect(screen.queryByText("LINEアカウントを連携しました")).not.toBeInTheDocument();
+  });
+
+  it("別の操作で複数連携が解除されても古い成功メッセージを表示しない", () => {
+    useQueryMock.mockReturnValue({ status: "multiple" });
+    const panel = (
+      <MemoryRouter
+        initialEntries={[{ pathname: "/settings", state: { lineLinkFeedback: "success" } }]}
+      >
+        <LineLinkSettingsPanel />
+      </MemoryRouter>
+    );
+    const { rerender } = render(panel);
+    expect(screen.getByText("LINE連携を確認してください")).toBeInTheDocument();
+    expect(screen.queryByText("LINEアカウントを連携しました")).not.toBeInTheDocument();
+
+    useQueryMock.mockReturnValue({ status: "unlinked" });
+    rerender(
+      <MemoryRouter
+        initialEntries={[{ pathname: "/settings", state: { lineLinkFeedback: "success" } }]}
+      >
+        <LineLinkSettingsPanel />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("LINEアカウントは連携されていません")).toBeInTheDocument();
+    expect(screen.queryByText("LINEアカウントを連携しました")).not.toBeInTheDocument();
   });
 
   it("解除中は確認ダイアログの操作を無効化する", async () => {

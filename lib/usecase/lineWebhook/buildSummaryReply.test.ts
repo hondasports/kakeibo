@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LineAccountLinkRecord } from "../../domain/lineWebhook/records";
+import type { LineAccountLinkRecord } from "../../domain/lineLink/records";
 import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../domain/lineWebhook/reply";
 import { buildSummaryReply, type BuildSummaryReplyDeps } from "./buildSummaryReply";
 
@@ -8,6 +8,9 @@ const originalLink: LineAccountLinkRecord = {
   userId: "user-a",
   lineUserId: "line-a",
   status: "active",
+  linkedAt: 100,
+  createdAt: 100,
+  updatedAt: 100,
 };
 const args = {
   userId: "user-a",

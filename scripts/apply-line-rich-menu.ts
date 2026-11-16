@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyLineDefaultRichMenu } from "../convex/lineWebhook/richMenuClient.ts";
+import { applyLineDefaultRichMenu } from "../lib/convex/lineWebhook/lineRichMenuClient.ts";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_IMAGE_PATH = resolve(repoRoot, "docs/line/rich-menu-readonly-summary.png");

@@ -17,13 +17,7 @@ export {
   type WeekSummaryWithCategories,
 } from "../../lib/convex/receipts/summaryLib/week";
 export {
-  getDailySpendingTrendHandler,
-  type DailySpendingTrendData,
-} from "../../lib/convex/receipts/summaryLib/trend";
-export {
-  getMonthlyExpensesSummaryHandler,
   getMonthSummaryWithCategoriesHandler,
-  type MonthlyExpensesSummary,
   type MonthlySummaryWithCategories,
 } from "../../lib/convex/receipts/summaryLib/monthly";
 export {
@@ -36,11 +30,7 @@ import {
   getWeekSummaryWithCategoriesHandler,
   getFourWeeksSummaryHandler,
 } from "../../lib/convex/receipts/summaryLib/week";
-import { getDailySpendingTrendHandler } from "../../lib/convex/receipts/summaryLib/trend";
-import {
-  getMonthlyExpensesSummaryHandler,
-  getMonthSummaryWithCategoriesHandler,
-} from "../../lib/convex/receipts/summaryLib/monthly";
+import { getMonthSummaryWithCategoriesHandler } from "../../lib/convex/receipts/summaryLib/monthly";
 import { getYearSummaryHandler } from "../../lib/convex/receipts/summaryLib/yearly";
 
 export const getWeekSummary = query({
@@ -130,20 +120,6 @@ export const getFourWeeksSummary = query({
     weekStartDate: v.string(),
   },
   handler: getFourWeeksSummaryHandler,
-});
-
-export const getDailySpendingTrend = query({
-  args: {
-    weekStartDate: v.string(),
-  },
-  handler: getDailySpendingTrendHandler,
-});
-
-export const getMonthlyExpensesSummary = query({
-  args: {
-    monthStartDate: v.string(),
-  },
-  handler: getMonthlyExpensesSummaryHandler,
 });
 
 const yearlyMonthPointValidator = v.object({

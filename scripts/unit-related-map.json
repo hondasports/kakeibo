@@ -1,7 +1,7 @@
 {
   "$comment": "import グラフに乗らない依存（テストが readFileSync 等でrepo内ファイルを読む）→ それを検査するunitテストの対応表。verify:prepush（scripts/verify-prepush.mjs）が変更ファイルをこのmapで引き、当たったテストを vitest related の実行対象に加える。テストがrepo内ファイルを fs で読む構造を追加したらここへ追記すること。キーは e2e/spec-map.json と同じ gitignore 風glob、値はrepo相対のテストファイルパス。",
   "docs/line/*.png": [
-    "convex/lineWebhook/richMenuClient.test.ts",
+    "lib/convex/lineWebhook/lineRichMenuClient.test.ts",
     "lib/domain/lineSummary/richMenu.test.ts"
   ],
   ".github/workflows/ci.yml": ["scripts/ci-change-scope.test.mjs"],

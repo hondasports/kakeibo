@@ -202,7 +202,7 @@ convex/
     membership.ts
     mutations.ts
     queries.ts
-    members.ts                 # addMemberByEmail, removeMember 等
+    members.ts                 # removeMember 等
     invitations.ts             # 招待API登録とハンドラへの委譲
     clerkInvitations.ts
     deletion.ts
@@ -221,7 +221,6 @@ convex/
     mutations.ts
     receipts.test.ts
     summaries.ts
-    spendingEntries.ts         # lib/convex/receipts/spendingEntries.ts への re-export ラッパー
   expenseEntries/
     mutations.ts
     internal.ts
@@ -271,10 +270,6 @@ convex/
   systemAdminPendingInvitationAction.ts
   systemAdminOwnerlessGroupRecovery.ts
   systemAdminGroupDeletion.ts
-  legacyGroupDeletionAuditMigration.ts
-  orphanedLineLinkMigration.ts   # 退会済みユーザーに残った LINE 連携データの一回限り内部 migration（§16.4）
-  aiExpenseDraftRegisteredAtMigration.ts # 登録済み下書きの registeredAt を補完する一回限り内部 backfill（§16.4）
-  aiExpenseDraftListSummaryMigration.ts # 下書き一覧用の保存サマリ（listSummary）を補完する一回限り内部 backfill（§16.4）
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
@@ -381,7 +376,7 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   `lib/convex/*Repository.ts` が `Id<>` と `string` の写像を吸収する。
 - 互換性のため `*Handler` のエクスポート名・`(ctx, args)` シグネチャ・
   エラーメッセージは維持する（既存テスト・aiExpenseDrafts 連携が依存）。
-- `convex/receipts/mutations.ts` の `deleteReceiptsByUser`（E2E 用内部 API）は
+- `convex/receipts/crud.ts` の `deleteReceiptsByUser`（E2E 用内部 API）は
   インデックス走査を伴うユーティリティであり、ドメイン層には移さない。
 
 `aiExpenseDrafts` ではこれに加えて次のパターンを使う。
@@ -389,8 +384,7 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 - **ワークフローサービス・ポート**（`lib/domain/aiExpenseDrafts/draftWorkflowServices.ts`）:
   税再解釈の永続化（`DraftTaxInterpretationService`）、ユーザー上書きスナップショット
   （`DraftOverrideSnapshotService`）、明細置換（`DraftItemReplaceService`）、
-  支出エントリのリコンサイル（`DraftExpenseEntryReconcileService`）、
-  receipt 登録（`DraftReceiptInsertService`）のように、複数テーブルにまたがる
+  支出エントリのリコンサイル（`DraftExpenseEntryReconcileService`）のように、複数テーブルにまたがる
   永続化オーケストレーションをドメインが定義する interface として宣言し、
   `lib/convex/aiExpenseDrafts/convexDraftWorkflowServices.ts` が既存の
   永続化関数（`persistDraftTaxInterpretation` 等）へ ctx を束縛して実装する。
@@ -428,9 +422,9 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   `deleteAllGroupScopedData`）、テーブル横断の ctx.db/scheduler/storage アクセスは
   `lib/convex/groupDeletion/` のアダプタ（`GroupDeletionJobStore`・
   `GroupDeletionPurgeStore`・`GroupDeletionRecipientStore`・`GroupDeletionScheduler`）
-  へ隔離した。`convex/groups/lib/groupDeletion*.ts` は export 名・シグネチャを
-  維持した互換シムとなり、internal endpoint 名・ステージ順序・削除カウント・
-  通知 dedupe キー・エラーメッセージは不変。
+  へ隔離した。`convex/groups/lib/` の削除ハンドラはユースケースへ委譲し、
+  internal endpoint 名・ステージ順序・削除カウント・通知 dedupe キー・
+  エラーメッセージを維持する。
 - `convex/groups/e2e.ts`（E2E 専用フィクスチャ）は層移行の対象外とするが、
   `deleteAllGroupScopedData` 内部はユースケースへ委譲済み。
 
@@ -529,8 +523,8 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   `sendUnlinkedGuide`・`sendSummaryReply`・`buildLinkedImageReply`/
   `processLinkedImage`（リトライ規則を含む）。
 - **インフラ**（`lib/convex/lineWebhook/`）: 各ポートの Convex 実装、
-  LINE Messaging API / Rich Menu クライアント（旧 `client.ts`/
-  `richMenuClient.ts` の本体）、action ランナー、deps 組み立て。
+  LINE Messaging API / Rich Menu クライアント（`lineMessagingClient.ts` /
+  `lineRichMenuClient.ts`）、action ランナー、deps 組み立て。
 - **プレゼンテーション**: `convex/lineWebhook/*.ts` は endpoint 宣言・
   validator・互換 export シムのみ。`webhook.ts` は HTTP 境界（raw body・
   署名・payload 解析・413/401/400/200 応答）を担当し、mutation 呼び出しは
@@ -620,9 +614,9 @@ candidate・CategoryRepository port）を再利用し、endpoint 向けの完全
   `./normalize` ラッパ）のみ。endpoint名、args/returns、エラー文言、seed 分岐、
   上限判定、E2E挙動は不変とする。
 
-`users`（Clerk認証由来のプロフィール upsert・consent・monthlyIncome・
+`users`（Clerk認証由来のプロフィール upsert・consent・
 weekly settings・internal user lookup）も4層へ移行済み。既存の
-`lib/domain/users/`（clerkProfile・displayName・email・monthlyIncome）と
+`lib/domain/users/`（clerkProfile・displayName・email）と
 `lib/domain/week/weekDates.ts` を再利用し、endpoint 向けのストアポートと
 フィールド構築ルールを追加した。
 
@@ -630,8 +624,7 @@ weekly settings・internal user lookup）も4層へ移行済み。既存の
   ポート）と `rules.ts`（identity 由来の insert/patch フィールド構築・
   displayName 解決・User not found 検証）。
 - **ユースケース**（`lib/usecase/users/`）: upsertUser（insert/patch 分岐）、
-  consent（既設定時刻を保持する冪等 patch）、updateMonthlyIncome（null で
-  undefined クリア）、updateWeeklyDays（weeklyEndDay は開始曜日から導出）、
+  consent（既設定時刻を保持する冪等 patch）、updateWeeklyDays（weeklyEndDay は開始曜日から導出）、
   getUserProfile/getReceiptImageConsent、internal upsert/getUserIdByEmail/
   getUserById/clearUserMonthlyIncome、共有 `getWeeklyStartDayForUser`。
 - **インフラ**（`lib/convex/users/`）: `UserStore` の Convex 実装
@@ -643,16 +636,15 @@ weekly settings・internal user lookup）も4層へ移行済み。既存の
   endpoint名、args/returns、エラー文言、undefined クリア挙動、consent 冪等性、
   internal upsert の email trim+小文字化（空文字保持）は不変とする。
 
-`weekSessions`（週次セッションの get-or-create・reviewMemo 更新・complete・
-E2E reset・取得）も4層へ移行済み。週の日付計算は既存 `lib/domain/week/weekDates.ts`
+`weekSessions`（週次セッションの get-or-create・E2E reset）も4層へ移行済み。週の日付計算は既存 `lib/domain/week/weekDates.ts`
 を再利用する。
 
 - **純粋関数**（`lib/domain/weekSessions/`）: `store.ts`（`WeekSessionRecord`・
   `WeekSessionStore` ポート）と `rules.ts`（
-  新規 draft フィールド構築、complete patch（reviewMemo は指定時のみキー含有）、
-  reset patch（reviewMemo を undefined で明示クリア）、not found / retrieve 失敗検証）。
+  新規 draft フィールド構築、reset patch（reviewMemo を undefined で明示クリア）、
+  retrieve 失敗検証）。
 - **ユースケース**（`lib/usecase/weekSessions/`）: getOrCreate（既存返却・無ければ
-  insert→get）、updateReviewMemo・complete（patch→get）、reset（`{reset}` 返却）、get。
+  insert→get）、reset（`{reset}` 返却）。
 - **インフラ**（`lib/convex/weekSessions/`）: `WeekSessionStore` の Convex 実装
   （`createWeekSessionStore`）と query 用 `createWeekSessionReader`、Doc/Record 変換。
   by_group_id_and_week_start_date インデックス利用を隔離する。
@@ -669,7 +661,7 @@ OpenAI 応答 envelope の取り出し・mock 結果は `lib/convex/receiptImage
 - **純粋関数**（`lib/domain/receiptImageExtraction/`）: 既存 `mode.ts` に加え、
   `rules.ts`（imageDataUrl 検証、抽出計画解決: mode → real は production 限定 →
   mock → OPENAI_API_KEY 必須、グループ選択・同意検証）と `ports.ts`（環境読み取り・
-  mock/real extractor・group/consent/categories 読み取りポート）、
+  mock/real extractor ポート）、
   `extractionRequest.ts`（抽出リクエスト構築: `ReceiptCategoryHint`/`CategoryInput` 型、
   BiDi制御文字 sanitize・重複排除 `normalizeCategories`、プロンプト構築
   `buildReceiptExtractionPrompt`、JSONスキーマ `buildReceiptExtractionJsonSchema`、
@@ -696,13 +688,11 @@ OpenAI 応答 envelope の取り出し・mock 結果は `lib/convex/receiptImage
   `lib/domain/dependencyDirection.test.ts` が lib/domain → convex 参照の
   逆依存再導入を検査する。
 - **ユースケース**（`lib/usecase/receiptImageExtraction/`）: `extractReceiptFields`
-  （検証 → 計画 → mock/real）と `extractReceiptFieldsForCurrentGroup`
-  （group → consent+categories 並列取得 → 抽出）。
+  （検証 → 計画 → mock/real）。
 - **インフラ**（`lib/convex/receiptImageExtraction/extractorDeps.ts`）: process.env を
-  呼出時に読む環境スナップショット、`getMockResult`/`callOpenAIReceiptExtractor` の合成、
-  `runQuery` ベースのコンテキスト読み取り。
-- **プレゼンテーション**: `convex/receiptImageExtraction/extraction.ts` は action・
-  validator・`requireAuthenticatedUserId`・互換export（`extractReceiptFieldsFromImage`・
+  呼出時に読む環境スナップショットと、`getMockResult`/`callOpenAIReceiptExtractor` の合成。
+- **プレゼンテーション**: `convex/receiptImageExtraction/extraction.ts` は
+  `requireAuthenticatedUserId`・互換export（`extractReceiptFieldsFromImage`・
   `extractReceiptFieldsHandler`・型/関数再export）のみ。ドメインエラーだけを
   ConvexError へ変換し、判定順序と全エラー文言は不変とする。
 
@@ -968,7 +958,7 @@ Convex関数を実装する時点で、未認証の場合に拒否されるこ�
 この運用では、次の制約を前提にする。
 
 - 1ユーザーは同時に複数グループへ所属できる。
-- `acceptGroupInvitation` は、招待メールとログイン中ユーザーのメールが一致する場合だけ所属を追加する。
+- 招待受諾はトークンと認証ユーザーのメール候補を照合して所属を追加する。
 - `setActiveGroup` は、ログイン中ユーザーが所属しているグループだけを active にできる。
 - `removeMember` はユーザー本人の `users` レコードや Clerk アカウントは削除しない。
 - `requestGroupDeletion` はjob作成、`groups.status = deleting`、依頼者の`activeGroupId`解除を同一transactionで行い、bounded workerへ委譲する。Clerk アカウントや`users`レコードは削除しない（#224）。
@@ -1107,7 +1097,7 @@ active record が確認できない場合は fail closed にする。
 | confidence          | object                                                             | 主要フィールドごとのAI信頼度          |
 | warnings            | string[] (optional)                                                | 解析時の警告                          |
 | reviewReasons       | fixed enum array                                                   | 確認が必要な理由                      |
-| registeredReceiptId | Id<"receipts"> (optional)                                          | レガシー `registerReadyDrafts` 用。主導線では未設定 |
+| registeredReceiptId | Id<"receipts"> (optional)                                          | 旧登録経路の保存済みデータ用。主導線では未設定 |
 | createdAt           | number                                                             | 作成日時                              |
 | updatedAt           | number                                                             | 更新日時                              |
 
@@ -1242,29 +1232,22 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 
 ### 10.2 receipts（互換層）
 
-- `receipts.crud.createReceipt(input)`（レガシー。本番入力 UI では未使用）
 - `receipts.crud.updateReceipt(id, input)`
 - `receipts.crud.deleteReceipt(id)`
-- `receipts.summaries.getReceiptsByWeek(weekStartDate)`
 - `receipts.summaries.getWeekSummary(weekStartDate)`
 - `receipts.summaries.getWeekSummaryWithCategories(weekStartDate)`
 - `receipts.summaries.getFourWeeksSummary()`
-- `receipts.summaries.getDailySpendingTrend(weekStartDate)`
-- `receipts.summaries.getMonthlyExpensesSummary(month?)`
 - `receipts.crud.deleteReceiptsByUser(groupId, userId)`（internal。指定ユーザーの作成データだけを対象）
 
 `receipts` は支出と収入の両方を扱う schema 互換として残る。新規手入力は `expenseEntries` を正本とし、
 収入は `entryType: "income"`、カテゴリなし、入力内容を `title` に保存する。
 
-集計は `lib/convex/receipts/spendingEntries.ts` が `expenseEntries` と `receipts` を統合する（`convex/receipts/spendingEntries.ts` は re-export ラッパー）。
+集計は `lib/convex/receipts/spendingEntries.ts` が `expenseEntries` と `receipts` を統合する。
 
 ### 10.3 weekSessions
 
 - `weekSessions.mutations.getOrCreateCurrentWeekSession()`
 - `weekSessions.mutations.getOrCreateWeekSession(weekStartDate)`
-- `weekSessions.queries.getWeekSession(weekStartDate)`
-- `weekSessions.mutations.updateReviewMemo(weekStartDate, reviewMemo)`
-- `weekSessions.mutations.completeWeekSession(weekStartDate)`
 - `weekSessions.internal.resetWeekSessionForUser(groupId)`（internal）
 
 ### 10.4 categories
@@ -1300,7 +1283,6 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `users.queries.getUserProfile()`
 - `users.queries.getReceiptImageConsent()`
 - `users.mutations.acceptReceiptImageExternalApiConsent()`
-- `users.mutations.updateMonthlyIncome(monthlyIncome)`
 - `users.mutations.updateWeeklyDays(weeklyStartDay, weeklyEndDay)`
 - `users.internal.clearUserMonthlyIncome(userId)`（internal）
 
@@ -1332,8 +1314,6 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `aiExpenseDrafts.mutations.updateDraftItemTaxOverrides(draftId, itemId, taxRatePercent?, amountBasis?)`
 - `aiExpenseDrafts.mutations.applyReceiptTaxSettings(draftId, taxRatePercent?, amountBasis?)`
 - `aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries(draftIds)`（主導線）
-- `aiExpenseDrafts.mutations.registerReadyDrafts(draftIds)`（レガシー。`receipts` へ登録し `registeredReceiptId` を設定）
-- `aiExpenseDrafts.actions.analyzeReceiptImageToDraft(input)`
 - `aiExpenseDrafts.internal.createFromExtraction(input)`（internal）
 - `aiExpenseDrafts.internal.createFailedDraftFromImageAnalysis(input)`（internal）
 
@@ -1356,7 +1336,6 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 ### 10.9 receipt analysis jobs
 
 - `receiptAnalysisJobs.mutations.createBatch(input)`
-- `receiptAnalysisJobs.queries.listBatches()`
 - `receiptAnalysisJobs.queries.listJobsByBatch(batchId)`
 - `receiptAnalysisJobs.queries.listActiveJobs()`
 - `receiptAnalysisJobs.queries.listJobsByDraftIds(draftIds)`
@@ -1423,7 +1402,7 @@ active group を解決する。`draftId` や `categoryId` を受け取る処理�
 | `unknown` | 確認が必要な下書きとして扱い、登録前にユーザーが必要項目を確定する。 |
 
 主導線の `registerReadyDraftsAsExpenseEntries` は `expenseEntries` を作成し、下書きを `status: "registered"` に更新する。
-`registeredReceiptId` は設定しない。レガシーの `registerReadyDrafts` のみ `receipts` を作成し `registeredReceiptId` を保存する。
+`registeredReceiptId` は現行の登録経路では設定しない。
 
 既存データへの migration / backfill は不要とする。新しい下書きテーブルの追加のみで、
 既存 `receipts`、`categories`、`weekSessions` の必須項目は変更しないため、既存データの読み取りは
@@ -1572,7 +1551,7 @@ CSV生成関数、CSVダウンロード処理はいずれも未実装である�
 - 同意が保存されていない場合は、Convex Action を呼ばず、画像データも送信しない。
 - 画像は Convex Storage や `receipts` テーブルへ保存しない。
 - 抽出結果はフォーム候補であり、自動保存しない。
-- ユーザーが `保存して次へ` を押した時点で、既存の `receipts.createReceipt` を使って通常の receipt として保存する。
+- 現行の登録経路は確認済み下書きを支出エントリとして保存する。
 
 ### 14.2 失敗時と拒否時
 
@@ -1659,65 +1638,13 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 - 必須項目追加で既存データが壊れないか
 - query/mutationの認可条件が維持されているか
 
-#### 退会済みユーザーの LINE 連携データ掃除（一回限りの内部 migration）
+#### 完了済みのデータ移行
 
-finalize の purge に `lineAccountLinks` 等を加える前に完了した退会では、active な連携が取り残され、LINE webhook の解決と再連携（`LINE_LINK_CONFLICT`）を妨げる。また LINE OAuth を開始しただけで連携を完了せず退会したユーザーには `lineAccountLinks` が無く、`lineLinkRequests` / `lineLinkAuditLogs` だけが残る。`convex/orphanedLineLinkMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`users` に行が無い userId の連携データを削除する。存在するユーザーと、終端でない `accountDeletionRequests` を持つ userId には触れない。
-
-走査は 3 つの phase を `links` → `requests` → `auditLogs` の順に、テーブルごとに独立した pagination で行う（1 page 10 件）。
-
-- `links`: `lineAccountLinks` の孤立リンクと、その userId の通知 job / event・連携リクエスト・監査ログを削除する。通知 job はリンクより先に削除する。
-- `requests`: リンクを持たない孤立 userId の `lineLinkRequests` を削除する。
-- `auditLogs`: リンクを持たない孤立 userId の `lineLinkAuditLogs` を削除する。
-
-cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` の先頭。戻り値の `continueCursor` をそのまま次の呼び出しに渡す。最後の phase（`auditLogs`）が終わった時だけ `isDone: true` / `continueCursor: null` になる。戻り値・ログは件数のみで userId / lineUserId は含まない。
-
-**削除は不可逆で、孤児の判定根拠は「`users` に行が無い」ことだけである。** 完了した退会リクエストは日次 cron で消えるため、「退会が完了した」という積極的な証拠は要求していない。そのため、プロフィール作成（`upsertUser`）に失敗した認証済みユーザー（UI は使え、LINE 連携も開始できるが `users` 行が無い。`useInitializeUser` は失敗をログのみで継続する）の連携を、孤児と誤判定して消す可能性がある。誤って消した連携は、本人が LINE 連携をやり直せば復旧し、失われるのは連携情報に限られる。この判定方針は、プロダクトオーナーが「`users` 行が無ければ削除」で確定したものである。
-
-運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の件数が想定の退会者数と妥当に一致することを確認してから `executeBatch` を実行し、想定より多い場合は実行せず内訳を調べる。**
-
-1. `pnpm exec convex run orphanedLineLinkMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`orphanLinks` / `orphanRequests` / `orphanAuditLogs` と `wouldDelete` を確認。`wouldDelete` は phase 間で重複しうる上限見積もり）
-2. `pnpm exec convex run orphanedLineLinkMigration:executeBatch '{}'`（自己再スケジュールで全 phase を最後まで進む。冪等なので再実行可。`isDone: true` を戻り値かログで確認）
-3. `pnpm exec convex run orphanedLineLinkMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remainingOrphanLinks` / `remainingOrphanRequests` / `remainingOrphanAuditLogs` が 0 であること）
-
-#### 登録済み下書きの registeredAt 補完（一回限りの内部 backfill）
-
-登録済み下書き一覧は `by_group_id_and_status_and_registered_at` index で登録日時降順に並ぶ。フィールド追加前の登録済み下書きは `registeredAt` を持たず、index 上は未設定（最小値）として一覧の末尾に並ぶため、登録日時の正しい位置に戻すには本 backfill が必要である。
-
-`convex/aiExpenseDraftRegisteredAtMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`status === "registered"` かつ `registeredAt` 未設定の `aiExpenseDrafts` に `registeredAt` を書き込む。値は `derivedRegistration.registeredAt`（無ければ `updatedAt` を登録時点の近似として使う）。`registeredAt` を持つ下書き・未登録の下書き・`updatedAt` には触れない。
-
-走査はテーブル全体の pagination を 1 batch 25 件で行い、`executeBatch` は自分自身を再スケジュールして最後まで進む。冪等なので再実行してよい。戻り値・ログは件数のみで、ユーザー識別子を含まない。
-
-運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の `needsBackfill` が既存の登録済み下書き数と妥当に一致することを確認してから `executeBatch` を実行する。**
-
-1. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` を確認）
-2. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
-3. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること）
-
-#### 下書き一覧の保存サマリ（listSummary）補完（一回限りの内部 backfill）
-
-ready / needs_review の下書き一覧は明細読み取り（N+1）を避けるため `listSummary` を読む（Issue #1062 Phase 2）。フィールド追加前の下書きは `listSummary` を持たなかったため、追加当初は一覧側が明細から再計算するフォールバックを置いていた。本番での backfill 完了（2026-10-20、verify の `remaining=0`）を確認し、Phase 3b でフォールバックを除去した。現在は `listSummary` を持たない下書きに `itemSummary` を付けずに返し、クライアント側でも保存値が無い場合は明細から再判定せず「金額・税内訳が未解決」と同じ扱いにする。
-
-`convex/aiExpenseDraftListSummaryMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`status === "ready" | "needs_review"` かつ `listSummary` 未設定の `aiExpenseDrafts` に `listSummary` を書き込む。値は `buildDraftListSummary`（`lib/domain/aiExpenseDrafts/listSummary.ts`）に、同一グループの明細を作成順に最大101件まで読み、100件以下のときに全件を渡して計算する。101件以上では `listSummary` を補完せず、`skippedOverLimit` に数える。`listSummary` を既に持つ下書き・対象外 status の下書き・`updatedAt` には触れない。
-
-走査はテーブル全体の pagination を 1 batch 25 件で行い、`executeBatch` は自分自身を再スケジュールして最後まで進む。冪等なので再実行してよい。戻り値・ログは件数のみで、ユーザー識別子を含まない。
-
-運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の `needsBackfill` と `skippedOverLimit` の合計が `listSummary` 未設定の ready / needs_review 下書き数と妥当に一致することを確認してから `executeBatch` を実行する。**
-
-1. `pnpm exec convex run aiExpenseDraftListSummaryMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` / `skippedOverLimit` を確認）
-2. `pnpm exec convex run aiExpenseDraftListSummaryMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
-3. `pnpm exec convex run aiExpenseDraftListSummaryMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること、`skippedOverLimit` を別途確認）
-
-#### 下書きの金額差異理由の再計算（一回限りの内部 migration）
-
-`convex/aiExpenseDraftAmountTaxMigration.ts` は `ready` / `needs_review` かつ明細100件以下の下書きについて、`judgeDraftAmountAndTax` と `buildDraftListSummary` で一覧サマリを再計算し、保存値と異なる場合は更新する。加えて明細が100件以下で `amount_mismatch` を持ち正本で解決済みの下書きだけ、その理由を除き、残る理由の有無で status を決める。101件以上では理由・status・listSummary のいずれも変更しない。両者が該当する場合は同じ書き込みで更新する。未解決の理由なし下書きには `amount_mismatch` を追加しない。税未確定は金額差異を意味しないためである。ほかの理由、明細、金額、税値、`updatedAt` と対象外 status は変更しない。下書きに対応する同一グループの明細を作成順に最大101件読み、100件以下のときのみ判定とサマリを計算し、101件目があれば更新を見送る。テーブルを25件ずつ cursor で走査する。`executeBatch` は自己再スケジュールし、再実行しても同じ結果になる。支出は作成しない。既存 `aiExpenseDraftListSummaryMigration` は未設定だけを補完するため、保存済みの古いサマリの更新には使えない。
-
-運用前に非本番で以下を確認する。本番操作は対象 deployment と操作の明示承認を得た運用者が行う。復旧に備え、実行前に対象 deployment のバックアップを取得し、対象・時刻・検証結果を記録する。バックアップの取得や復元も別途承認した手順で行う。
-
-1. `pnpm exec convex run aiExpenseDraftAmountTaxMigration:dryRun '{}'` を実行し、`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` を渡して続行する。全ページの `needsReasonRemoval`（理由を外す件数）と `needsSummaryOnly`（理由を変更せずサマリだけを更新する件数）の合計を確認する。`needsUpdate` は両者の合計である。`skippedOverLimit` は101件目があるため理由・status・サマリの更新をすべて見送った件数。
-2. 件数が妥当と確認できたら `pnpm exec convex run aiExpenseDraftAmountTaxMigration:executeBatch '{}'` を1回実行し、最終ページのログの `done=true` と `reasonRemoved` / `summaryUpdatedOnly` を確認する（戻り値は `isDone`）。
-3. 再び `dryRun` を全ページ実行し、`needsReasonRemoval` と `needsSummaryOnly` の合計がそれぞれ0であることを確認する。`skippedOverLimit` は残るため、件数と対象の扱いを別途確認する。並行更新がある場合はその影響も調査する。
-
-コードの revert だけでは書き込み済みデータは戻らない。問題があればバッチの継続と関係する書き込みを止め、実行前バックアップと実行後の変更を照合する。以後の利用者編集を上書きしないよう個別の復旧対象と方法を決め、承認を得て復旧する。理由の一律再追加は、元から理由のない下書きと区別できないため行わない。
+- 下書き一覧の保存サマリ: 2026-10-20、本番 verify の `remaining` 0。
+- 登録済み下書きの登録日時: 2026-11-15、本番 verify の `remaining` 合計 0。
+- 下書きの金額・税判定: 2026-11-15、本番 dryRun の `needsReasonRemoval`・`needsSummaryOnly`・`needsUpdate`・`skippedOverLimit` はすべて 0。
+- 退会済みユーザーの LINE 連携データ: 2026-11-15、本番 verify の `remainingOrphanLinks`・`remainingOrphanRequests`・`remainingOrphanAuditLogs` はすべて 0。
+- 旧グループ削除監査: 2026-11-15、本番 verify の `remainingOrphaned`・`unmigrated`・`skipped`、dryRun の `orphaned`・`convertible`・`skipped`・`alreadyProcessed` はすべて 0。 同日の監査移行記録の全件確認では `scanned`・`migrated`・`skipped`・`failed` はすべて 0。
 
 #### aiExpenseDraftItems の printedAmountYen 欠落行（据え置き・backfill 不実施）
 
@@ -1977,7 +1904,7 @@ M18では、既存MVP利用者向けに、家計簿の中心を `receipts` か�
 ### 21.7 互換境界
 
 - `receipts` は互換層として維持する。手入力・AI 登録は `expenseEntries` を正本とする。
-- 集計の正本ロジックは `lib/convex/receipts/spendingEntries.ts` に集約する。`convex/receipts/spendingEntries.ts` は `lib/convex/receipts/spendingEntries.ts` への re-export ラッパーとして残す。
+- 集計の正本ロジックは `lib/convex/receipts/spendingEntries.ts` に集約する。
 - M18 の後続 Issue は `expenseEntries` を正本として扱える。
 
 ## 22. N2. P1 LINE連携基盤

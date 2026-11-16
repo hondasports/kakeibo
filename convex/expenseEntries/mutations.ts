@@ -1,10 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import {
-  createExpenseEntriesFromDraftHandler,
-  type CreateExpenseEntriesFromDraftArgs,
-} from "../../lib/convex/expenseEntries/createFromDraft";
-import {
   createExpenseEntriesHandler,
   createIncomeEntryHandler,
   deleteExpenseEntryHandler,
@@ -21,8 +17,6 @@ export {
   createIncomeEntryHandler,
   deleteExpenseEntryHandler,
   updateExpenseEntryHandler,
-  createExpenseEntriesFromDraftHandler,
-  type CreateExpenseEntriesFromDraftArgs,
   bulkDeleteSpendingRecordsHandler,
   bulkUpdateSpendingCategoriesHandler,
 };
@@ -50,22 +44,6 @@ export const createExpenseEntries = mutation({
   },
   handler: async (ctx, args) => {
     await createExpenseEntriesHandler(ctx, args);
-  },
-});
-
-export const createExpenseEntriesFromDraft = mutation({
-  args: {
-    draftId: v.id("aiExpenseDrafts"),
-    items: v.array(
-      v.object({
-        itemName: v.optional(v.string()),
-        amountYen: v.number(),
-        categoryId: v.optional(v.id("categories")),
-      }),
-    ),
-  },
-  handler: async (ctx, args) => {
-    return await createExpenseEntriesFromDraftHandler(ctx, args);
   },
 });
 

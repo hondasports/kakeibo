@@ -1,6 +1,5 @@
 /**
  * 受信者通知の1バッチ処理（内部ステップ）。
- * 既存 groupDeletionRecipientNotifications.processRecipientNotificationBatch の移植 —
  * 未処理受信者へ started/completed メールを enqueue し、全件処理済みなら次ステージへ進める。
  */
 import { BATCH_SIZE } from "../../domain/groupDeletion/constants";

@@ -5,7 +5,7 @@
 import type { ActionCtx, MutationCtx, QueryCtx } from "../../../convex/_generated/server";
 import { createGroupReadRepository } from "../groups/convexGroupRepository";
 import { createUserSettingsRepository } from "../users/userSettingsRepository";
-import { createLineAccountLinkReader } from "./convexLineAccountLinkReader";
+import { createLineAccountLinkReader } from "../lineLink/convexLineAccountLinkStore";
 import { createLineActiveGroupResolver } from "./convexLineActiveGroupResolver";
 import { createLineImageJobReader, createLineImageJobStore } from "./convexLineImageJobStore";
 import { createLineSummaryDataReader } from "./convexLineSummaryDataReader";

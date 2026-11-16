@@ -87,11 +87,11 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "oxlint",
-      "oxfmt --check"
+      "oxlint --no-error-on-unmatched-pattern",
+      "oxfmt --check --no-error-on-unmatched-pattern"
     ],
     "*.{json,css}": [
-      "oxfmt --check"
+      "oxfmt --check --no-error-on-unmatched-pattern"
     ]
   },
   "engines": {
