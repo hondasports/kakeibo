@@ -1,18 +1,21 @@
-import type { ActionCtx } from "../_generated/server";
+import type { ActionCtx } from "../../../convex/_generated/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LINE_UNLINKED_GUIDANCE_MESSAGE,
   MOCK_LINE_IMAGE_BYTES,
   getLineMessageContent,
   sendLineTextReply,
-} from "./client";
+} from "./lineMessagingClient";
 import {
   LineImageContentTooLargeError,
   MAX_LINE_IMAGE_RAW_BYTES,
-} from "../../lib/domain/lineImage/content";
-import { sendSummaryReplyHandler, sendUnlinkedGuideHandler } from "./actions";
-import { LINE_SUMMARY_UNAVAILABLE_MESSAGE } from "../../lib/domain/lineSummary/reply";
-import { buildLineQuickReplyActions } from "../../lib/domain/lineSummary/quickReply";
+} from "../../domain/lineImage/content";
+import {
+  sendSummaryReplyHandler,
+  sendUnlinkedGuideHandler,
+} from "../../../convex/lineWebhook/actions";
+import { LINE_SUMMARY_UNAVAILABLE_MESSAGE } from "../../domain/lineSummary/reply";
+import { buildLineQuickReplyActions } from "../../domain/lineSummary/quickReply";
 
 function setEnvironment(values: Record<string, string | undefined>) {
   const original = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));

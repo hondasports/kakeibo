@@ -1,3 +1,4 @@
+import { normalizeEmail } from "../../lib/domain/users/email";
 import { httpAction } from "../_generated/server";
 import type { E2eTaxReviewReceiptCase } from "../aiExpenseDrafts/e2eDraftFixtures";
 import type { ActionCtx } from "../_generated/server";
@@ -274,7 +275,7 @@ export const e2eSeedPendingGroupInvitationHandler = httpAction(async (ctx, req) 
   const scope = await resolveE2eScope(ctx, body);
   if (scope instanceof Response) return scope;
 
-  const invitationEmail = body.invitationEmail?.trim().toLowerCase();
+  const invitationEmail = normalizeEmail(body.invitationEmail);
   if (!invitationEmail) {
     return new Response(JSON.stringify({ error: "invitationEmail is required." }), {
       status: 400,

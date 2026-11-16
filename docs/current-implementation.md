@@ -261,7 +261,7 @@ LINEはClerk認証を置き換えるログイン方式ではなく、認証済�
 - 連携済みtextメッセージからの読み取り専用サマリー返信（今週の支出・収入・カテゴリ別・週別推移。未知テキストは使い方案内のみ。代表的な自然文はルールベースで既存intentへ正規化する）
 - サマリー返信と使い方へのクイックリプライ（既存テキストコマンドと `APP_BASE_URL` の `/weeks/current/input`。未連携案内には家計操作を付けない）
 - 連携済みimageメッセージの一時取得とAI支出下書き作成（Web確認必須。LINE側での登録・編集・削除はしない）
-- Messaging API channel 向け default Rich Menu のセル定義（`lib/domain/lineSummary/richMenu.ts`）、設置用画像、および mock-safe な apply client（`convex/lineWebhook/richMenuClient.ts`）。実行時の自動適用はしない。人間が `pnpm run line:rich-menu -- --apply` で非Production channelへ設置する。セルは読み取り専用サマリーの message action のみで、レシート送信と Web 起動はクイックリプライ側に置く
+- Messaging API channel 向け default Rich Menu のセル定義（`lib/domain/lineSummary/richMenu.ts`）、設置用画像、および mock-safe な apply client（`lib/convex/lineWebhook/lineRichMenuClient.ts`）。実行時の自動適用はしない。人間が `pnpm run line:rich-menu -- --apply` で非Production channelへ設置する。セルは読み取り専用サマリーの message action のみで、レシート送信と Web 起動はクイックリプライ側に置く
 
 関連テーブル:
 

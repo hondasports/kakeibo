@@ -6,7 +6,7 @@ import type { ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import schema from "../schema";
 import { convexTestModules } from "../test.setup";
-import { MOCK_LINE_IMAGE_BYTES } from "./client";
+import { MOCK_LINE_IMAGE_BYTES } from "../../lib/convex/lineWebhook/lineMessagingClient";
 import { buildLinkedImageReply, processLinkedImageHandler } from "./image";
 import {
   LINE_IMAGE_CONSENT_REQUIRED_MESSAGE,

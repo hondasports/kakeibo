@@ -5,7 +5,7 @@ import type { SendSummaryReplyJobArgs } from "../../lib/domain/lineWebhook/actio
 import { createLineWebhookActionDeps } from "../../lib/convex/lineWebhook/lineWebhookDeps";
 import { sendSummaryReply as sendSummaryReplyUseCase } from "../../lib/usecase/lineWebhook/sendSummaryReply";
 import { sendUnlinkedGuide as sendUnlinkedGuideUseCase } from "../../lib/usecase/lineWebhook/sendUnlinkedGuide";
-import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "./client";
+import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../lib/convex/lineWebhook/lineMessagingClient";
 
 export async function sendUnlinkedGuideHandler(
   ctx: ActionCtx,

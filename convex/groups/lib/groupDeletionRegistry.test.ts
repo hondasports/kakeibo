@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import schema from "../../schema";
-import { GROUP_DELETION_PURGE_TABLES } from "./groupDeletionRegistry";
+import { GROUP_DELETION_PURGE_STAGES as GROUP_DELETION_PURGE_TABLES } from "../../../lib/domain/groupDeletion/stages";
 
 function getSchemaGroupScopedTables() {
   return Object.entries(schema.tables)

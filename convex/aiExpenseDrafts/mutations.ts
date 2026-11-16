@@ -9,7 +9,7 @@ import {
   amountBasisValidator,
   receiptItemLineTypeValidator,
   receiptItemTaxRatePercentValidator,
-} from "./model";
+} from "./validators";
 import { requireGroupMembership } from "../groups/membership";
 import { deleteAiExpenseDraft } from "../../lib/usecase/aiExpenseDrafts/deleteDraft";
 import { createAiExpenseDraftDeps } from "../../lib/convex/aiExpenseDrafts/draftUsecaseDeps";

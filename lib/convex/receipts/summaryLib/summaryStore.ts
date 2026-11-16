@@ -6,7 +6,7 @@ import {
   getWeekIncomeEntries,
   getWeekSpendingEntries,
   getYearAggregationEntries,
-} from "../../../../convex/receipts/spendingEntries";
+} from "../spendingEntries";
 import type { SummaryStore } from "../../../usecase/receipts/summaries";
 import { buildCategoryInfoMap } from "./categoryAggregation";
 

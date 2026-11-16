@@ -3,7 +3,7 @@ import { paginationOptsValidator } from "convex/server";
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { aiExpenseDraftStatusValidator } from "./model";
+import { aiExpenseDraftStatusValidator } from "./validators";
 import { requireGroupMembership } from "../groups/membership";
 import {
   listAiExpenseDraftsByStatus,

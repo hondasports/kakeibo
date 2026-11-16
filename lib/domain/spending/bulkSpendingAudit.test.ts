@@ -4,7 +4,7 @@ import {
   BULK_SPENDING_DELETED_ACTION,
   buildBulkSpendingAuditSnapshot,
   formatBulkSpendingAuditTargetLabel,
-} from "./bulkOpsAudit";
+} from "./bulkSpendingAudit";
 
 describe("buildBulkSpendingAuditSnapshot", () => {
   it("件数・ID・日付・カテゴリだけを残し、金額や店名は持たない", () => {
