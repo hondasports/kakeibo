@@ -68,7 +68,9 @@ license: Apache-2.0
 ### 指摘の収集と照合
 
 - PR指摘は `node scripts/collect-pr-findings.mjs --pr <番号>` で機械収集して全件確認する（inlineスレッド・全stateの非空レビュー本文・PR会話コメント）。修正か棄却の根拠を残す。
-- Devin Review の指摘は collect-pr-findings.mjs の収集範囲（GitHub 上の inline スレッド・レビュー本文・PR会話コメント）に入らない。merge_ready を宣言する前に、Devin Review の該当PRページ（https://app.devin.ai/review/hondasports/kakeibo/pull/<番号>）を直接開いて新規指摘がないか確認する。GitHub のPR画面に指摘が見えなくても「指摘なし」とはしない。
+- Devin Review は GitHub にレビュー本文（`No Issues Found` や `N flag` の件数だけ）を投稿し、指摘の中身は投稿しない設定になっている。本文は最初に解析した HEAD に付き、後の push は解析しても投稿し直さないことがある。件数も、指摘を直した後に更新されない。このため GitHub の本文だけで「指摘なし」とはせず、merge_ready を宣言する前に次の順で確かめる。
+  1. 最新 HEAD の commit status `Devin Review` が `success`（`Completed analysis`）になるまで待つ（`gh api repos/{owner}/{repo}/commits/<HEAD>/statuses`）。status は件数を持たず、指摘があっても `success` になるので、解析が終わった合図にだけ使う。
+  2. Devin Review の該当PRページ（https://app.devin.ai/review/hondasports/kakeibo/pull/<番号>）を開き、「要対応」が 0 件であることを確かめる。要対応があれば中身を読み、修正するか棄却の根拠を残す。
 - レビュー本文と会話コメントはresolve状態を持たない。対応済みのfinding idと、確認した候補のupdatedAtをIssue・PRの記録に残し、`--handled <ファイル>` で `unhandledCount: 0` を「指摘なし」と判定する。未解決threadはresolveするまで常に未対応。
 - `bodyTruncated`・`commentsTruncated` の項目は、記載URLの全文を読むまで確認済みとしない。
 - CodeRabbitの「レビューをskipした」「利用上限に達した」通知はレビューではない。最新HEADをレビュー済みとして数えない。
