@@ -23,6 +23,7 @@ import { ITEM_IDENTITY_CHANGED, getItemTaxConfirmedFields } from "./itemTaxConfi
 import { deriveReceiptTaxSummaries } from "./deriveReceiptTaxSummaries";
 import { normalizeTaxSummary } from "./taxSummaryConsistency";
 import { taxSummaryEvidenceLines } from "./summaryEvidence";
+import { splitCombinedSummaryLines } from "./combinedSummaryLines";
 
 export type DraftTaxOverride = {
   itemIndex: number;
@@ -154,7 +155,9 @@ function resolveReconciledItemBases(
 }
 
 export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): ReinterpretDraftTaxResult {
-  const rawObservationLines = resolveObservationAmounts(input.rawObservationLines);
+  const rawObservationLines = splitCombinedSummaryLines(
+    resolveObservationAmounts(input.rawObservationLines),
+  );
   const needsRateConfirmation = input.items.map(
     (item, index) =>
       Boolean(item.taxReviewReasons?.includes(ITEM_IDENTITY_CHANGED)) &&
