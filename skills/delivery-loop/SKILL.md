@@ -68,7 +68,9 @@ license: Apache-2.0
 ### 指摘の収集と照合
 
 - PR指摘は `node scripts/collect-pr-findings.mjs --pr <番号>` で機械収集して全件確認する（inlineスレッド・全stateの非空レビュー本文・PR会話コメント）。修正か棄却の根拠を残す。
-- Devin Review の指摘は collect-pr-findings.mjs の収集範囲（GitHub 上の inline スレッド・レビュー本文・PR会話コメント）に入らない。merge_ready を宣言する前に、Devin Review の該当PRページ（https://app.devin.ai/review/hondasports/kakeibo/pull/<番号>）を直接開いて新規指摘がないか確認する。GitHub のPR画面に指摘が見えなくても「指摘なし」とはしない。
+- Devin Review は GitHub にレビュー本文（`No Issues Found` や `N flag` の件数だけ）を投稿し、指摘の中身は投稿しない設定になっている。本文は最初に解析した HEAD に付き、後の push は解析しても投稿し直さないことがある。件数も、指摘を直した後に更新されない。このため GitHub の本文だけで「指摘なし」とはせず、merge_ready を宣言する前に次の順で確かめる。
+  1. 最新 HEAD の commit status `Devin Review` が `success`（`Completed analysis`）になるまで待つ（`gh api repos/{owner}/{repo}/commits/<HEAD>/statuses`）。status は件数を持たず、指摘があっても `success` になるので、解析が終わった合図にだけ使う。
+  2. Devin Review の該当PRページ（https://app.devin.ai/review/hondasports/kakeibo/pull/<番号>）を開き、「要対応」が 0 件であることを確かめる。要対応があれば中身を読み、修正するか棄却の根拠を残す。棄却した指摘はページで無効化して「無効化済み」へ移す。根拠を残すだけでは要対応に残る。権限で無効化できなければ、対象を挙げてユーザーに依頼する（承認待ち）。
 - レビュー本文と会話コメントはresolve状態を持たない。対応済みのfinding idと、確認した候補のupdatedAtをIssue・PRの記録に残し、`--handled <ファイル>` で `unhandledCount: 0` を「指摘なし」と判定する。未解決threadはresolveするまで常に未対応。
 - `bodyTruncated`・`commentsTruncated` の項目は、記載URLの全文を読むまで確認済みとしない。
 - CodeRabbitの「レビューをskipした」「利用上限に達した」通知はレビューではない。最新HEADをレビュー済みとして数えない。
@@ -98,6 +100,7 @@ license: Apache-2.0
   - 必要なcheckが揃っている。base `main` は、rulesetの必須checkの一覧（`gh api repos/{owner}/{repo}/rules/branches/main --jq '.[]|select(.type=="required_status_checks")|.parameters.required_status_checks[].context'`）を取り、最新HEADのcheck（`gh pr checks <番号> --json name,state`）にすべてあることを照合する。`gh pr checks --required` は報告済みのcheckから絞り込むだけなので、まだ登録されていない必須checkを見落とす。branch protectionも設定されていれば、`gh api repos/{owner}/{repo}/branches/main --jq '.protection.required_status_checks.contexts[]'` の必須checkも一覧に足す。`preview` にはrulesetが無く必須checkが登録されないため、`ci.yml`・`e2e.yml`・`pr-update-spec.yml` のrunが最新HEADにあることを確かめる。
   - 揃ったcheckがすべてsuccess（workflowの条件によるskipは可。failure・cancelled・pendingは不可）。
   - 未対応finding 0、未解決thread 0、conflictなし。
+  - 最新HEADの Devin Review の要対応 0。`collect-pr-findings.mjs` の結果には現れないので、「指摘の収集と照合」の Devin Review の手順で別に確かめる。
 - マージ方式はユーザーの指定に従う。指定がなければ、同じbaseに直近でマージされたPRと同じ方式にする。
 - マージ後はPRのmerged状態とマージ先の新しいSHAを確認する。`preview` へのマージなら、続いて走る `preview-deploy.yml` の結果も報告に含める。
 
