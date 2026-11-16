@@ -150,9 +150,15 @@ export function markerEvidence(
 }
 
 export function positionEvidence(input: ReceiptTaxInput) {
-  const rawLineByIndex = new Map(
-    (input.rawObservationLines ?? []).map((line) => [line.sourceLineIndex, line]),
-  );
+  // 対象額と税額に分けた行は同じ sourceLineIndex を持つため、同じ印字行の文言をまとめて見る。
+  const rawTextByIndex = new Map<number, string>();
+  for (const line of input.rawObservationLines ?? []) {
+    const previous = rawTextByIndex.get(line.sourceLineIndex);
+    rawTextByIndex.set(
+      line.sourceLineIndex,
+      previous === undefined ? line.rawText : `${previous} ${line.rawText}`,
+    );
+  }
   const contextualRates = (input.receiptLineClassifications ?? []).flatMap((classification) => {
     if (
       classification.candidates[0]?.role !== "tax" ||
@@ -160,8 +166,7 @@ export function positionEvidence(input: ReceiptTaxInput) {
     ) {
       return [];
     }
-    const text =
-      rawLineByIndex.get(classification.sourceLineIndex)?.rawText.normalize("NFKC") ?? "";
+    const text = rawTextByIndex.get(classification.sourceLineIndex)?.normalize("NFKC") ?? "";
     return [
       ...(/軽減(?:税率|税)/.test(text) ? ([8] as const) : []),
       ...(/標準(?:税率|税)/.test(text) ? ([10] as const) : []),

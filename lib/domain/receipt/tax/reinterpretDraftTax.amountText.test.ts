@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { reinterpretDraftTax } from "./reinterpretDraftTax";
+import { splitCombinedSummaryLines } from "./combinedSummaryLines";
+import { positionEvidence } from "./interpretTaxEvidence";
 import { unprovenTargetReceipt } from "./fixtures/unprovenTargetReceipt";
 import type { ReceiptLineClassification, ReceiptRawObservationLine } from "../observations";
 
@@ -99,4 +101,138 @@ describe("金額が amountText にだけ残る印字行（Issue #1018）", () =>
       expect(allocated(subtotalWithAmountTextOnly({ amountText }))).toBe(false);
     },
   );
+});
+
+/**
+ * Issue #1280 の本番観測を匿名化した形。対象額と消費税額が1行に並び、
+ * AIは `amountYen: null`、`amountText` に2つの金額を残していた。
+ */
+function combinedTargetAndTaxReceipt(
+  overrides: { rateLine?: string; rateAmountText?: string; totalLine?: string } = {},
+) {
+  const rateLine = overrides.rateLine ?? "10%税抜 ¥220 消費税等 ¥22";
+  const totalLine = overrides.totalLine ?? "合計税抜 ¥220 消費税計 ¥22";
+  return {
+    amountYen: 242,
+    items: [
+      {
+        itemName: "商品",
+        lineType: "item" as const,
+        printedAmountYen: 220,
+        amountBasis: "tax_excluded" as const,
+        taxRatePercent: 10 as const,
+        markers: [],
+        warnings: [],
+        taxResolutionStatus: "resolved" as const,
+        taxResolutionSource: "item_explicit" as const,
+      },
+    ],
+    taxSummaries: [],
+    rawObservationLines: [
+      line(0, "商品 1コ ¥220", 220, ["item"]),
+      line(1, rateLine, null, ["tax", "subtotal"], overrides.rateAmountText ?? "¥220 / ¥22"),
+      line(2, totalLine, null, ["subtotal", "tax"], "¥220 / ¥22"),
+      line(3, "合計 1点 ¥242", 242, ["total"]),
+      line(4, "お預り ¥242", 242, ["payment"]),
+    ],
+    receiptLineClassifications: [
+      classification(0, "classified", [["item", 0.75]]),
+      classification(1, "ambiguous", [
+        ["subtotal", 0.75],
+        ["tax", 0.75],
+      ]),
+      classification(2, "classified", [
+        ["tax", 0.94],
+        ["totalCandidate", 0.94],
+      ]),
+      classification(3, "classified", [["totalCandidate", 1]]),
+      classification(4, "classified", [["cashReceived", 1]]),
+    ],
+  };
+}
+
+describe("対象額と消費税額が1行に並ぶ印字行（Issue #1280）", () => {
+  it("ラベルごとに金額を読み、税額を確定して配分する", () => {
+    const result = reinterpretDraftTax(combinedTargetAndTaxReceipt());
+    expect(result.interpretation.taxSummaries).toEqual([
+      expect.objectContaining({
+        taxRatePercent: 10,
+        status: "verified",
+        taxableAmountYen: 220,
+        taxYen: 22,
+      }),
+    ]);
+    expect(result.itemFields[0]).toMatchObject({
+      taxAllocationStatus: "allocated",
+      allocatedTaxYen: 22,
+      normalizedAmountYen: 242,
+    });
+  });
+
+  it.each([
+    ["通貨記号と円を併用した金額", "10%税抜 ¥220円 消費税等 ¥22円", "¥220円 / ¥22円"],
+    ["税率と%の間に空白がある", "10 %税抜 ¥220 消費税等 ¥22", "¥220 / ¥22"],
+  ])("%sも読んで配分する", (_, rateLine, rateAmountText) => {
+    const result = reinterpretDraftTax(combinedTargetAndTaxReceipt({ rateLine, rateAmountText }));
+    expect(result.itemFields[0]).toMatchObject({
+      taxAllocationStatus: "allocated",
+      allocatedTaxYen: 22,
+    });
+  });
+
+  it("税率の空白を除いて、後ろの税額の行にも税率を付ける", () => {
+    const [, tax] = splitCombinedSummaryLines([
+      line(1, "10 %税抜 ¥220 消費税等 ¥22", null, ["tax"], "¥220 / ¥22"),
+    ])!;
+    expect(tax).toMatchObject({ rawText: "10%消費税等 ¥22", amountYen: 22 });
+  });
+
+  it("分けた行の両方の文言を、位置による税率の根拠に使う", () => {
+    const lines = splitCombinedSummaryLines([
+      line(1, "標準税率対象 ¥220 消費税等 ¥22", null, ["tax"], "¥220 / ¥22"),
+    ]);
+    expect(lines).toHaveLength(2);
+    const evidence = positionEvidence({
+      amountYen: 242,
+      items: [],
+      taxSummaries: [],
+      rawObservationLines: lines,
+      receiptLineClassifications: [
+        {
+          sourceLineIndex: 1,
+          status: "classified",
+          candidates: [{ role: "tax", score: 1, evidence: ["position:receipt_footer"] }],
+        },
+      ],
+    });
+    expect(evidence?.composition).toBe("rate10");
+  });
+
+  it("印字された税額が税率の計算と合わなければ、従来どおり矛盾として止める", () => {
+    const result = reinterpretDraftTax(
+      combinedTargetAndTaxReceipt({
+        rateLine: "10%税抜 ¥220 消費税等 ¥30",
+        rateAmountText: "¥220 / ¥30",
+      }),
+    );
+    expect(result.itemFields[0].taxAllocationStatus).toBe("unallocated");
+    expect(result.interpretation.taxSummaries[0].status).not.toBe("verified");
+  });
+
+  it.each([
+    ["ラベルの無い金額がある", "10%税抜 ¥220 ¥22", "¥220 / ¥22"],
+    ["同じ種類のラベルが2つある", "10%消費税 ¥220 消費税等 ¥22", "¥220 / ¥22"],
+    ["金額の後ろに文字が残る", "10%税抜 ¥220 消費税等 ¥22 他", "¥220 / ¥22"],
+    ["金額が3つある", "10%税抜 ¥220 消費税等 ¥22 合計 ¥242", "¥220 / ¥22 / ¥242"],
+    ["amountText と原文の金額が違う", "10%税抜 ¥220 消費税等 ¥22", "¥220 / ¥20"],
+    ["負の金額がある", "10%税抜 220円 消費税等 -22円", "220円 / -22円"],
+    ["▲付きの金額がある", "10%税抜 ¥220 消費税等 ▲¥22", "¥220 / ▲¥22"],
+    ["判読できない桁がある", "10%税抜 ¥220? 消費税等 ¥22", "¥220? / ¥22"],
+    ["判読できない先頭の桁がある", "10%税抜 220円 消費税等 ?22円", "220円 / ?22円"],
+    ["対象額の先頭の桁が判読できない", "10%税抜 ?220円 消費税等 22円", "?220円 / 22円"],
+    ["小数の金額がある", "10%税抜 ¥220.5 消費税等 ¥22", "¥220.5 / ¥22"],
+  ])("%s行は読めない税の根拠のまま止める", (_, rateLine, rateAmountText) => {
+    const result = reinterpretDraftTax(combinedTargetAndTaxReceipt({ rateLine, rateAmountText }));
+    expect(result.itemFields[0].taxAllocationStatus).toBe("unallocated");
+  });
 });
