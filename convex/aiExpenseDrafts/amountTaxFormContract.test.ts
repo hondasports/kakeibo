@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
-import { makeFunctionReference, type FunctionArgs } from "convex/server";
+import type { FunctionArgs } from "convex/server";
 import type { Id } from "../_generated/dataModel";
 import { api } from "../_generated/api";
 import schema from "../schema";
@@ -157,7 +157,7 @@ describe("金額・税の保存とフォーム契約", () => {
     ["割引対象保存あり", "resolved", "resolved", "resolved"],
     ["割引対象保存なし", "resolved", "resolved", "resolved"],
   ])(
-    "同じ下書きの保存・一覧・フォーム・登録・移行: %s",
+    "同じ下書きの保存・一覧・フォーム・登録: %s",
     async (scenario, expectedStored, expectedForm, expectedSaved) => {
       const { t, ids } = await setup();
       const prepared = await t.run(async ({ db }) => {
@@ -284,14 +284,6 @@ describe("金額・税の保存とフォーム契約", () => {
       await t.run(({ db }) =>
         db.patch(ids.draftId, { status: "needs_review", reviewReasons: ["amount_mismatch"] }),
       );
-      const migration = makeFunctionReference<"mutation">(
-        "aiExpenseDraftAmountTaxMigration:executeBatch",
-      );
-      await t.mutation(migration, {});
-      const migrated = (await t.run(({ db }) => db.get(ids.draftId)))!;
-      expect(migrated.reviewReasons.includes("amount_mismatch")).toBe(j.status !== "resolved");
-      if (j.status === "resolved")
-        expect(migrated.listSummary?.itemSummary?.itemDifferenceYen).toBe(0);
       const submitItems = initial.map((item) => ({
         ...(item.persistedItemId
           ? { itemId: item.persistedItemId as Id<"aiExpenseDraftItems"> }

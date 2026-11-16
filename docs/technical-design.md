@@ -270,9 +270,6 @@ convex/
   systemAdminPendingInvitationAction.ts
   systemAdminOwnerlessGroupRecovery.ts
   systemAdminGroupDeletion.ts
-  legacyGroupDeletionAuditMigration.ts
-  orphanedLineLinkMigration.ts   # 退会済みユーザーに残った LINE 連携データの一回限り内部 migration（§16.4）
-  aiExpenseDraftRegisteredAtMigration.ts # 登録済み下書きの registeredAt を補完する一回限り内部 backfill（§16.4）
 
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
@@ -1641,55 +1638,13 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 - 必須項目追加で既存データが壊れないか
 - query/mutationの認可条件が維持されているか
 
-#### 退会済みユーザーの LINE 連携データ掃除（一回限りの内部 migration）
+#### 完了済みのデータ移行
 
-finalize の purge に `lineAccountLinks` 等を加える前に完了した退会では、active な連携が取り残され、LINE webhook の解決と再連携（`LINE_LINK_CONFLICT`）を妨げる。また LINE OAuth を開始しただけで連携を完了せず退会したユーザーには `lineAccountLinks` が無く、`lineLinkRequests` / `lineLinkAuditLogs` だけが残る。`convex/orphanedLineLinkMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`users` に行が無い userId の連携データを削除する。存在するユーザーと、終端でない `accountDeletionRequests` を持つ userId には触れない。
-
-走査は 3 つの phase を `links` → `requests` → `auditLogs` の順に、テーブルごとに独立した pagination で行う（1 page 10 件）。
-
-- `links`: `lineAccountLinks` の孤立リンクと、その userId の通知 job / event・連携リクエスト・監査ログを削除する。通知 job はリンクより先に削除する。
-- `requests`: リンクを持たない孤立 userId の `lineLinkRequests` を削除する。
-- `auditLogs`: リンクを持たない孤立 userId の `lineLinkAuditLogs` を削除する。
-
-cursor は `"<phase>:<Convex cursor>"` の文字列で、省略時は `links` の先頭。戻り値の `continueCursor` をそのまま次の呼び出しに渡す。最後の phase（`auditLogs`）が終わった時だけ `isDone: true` / `continueCursor: null` になる。戻り値・ログは件数のみで userId / lineUserId は含まない。
-
-**削除は不可逆で、孤児の判定根拠は「`users` に行が無い」ことだけである。** 完了した退会リクエストは日次 cron で消えるため、「退会が完了した」という積極的な証拠は要求していない。そのため、プロフィール作成（`upsertUser`）に失敗した認証済みユーザー（UI は使え、LINE 連携も開始できるが `users` 行が無い。`useInitializeUser` は失敗をログのみで継続する）の連携を、孤児と誤判定して消す可能性がある。誤って消した連携は、本人が LINE 連携をやり直せば復旧し、失われるのは連携情報に限られる。この判定方針は、プロダクトオーナーが「`users` 行が無ければ削除」で確定したものである。
-
-運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の件数が想定の退会者数と妥当に一致することを確認してから `executeBatch` を実行し、想定より多い場合は実行せず内訳を調べる。**
-
-1. `pnpm exec convex run orphanedLineLinkMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`orphanLinks` / `orphanRequests` / `orphanAuditLogs` と `wouldDelete` を確認。`wouldDelete` は phase 間で重複しうる上限見積もり）
-2. `pnpm exec convex run orphanedLineLinkMigration:executeBatch '{}'`（自己再スケジュールで全 phase を最後まで進む。冪等なので再実行可。`isDone: true` を戻り値かログで確認）
-3. `pnpm exec convex run orphanedLineLinkMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remainingOrphanLinks` / `remainingOrphanRequests` / `remainingOrphanAuditLogs` が 0 であること）
-
-#### 登録済み下書きの registeredAt 補完（一回限りの内部 backfill）
-
-登録済み下書き一覧は `by_group_id_and_status_and_registered_at` index で登録日時降順に並ぶ。フィールド追加前の登録済み下書きは `registeredAt` を持たず、index 上は未設定（最小値）として一覧の末尾に並ぶため、登録日時の正しい位置に戻すには本 backfill が必要である。
-
-`convex/aiExpenseDraftRegisteredAtMigration.ts`（`legacyGroupDeletionAuditMigration.ts` と同じ dryRun / executeBatch / verify 構成、すべて internal、cron なし）が、`status === "registered"` かつ `registeredAt` 未設定の `aiExpenseDrafts` に `registeredAt` を書き込む。値は `derivedRegistration.registeredAt`（無ければ `updatedAt` を登録時点の近似として使う）。`registeredAt` を持つ下書き・未登録の下書き・`updatedAt` には触れない。
-
-走査はテーブル全体の pagination を 1 batch 25 件で行い、`executeBatch` は自分自身を再スケジュールして最後まで進む。冪等なので再実行してよい。戻り値・ログは件数のみで、ユーザー識別子を含まない。
-
-運用者は必ず非本番 deployment で先に実行し、結果を確認してから本番へ同じ手順を適用する。**`dryRun` の `needsBackfill` が既存の登録済み下書き数と妥当に一致することを確認してから `executeBatch` を実行する。**
-
-1. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:dryRun '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、`needsBackfill` / `alreadyBackfilled` を確認）
-2. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:executeBatch '{}'`（自己再スケジュールで最後まで進む。`isDone: true` を戻り値かログで確認）
-3. `pnpm exec convex run aiExpenseDraftRegisteredAtMigration:verify '{}'`（`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` で繰り返し、全 page で `remaining` が 0 であること）
-
-#### 下書き一覧の保存サマリ（listSummary）補完（一回限りの内部 backfill）
-
-2026-10-20 に本番で完了し、verify の `remaining=0` を確認した。
-
-#### 下書きの金額差異理由の再計算（一回限りの内部 migration）
-
-`convex/aiExpenseDraftAmountTaxMigration.ts` は `ready` / `needs_review` かつ明細100件以下の下書きについて、`judgeDraftAmountAndTax` と `buildDraftListSummary` で一覧サマリを再計算し、保存値と異なる場合は更新する。加えて明細が100件以下で `amount_mismatch` を持ち正本で解決済みの下書きだけ、その理由を除き、残る理由の有無で status を決める。101件以上では理由・status・listSummary のいずれも変更しない。両者が該当する場合は同じ書き込みで更新する。未解決の理由なし下書きには `amount_mismatch` を追加しない。税未確定は金額差異を意味しないためである。ほかの理由、明細、金額、税値、`updatedAt` と対象外 status は変更しない。下書きに対応する同一グループの明細を作成順に最大101件読み、100件以下のときのみ判定とサマリを計算し、101件目があれば更新を見送る。テーブルを25件ずつ cursor で走査する。`executeBatch` は自己再スケジュールし、再実行しても同じ結果になる。支出は作成しない。
-
-運用前に非本番で以下を確認する。本番操作は対象 deployment と操作の明示承認を得た運用者が行う。復旧に備え、実行前に対象 deployment のバックアップを取得し、対象・時刻・検証結果を記録する。バックアップの取得や復元も別途承認した手順で行う。
-
-1. `pnpm exec convex run aiExpenseDraftAmountTaxMigration:dryRun '{}'` を実行し、`continueCursor` が `null` になるまで `'{"cursor":"<continueCursor>"}'` を渡して続行する。全ページの `needsReasonRemoval`（理由を外す件数）と `needsSummaryOnly`（理由を変更せずサマリだけを更新する件数）の合計を確認する。`needsUpdate` は両者の合計である。`skippedOverLimit` は101件目があるため理由・status・サマリの更新をすべて見送った件数。
-2. 件数が妥当と確認できたら `pnpm exec convex run aiExpenseDraftAmountTaxMigration:executeBatch '{}'` を1回実行し、最終ページのログの `done=true` と `reasonRemoved` / `summaryUpdatedOnly` を確認する（戻り値は `isDone`）。
-3. 再び `dryRun` を全ページ実行し、`needsReasonRemoval` と `needsSummaryOnly` の合計がそれぞれ0であることを確認する。`skippedOverLimit` は残るため、件数と対象の扱いを別途確認する。並行更新がある場合はその影響も調査する。
-
-コードの revert だけでは書き込み済みデータは戻らない。問題があればバッチの継続と関係する書き込みを止め、実行前バックアップと実行後の変更を照合する。以後の利用者編集を上書きしないよう個別の復旧対象と方法を決め、承認を得て復旧する。理由の一律再追加は、元から理由のない下書きと区別できないため行わない。
+- 下書き一覧の保存サマリ: 2026-10-20、本番 verify の `remaining` 0。
+- 登録済み下書きの登録日時: 2026-11-15、本番 verify の `remaining` 合計 0。
+- 下書きの金額・税判定: 2026-11-15、本番 dryRun の `needsReasonRemoval`・`needsSummaryOnly`・`needsUpdate`・`skippedOverLimit` はすべて 0。
+- 退会済みユーザーの LINE 連携データ: 2026-11-15、本番 verify の `remainingOrphanLinks`・`remainingOrphanRequests`・`remainingOrphanAuditLogs` はすべて 0。
+- 旧グループ削除監査: 2026-11-15、本番 verify の `remainingOrphaned`・`unmigrated`・`skipped`、dryRun の `orphaned`・`convertible`・`skipped`・`alreadyProcessed` はすべて 0。 同日の監査移行記録の全件確認では `scanned`・`migrated`・`skipped`・`failed` はすべて 0。
 
 #### aiExpenseDraftItems の printedAmountYen 欠落行（据え置き・backfill 不実施）
 
