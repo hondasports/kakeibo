@@ -4,7 +4,7 @@ import { taxSummaryLineKind } from "./summaryEvidence";
 const LABELED_AMOUNT = /[¥￥]\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\s*円)?|(\d{1,3}(?:,\d{3})+|\d+)\s*円/g;
 const RATE_PREFIX = /^(\d+(?:\.\d+)?%)/;
 // 符号・小数・判読できない桁が隣接する金額は、数字の一部だけを読むことになるので分けない。
-const UNSAFE_BEFORE = /[-−▲△\d.,]$/;
+const UNSAFE_BEFORE = /[-−▲△\d.,?？]$/;
 const UNSAFE_AFTER = /^[\d.,?？]/;
 
 function amounts(text: string): { yen: number; start: number; end: number }[] | undefined {
