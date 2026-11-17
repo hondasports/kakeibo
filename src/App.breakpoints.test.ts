@@ -42,3 +42,28 @@ describe("App.css のレスポンシブ境界", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("週次サマリーのカテゴリ別表の列幅（PC・2列カード内に収める）", () => {
+  const css = readFileSync(resolve(process.cwd(), "src/App.css"), "utf8");
+  const rowRule = css.match(/\.weekly-category-header,\s*\.weekly-category-row\s*\{([^}]*)\}/);
+  const columns = rowRule?.[1].match(/grid-template-columns:\s*([^;]+);/)?.[1].trim() ?? "";
+  const tracks = columns.match(/minmax\([^)]*\)|\S+/g) ?? [];
+
+  it("名前の列は0pxから縮められる（minmax(0, …)）", () => {
+    expect(tracks[0]).toMatch(/^minmax\(\s*0(px)?\s*,/);
+  });
+
+  it("固定幅の列と列間隔の合計が、PC側の2列カードの最小内幅（約316px）の中で名前の列を残せる（240px以下）", () => {
+    const toPx = (track: string) => {
+      const match = track.match(/^(\d+(?:\.\d+)?)(px|rem)$/);
+      if (!match) return null;
+      return Number(match[1]) * (match[2] === "rem" ? 16 : 1);
+    };
+    const fixedPx = tracks.slice(1).map(toPx);
+    expect(fixedPx.every((px) => px !== null)).toBe(true);
+    const gapPx = 3 * 12; // var(--space-sm) = 12px、列は4つ
+    expect(fixedPx.reduce<number>((sum, px) => sum + (px ?? 0), 0) + gapPx).toBeLessThanOrEqual(
+      240,
+    );
+  });
+});

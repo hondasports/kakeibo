@@ -863,7 +863,7 @@
 .weekly-category-header,
 .weekly-category-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) 112px 64px 52px;
+  grid-template-columns: minmax(0, 1fr) 6rem 3.5rem 3rem;
   gap: var(--space-sm);
   align-items: center;
   padding: var(--space-sm) 0;
