@@ -2,8 +2,9 @@ import { BarChart } from "@mui/x-charts/BarChart";
 import { Box, Paper, Skeleton, Stack, Typography, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { HistoryTrendPoint } from "../../../../lib/domain/expenseSearch/analytics";
-import { formatYenCompact } from "../../../../lib/domain/common/currency";
+import { formatYenAxisTick, formatYenCompact } from "../../../../lib/domain/common/currency";
 import { formatDateForDisplay } from "../../../utils/date";
+import { yAxisWidthForLabels, yenAxisTickLabels } from "../../../utils/chartAxisLayout";
 
 function pointLabel(point: HistoryTrendPoint): string {
   if (point.granularity === "day") {
@@ -27,10 +28,16 @@ export function HistoryTrendChart({
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("sm"));
   const chartHeight = isCompact ? 220 : 260;
-  const chartMargin = isCompact
-    ? { bottom: 48, left: 60, right: 8, top: 16 }
-    : { bottom: 42, left: 56, right: 12, top: 16 };
   const hasData = points.some((point) => point.totalExpenseYen > 0 || point.totalIncomeYen > 0);
+  const axisMaxYen = points.reduce(
+    (max, point) => Math.max(max, point.totalExpenseYen, point.totalIncomeYen),
+    0,
+  );
+  // 縦軸の目盛りは幅が固定だと切れるため、目盛りの文字数から幅を決める。
+  const yAxisWidth = yAxisWidthForLabels(yenAxisTickLabels(axisMaxYen));
+  const chartMargin = isCompact
+    ? { bottom: 48, left: yAxisWidth, right: 8, top: 16 }
+    : { bottom: 42, left: yAxisWidth, right: 12, top: 16 };
   const dataset = points.map((point) => ({
     label: pointLabel(point),
     expense: point.totalExpenseYen,
@@ -95,8 +102,9 @@ export function HistoryTrendChart({
                 xAxis={[{ dataKey: "label", scaleType: "band" }]}
                 yAxis={[
                   {
-                    valueFormatter: (value: number | null) => formatYenCompact(value ?? 0),
-                    width: isCompact ? 62 : 56,
+                    valueFormatter: (value: number | null) =>
+                      formatYenAxisTick(value ?? 0, axisMaxYen),
+                    width: yAxisWidth,
                   },
                 ]}
               />
