@@ -39,9 +39,12 @@ export const enqueueAiReviewNotifications = internalMutation({
   args: {
     batchId: v.id("receiptAnalysisBatches"),
     userId: v.string(),
+    // 件数を引数で渡していた旧コードの呼び出しが、デプロイ中に validator で弾かれて通知を
+    // 落とさないよう、値は使わずに受け取るだけにしている。次の変更で消してよい。
+    pendingCount: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
-    await enqueueAiReviewNotificationsUsecase(createAiReviewEnqueueDeps(ctx), args);
+  handler: async (ctx, { batchId, userId }) => {
+    await enqueueAiReviewNotificationsUsecase(createAiReviewEnqueueDeps(ctx), { batchId, userId });
   },
 });
 

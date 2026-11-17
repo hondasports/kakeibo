@@ -303,4 +303,20 @@ describe("確認依頼の通知件数は、下書きの状態で決まる", () =
     expect(JSON.parse(rows.emails[0]!.payloadJson)).toEqual({ pendingCount: 2 });
     expect(rows.lineJobs[0]).toMatchObject({ pendingCount: 2 });
   });
+
+  it("旧コードが pendingCount を付けて呼んでも弾かれず、付けた値でなく数えた件数で通知する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const seeded = await seedBatchWithDrafts(t, 2);
+    await finalizeAllAsNeedsReview(t, seeded);
+
+    await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
+      batchId: seeded.batchId,
+      userId: USER_ID,
+      pendingCount: 7,
+    });
+    const rows = await readNotificationRows(t, seeded.batchId);
+
+    expect(JSON.parse(rows.emails[0]!.payloadJson)).toEqual({ pendingCount: 2 });
+    expect(rows.lineJobs[0]).toMatchObject({ pendingCount: 2 });
+  });
 });
