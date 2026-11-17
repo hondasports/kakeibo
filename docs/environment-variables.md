@@ -125,6 +125,9 @@ Clerk Dashboard の JWT template `convex` には `email`（`{{user.primary_email
 | -------------------- | ----------------------------------------- | ----- | --- | ---------- | ----------------------------------------------------- |
 | `E2E_CLEANUP_SECRET` | E2E クリーンアップ API の認証シークレット | ✅    | ✅  | ✅         | .env.local / GitHub Actions Secret / Convex Dashboard |
 | `E2E_CLERK_USER_ID`  | E2E操作を許可する固定テストユーザーの Clerk tokenIdentifier | ✅    | 生成 | ✅         | .env.local / Convex Dashboard |
+| `E2E_SYSTEM_ADMIN_MEMBERSHIP_FIXTURE` | system admin のメンバーシップ E2E（`e2e/system-admin-membership.spec.ts`・`e2e/notifications.spec.ts`）を有効にする。`"true"` のみ有効 | 任意 | 認証付き matrix で `true` | ❌ | workflow（`e2e.yml`・`preview-deploy.yml`） |
+| `E2E_SYSTEM_ADMIN_SEARCH_FIXTURE` | system admin の検索 E2E（`e2e/system-admin-search.spec.ts`）を有効にする。`"true"` のみ有効 | 任意 | 認証付き matrix で `true` | ❌ | workflow（`e2e.yml`・`preview-deploy.yml`） |
+| `PLAYWRIGHT_BYPASS_SECRET` | Playwright が Vercel Protection Bypass を使うための変数。設定時に `playwright.config.ts` が storageState を作り、`e2e/global-setup.ts` が bypass state を準備する | 任意 | `production-release.yml` が渡す | ✅ | workflow のみ（GitHub Secret `VERCEL_AUTOMATION_BYPASS_SECRET` の値を渡す） |
 
 Convex の E2E 専用 HTTP エンドポイント（`convex/http.ts` / `convex/e2eHttp/`）は常時登録される。各handlerは実行時に `APP_ENV=development`、`E2E_CLEANUP_SECRET` とヘッダ `X-E2E-Cleanup-Secret` を検証する。環境が許可外またはsecretが未設定なら503、不正なsecretなら401を返す。
 
@@ -139,12 +142,21 @@ GitHub Actionsでは、`preview-deploy.yml`、`e2e.yml`、`production-release.ym
 publishable keyから得たissuerとユーザーIDを組み合わせて`E2E_CLERK_USER_ID`をジョブ内で生成する。
 そのため、CIの固定IDを別のGitHub Secretとして手動同期しない。
 
-| エンドポイント | 用途 |
-| --- | --- |
-| `POST /e2e/cleanup` | 固定テストユーザーのE2Eテストデータのクリーンアップ |
-| `POST /e2e/purge-orphans` | deployment全体の孤児・終端運用データの物理削除（固定ユーザー検証なし） |
-| `POST /e2e/seed-ai-expense-draft` | AI 下書きのシード（認証なし疎通確認） |
-| `POST /e2e/seed-pending-group-invitation` | pending 招待のシード（`group-access` E2E 用） |
+| エンドポイント | 用途 | 固定ユーザー（`E2E_CLERK_USER_ID`）の検証 |
+| --- | --- | --- |
+| `POST /e2e/cleanup-auth-check` | E2E 認証経路の疎通確認。secret と `E2E_CLERK_USER_ID` の設定有無だけを確認し、データは変更しない | 設定の有無のみ（対象ユーザーは照合しない） |
+| `POST /e2e/cleanup` | 固定テストユーザーのE2Eテストデータのクリーンアップ。`seededUserId` 指定時は `e2e-seed\|` ユーザーのメンバーシップ掃除だけを許可する | あり |
+| `POST /e2e/purge-orphans` | deployment全体の孤児・終端運用データの物理削除 | なし |
+| `POST /e2e/seed-system-admin-membership` | system admin のメンバーシップ E2E 用 fixture の作成（`e2e-system-admin-291-` 接頭辞のみ） | あり |
+| `POST /e2e/cleanup-system-admin-membership` | 上記 fixture の削除（接頭辞単位） | あり |
+| `POST /e2e/seed-system-admin-search` | system admin の検索 E2E 用 fixture の作成（同じ接頭辞制約） | あり |
+| `POST /e2e/cleanup-system-admin-search` | 上記 fixture の削除（接頭辞単位） | あり |
+| `POST /e2e/seed-ai-expense-draft` | `ready` 状態の AI 下書きと E2E カテゴリ2件の作成 | あり |
+| `POST /e2e/seed-tax-review-draft` | 税レビュー用の `needs_review` 下書きの作成（`receiptCase` で税判定のケースを選ぶ） | あり |
+| `POST /e2e/seed-mixed-tax-review-draft` | 税率8%と10%が混在する `needs_review` 下書きの作成 | あり |
+| `POST /e2e/seed-tax-summary-conflict-draft` | 税サマリに不整合を含む `needs_review` 下書きの作成 | あり |
+| `POST /e2e/seed-unallocated-tax-draft` | 税額を明細へ配分できていない `needs_review` 下書きの作成 | あり |
+| `POST /e2e/seed-pending-group-invitation` | pending 招待のシード（`group-access` E2E 用） | あり |
 
 ### アプリ動作フラグ関連
 

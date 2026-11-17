@@ -1,6 +1,6 @@
 ---
 name: line-integration
-description: LINE連携（webhook・アカウント連携・サマリ返信・LINE通知・リッチメニュー・連携mode）を変更・操作するときに使う。対象パスは convex/line*/**・lib/**/line*/**、パスにLineLinkを含むファイル（設定画面・migration）、notifications配下でファイル名にline/Lineを含むもの、scripts/*line*。構成と注意点。
+description: LINE連携（webhook・アカウント連携・サマリ返信・LINE通知・リッチメニュー・連携mode）を変更・操作するときに使う。対象パスは convex/line*/**・lib/**/line*/**、パスにLineLinkを含むファイル（設定画面）、notifications配下でファイル名にline/Lineを含むもの、scripts/*line*。構成と注意点。
 license: Apache-2.0
 ---
 
