@@ -15,11 +15,11 @@ export interface ReceiptAnalysisReader {
     limit: number,
   ): Promise<ReceiptAnalysisJobRecord[]>;
   findJobByDraftId(draftId: string): Promise<ReceiptAnalysisJobRecord | null>;
-  /** バッチのジョブが指す下書きのうち、同じグループで実在し needs_review のものの数。 */
-  countNeedsReviewDraftsByBatch(batchId: string, limit: number): Promise<number>;
 }
 
 export interface ReceiptAnalysisStore extends ReceiptAnalysisReader {
+  /** バッチのジョブが指す下書きのうち、同じグループで実在し needs_review のものの数。 */
+  countNeedsReviewDraftsByBatch(batchId: string, limit: number): Promise<number>;
   insertBatch(fields: Omit<ReceiptAnalysisBatchRecord, "id" | "creationTime">): Promise<string>;
   patchBatch(
     id: string,

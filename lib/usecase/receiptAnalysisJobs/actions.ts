@@ -57,11 +57,10 @@ export async function checkReceiptAiReviewRequired(
 ): Promise<void> {
   const batch = await runner.getBatch(batchId);
   if (!batch?.createdByUserId) return;
-  const pendingCount = await runner.countNeedsReviewDrafts(batchId);
-  if (pendingCount === 0) return;
+  // 確認待ちの下書きの数は、通知を積む mutation の中で数える。ここで数えて渡すと、
+  // 数えた後・積む前に利用者が下書きを確認したときに、古い件数で通知してしまう。
   await runner.enqueueAiReviewRequiredNotifications({
     batchId,
     userId: batch.createdByUserId,
-    pendingCount,
   });
 }

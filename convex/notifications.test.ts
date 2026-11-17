@@ -504,6 +504,30 @@ describe("internal AI review notification enqueue", () => {
           createdAt: 1,
           updatedAt: 1,
         });
+        // 確認待ちの下書きを指すジョブが2件（通知の件数は下書きの数から数える）
+        for (let imageIndex = 0; imageIndex < 2; imageIndex += 1) {
+          const draftId = await ctx.db.insert("aiExpenseDrafts", {
+            groupId,
+            createdByUserId: "creator",
+            sourceType: "image_upload",
+            status: "needs_review",
+            documentType: "receipt",
+            confidence: {},
+            reviewReasons: [],
+            createdAt: 1,
+            updatedAt: 1,
+          });
+          await ctx.db.insert("receiptAnalysisImageJobs", {
+            batchId,
+            groupId,
+            draftId,
+            imageIndex,
+            fileName: `${imageIndex}.jpg`,
+            status: "needs_review",
+            createdAt: 1,
+            updatedAt: 1,
+          });
+        }
         return { groupId, batchId };
       })
       .then((ids) => ids.batchId);
@@ -517,7 +541,6 @@ describe("internal AI review notification enqueue", () => {
       await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
         batchId,
         userId: "creator",
-        pendingCount: 2,
       });
     }
 
@@ -555,7 +578,6 @@ describe("internal AI review notification enqueue", () => {
     await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
       batchId,
       userId: "creator",
-      pendingCount: 2,
     });
     const rows = await t.run(async (ctx) => ({
       emails: await ctx.db.query("transactionalEmailJobs").collect(),
@@ -585,7 +607,6 @@ describe("internal AI review notification enqueue", () => {
     await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
       batchId,
       userId: "creator",
-      pendingCount: 2,
     });
 
     const replayed = await t.run(async (ctx) => ({
@@ -602,7 +623,6 @@ describe("internal AI review notification enqueue", () => {
     await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
       batchId,
       userId: "creator",
-      pendingCount: 2,
     });
 
     const event = await t.run(
@@ -631,7 +651,6 @@ describe("internal AI review notification enqueue", () => {
     await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
       batchId,
       userId: "creator",
-      pendingCount: 2,
     });
 
     const rows = await t.run(async (ctx) => ({
@@ -650,7 +669,6 @@ describe("internal AI review notification enqueue", () => {
     await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
       batchId,
       userId: "attacker",
-      pendingCount: 2,
     });
     const rows = await t.run(async (ctx) => ({
       emails: await ctx.db.query("transactionalEmailJobs").collect(),

@@ -297,7 +297,5 @@ export function createReceiptAnalysisReader(ctx: Pick<QueryCtx, "db">): ReceiptA
         .unique();
       return doc === null ? null : toJobRecord(doc);
     },
-    countNeedsReviewDraftsByBatch: (batchId, limit) =>
-      countNeedsReviewDraftsByBatch(ctx, batchId, limit),
   };
 }

@@ -1343,7 +1343,6 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `receiptAnalysisJobs.mutations.cancelImageJob(jobId)`
 - `receiptAnalysisJobs.internal.finalizeBatchStatus(batchId)`（internal）
 - `receiptAnalysisJobs.internal.getBatchById(batchId)`（internal）
-- `receiptAnalysisJobs.internal.countNeedsReviewDraftsByBatchId(batchId)`（internal。バッチのジョブが指す下書きのうち、実在して `needs_review` のものを数える）
 - `receiptAnalysisJobs.actions.checkAiReviewRequired(batchId)`（internal action）
 
 バッチ画像解析は `receiptAnalysisBatches` / `receiptAnalysisImageJobs` テーブルで管理する。
@@ -1383,8 +1382,10 @@ draft をそのまま維持する。これにより回復した job はキュー
 
 `createBatch` 時に `receiptAnalysisBatches.createdByUserId` に実行ユーザーの `tokenIdentifier` を保存する。
 ジョブが `needs_review` など terminal 状態に更新されると、`updateJobStatus` は `aiReviewNotificationScheduledAt` を記録し、
-60 分後に `checkAiReviewRequired` をスケジュールする。60 分後に `needs_review` ジョブが残っていれば、
+60 分後に `checkAiReviewRequired` をスケジュールする。60 分後に、バッチのジョブが指す下書きのうち同じグループに実在して `needs_review` のものが残っていれば、
 `createdByUserId` に紐づくメールアドレスへ `ai_review_required` テンプレートの通知を送信する。
+件数はジョブの状態ではなく下書きの状態から、通知を積む mutation（`notifications.internal.enqueueAiReviewNotifications`）の
+中で数える。0 件ならメールも LINE も積まない。
 `aiReviewNotificationScheduledAt` は重複スケジュールを防ぐ。
 
 下書きの作成・更新・登録処理では、必ず `ctx.auth.getUserIdentity()` と `groupMembers` から

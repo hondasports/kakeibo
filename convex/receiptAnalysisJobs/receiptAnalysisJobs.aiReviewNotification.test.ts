@@ -128,14 +128,27 @@ async function finalizeAllAsNeedsReview(
   }
 }
 
-async function runCheck(t: TestT, batchId: Id<"receiptAnalysisBatches">) {
-  await t.action(internal.receiptAnalysisJobs.actions.checkAiReviewRequired, { batchId });
+async function readNotificationRows(t: TestT, batchId: Id<"receiptAnalysisBatches">) {
   return await t.run(async (ctx) => ({
     emails: await ctx.db.query("transactionalEmailJobs").collect(),
     lineJobs: await ctx.db.query("lineNotificationJobs").collect(),
     lineEvents: await ctx.db.query("lineNotificationEvents").collect(),
     batch: await ctx.db.get(batchId),
   }));
+}
+
+async function runCheck(t: TestT, batchId: Id<"receiptAnalysisBatches">) {
+  await t.action(internal.receiptAnalysisJobs.actions.checkAiReviewRequired, { batchId });
+  return await readNotificationRows(t, batchId);
+}
+
+/** 通知を積む mutation を直接呼ぶ。件数は引数でなく、mutation の中で下書きから数える。 */
+async function runEnqueue(t: TestT, batchId: Id<"receiptAnalysisBatches">) {
+  await t.mutation(internal.notifications.internal.enqueueAiReviewNotifications, {
+    batchId,
+    userId: USER_ID,
+  });
+  return await readNotificationRows(t, batchId);
 }
 
 async function setDraftStatus(t: TestT, draftId: Id<"aiExpenseDrafts">, status: DraftStatus) {
@@ -243,5 +256,51 @@ describe("確認依頼の通知件数は、下書きの状態で決まる", () =
     expect(JSON.parse(rows.emails[0]!.payloadJson)).toEqual({
       pendingCount: MAX_RECEIPT_ANALYSIS_BATCH_FILES,
     });
+  });
+
+  it.each(["ready", "failed", "running"] as const)(
+    "下書きが確認待ちのままなら、ジョブが %s でも下書きを数えて通知する",
+    async (jobStatus) => {
+      const t = convexTest(schema, convexTestModules);
+      const seeded = await seedBatchWithDrafts(t, 2);
+      await finalizeAllAsNeedsReview(t, seeded);
+      await t.run(async (ctx) => {
+        await ctx.db.patch(seeded.jobIds[0]!, { status: jobStatus, updatedAt: 2 });
+      });
+
+      const rows = await runCheck(t, seeded.batchId);
+
+      expect(rows.emails).toHaveLength(1);
+      expect(JSON.parse(rows.emails[0]!.payloadJson)).toEqual({ pendingCount: 2 });
+      expect(rows.lineJobs[0]).toMatchObject({ pendingCount: 2 });
+    },
+  );
+
+  it("通知を積む mutation を直接呼んでも、確認待ちの下書きが0件なら何も積まない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const seeded = await seedBatchWithDrafts(t, 2);
+    await finalizeAllAsNeedsReview(t, seeded);
+    // 件数を数えた後に下書きが確認された状況と同じく、mutation が呼ばれる時点で下書きは確認済み
+    await setDraftStatus(t, seeded.draftIds[0]!, "ready");
+    await setDraftStatus(t, seeded.draftIds[1]!, "registered");
+
+    const rows = await runEnqueue(t, seeded.batchId);
+
+    expect(rows.emails).toHaveLength(0);
+    expect(rows.lineJobs).toHaveLength(0);
+    expect(rows.lineEvents).toHaveLength(0);
+    expect(rows.batch?.aiReviewLineNotificationConsumedAt).toBeUndefined();
+  });
+
+  it("通知を積む mutation は、呼ばれた時点の下書きの数で通知する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const seeded = await seedBatchWithDrafts(t, 3);
+    await finalizeAllAsNeedsReview(t, seeded);
+    await setDraftStatus(t, seeded.draftIds[0]!, "ready");
+
+    const rows = await runEnqueue(t, seeded.batchId);
+
+    expect(JSON.parse(rows.emails[0]!.payloadJson)).toEqual({ pendingCount: 2 });
+    expect(rows.lineJobs[0]).toMatchObject({ pendingCount: 2 });
   });
 });

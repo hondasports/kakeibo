@@ -39,7 +39,6 @@ export const enqueueAiReviewNotifications = internalMutation({
   args: {
     batchId: v.id("receiptAnalysisBatches"),
     userId: v.string(),
-    pendingCount: v.number(),
   },
   handler: async (ctx, args) => {
     await enqueueAiReviewNotificationsUsecase(createAiReviewEnqueueDeps(ctx), args);

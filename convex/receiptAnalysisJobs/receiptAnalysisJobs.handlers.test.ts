@@ -1,10 +1,10 @@
 import { ConvexError } from "convex/values";
 import { describe, expect, it, vi } from "vitest";
+import { createReceiptAnalysisStore } from "../../lib/convex/receiptAnalysisJobs/convexReceiptAnalysisStore";
 import { MAX_RECEIPT_ANALYSIS_BATCH_FILES } from "../../lib/domain/receiptAnalysisJobs/rules";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import {
-  countNeedsReviewDraftsByBatchIdHandler,
   deleteReceiptAnalysisDataByUserBatchHandler,
   finalizeAnalysisAttemptHandler,
   finalizeBatchStatusHandler,
@@ -643,9 +643,7 @@ describe("receipt analysis internal handlers", () => {
       getJobByIdHandler(ctx, { jobId: "job-1" as Id<"receiptAnalysisImageJobs"> }),
     ).resolves.toBe(job);
     await expect(
-      countNeedsReviewDraftsByBatchIdHandler(ctx, {
-        batchId: "batch-1" as Id<"receiptAnalysisBatches">,
-      }),
+      createReceiptAnalysisStore(ctx as MutationCtx).countNeedsReviewDraftsByBatch("batch-1", 10),
     ).resolves.toBe(1);
     await expect(
       getJobByIdHandler(createInternalCtx(), {

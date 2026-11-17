@@ -429,41 +429,32 @@ describe("analyzeImageJobHandler", () => {
 });
 
 describe("checkAiReviewRequiredHandler", () => {
-  it("確認待ちの下書きがあれば作成者へ ai_review_required メールを enqueue する", async () => {
+  const USER = "https://issuer.example|user-001";
+
+  it("作成者の batch なら、batchId と userId だけで通知の enqueue mutation を呼ぶ", async () => {
     const ctx = createActionCtx(createIdentity());
-
-    ctx.runQuery = vi
-      .fn()
-      .mockResolvedValueOnce({
-        _id: "batch-1",
-        createdByUserId: "https://issuer.example|user-001",
-      })
-      .mockResolvedValueOnce(2);
-
-    ctx.runMutation = vi.fn().mockResolvedValueOnce("email-job-1");
+    ctx.runQuery = vi.fn().mockResolvedValueOnce({ _id: "batch-1", createdByUserId: USER });
+    ctx.runMutation = vi.fn().mockResolvedValueOnce(null);
 
     await checkAiReviewRequiredHandler(ctx, {
       batchId: "batch-1" as Id<"receiptAnalysisBatches">,
     });
 
-    expect(ctx.runMutation).toHaveBeenCalledWith(expect.anything(), {
-      batchId: "batch-1",
-      userId: "https://issuer.example|user-001",
-      pendingCount: 2,
-    });
+    // 件数は action で数えず、mutation の中で下書きの今の状態から数える
+    expect(ctx.runQuery).toHaveBeenCalledTimes(1);
+    expect(ctx.runMutation).toHaveBeenCalledTimes(1);
+    expect(ctx.runMutation).toHaveBeenCalledWith(
+      internal.notifications.internal.enqueueAiReviewNotifications,
+      { batchId: "batch-1", userId: USER },
+    );
   });
 
-  it("確認待ちの下書きが 0 件なら何もしない", async () => {
+  it.each([
+    ["batch が無い", null],
+    ["作成者が無い batch", { _id: "batch-1" }],
+  ])("%s なら何もしない", async (_label, batch) => {
     const ctx = createActionCtx(createIdentity());
-
-    ctx.runQuery = vi
-      .fn()
-      .mockResolvedValueOnce({
-        _id: "batch-1",
-        createdByUserId: "https://issuer.example|user-001",
-      })
-      .mockResolvedValueOnce(0);
-
+    ctx.runQuery = vi.fn().mockResolvedValueOnce(batch);
     ctx.runMutation = vi.fn();
 
     await checkAiReviewRequiredHandler(ctx, {
@@ -471,36 +462,5 @@ describe("checkAiReviewRequiredHandler", () => {
     });
 
     expect(ctx.runMutation).not.toHaveBeenCalled();
-  });
-
-  it("確認待ちの下書きがあれば batchId/userId/pendingCount だけで通知 enqueue する", async () => {
-    const ctx = createActionCtx(createIdentity());
-
-    ctx.runQuery = vi
-      .fn()
-      .mockResolvedValueOnce({
-        _id: "batch-1",
-        createdByUserId: "https://issuer.example|user-001",
-      })
-      .mockResolvedValueOnce(2);
-
-    ctx.runMutation = vi.fn();
-
-    await checkAiReviewRequiredHandler(ctx, {
-      batchId: "batch-1" as Id<"receiptAnalysisBatches">,
-    });
-
-    expect(ctx.runQuery).toHaveBeenCalledTimes(2);
-    // 件数はジョブの状態ではなく、下書きの状態から数える query で取る
-    expect(ctx.runQuery).toHaveBeenNthCalledWith(
-      2,
-      internal.receiptAnalysisJobs.internal.countNeedsReviewDraftsByBatchId,
-      { batchId: "batch-1" },
-    );
-    expect(ctx.runMutation).toHaveBeenCalledWith(expect.anything(), {
-      batchId: "batch-1",
-      userId: "https://issuer.example|user-001",
-      pendingCount: 2,
-    });
   });
 });
