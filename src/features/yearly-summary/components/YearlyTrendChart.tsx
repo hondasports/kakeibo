@@ -10,7 +10,12 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { formatYenCompact } from "../../../../lib/domain/common/currency";
+import { formatYenAxisTick } from "../../../../lib/domain/common/currency";
+import {
+  valueAxisEndMargin,
+  yAxisWidthForLabels,
+  yenAxisTickLabels,
+} from "../../../utils/chartAxisLayout";
 import { buildYearlyLineSeries, type YearlyTrendChartData } from "../utils/yearlyTrendChartData";
 
 export type YearlyChartMode = "balance" | "category";
@@ -35,10 +40,16 @@ export function YearlyTrendChart({
   const income = chartData?.income ?? [];
   const series = chartData?.series ?? [];
   const dataset = chartData?.dataset ?? [];
-  const chartMargin = isCompact
-    ? { bottom: 28, left: 56, right: 8, top: 16 }
-    : { bottom: 28, left: 52, right: 12, top: 16 };
-  const yAxisWidth = isCompact ? 60 : 52;
+  // 縦軸の目盛りは幅が固定だと切れるため、目盛りの文字数から幅を決める。
+  const axisMaxYen = Math.max(0, ...expense, ...income);
+  const yAxisWidth = yAxisWidthForLabels(yenAxisTickLabels(axisMaxYen));
+  // 横軸の最後の月ラベルは中央揃えで右へはみ出すため、最も長い月ラベルの半分の余白を取る。
+  const chartMargin = {
+    bottom: 28,
+    left: yAxisWidth,
+    right: valueAxisEndMargin(["12月"]),
+    top: 16,
+  };
   const chartHeight = isCompact ? 220 : 260;
   const hasBalanceData = expense.some((value) => value > 0) || income.some((value) => value > 0);
   const hasCategoryData = series.length > 0 && expense.some((value) => value > 0);
@@ -129,7 +140,8 @@ export function YearlyTrendChart({
               xAxis={[{ dataKey: "label", scaleType: "point" }]}
               yAxis={[
                 {
-                  valueFormatter: formatYenCompact,
+                  valueFormatter: (value: number | null) =>
+                    formatYenAxisTick(value ?? 0, axisMaxYen),
                   width: yAxisWidth,
                 },
               ]}

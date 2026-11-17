@@ -89,6 +89,21 @@ describe("YearlyTrendChart", () => {
     expect(screen.getByText("カテゴリ別の支出データがあると表示されます")).toBeInTheDocument();
   });
 
+  it("Y軸の目盛りは1本の軸の中で円と万円を混ぜない", () => {
+    const { container } = renderWithProviders(
+      <YearlyTrendChart chartData={chartData} mode="balance" onModeChange={vi.fn()} />,
+    );
+
+    const tickLabels = Array.from(
+      container.querySelectorAll('[data-testid="yearly-trend-chart"] svg text'),
+    )
+      .map((node) => node.textContent ?? "")
+      .filter((text) => text.endsWith("円"));
+
+    expect(tickLabels.length).toBeGreaterThan(0);
+    expect(tickLabels.every((text) => text.endsWith("万円"))).toBe(true);
+  });
+
   it("chartDataが無くても空状態を表示する", () => {
     renderWithProviders(<YearlyTrendChart mode="balance" onModeChange={vi.fn()} />);
     expect(screen.getByTestId("yearly-trend-chart-empty")).toBeInTheDocument();
