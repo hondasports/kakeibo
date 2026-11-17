@@ -6,6 +6,8 @@ import { formatMonthLabel } from "../lib/monthNavigation";
 import {
   buildMonthlySpendingCalendarData,
   CALENDAR_WEEKDAY_LABELS,
+  EXPENSE_INTENSITY_ALPHA,
+  getExpenseCellTextColor,
   getExpenseIntensity,
   type MonthlyCalendarDay,
 } from "../utils/monthlySpendingCalendar";
@@ -14,8 +16,6 @@ type CalendarEntry = {
   date: string;
   amountYen: number;
 };
-
-const EXPENSE_INTENSITY_ALPHA = [0, 0.1, 0.22, 0.38, 0.58] as const;
 
 function LegendItem({
   backgroundColor,
@@ -192,7 +192,7 @@ export function MonthlySpendingCalendar({
                           : "1px solid",
                         borderColor: isSelected ? "secondary.main" : "divider",
                         borderRadius: 1.5,
-                        color: intensity >= 4 ? "primary.contrastText" : "text.primary",
+                        color: getExpenseCellTextColor(),
                         flexDirection: "column",
                         justifyContent: "flex-start",
                         minHeight: { xs: 68, sm: 78 },

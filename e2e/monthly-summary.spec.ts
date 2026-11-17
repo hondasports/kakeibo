@@ -28,7 +28,7 @@ test.describe("月次サマリー（Issue #87）", () => {
     await page.setViewportSize({ width: 390, height: 844 });
 
     await expect(page.getByRole("heading", { name: "月次サマリー", level: 1 })).toBeVisible();
-    await page.getByRole("button", { name: /日付を選択してください/ }).click();
+    await page.getByRole("button", { name: /表示する月を選ぶ/ }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.getByRole("button", { name: "カレンダー表示から年選択表示に切り替える" }).click();
     await page.getByRole("radio", { name: targetYear, exact: true }).click();

@@ -27,6 +27,10 @@ export function MonthNavigator({
   const normalizedMonth = normalizeMonth(month);
   const normalizedCurrentMonth = normalizeMonth(currentMonth);
   const monthLabel = normalizedMonth ? formatMonthLabel(normalizedMonth) : "年月";
+  // MUI 既定の「日付を選択してください…」は日付の選択を指すため、月を選ぶ操作だと分かる名前にする。
+  const pickerButtonLabel = normalizedMonth
+    ? `表示する月を選ぶ（現在: ${monthLabel}）`
+    : "表示する月を選ぶ";
 
   const handlePickerChange = (value: Dayjs | null) => {
     if (value === null || !value.isValid() || pickerView.current !== "month") {
@@ -62,6 +66,9 @@ export function MonthNavigator({
         slotProps={{
           field: {
             "aria-label": `${monthLabel}を選択`,
+          },
+          openPickerButton: {
+            "aria-label": pickerButtonLabel,
           },
           textField: {
             sx: {

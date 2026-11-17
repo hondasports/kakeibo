@@ -1,6 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { designTokens } from "../../../designTokens";
 import { renderWithProviders } from "../../../test/render";
 import { MonthlySpendingCalendar } from "./MonthlySpendingCalendar";
 
@@ -52,6 +53,25 @@ describe("MonthlySpendingCalendar", () => {
     await user.click(screen.getByRole("button", { name: /2026年7月10日/ }));
 
     expect(onDateSelect).toHaveBeenCalledWith("2026-07-10");
+  });
+
+  it("最も濃い日でも金額の文字は濃い文字色で表示する", () => {
+    renderWithProviders(
+      <MonthlySpendingCalendar
+        expenses={[{ amountYen: 5000, date: "2026-07-15" }]}
+        incomes={[]}
+        month="2026-07"
+        onDateSelect={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /2026年7月15日/ })).toHaveAttribute(
+      "data-expense-intensity",
+      "4",
+    );
+    expect(screen.getByRole("button", { name: /2026年7月15日/ })).toHaveStyle({
+      color: designTokens.color.text.primary,
+    });
   });
 
   it("読み込み中はカレンダーのスケルトンを表示する", () => {
