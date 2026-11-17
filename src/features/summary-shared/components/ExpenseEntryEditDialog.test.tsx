@@ -1,5 +1,5 @@
 import { ConvexError } from "convex/values";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExpenseEntryEditDialog } from "./ExpenseEntryEditDialog";
 
@@ -29,12 +29,15 @@ vi.mock("../../../../convex/_generated/api", () => ({
   },
 }));
 
+/** getWithItems が返す下書きの最小形。必須の reviewReasons を欠いた形は永続化されない。 */
+const savedDraft = { _id: "draft-1", documentType: "receipt", reviewReasons: [] };
+
 describe("ExpenseEntryEditDialog AI draft history", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     updateRegisteredDraftMock.mockResolvedValue(undefined);
     useQueryMock.mockReturnValue({
-      draft: { _id: "draft-1" },
+      draft: savedDraft,
       items: [
         {
           _id: "item-1",
@@ -281,7 +284,7 @@ describe("ExpenseEntryEditDialog AI draft history", () => {
 
   it("detailedの値引き明細は負数でも保存できる", async () => {
     useQueryMock.mockReturnValue({
-      draft: { _id: "draft-1" },
+      draft: savedDraft,
       items: [
         {
           _id: "item-1",
@@ -356,7 +359,7 @@ describe("ExpenseEntryEditDialog AI draft history", () => {
     "detailedの行種別が割引の明細は、品名に割引の語が無くても%s保存できる",
     async (_caseName, inputAmount, expectedAmountYen) => {
       useQueryMock.mockReturnValue({
-        draft: { _id: "draft-1" },
+        draft: savedDraft,
         items: [
           {
             _id: "item-1",
@@ -417,4 +420,187 @@ describe("ExpenseEntryEditDialog AI draft history", () => {
       );
     },
   );
+});
+
+describe("ExpenseEntryEditDialog 明細の合計と金額の関係", () => {
+  const categories = [{ _id: "cat-food", name: "食費" }];
+  const taxResolved = {
+    taxRatePercent: 8,
+    taxResolutionStatus: "resolved",
+    taxResolutionSource: "item_explicit",
+    taxAllocationStatus: "allocated",
+    categoryId: "cat-food",
+  };
+  /** 外税レシート: 税抜の印字額 98・138・168（合計404）、税額32、支払額436。 */
+  const externalItems = [
+    [98, 8],
+    [138, 11],
+    [168, 13],
+  ].map(([printed, tax], index) => ({
+    ...taxResolved,
+    _id: `item-${index + 1}`,
+    itemName: `商品${index + 1}`,
+    amountYen: printed + tax,
+    printedAmountYen: printed,
+    normalizedAmountYen: printed + tax,
+    allocatedTaxYen: tax,
+    amountBasis: "tax_excluded",
+  }));
+  const externalDraft = {
+    ...savedDraft,
+    amountYen: 436,
+    categoryId: "cat-food",
+    taxSummaries: [
+      {
+        taxRatePercent: 8,
+        taxMode: "external",
+        taxableAmountYen: 404,
+        taxableAmountBasis: "tax_excluded",
+        taxYen: 32,
+        taxIncludedAmountYen: 436,
+        roundingMethod: "floor",
+        warnings: [],
+        status: "verified",
+      },
+    ],
+  };
+  const renderDialog = (registrationMode: "detailed" | "totalOnly", amountYen: number) =>
+    render(
+      <ExpenseEntryEditDialog
+        categories={categories}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        open
+        receipt={{
+          _id: "entry-1",
+          date: "2026-10-04",
+          type: "expense",
+          shopName: "スーパー青葉",
+          amountYen,
+          categoryId: "cat-food",
+          categoryName: "食費",
+          categoryColor: "#f97316",
+          recordType: "expenseEntry",
+          receiptShopName: "スーパー青葉",
+          receiptTotalAmountYen: amountYen,
+          aiExpenseDraftId: "draft-1",
+          registrationMode,
+        }}
+      />,
+    );
+  const summary = () => screen.findByRole("region", { name: "明細と金額の確認" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    updateRegisteredDraftMock.mockResolvedValue(undefined);
+    useMutationMock.mockImplementation((reference: string) =>
+      reference === "updateRegisteredDraft" ? updateRegisteredDraftMock : updateExpenseEntryMock,
+    );
+  });
+
+  it("外税: 税抜の明細合計と税額を足すと金額になると分かり、何も変えずに保存できる", async () => {
+    useQueryMock.mockReturnValue({ draft: externalDraft, items: externalItems });
+    renderDialog("detailed", 436);
+
+    const region = within(await summary());
+    expect(region.getByText("商品の金額と支払額が一致しています")).toBeInTheDocument();
+    expect(region.getByText("明細合計（税抜）").nextSibling).toHaveTextContent("404円");
+    expect(region.getByText("税額").nextSibling).toHaveTextContent("32円");
+    expect(region.getByText("支払額").nextSibling).toHaveTextContent("436円");
+    expect(region.getByText("明細の金額").nextSibling).toHaveTextContent("税抜");
+    expect(screen.getByLabelText("明細金額 1")).toHaveValue("98");
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() =>
+      expect(updateRegisteredDraftMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amountYen: 436,
+          registrationMode: "detailed",
+          items: externalItems.map((item) =>
+            expect.objectContaining({ itemId: item._id, amountYen: item.printedAmountYen }),
+          ),
+        }),
+      ),
+    );
+  });
+
+  it("内税: 税込の明細合計が金額と一致すると分かる", async () => {
+    useQueryMock.mockReturnValue({
+      draft: {
+        ...savedDraft,
+        amountYen: 324,
+        taxSummaries: [
+          {
+            taxRatePercent: 8,
+            taxMode: "included",
+            taxableAmountYen: 324,
+            taxableAmountBasis: "tax_included",
+            taxYen: 24,
+            roundingMethod: "floor",
+            warnings: [],
+            status: "verified",
+          },
+        ],
+      },
+      items: [108, 216].map((amountYen, index) => ({
+        ...taxResolved,
+        _id: `item-${index + 1}`,
+        itemName: `商品${index + 1}`,
+        amountYen,
+        printedAmountYen: amountYen,
+        normalizedAmountYen: amountYen,
+        amountBasis: "tax_included",
+      })),
+    });
+    renderDialog("detailed", 324);
+
+    const region = within(await summary());
+    expect(region.getByText("商品の金額と支払額が一致しています")).toBeInTheDocument();
+    expect(region.getByText("明細合計").nextSibling).toHaveTextContent("324円");
+    expect(region.getByText("支払額").nextSibling).toHaveTextContent("324円");
+    expect(region.getByText("明細の金額").nextSibling).toHaveTextContent("税込");
+    expect(region.queryByText("税額")).not.toBeInTheDocument();
+  });
+
+  it("税込か税抜かが決まらない明細は、確認画面と同じ文言で比較できないと示す", async () => {
+    useQueryMock.mockReturnValue({
+      draft: { ...externalDraft, taxSummaries: undefined },
+      items: externalItems.map((item) => ({
+        ...item,
+        amountBasis: "unknown",
+        taxResolutionStatus: undefined,
+        taxAllocationStatus: "unallocated",
+        normalizedAmountYen: undefined,
+      })),
+    });
+    renderDialog("detailed", 436);
+
+    const region = within(await summary());
+    expect(region.getByText("金額を比較できません")).toBeInTheDocument();
+    expect(
+      region.getByText("税設定・登録額の確認が必要な明細があるため、支払額と比較できません"),
+    ).toBeInTheDocument();
+    expect(region.getByText("明細合計").nextSibling).toHaveTextContent("404円");
+    expect(region.getByText("明細の金額").nextSibling).toHaveTextContent("不明");
+  });
+
+  it("金額を編集すると、その場で明細との関係を判定し直す", async () => {
+    useQueryMock.mockReturnValue({ draft: externalDraft, items: externalItems });
+    renderDialog("detailed", 436);
+    const region = within(await summary());
+    expect(region.getByText("商品の金額と支払額が一致しています")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("金額"), { target: { value: "500" } });
+
+    expect(region.queryByText("商品の金額と支払額が一致しています")).not.toBeInTheDocument();
+    expect(region.getByText("金額を比較できません")).toBeInTheDocument();
+  });
+
+  it("レシート合計だけで保存するときは表示しない", async () => {
+    useQueryMock.mockReturnValue({ draft: externalDraft, items: externalItems });
+    renderDialog("totalOnly", 436);
+
+    await screen.findByRole("combobox", { name: "登録方法" });
+    expect(screen.queryByRole("region", { name: "明細と金額の確認" })).not.toBeInTheDocument();
+  });
 });
