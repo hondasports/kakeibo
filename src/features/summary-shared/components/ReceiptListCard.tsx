@@ -52,6 +52,7 @@ export function ReceiptListCard({
   onBulkDelete?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const hasRowActions = Boolean(onEditReceipt || onDeleteReceipt);
   const orderedReceiptGroups = groupReceiptItems(receipts)
     .map((group, index) => ({ group, index }))
     .sort((a, b) => b.group.date.localeCompare(a.group.date) || b.index - a.index)
@@ -141,7 +142,7 @@ export function ReceiptListCard({
 
           <Box
             aria-label={listAriaLabel}
-            className={`receipt-list${selectionEnabled ? " receipt-list--selectable" : ""}`}
+            className={`receipt-list${selectionEnabled ? " receipt-list--selectable" : ""}${hasRowActions ? "" : " receipt-list--no-actions"}`}
             role={!isLoading && count > 0 ? "table" : undefined}
           >
             {isLoading ? (
@@ -181,7 +182,7 @@ export function ReceiptListCard({
                   <span role="columnheader">日付</span>
                   <span role="columnheader">店名・内訳</span>
                   <span role="columnheader">金額（円）</span>
-                  <span role="columnheader">操作</span>
+                  {hasRowActions && <span role="columnheader">操作</span>}
                 </Box>
                 {visibleReceiptGroups.map((group) => (
                   <ReceiptGroupRow
