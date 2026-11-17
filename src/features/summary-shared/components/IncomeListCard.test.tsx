@@ -37,6 +37,43 @@ describe("IncomeListCard", () => {
     expect(within(screen.getByTestId("receipt-row")).getAllByRole("cell")).toHaveLength(5);
   });
 
+  it("編集・削除を渡さないときは「操作」の見出しと列を出さない", () => {
+    renderWithProviders(
+      <IncomeListCard count={1} isLoading={false} incomes={incomes.slice(0, 1)} />,
+    );
+    const table = screen.getByRole("table");
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent);
+    expect(headers).toEqual(["日付", "内容", "金額（円）", "メモ"]);
+    for (const row of within(table).getAllByRole("row").slice(1)) {
+      const cells = within(row)
+        .getAllByRole("cell", { hidden: true })
+        .filter((cell) => !cell.classList.contains("receipt-row-actions"));
+      expect(cells).toHaveLength(headers.length);
+    }
+  });
+
+  it("編集・削除を渡すときは「操作」の見出しと列を出す", () => {
+    renderWithProviders(
+      <IncomeListCard
+        count={1}
+        isLoading={false}
+        incomes={incomes.slice(0, 1)}
+        onDeleteIncome={() => {}}
+        onEditIncome={() => {}}
+      />,
+    );
+    const table = screen.getByRole("table");
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent);
+    expect(headers).toEqual(["日付", "内容", "金額（円）", "メモ", "操作"]);
+    for (const row of within(table).getAllByRole("row").slice(1)) {
+      expect(within(row).getAllByRole("cell", { hidden: true })).toHaveLength(headers.length);
+    }
+  });
+
   it("収入のメモは従来の独立したセルに表示する", () => {
     renderWithProviders(
       <IncomeListCard

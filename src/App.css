@@ -855,6 +855,11 @@
   .receipt-list--no-actions.receipt-list--selectable .receipt-group-header {
     grid-template-columns: 44px 88px minmax(200px, 1fr) 104px;
   }
+
+  .receipt-list--income.receipt-list--no-actions .receipt-list-header--income,
+  .receipt-list--income.receipt-list--no-actions .receipt-row {
+    grid-template-columns: 88px minmax(156px, 1.3fr) 104px minmax(140px, 1fr);
+  }
 }
 
 .weekly-summary-analysis-grid {
@@ -1101,6 +1106,12 @@
 
   .receipt-list--no-actions:not(.receipt-list--income) .receipt-row {
     grid-template-areas: "date name amount";
+  }
+
+  .receipt-list--no-actions.receipt-list--income .receipt-row {
+    grid-template-areas:
+      "date name amount"
+      "memo memo memo";
   }
 
   .receipt-list--no-actions.receipt-list--selectable:not(.receipt-list--income) .receipt-row {
