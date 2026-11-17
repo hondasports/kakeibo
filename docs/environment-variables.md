@@ -149,7 +149,7 @@ publishable keyから得たissuerとユーザーIDを組み合わせて`E2E_CLER
 | `POST /e2e/purge-orphans` | deployment全体の孤児・終端運用データの物理削除 | なし |
 | `POST /e2e/seed-system-admin-membership` | system admin のメンバーシップ E2E 用 fixture の作成（`e2e-system-admin-291-` 接頭辞のみ） | あり |
 | `POST /e2e/cleanup-system-admin-membership` | 上記 fixture の削除（接頭辞単位） | あり |
-| `POST /e2e/seed-system-admin-search` | system admin の検索 E2E 用 fixture の作成（同じ接頭辞制約） | あり |
+| `POST /e2e/seed-system-admin-search` | system admin の検索 E2E 用 fixture の作成（`e2e-system-admin-504-` 接頭辞のみ） | あり |
 | `POST /e2e/cleanup-system-admin-search` | 上記 fixture の削除（接頭辞単位） | あり |
 | `POST /e2e/seed-ai-expense-draft` | `ready` 状態の AI 下書きと E2E カテゴリ2件の作成 | あり |
 | `POST /e2e/seed-tax-review-draft` | 税レビュー用の `needs_review` 下書きの作成（`receiptCase` で税判定のケースを選ぶ） | あり |
