@@ -57,7 +57,7 @@ export async function checkReceiptAiReviewRequired(
 ): Promise<void> {
   const batch = await runner.getBatch(batchId);
   if (!batch?.createdByUserId) return;
-  const pendingCount = await runner.countNeedsReviewJobs(batchId);
+  const pendingCount = await runner.countNeedsReviewDrafts(batchId);
   if (pendingCount === 0) return;
   await runner.enqueueAiReviewRequiredNotifications({
     batchId,

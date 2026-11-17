@@ -11,7 +11,10 @@ import {
   createReceiptAnalysisMutationDeps,
   createReceiptAnalysisQueryDeps,
 } from "../../lib/convex/receiptAnalysisJobs/receiptAnalysisDeps";
-import { ReceiptAnalysisJobDomainError } from "../../lib/domain/receiptAnalysisJobs/rules";
+import {
+  MAX_RECEIPT_ANALYSIS_BATCH_FILES,
+  ReceiptAnalysisJobDomainError,
+} from "../../lib/domain/receiptAnalysisJobs/rules";
 import {
   deleteReceiptAnalysisDataByUserBatch as deleteUserDataBatch,
   finalizeReceiptAnalysisAttempt,
@@ -39,11 +42,14 @@ export async function getBatchByIdHandler(
   return await getReceiptAnalysisBatchDocument(ctx, batchId);
 }
 
-export async function countNeedsReviewJobsByBatchIdHandler(
+export async function countNeedsReviewDraftsByBatchIdHandler(
   ctx: QueryCtx,
   { batchId }: { batchId: Id<"receiptAnalysisBatches"> },
 ): Promise<number> {
-  return createReceiptAnalysisQueryDeps(ctx).reader.countJobsByStatus(batchId, "needs_review");
+  return createReceiptAnalysisQueryDeps(ctx).reader.countNeedsReviewDraftsByBatch(
+    batchId,
+    MAX_RECEIPT_ANALYSIS_BATCH_FILES,
+  );
 }
 
 export async function scheduleAiReviewNotificationIfNeeded(
@@ -176,9 +182,9 @@ export const getBatchById = internalQuery({
   handler: getBatchByIdHandler,
 });
 
-export const countNeedsReviewJobsByBatchId = internalQuery({
+export const countNeedsReviewDraftsByBatchId = internalQuery({
   args: { batchId: v.id("receiptAnalysisBatches") },
-  handler: countNeedsReviewJobsByBatchIdHandler,
+  handler: countNeedsReviewDraftsByBatchIdHandler,
 });
 
 export const getJobById = internalQuery({

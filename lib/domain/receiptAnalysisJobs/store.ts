@@ -15,7 +15,8 @@ export interface ReceiptAnalysisReader {
     limit: number,
   ): Promise<ReceiptAnalysisJobRecord[]>;
   findJobByDraftId(draftId: string): Promise<ReceiptAnalysisJobRecord | null>;
-  countJobsByStatus(batchId: string, status: ReceiptAnalysisJobStatus): Promise<number>;
+  /** バッチのジョブが指す下書きのうち、同じグループで実在し needs_review のものの数。 */
+  countNeedsReviewDraftsByBatch(batchId: string, limit: number): Promise<number>;
 }
 
 export interface ReceiptAnalysisStore extends ReceiptAnalysisReader {

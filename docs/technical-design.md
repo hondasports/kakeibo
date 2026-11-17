@@ -1343,7 +1343,7 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `receiptAnalysisJobs.mutations.cancelImageJob(jobId)`
 - `receiptAnalysisJobs.internal.finalizeBatchStatus(batchId)`（internal）
 - `receiptAnalysisJobs.internal.getBatchById(batchId)`（internal）
-- `receiptAnalysisJobs.internal.countNeedsReviewJobsByBatchId(batchId)`（internal）
+- `receiptAnalysisJobs.internal.countNeedsReviewDraftsByBatchId(batchId)`（internal。バッチのジョブが指す下書きのうち、実在して `needs_review` のものを数える）
 - `receiptAnalysisJobs.actions.checkAiReviewRequired(batchId)`（internal action）
 
 バッチ画像解析は `receiptAnalysisBatches` / `receiptAnalysisImageJobs` テーブルで管理する。

@@ -1,3 +1,4 @@
+import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { analyzeImageJobHandler, checkAiReviewRequiredHandler } from "./actions";
 import {
@@ -428,7 +429,7 @@ describe("analyzeImageJobHandler", () => {
 });
 
 describe("checkAiReviewRequiredHandler", () => {
-  it("needs_review 待ちがあれば作成者へ ai_review_required メールを enqueue する", async () => {
+  it("確認待ちの下書きがあれば作成者へ ai_review_required メールを enqueue する", async () => {
     const ctx = createActionCtx(createIdentity());
 
     ctx.runQuery = vi
@@ -452,7 +453,7 @@ describe("checkAiReviewRequiredHandler", () => {
     });
   });
 
-  it("needs_review 待ちが 0 なら何もしない", async () => {
+  it("確認待ちの下書きが 0 件なら何もしない", async () => {
     const ctx = createActionCtx(createIdentity());
 
     ctx.runQuery = vi
@@ -472,7 +473,7 @@ describe("checkAiReviewRequiredHandler", () => {
     expect(ctx.runMutation).not.toHaveBeenCalled();
   });
 
-  it("needs_review 待ちがあれば batchId/userId/pendingCount だけで通知 enqueue する", async () => {
+  it("確認待ちの下書きがあれば batchId/userId/pendingCount だけで通知 enqueue する", async () => {
     const ctx = createActionCtx(createIdentity());
 
     ctx.runQuery = vi
@@ -490,6 +491,12 @@ describe("checkAiReviewRequiredHandler", () => {
     });
 
     expect(ctx.runQuery).toHaveBeenCalledTimes(2);
+    // 件数はジョブの状態ではなく、下書きの状態から数える query で取る
+    expect(ctx.runQuery).toHaveBeenNthCalledWith(
+      2,
+      internal.receiptAnalysisJobs.internal.countNeedsReviewDraftsByBatchId,
+      { batchId: "batch-1" },
+    );
     expect(ctx.runMutation).toHaveBeenCalledWith(expect.anything(), {
       batchId: "batch-1",
       userId: "https://issuer.example|user-001",

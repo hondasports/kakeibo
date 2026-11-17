@@ -134,8 +134,8 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
           ? {}
           : { createdByUserId: batch.createdByUserId };
     },
-    countNeedsReviewJobs: (batchId) =>
-      ctx.runQuery(internal.receiptAnalysisJobs.internal.countNeedsReviewJobsByBatchId, {
+    countNeedsReviewDrafts: (batchId) =>
+      ctx.runQuery(internal.receiptAnalysisJobs.internal.countNeedsReviewDraftsByBatchId, {
         batchId: batchId as Id<"receiptAnalysisBatches">,
       }),
     async enqueueAiReviewRequiredNotifications(args) {
