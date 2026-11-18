@@ -12,6 +12,8 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { formatYenAxisTick } from "../../../../lib/domain/common/currency";
 import {
+  groupedMaxYen,
+  stackedMaxYen,
   valueAxisEndMargin,
   yAxisWidthForLabels,
   yenAxisTickLabels,
@@ -40,8 +42,16 @@ export function YearlyTrendChart({
   const income = chartData?.income ?? [];
   const series = chartData?.series ?? [];
   const dataset = chartData?.dataset ?? [];
+  // 縦軸は今のモードで実際に描く系列の値から決める。収支は支出と収入の並列、カテゴリ別は積み上げの合計。
+  // 描かない収入を含めると、支出だけの軸が万円表記に丸められて読めなくなるため。
+  const axisMaxYen =
+    mode === "balance"
+      ? groupedMaxYen(dataset, ["expense", "income"])
+      : stackedMaxYen(
+          dataset,
+          series.map((entry) => entry.dataKey),
+        );
   // 縦軸の目盛りは幅が固定だと切れるため、目盛りの文字数から幅を決める。
-  const axisMaxYen = Math.max(0, ...expense, ...income);
   const yAxisWidth = yAxisWidthForLabels(yenAxisTickLabels(axisMaxYen));
   // 横軸の最後の月ラベルは中央揃えで右へはみ出すため、最も長い月ラベルの半分の余白を取る。
   const chartMargin = {

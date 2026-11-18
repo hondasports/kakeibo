@@ -58,3 +58,24 @@ export function yenAxisTickLabels(axisMaxYen: number): string[] {
     formatYenAxisTick(nextPowerOfTen, axisMaxYen),
   ];
 }
+
+type ChartRow = Record<string, string | number>;
+
+/**
+ * 積み上げ棒・面グラフの軸の最大値。描く系列（キー）の値を行ごとに足し、その最大を返す。
+ * 描かない系列（収入など）は keys に含めないので、軸の単位の判定に混ざらない。
+ */
+export function stackedMaxYen(rows: readonly ChartRow[], dataKeys: readonly string[]): number {
+  return rows.reduce((max, row) => {
+    const total = dataKeys.reduce((sum, key) => sum + Number(row[key] ?? 0), 0);
+    return Math.max(max, total);
+  }, 0);
+}
+
+/** 並べて描く系列（グループ棒・折れ線）の軸の最大値。描く系列の値のうち最大を返す。 */
+export function groupedMaxYen(rows: readonly ChartRow[], dataKeys: readonly string[]): number {
+  return rows.reduce(
+    (max, row) => dataKeys.reduce((current, key) => Math.max(current, Number(row[key] ?? 0)), max),
+    0,
+  );
+}

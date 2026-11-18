@@ -104,6 +104,34 @@ describe("YearlyTrendChart", () => {
     expect(tickLabels.every((text) => text.endsWith("万円"))).toBe(true);
   });
 
+  it("カテゴリ別モードは描く支出の積み上げだけで軸を決め、収入の大きさで万円表記にしない", () => {
+    const expenseOnlyData = buildYearlyTrendChartData(
+      summarizeYearlyTrend({
+        year: "2026",
+        months: [
+          {
+            month: "2026-08",
+            expenses: [{ amountYen: 300, categoryId: "food" }],
+            incomes: [{ amountYen: 180000 }],
+          },
+        ],
+        categoryInfoMap: new Map([["food", { name: "食費", color: "#8B5E3C" }]]),
+      }),
+    );
+    const { container } = renderWithProviders(
+      <YearlyTrendChart chartData={expenseOnlyData} mode="category" onModeChange={vi.fn()} />,
+    );
+
+    const tickLabels = Array.from(
+      container.querySelectorAll('[data-testid="yearly-trend-chart"] svg text'),
+    )
+      .map((node) => node.textContent ?? "")
+      .filter((text) => text.endsWith("円"));
+
+    expect(tickLabels.length).toBeGreaterThan(0);
+    expect(tickLabels.some((text) => text.endsWith("万円"))).toBe(false);
+  });
+
   it("chartDataが無くても空状態を表示する", () => {
     renderWithProviders(<YearlyTrendChart mode="balance" onModeChange={vi.fn()} />);
     expect(screen.getByTestId("yearly-trend-chart-empty")).toBeInTheDocument();

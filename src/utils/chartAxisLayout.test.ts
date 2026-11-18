@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   estimateTickLabelWidth,
+  groupedMaxYen,
+  stackedMaxYen,
   valueAxisEndMargin,
   yAxisWidthForLabels,
   yenAxisTickLabels,
@@ -43,5 +45,34 @@ describe("yenAxisTickLabels", () => {
     expect(
       yenAxisTickLabels(6_000).every((label) => label.endsWith("円") && !label.includes("万")),
     ).toBe(true);
+  });
+});
+
+describe("stackedMaxYen", () => {
+  it("積み上げの月ごとの合計の最大を返す", () => {
+    const rows = [
+      { label: "1月", a: 100, b: 200 },
+      { label: "2月", a: 150, b: 50 },
+    ];
+    expect(stackedMaxYen(rows, ["a", "b"])).toBe(300);
+  });
+
+  it("描かれない系列（キー一覧に無い値）は含めない", () => {
+    const rows = [{ label: "1月", a: 300, income: 180_000 }];
+    expect(stackedMaxYen(rows, ["a"])).toBe(300);
+  });
+
+  it("行が無ければ0を返す", () => {
+    expect(stackedMaxYen([], ["a"])).toBe(0);
+  });
+});
+
+describe("groupedMaxYen", () => {
+  it("並べて描く系列のうち最大の値を返す", () => {
+    const rows = [
+      { label: "1月", expense: 300, income: 180_000 },
+      { label: "2月", expense: 5_000, income: 1_000 },
+    ];
+    expect(groupedMaxYen(rows, ["expense", "income"])).toBe(180_000);
   });
 });
