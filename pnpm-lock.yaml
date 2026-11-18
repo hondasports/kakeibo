@@ -127,8 +127,8 @@ importers:
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.18)
       '@vitejs/plugin-react':
-        specifier: ^6.1.1
-        version: 6.1.1(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.1)(jiti@2.6.1)(tsx@4.23.15)(yaml@2.9.1))
+        specifier: ^6.3.0
+        version: 6.3.0(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.1)(jiti@2.6.1)(tsx@4.23.15)(yaml@2.9.1))
       '@vitest/coverage-v8':
         specifier: ^5.0.5
         version: 5.0.5(vitest@5.0.5)
@@ -239,8 +239,8 @@ packages:
     resolution: {integrity: sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA==}
     engines: {node: '>=6.9.0'}
 
-  '@babel/runtime@7.29.13':
-    resolution: {integrity: sha512-v+oN26xP4YIlQsbQ/CbTH1WG5m/l/DjKKZNy/Kp3f/AFvbgt7Em/D0FeMM3O2hX0YzeN2M16W8lOpyhIkfCBcQ==}
+  '@babel/runtime@7.29.14':
+    resolution: {integrity: sha512-Y5tqevQaUAZhhj82BpYMNC1ssvLQTVAfwKdm8iy8qwmhvC2/CpcAu8OC+QEtjM7pMk7knx83u1Qj8gzkicyelw==}
     engines: {node: '>=6.9.0'}
 
   '@babel/runtime@7.29.7':
@@ -1808,8 +1808,8 @@ packages:
   '@rolldown/pluginutils@1.0.0-rc.1':
     resolution: {integrity: sha512-UTBjtTxVOhodhzFVp/ayITaTETRHPUPYZPXQe0WU0wOgxghMojXxYjOiPOauKIYNWJAWS2fd7gJgGQK8GU8vDA==}
 
-  '@rolldown/pluginutils@1.0.1':
-    resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
+  '@rolldown/pluginutils@1.1.1':
+    resolution: {integrity: sha512-glFIJDvLNDtJhT9qrMFWLPbvS+skxgt4L0K8Ei2YtnhPysAJnsI7nyxSJxKj4ADeKX0OLjC4ntRkwpLOoS3rwA==}
 
   '@rollup/pluginutils@5.4.0':
     resolution: {integrity: sha512-MfPp06CjRLfXQ3wY0R8vJDYBy/MvVcc9OulEfR0B8Iv9ko+GCNaRZ+EpJYFl27LhKsZK0o420sYCRHCjfCgeUg==}
@@ -2291,13 +2291,13 @@ packages:
     os: [linux]
     libc: [glibc]
 
-  '@vitejs/plugin-react@6.1.1':
-    resolution: {integrity: sha512-yxLaQV9gkhS8ezJqCM6+ndU7mDY6gqAg75NQ+0IjwEI8IYOmQCgkRwHKVSfWXW076DsqMo0Dk+0FK1U+M5RgFw==}
+  '@vitejs/plugin-react@6.3.0':
+    resolution: {integrity: sha512-H9E955aVvD2F4zNHCw4eIZbIfF6xKldlh7MNu+hSU7xwQzh65lI/N+CJWqmfhi0PEjDXIt/H7T7J/4wU63KJiw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
-      '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0
+      '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0 || ^0.3.0
       babel-plugin-react-compiler: ^1.0.0
-      oxc-transform-react: ^0.145.0
+      oxc-transform-react: '>=0.152.0 <0.157.0'
       vite: ^8.0.0
     peerDependenciesMeta:
       '@rolldown/plugin-babel':
@@ -4284,7 +4284,7 @@ snapshots:
 
   '@babel/runtime@7.29.10': {}
 
-  '@babel/runtime@7.29.13': {}
+  '@babel/runtime@7.29.14': {}
 
   '@babel/runtime@7.29.7': {}
 
@@ -5390,7 +5390,7 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.0-rc.1': {}
 
-  '@rolldown/pluginutils@1.0.1': {}
+  '@rolldown/pluginutils@1.1.1': {}
 
   '@rollup/pluginutils@5.4.0':
     dependencies:
@@ -5417,7 +5417,7 @@ snapshots:
   '@testing-library/dom@10.4.1':
     dependencies:
       '@babel/code-frame': 7.29.7
-      '@babel/runtime': 7.29.13
+      '@babel/runtime': 7.29.14
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
       dom-accessibility-api: 0.5.16
@@ -6065,9 +6065,9 @@ snapshots:
   '@vercel/vc-native-linux-x64@65.9.0':
     optional: true
 
-  '@vitejs/plugin-react@6.1.1(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.1)(jiti@2.6.1)(tsx@4.23.15)(yaml@2.9.1))':
+  '@vitejs/plugin-react@6.3.0(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.1)(jiti@2.6.1)(tsx@4.23.15)(yaml@2.9.1))':
     dependencies:
-      '@rolldown/pluginutils': 1.0.1
+      '@rolldown/pluginutils': 1.1.1
       vite: 8.3.5(@types/node@26.6.5)(esbuild@0.28.1)(jiti@2.6.1)(tsx@4.23.15)(yaml@2.9.1)
 
   '@vitest/coverage-v8@5.0.5(vitest@5.0.5)':
@@ -7399,7 +7399,7 @@ snapshots:
   rolldown@1.2.15:
     dependencies:
       '@oxc-project/types': 0.155.0
-      '@rolldown/pluginutils': 1.0.1
+      '@rolldown/pluginutils': 1.1.1
     optionalDependencies:
       '@rolldown/binding-android-arm-eabi': 1.2.15
       '@rolldown/binding-android-arm64': 1.2.15
