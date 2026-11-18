@@ -1,4 +1,6 @@
+import { useCallback, useRef } from "react";
 import { beforeEach, vi } from "vitest";
+import type { NavigateOptions } from "react-router-dom";
 import { apiMockWith } from "../../../test/apiMock";
 
 const useQueryMock = vi.hoisted(() => vi.fn());
@@ -24,7 +26,17 @@ vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router-dom")>();
   return {
     ...actual,
-    useNavigate: () => navigateMock,
+    // 呼び出しを記録しつつ、実際のルーターでも遷移させる（URL の ?date= 反映を確かめるため）
+    // 参照は安定させる（ページの useEffect が再実行され続けて無限遷移になるのを防ぐ）
+    useNavigate: () => {
+      const navigate = actual.useNavigate();
+      const latestNavigate = useRef(navigate);
+      latestNavigate.current = navigate;
+      return useCallback((to: string, options?: NavigateOptions) => {
+        navigateMock(...(options ? [to, options] : [to]));
+        latestNavigate.current(to, options);
+      }, []);
+    },
     useParams: () => ({ month: routeMonth.value }),
   };
 });
