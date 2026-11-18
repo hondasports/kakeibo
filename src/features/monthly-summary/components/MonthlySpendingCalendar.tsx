@@ -48,11 +48,10 @@ function LegendItem({
   );
 }
 
-// 今日より後の日は支出を表示しないため、読み上げ名からも支出の有無を外す。
-function getDayLabel(day: MonthlyCalendarDay, isFuture: boolean): string {
-  if (isFuture) {
-    const incomeSuffix = day.incomeAmountYen > 0 ? `、収入${formatYen(day.incomeAmountYen)}` : "";
-    return `${formatJapaneseDate(day.date)}（これからの日）${incomeSuffix}`;
+// 今日より後で記録が無い日は、支出が無いのか未来だから空なのかを読み上げ名で区別する。記録がある未来の日は今日以前と同じ形にする。
+function getDayLabel(day: MonthlyCalendarDay, isUnrecordedFuture: boolean): string {
+  if (isUnrecordedFuture) {
+    return `${formatJapaneseDate(day.date)}（これからの日）`;
   }
   const expenseLabel = day.expenseAmountYen > 0 ? formatYen(day.expenseAmountYen) : "なし";
   const incomeLabel = day.incomeAmountYen > 0 ? formatYen(day.incomeAmountYen) : "なし";
@@ -181,20 +180,23 @@ export function MonthlySpendingCalendar({
                   const hasIncome = day.incomeAmountYen > 0;
                   const isSelected = selectedDate === day.date;
                   const isFuture = isFutureCalendarDate(day.date, today);
+                  // 今日より後で記録が無い日だけ空欄・押せない・薄く表示する。記録がある未来の日は今日以前と同じ扱い。
+                  const isUnrecordedFuture =
+                    isFuture && day.expenseAmountYen === 0 && day.incomeAmountYen === 0;
 
                   return (
                     <ButtonBase
-                      aria-label={getDayLabel(day, isFuture)}
+                      aria-label={getDayLabel(day, isUnrecordedFuture)}
                       aria-pressed={isSelected}
                       data-date={day.date}
                       data-expense-intensity={intensity}
                       data-has-income={hasIncome}
-                      disabled={isFuture}
+                      disabled={isUnrecordedFuture}
                       key={day.date}
                       onClick={() => onDateSelect(day.date)}
                       sx={{
                         alignItems: "stretch",
-                        backgroundColor: isFuture
+                        backgroundColor: isUnrecordedFuture
                           ? "var(--color-surface-sunken)"
                           : getCellBackgroundColor(intensity, theme.palette.primary.main),
                         border: isSelected
@@ -202,8 +204,8 @@ export function MonthlySpendingCalendar({
                           : "1px solid",
                         borderColor: isSelected ? "secondary.main" : "divider",
                         borderRadius: 1.5,
-                        borderStyle: isFuture ? "dashed" : undefined,
-                        color: isFuture
+                        borderStyle: isUnrecordedFuture ? "dashed" : undefined,
+                        color: isUnrecordedFuture
                           ? designTokens.color.text.secondary
                           : getExpenseCellTextColor(),
                         flexDirection: "column",
@@ -240,7 +242,7 @@ export function MonthlySpendingCalendar({
                           width: "100%",
                         }}
                       >
-                        {isFuture
+                        {isUnrecordedFuture
                           ? null
                           : day.expenseAmountYen > 0
                             ? formatYenCompact(day.expenseAmountYen)

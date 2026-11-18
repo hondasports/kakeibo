@@ -2,6 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { designTokens } from "../../../designTokens";
+import { formatYenCompact } from "../../../../lib/domain/common/currency";
 import { renderWithProviders } from "../../../test/render";
 import { MonthlySpendingCalendar } from "./MonthlySpendingCalendar";
 
@@ -119,6 +120,28 @@ describe("MonthlySpendingCalendar の今日より後の日", () => {
 
     expect(tomorrow).toBeDisabled();
     expect(within(tomorrow).queryByText("支出なし")).not.toBeInTheDocument();
+  });
+
+  it("今日より後の日でも、支出や収入の記録がある日は金額を出して押せるようにする", () => {
+    setToday("2026-11-18T03:00:00+09:00");
+
+    renderWithProviders(
+      <MonthlySpendingCalendar
+        expenses={[{ amountYen: 5000, date: "2026-11-20" }]}
+        incomes={[{ amountYen: 250000, date: "2026-11-21" }]}
+        month="2026-11"
+        onDateSelect={vi.fn()}
+      />,
+    );
+
+    const expenseDay = screen.getByRole("button", { name: /2026年11月20日、支出/ });
+    expect(expenseDay).toBeEnabled();
+    expect(expenseDay).toHaveTextContent(formatYenCompact(5000));
+    expect(expenseDay).not.toHaveTextContent("支出なし");
+
+    const incomeDay = screen.getByRole("button", { name: /2026年11月21日、支出なし、収入/ });
+    expect(incomeDay).toBeEnabled();
+    expect(incomeDay).toHaveAttribute("data-has-income", "true");
   });
 
   it("月をまたぐ判定でも、来月以降の日は押せず「支出なし」を出さない", () => {
