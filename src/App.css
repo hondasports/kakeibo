@@ -769,6 +769,11 @@
   padding-left: calc(var(--space-lg) + var(--space-sm));
 }
 
+/* 年つきの日付（「2026/12/31」）は、スマートフォンでも2行に割れないようにする */
+.receipt-list--with-year .receipt-row-date {
+  white-space: nowrap;
+}
+
 .receipt-row-amount {
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -859,6 +864,42 @@
   .receipt-list--income.receipt-list--no-actions .receipt-list-header--income,
   .receipt-list--income.receipt-list--no-actions .receipt-row {
     grid-template-columns: 88px minmax(156px, 1.3fr) 104px minmax(140px, 1fr);
+  }
+
+  /* 履歴検索の一覧だけ年つきの日付（「2026/12/31」）を収めるため、日付の列を広げる */
+  .receipt-list--with-year .receipt-list-header,
+  .receipt-list--with-year .receipt-row,
+  .receipt-list--with-year .receipt-group-header {
+    grid-template-columns: 104px minmax(200px, 1fr) 104px 184px;
+  }
+
+  .receipt-list--with-year.receipt-list--selectable .receipt-list-header,
+  .receipt-list--with-year.receipt-list--selectable .receipt-row,
+  .receipt-list--with-year.receipt-list--selectable .receipt-group-header {
+    grid-template-columns: 44px 104px minmax(200px, 1fr) 104px 184px;
+  }
+
+  .receipt-list--with-year.receipt-list--no-actions .receipt-list-header,
+  .receipt-list--with-year.receipt-list--no-actions .receipt-row,
+  .receipt-list--with-year.receipt-list--no-actions .receipt-group-header {
+    grid-template-columns: 104px minmax(200px, 1fr) 104px;
+  }
+
+  .receipt-list--with-year.receipt-list--selectable.receipt-list--no-actions .receipt-list-header,
+  .receipt-list--with-year.receipt-list--selectable.receipt-list--no-actions .receipt-row,
+  .receipt-list--with-year.receipt-list--selectable.receipt-list--no-actions .receipt-group-header {
+    grid-template-columns: 44px 104px minmax(200px, 1fr) 104px;
+  }
+
+  .receipt-list--with-year.receipt-list--income .receipt-list-header--income,
+  .receipt-list--with-year.receipt-list--income .receipt-row {
+    grid-template-columns: 104px minmax(156px, 1.3fr) 104px minmax(140px, 1fr) 184px;
+  }
+
+  .receipt-list--with-year.receipt-list--income.receipt-list--no-actions
+    .receipt-list-header--income,
+  .receipt-list--with-year.receipt-list--income.receipt-list--no-actions .receipt-row {
+    grid-template-columns: 104px minmax(156px, 1.3fr) 104px minmax(140px, 1fr);
   }
 }
 

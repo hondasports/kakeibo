@@ -319,4 +319,22 @@ describe("ReceiptListCard", () => {
     expect(screen.queryByText("店舗2")).not.toBeInTheDocument();
     expect(screen.queryByText("店舗1")).not.toBeInTheDocument();
   });
+
+  it("dateFormatを指定した一覧だけ年つき列幅のクラスを付ける", () => {
+    const { unmount } = renderWithProviders(
+      <ReceiptListCard
+        count={1}
+        dateFormat="yearMonthDay"
+        isLoading={false}
+        receipts={receipts.slice(0, 1)}
+      />,
+    );
+    expect(screen.getByRole("table")).toHaveClass("receipt-list--with-year");
+    unmount();
+
+    renderWithProviders(
+      <ReceiptListCard count={1} isLoading={false} receipts={receipts.slice(0, 1)} />,
+    );
+    expect(screen.getByRole("table")).not.toHaveClass("receipt-list--with-year");
+  });
 });

@@ -181,6 +181,57 @@ describe("ExpenseSearchPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("履歴検索の支出と収入の一覧は、年をまたぐ結果をそれぞれ年つきで日付を出す", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-old",
+            date: "2023-06-01",
+            type: "expense" as const,
+            shopName: "古い店",
+            amountYen: 900,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry" as const,
+          },
+          {
+            _id: "income-older",
+            date: "2021-03-15",
+            type: "income" as const,
+            bankName: "古い銀行",
+            amountYen: 300000,
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        totalCount: 2,
+        expenseCount: 1,
+        incomeCount: 1,
+        totalExpenseYen: 900,
+        totalIncomeYen: 300000,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    expect(within(expenseTable).getByText("2023/6/1")).toBeInTheDocument();
+    const incomeTable = screen.getByRole("table", { name: "収入の検索結果" });
+    expect(within(incomeTable).getByText("2021/3/15")).toBeInTheDocument();
+  });
+
   it("追加読み込み後も初回の前期間比較を保持する", async () => {
     const user = userEvent.setup();
     const firstPage: ExpenseSearchResult = {
