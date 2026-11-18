@@ -1,7 +1,9 @@
 import { alpha } from "@mui/material/styles";
 import { Box, ButtonBase, Paper, Skeleton, Stack, Typography, useTheme } from "@mui/material";
 import { formatJapaneseDate } from "../../../utils/date";
+import { designTokens } from "../../../designTokens";
 import { formatYen, formatYenCompact } from "../../../../lib/domain/common/currency";
+import { getTodayDateStringInJapan } from "../../../../lib/domain/common/date";
 import { formatMonthLabel } from "../lib/monthNavigation";
 import {
   buildMonthlySpendingCalendarData,
@@ -9,6 +11,7 @@ import {
   EXPENSE_INTENSITY_ALPHA,
   getExpenseCellTextColor,
   getExpenseIntensity,
+  isFutureCalendarDate,
   type MonthlyCalendarDay,
 } from "../utils/monthlySpendingCalendar";
 
@@ -45,7 +48,12 @@ function LegendItem({
   );
 }
 
-function getDayLabel(day: MonthlyCalendarDay): string {
+// 今日より後の日は支出を表示しないため、読み上げ名からも支出の有無を外す。
+function getDayLabel(day: MonthlyCalendarDay, isFuture: boolean): string {
+  if (isFuture) {
+    const incomeSuffix = day.incomeAmountYen > 0 ? `、収入${formatYen(day.incomeAmountYen)}` : "";
+    return `${formatJapaneseDate(day.date)}（これからの日）${incomeSuffix}`;
+  }
   const expenseLabel = day.expenseAmountYen > 0 ? formatYen(day.expenseAmountYen) : "なし";
   const incomeLabel = day.incomeAmountYen > 0 ? formatYen(day.incomeAmountYen) : "なし";
   return `${formatJapaneseDate(day.date)}、支出${expenseLabel}、収入${incomeLabel}`;
@@ -75,6 +83,7 @@ export function MonthlySpendingCalendar({
   const theme = useTheme();
   const calendar = buildMonthlySpendingCalendarData({ expenses, incomes, month });
   const monthLabel = formatMonthLabel(month);
+  const today = getTodayDateStringInJapan();
 
   return (
     <Paper className="paper-panel monthly-spending-calendar" elevation={0}>
@@ -171,28 +180,32 @@ export function MonthlySpendingCalendar({
                   );
                   const hasIncome = day.incomeAmountYen > 0;
                   const isSelected = selectedDate === day.date;
+                  const isFuture = isFutureCalendarDate(day.date, today);
 
                   return (
                     <ButtonBase
-                      aria-label={getDayLabel(day)}
+                      aria-label={getDayLabel(day, isFuture)}
                       aria-pressed={isSelected}
                       data-date={day.date}
                       data-expense-intensity={intensity}
                       data-has-income={hasIncome}
+                      disabled={isFuture}
                       key={day.date}
                       onClick={() => onDateSelect(day.date)}
                       sx={{
                         alignItems: "stretch",
-                        backgroundColor: getCellBackgroundColor(
-                          intensity,
-                          theme.palette.primary.main,
-                        ),
+                        backgroundColor: isFuture
+                          ? "var(--color-surface-sunken)"
+                          : getCellBackgroundColor(intensity, theme.palette.primary.main),
                         border: isSelected
                           ? `2px solid ${theme.palette.secondary.main}`
                           : "1px solid",
                         borderColor: isSelected ? "secondary.main" : "divider",
                         borderRadius: 1.5,
-                        color: getExpenseCellTextColor(),
+                        borderStyle: isFuture ? "dashed" : undefined,
+                        color: isFuture
+                          ? designTokens.color.text.secondary
+                          : getExpenseCellTextColor(),
                         flexDirection: "column",
                         justifyContent: "flex-start",
                         minHeight: { xs: 68, sm: 78 },
@@ -227,9 +240,11 @@ export function MonthlySpendingCalendar({
                           width: "100%",
                         }}
                       >
-                        {day.expenseAmountYen > 0
-                          ? formatYenCompact(day.expenseAmountYen)
-                          : "支出なし"}
+                        {isFuture
+                          ? null
+                          : day.expenseAmountYen > 0
+                            ? formatYenCompact(day.expenseAmountYen)
+                            : "支出なし"}
                       </Typography>
                       {hasIncome && (
                         <Stack
