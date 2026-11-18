@@ -79,8 +79,10 @@ describe("履歴検索の分析表示", () => {
 
     expect(screen.getByLabelText("該当件数")).toHaveTextContent("3件");
     expect(screen.getByLabelText("支出")).toHaveTextContent("1,500円");
+    expect(screen.getByLabelText("支出")).toHaveTextContent("2件の合計");
     expect(screen.getByLabelText("収入")).toHaveTextContent("3,000円");
     expect(screen.getByLabelText("差引")).toHaveTextContent("+1,500円");
+    expect(screen.queryByText(/グループ/)).not.toBeInTheDocument();
   });
 
   it("期間推移とカテゴリ別の金額・構成比を表示する", () => {

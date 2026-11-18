@@ -78,7 +78,7 @@ export function HistoryMetricsPanel({
             value={`${totalCount}件`}
           />
           <Metric
-            detail={`${expenseCount}グループ`}
+            detail={`${expenseCount}件の合計`}
             label="支出"
             value={formatYen(totalExpenseYen)}
           />

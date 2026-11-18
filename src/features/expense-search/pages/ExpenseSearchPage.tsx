@@ -184,7 +184,7 @@ export function ExpenseSearchPage() {
                   <ReceiptListCard
                     count={expenseItems.length}
                     emptyMessage="条件に合う支出はありません"
-                    heading={`支出（${displayResult.expenseCount}グループ）`}
+                    heading={`支出一覧（${displayResult.expenseCount}件）`}
                     isLoading={false}
                     listAriaLabel="支出の検索結果"
                     maxVisibleGroups={Number.POSITIVE_INFINITY}

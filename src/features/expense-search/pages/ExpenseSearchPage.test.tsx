@@ -172,10 +172,10 @@ describe("ExpenseSearchPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "支出（1グループ）" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "支出一覧（1件）" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "さらに読み込む" }));
 
-    expect(screen.getByRole("heading", { name: "支出（1グループ）" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "支出一覧（1件）" })).toBeInTheDocument();
     expect(
       screen.getByText("追加の履歴を読み込めませんでした。表示済みの履歴はそのまま残しています。"),
     ).toBeInTheDocument();
