@@ -1,7 +1,16 @@
+import { designTokens } from "../../../designTokens";
 import { normalizeMonth } from "../lib/monthNavigation";
 import { WEEKDAY_LABELS as CALENDAR_WEEKDAY_LABELS } from "../../../utils/date";
 
 export { CALENDAR_WEEKDAY_LABELS };
+
+// 支出の濃さ段階ごとの、primary を重ねる不透明度（0 は未使用）。
+export const EXPENSE_INTENSITY_ALPHA = [0, 0.1, 0.22, 0.38, 0.58] as const;
+
+// 支出の濃さ（背景の濃さ）によらず、金額の文字は濃い文字色にする。最も濃い背景でも WCAG AA を満たすため。
+export function getExpenseCellTextColor(): string {
+  return designTokens.color.text.primary;
+}
 
 export type MonthlyCalendarDay = {
   date: string;
