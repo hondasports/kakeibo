@@ -68,5 +68,5 @@ license: Apache-2.0
 - VERDICT: CLEAN / NEEDS_FIX（最終レビュー時点のもの。更新したら日時と HEAD SHA を添えて書き換える）
 - 実施したレビュー: セルフレビュー / Devin Review / Codex Review / CodeRabbit（実施したものだけ）
 - 指摘件数: 未対応 N 件（内訳 Blocker n / Major n / Minor n）
-- 証跡: 各レビューの確認先 URL（Devin Review は https://app.devin.ai/review/hondasports/kakeibo/pull/<番号>）
+- 証跡: 各レビューの確認先 URL
 ```
