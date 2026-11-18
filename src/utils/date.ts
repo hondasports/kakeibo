@@ -24,7 +24,7 @@ export function formatDateForDisplay(isoDate: string): string {
  */
 export function formatDateWithYearForDisplay(isoDate: string): string {
   const d = new Date(`${isoDate}T00:00:00`);
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  return `${String(d.getFullYear()).padStart(4, "0")}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 /**

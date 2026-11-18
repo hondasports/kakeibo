@@ -31,9 +31,51 @@ function splitSmartphoneStyles(source: string) {
   return { desktop: desktop + source.slice(cursor), mobile };
 }
 
+/** `header`（例: `@media (min-width: 900px) {`）で始まるブロックの本体を、対応する閉じ括弧まで取り出す */
+function closingBraceIndex(source: string, from: number) {
+  let depth = 1;
+  for (let i = from; i < source.length; i += 1) {
+    if (source[i] === "{") depth += 1;
+    if (source[i] === "}") {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  throw new Error("閉じ括弧が見つかりません");
+}
+
+function mediaBlockBodies(source: string, header: string) {
+  const bodies: string[] = [];
+  let cursor = 0;
+  for (let start = source.indexOf(header); start !== -1; start = source.indexOf(header, cursor)) {
+    const bodyStart = source.indexOf("{", start) + 1;
+    const bodyEnd = closingBraceIndex(source, bodyStart);
+    bodies.push(source.slice(bodyStart, bodyEnd));
+    cursor = bodyEnd + 1;
+  }
+  return bodies;
+}
+
+/** `@media` ブロックを取り除き、どのメディアクエリにも入らない通常のCSSだけを返す */
+function stripMediaBlocks(source: string) {
+  let top = "";
+  let cursor = 0;
+  for (
+    let start = source.indexOf("@media");
+    start !== -1;
+    start = source.indexOf("@media", cursor)
+  ) {
+    top += source.slice(cursor, start);
+    cursor = closingBraceIndex(source, source.indexOf("{", start) + 1) + 1;
+  }
+  return top + source.slice(cursor);
+}
+
 describe("ReceiptListCard responsive styles", () => {
   const css = readFileSync(resolve(process.cwd(), "src/App.css"), "utf8");
   const { desktop, mobile } = splitSmartphoneStyles(css);
+  const pcCss = mediaBlockBodies(css, "@media (min-width: 900px) {").join("\n");
+  const topLevelCss = stripMediaBlocks(css);
 
   it("PC一覧では日付と金額を詰めて店名・内訳の幅を広げる", () => {
     expect(css).toMatch(/grid-template-columns:\s*88px minmax\(200px, 1fr\) 104px 184px/);
@@ -86,26 +128,29 @@ describe("ReceiptListCard responsive styles", () => {
   });
 
   it("年つきの履歴一覧だけPCの日付の列を104pxに広げ、操作なし・選択ありの組み合わせも覆う", () => {
-    const pcBlock = css.slice(css.indexOf("@media (min-width: 900px)"));
-    expect(pcBlock).toMatch(
+    expect(pcCss).toMatch(
       /\.receipt-list--with-year \.receipt-row[^{]*\{[^}]*104px minmax\(200px, 1fr\) 104px 184px/,
     );
-    expect(pcBlock).toMatch(
+    expect(pcCss).toMatch(
       /\.receipt-list--with-year\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*104px minmax\(200px, 1fr\) 104px;/,
     );
-    expect(pcBlock).toMatch(
+    expect(pcCss).toMatch(
       /\.receipt-list--with-year\.receipt-list--selectable\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*44px 104px minmax\(200px, 1fr\) 104px;/,
     );
-    expect(pcBlock).toMatch(
+    expect(pcCss).toMatch(
       /\.receipt-list--with-year\.receipt-list--income\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*104px minmax\(156px, 1\.3fr\) 104px minmax\(140px, 1fr\);/,
     );
   });
 
-  it("年つきの列幅の指定はスマートフォンのブロックに置かない", () => {
+  it("年つきの列幅の指定はPCのメディアクエリの外・スマートフォンのブロックのどちらにも置かない", () => {
+    expect(topLevelCss).not.toMatch(/\.receipt-list--with-year[^{]*\{[^}]*104px/);
     expect(mobile).not.toMatch(/with-year/);
   });
 
-  it("日付のセルは折り返さず、年つきの日付が2行に割れないようにする", () => {
-    expect(css).toMatch(/\.receipt-row-date\s*\{[^}]*white-space:\s*nowrap/);
+  it("年つきの日付のセルは全幅で折り返さない（週次・月次の「月/日」には効かせない）", () => {
+    expect(topLevelCss).toMatch(
+      /\.receipt-list--with-year \.receipt-row-date\s*\{[^}]*white-space:\s*nowrap/,
+    );
+    expect(css).not.toMatch(/(^|\n)\.receipt-row-date\s*\{[^}]*nowrap/);
   });
 });

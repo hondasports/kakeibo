@@ -769,7 +769,8 @@
   padding-left: calc(var(--space-lg) + var(--space-sm));
 }
 
-.receipt-row-date {
+/* 年つきの日付（「2026/12/31」）は、スマートフォンでも2行に割れないようにする */
+.receipt-list--with-year .receipt-row-date {
   white-space: nowrap;
 }
 

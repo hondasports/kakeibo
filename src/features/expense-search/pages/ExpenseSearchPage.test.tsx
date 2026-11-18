@@ -181,7 +181,7 @@ describe("ExpenseSearchPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("履歴検索の一覧は年をまたぐ結果でも年つきで日付を出す", () => {
+  it("履歴検索の支出と収入の一覧は、年をまたぐ結果をそれぞれ年つきで日付を出す", () => {
     useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
       if (_api === "get-user-profile") {
         return { weeklyStartDay: 3 };
@@ -203,10 +203,20 @@ describe("ExpenseSearchPage", () => {
             categoryColor: "#f97316",
             recordType: "expenseEntry" as const,
           },
+          {
+            _id: "income-older",
+            date: "2021-03-15",
+            type: "income" as const,
+            bankName: "古い銀行",
+            amountYen: 300000,
+            recordType: "expenseEntry" as const,
+          },
         ],
-        totalCount: 1,
+        totalCount: 2,
         expenseCount: 1,
+        incomeCount: 1,
         totalExpenseYen: 900,
+        totalIncomeYen: 300000,
       };
     });
 
@@ -216,7 +226,10 @@ describe("ExpenseSearchPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("2023/6/1")).toBeInTheDocument();
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    expect(within(expenseTable).getByText("2023/6/1")).toBeInTheDocument();
+    const incomeTable = screen.getByRole("table", { name: "収入の検索結果" });
+    expect(within(incomeTable).getByText("2021/3/15")).toBeInTheDocument();
   });
 
   it("追加読み込み後も初回の前期間比較を保持する", async () => {

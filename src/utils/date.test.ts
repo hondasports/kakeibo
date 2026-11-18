@@ -38,6 +38,10 @@ describe("formatDateWithYearForDisplay", () => {
   it("1桁の月・日でもゼロパディングなし", () => {
     expect(formatDateWithYearForDisplay("2026-03-05")).toBe("2026/3/5");
   });
+
+  it("4桁未満の年は4桁にそろえ、月・日はゼロ埋めしない", () => {
+    expect(formatDateWithYearForDisplay("0099-06-01")).toBe("0099/6/1");
+  });
 });
 
 describe("formatDateTimeForDisplay", () => {
