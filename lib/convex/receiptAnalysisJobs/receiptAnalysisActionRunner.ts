@@ -134,15 +134,10 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
           ? {}
           : { createdByUserId: batch.createdByUserId };
     },
-    countNeedsReviewJobs: (batchId) =>
-      ctx.runQuery(internal.receiptAnalysisJobs.internal.countNeedsReviewJobsByBatchId, {
-        batchId: batchId as Id<"receiptAnalysisBatches">,
-      }),
     async enqueueAiReviewRequiredNotifications(args) {
       await ctx.runMutation(internal.notifications.internal.enqueueAiReviewNotifications, {
         batchId: args.batchId as Id<"receiptAnalysisBatches">,
         userId: args.userId,
-        pendingCount: args.pendingCount,
       });
     },
   };
