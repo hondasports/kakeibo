@@ -80,6 +80,12 @@ export function isDateInMonth(date: string, month: string): boolean {
   return normalizedDate === date && date.startsWith(`${normalizedMonth}-`);
 }
 
+// today は JST の「YYYY-MM-DD」（getTodayDateStringInJapan の結果）。今日当日は今日以前として扱う。
+// ゼロ埋めの ISO 日付は文字列の辞書順が日付順と一致するため、日付計算をせずに比較する。
+export function isFutureCalendarDate(date: string, today: string): boolean {
+  return date > today;
+}
+
 export function getExpenseIntensity(
   amountYen: number,
   maxExpenseAmountYen: number,

@@ -3,6 +3,7 @@ import {
   buildMonthlySpendingCalendarData,
   getExpenseIntensity,
   isDateInMonth,
+  isFutureCalendarDate,
 } from "./monthlySpendingCalendar";
 
 describe("monthlySpendingCalendar", () => {
@@ -58,6 +59,16 @@ describe("monthlySpendingCalendar", () => {
     expect(isDateInMonth("2026-08-01", "2026-07")).toBe(false);
     expect(isDateInMonth("2026-7-01", "2026-07")).toBe(false);
     expect(isDateInMonth("invalid", "2026-07")).toBe(false);
+  });
+
+  it("日付が今日より後かどうかを、今日当日を含めずに判定する", () => {
+    expect(isFutureCalendarDate("2026-11-17", "2026-11-18")).toBe(false);
+    expect(isFutureCalendarDate("2026-11-18", "2026-11-18")).toBe(false);
+    expect(isFutureCalendarDate("2026-11-19", "2026-11-18")).toBe(true);
+    // 月・年をまたぐ境界。
+    expect(isFutureCalendarDate("2026-12-01", "2026-11-30")).toBe(true);
+    expect(isFutureCalendarDate("2026-11-30", "2026-12-01")).toBe(false);
+    expect(isFutureCalendarDate("2027-01-01", "2026-12-31")).toBe(true);
   });
 
   it("不正な月は空のカレンダーとして扱う", () => {
