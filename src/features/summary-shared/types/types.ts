@@ -67,6 +67,9 @@ export function groupReceiptItems(receipts: ReceiptItem[]): ReceiptGroup[] {
   }));
 }
 
+/** 一覧の日付の書式。`monthDay` は「M/D」、`yearMonthDay` は「YYYY/M/D」。 */
+export type ReceiptDateFormat = "monthDay" | "yearMonthDay";
+
 export type IncomeItem = {
   _id: string;
   date: string;

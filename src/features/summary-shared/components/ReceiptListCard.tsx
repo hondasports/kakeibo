@@ -3,11 +3,12 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Alert, Box, Button, Checkbox, Paper, Skeleton, Stack, Typography } from "@mui/material";
 import { ReceiptGroupRow } from "./ReceiptGroupRow";
 import type { CategoryPreview } from "./ReceiptRow";
-import { groupReceiptItems, type ReceiptItem } from "../types/types";
+import { groupReceiptItems, type ReceiptDateFormat, type ReceiptItem } from "../types/types";
 import { getVisibleSelectableReceipts } from "../utils/bulkSelection";
 
 export function ReceiptListCard({
   count,
+  dateFormat = "monthDay",
   emptyMessage = "まだレシートがありません",
   heading,
   isLoading,
@@ -30,6 +31,7 @@ export function ReceiptListCard({
   onBulkDelete,
 }: {
   count: number;
+  dateFormat?: ReceiptDateFormat;
   emptyMessage?: string;
   heading?: string;
   isLoading: boolean;
@@ -187,6 +189,7 @@ export function ReceiptListCard({
                 {visibleReceiptGroups.map((group) => (
                   <ReceiptGroupRow
                     key={group.id}
+                    dateFormat={dateFormat}
                     group={group}
                     onDelete={onDeleteReceipt}
                     onEdit={onEditReceipt}

@@ -32,6 +32,25 @@ describe("ReceiptRow", () => {
       locale.mockRestore();
     }
   });
+  it("dateFormatを指定すると行の日付と読み上げ名に年を出し、指定しないときは「月/日」のまま", () => {
+    const { unmount } = renderWithProviders(
+      <ReceiptRow dateFormat="yearMonthDay" receipt={sampleReceipt} onEdit={vi.fn()} />,
+    );
+    expect(screen.getByTestId("receipt-row").querySelector(".receipt-row-date")).toHaveTextContent(
+      "2026/6/21",
+    );
+    expect(
+      screen.getByRole("button", { name: "スーパーA（2026/6/21）を編集" }),
+    ).toBeInTheDocument();
+    unmount();
+
+    renderWithProviders(<ReceiptRow receipt={sampleReceipt} onEdit={vi.fn()} />);
+    expect(screen.getByTestId("receipt-row").querySelector(".receipt-row-date")).toHaveTextContent(
+      /^6\/21$/,
+    );
+    expect(screen.getByRole("button", { name: "スーパーA（6/21）を編集" })).toBeInTheDocument();
+  });
+
   it("編集と削除ボタンからコールバックを呼び出す", async () => {
     const user = userEvent.setup();
     const onEdit = vi.fn();

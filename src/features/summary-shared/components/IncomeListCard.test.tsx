@@ -27,6 +27,20 @@ describe("IncomeListCard", () => {
     expect(screen.getAllByTestId("receipt-row")).toHaveLength(7);
   });
 
+  it("dateFormatを指定すると収入一覧の日付に年を出す", () => {
+    renderWithProviders(
+      <IncomeListCard
+        count={1}
+        dateFormat="yearMonthDay"
+        incomes={incomes.slice(0, 1)}
+        isLoading={false}
+      />,
+    );
+    expect(screen.getByTestId("receipt-row").querySelector(".receipt-row-date")).toHaveTextContent(
+      "2026/6/21",
+    );
+  });
+
   it("収入は従来どおりメモ列と空メモを表示する", () => {
     renderWithProviders(
       <IncomeListCard count={1} isLoading={false} incomes={incomes.slice(0, 1)} />,

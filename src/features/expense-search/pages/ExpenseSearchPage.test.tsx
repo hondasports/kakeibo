@@ -181,6 +181,44 @@ describe("ExpenseSearchPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("履歴検索の一覧は年をまたぐ結果でも年つきで日付を出す", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-old",
+            date: "2023-06-01",
+            type: "expense" as const,
+            shopName: "古い店",
+            amountYen: 900,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        totalCount: 1,
+        expenseCount: 1,
+        totalExpenseYen: 900,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("2023/6/1")).toBeInTheDocument();
+  });
+
   it("追加読み込み後も初回の前期間比較を保持する", async () => {
     const user = userEvent.setup();
     const firstPage: ExpenseSearchResult = {

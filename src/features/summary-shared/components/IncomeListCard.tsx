@@ -2,11 +2,12 @@ import { useState } from "react";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Box, Button, Paper, Skeleton, Stack, Typography } from "@mui/material";
 import { ReceiptRow } from "./ReceiptRow";
-import type { IncomeItem } from "../types/types";
+import type { IncomeItem, ReceiptDateFormat } from "../types/types";
 import { incomeItemToReceiptItem } from "../types/types";
 
 export function IncomeListCard({
   count,
+  dateFormat = "monthDay",
   emptyMessage = "まだ収入がありません",
   isLoading,
   incomes,
@@ -15,6 +16,7 @@ export function IncomeListCard({
   onEditIncome,
 }: {
   count: number;
+  dateFormat?: ReceiptDateFormat;
   emptyMessage?: string;
   isLoading: boolean;
   incomes: IncomeItem[];
@@ -68,6 +70,7 @@ export function IncomeListCard({
                   return (
                     <ReceiptRow
                       key={income._id}
+                      dateFormat={dateFormat}
                       receipt={receipt}
                       showCategory={false}
                       onDelete={onDeleteIncome ? () => onDeleteIncome(income) : undefined}

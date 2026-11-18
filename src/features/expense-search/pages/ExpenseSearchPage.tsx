@@ -183,6 +183,7 @@ export function ExpenseSearchPage() {
                 {applied.entryType !== "income" && expenseItems.length > 0 ? (
                   <ReceiptListCard
                     count={expenseItems.length}
+                    dateFormat="yearMonthDay"
                     emptyMessage="条件に合う支出はありません"
                     heading={`支出（${displayResult.expenseCount}グループ）`}
                     isLoading={false}
@@ -194,6 +195,7 @@ export function ExpenseSearchPage() {
                 {applied.entryType !== "expense" && incomeItems.length > 0 ? (
                   <IncomeListCard
                     count={incomeItems.length}
+                    dateFormat="yearMonthDay"
                     emptyMessage="条件に合う収入はありません"
                     incomes={incomeItems}
                     isLoading={false}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatDateForDisplay,
+  formatDateWithYearForDisplay,
   formatDateTimeForDisplay,
   formatJapaneseDate,
   formatShortDateWithWeekday,
@@ -21,6 +22,21 @@ describe("formatDateForDisplay", () => {
 
   it("1桁の月・日でもゼロパディングなし", () => {
     expect(formatDateForDisplay("2026-03-05")).toBe("3/5");
+  });
+});
+
+describe("formatDateWithYearForDisplay", () => {
+  it("ISO形式の日付を YYYY/M/D 形式にフォーマットする", () => {
+    expect(formatDateWithYearForDisplay("2023-06-01")).toBe("2023/6/1");
+  });
+
+  it("1月1日・12月31日の年の境界を正しくフォーマットする", () => {
+    expect(formatDateWithYearForDisplay("2026-01-01")).toBe("2026/1/1");
+    expect(formatDateWithYearForDisplay("2026-12-31")).toBe("2026/12/31");
+  });
+
+  it("1桁の月・日でもゼロパディングなし", () => {
+    expect(formatDateWithYearForDisplay("2026-03-05")).toBe("2026/3/5");
   });
 });
 
