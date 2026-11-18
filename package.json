@@ -73,7 +73,7 @@
     "convex-test": "0.0.56",
     "dotenv": "^18.0.5",
     "husky": "^9.1.7",
-    "jsdom": "^29.1.1",
+    "jsdom": "^31.0.1",
     "lint-staged": "^17.6.0",
     "oxfmt": "^0.72.0",
     "oxlint": "^1.82.0",
