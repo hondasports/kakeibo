@@ -144,7 +144,7 @@ export function ReceiptListCard({
 
           <Box
             aria-label={listAriaLabel}
-            className={`receipt-list${selectionEnabled ? " receipt-list--selectable" : ""}${hasRowActions ? "" : " receipt-list--no-actions"}`}
+            className={`receipt-list${selectionEnabled ? " receipt-list--selectable" : ""}${hasRowActions ? "" : " receipt-list--no-actions"}${dateFormat === "yearMonthDay" ? " receipt-list--with-year" : ""}`}
             role={!isLoading && count > 0 ? "table" : undefined}
           >
             {isLoading ? (

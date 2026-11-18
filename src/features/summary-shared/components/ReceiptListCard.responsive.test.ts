@@ -84,4 +84,28 @@ describe("ReceiptListCard responsive styles", () => {
       /\.receipt-list--selectable:not\(\.receipt-list--income\) \.receipt-row\s*\{[^}]*"select date name amount" "select actions actions actions"/,
     );
   });
+
+  it("年つきの履歴一覧だけPCの日付の列を104pxに広げ、操作なし・選択ありの組み合わせも覆う", () => {
+    const pcBlock = css.slice(css.indexOf("@media (min-width: 900px)"));
+    expect(pcBlock).toMatch(
+      /\.receipt-list--with-year \.receipt-row[^{]*\{[^}]*104px minmax\(200px, 1fr\) 104px 184px/,
+    );
+    expect(pcBlock).toMatch(
+      /\.receipt-list--with-year\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*104px minmax\(200px, 1fr\) 104px;/,
+    );
+    expect(pcBlock).toMatch(
+      /\.receipt-list--with-year\.receipt-list--selectable\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*44px 104px minmax\(200px, 1fr\) 104px;/,
+    );
+    expect(pcBlock).toMatch(
+      /\.receipt-list--with-year\.receipt-list--income\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*104px minmax\(156px, 1\.3fr\) 104px minmax\(140px, 1fr\);/,
+    );
+  });
+
+  it("年つきの列幅の指定はスマートフォンのブロックに置かない", () => {
+    expect(mobile).not.toMatch(/with-year/);
+  });
+
+  it("日付のセルは折り返さず、年つきの日付が2行に割れないようにする", () => {
+    expect(css).toMatch(/\.receipt-row-date\s*\{[^}]*white-space:\s*nowrap/);
+  });
 });

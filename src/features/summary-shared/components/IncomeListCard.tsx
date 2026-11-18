@@ -43,7 +43,7 @@ export function IncomeListCard({
 
           <Box
             aria-label={listAriaLabel}
-            className={`receipt-list receipt-list--income${hasRowActions ? "" : " receipt-list--no-actions"}`}
+            className={`receipt-list receipt-list--income${hasRowActions ? "" : " receipt-list--no-actions"}${dateFormat === "yearMonthDay" ? " receipt-list--with-year" : ""}`}
             role={!isLoading && count > 0 ? "table" : undefined}
           >
             {isLoading ? (
