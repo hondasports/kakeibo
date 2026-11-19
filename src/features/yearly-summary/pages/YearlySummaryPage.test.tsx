@@ -132,7 +132,7 @@ describe("YearlySummaryPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole("button", { name: /日付を選択/ }));
+    await user.click(screen.getByRole("button", { name: /表示する年を選ぶ/ }));
     await user.click(screen.getByRole("radio", { name: /^2026$/ }));
     expect(navigateMock).toHaveBeenCalledWith("/years/2026");
   });

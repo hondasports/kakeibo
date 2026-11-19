@@ -23,6 +23,24 @@ describe("YearNavigator", () => {
     expect(screen.getByLabelText("2025年を選択")).toBeInTheDocument();
   });
 
+  it("年ピッカーを開くボタンに、年を選ぶ操作だと分かる名前を付ける", () => {
+    renderWithDatePickers(
+      <YearNavigator
+        currentYear="2026"
+        onCurrentYear={vi.fn()}
+        onNextYear={vi.fn()}
+        onPreviousYear={vi.fn()}
+        onYearChange={vi.fn()}
+        year="2025"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "表示する年を選ぶ（現在: 2025年）" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /日付を選択/ })).not.toBeInTheDocument();
+  });
+
   it("今年表示では次年と今年ボタンを無効化する", () => {
     renderWithDatePickers(
       <YearNavigator
@@ -78,6 +96,7 @@ describe("YearNavigator", () => {
     );
 
     expect(screen.getByLabelText("年を選択")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "表示する年を選ぶ" })).toBeInTheDocument();
   });
 
   it("年ピッカーで選んだ年を通知する", async () => {
@@ -95,7 +114,7 @@ describe("YearNavigator", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /日付を選択/ }));
+    await user.click(screen.getByRole("button", { name: "表示する年を選ぶ（現在: 2025年）" }));
     await user.click(screen.getByRole("radio", { name: /^2024$/ }));
 
     expect(onYearChange).toHaveBeenCalledWith("2024");
