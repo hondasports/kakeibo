@@ -25,6 +25,10 @@ export function YearNavigator({
   const normalizedYear = normalizeYear(year);
   const normalizedCurrentYear = normalizeYear(currentYear);
   const yearLabel = normalizedYear ? formatYearLabel(normalizedYear) : "年";
+  // MUI 既定の「日付を選択してください…」は日付の選択を指すため、年を選ぶ操作だと分かる名前にする。
+  const pickerButtonLabel = normalizedYear
+    ? `表示する年を選ぶ（現在: ${yearLabel}）`
+    : "表示する年を選ぶ";
 
   const handlePickerChange = (value: Dayjs | null) => {
     applyPickedYear(value, onYearChange);
@@ -57,6 +61,9 @@ export function YearNavigator({
         slotProps={{
           field: {
             "aria-label": `${yearLabel}を選択`,
+          },
+          openPickerButton: {
+            "aria-label": pickerButtonLabel,
           },
           textField: {
             sx: {
