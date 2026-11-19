@@ -1,9 +1,9 @@
+import { OAUTH_CALLBACK_PATH } from "../../app-shell";
 import {
   getMissingFields,
   hasPasswordField,
   hasSupportedProfileFields,
   isExistingAccountInvitationError,
-  OAUTH_CALLBACK_PATH,
   type ClerkSignIn,
   type ClerkSignUp,
   type ClerkSignUpResult,

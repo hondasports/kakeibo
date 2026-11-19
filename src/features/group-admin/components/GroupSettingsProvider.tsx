@@ -1,40 +1,19 @@
 import { api } from "../../../../convex/_generated/api";
 import { createContext, type ReactNode, useContext } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
-import type { Id } from "../../../../convex/_generated/dataModel";
-import type { GroupMemberListItem } from "../utils/groupMemberDisplay";
-import type { GroupPendingInvitationListItem } from "../utils/groupInvitationDisplay";
-import type { GroupManagementAuditLogListItem } from "../utils/groupManagementAuditLogDisplay";
-import type { GroupRole } from "../../../../lib/domain/groups/role";
-
-export type GroupInfo = {
-  _id: Id<"groups">;
-  name: string;
-  role: GroupRole;
-  createdAt: number;
-};
-
-type GroupListItem = {
-  _id: Id<"groups">;
-  name: string;
-  role: GroupRole;
-  isActive: boolean;
-};
 
 function useGroupSettingsValue() {
-  const group = useQuery(api.groups.queries.getMyGroup) as GroupInfo | null | undefined;
-  const groups = useQuery(api.groups.queries.listMyGroups) as GroupListItem[] | undefined;
-  const members = useQuery(api.groups.queries.getGroupMembers, { allowUnavailable: true }) as
-    | GroupMemberListItem[]
-    | undefined;
+  const group = useQuery(api.groups.queries.getMyGroup);
+  const groups = useQuery(api.groups.queries.listMyGroups);
+  const members = useQuery(api.groups.queries.getGroupMembers, { allowUnavailable: true });
   const pendingInvitations = useQuery(
     api.groups.queries.listPendingGroupInvitations,
     group?.role === "owner" ? { allowUnavailable: true } : "skip",
-  ) as GroupPendingInvitationListItem[] | undefined;
+  );
   const managementAuditLogs = useQuery(
     api.groups.auditLogs.listManagementAuditLogs,
     group?.role === "owner" ? { allowUnavailable: true } : "skip",
-  ) as GroupManagementAuditLogListItem[] | undefined;
+  );
 
   return {
     group,
