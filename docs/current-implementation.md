@@ -64,7 +64,7 @@
 | `/months/:month` | 月次サマリー | lazy load |
 | `/years/:year` | 年次サマリー | lazy load |
 | `/search` | 履歴検索（支出・収入） | lazy load |
-| `/settings` | 設定 | LINE連携・カテゴリ・週設定・グループ設定等 |
+| `/settings` | 設定 | 設定画面。構成の正本は `docs/ui-ux-design.md` 5.4 節 |
 | `/settings/line/callback` | LINE Login callback | Web側連携完了導線 |
 | `/settings/account/delete` | アカウント削除 | グループ認可配下 |
 | `/settings/account/delete/status` | アカウント削除状況 | 認可ガード外の専用状態画面 |

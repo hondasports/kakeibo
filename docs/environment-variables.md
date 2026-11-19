@@ -322,6 +322,7 @@ PR単位のE2EではGitHub Actions内に使い捨てlocal backendを起動し、
 | `VITE_APP_VERSION` | `2026.07.11-458` | Vite ビルドで `<meta name="app-version">` と React ページに注入 | `APP_VERSION` と同値 |
 | `RELEASE_NOTE` | `m15 PREVIEW URL確認済み` | GitHub Release のリリースノート本文 | `workflow_dispatch.inputs.release_note` または `main` push 時の定型文 |
 | `BASE_REF` | `main` | 統合PR判定の補助情報 | `main` または `inputs.source_ref` |
+| `SOURCE_REF` | `0b3a8bcf`（コミットSHA） | Product Update の収集範囲の末端・GitHub Release の target。詳細は `docs/production-release.md` を参照 | preflight job の env（`github.sha` または `inputs.source_ref`）を "Resolve release commit" でSHA解決した `source_sha` output |
 
 これらは GitHub Actions 上で生成される。Vercel Dashboard には `VITE_APP_VERSION` を固定値として設定しない。
 

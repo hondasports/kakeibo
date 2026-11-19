@@ -282,7 +282,7 @@ tests/
 
 フロントエンドは **Feature-based Architecture** を採用する。各 feature は `src/features/<feature-name>/`
 配下に置き、feature 内は **type-based**（`components/`、`hooks/`、`pages/`、`types/`、`utils/`）で整理する。
-画面ルートは各 feature の `pages/` に置き、`router.tsx` から feature の `index.ts` 経由で import する。
+画面ルートは各 feature の `pages/` に置き、`router.tsx` から import する（import 方針は 5.1 節）。
 横断的な UI は `features/ui/`、週ナビ・日付は `features/week/`、アプリシェル・公開ページは
 `features/app-shell/`、認証ユーティリティは `features/auth/lib/` に置く。バリデーションは
 各 feature の `validation/` に置き、feature 外からは `index.ts` 経由で import する。
@@ -298,7 +298,8 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 ### 5.1 feature 間の import 方針
 
 - **エントリポイント**（`router.tsx`、`App.tsx`、`main.tsx`）から feature を参照するときは、必ず
-  `features/<name>/index.ts`（barrel）経由にする。
+  `features/<name>/index.ts`（barrel）経由にする。ただし `router.tsx` が lazy load する page は、
+  code splitting を保つため `features/<name>/pages/<PageFile>` を直接 import する。
 - **feature 同士**の参照も barrel 経由とする（例: `import { WeekNavigator } from "../../week"`）。
   feature 内のファイルパス（`../../week/components/...`）への直接 import は避ける。
   ただし barrel を持たない共有 feature（`summary-shared`、`receipt-review`）は、中身の
@@ -985,7 +986,7 @@ active record が確認できない場合は fail closed にする。
 | `/years/:year` | 年次サマリー | 年間収支と月別推移を確認する |
 | `/search` | 履歴検索 | 支出・収入を条件で検索し、集計・比較する |
 | `/settings/line/callback` | LINE連携コールバック | WebユーザーとLINEアカウントの連携を完了する |
-| `/settings`                    | 設定               | グループ、カテゴリ、週の開始曜日を設定する（終了曜日は自動） |
+| `/settings`                    | 設定               | 設定画面。構成の正本は `docs/ui-ux-design.md` 5.4 節 |
 | `/categories`                  | 設定               | `/settings` と同じ設定画面への互換ルート   |
 | `/group/setup`                 | グループ作成       | グループ未所属ユーザーが家族グループを作成する |
 | `/group/select`                | グループ選択       | 複数所属ユーザーが表示対象グループを選ぶ     |
