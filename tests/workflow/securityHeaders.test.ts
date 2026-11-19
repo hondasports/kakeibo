@@ -21,6 +21,15 @@ const vercelConfig = JSON.parse(
 const headerRules = vercelConfig.headers ?? [];
 
 const PRODUCTION_HOST_PATTERN = "^(www\\.)?suzumemo\\.jp$";
+const PRE_CHANGE_CSP =
+  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
+  "script-src 'self' https://*.clerk.accounts.dev https://*.clerk.accounts.com https://*.clerk.com https://clerk.suzumemo.jp; " +
+  "script-src-attr 'none'; style-src 'self' 'unsafe-inline'; " +
+  "img-src 'self' data: blob: https:; font-src 'self' data: https:; " +
+  "connect-src 'self' https://*.convex.cloud https://*.convex.site https://*.clerk.accounts.dev https://*.clerk.accounts.com https://*.clerk.com https://clerk.suzumemo.jp https://api.clerk.com wss://*.convex.cloud; " +
+  "frame-src https://*.clerk.accounts.dev https://*.clerk.accounts.com https://*.clerk.com; " +
+  "form-action 'self' https://*.clerk.accounts.dev https://*.clerk.accounts.com https://*.clerk.com; " +
+  "worker-src 'self' blob:";
 const CLERK_DEVELOPMENT_DOMAINS = [
   "https://*.clerk.accounts.dev",
   "https://*.clerk.accounts.com",
@@ -72,8 +81,13 @@ describe("Vercel security headers", () => {
 
   it("本番hostとそれ以外のhostでCSPルールが互いに排他になる", () => {
     expect(headerRules).toHaveLength(2);
+    expect(headerRules.every((rule) => rule.source === "/(.*)")).toBe(true);
+    expect(productionRule).toBeDefined();
+    expect(nonProductionRule).toBeDefined();
     expect(productionRule?.has).toEqual([{ type: "host", value: PRODUCTION_HOST_PATTERN }]);
+    expect(productionRule?.missing).toBeUndefined();
     expect(nonProductionRule?.missing).toEqual([{ type: "host", value: PRODUCTION_HOST_PATTERN }]);
+    expect(nonProductionRule?.has).toBeUndefined();
 
     const hostPattern = new RegExp(PRODUCTION_HOST_PATTERN);
     for (const host of ["suzumemo.jp", "www.suzumemo.jp"]) {
@@ -118,18 +132,8 @@ describe("Vercel security headers", () => {
     expect(productionCsp).not.toContain("*.suzumemo.jp");
   });
 
-  it("それ以外のhostのCSPは従来どおりClerkの全ドメインを許可する", () => {
-    for (const directiveName of ["script-src", "connect-src", "frame-src", "form-action"]) {
-      const sources = getDirectiveSources(nonProductionCsp, directiveName);
-      for (const domain of CLERK_DEVELOPMENT_DOMAINS) {
-        expect(sources).toContain(domain);
-      }
-    }
-    expect(getDirectiveSources(nonProductionCsp, "connect-src")).toContain(
-      "https://clerk.suzumemo.jp",
-    );
-    expect(getDirectiveSources(nonProductionCsp, "connect-src")).toContain("https://api.clerk.com");
-    expect(nonProductionCsp).not.toContain("*.suzumemo.jp");
+  it("それ以外のhostのCSPは変更前と同一", () => {
+    expect(nonProductionCsp).toBe(PRE_CHANGE_CSP);
   });
 
   it("CSP以外のheaderは全hostで同一", () => {
