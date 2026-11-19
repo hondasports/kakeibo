@@ -298,8 +298,9 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 ### 5.1 feature 間の import 方針
 
 - **エントリポイント**（`router.tsx`、`App.tsx`、`main.tsx`）から feature を参照するときは、必ず
-  `features/<name>/index.ts`（barrel）経由にする。ただし `router.tsx` が lazy load する page は、
-  code splitting を保つため `features/<name>/pages/<PageFile>` を直接 import する。
+  `features/<name>/index.ts`（barrel）経由にする。ただし `router.tsx` では、lazy load する page を
+  code splitting のため `features/<name>/pages/<PageFile>` から直接 import し、barrel に公開して
+  いない page（現状 `LineLinkCallbackPage`）も直接 import している。
 - **feature 同士**の参照も barrel 経由とする（例: `import { WeekNavigator } from "../../week"`）。
   feature 内のファイルパス（`../../week/components/...`）への直接 import は避ける。
   ただし barrel を持たない共有 feature（`summary-shared`、`receipt-review`）は、中身の
