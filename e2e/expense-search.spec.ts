@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { gotoAuthenticated } from "./helpers/auth";
 import { cleanupE2eExpenseEntries } from "./helpers/cleanup";
 import { saveExpense } from "./helpers/expenseEntry";
+import { expectNoContentOverflow } from "./helpers/viewport";
 
 test.describe("履歴検索（Issue #537 / #637〜#643）", () => {
   test.beforeEach(async ({ page }) => {
@@ -23,6 +24,15 @@ test.describe("履歴検索（Issue #537 / #637〜#643）", () => {
     await expect(page.getByRole("heading", { name: "履歴検索", level: 1 })).toBeVisible();
     await expect(page.getByText("検索用スーパー北浜").first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("3,210円").first()).toBeVisible();
+
+    // Issue #1295: 狭いPC幅（900〜1199px）で年つき日付の一覧が枠からはみ出さないこと
+    const expenseList = page.getByRole("table", { name: "支出の検索結果" });
+    for (const width of [900, 1199]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(expenseList).toBeVisible();
+      await expectNoContentOverflow(expenseList);
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
   });
 
   test("収入も履歴検索の結果と種別フィルタに含まれる", async ({ page }) => {
@@ -37,6 +47,15 @@ test.describe("履歴検索（Issue #537 / #637〜#643）", () => {
     await expect(page.getByRole("heading", { name: "履歴検索", level: 1 })).toBeVisible();
     await expect(page.getByText("収入一覧（1件）")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("検索用給与").first()).toBeVisible();
+
+    // Issue #1295: 狭いPC幅（900〜1199px）で年つき日付の収入一覧が枠からはみ出さないこと
+    const incomeList = page.getByRole("table", { name: "収入の検索結果" });
+    for (const width of [900, 1199]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(incomeList).toBeVisible();
+      await expectNoContentOverflow(incomeList);
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
 
     await page
       .getByRole("group", { name: "記録種別" })

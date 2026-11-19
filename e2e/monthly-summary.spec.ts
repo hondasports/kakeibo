@@ -3,6 +3,7 @@ import { addMonths, formatMonthLabel } from "../lib/domain/common/month";
 import { gotoAuthenticated } from "./helpers/auth";
 import { cleanupE2eExpenseEntries, cleanupTestReceipts } from "./helpers/cleanup";
 import { saveExpense } from "./helpers/expenseEntry";
+import { expectNoContentOverflow } from "./helpers/viewport";
 
 test.describe("月次サマリー（Issue #87）", () => {
   test.beforeEach(async ({ page }) => {
@@ -72,6 +73,17 @@ test.describe("月次サマリー（Issue #87）", () => {
     await expect(page.getByRole("heading", { name: "2026年8月12日の明細" })).toBeVisible();
     await expect(page.getByLabel("2026年8月12日の支出一覧")).toContainText(expenseTitle);
     await expect(page.getByLabel("2026年8月12日の収入一覧")).toContainText(incomeTitle);
+
+    // Issue #1295: 狭いPC幅（900〜1199px）で支出・収入の一覧が枠からはみ出さないこと
+    for (const width of [900, 1199]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const listName of ["2026年8月12日の支出一覧", "2026年8月12日の収入一覧"]) {
+        const list = page.getByLabel(listName);
+        await expect(list).toBeVisible();
+        await expectNoContentOverflow(list);
+      }
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
 
     await page.getByRole("button", { name: "月全体を見る" }).click();
     await expect(page).toHaveURL(`/months/${currentMonth}`);

@@ -158,7 +158,7 @@ export function ReceiptRow({
                 type="button"
                 variant="text"
               >
-                編集
+                <span className="receipt-row-action-label">編集</span>
               </Button>
             )}
             {onDelete && (
@@ -172,7 +172,7 @@ export function ReceiptRow({
                 type="button"
                 variant="text"
               >
-                削除
+                <span className="receipt-row-action-label">削除</span>
               </Button>
             )}
           </Stack>
