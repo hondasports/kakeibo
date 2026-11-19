@@ -288,7 +288,7 @@ CIで実行するbackendは共有cloud devではなく、ジョブごとの `CON
 - `.github/workflows/preview-deploy.yml`
 - `.github/workflows/production-release.yml`
 
-各workflowのNode.jsは `jdx/mise-action`（SHA固定。現行 `v5.2.5`）でリポジトリの `mise.toml` から導入する。pnpmは `package.json` の `packageManager` に合わせて `pnpm/action-setup` で導入し、ローカルとCIでNode.jsの選択元を分けない。
+各workflowのNode.jsは `jdx/mise-action`（SHA固定。版は各workflowを参照）でリポジトリの `mise.toml` から導入する。pnpmは `package.json` の `packageManager` に合わせて `pnpm/action-setup` で導入し、ローカルとCIでNode.jsの選択元を分けない。例外として `preview-deploy.yml` の `wait-for-staging-window` job は依存を導入しない待機専用で、runner 標準の Node.js で `scripts/wait-for-staging-window.mjs` を実行する。
 
 通常CIの主なcheck:
 
