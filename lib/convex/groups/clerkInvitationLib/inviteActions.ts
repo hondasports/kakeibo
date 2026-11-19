@@ -79,7 +79,7 @@ function createInvitationStore(
         ...(clerkInvitationId === undefined ? {} : { clerkInvitationId }),
       }),
     cancelPendingGroupInvitation: (invitationId) =>
-      ctx.runMutation(api.groups.invitations.cancelPendingGroupInvitation, {
+      ctx.runMutation(internal.groups.invitations.cancelPendingGroupInvitation, {
         invitationId: invitationId as Id<"groupInvitations">,
       }),
   };

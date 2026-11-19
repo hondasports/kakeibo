@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { requireGroupMembershipForGroup } from "./membership";
 import { assertGroupOwnerRole } from "./adminGuards";
-import { internalMutation, internalQuery, mutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { assertEmailCanBeInvitedToGroup as assertEmailCanBeInvitedToGroupUsecase } from "../../lib/usecase/groups/assertEmailCanBeInvitedToGroup";
@@ -75,7 +75,7 @@ export async function deletePendingGroupInvitationRecordByTokenHandler(
   return invitationId === null ? null : (invitationId as Id<"groupInvitations">);
 }
 
-export const cancelPendingGroupInvitation = mutation({
+export const cancelPendingGroupInvitation = internalMutation({
   args: { invitationId: v.id("groupInvitations") },
   returns: v.object({ clerkInvitationIds: v.array(v.string()) }),
   handler: cancelPendingGroupInvitationHandler,
