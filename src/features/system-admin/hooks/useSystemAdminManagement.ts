@@ -7,14 +7,8 @@ import type { UserSearchType } from "../../../../lib/domain/systemAdmin/searchQu
 
 export type StatusFilter = SystemAdminStatus;
 
-type ManagementContext = {
-  status: string;
-  environment: "development" | "preview" | "production";
-  userId?: string;
-} | null;
-
 export function useSystemAdminManagement() {
-  const context = useQuery(api.systemAdmins.getMySystemAdminContext, {}) as ManagementContext;
+  const context = useQuery(api.systemAdmins.getMySystemAdminContext, {});
   const [statusFilter, setStatusFilterState] = useState<StatusFilter>("active");
   const [cursor, setCursor] = useState<string | null>(null);
   const [searchType, setSearchType] = useState<UserSearchType>("displayName");

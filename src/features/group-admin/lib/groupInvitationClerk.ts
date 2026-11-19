@@ -31,7 +31,6 @@ export type ClerkSignIn = {
   }) => Promise<ClerkSsoResult>;
 };
 
-export const OAUTH_CALLBACK_PATH = "/sso-callback";
 export const CLERK_STATUS_SIGN_IN = "sign_in";
 
 export const firstNameFieldNames = new Set(["firstName", "first_name"]);

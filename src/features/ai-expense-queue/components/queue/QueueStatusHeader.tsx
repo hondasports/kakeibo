@@ -1,6 +1,6 @@
 import { Button, Chip, Stack } from "@mui/material";
 import type { AiExpenseQueueItem } from "../../../../types/aiExpenseQueue";
-import { displayStatusLabels } from "../../../receipt-review/components/labels";
+import { queueSectionLabels } from "../../../receipt-review/components/labels";
 
 type QueueStatusHeaderProps = {
   groupedItems: {
@@ -40,7 +40,7 @@ export function QueueStatusHeader({
             <Chip
               color={color}
               key={status}
-              label={`${displayStatusLabels[status]} ${count}件`}
+              label={`${queueSectionLabels[status]} ${count}件`}
               size="small"
               variant={outlined ? "outlined" : "filled"}
             />

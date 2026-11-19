@@ -76,7 +76,6 @@ src/
   designTokens.ts              # MUI sx 用デザイントークン（feature 横断）
   designTokens.test.ts
   index.css
-  assets/                      # Vite 同梱の静的アセット（hero.png 等）
   content/                     # Product Update 原稿データ（product-updates.ts）
   generated/                   # 生成物（product-updates.json）
   utils/                       # feature 横断ユーティリティ（例: imageDataUrl）
@@ -106,19 +105,16 @@ src/
       lib/
       pages/
       utils/
-      index.ts
     yearly-summary/            # 年次サマリページ
       components/
       lib/
       pages/
       utils/
-      index.ts
     expense-search/            # 支出検索ページ
       components/
       hooks/                   # useExpenseSearchResults
       lib/                     # searchParams, expenseSearchItems
       pages/
-      index.ts
     summary-shared/            # 集計系 feature で共有する表示部品・型・util（index.ts なし）
       components/              # CategoryBreakdownCard, ReceiptListCard, ReceiptRow,
                                #   ReceiptGroupRow, IncomeListCard, MonthlyMetricsPanel,
@@ -170,13 +166,12 @@ src/
       lib/
       index.ts
     weekly-summary/            # 週次サマリページ
-      components/              # WeeklySummaryPanel, TotalSummaryCard, SummaryMetricsPanel,
-                               #   WeeklyCategoryBreakdown, PreviousWeekComparison,
+      components/              # WeeklySummaryPanel, SummaryMetricsPanel,
+                               #   WeeklyCategoryBreakdown,
                                #   ExpenseBulkCategoryDialog, ExpenseBulkDeleteDialog, ...
       pages/
       types/                   # WeeklySummaryPanelProps（共有表示型は summary-shared/types 参照）
       utils/                   # weeklyExpenseChartData
-      index.ts
     account-deletion/          # アカウント削除リクエスト・status UI
       pages/
       index.ts
