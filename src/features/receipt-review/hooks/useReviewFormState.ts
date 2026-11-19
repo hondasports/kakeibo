@@ -5,7 +5,7 @@ import {
   mapDraftItemsToReviewItems,
   mapDraftToReviewForm,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewDraftMapping";
-import { emptyReviewForm, isDraftWithItems } from "../utils/mappers";
+import { emptyReviewForm } from "../utils/mappers";
 import type {
   AiExpenseDraft,
   AiExpenseDraftItem,
@@ -52,7 +52,7 @@ export function useReviewFormState({
     const mappedForm = mapDraftToReviewForm(selectedReviewDraft);
     const mappedItems = localReviewItems
       ? mapDraftItemsToReviewItems(localReviewItems)
-      : isDraftWithItems(selectedReviewDraftDetails)
+      : selectedReviewDraftDetails
         ? mapDraftItemsToReviewItems(selectedReviewDraftDetails.items)
         : [];
     const categoryState = initializeReviewCategoryState(mappedItems, mappedForm.categoryId);

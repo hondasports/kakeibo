@@ -26,15 +26,25 @@ import type {
 
 export type AiExpenseQueueDocumentType = AiExpenseDraftDocumentType;
 
-/** 一覧・レビュー画面で扱う下書き状態。解析中・登録中の status はこの境界には出さない。 */
-export type AiExpenseDraftStatus = Extract<
-  PersistedDraftStatus,
-  "ready" | "needs_review" | "failed" | "registered"
->;
+/** レビュー画面で扱う下書き状態。queued / analyzing の解析中 status はこの境界には出さない。 */
+export const REVIEWABLE_DRAFT_STATUSES = [
+  "ready",
+  "needs_review",
+  "failed",
+  "registered",
+] as const satisfies readonly PersistedDraftStatus[];
+
+export type ReviewableDraftStatus = (typeof REVIEWABLE_DRAFT_STATUSES)[number];
+
+export function isReviewableDraftStatus(
+  status: PersistedDraftStatus,
+): status is ReviewableDraftStatus {
+  return (REVIEWABLE_DRAFT_STATUSES as readonly PersistedDraftStatus[]).includes(status);
+}
 
 export type AiExpenseDraft = {
   _id: string;
-  status: AiExpenseDraftStatus;
+  status: ReviewableDraftStatus;
   documentType: AiExpenseQueueDocumentType;
   imageFileName?: string;
   shopName?: string;
@@ -145,6 +155,6 @@ export type ReviewItemValues = AiExpenseItemTaxDetails & {
 };
 
 export type AiExpenseReviewSubmitResult = {
-  status: AiExpenseDraftStatus;
+  status: ReviewableDraftStatus;
   reviewReasons: string[];
 };

@@ -419,7 +419,7 @@ test.describe("[Issue #371] 前週差表示（P1 / regression）", () => {
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
 
     // Issue #371: SummaryPageでは前週比（指数）ではなく前週差（円）を表示する
-    // 今週 6,280円 - 前週 7,000円 = -720円（formatSignedAmount のマイナスは U+2212）
+    // 今週 6,280円 - 前週 7,000円 = -720円（formatSignedYen のマイナスは U+2212）
     await expect(page.getByLabel("前週差")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByLabel("前週差")).toContainText("−720円");
     // 前週の 7,000円 はカテゴリ別支出・支出一覧には表示されない（グラフバーラベルを除く）

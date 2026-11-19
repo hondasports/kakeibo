@@ -2,13 +2,13 @@ import {
   AI_EXPENSE_DRAFT_LIST_LIMIT,
   type AiExpenseDraftStatus,
 } from "../../domain/aiExpenseDrafts/constants";
-import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
+import type { PersistedAiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftReadRepository } from "../../domain/aiExpenseDrafts/aiExpenseDraftRepository";
 import type { PaginatedResult, PaginationOpts } from "../../domain/pagination";
 import type { ItemSummary } from "../../domain/aiExpenseDrafts/reviewItems";
 import type { UsecaseGroupContext } from "../context";
 
-export type AiExpenseDraftListEntry = AiExpenseDraftFields & {
+export type AiExpenseDraftListEntry = PersistedAiExpenseDraftFields & {
   itemSummary?: ItemSummary;
 };
 
@@ -23,7 +23,7 @@ type DraftListDeps = {
  */
 function attachItemSummary(
   status: AiExpenseDraftStatus,
-  drafts: AiExpenseDraftFields[],
+  drafts: PersistedAiExpenseDraftFields[],
 ): AiExpenseDraftListEntry[] {
   if (status !== "ready" && status !== "needs_review") {
     return drafts;

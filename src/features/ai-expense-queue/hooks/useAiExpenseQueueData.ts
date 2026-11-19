@@ -9,9 +9,12 @@ import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { getSectionKey } from "../../receipt-review/components/labels";
 import { getImageCaptureFailureHint } from "../../../../lib/domain/aiExpenseDrafts/failure";
 import { mapDraftToQueueItem } from "../../receipt-review/utils/mappers";
-import type { AiExpenseQueueCategory, AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
+import type {
+  AiExpenseQueueCategory,
+  AiExpenseQueueDraftSource,
+  AiExpenseQueueItem,
+} from "../../../types/aiExpenseQueue";
 import type { AiExpenseQueueBatchSummary, AiExpenseUploadBatch } from "../types/types";
-import type { AiExpenseDraft } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 
 const REGISTERED_PAGE_SIZE = 10;
 
@@ -30,26 +33,20 @@ export function useAiExpenseQueueData({
   retryBatchIds?: string[];
   initialItems?: AiExpenseQueueItem[];
 }) {
-  const readyDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, { status: "ready" }) as
-    | AiExpenseDraft[]
-    | undefined;
+  const readyDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, { status: "ready" });
   const needsReviewDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, {
     status: "needs_review",
-  }) as AiExpenseDraft[] | undefined;
-  const failedDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, { status: "failed" }) as
-    | AiExpenseDraft[]
-    | undefined;
+  });
+  const failedDrafts = useQuery(api.aiExpenseDrafts.queries.listByStatus, { status: "failed" });
   const registeredPage = usePaginatedQuery(
     api.aiExpenseDrafts.queries.listByStatusPaginated,
     { status: "registered" },
     { initialNumItems: REGISTERED_PAGE_SIZE },
   );
-  const registeredDrafts = registeredPage.results as AiExpenseDraft[];
+  const registeredDrafts = registeredPage.results;
   const { loadMore } = registeredPage;
   const loadMoreRegistered = useCallback(() => loadMore(REGISTERED_PAGE_SIZE), [loadMore]);
-  const activeJobs = useQuery(api.receiptAnalysisJobs.queries.listActiveJobs) as
-    | Doc<"receiptAnalysisImageJobs">[]
-    | undefined;
+  const activeJobs = useQuery(api.receiptAnalysisJobs.queries.listActiveJobs);
   const batchQueries = useMemo(
     () =>
       Object.fromEntries(
@@ -149,7 +146,7 @@ export function useAiExpenseQueueData({
   );
 
   const liveItems = useMemo(() => {
-    const mapDraft = (draft: AiExpenseDraft): AiExpenseQueueItem => {
+    const mapDraft = (draft: AiExpenseQueueDraftSource): AiExpenseQueueItem => {
       const job = jobByDraftId.get(draft._id);
       return {
         ...mapDraftToQueueItem(draft, {}, categories, pendingImageDataUrls.get(job?._id ?? "")),

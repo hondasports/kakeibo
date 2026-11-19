@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatSignedPercent,
   formatSignedYen,
   formatYen,
   formatYenAbs,
@@ -42,6 +43,20 @@ describe("formatSignedYen", () => {
 
   it("0 は符号なしの 0円 と返す", () => {
     expect(formatSignedYen(0)).toBe("0円");
+  });
+});
+
+describe("formatSignedPercent", () => {
+  it("正の数値は + 付きでフォーマットする", () => {
+    expect(formatSignedPercent(8)).toBe("+8%");
+  });
+
+  it("負の数値は − 付きでフォーマットする", () => {
+    expect(formatSignedPercent(-8)).toBe("−8%");
+  });
+
+  it("0 は符号なしの 0% と返す", () => {
+    expect(formatSignedPercent(0)).toBe("0%");
   });
 });
 

@@ -71,7 +71,10 @@ export function useReviewTaxOverrides({
       if (requestId !== taxOverrideRequestIdRef.current) {
         return;
       }
-      setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft), result.items);
+      const draft = mapConvexDraftToAiExpenseDraft(result.draft);
+      if (draft !== null) {
+        setReviewDraftOverride(draft, result.items);
+      }
       setReviewItems((current) =>
         applyReviewItemsTaxPreview(
           mergeReviewTaxItems(
@@ -115,7 +118,10 @@ export function useReviewTaxOverrides({
       if (requestId !== taxOverrideRequestIdRef.current) {
         return;
       }
-      setReviewDraftOverride(mapConvexDraftToAiExpenseDraft(result.draft), result.items);
+      const draft = mapConvexDraftToAiExpenseDraft(result.draft);
+      if (draft !== null) {
+        setReviewDraftOverride(draft, result.items);
+      }
       setReviewItems((current) =>
         applyReviewItemsTaxPreview(
           mergeReviewTaxItems(

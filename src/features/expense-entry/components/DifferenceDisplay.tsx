@@ -1,5 +1,5 @@
 import { Chip, Stack, Typography } from "@mui/material";
-import { currencyFormatter, formatYen, formatYenAbs } from "../../../../lib/domain/common/currency";
+import { formatSignedYen, formatYen, formatYenAbs } from "../../../../lib/domain/common/currency";
 
 export function DifferenceDisplay({
   difference,
@@ -25,11 +25,7 @@ export function DifferenceDisplay({
         差額
       </Typography>
       <Typography aria-label="差額" variant="body2" sx={{ color, fontWeight: 700 }}>
-        {isZero
-          ? "0"
-          : isNegative
-            ? `-${currencyFormatter.format(Math.abs(difference))}`
-            : `+${currencyFormatter.format(difference)}`}
+        {formatSignedYen(difference)}
       </Typography>
       <Chip
         label={label}

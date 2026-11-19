@@ -2,11 +2,10 @@ import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { isDraftWithItems } from "../utils/mappers";
+import { toReviewableDraftWithItems } from "../utils/mappers";
 import type {
   AiExpenseDraft,
   AiExpenseDraftItem,
-  AiExpenseDraftWithItems,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 
 export function useReviewDraftSelection({
@@ -25,24 +24,35 @@ export function useReviewDraftSelection({
   const localReviewItems = selectedReviewDraftId
     ? initialReviewDraftItems[selectedReviewDraftId]
     : undefined;
-  const selectedReviewDraftDetails = useQuery(
+  const rawSelectedReviewDraftDetails = useQuery(
     api.aiExpenseDrafts.queries.getWithItems,
     selectedReviewDraftId && !localReviewDraft
       ? { draftId: selectedReviewDraftId as Id<"aiExpenseDrafts"> }
       : "skip",
-  ) as AiExpenseDraftWithItems | null | undefined;
+  );
+  const selectedReviewDraftDetails = toReviewableDraftWithItems(rawSelectedReviewDraftDetails);
+
+  // queued / analyzing の解析中下書きはレビュー対象外なので、選択自体を解除する
+  if (
+    selectedReviewDraftId !== null &&
+    !localReviewDraft &&
+    rawSelectedReviewDraftDetails !== undefined &&
+    rawSelectedReviewDraftDetails !== null &&
+    selectedReviewDraftDetails === null
+  ) {
+    setSelectedReviewDraftId(null);
+    setReviewDraftOverride(null);
+  }
 
   const selectedReviewDraft =
     reviewDraftOverride ??
-    (localReviewDraft
-      ? localReviewDraft
-      : isDraftWithItems(selectedReviewDraftDetails)
-        ? selectedReviewDraftDetails.draft
-        : null);
+    (localReviewDraft ? localReviewDraft : (selectedReviewDraftDetails?.draft ?? null));
   const isReviewDraftNotFound =
-    selectedReviewDraftId !== null && !localReviewDraft && selectedReviewDraftDetails === null;
+    selectedReviewDraftId !== null && !localReviewDraft && rawSelectedReviewDraftDetails === null;
   const isReviewDraftLoading =
-    selectedReviewDraftId !== null && !localReviewDraft && selectedReviewDraftDetails === undefined;
+    selectedReviewDraftId !== null &&
+    !localReviewDraft &&
+    rawSelectedReviewDraftDetails === undefined;
 
   const clearSelection = () => {
     setSelectedReviewDraftId(null);
