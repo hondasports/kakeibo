@@ -247,6 +247,23 @@ describe("bulkUpdateSpendingCategoriesHandler", () => {
     expect(ctx.db.patch).not.toHaveBeenCalled();
     expect(ctx.db.insert).not.toHaveBeenCalled();
   });
+
+  it("他グループの receipt を含む一括カテゴリ変更は書き込み前に失敗する", async () => {
+    const ctx = createMutationCtx({
+      "cat-food": foodCategory,
+      "receipt-other": { ...expenseReceipt, _id: "receipt-other", groupId: OTHER_GROUP_ID },
+    });
+
+    await expect(
+      bulkUpdateSpendingCategoriesHandler(ctx, {
+        expenseEntryIds: [],
+        receiptIds: ["receipt-other" as Id<"receipts">],
+        categoryId: "cat-food" as Id<"categories">,
+      }),
+    ).rejects.toThrow("Receipt does not belong to the current group");
+    expect(ctx.db.patch).not.toHaveBeenCalled();
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+  });
 });
 
 describe("bulkDeleteSpendingRecordsHandler", () => {
@@ -286,6 +303,21 @@ describe("bulkDeleteSpendingRecordsHandler", () => {
         receiptIds: ["receipt-001" as Id<"receipts">],
       }),
     ).rejects.toThrow("Income records cannot be included in bulk spending operations");
+    expect(ctx.db.delete).not.toHaveBeenCalled();
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+  });
+
+  it("他グループの receipt を含む一括削除は削除も監査もしない", async () => {
+    const ctx = createMutationCtx({
+      "receipt-other": { ...expenseReceipt, _id: "receipt-other", groupId: OTHER_GROUP_ID },
+    });
+
+    await expect(
+      bulkDeleteSpendingRecordsHandler(ctx, {
+        expenseEntryIds: [],
+        receiptIds: ["receipt-other" as Id<"receipts">],
+      }),
+    ).rejects.toThrow("Receipt does not belong to the current group");
     expect(ctx.db.delete).not.toHaveBeenCalled();
     expect(ctx.db.insert).not.toHaveBeenCalled();
   });

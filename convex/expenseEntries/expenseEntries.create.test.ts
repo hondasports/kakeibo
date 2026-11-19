@@ -194,6 +194,32 @@ describe("createExpenseEntriesHandler", () => {
     );
   });
 
+  it("他グループの sourceDocument には支出を紐づけられない", async () => {
+    const ctx = createMutationCtx(createIdentity(), {
+      getDocById: {
+        "cat-food": activeFoodCategory,
+        "source-doc-1": {
+          _id: "source-doc-1",
+          _creationTime: 1000,
+          groupId: OTHER_GROUP_ID,
+          sourceType: "manual",
+          status: "finalized",
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
+      },
+    });
+
+    await expect(
+      createExpenseEntriesHandler(ctx, {
+        date: "2026-06-07",
+        sourceDocumentId,
+        items: [{ categoryId: catFoodId, amountYen: 2000, title: "食料品" }],
+      }),
+    ).rejects.toThrow("Source document does not belong to the current group");
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+  });
+
   it("店舗名が指定された場合、手入力をsourceDocumentにまとめて保存する", async () => {
     const ctx = createMutationCtx(createIdentity(), {
       getDocById: {

@@ -265,6 +265,31 @@ describe("cancelImageJobHandler", () => {
       expect.objectContaining({ status: "cancelled" }),
     );
   });
+
+  it("他グループの job は取り消せず、その下書きと明細を削除しない", async () => {
+    const ctx = createMutationCtx(createIdentity(), {
+      docs: {
+        "job-1": {
+          _id: "job-1",
+          groupId: "group-other",
+          status: "failed",
+          draftId: "draft-1",
+        },
+        "draft-1": {
+          _id: "draft-1",
+          groupId: "group-other",
+          status: "failed",
+        },
+      },
+      queryResult: [{ _id: "item-1" }],
+    });
+
+    await expect(
+      cancelImageJobHandler(ctx, { jobId: "job-1" as Id<"receiptAnalysisImageJobs"> }),
+    ).rejects.toThrow("Job not found");
+    expect(ctx.db.delete).not.toHaveBeenCalled();
+    expect(ctx.db.patch).not.toHaveBeenCalled();
+  });
 });
 
 describe("updateJobStatusHandler", () => {
