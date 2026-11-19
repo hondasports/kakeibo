@@ -214,27 +214,20 @@ convex/
   categories/
     queries.ts
     mutations.ts
-    candidate.ts
     internal.ts
   receipts/
     crud.ts
-    mutations.ts
-    receipts.test.ts
     summaries.ts
   expenseEntries/
     mutations.ts
     internal.ts
-    expenseEntries.test.ts
   expenseSearch.ts             # 支出検索 query（searchExpenses）
   weekSessions/
-    queries.ts
     mutations.ts
     internal.ts
   aiExpenseDrafts/
     queries.ts
     mutations.ts
-    actions.ts
-    model.ts
     internal.ts
     validators.ts              # v.* validator 宣言
     e2eDraftFixtures.ts        # E2E seed 用フィクスチャ
@@ -274,13 +267,12 @@ convex/
 lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥大化回避）
   convex/
     aiExpenseDrafts/           # reviewValidation, convex*Repository, convexDraftWorkflowServices, draftUsecaseDeps, handler グルー, persistTaxInterpretation, ...（v.* validator 宣言は convex/aiExpenseDrafts/validators.ts、E2Eフィクスチャは convex/aiExpenseDrafts/e2eDraftFixtures.ts へ移動）
-    dateUtils.ts
-    expenseEntries/            # createFromDraft, expenseEntryValidation
+    expenseEntries/            # expenseEntryHandlers, expenseEntryRepository, expenseEntryValidation
     groups/
       clerkInvitationLib/
       invitationHandlers/
     receiptImageExtraction/    # analyzeReceiptImageCore, openaiClient, parse, validators, ...
-    receipts/                  # insert, queries, summaryLib, spendingEntries.ts
+    receipts/                  # receiptRepository, update, delete, summaryLib, spendingEntries.ts
   domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
   email/                       # メール provider・template 定義（convex/email から利用）
 
@@ -403,12 +395,17 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   categories・weekSessions・receiptAnalysisJobs・aiExpenseDrafts・lineWebhook など
   複数ドメインから呼ばれるため、関数名・シグネチャ・エラー文言を維持したまま内部を
   ポート（`GroupMembershipReadRepository` / `UserDirectoryRead`）経由化している。
-- **ドメインサービス・ポート**（`lib/domain/groups/groupServices.ts`）: 監査ログ
-  （`ManagementAuditLog`）、メールキュー投入（`GroupEmailQueue`）、招待クリーンアップ
-  （`GroupInvitationCleanup`）、アカウント削除ガード（`GroupAccountDeletionGuard`）、
-  最後の owner 保護（`GroupOwnerTransitionGuard`）を interface として宣言し、
-  `lib/convex/groups/` のアダプタが既存実装（`convex/groups/lib/*`・`adminGuards`）へ
-  委譲する。これにより既存の委譲経路（spy 検証を含む）が保持される。
+- **ドメインサービス・ポート**（`lib/domain/groups/groupServices.ts`）: メール通知キュー
+  （`GroupEmailNotificationQueue`）、アカウント削除ガード（`AccountDeletionGuard`）、
+  最後の owner 保護（`GroupOwnerTransitionGuard`）、招待クリーンアップ
+  （`GroupInvitationCleanupService`）を interface として宣言する。監査ログのポートは
+  `lib/domain/groups/managementAuditLogRepository.ts`（`ManagementAuditLogReadRepository`・
+  `ManagementAuditLogRecorder`）にある。`lib/convex/groups/` のアダプタは次の既存実装へ委譲する。
+  メール通知は `convex/email/jobs.ts`、アカウント削除ガードは `convex/accountDeletion.ts`、
+  最後の owner 保護は `convex/groups/adminGuards.ts`、招待クリーンアップは
+  `lib/convex/groups/invitationHandlers/`（`revoke`・`staleCleanup`）。
+  監査ログのアダプタ（`convexManagementAuditLog.ts`）は委譲せず `ctx.db` を直接使う。
+  これにより既存の委譲経路（spy 検証を含む）が保持される。
 - **クエリモック互換**: Convex クエリ読み出しは `convex/groups/lib/groupQueryHelpers.ts`
   の `readQueryDoc(s)` 経由に統一し、インメモリテストモックのフォールバック
   （`collect` → `take` → `unique`）を維持する。
@@ -785,20 +782,20 @@ OpenAI 応答 envelope の取り出し・mock 結果は `lib/convex/receiptImage
   取得・各op適用前のカテゴリ検証委譲・patch/insert/delete 適用・結果ID順序維持と
   `ReconcileExpenseEntriesDomainError` の ConvexError 変換のみを担う。
 
-`receipts` の集計ハンドラ群（週次・4週・日次推移・月次・年次サマリ）も
+`receipts` の集計ハンドラ群（週次・4週・月次・年次サマリ）も
 `lib/usecase/receipts/summaries.ts` へオーケストレーションを分離済み。
 
 - **純粋関数**: `lib/domain/receipt/summaryEntries.ts`（`SummaryReceiptEntry` 型と
   `mapSpendingEntryToSummaryReceipt`。カテゴリ名 fallback「不明」・色 fallback
-  「#AAB7C4」）。既存 `summary.ts` / `monthlySummary.ts` / `yearlySummary.ts` /
+  「#AAB7C4」）。既存 `summary.ts` / `yearlySummary.ts` /
   `weekDates.ts` の集計・週算出はそのまま利用する。
-- **ユースケース**: `SummaryStore` ポート経由で週/日/月/年のエントリ取得・前週算出・
-  4週反復（降順取得→昇順反転）・日次7日ループ・カテゴリ情報取得・応答組立を行う。
+- **ユースケース**: `SummaryStore` ポート経由で週/月/年のエントリ取得・前週算出・
+  4週反復（降順取得→昇順反転）・カテゴリ情報取得・応答組立を行う。
   `prevWeekTotalAmountYen` の null 化（前週0件時）・4週 `weekCount`（0円週除外）・
   月次 `netAmountYen`（収入-支出）の算出もここに置く。
 - **インフラ**: `lib/convex/receipts/summaryLib/summaryStore.ts` が `SummaryStore` を
   `ctx.db` / `spendingEntries` アダプタへ橋渡しする。`week.ts` / `monthly.ts` /
-  `trend.ts` / `yearly.ts` の各ハンドラは `requireGroupMembership` と
+  `yearly.ts` の各ハンドラは `requireGroupMembership` と
   `normalizeMonth`/`normalizeYear` → `ConvexError("Invalid month"/"Invalid year")`
   の変換のみを担い、公開ハンドラ名・戻り値型・エラー文言は不変とする。
   `buildCategoryInfoMap` は `categoryAggregation.ts` の DB アダプタとして維持する。
@@ -1236,7 +1233,9 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `receipts.crud.deleteReceipt(id)`
 - `receipts.summaries.getWeekSummary(weekStartDate)`
 - `receipts.summaries.getWeekSummaryWithCategories(weekStartDate)`
-- `receipts.summaries.getFourWeeksSummary()`
+- `receipts.summaries.getFourWeeksSummary(weekStartDate)`
+- `receipts.summaries.getMonthSummaryWithCategories(month)`
+- `receipts.summaries.getYearSummary(year)`
 - `receipts.crud.deleteReceiptsByUser(groupId, userId)`（internal。指定ユーザーの作成データだけを対象）
 
 `receipts` は支出と収入の両方を扱う schema 互換として残る。新規手入力は `expenseEntries` を正本とし、
@@ -1344,7 +1343,6 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `receiptAnalysisJobs.mutations.cancelImageJob(jobId)`
 - `receiptAnalysisJobs.internal.finalizeBatchStatus(batchId)`（internal）
 - `receiptAnalysisJobs.internal.getBatchById(batchId)`（internal）
-- `receiptAnalysisJobs.internal.countNeedsReviewJobsByBatchId(batchId)`（internal）
 - `receiptAnalysisJobs.actions.checkAiReviewRequired(batchId)`（internal action）
 
 バッチ画像解析は `receiptAnalysisBatches` / `receiptAnalysisImageJobs` テーブルで管理する。
@@ -1384,8 +1382,10 @@ draft をそのまま維持する。これにより回復した job はキュー
 
 `createBatch` 時に `receiptAnalysisBatches.createdByUserId` に実行ユーザーの `tokenIdentifier` を保存する。
 ジョブが `needs_review` など terminal 状態に更新されると、`updateJobStatus` は `aiReviewNotificationScheduledAt` を記録し、
-60 分後に `checkAiReviewRequired` をスケジュールする。60 分後に `needs_review` ジョブが残っていれば、
+60 分後に `checkAiReviewRequired` をスケジュールする。60 分後に、バッチのジョブが指す下書きのうち同じグループに実在して `needs_review` のものが残っていれば、
 `createdByUserId` に紐づくメールアドレスへ `ai_review_required` テンプレートの通知を送信する。
+件数はジョブの状態ではなく下書きの状態から、通知を積む mutation（`notifications.internal.enqueueAiReviewNotifications`）の
+中で数える。0 件ならメールも LINE も積まない。
 `aiReviewNotificationScheduledAt` は重複スケジュールを防ぐ。
 
 下書きの作成・更新・登録処理では、必ず `ctx.auth.getUserIdentity()` と `groupMembers` から

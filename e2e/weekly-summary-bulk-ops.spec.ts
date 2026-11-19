@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { gotoAuthenticated } from "./helpers/auth";
 import { cleanupE2eExpenseEntries, cleanupTestReceipts } from "./helpers/cleanup";
 import { saveExpense } from "./helpers/expenseEntry";
+import { expectLocatorInsideContainer, expectNoContentOverflow } from "./helpers/viewport";
 
 function uniqueName(prefix: string): string {
   return `${prefix}_${Date.now()}`;
@@ -36,6 +37,16 @@ test.describe("週次サマリーの一括操作（Issue #550）", () => {
     const secondRow = page.getByTestId("receipt-row").filter({ hasText: secondShop }).first();
     await expect(firstRow).toBeVisible({ timeout: 15_000 });
     await expect(secondRow).toBeVisible();
+
+    // Issue #1295: 狭いPC幅（900〜1199px）で選択・操作列つきの一覧が枠からはみ出さないこと
+    const expenseList = page.getByRole("table", { name: "週次サマリーの支出一覧" });
+    for (const width of [900, 1199]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(expenseList).toBeVisible();
+      await expectNoContentOverflow(expenseList);
+      await expectLocatorInsideContainer(expenseList.locator(".receipt-row").first(), expenseList);
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
 
     await firstRow.getByRole("checkbox", { name: /を選択/ }).check();
     await secondRow.getByRole("checkbox", { name: /を選択/ }).check();

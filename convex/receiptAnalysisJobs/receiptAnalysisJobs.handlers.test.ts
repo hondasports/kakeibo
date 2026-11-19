@@ -1,10 +1,10 @@
 import { ConvexError } from "convex/values";
 import { describe, expect, it, vi } from "vitest";
+import { createReceiptAnalysisStore } from "../../lib/convex/receiptAnalysisJobs/convexReceiptAnalysisStore";
 import { MAX_RECEIPT_ANALYSIS_BATCH_FILES } from "../../lib/domain/receiptAnalysisJobs/rules";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import {
-  countNeedsReviewJobsByBatchIdHandler,
   deleteReceiptAnalysisDataByUserBatchHandler,
   finalizeAnalysisAttemptHandler,
   finalizeBatchStatusHandler,
@@ -615,12 +615,25 @@ describe("finalizeAnalysisAttemptHandler", () => {
 });
 
 describe("receipt analysis internal handlers", () => {
-  it("batch/job取得とneeds_review件数を処理する", async () => {
-    const batch = { _id: "batch-1", processedCount: 0, totalCount: 2 };
-    const job = { _id: "job-1", batchId: "batch-1", status: "needs_review" };
+  it("batch/job取得と、確認待ちの下書きの件数を処理する", async () => {
+    const batch = { _id: "batch-1", groupId: GROUP_ID, processedCount: 0, totalCount: 4 };
+    const job = { _id: "job-1", batchId: "batch-1", status: "needs_review", draftId: "draft-1" };
     const ctx = createInternalCtx({
-      docs: { "batch-1": batch, "job-1": job },
-      jobs: [job, { status: "ready" }],
+      docs: {
+        "batch-1": batch,
+        "job-1": job,
+        "draft-1": { _id: "draft-1", groupId: GROUP_ID, status: "needs_review" },
+        "draft-ready": { _id: "draft-ready", groupId: GROUP_ID, status: "ready" },
+        "draft-other-group": { _id: "draft-other-group", groupId: "other", status: "needs_review" },
+      },
+      jobs: [
+        job,
+        // 下書きが確認・登録済み、別グループ、削除済み、未紐づけのジョブは数えない
+        { status: "needs_review", draftId: "draft-ready" },
+        { status: "needs_review", draftId: "draft-other-group" },
+        { status: "needs_review", draftId: "draft-deleted" },
+        { status: "needs_review" },
+      ],
     });
 
     await expect(
@@ -630,9 +643,7 @@ describe("receipt analysis internal handlers", () => {
       getJobByIdHandler(ctx, { jobId: "job-1" as Id<"receiptAnalysisImageJobs"> }),
     ).resolves.toBe(job);
     await expect(
-      countNeedsReviewJobsByBatchIdHandler(ctx, {
-        batchId: "batch-1" as Id<"receiptAnalysisBatches">,
-      }),
+      createReceiptAnalysisStore(ctx as MutationCtx).countNeedsReviewDraftsByBatch("batch-1", 10),
     ).resolves.toBe(1);
     await expect(
       getJobByIdHandler(createInternalCtx(), {

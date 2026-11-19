@@ -54,7 +54,7 @@ export type NotificationAdminMutationDeps = {
 };
 
 export type AiReviewNotificationEnqueueDeps = {
-  batches: Pick<ReceiptAnalysisStore, "getBatch" | "patchBatch">;
+  batches: Pick<ReceiptAnalysisStore, "getBatch" | "patchBatch" | "countNeedsReviewDraftsByBatch">;
   groups: Pick<GroupReadRepository, "get">;
   memberships: Pick<GroupMembershipReadRepository, "findByGroupAndUser">;
   users: Pick<UserStore, "findByUserId">;

@@ -8,10 +8,11 @@ import type {
   LineNotificationJobStore,
 } from "../../domain/notifications/store";
 import type { TransactionalEmailJobRecord } from "../../domain/email/records";
+import { MAX_RECEIPT_ANALYSIS_BATCH_FILES } from "../../domain/receiptAnalysisJobs/rules";
 import { enqueueAiReviewNotifications } from "./enqueueAiReview";
 import type { AiReviewNotificationEnqueueDeps } from "./deps";
 
-const ARGS = { batchId: "batch-1", userId: "user-1", pendingCount: 3 };
+const ARGS = { batchId: "batch-1", userId: "user-1" };
 
 function makeDeps({
   email = "user@example.test",
@@ -45,6 +46,7 @@ function makeDeps({
   membership = { id: "m-1" },
   deletionRequests = [],
   user,
+  pendingCount = 3,
 }: {
   email?: string | null;
   lineGlobal?: boolean;
@@ -58,6 +60,7 @@ function makeDeps({
   membership?: unknown;
   deletionRequests?: { status: string }[];
   user?: unknown;
+  pendingCount?: number;
 } = {}) {
   const emailJobs = { inserted: [] as Record<string, unknown>[] };
   const lineJobs = { inserted: [] as Record<string, unknown>[] };
@@ -94,6 +97,7 @@ function makeDeps({
   const deps = {
     batches: {
       getBatch: vi.fn().mockResolvedValue(batch),
+      countNeedsReviewDraftsByBatch: vi.fn().mockResolvedValue(pendingCount),
       patchBatch: vi.fn(async (id: string, fields: Record<string, unknown>) => {
         batchPatches.applied.push({ id, fields });
       }),
@@ -295,14 +299,23 @@ describe("enqueueAiReviewNotifications", () => {
     expect(lineJobs.inserted).toHaveLength(0);
   });
 
-  it.each([
-    ["zero pending count", { pendingCount: 0 }],
-    ["negative pending count", { pendingCount: -2 }],
-  ])("enqueues nothing with %s", async (_label, args) => {
-    const { deps, emailJobs, lineJobs } = makeDeps();
-    await enqueueAiReviewNotifications(deps, { ...ARGS, ...args });
+  it("counts pending drafts of the batch within the per-batch job limit", async () => {
+    const { deps, lineJobs } = makeDeps({ pendingCount: 2 });
+    await enqueueAiReviewNotifications(deps, ARGS);
+    expect(deps.batches.countNeedsReviewDraftsByBatch).toHaveBeenCalledWith(
+      "batch-1",
+      MAX_RECEIPT_ANALYSIS_BATCH_FILES,
+    );
+    expect(lineJobs.inserted[0]).toMatchObject({ pendingCount: 2 });
+  });
+
+  it("enqueues nothing and does not consume the LINE dedupe when no draft awaits review", async () => {
+    const { deps, emailJobs, lineJobs, lineEvents, batchPatches } = makeDeps({ pendingCount: 0 });
+    await enqueueAiReviewNotifications(deps, ARGS);
     expect(emailJobs.inserted).toHaveLength(0);
     expect(lineJobs.inserted).toHaveLength(0);
+    expect(lineEvents.inserted).toHaveLength(0);
+    expect(batchPatches.applied).toHaveLength(0);
   });
 
   it.each([

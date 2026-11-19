@@ -1,5 +1,5 @@
 import { api } from "../../../../convex/_generated/api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material";
@@ -20,10 +20,24 @@ import { formatYearLabel } from "../../../../lib/domain/common/year";
 import { addMonths, getCurrentMonth, isFutureMonth, normalizeMonth } from "../lib/monthNavigation";
 import { isDateInMonth } from "../utils/monthlySpendingCalendar";
 
+function scrollToDetailHeading(heading: HTMLElement) {
+  const prefersReducedMotion =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  heading.scrollIntoView?.({
+    behavior: prefersReducedMotion ? "auto" : "smooth",
+    block: "start",
+  });
+  heading.focus({ preventScroll: true });
+}
+
 export function MonthlySummaryPage() {
   const { month: rawMonth } = useParams<{ month: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  // 利用者が日付を選んだ直後だけ true にする。?date= 付きの初回表示や戻る/進むではスクロールしない
+  const pendingDetailFocusRef = useRef(false);
+  const detailHeadingRef = useRef<HTMLHeadingElement>(null);
   const [editingReceipt, setEditingReceipt] = useState<ReceiptItem | null>(null);
   const [deletingReceipt, setDeletingReceipt] = useState<ReceiptItem | null>(null);
   const [deleteSaving, setDeleteSaving] = useState(false);
@@ -79,6 +93,15 @@ export function MonthlySummaryPage() {
       navigate(`/months/${month}`, { replace: true });
     }
   }, [dateQuery, month, navigate, selectedDate]);
+
+  useEffect(() => {
+    const heading = detailHeadingRef.current;
+    if (!pendingDetailFocusRef.current || !heading) {
+      return;
+    }
+    pendingDetailFocusRef.current = false;
+    scrollToDetailHeading(heading);
+  }, [selectedDate]);
 
   const navigateToMonth = (targetMonth: string) => {
     const normalizedTarget = normalizeMonth(targetMonth);
@@ -160,7 +183,15 @@ export function MonthlySummaryPage() {
           incomes={summary.incomes}
           isLoading={isSummaryLoading}
           month={month}
-          onDateSelect={(date) => navigate(`/months/${month}?date=${date}`)}
+          onDateSelect={(date) => {
+            if (date === selectedDate && detailHeadingRef.current) {
+              // 同じ日を選び直した場合は URL が変わらず effect も走らないので、その場で移す
+              scrollToDetailHeading(detailHeadingRef.current);
+            } else {
+              pendingDetailFocusRef.current = true;
+            }
+            navigate(`/months/${month}?date=${date}`);
+          }}
           selectedDate={selectedDate}
         />
 
@@ -193,7 +224,7 @@ export function MonthlySummaryPage() {
             spacing={1}
             sx={{ alignItems: { xs: "stretch", sm: "center" }, justifyContent: "space-between" }}
           >
-            <Typography component="h2" variant="h6">
+            <Typography component="h2" ref={detailHeadingRef} tabIndex={-1} variant="h6">
               {dateLabel}の明細
             </Typography>
             <Button

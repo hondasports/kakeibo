@@ -714,7 +714,7 @@
 .receipt-row,
 .receipt-group-header {
   display: grid;
-  grid-template-columns: 88px minmax(200px, 1fr) 104px 184px;
+  grid-template-columns: 88px minmax(0, 1fr) 104px 184px;
   gap: var(--space-md);
   align-items: center;
   padding: var(--space-sm) var(--space-xs);
@@ -724,7 +724,7 @@
 .receipt-list--selectable .receipt-list-header,
 .receipt-list--selectable .receipt-row,
 .receipt-list--selectable .receipt-group-header {
-  grid-template-columns: 44px 88px minmax(200px, 1fr) 104px 184px;
+  grid-template-columns: 44px 88px minmax(0, 1fr) 104px 184px;
 }
 
 .receipt-row-select {
@@ -769,10 +769,19 @@
   padding-left: calc(var(--space-lg) + var(--space-sm));
 }
 
+/* 年つきの日付（「2026/12/31」）は、スマートフォンでも2行に割れないようにする */
+.receipt-list--with-year .receipt-row-date {
+  white-space: nowrap;
+}
+
 .receipt-row-amount {
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
+}
+
+.receipt-row-memo {
+  min-width: 0;
 }
 
 .receipt-row-actions {
@@ -782,6 +791,10 @@
 
 .receipt-row-actions .MuiButton-root {
   white-space: nowrap;
+}
+
+.receipt-list--no-actions .receipt-row-actions {
+  display: none;
 }
 
 .summary-header,
@@ -836,8 +849,112 @@
   .receipt-list--income .receipt-list-header--income,
   .receipt-list--income .receipt-row {
     grid-template-columns:
-      88px minmax(156px, 1.3fr) 104px minmax(140px, 1fr)
+      88px minmax(0, 1.3fr) 104px minmax(0, 1fr)
       184px;
+  }
+
+  .receipt-list--no-actions .receipt-list-header,
+  .receipt-list--no-actions .receipt-row,
+  .receipt-list--no-actions .receipt-group-header {
+    grid-template-columns: 88px minmax(0, 1fr) 104px;
+  }
+
+  .receipt-list--no-actions.receipt-list--selectable .receipt-list-header,
+  .receipt-list--no-actions.receipt-list--selectable .receipt-row,
+  .receipt-list--no-actions.receipt-list--selectable .receipt-group-header {
+    grid-template-columns: 44px 88px minmax(0, 1fr) 104px;
+  }
+
+  .receipt-list--income.receipt-list--no-actions .receipt-list-header--income,
+  .receipt-list--income.receipt-list--no-actions .receipt-row {
+    grid-template-columns: 88px minmax(0, 1.3fr) 104px minmax(0, 1fr);
+  }
+
+  /* 履歴検索の一覧だけ年つきの日付（「2026/12/31」）を収めるため、日付の列を広げる */
+  .receipt-list--with-year .receipt-list-header,
+  .receipt-list--with-year .receipt-row,
+  .receipt-list--with-year .receipt-group-header {
+    grid-template-columns: 104px minmax(0, 1fr) 104px 184px;
+  }
+
+  .receipt-list--with-year.receipt-list--selectable .receipt-list-header,
+  .receipt-list--with-year.receipt-list--selectable .receipt-row,
+  .receipt-list--with-year.receipt-list--selectable .receipt-group-header {
+    grid-template-columns: 44px 104px minmax(0, 1fr) 104px 184px;
+  }
+
+  .receipt-list--with-year.receipt-list--no-actions .receipt-list-header,
+  .receipt-list--with-year.receipt-list--no-actions .receipt-row,
+  .receipt-list--with-year.receipt-list--no-actions .receipt-group-header {
+    grid-template-columns: 104px minmax(0, 1fr) 104px;
+  }
+
+  .receipt-list--with-year.receipt-list--selectable.receipt-list--no-actions .receipt-list-header,
+  .receipt-list--with-year.receipt-list--selectable.receipt-list--no-actions .receipt-row,
+  .receipt-list--with-year.receipt-list--selectable.receipt-list--no-actions .receipt-group-header {
+    grid-template-columns: 44px 104px minmax(0, 1fr) 104px;
+  }
+
+  .receipt-list--with-year.receipt-list--income .receipt-list-header--income,
+  .receipt-list--with-year.receipt-list--income .receipt-row {
+    grid-template-columns: 104px minmax(0, 1.3fr) 104px minmax(0, 1fr) 184px;
+  }
+
+  .receipt-list--with-year.receipt-list--income.receipt-list--no-actions
+    .receipt-list-header--income,
+  .receipt-list--with-year.receipt-list--income.receipt-list--no-actions .receipt-row {
+    grid-template-columns: 104px minmax(0, 1.3fr) 104px minmax(0, 1fr);
+  }
+}
+
+/* 狭いPC幅ではサイドバーを除いた一覧の内幅が足りないため、操作列を詰めてボタンをアイコンのみにする。
+   文言は .receipt-row-action-label で包み、この帯の中だけ display:none にする（aria-label の読み上げ名は残る） */
+@media (min-width: 900px) and (max-width: 1199px) {
+  .receipt-list-header,
+  .receipt-row,
+  .receipt-group-header {
+    grid-template-columns: 88px minmax(0, 1fr) 104px 116px;
+  }
+
+  .receipt-list--selectable .receipt-list-header,
+  .receipt-list--selectable .receipt-row,
+  .receipt-list--selectable .receipt-group-header {
+    grid-template-columns: 44px 88px minmax(0, 1fr) 104px 116px;
+  }
+
+  .receipt-list--income .receipt-list-header--income,
+  .receipt-list--income .receipt-row {
+    grid-template-columns: 88px minmax(0, 1.3fr) 104px minmax(0, 1fr) 116px;
+  }
+
+  .receipt-list--with-year .receipt-list-header,
+  .receipt-list--with-year .receipt-row,
+  .receipt-list--with-year .receipt-group-header {
+    grid-template-columns: 104px minmax(0, 1fr) 104px 116px;
+  }
+
+  .receipt-list--with-year.receipt-list--selectable .receipt-list-header,
+  .receipt-list--with-year.receipt-list--selectable .receipt-row,
+  .receipt-list--with-year.receipt-list--selectable .receipt-group-header {
+    grid-template-columns: 44px 104px minmax(0, 1fr) 104px 116px;
+  }
+
+  .receipt-list--with-year.receipt-list--income .receipt-list-header--income,
+  .receipt-list--with-year.receipt-list--income .receipt-row {
+    grid-template-columns: 104px minmax(0, 1.3fr) 104px minmax(0, 1fr) 116px;
+  }
+
+  .receipt-row-action-label {
+    display: none;
+  }
+
+  .receipt-row-actions .MuiButton-root {
+    min-width: 0;
+  }
+
+  .receipt-row-actions .MuiButton-startIcon {
+    margin-left: 0;
+    margin-right: 0;
   }
 }
 
@@ -863,7 +980,7 @@
 .weekly-category-header,
 .weekly-category-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) 112px 64px 52px;
+  grid-template-columns: minmax(0, 1fr) 6rem 3.5rem 3rem;
   gap: var(--space-sm);
   align-items: center;
   padding: var(--space-sm) 0;
@@ -1081,6 +1198,20 @@
 
   .receipt-list--selectable:not(.receipt-list--income) .receipt-row {
     grid-template-areas: "select date name amount" "select actions actions actions";
+  }
+
+  .receipt-list--no-actions:not(.receipt-list--income) .receipt-row {
+    grid-template-areas: "date name amount";
+  }
+
+  .receipt-list--no-actions.receipt-list--income .receipt-row {
+    grid-template-areas:
+      "date name amount"
+      "memo memo memo";
+  }
+
+  .receipt-list--no-actions.receipt-list--selectable:not(.receipt-list--income) .receipt-row {
+    grid-template-areas: "select date name amount";
   }
 
   .receipt-row-actions {

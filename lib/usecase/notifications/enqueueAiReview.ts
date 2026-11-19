@@ -11,23 +11,29 @@ import {
   buildAiReviewLineDedupeKey,
   buildAiReviewLineText,
 } from "../../domain/notifications/rules";
+import { MAX_RECEIPT_ANALYSIS_BATCH_FILES } from "../../domain/receiptAnalysisJobs/rules";
 import { enqueueTransactionalEmailJob } from "../email/enqueueJob";
 import type { AiReviewNotificationEnqueueDeps } from "./deps";
 
 export type EnqueueAiReviewNotificationsArgs = {
   batchId: string;
   userId: string;
-  pendingCount: number;
 };
 
 export async function enqueueAiReviewNotifications(
   deps: AiReviewNotificationEnqueueDeps,
   args: EnqueueAiReviewNotificationsArgs,
 ): Promise<void> {
-  if (!Number.isInteger(args.pendingCount) || args.pendingCount < 1) return;
-
   const batch = await deps.batches.getBatch(args.batchId);
   if (!batch?.createdByUserId || batch.createdByUserId !== args.userId) return;
+
+  // 件数は通知を積むのと同じ transaction の中で、下書きの今の状態から数える。
+  // 0件ならメールも LINE も積まず、LINE の重複防止（aiReviewLineNotificationConsumedAt）も立てない。
+  const pendingCount = await deps.batches.countNeedsReviewDraftsByBatch(
+    args.batchId,
+    MAX_RECEIPT_ANALYSIS_BATCH_FILES,
+  );
+  if (pendingCount < 1) return;
 
   const now = (deps.now ?? Date.now)();
 
@@ -49,7 +55,7 @@ export async function enqueueAiReviewNotifications(
       { jobs: deps.emailJobs, scheduler: deps.emailScheduler, now: () => now },
       {
         templateType: AI_REVIEW_REQUIRED_NOTIFICATION_TYPE,
-        payloadJson: JSON.stringify({ pendingCount: args.pendingCount }),
+        payloadJson: JSON.stringify({ pendingCount: pendingCount }),
         recipientEmail: user.email,
         recipientUserId: user.userId,
         businessDedupeKey: buildAiReviewEmailDedupeKey(args.batchId),
@@ -114,11 +120,11 @@ export async function enqueueAiReviewNotifications(
     userId: batch.createdByUserId,
     batchId: args.batchId,
     type: AI_REVIEW_REQUIRED_NOTIFICATION_TYPE,
-    pendingCount: args.pendingCount,
+    pendingCount: pendingCount,
     linkId: link.id,
     linkedAtSnapshot: link.linkedAt,
     lineUserIdSnapshot: link.lineUserId,
-    text: buildAiReviewLineText(args.pendingCount),
+    text: buildAiReviewLineText(pendingCount),
     status: "queued",
     attemptCount: 0,
     createdAt: now,

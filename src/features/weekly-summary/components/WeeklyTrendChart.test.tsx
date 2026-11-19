@@ -82,6 +82,19 @@ describe("WeeklyTrendChart", () => {
     expect(screen.getAllByText("1万円").length).toBeGreaterThan(0);
   });
 
+  it("Y軸の目盛りは1本の軸の中で円と万円を混ぜない", () => {
+    const { container } = renderWithProviders(<WeeklyTrendChart chartData={chartData} />);
+
+    const tickLabels = Array.from(
+      container.querySelectorAll('[data-testid="weekly-expense-trend-chart"] svg text'),
+    )
+      .map((node) => node.textContent ?? "")
+      .filter((text) => text.endsWith("円"));
+
+    expect(tickLabels.length).toBeGreaterThan(0);
+    expect(tickLabels.every((text) => text.endsWith("万円"))).toBe(true);
+  });
+
   it("全週0円のとき空状態を表示する", () => {
     renderWithProviders(
       <WeeklyTrendChart

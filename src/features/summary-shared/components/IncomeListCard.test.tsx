@@ -27,6 +27,28 @@ describe("IncomeListCard", () => {
     expect(screen.getAllByTestId("receipt-row")).toHaveLength(7);
   });
 
+  it("dateFormatを指定すると収入一覧の日付に年を出す", () => {
+    renderWithProviders(
+      <IncomeListCard
+        count={1}
+        dateFormat="yearMonthDay"
+        incomes={incomes.slice(0, 1)}
+        isLoading={false}
+      />,
+    );
+    expect(screen.getByTestId("receipt-row").querySelector(".receipt-row-date")).toHaveTextContent(
+      "2026/6/21",
+    );
+    expect(screen.getByRole("table")).toHaveClass("receipt-list--with-year");
+  });
+
+  it("dateFormatを指定しない収入一覧には年つき列幅のクラスを付けない", () => {
+    renderWithProviders(
+      <IncomeListCard count={1} incomes={incomes.slice(0, 1)} isLoading={false} />,
+    );
+    expect(screen.getByRole("table")).not.toHaveClass("receipt-list--with-year");
+  });
+
   it("収入は従来どおりメモ列と空メモを表示する", () => {
     renderWithProviders(
       <IncomeListCard count={1} isLoading={false} incomes={incomes.slice(0, 1)} />,
@@ -35,6 +57,43 @@ describe("IncomeListCard", () => {
     expect(within(table).getByRole("columnheader", { name: "メモ" })).toBeInTheDocument();
     expect(within(table).getByText("—")).toBeInTheDocument();
     expect(within(screen.getByTestId("receipt-row")).getAllByRole("cell")).toHaveLength(5);
+  });
+
+  it("編集・削除を渡さないときは「操作」の見出しと列を出さない", () => {
+    renderWithProviders(
+      <IncomeListCard count={1} isLoading={false} incomes={incomes.slice(0, 1)} />,
+    );
+    const table = screen.getByRole("table");
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent);
+    expect(headers).toEqual(["日付", "内容", "金額（円）", "メモ"]);
+    for (const row of within(table).getAllByRole("row").slice(1)) {
+      const cells = within(row)
+        .getAllByRole("cell", { hidden: true })
+        .filter((cell) => !cell.classList.contains("receipt-row-actions"));
+      expect(cells).toHaveLength(headers.length);
+    }
+  });
+
+  it("編集・削除を渡すときは「操作」の見出しと列を出す", () => {
+    renderWithProviders(
+      <IncomeListCard
+        count={1}
+        isLoading={false}
+        incomes={incomes.slice(0, 1)}
+        onDeleteIncome={() => {}}
+        onEditIncome={() => {}}
+      />,
+    );
+    const table = screen.getByRole("table");
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent);
+    expect(headers).toEqual(["日付", "内容", "金額（円）", "メモ", "操作"]);
+    for (const row of within(table).getAllByRole("row").slice(1)) {
+      expect(within(row).getAllByRole("cell", { hidden: true })).toHaveLength(headers.length);
+    }
   });
 
   it("収入のメモは従来の独立したセルに表示する", () => {

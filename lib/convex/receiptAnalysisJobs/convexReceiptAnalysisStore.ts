@@ -58,6 +58,30 @@ export function toJobRecord(doc: Doc<"receiptAnalysisImageJobs">): ReceiptAnalys
   };
 }
 
+/**
+ * バッチのジョブが指す下書きのうち、実在して確認待ち（needs_review）のものを数える。
+ * ジョブの status は解析が終わった時点から変わらず、下書きの確認・登録・削除を反映しないため、
+ * 下書きを正本にする。バッチのジョブは limit 件までなので、読み込み件数は決まっている。
+ */
+async function countNeedsReviewDraftsByBatch(
+  ctx: Pick<QueryCtx, "db">,
+  batchId: string,
+  limit: number,
+): Promise<number> {
+  const batch = await ctx.db.get(batchId as Id<"receiptAnalysisBatches">);
+  if (batch === null) return 0;
+  const jobs = await ctx.db
+    .query("receiptAnalysisImageJobs")
+    .withIndex("by_batch_id", (q) => q.eq("batchId", batch._id))
+    .take(limit);
+  const draftIds = new Set<Id<"aiExpenseDrafts">>();
+  for (const job of jobs) if (job.draftId !== undefined) draftIds.add(job.draftId);
+  const drafts = await Promise.all([...draftIds].map((draftId) => ctx.db.get(draftId)));
+  return drafts.filter(
+    (draft) => draft !== null && draft.groupId === batch.groupId && draft.status === "needs_review",
+  ).length;
+}
+
 export function batchRecordToDoc(
   record: ReceiptAnalysisBatchRecord,
 ): Doc<"receiptAnalysisBatches"> {
@@ -206,13 +230,8 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
     async deleteJob(id) {
       await ctx.db.delete(id as Id<"receiptAnalysisImageJobs">);
     },
-    async countJobsByStatus(batchId, status) {
-      const docs = await ctx.db
-        .query("receiptAnalysisImageJobs")
-        .withIndex("by_batch_id", (q) => q.eq("batchId", batchId as Id<"receiptAnalysisBatches">))
-        .collect();
-      return docs.filter((job) => job.status === status).length;
-    },
+    countNeedsReviewDraftsByBatch: (batchId, limit) =>
+      countNeedsReviewDraftsByBatch(ctx, batchId, limit),
     async getDraft(id) {
       const doc = await ctx.db.get(id as Id<"aiExpenseDrafts">);
       return doc === null
@@ -277,13 +296,6 @@ export function createReceiptAnalysisReader(ctx: Pick<QueryCtx, "db">): ReceiptA
         .withIndex("by_draft_id", (q) => q.eq("draftId", draftId as Id<"aiExpenseDrafts">))
         .unique();
       return doc === null ? null : toJobRecord(doc);
-    },
-    async countJobsByStatus(batchId, status) {
-      const docs = await ctx.db
-        .query("receiptAnalysisImageJobs")
-        .withIndex("by_batch_id", (q) => q.eq("batchId", batchId as Id<"receiptAnalysisBatches">))
-        .collect();
-      return docs.filter((job) => job.status === status).length;
     },
   };
 }

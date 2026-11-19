@@ -2,8 +2,9 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Box, Button, Checkbox, Chip, Stack, Typography } from "@mui/material";
 import { formatDateForDisplay } from "../../week";
+import { formatDateWithYearForDisplay } from "../../../utils/date";
 import { MemoExpandableText } from "./MemoExpandableText";
-import type { ReceiptItem } from "../types/types";
+import type { ReceiptDateFormat, ReceiptItem } from "../types/types";
 import { formatYen } from "../../../../lib/domain/common/currency";
 
 export type CategoryPreview = {
@@ -14,6 +15,7 @@ export type CategoryPreview = {
 
 export function ReceiptRow({
   receipt,
+  dateFormat = "monthDay",
   onDelete,
   onEdit,
   showCategory = true,
@@ -25,6 +27,7 @@ export function ReceiptRow({
   onToggleSelection,
 }: {
   receipt: ReceiptItem;
+  dateFormat?: ReceiptDateFormat;
   onDelete?: (receipt: ReceiptItem) => void;
   onEdit?: (receipt: ReceiptItem) => void;
   showCategory?: boolean;
@@ -37,7 +40,9 @@ export function ReceiptRow({
 }) {
   const displayName =
     receipt.type === "income" ? (receipt.bankName ?? "不明") : (receipt.shopName ?? "不明");
-  const actionLabelSuffix = `${combinedShopName ?? displayName}（${formatDateForDisplay(receipt.date)}）`;
+  const formatDate =
+    dateFormat === "yearMonthDay" ? formatDateWithYearForDisplay : formatDateForDisplay;
+  const actionLabelSuffix = `${combinedShopName ?? displayName}（${formatDate(receipt.date)}）`;
   const showItemName =
     isDetail ||
     (combinedShopName !== undefined && receipt.itemName?.trim() !== combinedShopName.trim());
@@ -67,7 +72,7 @@ export function ReceiptRow({
         </Box>
       )}
       <Typography className="receipt-row-date" color="text.secondary" role="cell" variant="body2">
-        {isDetail ? "" : formatDateForDisplay(receipt.date)}
+        {isDetail ? "" : formatDate(receipt.date)}
       </Typography>
       <Box className="receipt-row-name" role="cell">
         <Stack
@@ -153,7 +158,7 @@ export function ReceiptRow({
                 type="button"
                 variant="text"
               >
-                編集
+                <span className="receipt-row-action-label">編集</span>
               </Button>
             )}
             {onDelete && (
@@ -167,7 +172,7 @@ export function ReceiptRow({
                 type="button"
                 variant="text"
               >
-                削除
+                <span className="receipt-row-action-label">削除</span>
               </Button>
             )}
           </Stack>

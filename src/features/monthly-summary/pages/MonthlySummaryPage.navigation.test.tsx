@@ -2,7 +2,7 @@ import "./MonthlySummaryPageTestMocks";
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { getCurrentMonth } from "../../../../lib/domain/common/month";
@@ -179,6 +179,84 @@ describe("MonthlySummaryPage（表示・遷移）", () => {
 
     await waitFor(() => {
       expect(navigateMock).toHaveBeenCalledWith("/months/2026-07", { replace: true });
+    });
+  });
+  describe("日付選択後の明細へのスクロールとフォーカス", () => {
+    const detailHeadingName = "2026年7月10日の明細";
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      // jsdom は scrollIntoView を持たないため、テストごとに差し込んだスタブを外す
+      Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    });
+
+    it("日付を選ぶと明細の見出しへスクロールし、フォーカスを移す", async () => {
+      const user = userEvent.setup();
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+
+      renderWithProviders(
+        <MemoryRouter>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <MonthlySummaryPage />
+          </LocalizationProvider>
+        </MemoryRouter>,
+      );
+
+      await user.click(screen.getByRole("button", { name: /2026年7月10日/ }));
+
+      const heading = await screen.findByRole("heading", { name: detailHeadingName });
+      expect(heading).toHaveFocus();
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    });
+
+    it("prefers-reduced-motion のときはアニメーション無しでスクロールする", async () => {
+      const user = userEvent.setup();
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      vi.stubGlobal(
+        "matchMedia",
+        vi.fn().mockImplementation((query: string) => ({
+          matches: query === "(prefers-reduced-motion: reduce)",
+          media: query,
+          onchange: null,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          dispatchEvent: vi.fn(() => false),
+        })),
+      );
+
+      renderWithProviders(
+        <MemoryRouter>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <MonthlySummaryPage />
+          </LocalizationProvider>
+        </MemoryRouter>,
+      );
+
+      await user.click(screen.getByRole("button", { name: /2026年7月10日/ }));
+
+      await screen.findByRole("heading", { name: detailHeadingName });
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
+    });
+
+    it("?date= 付きで開いた初回表示では、スクロールもフォーカス移動もしない", () => {
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={["/months/2026-07?date=2026-07-10"]}>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <MonthlySummaryPage />
+          </LocalizationProvider>
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByRole("heading", { name: detailHeadingName })).not.toHaveFocus();
+      expect(scrollIntoView).not.toHaveBeenCalled();
     });
   });
 });

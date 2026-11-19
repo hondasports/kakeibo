@@ -6,7 +6,12 @@ import {
   HISTORY_OTHER_CATEGORY_ID,
 } from "../../../../lib/domain/expenseSearch/analytics";
 import type { CategorySummary } from "../../../../lib/domain/receipt/summary";
-import { formatYen, formatYenCompact } from "../../../../lib/domain/common/currency";
+import {
+  formatYen,
+  formatYenAxisTick,
+  formatYenCompact,
+} from "../../../../lib/domain/common/currency";
+import { valueAxisEndMargin, yenAxisTickLabels } from "../../../utils/chartAxisLayout";
 
 export function HistoryCategoryChart({
   categories,
@@ -29,6 +34,12 @@ export function HistoryCategoryChart({
     label: category.categoryName,
     amount: category.totalAmountYen,
   }));
+  const axisMaxYen = topCategories.reduce(
+    (max, category) => Math.max(max, category.totalAmountYen),
+    0,
+  );
+  // 横軸の最後の目盛りが右端で切れないよう、目盛りの文字数から右余白を決める。
+  const valueAxisLabels = yenAxisTickLabels(axisMaxYen);
 
   return (
     <Paper className="paper-panel" data-testid="history-category-chart" elevation={0}>
@@ -58,7 +69,12 @@ export function HistoryCategoryChart({
               height={chartHeight}
               hideLegend
               layout="horizontal"
-              margin={{ bottom: 28, left: isCompact ? 78 : 112, right: 12, top: 12 }}
+              margin={{
+                bottom: 28,
+                left: isCompact ? 78 : 112,
+                right: valueAxisEndMargin(valueAxisLabels),
+                top: 12,
+              }}
               onItemClick={(_event, item) => {
                 const category = topCategories[item.dataIndex];
                 if (category !== undefined && category.categoryId !== HISTORY_OTHER_CATEGORY_ID) {
@@ -73,7 +89,12 @@ export function HistoryCategoryChart({
                 },
               ]}
               skipAnimation
-              xAxis={[{ valueFormatter: (value: number | null) => formatYenCompact(value ?? 0) }]}
+              xAxis={[
+                {
+                  valueFormatter: (value: number | null) =>
+                    formatYenAxisTick(value ?? 0, axisMaxYen),
+                },
+              ]}
               yAxis={[{ dataKey: "label", scaleType: "band" }]}
             />
           </Box>

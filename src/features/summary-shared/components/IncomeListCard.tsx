@@ -2,11 +2,12 @@ import { useState } from "react";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Box, Button, Paper, Skeleton, Stack, Typography } from "@mui/material";
 import { ReceiptRow } from "./ReceiptRow";
-import type { IncomeItem } from "../types/types";
+import type { IncomeItem, ReceiptDateFormat } from "../types/types";
 import { incomeItemToReceiptItem } from "../types/types";
 
 export function IncomeListCard({
   count,
+  dateFormat = "monthDay",
   emptyMessage = "まだ収入がありません",
   isLoading,
   incomes,
@@ -15,6 +16,7 @@ export function IncomeListCard({
   onEditIncome,
 }: {
   count: number;
+  dateFormat?: ReceiptDateFormat;
   emptyMessage?: string;
   isLoading: boolean;
   incomes: IncomeItem[];
@@ -23,6 +25,7 @@ export function IncomeListCard({
   onEditIncome?: (income: IncomeItem) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const hasRowActions = Boolean(onEditIncome || onDeleteIncome);
   const orderedIncomes = incomes
     .map((income, index) => ({ income, index }))
     .sort((a, b) => b.income.date.localeCompare(a.income.date) || b.index - a.index)
@@ -40,7 +43,7 @@ export function IncomeListCard({
 
           <Box
             aria-label={listAriaLabel}
-            className="receipt-list receipt-list--income"
+            className={`receipt-list receipt-list--income${hasRowActions ? "" : " receipt-list--no-actions"}${dateFormat === "yearMonthDay" ? " receipt-list--with-year" : ""}`}
             role={!isLoading && count > 0 ? "table" : undefined}
           >
             {isLoading ? (
@@ -60,13 +63,14 @@ export function IncomeListCard({
                   <span role="columnheader">内容</span>
                   <span role="columnheader">金額（円）</span>
                   <span role="columnheader">メモ</span>
-                  <span role="columnheader">操作</span>
+                  {hasRowActions && <span role="columnheader">操作</span>}
                 </Box>
                 {visibleIncomes.map((income) => {
                   const receipt = incomeItemToReceiptItem(income);
                   return (
                     <ReceiptRow
                       key={income._id}
+                      dateFormat={dateFormat}
                       receipt={receipt}
                       showCategory={false}
                       onDelete={onDeleteIncome ? () => onDeleteIncome(income) : undefined}

@@ -51,7 +51,13 @@ describe("ReceiptListCard", () => {
 
   it("PC一覧用の列見出しを提供する", () => {
     renderWithProviders(
-      <ReceiptListCard count={1} isLoading={false} receipts={receipts.slice(0, 1)} />,
+      <ReceiptListCard
+        count={1}
+        isLoading={false}
+        onDeleteReceipt={vi.fn()}
+        onEditReceipt={vi.fn()}
+        receipts={receipts.slice(0, 1)}
+      />,
     );
 
     for (const label of ["日付", "店名・内訳", "金額（円）", "操作"]) {
@@ -59,6 +65,46 @@ describe("ReceiptListCard", () => {
     }
     expect(screen.queryByRole("columnheader", { name: "メモ" })).not.toBeInTheDocument();
     expect(screen.queryByText("カテゴリ")).not.toBeInTheDocument();
+  });
+
+  it("編集・削除を渡さないときは「操作」の見出しと列を出さない", () => {
+    const item = { ...receipts[0], itemName: "牛乳", receiptTotalAmountYen: 1200 };
+    renderWithProviders(<ReceiptListCard count={1} isLoading={false} receipts={[item]} />);
+
+    const table = screen.getByRole("table");
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent);
+    expect(headers).toEqual(["日付", "店名・内訳", "金額（円）"]);
+    expect(screen.queryByText("操作")).not.toBeInTheDocument();
+    for (const row of within(table).getAllByRole("row").slice(1)) {
+      const cells = within(row)
+        .getAllByRole("cell", { hidden: true })
+        .filter((cell) => !cell.classList.contains("receipt-row-actions"));
+      expect(cells).toHaveLength(headers.length);
+    }
+  });
+
+  it("編集・削除を渡すときは「操作」の見出しと列を出す", () => {
+    const item = { ...receipts[0], itemName: "牛乳", receiptTotalAmountYen: 1200 };
+    renderWithProviders(
+      <ReceiptListCard
+        count={1}
+        isLoading={false}
+        onDeleteReceipt={vi.fn()}
+        onEditReceipt={vi.fn()}
+        receipts={[item]}
+      />,
+    );
+
+    const table = screen.getByRole("table");
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent);
+    expect(headers).toEqual(["日付", "店名・内訳", "金額（円）", "操作"]);
+    for (const row of within(table).getAllByRole("row").slice(1)) {
+      expect(within(row).getAllByRole("cell", { hidden: true })).toHaveLength(headers.length);
+    }
   });
 
   it.each([false, true])(
@@ -77,7 +123,10 @@ describe("ReceiptListCard", () => {
       const rows = within(table).getAllByRole("row");
       const columns = within(rows[0]).getAllByRole("columnheader").length;
       for (const row of rows.slice(1)) {
-        expect(within(row).getAllByRole("cell", { hidden: true })).toHaveLength(columns);
+        const cells = within(row)
+          .getAllByRole("cell", { hidden: true })
+          .filter((cell) => !cell.classList.contains("receipt-row-actions"));
+        expect(cells).toHaveLength(columns);
       }
     },
   );
@@ -269,5 +318,23 @@ describe("ReceiptListCard", () => {
     expect(screen.getByText("店舗3")).toBeInTheDocument();
     expect(screen.queryByText("店舗2")).not.toBeInTheDocument();
     expect(screen.queryByText("店舗1")).not.toBeInTheDocument();
+  });
+
+  it("dateFormatを指定した一覧だけ年つき列幅のクラスを付ける", () => {
+    const { unmount } = renderWithProviders(
+      <ReceiptListCard
+        count={1}
+        dateFormat="yearMonthDay"
+        isLoading={false}
+        receipts={receipts.slice(0, 1)}
+      />,
+    );
+    expect(screen.getByRole("table")).toHaveClass("receipt-list--with-year");
+    unmount();
+
+    renderWithProviders(
+      <ReceiptListCard count={1} isLoading={false} receipts={receipts.slice(0, 1)} />,
+    );
+    expect(screen.getByRole("table")).not.toHaveClass("receipt-list--with-year");
   });
 });

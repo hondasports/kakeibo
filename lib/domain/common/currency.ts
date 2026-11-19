@@ -38,3 +38,17 @@ export function formatYenCompact(amount: number): string {
   }
   return formatYen(amount);
 }
+
+/**
+ * グラフの軸の目盛りを、軸全体の単位をそろえて表記する。
+ * 軸の最大値が 1 万円以上なら全目盛りを万円で表す（"0万円"・"0.5万円"・"1.2万円"）。
+ * 1 万円未満なら全目盛りを円で表す。目盛りごとに単位を切り替えると、
+ * 同じ軸に "4,000円" と "1.2万円" が混ざって読み取りにくくなるため、判定は目盛り単位ではなく軸全体で行う。
+ */
+export function formatYenAxisTick(amount: number, axisMaxYen: number): string {
+  if (Math.abs(axisMaxYen) < 10_000) {
+    return formatYen(amount);
+  }
+  const amountInTenThousands = Number((amount / 10_000).toFixed(1));
+  return `${amountInTenThousands}万円`;
+}

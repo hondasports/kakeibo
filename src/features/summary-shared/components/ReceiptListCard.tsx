@@ -3,11 +3,12 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Alert, Box, Button, Checkbox, Paper, Skeleton, Stack, Typography } from "@mui/material";
 import { ReceiptGroupRow } from "./ReceiptGroupRow";
 import type { CategoryPreview } from "./ReceiptRow";
-import { groupReceiptItems, type ReceiptItem } from "../types/types";
+import { groupReceiptItems, type ReceiptDateFormat, type ReceiptItem } from "../types/types";
 import { getVisibleSelectableReceipts } from "../utils/bulkSelection";
 
 export function ReceiptListCard({
   count,
+  dateFormat = "monthDay",
   emptyMessage = "まだレシートがありません",
   heading,
   isLoading,
@@ -30,6 +31,7 @@ export function ReceiptListCard({
   onBulkDelete,
 }: {
   count: number;
+  dateFormat?: ReceiptDateFormat;
   emptyMessage?: string;
   heading?: string;
   isLoading: boolean;
@@ -52,6 +54,7 @@ export function ReceiptListCard({
   onBulkDelete?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const hasRowActions = Boolean(onEditReceipt || onDeleteReceipt);
   const orderedReceiptGroups = groupReceiptItems(receipts)
     .map((group, index) => ({ group, index }))
     .sort((a, b) => b.group.date.localeCompare(a.group.date) || b.index - a.index)
@@ -141,7 +144,7 @@ export function ReceiptListCard({
 
           <Box
             aria-label={listAriaLabel}
-            className={`receipt-list${selectionEnabled ? " receipt-list--selectable" : ""}`}
+            className={`receipt-list${selectionEnabled ? " receipt-list--selectable" : ""}${hasRowActions ? "" : " receipt-list--no-actions"}${dateFormat === "yearMonthDay" ? " receipt-list--with-year" : ""}`}
             role={!isLoading && count > 0 ? "table" : undefined}
           >
             {isLoading ? (
@@ -181,11 +184,12 @@ export function ReceiptListCard({
                   <span role="columnheader">日付</span>
                   <span role="columnheader">店名・内訳</span>
                   <span role="columnheader">金額（円）</span>
-                  <span role="columnheader">操作</span>
+                  {hasRowActions && <span role="columnheader">操作</span>}
                 </Box>
                 {visibleReceiptGroups.map((group) => (
                   <ReceiptGroupRow
                     key={group.id}
+                    dateFormat={dateFormat}
                     group={group}
                     onDelete={onDeleteReceipt}
                     onEdit={onEditReceipt}

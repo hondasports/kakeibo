@@ -5,8 +5,9 @@ import {
   formatWeeklyExpenseTooltip,
   type WeeklyExpenseChartData,
 } from "../utils/weeklyExpenseChartData";
-import { formatYen, formatYenCompact } from "../../../../lib/domain/common/currency";
+import { formatYen, formatYenAxisTick } from "../../../../lib/domain/common/currency";
 import { formatDateForDisplay } from "../../../utils/date";
+import { yAxisWidthForLabels, yenAxisTickLabels } from "../../../utils/chartAxisLayout";
 
 type WeeklyTrendChartProps = {
   chartData?: WeeklyExpenseChartData;
@@ -19,10 +20,10 @@ export function WeeklyTrendChart({ chartData, isLoading = false }: WeeklyTrendCh
   const items = chartData?.items ?? [];
   const series = chartData?.series ?? [];
   const dataset = chartData?.dataset ?? [];
-  const chartMargin = isCompact
-    ? { bottom: 28, left: 56, right: 8, top: 16 }
-    : { bottom: 28, left: 52, right: 12, top: 16 };
-  const yAxisWidth = isCompact ? 60 : 52;
+  const axisMaxYen = items.reduce((max, item) => Math.max(max, item.amount), 0);
+  // 縦軸の目盛りは幅が固定だと "6,000円" が切れるため、目盛りの文字数から幅を決める。
+  const yAxisWidth = yAxisWidthForLabels(yenAxisTickLabels(axisMaxYen));
+  const chartMargin = { bottom: 28, left: yAxisWidth, right: isCompact ? 8 : 12, top: 16 };
   const chartHeight = isCompact ? 180 : 200;
 
   if (isLoading) {
@@ -111,7 +112,7 @@ export function WeeklyTrendChart({ chartData, isLoading = false }: WeeklyTrendCh
             xAxis={[{ dataKey: "label", scaleType: "band" }]}
             yAxis={[
               {
-                valueFormatter: formatYenCompact,
+                valueFormatter: (value: number | null) => formatYenAxisTick(value ?? 0, axisMaxYen),
                 width: yAxisWidth,
               },
             ]}

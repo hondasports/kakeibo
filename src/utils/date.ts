@@ -18,6 +18,16 @@ export function formatDateForDisplay(isoDate: string): string {
 }
 
 /**
+ * ISO 形式の日付文字列 (YYYY-MM-DD) を "YYYY/M/D" 形式にフォーマットする。
+ * 年をまたぐ一覧で、いつの記録かを示すために使う。
+ * 例: "2023-06-01" → "2023/6/1"
+ */
+export function formatDateWithYearForDisplay(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00`);
+  return `${String(d.getFullYear()).padStart(4, "0")}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+/**
  * Unix タイムスタンプを日本語の日時表記に変換する。
  */
 export function formatDateTimeForDisplay(timestamp: number): string {

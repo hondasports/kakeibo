@@ -38,7 +38,7 @@ function yen(value: number | undefined): string {
   return value === undefined ? "未確定" : formatYen(value);
 }
 
-function CheckCard({
+export function CheckCard({
   title,
   status,
   children,
@@ -69,13 +69,13 @@ function CheckCard({
   );
 }
 
-const numericSx = {
+export const numericSx = {
   fontVariantNumeric: "tabular-nums",
   whiteSpace: "nowrap",
   textAlign: "right",
 } as const;
 
-function AmountCheckLine({ label, value }: { label: string; value: number | undefined }) {
+export function AmountCheckLine({ label, value }: { label: string; value: number | undefined }) {
   return (
     <Stack direction="row" sx={{ justifyContent: "space-between", gap: 1 }}>
       <Typography variant="body2" color="text.secondary">
@@ -88,7 +88,7 @@ function AmountCheckLine({ label, value }: { label: string; value: number | unde
   );
 }
 
-function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
+export function AmountCheckBody({ check }: { check: ReviewAmountCheck }) {
   if (check.status === "matched") {
     return null;
   }
@@ -198,6 +198,15 @@ function TaxRateCheckBody({ check }: { check: ReviewTaxRateCheck }) {
   );
 }
 
+/** 金額確認カードの見出し文。履歴の編集ダイアログも同じ文言を使う。 */
+export function getAmountCheckHeadline(amount: ReviewAmountCheck): string {
+  if (amount.status === "matched") return "商品の金額と支払額が一致しています";
+  if (amount.status === "uncomparable") return "金額を比較できません";
+  return amount.differenceYen === undefined
+    ? "金額が一致していません"
+    : `金額が${formatYen(Math.abs(amount.differenceYen))}合いません`;
+}
+
 export function ReviewCheckCards({
   amount,
   taxRate,
@@ -228,13 +237,7 @@ export function ReviewCheckCards({
     >
       <CheckCard title="金額確認" status={amount.status}>
         <Typography variant="body2" aria-live={amount.status === "matched" ? "polite" : undefined}>
-          {amount.status === "matched"
-            ? "商品の金額と支払額が一致しています"
-            : amount.status === "uncomparable"
-              ? "金額を比較できません"
-              : amount.differenceYen === undefined
-                ? "金額が一致していません"
-                : `金額が${formatYen(Math.abs(amount.differenceYen))}合いません`}
+          {getAmountCheckHeadline(amount)}
         </Typography>
         <AmountCheckBody check={amount} />
         {amount.status === "mismatch" && (

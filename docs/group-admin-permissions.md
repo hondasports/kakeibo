@@ -293,7 +293,7 @@ group admin から他ユーザーの Clerk アカウントを削除する機能�
 | --- | --- | --- |
 | owner はグループ管理画面でグループ情報・メンバー・pending 招待を確認できる | `GroupSettingsPanel` UI + `e2e/group-access.spec.ts` | [x] |
 | owner は Phase1 対象の管理操作を実行できる | `convex/groups/members.ts` mutations + E2E smoke | [x] |
-| member は管理操作を実行できない | UI 非表示 + `GroupSettingsPanel.test.tsx` | [x] |
+| member は管理操作を実行できない | UI 非表示 + `GroupSettingsPanel.dangerZone.test.tsx`・`GroupSettingsPanel.nameEdit.test.tsx` | [x] |
 | member が直接 mutation を呼んでも拒否される | `convex/groups/groups.test.ts` Phase1 owner-only permissions | [x] |
 | グループからのメンバー解除と Clerk ユーザー削除が混同されていない | §7.1 + `removeMemberHandler` unit test | [x] |
 | pending 招待の表示・取り消しができる | `GroupPendingInvitationList` + E2E | [x] |

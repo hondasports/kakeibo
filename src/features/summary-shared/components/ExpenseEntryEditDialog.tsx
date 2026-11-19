@@ -14,6 +14,7 @@ import type { AiExpenseRegistrationMode } from "../../../../lib/domain/aiExpense
 import type { ReceiptItem } from "../types/types";
 import { extractAmountDigits } from "../../../utils/currency";
 import { useExpenseEntryEditDialogState } from "../hooks/useExpenseEntryEditDialogState";
+import { DraftItemsAmountSummary } from "./ExpenseEntryDraftItemsAmountSummary";
 import {
   DraftItemsEditor,
   DraftItemsLoader,
@@ -139,6 +140,14 @@ export function ExpenseEntryEditDialog({
               draftItems={draftItems}
               draftItemsLoading={draftItemsLoading}
               setDraftItems={setDraftItems}
+            />
+          ) : null}
+          {receipt?.aiExpenseDraftId && registrationMode === "detailed" && !draftItemsLoading ? (
+            <DraftItemsAmountSummary
+              amountYen={amountYen}
+              categoryId={categoryId}
+              draftId={receipt.aiExpenseDraftId as Id<"aiExpenseDrafts">}
+              draftItems={draftItems}
             />
           ) : null}
           {!isIncome && (
