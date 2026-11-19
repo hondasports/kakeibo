@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 
 const SMARTPHONE_QUERY = "@media not all and (min-width: 900px)";
 const NARROW_PC_QUERY = "@media (min-width: 900px) and (max-width: 1199px)";
+// 一覧のgrid領域の最小幅: 900px（PC最小viewport）− サイドバー220px − 本文左右余白32px
+// − カードの枠線2pxと内側padding40px − 行の左右padding16px = 590px
+const MIN_GRID_AREA_PX = 900 - 220 - 32 - 42 - 16;
 
 /** `@media not all and (min-width: 900px)` ブロックの本体だけを集め、残りをPC用のCSSとして分ける */
 function splitSmartphoneStyles(source: string) {
@@ -81,15 +84,83 @@ function cssRules(body: string) {
   return rules;
 }
 
-/** `grid-template-columns` の宣言から固定幅トラックの合計と列間gapの合計をpxで返す（minmax(0, …) の可変列は0として扱う） */
+/**
+ * `grid-template-columns` の宣言から固定トラックの合計と列間gapの合計をpxで返す。
+ * `minmax(<min>, <max>)` は `<min>` を固定幅として数える（`minmax(0, 1fr)` なら0、`minmax(200px, 1fr)` なら200）
+ */
 function fixedTracksPx(declarations: string) {
   const columns = declarations.match(/grid-template-columns:\s*([^;]+);/)?.[1] ?? "";
   const tracks = columns.match(/minmax\([^)]*\)|\d+(?:\.\d+)?px/g) ?? [];
-  const fixedPx = tracks
-    .filter((track) => !track.startsWith("minmax"))
-    .reduce((sum, track) => sum + Number.parseFloat(track), 0);
+  const fixedPx = tracks.reduce((sum, track) => {
+    if (!track.startsWith("minmax")) return sum + Number.parseFloat(track);
+    const min = track.match(/minmax\(\s*([^,]+),/)?.[1] ?? "";
+    return sum + Number.parseFloat(min);
+  }, 0);
   // gap: var(--space-md) = 16px（designTokens.space.md）
   return { fixedPx, gapPx: (tracks.length - 1) * 16 };
+}
+
+/** `header` で始まるメディアブロックの開始位置と終了位置（閉じ括弧の次）を全て返す */
+function mediaBlockSpans(source: string, header: string) {
+  const spans: { start: number; end: number }[] = [];
+  for (let cursor = 0; ;) {
+    const start = source.indexOf(header, cursor);
+    if (start === -1) return spans;
+    const end = closingBraceIndex(source, source.indexOf("{", start) + 1) + 1;
+    spans.push({ start, end });
+    cursor = end;
+  }
+}
+
+/** `@media (min-width: 900px) and (max-width: 1199px)` のうち receipt 系の列指定を持つブロック */
+function receiptBandSpans(source: string) {
+  return mediaBlockSpans(source, `${NARROW_PC_QUERY} {`).filter(({ start, end }) =>
+    source.slice(start, end).includes("receipt-list"),
+  );
+}
+
+/** receipt系の列指定を持つPC用 `@media (min-width: 900px) {` ブロック */
+function receiptPcSpans(source: string) {
+  return mediaBlockSpans(source, "@media (min-width: 900px) {").filter(({ start, end }) =>
+    source.slice(start, end).includes("receipt-list"),
+  );
+}
+
+/** 帯ブロックがPC用のreceiptルールより後ろにあるか（詳細度が同じで宣言順が勝敗を決めるため） */
+function bandFollowsPcReceiptRules(source: string) {
+  const bandSpans = receiptBandSpans(source);
+  const pcSpans = receiptPcSpans(source);
+  return (
+    bandSpans.length > 0 &&
+    pcSpans.length > 0 &&
+    bandSpans.every(({ start }) => pcSpans.every(({ end }) => start > end))
+  );
+}
+
+/** 帯のreceipt列ルールとPC用の操作なし一覧の列ルールで、固定トラック+gapが最小内幅を超えるものを列挙する */
+function overflowingColumnRules(source: string) {
+  const problems: string[] = [];
+  const collect = (rules: { selector: string; declarations: string }[]) => {
+    for (const rule of rules) {
+      const { fixedPx, gapPx } = fixedTracksPx(rule.declarations);
+      if (fixedPx + gapPx > MIN_GRID_AREA_PX) {
+        problems.push(`${rule.selector}: ${fixedPx + gapPx}px > ${MIN_GRID_AREA_PX}px`);
+      }
+    }
+  };
+  collect(
+    cssRules(mediaBlockBodies(source, `${NARROW_PC_QUERY} {`).join("\n")).filter(
+      (rule) =>
+        rule.selector.includes("receipt") && rule.declarations.includes("grid-template-columns"),
+    ),
+  );
+  collect(
+    cssRules(mediaBlockBodies(source, "@media (min-width: 900px) {").join("\n")).filter(
+      (rule) =>
+        rule.selector.includes("no-actions") && rule.declarations.includes("grid-template-columns"),
+    ),
+  );
+  return problems;
 }
 
 describe("ReceiptListCard responsive styles", () => {
@@ -176,9 +247,6 @@ describe("ReceiptListCard responsive styles", () => {
   });
 
   it("900〜1199pxでは操作列を詰めてアイコンのみにし、固定列と間隔が一覧の最小内幅に収まる", () => {
-    // 一覧のgrid領域の最小幅: 900px（PC最小viewport）− サイドバー220px − 本文左右余白32px
-    // − カードの枠線2pxと内側padding40px − 行の左右padding16px = 590px
-    const minGridAreaPx = 900 - 220 - 32 - 42 - 16;
     const bandRules = cssRules(mediaBlockBodies(css, `${NARROW_PC_QUERY} {`).join("\n")).filter(
       (rule) =>
         rule.selector.includes("receipt") && rule.declarations.includes("grid-template-columns"),
@@ -187,8 +255,6 @@ describe("ReceiptListCard responsive styles", () => {
     // 操作列を持つ全バリアント（通常・選択・年つき・収入）に帯の列指定がある
     expect(bandRules).toHaveLength(6);
     for (const rule of bandRules) {
-      const { fixedPx, gapPx } = fixedTracksPx(rule.declarations);
-      expect(fixedPx + gapPx, rule.selector).toBeLessThanOrEqual(minGridAreaPx);
       // 最後の列（操作列）は124px以下に詰め、いちばん狭いバリアントでも店名列に約150pxを残す
       const lastTrack = rule.declarations
         .match(/grid-template-columns:\s*([^;]+);/)?.[1]
@@ -198,16 +264,36 @@ describe("ReceiptListCard responsive styles", () => {
       expect(Number.parseFloat(lastTrack ?? ""), rule.selector).toBeLessThanOrEqual(124);
     }
 
-    // 操作列を持たないバリアントはPC用の列指定がそのまま効くため、そちらも最小内幅に収まることを確かめる
-    const noActionRules = cssRules(pcCss).filter(
-      (rule) =>
-        rule.selector.includes("no-actions") && rule.declarations.includes("grid-template-columns"),
-    );
-    expect(noActionRules.length).toBeGreaterThan(0);
-    for (const rule of noActionRules) {
-      const { fixedPx, gapPx } = fixedTracksPx(rule.declarations);
-      expect(fixedPx + gapPx, rule.selector).toBeLessThanOrEqual(minGridAreaPx);
-    }
+    // 帯の列指定と、操作列を持たないバリアントのPC用の列指定が最小内幅に収まることを確かめる
+    expect(overflowingColumnRules(css)).toEqual([]);
+  });
+
+  it("帯の列指定はPC用の900pxメディアクエリより後ろに置く（詳細度が同じで宣言順が勝敗を決めるため）", () => {
+    expect(bandFollowsPcReceiptRules(css)).toBe(true);
+  });
+
+  it("帯の列指定を minmax(200px,…) に戻したCSSでは幅の検査が失敗する", () => {
+    const [band] = receiptBandSpans(css);
+    if (!band) throw new Error("receipt系の帯ブロックがありません");
+    const broken =
+      css.slice(0, band.start) +
+      css.slice(band.start, band.end).replaceAll("minmax(0,", "minmax(200px,") +
+      css.slice(band.end);
+    expect(overflowingColumnRules(broken)).not.toEqual([]);
+  });
+
+  it("帯ブロックをPC用のreceiptルールより前に動かしたCSSでは順序の検査が失敗する", () => {
+    const [band] = receiptBandSpans(css);
+    if (!band) throw new Error("receipt系の帯ブロックがありません");
+    const pcBlocks = receiptPcSpans(css);
+    if (pcBlocks.length === 0) throw new Error("receipt系のPC用ブロックがありません");
+    const target = pcBlocks.reduce((latest, span) => (span.end > latest.end ? span : latest));
+    const broken =
+      css.slice(0, target.start) +
+      css.slice(band.start, band.end) +
+      css.slice(target.start, band.start) +
+      css.slice(band.end);
+    expect(bandFollowsPcReceiptRules(broken)).toBe(false);
   });
 
   it("900〜1199pxでは操作ボタンの文言を隠し、アイコンと読み上げ名を残す", () => {
