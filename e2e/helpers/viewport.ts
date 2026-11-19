@@ -50,6 +50,15 @@ export async function expectLocatorInsideContainer(locator: Locator, container: 
     .toBeLessThanOrEqual(0);
 }
 
+/** 要素の内容が自身のpadding boxからはみ出さないことを確かめる（scrollWidth <= clientWidth） */
+export async function expectNoContentOverflow(locator: Locator) {
+  await expect
+    .poll(async () => locator.evaluate((target) => target.scrollWidth - target.clientWidth), {
+      timeout: 5000,
+    })
+    .toBeLessThanOrEqual(0);
+}
+
 export async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
   // viewport切替直後はPageTransitionのslideが残り一瞬はみ出すため、収束するまで待つ。
   await expect

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const SMARTPHONE_QUERY = "@media not all and (min-width: 900px)";
+const NARROW_PC_QUERY = "@media (min-width: 900px) and (max-width: 1199px)";
 
 /** `@media not all and (min-width: 900px)` ブロックの本体だけを集め、残りをPC用のCSSとして分ける */
 function splitSmartphoneStyles(source: string) {
@@ -71,6 +72,26 @@ function stripMediaBlocks(source: string) {
   return top + source.slice(cursor);
 }
 
+/** メディアブロックの本体から「セレクタ { 宣言 }」の組を取り出す */
+function cssRules(body: string) {
+  const rules: { selector: string; declarations: string }[] = [];
+  for (const match of body.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    rules.push({ selector: match[1].trim(), declarations: match[2] });
+  }
+  return rules;
+}
+
+/** `grid-template-columns` の宣言から固定幅トラックの合計と列間gapの合計をpxで返す（minmax(0, …) の可変列は0として扱う） */
+function fixedTracksPx(declarations: string) {
+  const columns = declarations.match(/grid-template-columns:\s*([^;]+);/)?.[1] ?? "";
+  const tracks = columns.match(/minmax\([^)]*\)|\d+(?:\.\d+)?px/g) ?? [];
+  const fixedPx = tracks
+    .filter((track) => !track.startsWith("minmax"))
+    .reduce((sum, track) => sum + Number.parseFloat(track), 0);
+  // gap: var(--space-md) = 16px（designTokens.space.md）
+  return { fixedPx, gapPx: (tracks.length - 1) * 16 };
+}
+
 describe("ReceiptListCard responsive styles", () => {
   const css = readFileSync(resolve(process.cwd(), "src/App.css"), "utf8");
   const { desktop, mobile } = splitSmartphoneStyles(css);
@@ -78,18 +99,18 @@ describe("ReceiptListCard responsive styles", () => {
   const topLevelCss = stripMediaBlocks(css);
 
   it("PC一覧では日付と金額を詰めて店名・内訳の幅を広げる", () => {
-    expect(css).toMatch(/grid-template-columns:\s*88px minmax\(200px, 1fr\) 104px 184px/);
+    expect(css).toMatch(/grid-template-columns:\s*88px minmax\(0, 1fr\) 104px 184px/);
   });
 
   it("選択可能な週次一覧だけチェックボックス列を足す", () => {
     expect(css).toMatch(
-      /\.receipt-list--selectable \.receipt-list-header[\s\S]*grid-template-columns:\s*44px 88px minmax\(200px, 1fr\) 104px 184px/,
+      /\.receipt-list--selectable \.receipt-list-header[\s\S]*grid-template-columns:\s*44px 88px minmax\(0, 1fr\) 104px 184px/,
     );
   });
 
   it("収入一覧は独立したメモ列の幅をスマートフォン幅の外でだけ維持する", () => {
     expect(css).toMatch(
-      /@media \(min-width: 900px\)\s*\{\s*\.receipt-list--income \.receipt-list-header--income,\s*\.receipt-list--income \.receipt-row\s*\{[^}]*88px minmax\(156px, 1\.3fr\) 104px minmax\(140px, 1fr\)\s*184px/,
+      /@media \(min-width: 900px\)\s*\{\s*\.receipt-list--income \.receipt-list-header--income,\s*\.receipt-list--income \.receipt-row\s*\{[^}]*88px minmax\(0, 1\.3fr\) 104px minmax\(0, 1fr\)\s*184px/,
     );
   });
 
@@ -129,16 +150,16 @@ describe("ReceiptListCard responsive styles", () => {
 
   it("年つきの履歴一覧だけPCの日付の列を104pxに広げ、操作なし・選択ありの組み合わせも覆う", () => {
     expect(pcCss).toMatch(
-      /\.receipt-list--with-year \.receipt-row[^{]*\{[^}]*104px minmax\(200px, 1fr\) 104px 184px/,
+      /\.receipt-list--with-year \.receipt-row[^{]*\{[^}]*104px minmax\(0, 1fr\) 104px 184px/,
     );
     expect(pcCss).toMatch(
-      /\.receipt-list--with-year\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*104px minmax\(200px, 1fr\) 104px;/,
+      /\.receipt-list--with-year\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*104px minmax\(0, 1fr\) 104px;/,
     );
     expect(pcCss).toMatch(
-      /\.receipt-list--with-year\.receipt-list--selectable\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*44px 104px minmax\(200px, 1fr\) 104px;/,
+      /\.receipt-list--with-year\.receipt-list--selectable\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*44px 104px minmax\(0, 1fr\) 104px;/,
     );
     expect(pcCss).toMatch(
-      /\.receipt-list--with-year\.receipt-list--income\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*104px minmax\(156px, 1\.3fr\) 104px minmax\(140px, 1fr\);/,
+      /\.receipt-list--with-year\.receipt-list--income\.receipt-list--no-actions \.receipt-row[^{]*\{[^}]*104px minmax\(0, 1\.3fr\) 104px minmax\(0, 1fr\);/,
     );
   });
 
@@ -152,5 +173,49 @@ describe("ReceiptListCard responsive styles", () => {
       /\.receipt-list--with-year \.receipt-row-date\s*\{[^}]*white-space:\s*nowrap/,
     );
     expect(css).not.toMatch(/(^|\n)\.receipt-row-date\s*\{[^}]*nowrap/);
+  });
+
+  it("900〜1199pxでは操作列を詰めてアイコンのみにし、固定列と間隔が一覧の最小内幅に収まる", () => {
+    // 一覧のgrid領域の最小幅: 900px（PC最小viewport）− サイドバー220px − 本文左右余白32px
+    // − カードの枠線2pxと内側padding40px − 行の左右padding16px = 590px
+    const minGridAreaPx = 900 - 220 - 32 - 42 - 16;
+    const bandRules = cssRules(mediaBlockBodies(css, `${NARROW_PC_QUERY} {`).join("\n")).filter(
+      (rule) =>
+        rule.selector.includes("receipt") && rule.declarations.includes("grid-template-columns"),
+    );
+
+    // 操作列を持つ全バリアント（通常・選択・年つき・収入）に帯の列指定がある
+    expect(bandRules).toHaveLength(6);
+    for (const rule of bandRules) {
+      const { fixedPx, gapPx } = fixedTracksPx(rule.declarations);
+      expect(fixedPx + gapPx, rule.selector).toBeLessThanOrEqual(minGridAreaPx);
+      // 最後の列（操作列）は124px以下に詰め、いちばん狭いバリアントでも店名列に約150pxを残す
+      const lastTrack = rule.declarations
+        .match(/grid-template-columns:\s*([^;]+);/)?.[1]
+        .trim()
+        .split(/\s+/)
+        .at(-1);
+      expect(Number.parseFloat(lastTrack ?? ""), rule.selector).toBeLessThanOrEqual(124);
+    }
+
+    // 操作列を持たないバリアントはPC用の列指定がそのまま効くため、そちらも最小内幅に収まることを確かめる
+    const noActionRules = cssRules(pcCss).filter(
+      (rule) =>
+        rule.selector.includes("no-actions") && rule.declarations.includes("grid-template-columns"),
+    );
+    expect(noActionRules.length).toBeGreaterThan(0);
+    for (const rule of noActionRules) {
+      const { fixedPx, gapPx } = fixedTracksPx(rule.declarations);
+      expect(fixedPx + gapPx, rule.selector).toBeLessThanOrEqual(minGridAreaPx);
+    }
+  });
+
+  it("900〜1199pxでは操作ボタンの文言を隠し、アイコンと読み上げ名を残す", () => {
+    const bandCss = mediaBlockBodies(css, `${NARROW_PC_QUERY} {`).join("\n");
+    expect(bandCss).toMatch(/\.receipt-row-action-label\s*\{[^}]*display:\s*none/);
+    expect(bandCss).toMatch(/\.receipt-row-actions \.MuiButton-root\s*\{[^}]*min-width:\s*0/);
+    // 1200px以上とスマートフォンでは文言を消さない（帯のメディアクエリの外に書かない）
+    expect(topLevelCss).not.toMatch(/\.receipt-row-action-label\s*\{[^}]*display:\s*none/);
+    expect(mobile).not.toMatch(/receipt-row-action-label/);
   });
 });

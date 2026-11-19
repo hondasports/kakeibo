@@ -62,6 +62,11 @@ describe("ReceiptRow", () => {
     expect(screen.getByRole("button", { name: "スーパーA（6/21）を編集" })).toHaveStyle({
       minHeight: "44px",
     });
+    // 900〜1199pxではCSSがこのspanだけを隠してアイコンのみにする。文言とaria-labelは残す
+    const editButton = screen.getByRole("button", { name: "スーパーA（6/21）を編集" });
+    expect(editButton.querySelector(".receipt-row-action-label")).toHaveTextContent("編集");
+    const deleteButton = screen.getByRole("button", { name: "スーパーA（6/21）を削除" });
+    expect(deleteButton.querySelector(".receipt-row-action-label")).toHaveTextContent("削除");
 
     await user.click(screen.getByRole("button", { name: "スーパーA（6/21）を編集" }));
     await user.click(screen.getByRole("button", { name: "スーパーA（6/21）を削除" }));
