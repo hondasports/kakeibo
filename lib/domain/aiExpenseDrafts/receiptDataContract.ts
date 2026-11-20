@@ -99,6 +99,9 @@ export const AI_EXPENSE_REGISTRATION_MODES = ["detailed", "totalOnly"] as const;
 
 export type AiExpenseRegistrationMode = (typeof AI_EXPENSE_REGISTRATION_MODES)[number];
 
+/** 登録モード未設定時の既定値。既存データは detailed として扱う。 */
+export const DEFAULT_REGISTRATION_MODE: AiExpenseRegistrationMode = "detailed";
+
 export const REGISTRATION_DESTINATIONS = ["receipt", "expense_entries"] as const;
 
 export type RegistrationDestination = (typeof REGISTRATION_DESTINATIONS)[number];

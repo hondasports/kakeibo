@@ -1,9 +1,10 @@
 import type { YearlySummary } from "../../../../lib/domain/receipt/yearlySummary";
 import { formatYen } from "../../../../lib/domain/common/currency";
+import { designTokens } from "../../../designTokens";
 
 export const OTHER_SERIES_DATA_KEY = "__yearly_other__";
 export const MAX_STACKED_CATEGORIES = 5;
-const OTHER_CATEGORY_COLOR = "#AAB7C4";
+const OTHER_CATEGORY_COLOR = designTokens.color.brand.mist;
 
 export type YearlyChartSeries = {
   dataKey: string;

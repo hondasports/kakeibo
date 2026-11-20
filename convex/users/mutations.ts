@@ -9,13 +9,10 @@ import {
   updateWeeklyDays as updateWeeklyDaysUsecase,
   upsertUser as upsertUserUsecase,
 } from "../../lib/usecase/users";
+import { toConvexEndpointError } from "../lib/errors";
 
 function convexError(error: unknown): never {
-  if (error instanceof ConvexError) throw error;
-  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
-  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
-  if (error instanceof UserDomainError) throw new ConvexError(error.message);
-  throw error;
+  toConvexEndpointError(error, [UserDomainError]);
 }
 
 // by_token_identifier インデックスにはConvexの仕様上unique constraintを付与できない

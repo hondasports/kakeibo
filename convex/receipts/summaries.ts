@@ -32,6 +32,7 @@ import {
 } from "../../lib/convex/receipts/summaryLib/week";
 import { getMonthSummaryWithCategoriesHandler } from "../../lib/convex/receipts/summaryLib/monthly";
 import { getYearSummaryHandler } from "../../lib/convex/receipts/summaryLib/yearly";
+import { categorySummaryValidator } from "../lib/validators";
 
 export const getWeekSummary = query({
   args: {
@@ -68,14 +69,6 @@ const receiptWithCategoryValidator = v.object({
   receiptTotalAmountYen: v.optional(v.number()),
   aiExpenseDraftId: v.optional(v.string()),
   registrationMode: v.optional(aiExpenseRegistrationModeValidator),
-});
-
-const categorySummaryValidator = v.object({
-  categoryId: v.string(),
-  categoryName: v.string(),
-  categoryColor: v.string(),
-  totalAmountYen: v.number(),
-  count: v.number(),
 });
 
 const monthlySummaryWithCategoriesValidator = v.object({

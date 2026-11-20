@@ -1,4 +1,4 @@
-import { Alert, Button, CircularProgress, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Button, Paper, Stack, Typography } from "@mui/material";
 import { useParams } from "react-router-dom";
 import { SystemAdminInvitationRevokeDialog } from "../components/SystemAdminInvitationRevokeDialog";
 import { GroupInvitationsSection } from "../components/GroupInvitationsSection";
@@ -12,6 +12,7 @@ import {
   SystemAdminErrorState,
   SystemAdminPageFrame,
 } from "./SystemAdminPageFrame";
+import { LoadingDetail } from "../components/LoadingDetail";
 
 export function SystemAdminGroupDetailPage() {
   const { groupId } = useParams();
@@ -223,14 +224,5 @@ export function SystemAdminGroupDetailPage() {
         target={recoveryTarget}
       />
     </SystemAdminPageFrame>
-  );
-}
-
-function LoadingDetail() {
-  return (
-    <Stack spacing={1} sx={{ alignItems: "center" }}>
-      <CircularProgress aria-label="詳細を読み込み中" />
-      <Typography>詳細を読み込んでいます。</Typography>
-    </Stack>
   );
 }

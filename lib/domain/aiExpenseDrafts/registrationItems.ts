@@ -1,4 +1,5 @@
 import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
+import { DEFAULT_REGISTRATION_MODE } from "./receiptDataContract";
 import type { AiExpenseRegistrationMode } from "./receiptDataContract";
 import { resolveReceiptShopNameFromDraft } from "./shopName";
 import { aggregateDraftItemsByCategory, getDraftItemAggregationErrorMessage } from "./reviewItems";
@@ -38,7 +39,7 @@ export type DraftItemForRegistration = AiExpenseDraftItemFields;
 export function resolveRegistrationMode(draft: {
   registrationMode?: AiExpenseRegistrationMode;
 }): AiExpenseRegistrationMode {
-  return draft.registrationMode ?? "detailed";
+  return draft.registrationMode ?? DEFAULT_REGISTRATION_MODE;
 }
 
 function assertUserConfirmedReceiptTotal(draft: DraftForRegistration): void {

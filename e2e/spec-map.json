@@ -91,6 +91,10 @@
     "e2e/ai-expense-tax-allocation.spec.ts",
     "e2e/ai-expense-queue.tax-summary-state.spec.ts"
   ],
+  "lib/domain/receipt/spendingEntry.ts": [
+    "e2e/ai-expense-queue*.spec.ts",
+    "e2e/ai-expense-tax-allocation.spec.ts"
+  ],
   "lib/domain/receipt/observations.ts": [
     "e2e/ai-expense-tax-allocation.spec.ts",
     "e2e/ai-expense-queue.tax-summary-state.spec.ts"
@@ -138,6 +142,14 @@
     "e2e/ai-expense-queue.spec.ts"
   ],
   "convex/groups/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
+  "convex/lib/**": [
+    "e2e/receipt-form.spec.ts",
+    "e2e/expense-search.spec.ts",
+    "e2e/settings.spec.ts",
+    "e2e/ai-expense-queue.spec.ts",
+    "e2e/weekly-summary-bulk-ops.spec.ts",
+    "e2e/group-access.spec.ts"
+  ],
   "convex/lineLink/**": ["e2e/notifications.spec.ts"],
   "convex/lineWebhook/**": ["e2e/notifications.spec.ts"],
   "convex/notifications/**": ["e2e/notifications.spec.ts"],
@@ -147,6 +159,8 @@
   "lib/usecase/receiptAnalysisJobs/**": ["e2e/ai-expense-queue.spec.ts"],
   "convex/receiptImageExtraction/**": ["e2e/ai-expense-queue.spec.ts"],
   "convex/receipts/**": ["e2e/receipt-form.spec.ts", "e2e/ai-expense-queue*.spec.ts"],
+  "convex/expenseSearch.ts": ["e2e/expense-search.spec.ts"],
+  "e2e/spec-map.json": ["e2e/auth.spec.ts", "e2e/navigation.spec.ts"],
   "convex/users/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
   "convex/weekSessions/**": ["e2e/weekly-summary-bulk-ops.spec.ts"],
   "convex/auth.config.ts": ["e2e/auth.spec.ts"],

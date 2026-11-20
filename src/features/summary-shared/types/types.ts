@@ -1,6 +1,7 @@
 import type { EntryKind } from "../../../../lib/domain/common/entryKind";
 import type { RecordType } from "../../../../lib/domain/common/recordKind";
 import type { AiExpenseRegistrationMode } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
+import { designTokens } from "../../../designTokens";
 
 export type CategorySummary = {
   categoryId: string;
@@ -91,6 +92,6 @@ export function incomeItemToReceiptItem(income: IncomeItem): ReceiptItem {
     recordType: income.recordType,
     categoryId: "",
     categoryName: "",
-    categoryColor: "#AAB7C4",
+    categoryColor: designTokens.color.brand.mist,
   };
 }
