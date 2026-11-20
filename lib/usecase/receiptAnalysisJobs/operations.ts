@@ -21,6 +21,7 @@ import {
   resolveReceiptAnalysisBatchStatus,
   shouldScheduleAiReviewNotification,
 } from "../../domain/receiptAnalysisJobs/rules";
+import type { DraftResultImageJobStatus } from "../../domain/receiptAnalysisJobs/status";
 
 export async function scheduleAiReviewNotificationIfNeeded(
   deps: { store: ReceiptAnalysisStore; scheduler: ReceiptAnalysisScheduler },
@@ -118,7 +119,7 @@ export async function updateReceiptAnalysisJobStatus(
   deps: { store: ReceiptAnalysisStore; scheduler: ReceiptAnalysisScheduler },
   args: {
     jobId: string;
-    status: "running" | "ready" | "needs_review" | "failed";
+    status: "running" | DraftResultImageJobStatus;
     draftId?: string;
     error?: string;
     expectedDraftId?: string | null;
@@ -157,7 +158,7 @@ export async function finalizeReceiptAnalysisAttempt(
     expectedDraftId: string | null;
     expectedDraftUpdatedAt?: number;
     newDraftId: string;
-    status: "ready" | "needs_review" | "failed";
+    status: DraftResultImageJobStatus;
     error?: string;
   },
   now = Date.now(),

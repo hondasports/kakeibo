@@ -27,6 +27,22 @@ export const TRANSACTIONAL_EMAIL_JOB_STATUSES = [
 
 export type TransactionalEmailJobStatus = (typeof TRANSACTIONAL_EMAIL_JOB_STATUSES)[number];
 
+/** webhook から報告されうる job status の部分集合。 */
+export const EMAIL_WEBHOOK_REPORTED_STATUSES = [
+  "sent",
+  "delivered",
+  "bounced",
+  "complained",
+  "suppressed",
+  "failed",
+] as const satisfies readonly TransactionalEmailJobStatus[];
+
+/** 送信失敗として終了する status の部分集合。 */
+export const EMAIL_JOB_FAILURE_STATUSES = [
+  "failed",
+  "suppressed",
+] as const satisfies readonly TransactionalEmailJobStatus[];
+
 export const EMAIL_SUPPRESSION_REASONS = ["bounce", "complaint", "provider_suppressed"] as const;
 
 export type EmailSuppressionReason = (typeof EMAIL_SUPPRESSION_REASONS)[number];

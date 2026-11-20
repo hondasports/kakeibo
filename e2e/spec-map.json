@@ -123,6 +123,34 @@
     "e2e/notifications.spec.ts"
   ],
   "convex/email/**": ["e2e/notifications.spec.ts"],
+  "convex/expenseSearch.ts": ["e2e/expense-search.spec.ts"],
+  "convex/accountDeletion.ts": ["e2e/account-deletion.spec.ts"],
+  "convex/systemAdmin*.ts": [
+    "e2e/system-admin-membership.spec.ts",
+    "e2e/notifications.spec.ts",
+    "e2e/system-admin-search.spec.ts"
+  ],
+  "lib/convex/systemAdmin/**": [
+    "e2e/system-admin-membership.spec.ts",
+    "e2e/notifications.spec.ts",
+    "e2e/system-admin-search.spec.ts"
+  ],
+  "lib/domain/systemAdmin/**": [
+    "e2e/system-admin-membership.spec.ts",
+    "e2e/notifications.spec.ts",
+    "e2e/system-admin-search.spec.ts"
+  ],
+  "lib/usecase/systemAdmin/**": [
+    "e2e/system-admin-membership.spec.ts",
+    "e2e/notifications.spec.ts",
+    "e2e/system-admin-search.spec.ts"
+  ],
+  "lib/domain/accountDeletion/**": ["e2e/account-deletion.spec.ts"],
+  "lib/usecase/accountDeletion/**": ["e2e/account-deletion.spec.ts"],
+  "lib/domain/email/**": ["e2e/notifications.spec.ts"],
+  "lib/domain/lineWebhook/**": ["e2e/notifications.spec.ts"],
+  "lib/domain/groups/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
+  "lib/domain/receiptAnalysisJobs/**": ["e2e/ai-expense-queue.spec.ts"],
   "convex/expenseEntries/**": [
     "e2e/receipt-form.spec.ts",
     "e2e/expense-search.spec.ts",

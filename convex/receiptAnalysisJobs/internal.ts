@@ -19,6 +19,8 @@ import {
   updateReceiptAnalysisJobStatus,
 } from "../../lib/usecase/receiptAnalysisJobs/operations";
 import { toConvexEndpointError } from "../lib/errors";
+import type { DraftResultImageJobStatus } from "../../lib/domain/receiptAnalysisJobs/status";
+import { DRAFT_RESULT_IMAGE_JOB_STATUSES } from "../../lib/domain/receiptAnalysisJobs/status";
 
 export { isTerminalImageJobStatus } from "../../lib/domain/receiptAnalysisJobs/status";
 
@@ -65,7 +67,7 @@ export async function finalizeAnalysisAttemptHandler(
     expectedDraftId: Id<"aiExpenseDrafts"> | null;
     expectedDraftUpdatedAt?: number;
     newDraftId: Id<"aiExpenseDrafts">;
-    status: "ready" | "needs_review" | "failed";
+    status: DraftResultImageJobStatus;
     error?: string;
   },
 ) {
@@ -135,6 +137,10 @@ export const updateJobStatus = internalMutation({
   handler: updateJobStatusHandler,
 });
 
+const draftResultImageJobStatusValidator = v.union(
+  ...DRAFT_RESULT_IMAGE_JOB_STATUSES.map((status) => v.literal(status)),
+);
+
 export const finalizeAnalysisAttempt = internalMutation({
   args: {
     jobId: v.id("receiptAnalysisImageJobs"),
@@ -142,7 +148,7 @@ export const finalizeAnalysisAttempt = internalMutation({
     expectedDraftId: v.union(v.id("aiExpenseDrafts"), v.null()),
     expectedDraftUpdatedAt: v.optional(v.number()),
     newDraftId: v.id("aiExpenseDrafts"),
-    status: v.union(v.literal("ready"), v.literal("needs_review"), v.literal("failed")),
+    status: draftResultImageJobStatusValidator,
     error: v.optional(v.string()),
   },
   handler: finalizeAnalysisAttemptHandler,

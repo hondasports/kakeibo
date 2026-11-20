@@ -4,11 +4,12 @@
  * 未完了なら60秒後に再スケジュール、失敗があれば failed へ遷移させる。
  */
 import type { AccountDeletionMutationDeps } from "./deps";
+import type { AccountDeletionPurgeOutcome } from "../../domain/accountDeletion/request";
 
 const GROUP_BATCH_SIZE = 25;
 const PURGE_POLL_DELAY_MS = 60_000;
 
-export type AdvancePurgeResult = "waiting" | "ready" | "failed";
+export type AdvancePurgeResult = AccountDeletionPurgeOutcome;
 
 export async function advanceAccountDeletionPurge(
   deps: Pick<

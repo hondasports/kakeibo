@@ -18,6 +18,7 @@ import {
   lineImageSkipReasonValidator,
   lineWebhookEventInputValidator,
 } from "./model";
+import { LINE_GROUP_RESOLUTION_STATUSES } from "../../lib/domain/lineWebhook/activeGroupResolver";
 
 export const claimEvents = internalMutation({
   args: {
@@ -74,7 +75,7 @@ export const loadImageProcessingContext = internalQuery({
   returns: v.object({
     hasUniqueActiveLink: v.boolean(),
     hasConsent: v.boolean(),
-    groupStatus: v.union(v.literal("resolved"), v.literal("no_group"), v.literal("unresolved")),
+    groupStatus: v.union(...LINE_GROUP_RESOLUTION_STATUSES.map((status) => v.literal(status))),
     groupId: v.optional(v.id("groups")),
     categories: v.array(categoryHintValidator),
   }),
