@@ -12,6 +12,9 @@ export const EXPENSE_ENTRY_MEMO_MAX_LENGTH = 500;
 /** 支出金額の最大値（円）。 */
 export const EXPENSE_ENTRY_AMOUNT_MAX = 9_999_999;
 
+/** 一度に作成できる支出項目の最大件数。 */
+export const MAX_EXPENSE_ENTRY_ITEMS = 100;
+
 /** 数値金額の検証失敗理由。 */
 export type ExpenseAmountError = "not_positive_integer" | "too_large";
 
