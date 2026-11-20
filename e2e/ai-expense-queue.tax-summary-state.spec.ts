@@ -30,7 +30,7 @@ test.describe("Issue #1015 旧形式の税内訳", () => {
     await cleanupAiExpenseQueue();
   });
 
-  test("summary892 確認済み商品から保存・再表示・登録で1782円を維持する", async ({
+  test("@smoke summary892 確認済み商品から保存・再表示・登録で1782円を維持する", async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -60,7 +60,7 @@ test.describe("Issue #1015 旧形式の税内訳", () => {
     await expect(queue.getByRole("region", { name: "登録済み" })).toContainText("1,782円");
   });
 
-  test("summary892 320pxでも商品一覧がviewport内に収まる", async ({ page }, testInfo) => {
+  test("@smoke summary892 320pxでも商品一覧がviewport内に収まる", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 320, height: 900 });
     const { dialog } = await seedLegacySummaryDraft(page);
     await expectResolved(dialog);

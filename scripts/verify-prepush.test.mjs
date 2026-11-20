@@ -1,12 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   classifyIncludes,
-  e2ePreflight,
-  portBusy,
   runPrepush,
   sanitizeHookEnv,
   unitRelatedTargets,
@@ -17,8 +14,6 @@ function tmpdirFixture() {
   const dir = mkdtempSync(path.join(tmpdir(), "prepush-"));
   dirs.push(dir);
   mkdirSync(path.join(dir, ".git"), { recursive: true });
-  mkdirSync(path.join(dir, "e2e"), { recursive: true });
-  writeFileSync(path.join(dir, "e2e", "spec-map.json"), "{}");
   return dir;
 }
 
@@ -44,17 +39,17 @@ function collectOut() {
   return { lines, out: (msg) => lines.push(msg) };
 }
 
-describe("classifyIncludes (AC9)", () => {
-  test("e2e spec → e2eSpecs、unit test → unitTests", () => {
+describe("classifyIncludes", () => {
+  test("unit test → unitTests、e2e spec → missing（pre-pushではE2Eを実行しない）", () => {
     const exists = (p) => p === "e2e/settings.spec.ts" || p === "src/foo.test.ts";
     const result = classifyIncludes(["e2e/settings.spec.ts", "src/foo.test.ts"], { exists });
-    expect(result.e2eSpecs).toEqual(["e2e/settings.spec.ts"]);
     expect(result.unitTests).toEqual(["src/foo.test.ts"]);
-    expect(result.missing).toEqual([]);
+    expect(result.missing[0]).toContain("e2e/settings.spec.ts");
+    expect(result.missing[0]).toContain("e2e:isolated");
   });
   test("存在しないファイルはmissing", () => {
-    const result = classifyIncludes(["e2e/none.spec.ts"], { exists: () => false });
-    expect(result.missing[0]).toContain("e2e/none.spec.ts");
+    const result = classifyIncludes(["x/none.test.ts"], { exists: () => false });
+    expect(result.missing[0]).toContain("x/none.test.ts");
   });
   test("テストでもe2e specでもないファイルはmissing", () => {
     const result = classifyIncludes(["src/app.ts"], { exists: () => true });
@@ -90,31 +85,8 @@ describe("unitRelatedTargets", () => {
 });
 
 describe("runPrepush", () => {
-  test("rejects invalid ports before preflight or commands", async () => {
-    let called = false;
-    await expect(
-      runPrepush({
-        env: { E2E_VITE_PORT: "0" },
-        preflight: async () => {
-          called = true;
-          return [];
-        },
-        runStep: () => {
-          called = true;
-          return 0;
-        },
-      }),
-    ).rejects.toThrow("E2E_VITE_PORT");
-    expect(called).toBe(false);
-  });
-  test("uses one custom port environment for preflight and every invoked step", async () => {
-    const env = {
-      E2E_VITE_PORT: "15173",
-      E2E_CONVEX_CLOUD_PORT: "13210",
-      E2E_CONVEX_SITE_PORT: "13211",
-      GIT_DIR: "dummy",
-    };
-    const preflights = [];
+  test("hook由来のGIT_*は各stepの環境から除く", async () => {
+    const env = { GIT_DIR: "dummy", PATH: "/bin" };
     const calls = [];
     const code = await runPrepush({
       cwd: repoRoot,
@@ -122,28 +94,19 @@ describe("runPrepush", () => {
       changedFilesOverride: ["src/features/expense-search/pages/ExpenseSearchPage.tsx"],
       gitOps: gitOpsFor(),
       out: () => {},
-      preflight: async (options) => {
-        preflights.push(options);
-        return [];
-      },
       runStep: (_cmd, args, _cwd, _log, stepEnv) => {
         calls.push({ args, env: stepEnv });
         return 0;
       },
     });
     expect(code).toBe(0);
-    expect(preflights[0].ports.map(({ port }) => port)).toEqual([15173, 13210, 13211]);
-    expect(calls.some(({ args }) => args.includes("e2e:isolated"))).toBe(true);
+    expect(calls.some(({ args }) => args.includes("e2e:isolated"))).toBe(false);
     for (const call of calls) {
-      expect(call.env).toMatchObject({
-        E2E_VITE_PORT: "15173",
-        E2E_CONVEX_CLOUD_PORT: "13210",
-        E2E_CONVEX_SITE_PORT: "13211",
-      });
       expect(call.env.GIT_DIR).toBeUndefined();
+      expect(call.env.PATH).toBe("/bin");
     }
   });
-  test("AC2: docsのみならe2eなし。unitはfs依存mapに当たるテストだけ", async () => {
+  test("docsのみならunitはfs依存mapに当たるテストだけ。e2e stepは存在しない", async () => {
     const { lines, out } = collectOut();
     const calls = [];
     const code = await runPrepush({
@@ -166,7 +129,7 @@ describe("runPrepush", () => {
     expect(lines.join("\n")).toContain("PASS");
   });
 
-  test("AC1相当: feature変更なら unit(related)+e2e spec選定で実行", async () => {
+  test("feature変更ならunit(related)が対象のファイルを実行する", async () => {
     const calls = [];
     const { out } = collectOut();
     const code = await runPrepush({
@@ -178,38 +141,16 @@ describe("runPrepush", () => {
         writeFileSync(log, "x");
         return 0;
       },
-      preflight: async () => [],
       gitOps: gitOpsFor(),
       out,
     });
     expect(code).toBe(0);
-    const e2eCall = calls.find((c) => c.includes("e2e:isolated"));
-    expect(e2eCall).toContain("e2e/expense-search.spec.ts");
     const unitCall = calls.find((c) => c.includes("vitest related"));
     expect(unitCall).toContain("src/features/expense-search/pages/ExpenseSearchPage.tsx");
+    expect(calls.some((c) => c.includes("e2e:isolated"))).toBe(false);
   });
 
-  test("AC3相当: unmapped変更はfallback（public specを含む）", async () => {
-    const calls = [];
-    const { out } = collectOut();
-    await runPrepush({
-      argv: [],
-      cwd: repoRoot,
-      changedFilesOverride: ["vite.config.ts"],
-      runStep: (cmd, args, cwd, log) => {
-        calls.push(args.join(" "));
-        writeFileSync(log, "x");
-        return 0;
-      },
-      preflight: async () => [],
-      gitOps: gitOpsFor(),
-      out,
-    });
-    const e2eCall = calls.find((c) => c.includes("e2e:isolated"));
-    expect(e2eCall).toContain("e2e/public-pages.spec.ts");
-  });
-
-  test("AC4: 失敗時に step名・再実行・log path を出して先で止まる", async () => {
+  test("失敗時に step名・再実行・log path を出して先で止まる", async () => {
     const calls = [];
     const { lines, out } = collectOut();
     let n = 0;
@@ -226,7 +167,6 @@ describe("runPrepush", () => {
         n += 1;
         return n === 4 ? 1 : 0; // unit-relatedで失敗
       },
-      preflight: async () => [],
       gitOps: gitOpsFor(),
       out,
     });
@@ -238,63 +178,17 @@ describe("runPrepush", () => {
     expect(tail).toContain("log:");
   });
 
-  test("AC5: e2e事前条件NGならE2Eを実行せずexit 1＋条件列挙", async () => {
-    const calls = [];
-    const { lines, out } = collectOut();
-    const code = await runPrepush({
-      argv: [],
-      cwd: repoRoot,
-      changedFilesOverride: ["src/features/expense-search/pages/ExpenseSearchPage.tsx"],
-      runStep: (cmd, args, cwd, log) => {
-        calls.push(args.join(" "));
-        writeFileSync(log, "x");
-        return 0;
-      },
-      preflight: async () => ["ポート 5173 が使用中", "Chromium未インストール"],
-      gitOps: gitOpsFor(),
-      out,
-    });
-    expect(code).toBe(1);
-    expect(calls.some((c) => c.includes("e2e:isolated"))).toBe(false);
-    const tail = lines.at(-1);
-    expect(tail).toContain("ポート 5173 が使用中");
-    expect(tail).toContain("Chromium未インストール");
-  });
-
-  test("unmapped注意はstep失敗より先に出る", async () => {
-    const { lines, out } = collectOut();
-    const code = await runPrepush({
-      argv: [],
-      cwd: repoRoot,
-      changedFilesOverride: ["vite.config.ts"], // spec-map未収載 → unmapped
-      runStep: () => 1, // 最初のstepで失敗
-      preflight: async () => [],
-      gitOps: gitOpsFor(),
-      out,
-    });
-    expect(code).toBe(1);
-    const text = lines.join("\n");
-    expect(text.indexOf("spec-mapにないパス")).toBeLessThan(text.indexOf("FAILED"));
-  });
-
-  test("AC9: --includeで spec追加・unit追加・不存在でexit 1", async () => {
-    const calls = [];
-    // e2e spec include: runtimeRelevant=falseのdocs変更でもE2Eが走る
+  test("--include: e2e specはmissingでexit 1、unit追加は実行、不存在はexit 1", async () => {
+    // e2e spec include: pre-pushではE2Eを実行しないのでmissingとして拒否
     const code = await runPrepush({
       argv: ["--include", "e2e/settings.spec.ts"],
       cwd: repoRoot,
       changedFilesOverride: ["docs/a.md"],
-      runStep: (cmd, args, cwd, log) => {
-        calls.push(args.join(" "));
-        writeFileSync(log, "x");
-        return 0;
-      },
-      preflight: async () => [],
+      runStep: () => 0,
       gitOps: gitOpsFor(),
       out: () => {},
     });
-    expect(code).toBe(0);
-    expect(calls.find((c) => c.includes("e2e:isolated"))).toContain("e2e/settings.spec.ts");
+    expect(code).toBe(1);
 
     // unit test include
     const unitCalls = [];
@@ -309,7 +203,6 @@ describe("runPrepush", () => {
         writeFileSync(log, "x");
         return 0;
       },
-      preflight: async () => [],
       gitOps: gitOpsFor(),
       out: () => {},
     });
@@ -318,7 +211,7 @@ describe("runPrepush", () => {
 
     // 不存在 → exit 1
     const code3 = await runPrepush({
-      argv: ["--include", "e2e/ghost.spec.ts"],
+      argv: ["--include", "x/ghost.test.ts"],
       cwd: repoRoot,
       changedFilesOverride: ["docs/a.md"],
       runStep: () => 0,
@@ -339,7 +232,6 @@ describe("runPrepush", () => {
         writeFileSync(log, "x");
         return 0;
       },
-      preflight: async () => [],
       gitOps: gitOpsFor(),
       out: () => {},
     });
@@ -389,7 +281,6 @@ describe("runPrepush", () => {
         writeFileSync(log, "x");
         return 0;
       },
-      preflight: async () => [],
       gitOps: gitOpsFor(),
       out: () => {},
     });
@@ -419,151 +310,5 @@ describe("hook env sanitization (pre-push経由のGIT_*汚染対策)", () => {
     expect(clean.GIT_PREFIX).toBeUndefined();
     expect(clean.PATH).toBe("/bin");
     expect(clean.FOO).toBe("bar");
-  });
-});
-
-describe("portBusy", () => {
-  const fakeSocket = (fire) => ({
-    once: (ev, cb) => {
-      if (ev === fire) cb(new Error("refused"));
-    },
-    destroy: () => {},
-    setTimeout: () => {},
-  });
-  test("connect成功すればbusy", async () => {
-    expect(
-      await portBusy(5173, { hosts: ["127.0.0.1"], connect: () => fakeSocket("connect") }),
-    ).toBe(true);
-  });
-  test("connect失敗なら空き", async () => {
-    expect(await portBusy(5173, { hosts: ["127.0.0.1"], connect: () => fakeSocket("error") })).toBe(
-      false,
-    );
-  });
-  test("複数ホストでどれか1つでも繋がればbusy（IPv6側も見る）", async () => {
-    const seen = [];
-    const connect = ({ host }) => {
-      seen.push(host);
-      return fakeSocket(host === "::1" ? "connect" : "error");
-    };
-    expect(await portBusy(3210, { connect })).toBe(true);
-    expect(seen).toEqual(["127.0.0.1", "::1"]);
-  });
-  test("connect自体がthrowしてもfalse（投げない）", async () => {
-    expect(
-      await portBusy(5173, {
-        hosts: ["127.0.0.1"],
-        connect: () => {
-          throw new Error("bad family");
-        },
-      }),
-    ).toBe(false);
-  });
-});
-
-describe("e2ePreflight", () => {
-  test("checks custom ports only and reports the selected busy port", async () => {
-    const seen = [];
-    const failures = await e2ePreflight({
-      env: {
-        E2E_VITE_PORT: "15173",
-        E2E_CONVEX_CLOUD_PORT: "13210",
-        E2E_CONVEX_SITE_PORT: "13211",
-      },
-      requiredEnv: [],
-      chromiumPath: () => fileURLToPath(import.meta.url),
-      backendBinaryPresent: async () => true,
-      checkPort: async (port) => {
-        seen.push(port);
-        return port === 13211;
-      },
-    });
-    expect(seen).toEqual([15173, 13210, 13211]);
-    expect(failures).toHaveLength(1);
-    expect(failures[0]).toContain("13211");
-  });
-  const okDeps = {
-    ports: [],
-    requiredEnv: ["AAA", "E2E_CLERK_USER_ID"],
-    checkPort: async () => false,
-    // chromiumPathはexistsSyncされるので実在ファイルを返す
-    chromiumPath: () => fileURLToPath(import.meta.url),
-    backendBinaryPresent: async () => true,
-    networkReachable: async () => true,
-  };
-  const withEnv = async (vars, fn) => {
-    const saved = {};
-    for (const key of Object.keys(vars)) {
-      saved[key] = process.env[key];
-      process.env[key] = vars[key];
-    }
-    try {
-      return await fn();
-    } finally {
-      for (const [key, val] of Object.entries(saved)) {
-        if (val === undefined) delete process.env[key];
-        else process.env[key] = val;
-      }
-    }
-  };
-  test("port占有は失敗として列挙", async () => {
-    const failures = await e2ePreflight({
-      ...okDeps,
-      ports: [{ port: 5173, label: "Vite dev" }],
-      checkPort: async (port) => port === 5173,
-    });
-    expect(failures.join("\n")).toContain("5173");
-    expect(failures.join("\n")).toContain("Vite dev");
-  });
-  test("envはprocess.envまたは.env.localのどちらでも満たせる", async () => {
-    const dir = tmpdirFixture();
-    // .env.local無し・process.envにあり → 失敗しない
-    await withEnv({ AAA: "1", E2E_CLERK_USER_ID: "u1" }, async () => {
-      const failures = await e2ePreflight({ ...okDeps, cwd: dir });
-      expect(failures).toEqual([]);
-    });
-    // .env.localのみ → 失敗しない
-    writeFileSync(path.join(dir, ".env.local"), "AAA=1\nE2E_CLERK_USER_ID=u1\n");
-    const failures = await e2ePreflight({ ...okDeps, cwd: dir });
-    expect(failures).toEqual([]);
-  });
-  test("env不足はprocess.envにも.env.localにも無い場合だけ失敗", async () => {
-    const dir = tmpdirFixture();
-    writeFileSync(path.join(dir, ".env.local"), "AAA=1\n");
-    const saved = process.env.E2E_CLERK_USER_ID;
-    delete process.env.E2E_CLERK_USER_ID;
-    try {
-      const failures = await e2ePreflight({ ...okDeps, cwd: dir });
-      expect(failures.join("\n")).toContain("E2E_CLERK_USER_ID");
-      expect(failures).toHaveLength(1);
-    } finally {
-      if (saved !== undefined) process.env.E2E_CLERK_USER_ID = saved;
-    }
-  });
-  test("backend binary不在かつnetwork不可のみ失敗", async () => {
-    const dir = tmpdirFixture();
-    await withEnv({ AAA: "1", E2E_CLERK_USER_ID: "u" }, async () => {
-      const offline = await e2ePreflight({
-        ...okDeps,
-        cwd: dir,
-        backendBinaryPresent: async () => false,
-        networkReachable: async () => false,
-      });
-      expect(offline.join("\n")).toContain("Convex local backend");
-      const online = await e2ePreflight({
-        ...okDeps,
-        cwd: dir,
-        backendBinaryPresent: async () => false,
-        networkReachable: async () => true,
-      });
-      expect(online.join("\n")).not.toContain("Convex local backend");
-    });
-  });
-  test("Chromium未導入を検出", async () => {
-    const dir = tmpdirFixture();
-    await withEnv({ AAA: "1", E2E_CLERK_USER_ID: "u" }, async () => {
-      const failures = await e2ePreflight({ ...okDeps, cwd: dir, chromiumPath: () => null });
-      expect(failures.join("\n")).toContain("Chromium");
-    });
   });
 });

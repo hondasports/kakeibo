@@ -41,7 +41,9 @@ test.describe("公開・異常系ページ", () => {
     ).toBeVisible();
   });
 
-  test("未ログインのログイン画面から法務ページへリンクできる (#249/#250)", async ({ page }) => {
+  test("@public 未ログインのログイン画面から法務ページへリンクできる (#249/#250)", async ({
+    page,
+  }) => {
     await bypassClerkBotDetection(page);
     await page.goto("/");
 
@@ -69,7 +71,9 @@ test.describe("公開・異常系ページ", () => {
     ).toBeVisible();
   });
 
-  test("未ログインで Error Boundary のデザイン画面を表示する (#254/#268)", async ({ page }) => {
+  test("@public 未ログインで Error Boundary のデザイン画面を表示する (#254/#268)", async ({
+    page,
+  }) => {
     await page.goto("/__e2e__/app-error-boundary");
 
     await expect(page.getByRole("alert")).toBeVisible();

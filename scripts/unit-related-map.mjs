@@ -2,7 +2,28 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeChangedPath } from "./classify-e2e-relevance.mjs";
-import { globToRegExp } from "./select-e2e-specs.mjs";
+/**
+ * gitignore風glob（*は1セグメント内、**は0個以上のセグメント、?は1文字）。
+ * 廃止した select-e2e-specs.mjs から移設（unit関連mapのglob解釈の正本）。
+ */
+export function globToRegExp(pattern) {
+  let out = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "*" && pattern[i + 1] === "*") {
+      if (pattern[i + 2] === "/") {
+        out += "(?:[^/]+/)*";
+        i += 2;
+      } else {
+        out += ".*";
+        i += 1;
+      }
+    } else if (ch === "*") out += "[^/]*";
+    else if (ch === "?") out += "[^/]";
+    else out += ch.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  }
+  return new RegExp(`^${out}$`);
+}
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
