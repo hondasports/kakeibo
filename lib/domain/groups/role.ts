@@ -6,6 +6,9 @@
 /** グループ内ロールの全値。schema・API validator はこの並び（owner → member）に合わせる。 */
 export const GROUP_ROLES = ["owner", "member"] as const;
 
+/** 1グループの owner 数上限。超過判定は件数をこの値と比較する。 */
+export const MAX_GROUP_OWNERS = 100;
+
 /** グループ内ロール。 */
 export type GroupRole = (typeof GROUP_ROLES)[number];
 

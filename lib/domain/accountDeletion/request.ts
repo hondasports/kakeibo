@@ -16,6 +16,11 @@ export const ACCOUNT_DELETION_REQUEST_STATUSES = [
 
 export type AccountDeletionRequestStatus = (typeof ACCOUNT_DELETION_REQUEST_STATUSES)[number];
 
+/** advanceAccountDeletionPurge の進捗結果の全値。 */
+export const ACCOUNT_DELETION_PURGE_OUTCOMES = ["waiting", "ready", "failed"] as const;
+
+export type AccountDeletionPurgeOutcome = (typeof ACCOUNT_DELETION_PURGE_OUTCOMES)[number];
+
 /** accountDeletionRequests ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
 export type AccountDeletionRequestFields = {
   userId: string;

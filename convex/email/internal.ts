@@ -15,6 +15,10 @@ import {
   createProcessResendEventDeps,
 } from "../../lib/convex/email/emailDeps";
 import { reconcileResendEvents } from "../../lib/usecase/email/processResendEvent";
+import {
+  EMAIL_JOB_FAILURE_STATUSES,
+  EMAIL_WEBHOOK_REPORTED_STATUSES,
+} from "../../lib/domain/email/model";
 
 export const getJobById = internalQuery({
   args: { jobId: v.id("transactionalEmailJobs") },
@@ -63,7 +67,7 @@ export const updateJobForRetry = internalMutation({
 export const updateJobForFailure = internalMutation({
   args: {
     jobId: v.id("transactionalEmailJobs"),
-    status: v.union(v.literal("failed"), v.literal("suppressed")),
+    status: v.union(...EMAIL_JOB_FAILURE_STATUSES.map((status) => v.literal(status))),
     errorMessage: v.optional(v.string()),
     errorCode: v.optional(v.string()),
     updatedAt: v.number(),
@@ -76,14 +80,7 @@ export const updateJobForFailure = internalMutation({
 export const updateJobStatusFromWebhook = internalMutation({
   args: {
     jobId: v.id("transactionalEmailJobs"),
-    status: v.union(
-      v.literal("sent"),
-      v.literal("delivered"),
-      v.literal("bounced"),
-      v.literal("complained"),
-      v.literal("suppressed"),
-      v.literal("failed"),
-    ),
+    status: v.union(...EMAIL_WEBHOOK_REPORTED_STATUSES.map((status) => v.literal(status))),
     lastProviderEventAt: v.number(),
     lastVerifiedProviderEventAt: v.optional(v.number()),
     updatedAt: v.number(),

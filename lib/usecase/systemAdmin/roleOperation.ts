@@ -10,6 +10,9 @@ import type { GroupRole } from "../../domain/groups/role";
 import { assertAccountDeletionNotInProgress } from "../accountDeletion/classification";
 import type { SystemAdminMutationDeps } from "./deps";
 import { requireSystemAdminActor } from "./actor";
+import { MAX_GROUP_OWNERS } from "../../domain/groups/role";
+import { MAX_ACTIVE_SYSTEM_ADMINS } from "../../domain/systemAdmin/systemAdminStore";
+import type { SystemAdminRoleOperation } from "../../domain/systemAdmin/roleOperation";
 
 type Deps = Pick<
   SystemAdminMutationDeps,
@@ -32,14 +35,15 @@ async function notify(
 ) {
   const recipients = new Set<string>([targetUserId]);
   if (extraRecipientUserId) recipients.add(extraRecipientUserId);
-  const owners = await deps.memberships.listByGroupAndRole(groupId, "owner", 101);
-  if (owners.length > 100) throw new ConvexError("owner数が上限を超えています");
+  const owners = await deps.memberships.listByGroupAndRole(groupId, "owner", MAX_GROUP_OWNERS + 1);
+  if (owners.length > MAX_GROUP_OWNERS) throw new ConvexError("owner数が上限を超えています");
   for (const owner of owners) {
     const user = await deps.users.findByUserId(owner.userId);
     if (user) recipients.add(user.docId);
   }
-  const admins = await deps.admins.takeByStatus("active", 101);
-  if (admins.length > 100) throw new ConvexError("active system admin数が上限を超えています");
+  const admins = await deps.admins.takeByStatus("active", MAX_ACTIVE_SYSTEM_ADMINS + 1);
+  if (admins.length > MAX_ACTIVE_SYSTEM_ADMINS)
+    throw new ConvexError("active system admin数が上限を超えています");
   for (const admin of admins) recipients.add(admin.userId);
   for (const recipientUserId of recipients) {
     const dedupeKey = `${auditId}:${recipientUserId}`;
@@ -65,7 +69,7 @@ export async function systemAdminRoleOperation(
   deps: Deps,
   args: {
     tokenIdentifier: string;
-    operation: "change_role" | "transfer_owner";
+    operation: SystemAdminRoleOperation;
     groupId: string;
     targetUserId: string;
     sourceOwnerUserId?: string;
@@ -89,8 +93,12 @@ export async function systemAdminRoleOperation(
     { requests: deps.accountDeletionRequests },
     target.userId,
   );
-  const owners = await deps.memberships.listByGroupAndRole(args.groupId, "owner", 101);
-  if (owners.length > 100) throw new ConvexError("owner数が上限を超えています");
+  const owners = await deps.memberships.listByGroupAndRole(
+    args.groupId,
+    "owner",
+    MAX_GROUP_OWNERS + 1,
+  );
+  if (owners.length > MAX_GROUP_OWNERS) throw new ConvexError("owner数が上限を超えています");
   let action: "system_admin_group_role_changed" | "system_admin_group_owner_transferred";
   let sourceUser: typeof target | undefined;
   let beforeRole = targetMembership.role;

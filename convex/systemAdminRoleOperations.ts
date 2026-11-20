@@ -4,7 +4,7 @@ import { createSystemAdminMutationDeps } from "../lib/convex/systemAdmin/systemA
 import { systemAdminRoleOperation as systemAdminRoleOperationUsecase } from "../lib/usecase/systemAdmin";
 import { groupRoleValidator } from "./groups/validators";
 
-const operationValidator = v.union(v.literal("change_role"), v.literal("transfer_owner"));
+import { systemAdminRoleOperationValidator as operationValidator } from "../lib/convex/systemAdmin/validators";
 
 export const systemAdminRoleOperation = mutation({
   args: {

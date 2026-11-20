@@ -8,8 +8,8 @@ import {
 } from "../../domain/systemAdmin/reason";
 import type { SystemAdminMutationDeps } from "./deps";
 import { requireSystemAdminActor } from "./actor";
-
-const MAX_OWNERS = 100;
+import { MAX_GROUP_OWNERS } from "../../domain/groups/role";
+import { MAX_ACTIVE_SYSTEM_ADMINS } from "../../domain/systemAdmin/systemAdminStore";
 
 type Deps = Pick<
   SystemAdminMutationDeps,
@@ -23,8 +23,9 @@ async function enqueueNotifications(
   auditId: string,
 ) {
   const recipients = new Set<string>([targetUserId]);
-  const admins = await deps.admins.takeByStatus("active", 101);
-  if (admins.length > 100) throw new ConvexError("active system admin数が上限を超えています");
+  const admins = await deps.admins.takeByStatus("active", MAX_ACTIVE_SYSTEM_ADMINS + 1);
+  if (admins.length > MAX_ACTIVE_SYSTEM_ADMINS)
+    throw new ConvexError("active system admin数が上限を超えています");
   for (const admin of admins) recipients.add(admin.userId);
   const now = Date.now();
   for (const recipientUserId of recipients) {
@@ -60,8 +61,12 @@ export async function recoverOwnerlessGroup(
   if (group.status !== "active") {
     throw new ConvexError("削除中・削除済み・アーカイブ済みグループは復旧できません");
   }
-  const owners = await deps.memberships.listByGroupAndRole(args.groupId, "owner", MAX_OWNERS + 1);
-  if (owners.length > MAX_OWNERS) throw new ConvexError("owner数が上限を超えています");
+  const owners = await deps.memberships.listByGroupAndRole(
+    args.groupId,
+    "owner",
+    MAX_GROUP_OWNERS + 1,
+  );
+  if (owners.length > MAX_GROUP_OWNERS) throw new ConvexError("owner数が上限を超えています");
   if (owners.length > 0)
     throw new ConvexError("ownerが存在するグループは通常のowner操作を使ってください");
   const target = await deps.users.findByDocId(args.targetUserId);

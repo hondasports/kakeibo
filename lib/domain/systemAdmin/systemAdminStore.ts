@@ -12,6 +12,15 @@ export const SYSTEM_ADMIN_STATUSES = ["active", "revoked"] as const;
 /** systemAdmins レコードの状態。 */
 export type SystemAdminStatus = (typeof SYSTEM_ADMIN_STATUSES)[number];
 
+/** active な systemAdmin の数上限。超過判定は件数をこの値と比較する。 */
+export const MAX_ACTIVE_SYSTEM_ADMINS = 100;
+
+/** context 解決時の状態の全値。"none" は systemAdmin でない状態を表す。 */
+export const SYSTEM_ADMIN_CONTEXT_STATUSES = [...SYSTEM_ADMIN_STATUSES, "none"] as const;
+
+/** context 解決時の状態。 */
+export type SystemAdminContextStatus = (typeof SYSTEM_ADMIN_CONTEXT_STATUSES)[number];
+
 /** systemAdmins ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
 export type SystemAdminFields = {
   userId: string;

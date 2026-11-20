@@ -16,6 +16,7 @@ import { measureReceiptExtractionSave } from "../receiptImageExtraction/telemetr
 import type { ReceiptUserOverrideSnapshot } from "../../domain/aiExpenseDrafts/receiptDataContract";
 import type { ReceiptAnalysisActionRunner } from "../../domain/receiptAnalysisJobs/actionRunner";
 import { toJobRecord } from "./convexReceiptAnalysisStore";
+import type { DraftResultImageJobStatus } from "../../domain/receiptAnalysisJobs/status";
 
 export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalysisActionRunner {
   return {
@@ -82,7 +83,7 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
       });
       return {
         id: draft._id,
-        status: draft.status as "ready" | "needs_review" | "failed",
+        status: draft.status as DraftResultImageJobStatus,
         updatedAt: draft.updatedAt,
         ...(draft.warnings === undefined ? {} : { warnings: draft.warnings }),
       };
@@ -97,7 +98,7 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
       );
       return {
         id: draft._id,
-        status: draft.status as "failed",
+        status: draft.status as DraftResultImageJobStatus,
         updatedAt: draft.updatedAt,
         ...(draft.warnings === undefined ? {} : { warnings: draft.warnings }),
       };
