@@ -147,6 +147,8 @@
   "lib/usecase/receiptAnalysisJobs/**": ["e2e/ai-expense-queue.spec.ts"],
   "convex/receiptImageExtraction/**": ["e2e/ai-expense-queue.spec.ts"],
   "convex/receipts/**": ["e2e/receipt-form.spec.ts", "e2e/ai-expense-queue*.spec.ts"],
+  "convex/expenseSearch.ts": ["e2e/expense-search.spec.ts"],
+  "e2e/spec-map.json": ["e2e/auth.spec.ts", "e2e/navigation.spec.ts"],
   "convex/users/**": ["e2e/group-access.spec.ts", "e2e/settings.spec.ts"],
   "convex/weekSessions/**": ["e2e/weekly-summary-bulk-ops.spec.ts"],
   "convex/auth.config.ts": ["e2e/auth.spec.ts"],
