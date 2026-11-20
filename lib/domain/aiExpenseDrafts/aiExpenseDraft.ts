@@ -67,6 +67,12 @@ export type AiExpenseDraftFields = {
 /** 下書きに対する部分更新 patch。id/creationTime は含めない。 */
 export type AiExpenseDraftPatch = Partial<Omit<AiExpenseDraftFields, "id" | "creationTime">>;
 
+/** 永続化済みレコード。id/creationTime は常に存在する。 */
+export type PersistedAiExpenseDraftFields = AiExpenseDraftFields & {
+  id: string;
+  creationTime: number;
+};
+
 export class AiExpenseDraft {
   private readonly fields: AiExpenseDraftFields;
 

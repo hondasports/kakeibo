@@ -8,16 +8,18 @@ import {
 describe("weekComparison", () => {
   describe("formatPrevWeekDiff", () => {
     it("差額をフォーマットする", () => {
-      expect(formatPrevWeekDiff(-3340)).toBe("-3,340円");
-      expect(formatPrevWeekDiff(0)).toBe("±0円");
+      expect(formatPrevWeekDiff(-3340)).toBe("−3,340円");
+      expect(formatPrevWeekDiff(3340)).toBe("+3,340円");
+      expect(formatPrevWeekDiff(0)).toBe("0円");
       expect(formatPrevWeekDiff(null)).toBe("比較データなし");
     });
   });
 
   describe("formatPrevWeekRate", () => {
     it("増減率をフォーマットする", () => {
-      expect(formatPrevWeekRate(-8)).toBe("-8%");
-      expect(formatPrevWeekRate(0)).toBe("±0%");
+      expect(formatPrevWeekRate(-8)).toBe("−8%");
+      expect(formatPrevWeekRate(8)).toBe("+8%");
+      expect(formatPrevWeekRate(0)).toBe("0%");
       expect(formatPrevWeekRate(null)).toBe("前週データなし");
     });
   });

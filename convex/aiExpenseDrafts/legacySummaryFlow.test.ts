@@ -74,7 +74,7 @@ describe("旧形式税内訳の保存・登録", () => {
     expect(judgeDraftAmountAndTax({ ...draft, items }).status).toBe("unresolved");
     expect(draft.reviewReasons).toContain("amount_mismatch");
     expect(draft.reviewReasons).toContain("user_confirmation_required");
-    const reasons = mapDraftToQueueItem(mapConvexDraftToAiExpenseDraft(draft), {}).reviewReasons;
+    const reasons = mapDraftToQueueItem(mapConvexDraftToAiExpenseDraft(draft)!, {}).reviewReasons;
     expect(reasons).toContain("amount_mismatch");
     expect(getReviewReasonLabel(getPrimaryReviewReason(reasons)!)).toBe("金額・税内訳の確認が必要");
   });
@@ -131,7 +131,7 @@ describe("旧形式税内訳の保存・登録", () => {
     expect(judgeDraftAmountAndTax({ ...initial.draft, items: initial.items }).status).toBe(
       "unresolved",
     );
-    const queue = mapDraftToQueueItem(mapConvexDraftToAiExpenseDraft(initial.draft), {});
+    const queue = mapDraftToQueueItem(mapConvexDraftToAiExpenseDraft(initial.draft)!, {});
     expect(queue.reviewReasons).toContain("amount_mismatch");
     expect(queue.reviewReasons.map(getReviewReasonLabel)).toContain("金額・税内訳の確認が必要");
     const form = mapDraftToReviewForm(initial.draft);
@@ -170,7 +170,7 @@ describe("旧形式税内訳の保存・登録", () => {
     expect(saved.draft.reviewReasons).not.toContain("amount_mismatch");
     expect(saved.draft.amountYen).toBe(1782);
     expect(
-      mapDraftToQueueItem(mapConvexDraftToAiExpenseDraft(saved.draft), {}).reviewReasons,
+      mapDraftToQueueItem(mapConvexDraftToAiExpenseDraft(saved.draft)!, {}).reviewReasons,
     ).not.toContain("amount_mismatch");
     const reopenedForm = mapDraftToReviewForm(saved.draft);
     const reopenedItems = initializeReviewCategoryState(

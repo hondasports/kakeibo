@@ -9,7 +9,7 @@ import {
 } from "../../../../lib/domain/aiExpenseDrafts/editedDraftItemsAmountSummary";
 import { getAmountBasisLabel } from "../../../../lib/domain/aiExpenseDrafts/receiptTaxLabels";
 import type { ReviewAmountCheck } from "../../../../lib/domain/aiExpenseDrafts/reviewAmountChecks";
-import type { AiExpenseDraftWithItems } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
+import { toReviewableDraftWithItems } from "../../receipt-review/utils/mappers";
 import {
   AmountCheckBody,
   AmountCheckLine,
@@ -69,10 +69,9 @@ export function DraftItemsAmountSummary({
   categoryId: string;
   draftItems: EditableDraftItem[];
 }) {
-  const details = useQuery(api.aiExpenseDrafts.queries.getWithItems, { draftId }) as
-    | AiExpenseDraftWithItems
-    | null
-    | undefined;
+  const details = toReviewableDraftWithItems(
+    useQuery(api.aiExpenseDrafts.queries.getWithItems, { draftId }),
+  );
   const summary = useMemo(
     () =>
       details

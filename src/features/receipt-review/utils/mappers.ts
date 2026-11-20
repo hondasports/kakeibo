@@ -1,13 +1,17 @@
 import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { getImageCaptureFailureHint } from "../../../../lib/domain/aiExpenseDrafts/failure";
 import { getDraftTitle } from "../../../../lib/domain/aiExpenseDrafts/title";
-import type {
-  AiExpenseDraft,
-  AiExpenseDraftStatus,
-  AiExpenseDraftWithItems,
-  ReviewFormValues,
+import {
+  isReviewableDraftStatus,
+  type AiExpenseDraft,
+  type AiExpenseDraftWithItems,
+  type ReviewFormValues,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
-import type { AiExpenseQueueItem, AiExpenseQueueStatus } from "../../../types/aiExpenseQueue";
+import type {
+  AiExpenseQueueDraftSource,
+  AiExpenseQueueItem,
+  AiExpenseQueueStatus,
+} from "../../../types/aiExpenseQueue";
 
 export const emptyReviewForm: ReviewFormValues = {
   documentType: "receipt",
@@ -19,7 +23,7 @@ export const emptyReviewForm: ReviewFormValues = {
 };
 
 export function mapDraftToQueueItem(
-  draft: AiExpenseDraft,
+  draft: AiExpenseQueueDraftSource,
   statusOverrides: Partial<Record<string, AiExpenseQueueStatus>>,
   categories?: Array<{ _id: Id<"categories"> | string; name: string }>,
   previewImageDataUrl?: string,
@@ -33,7 +37,7 @@ export function mapDraftToQueueItem(
     id: draft._id,
     fileName: draft.imageFileName ?? "AI支出下書き",
     previewImageDataUrl,
-    failureHint: getImageCaptureFailureHint(draft.status as AiExpenseDraftStatus, draft.warnings),
+    failureHint: getImageCaptureFailureHint(draft.status, draft.warnings),
     warnings: draft.warnings,
     status: statusOverrides[draft._id] ?? draft.status,
     documentType: draft.documentType,
@@ -51,10 +55,20 @@ export function mapDraftToQueueItem(
   };
 }
 
-export function mapConvexDraftToAiExpenseDraft(draft: Doc<"aiExpenseDrafts">): AiExpenseDraft {
+/**
+ * 永続化ドキュメントをレビュー用 DTO へ変換する。
+ * queued / analyzing の解析中 status はレビュー対象外なので null を返す。
+ */
+export function mapConvexDraftToAiExpenseDraft(
+  draft: Doc<"aiExpenseDrafts">,
+): AiExpenseDraft | null {
+  const status = draft.status;
+  if (!isReviewableDraftStatus(status)) {
+    return null;
+  }
   return {
     _id: draft._id,
-    status: draft.status as AiExpenseDraftStatus,
+    status,
     documentType: draft.documentType,
     imageFileName: draft.imageFileName,
     shopName: draft.shopName,
@@ -80,11 +94,20 @@ export function mapConvexDraftToAiExpenseDraft(draft: Doc<"aiExpenseDrafts">): A
   };
 }
 
-export function isDraftWithItems(value: unknown): value is AiExpenseDraftWithItems {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "draft" in value &&
-    typeof (value as { draft?: unknown }).draft === "object"
-  );
+/**
+ * getWithItems の戻り値をレビュー用 DTO へ変換する。
+ * undefined（読み込み中）と null（不存在）はそのまま返し、
+ * レビュー対象外の status は null に畳む。
+ */
+export function toReviewableDraftWithItems(
+  value: { draft: Doc<"aiExpenseDrafts">; items: Doc<"aiExpenseDraftItems">[] } | null | undefined,
+): AiExpenseDraftWithItems | null | undefined {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  const draft = mapConvexDraftToAiExpenseDraft(value.draft);
+  if (draft === null) {
+    return null;
+  }
+  return { draft, items: value.items };
 }

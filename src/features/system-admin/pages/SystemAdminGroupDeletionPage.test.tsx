@@ -49,4 +49,15 @@ describe("SystemAdminGroupDeletionPage", () => {
     await user.click(screen.getByRole("button", { name: "再開する" }));
     expect(resumeMock).toHaveBeenCalledWith({ jobId: "job-1", reason: "原因を確認したため" });
   });
+
+  it("requestedステータスで絞り込める", async () => {
+    const user = userEvent.setup();
+    render(<SystemAdminGroupDeletionPage />);
+    await user.click(screen.getByRole("combobox", { name: "状態" }));
+    await user.click(screen.getByRole("option", { name: "requested" }));
+    expect(useQueryMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "requested" }),
+    );
+  });
 });

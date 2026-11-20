@@ -113,7 +113,7 @@ export async function updateAiExpenseDraftForReview(
   }
   const shouldReinterpretTax = hasReceiptTaxMetadata(fields, originalItems);
   // 読み込み済みの下書き・明細を引き回し、patch 内容をメモリ上で追跡して再読み込みを省く。
-  let currentDraft = fields;
+  let currentDraft: AiExpenseDraftFields = fields;
   if (!fields.receiptInterpretation && shouldReinterpretTax) {
     const legacyInterpretationPatch = {
       receiptInterpretation: {

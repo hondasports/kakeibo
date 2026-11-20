@@ -17,32 +17,6 @@ export const statusLabels: Record<AiExpenseQueueStatus, string> = {
   registered: "登録済み",
 };
 
-export type DisplayQueueStatus = "needs_review" | "ready" | "processing" | "failed" | "registered";
-
-export const displayStatusLabels: Record<DisplayQueueStatus, string> = {
-  needs_review: "確認待ち",
-  ready: "登録できます",
-  processing: "読み取り中",
-  failed: "読み取り失敗",
-  registered: "登録済み",
-};
-
-export function getDisplayStatus(status: AiExpenseQueueStatus): DisplayQueueStatus {
-  if (status === "ready" || status === "registering") {
-    return "ready";
-  }
-  if (status === "needs_review") {
-    return "needs_review";
-  }
-  if (status === "failed") {
-    return "failed";
-  }
-  if (status === "registered") {
-    return "registered";
-  }
-  return "processing";
-}
-
 export const documentTypeLabels: Record<AiExpenseQueueDocumentType, string> = {
   receipt: "レシート",
   convenience_payment: "払込票",

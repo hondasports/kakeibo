@@ -119,7 +119,7 @@ describe("runPrepush", () => {
     const code = await runPrepush({
       cwd: repoRoot,
       env,
-      changedFilesOverride: ["src/features/expense-search/index.ts"],
+      changedFilesOverride: ["src/features/expense-search/pages/ExpenseSearchPage.tsx"],
       gitOps: gitOpsFor(),
       out: () => {},
       preflight: async (options) => {
@@ -172,7 +172,7 @@ describe("runPrepush", () => {
     const code = await runPrepush({
       argv: [],
       cwd: repoRoot,
-      changedFilesOverride: ["src/features/expense-search/index.ts"],
+      changedFilesOverride: ["src/features/expense-search/pages/ExpenseSearchPage.tsx"],
       runStep: (cmd, args, cwd, log) => {
         calls.push(args.join(" "));
         writeFileSync(log, "x");
@@ -186,7 +186,7 @@ describe("runPrepush", () => {
     const e2eCall = calls.find((c) => c.includes("e2e:isolated"));
     expect(e2eCall).toContain("e2e/expense-search.spec.ts");
     const unitCall = calls.find((c) => c.includes("vitest related"));
-    expect(unitCall).toContain("src/features/expense-search/index.ts");
+    expect(unitCall).toContain("src/features/expense-search/pages/ExpenseSearchPage.tsx");
   });
 
   test("AC3相当: unmapped変更はfallback（public specを含む）", async () => {
@@ -216,7 +216,10 @@ describe("runPrepush", () => {
     const code = await runPrepush({
       argv: [],
       cwd: repoRoot,
-      changedFilesOverride: ["src/features/expense-search/index.ts", "scripts/a.mjs"],
+      changedFilesOverride: [
+        "src/features/expense-search/pages/ExpenseSearchPage.tsx",
+        "scripts/a.mjs",
+      ],
       runStep: (cmd, args, cwd, log) => {
         calls.push(args.join(" "));
         writeFileSync(log, "x");
@@ -241,7 +244,7 @@ describe("runPrepush", () => {
     const code = await runPrepush({
       argv: [],
       cwd: repoRoot,
-      changedFilesOverride: ["src/features/expense-search/index.ts"],
+      changedFilesOverride: ["src/features/expense-search/pages/ExpenseSearchPage.tsx"],
       runStep: (cmd, args, cwd, log) => {
         calls.push(args.join(" "));
         writeFileSync(log, "x");

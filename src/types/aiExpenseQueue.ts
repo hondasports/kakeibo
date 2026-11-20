@@ -11,6 +11,14 @@ import type {
 
 export type AiExpenseQueueStatus = AiExpenseDraftStatus | "adding" | "registering";
 
+/**
+ * キュー項目の材料となる下書き。永続化 status を持つ一覧レコードと
+ * レビュー用 DTO（status が絞られた AiExpenseDraft）の両方を受ける。
+ */
+export type AiExpenseQueueDraftSource = Omit<AiExpenseDraft, "status"> & {
+  status: AiExpenseDraftStatus;
+};
+
 export type AiExpenseQueueItem = {
   id: string;
   fileName?: string;

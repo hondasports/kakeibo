@@ -15,10 +15,17 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-type FeedbackCode = "success" | "expired" | "invalid" | "conflict" | "failed";
+import {
+  LINE_LINK_FEEDBACK_CODES,
+  type LineLinkFeedbackCode,
+} from "../../../../lib/domain/lineLink/feedback";
+
 type LineLinkNavigationState = { lineLinkFeedback?: unknown };
 
-const feedbackMessages: Record<FeedbackCode, { message: string; severity: "success" | "error" }> = {
+const feedbackMessages: Record<
+  LineLinkFeedbackCode,
+  { message: string; severity: "success" | "error" }
+> = {
   success: { message: "LINEアカウントを連携しました", severity: "success" },
   expired: { message: "連携の有効期限が切れました。もう一度お試しください", severity: "error" },
   invalid: { message: "LINE連携を確認できませんでした。もう一度お試しください", severity: "error" },
@@ -29,17 +36,13 @@ const feedbackMessages: Record<FeedbackCode, { message: string; severity: "succe
   failed: { message: "LINE連携を完了できませんでした。もう一度お試しください", severity: "error" },
 };
 
-function isFeedbackCode(value: string | null): value is FeedbackCode {
+function isFeedbackCode(value: string | null): value is LineLinkFeedbackCode {
   return (
-    value === "success" ||
-    value === "expired" ||
-    value === "invalid" ||
-    value === "conflict" ||
-    value === "failed"
+    typeof value === "string" && (LINE_LINK_FEEDBACK_CODES as readonly string[]).includes(value)
   );
 }
 
-function getNavigationFeedback(state: unknown): FeedbackCode | null {
+function getNavigationFeedback(state: unknown): LineLinkFeedbackCode | null {
   if (!state || typeof state !== "object") return null;
   const value = (state as LineLinkNavigationState).lineLinkFeedback;
   return typeof value === "string" && isFeedbackCode(value) ? value : null;
@@ -56,7 +59,7 @@ export function LineLinkSettingsPanel() {
   const [starting, setStarting] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [feedback, setFeedback] = useState<FeedbackCode | null>(() =>
+  const [feedback, setFeedback] = useState<LineLinkFeedbackCode | null>(() =>
     isFeedbackCode(feedbackQuery) ? feedbackQuery : getNavigationFeedback(location.state),
   );
 

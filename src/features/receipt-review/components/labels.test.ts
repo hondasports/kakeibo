@@ -1,19 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { displayStatusLabels, getDisplayStatus, getSectionKey } from "./labels";
+import { getSectionKey, queueSectionLabels } from "./labels";
 
-describe("queue display status labels", () => {
+describe("queue section labels", () => {
   it("主要5状態へ統一マッピングする", () => {
-    expect(getDisplayStatus("needs_review")).toBe("needs_review");
-    expect(getDisplayStatus("ready")).toBe("ready");
-    expect(getDisplayStatus("registering")).toBe("ready");
-    expect(getDisplayStatus("failed")).toBe("failed");
-    expect(getDisplayStatus("registered")).toBe("registered");
-    expect(getDisplayStatus("adding")).toBe("processing");
-    expect(getDisplayStatus("queued")).toBe("processing");
-    expect(getDisplayStatus("analyzing")).toBe("processing");
+    expect(getSectionKey("needs_review")).toBe("needs_review");
+    expect(getSectionKey("ready")).toBe("ready");
     expect(getSectionKey("registering")).toBe("ready");
-    expect(displayStatusLabels.processing).toBe("読み取り中");
-    expect(displayStatusLabels.ready).toBe("登録できます");
-    expect(displayStatusLabels.failed).toBe("読み取り失敗");
+    expect(getSectionKey("failed")).toBe("failed");
+    expect(getSectionKey("registered")).toBe("registered");
+    expect(getSectionKey("adding")).toBe("processing");
+    expect(getSectionKey("queued")).toBe("processing");
+    expect(getSectionKey("analyzing")).toBe("processing");
+    expect(queueSectionLabels.processing).toBe("読み取り中");
+    expect(queueSectionLabels.ready).toBe("登録できます");
+    expect(queueSectionLabels.failed).toBe("読み取り失敗");
   });
 });

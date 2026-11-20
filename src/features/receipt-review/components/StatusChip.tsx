@@ -1,10 +1,10 @@
 import { Chip } from "@mui/material";
 import type { AiExpenseQueueStatus } from "../../../types/aiExpenseQueue";
 import {
-  displayStatusLabels,
-  getDisplayStatus,
+  getSectionKey,
   getStatusColor,
   getStatusIcon,
+  queueSectionLabels,
   statusLabels,
 } from "./labels";
 
@@ -12,7 +12,7 @@ function getStatusChipLabel(status: AiExpenseQueueStatus) {
   if (status === "registering") {
     return statusLabels.registering;
   }
-  return displayStatusLabels[getDisplayStatus(status)];
+  return queueSectionLabels[getSectionKey(status)];
 }
 
 export function StatusChip({ status }: { status: AiExpenseQueueStatus }) {

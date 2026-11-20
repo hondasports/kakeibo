@@ -28,6 +28,17 @@ export function formatSignedYen(amount: number): string {
 }
 
 /**
+ * 率（%）の符号付き表記。0 は "±0%" ではなく "0%"、負号は U+2212。
+ * 例: -8 → "−8%", 12.5 → "+12.5%"
+ */
+export function formatSignedPercent(value: number): string {
+  if (value === 0) {
+    return "0%";
+  }
+  return `${value < 0 ? "−" : "+"}${Math.abs(value)}%`;
+}
+
+/**
  * 1 万円以上の場合は "1.2万円" のように圧縮して表記する。
  * 1 万円未満は "1,234円" の通常表記を返す。
  */

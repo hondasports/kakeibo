@@ -3,12 +3,15 @@
  * Doc の _id/_creationTime をドメインの id/creationTime に写し替える。
  */
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
-import type { AiExpenseDraftFields } from "../../domain/aiExpenseDrafts/aiExpenseDraft";
+import type {
+  AiExpenseDraftFields,
+  PersistedAiExpenseDraftFields,
+} from "../../domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../domain/aiExpenseDrafts/aiExpenseDraftItem";
 
-export function draftDocToFields(doc: Doc<"aiExpenseDrafts">): AiExpenseDraftFields {
+export function draftDocToFields(doc: Doc<"aiExpenseDrafts">): PersistedAiExpenseDraftFields {
   const { _id, _creationTime, ...fields } = doc;
-  return { ...fields, id: _id, creationTime: _creationTime } as AiExpenseDraftFields;
+  return { ...fields, id: _id, creationTime: _creationTime } as PersistedAiExpenseDraftFields;
 }
 
 export function draftFieldsToDoc(fields: AiExpenseDraftFields): Doc<"aiExpenseDrafts"> {

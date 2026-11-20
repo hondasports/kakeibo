@@ -23,7 +23,7 @@ describe("WeekComparisonChart", () => {
     );
 
     expect(screen.getByRole("heading", { name: "前週との比較" })).toBeInTheDocument();
-    expect(screen.getByText("差額 -3,340円 (-8%)")).toBeInTheDocument();
+    expect(screen.getByText("差額 −3,340円 (−8%)")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "前週との比較グラフ" })).toBeInTheDocument();
     expect(screen.getByText("38,420円")).toBeInTheDocument();
     expect(screen.getByText("41,760円")).toBeInTheDocument();

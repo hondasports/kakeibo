@@ -1,13 +1,15 @@
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import type { GroupDeletionJobStatus } from "../../../../lib/domain/groupDeletion/groupDeletionJob";
 import { normalizeSystemAdminReason } from "../../../../lib/domain/systemAdmin/reason";
 import type { AppEnvironment } from "../types";
 
-type StatusFilter = "" | "running" | "retry_wait" | "failed" | "completed";
+type StatusFilter = GroupDeletionJobStatus | "";
 
 const statusLabels: Record<StatusFilter, string> = {
   "": "すべて",
+  requested: "requested",
   running: "running",
   retry_wait: "retry_wait",
   failed: "failed",

@@ -10,7 +10,6 @@ import { useReviewDraftSelection } from "./useReviewDraftSelection";
 import { useReviewFormState } from "./useReviewFormState";
 import { useReviewSubmit } from "./useReviewSubmit";
 import { useReviewTaxOverrides } from "./useReviewTaxOverrides";
-import { isDraftWithItems } from "../utils/mappers";
 import { useState } from "react";
 
 export function useReviewDialog({
@@ -90,9 +89,7 @@ export function useReviewDialog({
       ? taxPersistedItems.items
       : undefined) ??
     draftSelection.localReviewItems ??
-    (isDraftWithItems(draftSelection.selectedReviewDraftDetails)
-      ? draftSelection.selectedReviewDraftDetails.items
-      : undefined);
+    draftSelection.selectedReviewDraftDetails?.items;
   return {
     selectedReviewDraftId: draftSelection.selectedReviewDraftId,
     initializedReviewDraftId: formState.initializedReviewDraftId,
