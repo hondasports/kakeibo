@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, getMonthEndDate, getTodayDateStringInJapan } from "./date";
+import { addDays, getMonthEndDate, getTodayDateStringInJapan, isValidCalendarDate } from "./date";
 
 describe("addDays", () => {
   it("通常の日加算", () => {
@@ -87,6 +87,27 @@ describe("getMonthEndDate", () => {
 
   it("不正なフォーマットは NaN を含む", () => {
     expect(getMonthEndDate("not-a-date")).toMatch(/NaN/);
+  });
+});
+
+describe("isValidCalendarDate", () => {
+  it("暦に存在する日付を受け付ける", () => {
+    expect(isValidCalendarDate(2024, 2, 29)).toBe(true);
+    expect(isValidCalendarDate(2026, 11, 20)).toBe(true);
+  });
+
+  it("暦に存在しない日付を拒否する", () => {
+    expect(isValidCalendarDate(2023, 2, 29)).toBe(false);
+    expect(isValidCalendarDate(2024, 13, 1)).toBe(false);
+  });
+
+  it("小数の日・月・年は暦日として扱わない", () => {
+    expect(isValidCalendarDate(2024, 2, 1.5)).toBe(false);
+    expect(isValidCalendarDate(2024, 1.5, 15)).toBe(false);
+  });
+
+  it("100年未満の年を1900年代へ補正しない", () => {
+    expect(isValidCalendarDate(99, 1, 1)).toBe(false);
   });
 });
 

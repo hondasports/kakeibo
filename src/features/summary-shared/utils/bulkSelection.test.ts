@@ -49,6 +49,13 @@ describe("bulkSelection", () => {
     expect(Array.from(next)).toEqual(["expenseEntry:e1"]);
   });
 
+  it("選択数が上限と等しいときは上限扱いにしない", () => {
+    expect(takeKeysUpToLimit(["expenseEntry:a", "expenseEntry:b"], 2)).toEqual({
+      nextKeys: ["expenseEntry:a", "expenseEntry:b"],
+      capped: false,
+    });
+  });
+
   it("上限を超える選択は先頭から切り詰める", () => {
     expect(takeKeysUpToLimit(["expenseEntry:a", "expenseEntry:b", "expenseEntry:c"], 2)).toEqual({
       nextKeys: ["expenseEntry:a", "expenseEntry:b"],
