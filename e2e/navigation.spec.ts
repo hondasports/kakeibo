@@ -5,7 +5,7 @@ import { getCurrentMonth, getCurrentWeekStartDate } from "./helpers/currentPerio
 import { saveExpense } from "./helpers/expenseEntry";
 
 test.describe("ナビゲーション（Issue #49）", () => {
-  test("@navigation シナリオN-1.1: SP幅でBottomNavigationの非選択項目と選択状態が視認できる", async ({
+  test("@smoke @navigation シナリオN-1.1: SP幅でBottomNavigationの非選択項目と選択状態が視認できる", async ({
     page,
   }) => {
     await gotoAuthenticated(page);
