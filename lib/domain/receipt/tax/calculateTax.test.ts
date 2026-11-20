@@ -11,6 +11,12 @@ describe("calculateTaxYen", () => {
     [999, 10, "ceil", 100],
     [1000, 10, "floor", 100],
     [1559, 0, "ceil", 0],
+    [101, 8, "floor", 8],
+    [101, 8, "round", 8],
+    [101, 8, "ceil", 9],
+    [25, 10, "floor", 2],
+    [25, 10, "round", 3],
+    [25, 10, "ceil", 3],
   ] as const)(
     "%i円 税率%i%% %s => %i円",
     (taxableAmountYen, taxRatePercent, roundingMethod, expected) => {

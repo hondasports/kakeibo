@@ -114,6 +114,15 @@ describe("filterHistoryGroups", () => {
     expect(filtered[0]?.items.map((item) => item.categoryId)).toEqual(["cat-food", "cat-daily"]);
   });
 
+  it("下限と上限が等しいとき該当額のグループだけを残す", () => {
+    const filtered = filterHistoryGroups(groups, {
+      entryType: "expense",
+      minAmountYen: 540,
+      maxAmountYen: 540,
+    });
+    expect(filtered.map((group) => group.shopName)).toEqual(["セブンイレブン"]);
+  });
+
   it("レシート合計金額の下限・上限で絞り込む", () => {
     const filtered = filterHistoryGroups(groups, {
       entryType: "expense",
@@ -240,6 +249,13 @@ describe("parseExpenseSearchFilters", () => {
     expect(parseExpenseSearchFilters({ minAmountYen: 200, maxAmountYen: 100 })).toEqual({
       ok: false,
       error: "金額の下限は上限以下にしてください",
+    });
+  });
+
+  it("下限と上限が等しい金額を受け付ける", () => {
+    expect(parseExpenseSearchFilters({ minAmountYen: 900, maxAmountYen: 900 })).toEqual({
+      ok: true,
+      filters: { entryType: "all", minAmountYen: 900, maxAmountYen: 900 },
     });
   });
 
