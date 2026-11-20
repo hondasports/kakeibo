@@ -1,5 +1,6 @@
 import type { EntryKind } from "../common/entryKind";
 import type { RecordType } from "../common/recordKind";
+import { DEFAULT_REGISTRATION_MODE } from "../aiExpenseDrafts/receiptDataContract";
 import type { AiExpenseRegistrationMode } from "../aiExpenseDrafts/receiptDataContract";
 
 export type SpendingEntry = {
@@ -197,7 +198,7 @@ export function enrichSpendingEntry(
         aiExpenseDraft.shopName ?? aiExpenseDraft.payeeName ?? entry.shopName ?? "不明",
       receiptTotalAmountYen: aiExpenseDraft.amountYen ?? entry.amountYen,
       aiExpenseDraftId: aiExpenseDraft._id,
-      registrationMode: aiExpenseDraft.registrationMode ?? "detailed",
+      registrationMode: aiExpenseDraft.registrationMode ?? DEFAULT_REGISTRATION_MODE,
       itemName:
         aiExpenseDraft.registrationMode === "totalOnly"
           ? undefined

@@ -1,6 +1,7 @@
 import { Button, Chip, Paper, Stack, Typography } from "@mui/material";
 import { SystemAdminEmptyState } from "../pages/SystemAdminPageFrame";
 import type { SystemAdminAuditItem } from "../types";
+import { formatDateTimeForDisplay } from "../../../utils/date";
 
 type AuditLogListProps = {
   logs: { page: unknown[]; isDone: boolean; continueCursor: string } | undefined;
@@ -62,7 +63,7 @@ export function AuditLogList({
                   {formatAction(item.action)}
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
-                  {new Date(item.createdAt).toLocaleString("ja-JP")}
+                  {formatDateTimeForDisplay(item.createdAt)}
                 </Typography>
                 <Typography
                   color="text.secondary"

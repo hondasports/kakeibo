@@ -1,5 +1,4 @@
 import type { ActionCtx } from "../_generated/server";
-import { ConvexError } from "convex/values";
 import { requireAuthenticatedUserId } from "../users/auth";
 import { ReceiptImageExtractionDomainError } from "../../lib/domain/receiptImageExtraction/rules";
 import { createReceiptExtractorDeps } from "../../lib/convex/receiptImageExtraction/extractorDeps";
@@ -8,6 +7,7 @@ import type {
   ExtractReceiptFieldsResult,
 } from "../../lib/convex/receiptImageExtraction/types";
 import { extractReceiptFields as extractReceiptFieldsUsecase } from "../../lib/usecase/receiptImageExtraction";
+import { toConvexEndpointError } from "../lib/errors";
 
 export type {
   ExtractionConfidence,
@@ -24,9 +24,7 @@ export { getMockResult } from "../../lib/convex/receiptImageExtraction/mock";
 export { getExtractorMode } from "../../lib/convex/receiptImageExtraction/mode";
 
 function convexError(error: unknown): never {
-  if (error instanceof ConvexError) throw error;
-  if (error instanceof ReceiptImageExtractionDomainError) throw new ConvexError(error.message);
-  throw error;
+  toConvexEndpointError(error, [ReceiptImageExtractionDomainError]);
 }
 
 export async function extractReceiptFieldsFromImage(

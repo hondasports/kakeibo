@@ -1,5 +1,5 @@
 import { internalMutation, internalQuery } from "../_generated/server";
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import {
   categoryRecordToDoc,
@@ -10,13 +10,10 @@ import { CategoryDomainError } from "../../lib/domain/categories/rules";
 import { deleteE2eCategoriesByGroup, ensureE2eCategory } from "../../lib/usecase/categories";
 import { listActive as listActiveUsecase } from "../../lib/usecase/categories";
 import { requireGroupMembershipForGroup } from "../groups/membership";
+import { toConvexEndpointError } from "../lib/errors";
 
 function convexError(error: unknown): never {
-  if (error instanceof ConvexError) throw error;
-  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
-  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
-  if (error instanceof CategoryDomainError) throw new ConvexError(error.message);
-  throw error;
+  toConvexEndpointError(error, [CategoryDomainError]);
 }
 
 export const deleteE2eCategoriesByUser = internalMutation({

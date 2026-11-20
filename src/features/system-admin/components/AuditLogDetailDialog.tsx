@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogTitle, Stack, Typography } from "@mui/material";
 import type { SystemAdminAuditItem } from "../types";
+import { formatDateTimeForDisplay } from "../../../utils/date";
 
 type AuditLogDetailDialogProps = {
   selected: SystemAdminAuditItem | null;
@@ -20,7 +21,7 @@ export function AuditLogDetailDialog({
           <Stack spacing={1}>
             <Typography>操作: {formatAction(selected.action)}</Typography>
             <Typography>結果: {selected.result}</Typography>
-            <Typography>日時: {new Date(selected.createdAt).toLocaleString("ja-JP")}</Typography>
+            <Typography>日時: {formatDateTimeForDisplay(selected.createdAt)}</Typography>
             <Typography sx={{ overflowWrap: "anywhere" }}>
               actor: {selected.actorDisplayName ?? selected.actorUserId ?? selected.actorType}
             </Typography>

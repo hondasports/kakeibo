@@ -12,6 +12,7 @@ import {
 import { SystemAdminEmptyState } from "../pages/SystemAdminPageFrame";
 import type { SystemAdminListItem } from "../types";
 import type { useSystemAdminManagement, StatusFilter } from "../hooks/useSystemAdminManagement";
+import { formatDateTimeForDisplay } from "../../../utils/date";
 
 type AdminList = NonNullable<ReturnType<typeof useSystemAdminManagement>["list"]>;
 
@@ -141,11 +142,11 @@ function BoxText({ item }: { item: SystemAdminListItem }) {
         userId: {item.targetUserId}
       </Typography>
       <Typography color="text.secondary" variant="caption">
-        付与: {new Date(item.grantedAt).toLocaleString("ja-JP")}
+        付与: {formatDateTimeForDisplay(item.grantedAt)}
       </Typography>
       {item.revokedAt ? (
         <Typography color="text.secondary" variant="caption">
-          剥奪: {new Date(item.revokedAt).toLocaleString("ja-JP")}
+          剥奪: {formatDateTimeForDisplay(item.revokedAt)}
         </Typography>
       ) : null}
     </Stack>

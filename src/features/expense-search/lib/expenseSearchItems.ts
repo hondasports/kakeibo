@@ -1,5 +1,6 @@
 import type { ExpenseSearchReceipt } from "../../../../lib/convex/expenseSearch/searchExpenses";
 import type { IncomeItem, ReceiptItem } from "../../summary-shared/types/types";
+import { designTokens } from "../../../designTokens";
 
 export function mergeSearchPage(current: ExpenseSearchReceipt[], next: ExpenseSearchReceipt[]) {
   const itemKey = (item: ExpenseSearchReceipt) => `${item.recordType}:${item._id}`;
@@ -17,7 +18,7 @@ export function toReceiptItem(item: ExpenseSearchReceipt): ReceiptItem {
     amountYen: item.amountYen,
     categoryId: item.categoryId ?? "",
     categoryName: item.categoryName ?? "不明",
-    categoryColor: item.categoryColor ?? "#AAB7C4",
+    categoryColor: item.categoryColor ?? designTokens.color.brand.mist,
     memo: item.memo,
     recordType: item.recordType,
     itemName: item.itemName,
