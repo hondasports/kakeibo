@@ -1,16 +1,18 @@
 import { Box, Paper, Skeleton, Typography } from "@mui/material";
-import { formatYen, formatYenAbs } from "../../../../lib/domain/common/currency";
+import {
+  formatSignedPercent,
+  formatSignedYen,
+  formatYen,
+} from "../../../../lib/domain/common/currency";
 
 function formatSignedAmount(value: number | null): string {
   if (value === null) return "比較データなし";
-  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
-  return `${sign}${formatYenAbs(value)}`;
+  return formatSignedYen(value);
 }
 
 function formatSignedRate(value: number | null): string {
   if (value === null) return "比較データなし";
-  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
-  return `${sign}${Math.abs(value)}%`;
+  return formatSignedPercent(value);
 }
 
 function Metric({

@@ -8,7 +8,11 @@ import {
 import { buildDraftListSummary } from "../../../../lib/domain/aiExpenseDrafts/listSummary";
 import type { AiExpenseDraftFields } from "../../../../lib/domain/aiExpenseDrafts/aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "../../../../lib/domain/aiExpenseDrafts/aiExpenseDraftItem";
-import { mapConvexDraftToAiExpenseDraft, mapDraftToQueueItem } from "./mappers";
+import {
+  mapConvexDraftToAiExpenseDraft,
+  mapDraftToQueueItem,
+  toReviewableDraftWithItems,
+} from "./mappers";
 import type { AiExpenseDraft } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import { getReviewPriority } from "../../../../lib/domain/aiExpenseDrafts/queue";
 import { mixedTaxReviewFixture } from "../../../../lib/domain/aiExpenseDrafts/reviewTaxPreviewTestHelpers";
@@ -169,6 +173,65 @@ describe("mapConvexDraftToAiExpenseDraft", () => {
       receiptUserOverride,
       receiptTaxDecision,
       derivedRegistration,
+    });
+  });
+
+  it.each(["queued", "analyzing"] as const)(
+    "レビュー対象外の status %s は null を返す",
+    (status) => {
+      const mapped = mapConvexDraftToAiExpenseDraft({
+        _id: "draft-processing",
+        status,
+        documentType: "receipt",
+        reviewReasons: [],
+      } as never);
+      expect(mapped).toBeNull();
+    },
+  );
+
+  it("レビュー可能な status は AiExpenseDraft へ変換する", () => {
+    const mapped = mapConvexDraftToAiExpenseDraft({
+      _id: "draft-review",
+      status: "needs_review",
+      documentType: "receipt",
+      reviewReasons: [],
+    } as never);
+    expect(mapped).toMatchObject({ _id: "draft-review", status: "needs_review" });
+  });
+});
+
+describe("toReviewableDraftWithItems", () => {
+  const convexDraft = (status: string) =>
+    ({
+      _id: "draft-1",
+      status,
+      documentType: "receipt",
+      reviewReasons: [],
+    }) as never;
+
+  it("undefined と null はそのまま返す", () => {
+    expect(toReviewableDraftWithItems(undefined)).toBeUndefined();
+    expect(toReviewableDraftWithItems(null)).toBeNull();
+  });
+
+  it("レビュー対象外の status は null を返す", () => {
+    expect(
+      toReviewableDraftWithItems({ draft: convexDraft("queued"), items: [] } as never),
+    ).toBeNull();
+    expect(
+      toReviewableDraftWithItems({ draft: convexDraft("analyzing"), items: [] } as never),
+    ).toBeNull();
+  });
+
+  it("レビュー可能な status は draft と items を返す", () => {
+    const items = [{ _id: "item-1", itemName: "商品", amountYen: 100 }];
+    const result = toReviewableDraftWithItems({
+      draft: convexDraft("registered"),
+      items,
+    } as never);
+    expect(result).toMatchObject({
+      draft: { _id: "draft-1", status: "registered" },
+      items,
     });
   });
 });

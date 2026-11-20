@@ -30,7 +30,12 @@ vi.mock("../../../../convex/_generated/api", () => ({
 }));
 
 /** getWithItems が返す下書きの最小形。必須の reviewReasons を欠いた形は永続化されない。 */
-const savedDraft = { _id: "draft-1", documentType: "receipt", reviewReasons: [] };
+const savedDraft = {
+  _id: "draft-1",
+  status: "registered",
+  documentType: "receipt",
+  reviewReasons: [],
+};
 
 describe("ExpenseEntryEditDialog AI draft history", () => {
   beforeEach(() => {
