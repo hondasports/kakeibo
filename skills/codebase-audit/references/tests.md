@@ -13,7 +13,7 @@
 ## B. 見えていないテスト（あるのに気付けない・選ばれない）
 
 - **同じ関数のテストが分かれていないか。** shim や re-export を通して正本の関数を検証しているテストがないか。import をたどって、正本のテストと重なり・漏れがないかを見る。
-- **E2E の選び方の漏れ。** push 前のゲートは `e2e/spec-map.json` の対応で spec を選ぶ（`scripts/select-e2e-specs.mjs`）。変更したパスに対して、影響を受ける spec が選ばれない組み合わせがないか。`spec-map.json` のキーにあるのに対応する spec が足りないパスや、削除されたファイル（差分の判定から外れる）を確かめる。実際に選ばれた spec は、ゲートの E2E のログ（`$TMPDIR/suzumemo-prepush-*/e2e.log`）で確かめる。`verify:prepush` の画面出力には spec の名前が出ない。
+- **E2E タグの漏れ。** CI の E2E は `@smoke` / `@public` / `@staging` のタグ経由でだけ spec・テストを選ぶ（pre-push は E2E を起動しない）。タグを持たない `test(` が残っていないか（`grep -rEn 'test\("([^"@])|test\(`' e2e/` で 0 件であること）、既存テストからタグが外れていないかを確かめる。
 - **文書を検査するテスト。** `tests/workflow/*.test.ts` のように `readFileSync` で文書を読むテストは、`vitest related` では選ばれない。何を検査しているかと、検査先が正本になっているかを見る。
 - **不安定なテスト。** CI の flaky の集計（`scripts/report-flaky-e2e.mjs` の出力、GitHub Step Summary）や、リトライで通ったテストを見て、繰り返し不安定なものを挙げる。
 

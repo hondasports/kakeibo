@@ -160,7 +160,7 @@ test.describe("Issue #144 読み取りUI", () => {
 test.describe("Issue #146 AI支出下書きの確認要否分類（/__e2e__/ fixture・サーバー保存なし）", () => {
   // 表示内容・操作可否は AiExpenseQueuePanel.display.test がカバーするため、
   // 実ブラウザ固有の capture 属性だけをここで確認する。
-  test("失敗下書きの再撮影inputにcapture=environmentが付く", async ({ page }) => {
+  test("@smoke 失敗下書きの再撮影inputにcapture=environmentが付く", async ({ page }) => {
     await gotoAuthenticated(page, "/__e2e__/ai-expense-queue");
 
     const queue = page.getByRole("region", { name: "レシート入力" });
@@ -176,7 +176,7 @@ test.describe("下書き確認の税状態保存", () => {
     await cleanupAiExpenseQueue();
   });
 
-  test("明細ごとの税修正を保存すると再オープン後も維持される", async ({ page }) => {
+  test("@smoke 明細ごとの税修正を保存すると再オープン後も維持される", async ({ page }) => {
     await gotoAuthenticated(page, INPUT_PATH);
     const userId = await getCurrentClerkTokenIdentifier(page);
     await seedTaxReviewDraftByUser(userId);
@@ -396,7 +396,7 @@ test.describe("Issue #670 混在レシートの商品単位修正", () => {
     await cleanupAiExpenseQueue();
   });
 
-  test("SPでレシート参照を開き、未解決のまま下書きを保存できる", async ({ page }) => {
+  test("@smoke SPでレシート参照を開き、未解決のまま下書きを保存できる", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoAuthenticated(page, INPUT_PATH);
     const userId = await getCurrentClerkTokenIdentifier(page);
@@ -428,7 +428,7 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
     await cleanupAiExpenseQueue();
   });
 
-  test("旧税内訳の矛盾は商品の税設定を確認して保存・再表示できる", async ({ page }) => {
+  test("@smoke 旧税内訳の矛盾は商品の税設定を確認して保存・再表示できる", async ({ page }) => {
     await gotoAuthenticated(page, "/");
     await seedTaxSummaryConflictDraftByUser(await getCurrentClerkTokenIdentifier(page));
     await page.goto(INPUT_PATH);

@@ -211,7 +211,7 @@ required checksがPASSした後は、content change / material failure / unresol
 
 ### Functional E2E
 
-push前の検証は `.husky/pre-push` から走る `pnpm run verify:prepush` に一本化する。内容は型（`tsc -b`）→ lint/format → `vitest related`（差分に関係するunit）→ 対象E2E（`e2e:isolated`）。unitのrelated対象は `scripts/unit-related-map.json` の変更パスglobで、import グラフに乗らない fs 読み込み依存のテストも合流させる（テストがrepo内ファイルを `readFileSync` 等で読む構造を追加したらmapへ追記する）。E2Eの対象specは `e2e/spec-map.json` の変更パスglobで選び、`@smoke` のspecを最低ラインとして必ず合流させる。mapにないパスを変更した場合は安全側に `@smoke` + `@public` 全件を選び、map追記を促すファイル名を表示する。ローカル実行はマージ判定材料ではない（判定はCIのcheckが正本）。
+push前の検証は `.husky/pre-push` から走る `pnpm run verify:prepush` に一本化する。内容は型（`tsc -b`）→ lint/format → `vitest related`（差分に関係するunit）。unitのrelated対象は `scripts/unit-related-map.json` の変更パスglobで、import グラフに乗らない fs 読み込み依存のテストも合流させる（テストがrepo内ファイルを `readFileSync` 等で読む構造を追加したらmapへ追記する）。pre-push からは E2E を起動しない（Issue #1333: E2EはCIに集約し、ローカルとの2重実行を廃止）。E2E を任意にローカル実行する場合は `pnpm run e2e:isolated -- <spec>` を使う。ローカル実行はマージ判定材料ではない（判定はCIのcheckが正本）。
 
 E2Eをどのbackendで実行するかは次の通り。cloudのConvexはDatabase I/OをFree枠のteam合算で消費するため、全件を流さない。
 
@@ -224,13 +224,13 @@ E2Eをどのbackendで実行するかは次の通り。cloudのConvexはDatabase
 
 `@staging` は `@smoke` のうち、ローカルbackendでは検知できないstaging固有の確認だけに付ける。付ける数を増やす前に、ローカルbackendで足りないか確認する。
 
-CIで失敗したテストをローカルで再現するときは `--include` で対象を追加する（複数指定可）。
+CIで失敗したE2Eをローカルで再現するときは `pnpm run e2e:isolated -- <spec>` で対象を指定する（複数指定可）。`verify:prepush` の `--include` は unit test だけを受け付ける。
 
 ```bash
-pnpm run verify:prepush -- --include e2e/settings.spec.ts --include src/features/foo/foo.test.ts
+pnpm run e2e:isolated -- e2e/settings.spec.ts
 ```
 
-E2Eの実行には事前条件がある。満たさない場合はE2Eを実行せずに満たしていない条件と対処方法を表示して止まる。どうしても迂回する場合は `git push --no-verify` を使い、その事実をPR本文に記載する。
+E2Eの実行には事前条件がある（`e2e:isolated` の起動時にも検査される）。
 
 - Convex local backendのバイナリが取得済み、またはダウンロードできるネットワークがあること（macOS/Linuxのバイナリキャッシュは `~/.cache/convex/binaries/` 配下。制限された環境では先に `pnpm run e2e:isolated -- --probe` で取得しておく）
 - 使用するVite・Convex API・HTTP actionsのポートが空いていること（既定は `5173` / `3210` / `3211`）。別作業が使用中の場合は、そのサーバーを停止せず下記の別ポート指定を使う
@@ -240,10 +240,10 @@ E2Eの実行には事前条件がある。満たさない場合はE2Eを実行�
 別作業のサーバーを維持する場合は、Vite・Convex API・HTTP actionsに空いている別々のポートを指定できる。事前検査、匿名backend、Playwrightの起動先は同じ設定を使い、既存サーバーを再利用しない。
 
 ```bash
-E2E_VITE_PORT=15173 E2E_CONVEX_CLOUD_PORT=13210 E2E_CONVEX_SITE_PORT=13211 pnpm run verify:prepush
+E2E_VITE_PORT=15173 E2E_CONVEX_CLOUD_PORT=13210 E2E_CONVEX_SITE_PORT=13211 pnpm run e2e:isolated -- e2e/settings.spec.ts
 ```
 
-同じ環境変数は `pnpm run e2e:isolated -- <spec>` と `git push` のpre-push hookでも使用できる。指定しない場合は従来の `5173` / `3210` / `3211` を使う。
+指定しない場合は従来の `5173` / `3210` / `3211` を使う。
 
 ローカルE2Eは実DB、Clerk認証、Convex HTTP／mutation、画面の状態遷移をまとめて確認する層とし、関数単位の分岐は `convex-test`、外部公開URLが必要な確認だけcloud deploymentへ分ける。レシート抽出は `RECEIPT_IMAGE_EXTRACTOR_MODE=mock` とし、OpenAI APIは呼ばない。
 

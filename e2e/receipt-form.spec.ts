@@ -116,7 +116,9 @@ test.describe("[Issue #17] カテゴリ管理の反映確認（P1 / regression�
     await cleanupTestCategories();
   });
 
-  test("シナリオ16: 追加・編集・無効化が入力候補と既存表示に反映される", async ({ page }) => {
+  test("@smoke シナリオ16: 追加・編集・無効化が入力候補と既存表示に反映される", async ({
+    page,
+  }) => {
     const stamp = Date.now();
     const categoryName = `E2Eカテゴリ-${stamp}`;
     const updatedCategoryName = `${categoryName}-更新`;
@@ -260,7 +262,7 @@ test.describe("[Issue #14] 保存後のリアルタイム更新確認（P0 / 完
     await expect(receiptRows).toHaveCount(1);
   });
 
-  test("[Issue #359] 40文字超の1行メモも折り返し時は展開と折りたたみを切り替えられる", async ({
+  test("@smoke [Issue #359] 40文字超の1行メモも折り返し時は展開と折りたたみを切り替えられる", async ({
     page,
   }) => {
     const shopName = `QAメモ359wrap_${Date.now()}`;
@@ -298,7 +300,7 @@ test.describe("週次サマリーパネル（Issue #15 受け入れ確認）", (
     await cleanupTestReceipts();
   });
 
-  test("[Issue #371] 週次サマリーがPC表形式とSP縦積み表示に切り替わる", async ({ page }) => {
+  test("@smoke [Issue #371] 週次サマリーがPC表形式とSP縦積み表示に切り替わる", async ({ page }) => {
     const shopName = `QA週次サマリー371_${Date.now()}`;
     const memo = ["週末のまとめ買い", "牛乳とパン", "特売品を含む"].join("\n");
 
@@ -397,7 +399,7 @@ test.describe("[Issue #371] 前週差表示（P1 / regression）", () => {
     await cleanupE2eExpenseEntries();
   });
 
-  test("週次サマリーに前週差（円）が表示される", async ({ page }) => {
+  test("@smoke 週次サマリーに前週差（円）が表示される", async ({ page }) => {
     // Issue #181: ExpenseEntryForm の日付は週日選択UI（今週内のみ）のため、
     // 前週データは「前の週へ」ナビゲート後に保存し、今週へ戻って今週分を保存する
 
@@ -446,7 +448,7 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
     await resetTestWeekSession(getCurrentWeekStartDate(), { page });
   });
 
-  test("[Issue #47] ダッシュボードに前週比較グラフが表示される", async ({ page }) => {
+  test("@smoke [Issue #47] ダッシュボードに前週比較グラフが表示される", async ({ page }) => {
     // 比較グラフの描画には前週の支出が必須なため、前週分を保存しておく
     await gotoAuthenticated(page, "/weeks/current/input");
     await expect(page.getByRole("heading", { name: "入力", exact: true })).toBeVisible();

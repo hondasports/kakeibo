@@ -78,7 +78,7 @@ for (const width of [1280]) {
   });
 }
 
-test("Issue #1015 印字対象額の矛盾は商品確認後も保持し、内部値の編集を要求しない", async ({
+test("@smoke Issue #1015 印字対象額の矛盾は商品確認後も保持し、内部値の編集を要求しない", async ({
   page,
 }) => {
   await gotoAuthenticated(page, "/weeks/current/input");
@@ -104,7 +104,7 @@ test("Issue #1015 印字対象額の矛盾は商品確認後も保持し、内�
 
 // 軸の順序差は handler 層の updateItemTaxOverrides.confirmation.test.ts が
 // it.each で両方向をカバー済みなので、E2E ではブラウザ導線の代表1方向だけを確認する（#1159）。
-test("Issue #1015 片軸確認を保存してから残りを確認できる", async ({ page }) => {
+test("@smoke Issue #1015 片軸確認を保存してから残りを確認できる", async ({ page }) => {
   await gotoAuthenticated(page, "/weeks/current/input");
   await cleanupAiExpenseQueue();
   try {
@@ -170,7 +170,7 @@ test("Issue #1015 片軸確認を保存してから残りを確認できる", as
 });
 
 for (const saveBeforeRate of [false, true]) {
-  test(`Issue #1015 商品名変更後に税率を再確認して保存・登録できる 途中保存=${saveBeforeRate}`, async ({
+  test(`@smoke Issue #1015 商品名変更後に税率を再確認して保存・登録できる 途中保存=${saveBeforeRate}`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: saveBeforeRate ? 320 : 1280, height: 900 });
