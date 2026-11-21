@@ -26,5 +26,6 @@ CIと同じ匿名使い捨てbackendで走らせる場合（CIで失敗したspe
 ## 注意
 
 - secretやissuerの実値をchat・Issue・PR・log・commitへ出さない
+- Devin等のセッション環境では、セッション側の `VITE_CONVEX_URL`（cloud dev向けの値）がprocess環境として残り、`.env.local` のlocal向け値を上書きしてViteがcloudを見る場合がある。local Convex（`node scripts/start-ci-convex.mjs --probe` のanonymous backend等）でViteを起動・UI検証するときは、起動コマンドに `VITE_CONVEX_URL=http://127.0.0.1:3210` を明示して環境変数の取り違えを防ぐ
 - Windowsの既知パターン: Convex CLIが設定成功後の終了処理だけassertするケースでは、成功メッセージだけでPASSにせず最後のcleanup認証HTTPが200になるまで確認する
 - push前ゲートとE2Eのbackend構成は `docs/development-process.md#functional-e2e`、環境変数は `docs/environment-variables.md` を参照する。ローカルでの手順は本ファイルで完結する
