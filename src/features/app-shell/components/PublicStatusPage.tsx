@@ -15,11 +15,11 @@ type PublicStatusButtonAction = {
   variant?: "contained" | "outlined";
 };
 
-export type PublicStatusAction = PublicStatusLinkAction | PublicStatusButtonAction;
+type PublicStatusAction = PublicStatusLinkAction | PublicStatusButtonAction;
 
-export type PublicStatusLabelTone = "neutral" | "error";
+type PublicStatusLabelTone = "neutral" | "error";
 
-export type PublicStatusHeaderBrand = {
+type PublicStatusHeaderBrand = {
   alt: string;
   src: string;
   width?: number | string;
@@ -29,7 +29,7 @@ export type PublicStatusHeaderBrand = {
   showWordmark?: boolean;
 };
 
-export type PublicStatusPageProps = {
+type PublicStatusPageProps = {
   label: string;
   labelTone?: PublicStatusLabelTone;
   title: string;

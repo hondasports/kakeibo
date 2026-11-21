@@ -44,7 +44,7 @@ export function categoryRecordToDoc(record: CategoryStoreRecord): Doc<"categorie
 }
 
 /** query 側でも使える読み取り専用メソッド。 */
-export type CategoryReader = Pick<
+type CategoryReader = Pick<
   CategoryStore,
   "findByGroupAndSortOrder" | "listForWriteByGroup" | "listActive" | "listForSettings" | "get"
 >;

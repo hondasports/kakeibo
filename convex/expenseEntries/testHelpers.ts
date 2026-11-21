@@ -21,7 +21,7 @@ export type CategoryDoc = {
   updatedAt: number;
 };
 
-export type AiExpenseDraftDoc = {
+type AiExpenseDraftDoc = {
   _id: string;
   _creationTime: number;
   groupId: string;
@@ -44,7 +44,7 @@ export type AiExpenseDraftDoc = {
   updatedAt: number;
 };
 
-export type AiExpenseDraftItemDoc = {
+type AiExpenseDraftItemDoc = {
   _id: string;
   _creationTime: number;
   draftId: string;

@@ -19,7 +19,7 @@ export const GROUP_INVITATION_ACCEPT_ERRORS = {
   profileUpdateFailed: "招待の認証に必要な情報を保存できませんでした。入力内容を確認してください。",
 } as const;
 
-export type GroupInvitationPreviewResult = {
+type GroupInvitationPreviewResult = {
   token: string;
   details: GroupInvitationPreview;
 };
@@ -55,7 +55,7 @@ export const initialGroupInvitationAcceptState: GroupInvitationAcceptState = {
 };
 
 /** Clerk 認証フェーズと招待確認・受諾フェーズの両方から届く出来事。 */
-export type GroupInvitationAcceptEvent =
+type GroupInvitationAcceptEvent =
   | { type: "invitationContextReset" }
   | { type: "previewLoaded"; preview: GroupInvitationPreviewResult }
   | { type: "previewFailed" }
@@ -132,7 +132,7 @@ export function groupInvitationAcceptReducer(
   }
 }
 
-export type InvitationPageContext = {
+type InvitationPageContext = {
   isClerkLoaded: boolean;
   isSignedIn: boolean | undefined;
   isAuthenticated: boolean;

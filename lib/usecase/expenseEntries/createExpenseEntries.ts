@@ -10,7 +10,7 @@ import { assertUsableCategory } from "../categories/assertUsableCategory";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 
-export type CreateExpenseEntriesUsecaseArgs = {
+type CreateExpenseEntriesUsecaseArgs = {
   date: string;
   shopName?: string;
   sourceAmountYen?: number;

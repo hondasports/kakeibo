@@ -1,6 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-export type SystemAdminErrorBoundaryProps = {
+type SystemAdminErrorBoundaryProps = {
   children: ReactNode;
   label: string;
   renderError: (retry: () => void) => ReactNode;

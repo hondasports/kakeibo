@@ -16,7 +16,7 @@ import {
 import { requireSystemAdminActor } from "../systemAdmin/actor";
 import type { NotificationAdminMutationDeps, NotificationAdminQueryDeps } from "./deps";
 
-export type AdminNotificationSettingItem = {
+type AdminNotificationSettingItem = {
   type: TransactionalEmailType;
   channel: NotificationChannel;
   typeLabel: string;
@@ -27,7 +27,7 @@ export type AdminNotificationSettingItem = {
   updatedAt?: number;
 };
 
-export type AdminNotificationSettingsList = {
+type AdminNotificationSettingsList = {
   items: AdminNotificationSettingItem[];
 };
 

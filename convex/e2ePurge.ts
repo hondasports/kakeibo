@@ -47,7 +47,7 @@ const purgeStatsValidator = v.object({
   stepFailures: v.number(),
 });
 
-export type OrphanPurgeStats = {
+type OrphanPurgeStats = {
   groupsDeleted: number;
   groupsSkipped: number;
   groupDeleteFailed: number;

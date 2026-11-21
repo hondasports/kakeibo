@@ -6,7 +6,7 @@ export type ClerkSignUpResult = {
   status?: string | null;
 };
 
-export type ClerkSsoResult = {
+type ClerkSsoResult = {
   error?: unknown;
 };
 

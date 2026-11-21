@@ -14,13 +14,13 @@ import { createExpenseEntries } from "../../usecase/expenseEntries/createExpense
 import { updateExpenseEntry } from "../../usecase/expenseEntries/updateExpenseEntry";
 import { deleteExpenseEntry } from "../../usecase/expenseEntries/deleteExpenseEntry";
 
-export type CreateIncomeEntryArgs = {
+type CreateIncomeEntryArgs = {
   date: string;
   amountYen: number;
   title: string;
 };
 
-export type CreateExpenseEntriesArgs = {
+type CreateExpenseEntriesArgs = {
   date: string;
   shopName?: string;
   sourceAmountYen?: number;
@@ -33,7 +33,7 @@ export type CreateExpenseEntriesArgs = {
   }>;
 };
 
-export type UpdateExpenseEntryArgs = {
+type UpdateExpenseEntryArgs = {
   expenseEntryId: Id<"expenseEntries">;
   date?: string;
   amountYen?: number;
@@ -42,7 +42,7 @@ export type UpdateExpenseEntryArgs = {
   memo?: string;
 };
 
-export type DeleteExpenseEntryArgs = {
+type DeleteExpenseEntryArgs = {
   expenseEntryId: Id<"expenseEntries">;
 };
 

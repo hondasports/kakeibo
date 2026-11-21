@@ -1,4 +1,4 @@
-export type ReceiptExtractionStage = "openai_http" | "json_parse" | "domain_validation" | "save";
+type ReceiptExtractionStage = "openai_http" | "json_parse" | "domain_validation" | "save";
 
 type ReceiptExtractionTelemetry = {
   telemetryId?: string;

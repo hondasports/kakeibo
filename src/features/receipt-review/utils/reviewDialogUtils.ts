@@ -13,7 +13,7 @@ import {
   hasReviewUncategorizedItems,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewSummary";
 
-export type CategoryAggregateDisplay = {
+type CategoryAggregateDisplay = {
   categoryId: string;
   categoryName: string;
   amountYen: number;

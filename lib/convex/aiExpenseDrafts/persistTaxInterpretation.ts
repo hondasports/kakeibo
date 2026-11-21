@@ -21,7 +21,7 @@ import {
   draftItemFieldsToDoc,
 } from "./draftRecordMapping";
 
-export type PersistDraftTaxInterpretationArgs = {
+type PersistDraftTaxInterpretationArgs = {
   draftId: Id<"aiExpenseDrafts">;
   groupId: Id<"groups">;
   /** 既に読み込んだ下書き・明細。渡せば DB 再取得を省略する。 */
@@ -33,7 +33,7 @@ export type PersistDraftTaxInterpretationArgs = {
   receiptTotalSource?: "explicit_label" | "user_confirmed" | "ai_estimate";
 };
 
-export type PersistDraftTaxInterpretationResult = {
+type PersistDraftTaxInterpretationResult = {
   draft: Doc<"aiExpenseDrafts">;
   items: Doc<"aiExpenseDraftItems">[];
 };

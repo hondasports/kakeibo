@@ -18,9 +18,9 @@ import {
 } from "../../lib/usecase/receiptAnalysisJobs/operations";
 import { toConvexEndpointError } from "../lib/errors";
 
-export type CreateBatchArgs = { fileNames: string[] };
-export type RetryImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs"> };
-export type CancelImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs"> };
+type CreateBatchArgs = { fileNames: string[] };
+type RetryImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs"> };
+type CancelImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs"> };
 
 function convexError(error: unknown): never {
   toConvexEndpointError(error, [ReceiptAnalysisJobDomainError]);

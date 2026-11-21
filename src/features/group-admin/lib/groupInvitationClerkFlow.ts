@@ -53,7 +53,7 @@ export async function startGoogleSignInForInvitation(
   }
 }
 
-export type ClerkTicketOutcome =
+type ClerkTicketOutcome =
   | { kind: "redirecting" }
   | {
       kind: "requirementsDetected";

@@ -11,8 +11,8 @@ import {
 } from "../../lib/usecase/receiptAnalysisJobs/actions";
 import { toConvexEndpointError } from "../lib/errors";
 
-export type CheckAiReviewRequiredArgs = { batchId: Id<"receiptAnalysisBatches"> };
-export type AnalyzeImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs">; imageDataUrl: string };
+type CheckAiReviewRequiredArgs = { batchId: Id<"receiptAnalysisBatches"> };
+type AnalyzeImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs">; imageDataUrl: string };
 
 function convexError(error: unknown): never {
   toConvexEndpointError(error, [ReceiptAnalysisJobDomainError, ReceiptImageExtractionDomainError]);

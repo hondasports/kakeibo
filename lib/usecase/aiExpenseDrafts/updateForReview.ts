@@ -54,7 +54,7 @@ const REVIEW_OVERRIDE_FIELDS = [
   "categoryId",
 ] as const;
 
-export type UpdateForReviewUsecaseArgs = {
+type UpdateForReviewUsecaseArgs = {
   draftId: string;
   documentType: AiExpenseDraftDocumentType;
   shopName?: string;

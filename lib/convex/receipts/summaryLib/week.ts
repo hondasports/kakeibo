@@ -5,7 +5,6 @@ import {
   getWeekSummary,
   getWeekSummaryWithCategories,
   type FourWeeksSummaryResult,
-  type WeekSummaryResult,
   type WeekSummaryWithCategoriesResult,
 } from "../../../usecase/receipts/summaries";
 import { createSummaryStore } from "./summaryStore";
@@ -13,8 +12,6 @@ import { createSummaryStore } from "./summaryStore";
 type GetWeekSummaryArgs = {
   weekStartDate: string;
 };
-
-export type WeekSummary = WeekSummaryResult;
 
 /** getWeekSummary query の handler ロジック（テスト用に export） */
 export async function getWeekSummaryHandler(ctx: QueryCtx, args: GetWeekSummaryArgs) {

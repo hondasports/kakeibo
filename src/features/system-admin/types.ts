@@ -47,10 +47,6 @@ export type SystemAdminListItem = {
   isSelf: boolean;
 };
 
-export type SystemAdminListResult = PageResult<SystemAdminListItem> & {
-  hasAnotherActiveAdmin: boolean;
-};
-
 export type SystemAdminAuditItem = {
   id: string;
   action: SystemAdminAuditAction;

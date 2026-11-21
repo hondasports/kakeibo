@@ -6,7 +6,7 @@ import { assertUsableCategory } from "../categories/assertUsableCategory";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 
-export type UpdateExpenseEntryUsecaseArgs = {
+type UpdateExpenseEntryUsecaseArgs = {
   expenseEntryId: string;
   date?: string;
   amountYen?: number;

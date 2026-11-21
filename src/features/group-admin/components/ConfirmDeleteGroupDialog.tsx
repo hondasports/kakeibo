@@ -18,7 +18,7 @@ export type GroupDeletionPreviewCount = {
   accuracy: "exact" | "at_least" | "unknown";
 };
 
-export type GroupDeletionPreview = {
+type GroupDeletionPreview = {
   groupName: string;
   members: GroupDeletionPreviewCount;
   invitations: GroupDeletionPreviewCount;

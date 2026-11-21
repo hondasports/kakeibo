@@ -8,7 +8,7 @@ import { assertUsableCategory } from "../categories/assertUsableCategory";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 
-export type UpdateReceiptUsecaseArgs = { receiptId: string } & UpdateReceiptInput;
+type UpdateReceiptUsecaseArgs = { receiptId: string } & UpdateReceiptInput;
 
 /** レシートを更新する。所有権・カテゴリ利用可否・入力値を検証する。 */
 export async function updateReceipt(

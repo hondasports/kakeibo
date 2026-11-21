@@ -1,7 +1,7 @@
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { Chip, Stack } from "@mui/material";
 
-export type ReviewCheckChipsProps = {
+type ReviewCheckChipsProps = {
   fixCount: number;
   recommendationCount: number;
   basisConflictItemCount: number;

@@ -16,7 +16,7 @@ import { toConvexError } from "../errors";
 import type { AiExpenseDraftDeps } from "./deps";
 import { loadDraftInGroup } from "./loadDraftInGroup";
 
-export type RegisterReadyDraftsAsExpenseEntriesResult = {
+type RegisterReadyDraftsAsExpenseEntriesResult = {
   registeredDraftIds: string[];
   createdExpenseEntryIds: string[];
   alreadyRegisteredDraftIds: string[];

@@ -6,7 +6,7 @@ export const OTHER_SERIES_DATA_KEY = "__yearly_other__";
 export const MAX_STACKED_CATEGORIES = 5;
 const OTHER_CATEGORY_COLOR = designTokens.color.brand.mist;
 
-export type YearlyChartSeries = {
+type YearlyChartSeries = {
   dataKey: string;
   label: string;
   color: string;
@@ -20,14 +20,14 @@ export type YearlyTrendChartData = {
   dataset: Array<Record<string, string | number>>;
 };
 
-export type YearlyBalanceLineSeries = {
+type YearlyBalanceLineSeries = {
   color: string;
   dataKey: string;
   label: string;
   valueFormatter: (value: number | null, context: { dataIndex: number }) => string;
 };
 
-export type YearlyCategoryLineSeries = {
+type YearlyCategoryLineSeries = {
   area: true;
   color: string;
   dataKey: string;

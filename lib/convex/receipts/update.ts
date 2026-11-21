@@ -11,7 +11,7 @@ import { createCategoryRepository } from "../categories/categoryRepository";
 import { createUserSettingsRepository } from "../users/userSettingsRepository";
 import { createReceiptRepository } from "./receiptRepository";
 
-export type UpdateReceiptArgs = {
+type UpdateReceiptArgs = {
   receiptId: Id<"receipts">;
   date?: string;
   shopName?: string;

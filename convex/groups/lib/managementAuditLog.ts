@@ -3,7 +3,7 @@ import type { MutationCtx } from "../../_generated/server";
 import { createManagementAuditLogRecorder } from "../../../lib/convex/groups/convexManagementAuditLog";
 import type { ManagementAuditAction, ManagementAuditTargetKind } from "./managementAuditLogModel";
 
-export type RecordManagementAuditLogArgs = {
+type RecordManagementAuditLogArgs = {
   groupId: Id<"groups">;
   actorUserId: string;
   action: ManagementAuditAction;

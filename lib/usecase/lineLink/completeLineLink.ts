@@ -6,7 +6,7 @@ import { LineProviderError } from "../../domain/lineLink/provider";
 import type { LineProviderClient } from "../../domain/lineLink/provider";
 import type { LineLoginConfiguration } from "./startLineLink";
 
-export type CompleteLineLinkDeps = {
+type CompleteLineLinkDeps = {
   runner: LineLinkActionRunner;
   provider: LineProviderClient;
   getMode(): LineIntegrationMode;

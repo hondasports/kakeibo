@@ -14,7 +14,7 @@ export type ExpenseItemEntryInput = {
   memo?: string;
 };
 
-export type ExpenseItemEntryParsed = {
+type ExpenseItemEntryParsed = {
   categoryId: Id<"categories">;
   amountYen: number;
   title: string;
@@ -68,7 +68,7 @@ export function validateExpenseItemEntry(
   return { success: false, errors: mapExpenseItemErrors(result.errors) };
 }
 
-export type ValidateExpenseItemsInput = {
+type ValidateExpenseItemsInput = {
   sourceAmount: number | undefined;
   items: ExpenseItemEntryInput[];
 };

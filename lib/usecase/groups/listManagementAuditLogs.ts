@@ -9,7 +9,7 @@ import type { UsecaseGroupContext } from "../context";
 
 export const MANAGEMENT_AUDIT_LOG_LIST_LIMIT = 50;
 
-export type ManagementAuditLogListItem = {
+type ManagementAuditLogListItem = {
   logId: string;
   action: ManagementAuditAction;
   actorDisplayName: string;

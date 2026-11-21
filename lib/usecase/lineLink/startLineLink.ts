@@ -10,7 +10,7 @@ export type LineLoginConfiguration = {
   redirectUri: string;
 };
 
-export type StartLineLinkDeps = {
+type StartLineLinkDeps = {
   runner: LineLinkActionRunner;
   scheduler: LineLinkScheduler;
   getMode(): LineIntegrationMode;

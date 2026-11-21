@@ -9,7 +9,7 @@ import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { documentTypeLabels, reviewDocumentTypeOptions } from "./labels";
 import { extractAmountDigits } from "../../../utils/currency";
 
-export type ReviewDialogBasicsSectionProps = {
+type ReviewDialogBasicsSectionProps = {
   form: ReviewFormValues;
   categories: AiExpenseQueueCategory[];
   documentOpen: boolean;

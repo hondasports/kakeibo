@@ -9,7 +9,7 @@ import { runClaimEvents } from "../../lib/convex/lineWebhook/webhookIngress";
 
 export const MAX_RAW_BODY_BYTES = 1_000_000;
 
-export type LineSignatureVerifier = (
+type LineSignatureVerifier = (
   rawBody: Uint8Array,
   signature: string,
   channelSecret: string,

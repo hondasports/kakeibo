@@ -42,7 +42,7 @@ import {
   buildReviewTaxPreview,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
 
-export type ReviewDialogProps = {
+type ReviewDialogProps = {
   open: boolean;
   categories: AiExpenseQueueCategory[];
   isReviewDraftLoading: boolean;
