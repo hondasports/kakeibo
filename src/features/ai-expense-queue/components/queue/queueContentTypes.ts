@@ -12,6 +12,7 @@ export type QueueContentProps = {
   unbatchedReadyItems: AiExpenseQueueItem[];
   registeringIds: string[];
   registrationError: string;
+  registrationErrorDraftIds: string[];
   selectedReadyIds: string[];
   onClearOpenQueue: () => Promise<void>;
   onDeleteQueueItem: ReturnType<typeof useAiExpenseQueuePanel>["deleteQueueItem"];

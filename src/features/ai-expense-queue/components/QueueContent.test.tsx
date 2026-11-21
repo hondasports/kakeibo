@@ -42,6 +42,7 @@ function renderQueueContent(
     unbatchedReadyItems: groupedItems.ready,
     registeringIds: [] as string[],
     registrationError: "",
+    registrationErrorDraftIds: [] as string[],
     selectedReadyIds: [] as string[],
     onClearOpenQueue: vi.fn(async () => {}),
     onDeleteQueueItem: vi.fn(async () => {}),
@@ -240,6 +241,7 @@ describe("QueueContent の一覧制御", () => {
       unbatchedReadyItems: [readyItem],
       registeringIds: [] as string[],
       registrationError: "",
+      registrationErrorDraftIds: [] as string[],
       selectedReadyIds: [] as string[],
       onClearOpenQueue: vi.fn(async () => {}),
       onDeleteQueueItem: vi.fn(async () => {}),
@@ -312,6 +314,7 @@ describe("まとめて登録ボタンの無効理由", () => {
       unbatchedReadyItems: [readyItem],
       registeringIds: [],
       registrationError: "",
+      registrationErrorDraftIds: [],
       selectedReadyIds: [],
       onClearOpenQueue: vi.fn(async () => {}),
       onDeleteQueueItem: vi.fn(async () => {}),
@@ -417,5 +420,91 @@ describe("まとめて登録ボタンの無効理由", () => {
 
     expect(screen.getByRole("button", { name: "まとめて登録（2件）" })).toBeEnabled();
     expect(screen.queryByText("すべての下書きを選択すると登録できます")).not.toBeInTheDocument();
+  });
+});
+
+describe("登録エラーの再試行", () => {
+  const readyItem: AiExpenseQueueItem = {
+    ...registeredItem,
+    id: "ready-draft",
+    status: "ready",
+    title: "スーパー北浜",
+  };
+
+  it("失敗した下書きのIDで再試行でき、選択中の全件では呼ばない", async () => {
+    const user = userEvent.setup();
+    const onRegisterReady = vi.fn(async () => {});
+    const groupedItems = {
+      processing: [],
+      ready: [readyItem],
+      needs_review: [],
+      failed: [],
+      registered: [],
+    };
+    render(
+      <QueueActiveContent
+        clearableCount={0}
+        deletingIds={[]}
+        groupedItems={groupedItems}
+        itemCount={1}
+        readyItems={[readyItem]}
+        sessionBatchSummaries={[]}
+        unbatchedReadyItems={[readyItem]}
+        registeringIds={[]}
+        registrationError="登録に失敗しました。時間をおいて再度お試しください。"
+        registrationErrorDraftIds={["ready-draft"]}
+        selectedReadyIds={["ready-draft", "ready-draft-2"]}
+        onClearOpenQueue={vi.fn(async () => {})}
+        onDeleteQueueItem={vi.fn(async () => {})}
+        onOpenReview={vi.fn()}
+        onRegisterReady={onRegisterReady}
+        onRetry={vi.fn(async () => {})}
+        onToggleReadySelection={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("登録に失敗しました。時間をおいて再度お試しください。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("下書きは残っています。もう一度登録をお試しください。"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("スーパー北浜")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "再試行" }));
+    expect(onRegisterReady).toHaveBeenCalledWith(["ready-draft"]);
+  });
+
+  it("登録処理中は再試行ボタンを無効化する", () => {
+    const groupedItems = {
+      processing: [],
+      ready: [readyItem],
+      needs_review: [],
+      failed: [],
+      registered: [],
+    };
+    render(
+      <QueueActiveContent
+        clearableCount={0}
+        deletingIds={[]}
+        groupedItems={groupedItems}
+        itemCount={1}
+        readyItems={[readyItem]}
+        sessionBatchSummaries={[]}
+        unbatchedReadyItems={[readyItem]}
+        registeringIds={["ready-draft"]}
+        registrationError="登録に失敗しました。時間をおいて再度お試しください。"
+        registrationErrorDraftIds={["ready-draft"]}
+        selectedReadyIds={["ready-draft"]}
+        onClearOpenQueue={vi.fn(async () => {})}
+        onDeleteQueueItem={vi.fn(async () => {})}
+        onOpenReview={vi.fn()}
+        onRegisterReady={vi.fn(async () => {})}
+        onRetry={vi.fn(async () => {})}
+        onToggleReadySelection={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "再試行" })).toBeDisabled();
   });
 });

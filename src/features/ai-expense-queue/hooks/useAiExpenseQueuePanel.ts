@@ -103,6 +103,7 @@ export function useAiExpenseQueuePanel({
     registeredListStatus: queueData.registeredListStatus,
     loadMoreRegistered: queueData.loadMoreRegistered,
     registrationError: bulkRegister.registrationError,
+    registrationErrorDraftIds: bulkRegister.registrationErrorDraftIds,
     retryError: imageUpload.uploadError || retry.retryError,
     retryInputRef: retry.retryInputRef,
     retryingItemId: retry.retryingItemId,

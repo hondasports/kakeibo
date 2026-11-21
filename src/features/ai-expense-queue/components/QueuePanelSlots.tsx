@@ -17,6 +17,7 @@ function queueContentProps(queue: ReturnType<typeof useAiExpenseQueuePanelContex
     readyItems: queue.readyItems,
     registeringIds: queue.registeringIds,
     registrationError: queue.registrationError,
+    registrationErrorDraftIds: queue.registrationErrorDraftIds,
     selectedReadyIds: queue.selectedReadyIds,
     onClearOpenQueue: queue.handleClearOpenQueue,
     onDeleteQueueItem: queue.deleteQueueItem,
