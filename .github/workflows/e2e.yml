@@ -18,7 +18,7 @@ name: E2E
 # 共有Dev deployment・共有Dev用のsecretsには接続しない（Issue #956）。
 # backend の起動・env同期・終了は scripts/start-ci-convex.mjs が担う。
 #
-# 詳細: docs/development-process.md「E2E 確認方針」
+# 詳細: docs/development-process.md「Functional E2E」「PR CI E2Eの差分判定」
 #       docs/environment-variables.md「GitHub Actions Secrets に保存する項目」
 on:
   pull_request:
