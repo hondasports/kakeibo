@@ -43,7 +43,7 @@ export const SYSTEM_ADMIN_AUDIT_TARGET_KINDS = [
   "notification_setting",
 ] as const;
 
-export type SystemAdminAuditTargetKind = (typeof SYSTEM_ADMIN_AUDIT_TARGET_KINDS)[number];
+type SystemAdminAuditTargetKind = (typeof SYSTEM_ADMIN_AUDIT_TARGET_KINDS)[number];
 
 /** systemAdminAuditLogs.result の全値。schema・API validator はこの並びに合わせる。 */
 export const SYSTEM_ADMIN_AUDIT_RESULTS = ["success", "denied"] as const;
@@ -51,7 +51,7 @@ export const SYSTEM_ADMIN_AUDIT_RESULTS = ["success", "denied"] as const;
 export type SystemAdminAuditResult = (typeof SYSTEM_ADMIN_AUDIT_RESULTS)[number];
 
 /** systemAdminAuditLogs ドキュメントのフィールド（書き込み用）。 */
-export type SystemAdminAuditLogFields = {
+type SystemAdminAuditLogFields = {
   action: SystemAdminAuditAction;
   actorType: SystemAdminAuditActorType;
   actorUserId?: string;
@@ -86,7 +86,7 @@ export type SystemAdminAuditLogFields = {
 export type SystemAdminAuditLogRecord = SystemAdminAuditLogFields & { id: string };
 
 /** 監査ログ一覧のフィルタ。指定された組み合わせに応じてインフラ側が index を選択する。 */
-export type SystemAdminAuditLogFilter = {
+type SystemAdminAuditLogFilter = {
   from: number;
   to: number;
   action?: SystemAdminAuditAction;

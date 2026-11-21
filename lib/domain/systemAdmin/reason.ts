@@ -1,6 +1,6 @@
 export const MAX_REASON_LENGTH = 500;
 
-export type NormalizeReasonError = "empty" | "too_long";
+type NormalizeReasonError = "empty" | "too_long";
 
 const normalizeReasonErrorMessages: Record<NormalizeReasonError, string> = {
   empty: "理由は1〜500文字で入力してください",

@@ -37,7 +37,7 @@ function formatWeekRange(weekStartDate: string): string {
   return `${weekStartDate}〜${addDays(weekStartDate, 6)}`;
 }
 
-export type WeekSummaryReplyInput = {
+type WeekSummaryReplyInput = {
   weekStartDate: string;
   expenseCount: number;
   expenseTotalYen: number;
@@ -46,7 +46,7 @@ export type WeekSummaryReplyInput = {
   byCategory: CategorySummary[];
 };
 
-export type WeekTrendReplyInput = {
+type WeekTrendReplyInput = {
   weeks: Array<{
     weekStartDate: string;
     totalAmountYen: number;

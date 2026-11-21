@@ -13,7 +13,7 @@ export type BulkSpendingAuditRecord = {
   categoryId?: string;
 };
 
-export type BulkSpendingAuditSnapshot = {
+type BulkSpendingAuditSnapshot = {
   recordCount: number;
   expenseEntryIds: string[];
   receiptIds: string[];

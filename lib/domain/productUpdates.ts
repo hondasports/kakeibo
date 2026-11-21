@@ -29,7 +29,7 @@ const PULL_REQUEST_DECISION_OUTCOMES = [
   "not_merged",
 ] as const;
 
-export type PullRequestDecisionOutcome = (typeof PULL_REQUEST_DECISION_OUTCOMES)[number];
+type PullRequestDecisionOutcome = (typeof PULL_REQUEST_DECISION_OUTCOMES)[number];
 
 export type PullRequestDecision = {
   pullRequest: number;
@@ -55,7 +55,7 @@ export class ProductUpdateValidationError extends Error {
   }
 }
 
-export type ValidateAppVersionOptions = {
+type ValidateAppVersionOptions = {
   allowLocal?: boolean;
 };
 

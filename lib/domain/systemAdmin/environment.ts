@@ -1,7 +1,7 @@
 export const APP_ENVIRONMENTS = ["development", "preview", "production"] as const;
 export type AppEnvironment = (typeof APP_ENVIRONMENTS)[number];
 
-export type ResolveAppEnvironmentError = "mismatch" | "unknown";
+type ResolveAppEnvironmentError = "mismatch" | "unknown";
 
 const resolveAppEnvironmentErrorMessages: Record<ResolveAppEnvironmentError, string> = {
   mismatch: "対象環境が一致しません",

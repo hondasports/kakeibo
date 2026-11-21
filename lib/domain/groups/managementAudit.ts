@@ -24,7 +24,7 @@ export const MANAGEMENT_AUDIT_TARGET_KINDS = ["group", "member", "invitation"] a
 export type ManagementAuditTargetKind = (typeof MANAGEMENT_AUDIT_TARGET_KINDS)[number];
 
 /** managementAuditLogs ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
-export type ManagementAuditLogFields = {
+type ManagementAuditLogFields = {
   groupId: string;
   actorUserId: string;
   action: ManagementAuditAction;

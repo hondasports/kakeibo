@@ -4,7 +4,7 @@
  * 未設定・未知値（typo や大文字小文字違い）は production とみなさず fail-closed にする。
  */
 const KNOWN_APP_ENVS = ["development", "production"] as const;
-export type KnownAppEnv = (typeof KNOWN_APP_ENVS)[number];
+type KnownAppEnv = (typeof KNOWN_APP_ENVS)[number];
 
 /** APP_ENV が未設定・不正なときのエラー文言（変数名と許容値を示す） */
 export const APP_ENV_INVALID_MESSAGE =

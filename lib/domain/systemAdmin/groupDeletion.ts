@@ -5,7 +5,7 @@ const GROUP_DELETION_ERROR_CATEGORIES = new Set([
   "unknown",
 ] as const);
 
-export type GroupDeletionErrorCategory =
+type GroupDeletionErrorCategory =
   typeof GROUP_DELETION_ERROR_CATEGORIES extends Set<infer T> ? T : never;
 
 export function sanitizeGroupDeletionErrorCategory(

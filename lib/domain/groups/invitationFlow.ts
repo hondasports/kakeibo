@@ -47,7 +47,7 @@ export function resolveInvitationEmail(email: string): string {
   return result.email;
 }
 
-export type GroupInvitationRecordInput = {
+type GroupInvitationRecordInput = {
   groupId: string;
   email: string;
   token: string;

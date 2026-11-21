@@ -13,9 +13,6 @@ export const LINE_NOTIFICATION_COMPLETION_OUTCOMES = [
   "suppressed",
 ] as const;
 
-export type LineNotificationCompletionOutcome =
-  (typeof LINE_NOTIFICATION_COMPLETION_OUTCOMES)[number];
-
 export type LineNotificationCompletion =
   | { outcome: "sent"; providerRequestId?: string }
   | { outcome: "retrying"; nextRetryAt: number; errorCode?: string }

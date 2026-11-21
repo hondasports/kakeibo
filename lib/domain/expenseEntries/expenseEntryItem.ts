@@ -35,7 +35,7 @@ export function validateExpenseAmount(
 }
 
 /** 文字列金額の検証失敗理由。 */
-export type ExpenseAmountStringError = "required" | "not_number" | "not_positive" | "too_large";
+type ExpenseAmountStringError = "required" | "not_number" | "not_positive" | "too_large";
 
 /**
  * 入力された文字列の支出金額を数値に変換・検証する。
@@ -61,7 +61,7 @@ export function parseExpenseAmountString(
 }
 
 /** タイトルの検証失敗理由。 */
-export type ExpenseTitleError = "empty" | "too_long";
+type ExpenseTitleError = "empty" | "too_long";
 
 /**
  * 支出項目タイトルを trim し、空文字・長さ超過を検証する。
@@ -80,7 +80,7 @@ export function validateExpenseTitle(
 }
 
 /** メモの検証失敗理由。 */
-export type ExpenseMemoError = "too_long";
+type ExpenseMemoError = "too_long";
 
 /**
  * メモが指定されていれば長さを検証し、空文字は undefined として扱う。
@@ -98,10 +98,10 @@ export function validateExpenseMemo(
 }
 
 /** 支出項目のフィールド名。 */
-export type ExpenseItemField = "categoryId" | "amountYen" | "title" | "memo";
+type ExpenseItemField = "categoryId" | "amountYen" | "title" | "memo";
 
 /** 支出項目の検証済みデータ。 */
-export type ExpenseItem = {
+type ExpenseItem = {
   categoryId: string;
   amountYen: number;
   title: string;
@@ -109,7 +109,7 @@ export type ExpenseItem = {
 };
 
 /** 支出項目の入力データ（UI からの未検証値）。 */
-export type ExpenseItemInput = {
+type ExpenseItemInput = {
   categoryId: string;
   amountYen: string;
   title: string;

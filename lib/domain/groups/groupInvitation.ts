@@ -42,7 +42,7 @@ export type GroupInvitationRecord = GroupInvitationFields & { id: string };
  * - "keep": 現行を維持
  * - "check_membership": acceptedByUserId のグループ membership 不存在なら stale
  */
-export type StaleInvitationAssessment = "stale" | "keep" | "check_membership";
+type StaleInvitationAssessment = "stale" | "keep" | "check_membership";
 
 /** 招待が stale かを分類する。membership 参照が必要な場合のみ check_membership を返す。 */
 export function assessGroupInvitationStaleness(invitation: {

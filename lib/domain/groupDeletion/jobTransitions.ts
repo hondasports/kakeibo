@@ -5,7 +5,7 @@
 import type { GroupDeletionJobRecord, GroupDeletionJobStatus } from "./groupDeletionJob";
 import { canRunAfterGroupDeletion, isTerminalJobStatus } from "./stages";
 
-export type BatchEntryDecision =
+type BatchEntryDecision =
   | { kind: "skip" }
   | { kind: "reschedule"; delayMs: number }
   | { kind: "proceed" };
@@ -29,7 +29,7 @@ export function decideBatchEntry(
   return { kind: "proceed" };
 }
 
-export type ResumeEligibility =
+type ResumeEligibility =
   | { kind: "not_failed" }
   | { kind: "group_state_invalid" }
   | { kind: "already_active" }

@@ -25,7 +25,7 @@ export function isMaxRetryAttemptsReached(
   return attemptCount >= maxAttempts;
 }
 
-export type RetryPlan =
+type RetryPlan =
   | {
       status: "retry_wait";
       attemptCount: number;

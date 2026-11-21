@@ -5,7 +5,7 @@
 
 import { lineRichMenuCells } from "./richMenu";
 
-export type LineSummaryCommand =
+type LineSummaryCommand =
   | { type: "week_summary" }
   | { type: "week_expense" }
   | { type: "week_income" }

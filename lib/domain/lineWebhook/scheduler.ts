@@ -14,7 +14,7 @@ export type SummaryReplyJobArgs = {
   nowMs: number;
 };
 
-export type ProcessLinkedImageJobArgs = {
+type ProcessLinkedImageJobArgs = {
   replyToken: string;
   userId: string;
   webhookEventId: string;

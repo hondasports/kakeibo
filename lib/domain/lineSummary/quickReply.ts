@@ -84,7 +84,7 @@ function isAllowedLineQuickReplyAction(
   return action.uri === allowedWebUrl && allowedWebUrl.length > 0;
 }
 
-export type LineQuickReplyPayloadItem =
+type LineQuickReplyPayloadItem =
   | {
       type: "action";
       action: { type: "message"; label: string; text: string };

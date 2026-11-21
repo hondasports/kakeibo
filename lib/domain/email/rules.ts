@@ -80,7 +80,7 @@ export function buildNewEmailJobFields(args: {
   };
 }
 
-export type SendFailurePlan =
+type SendFailurePlan =
   | { kind: "failed" }
   | { kind: "retry"; nextAttempt: number; nextRetryAt: number; delayMs: number };
 
@@ -99,7 +99,7 @@ export function planSendFailure(
   return { kind: "retry", nextAttempt, nextRetryAt: now + delay, delayMs: delay };
 }
 
-export type ResendWebhookPayloadFields = {
+type ResendWebhookPayloadFields = {
   providerMessageId?: string;
   recipientEmail?: string;
 };

@@ -7,7 +7,7 @@ export const HISTORY_ENTRY_TYPES = ["all", ...ENTRY_KINDS] as const;
 
 export type HistoryEntryType = (typeof HISTORY_ENTRY_TYPES)[number];
 
-export type SearchableReceiptGroup = {
+type SearchableReceiptGroup = {
   id: string;
   date: string;
   shopName: string;
@@ -38,7 +38,7 @@ export type ExpenseSearchFilters = {
   endDate?: string;
 };
 
-export type ExpenseSearchFilterInput = {
+type ExpenseSearchFilterInput = {
   entryType?: string;
   shopQuery?: string;
   categoryId?: string;
@@ -48,7 +48,7 @@ export type ExpenseSearchFilterInput = {
   endDate?: string;
 };
 
-export type ParsedExpenseSearchFilters =
+type ParsedExpenseSearchFilters =
   | { ok: true; filters: ExpenseSearchFilters }
   | { ok: false; error: string };
 

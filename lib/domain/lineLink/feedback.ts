@@ -2,7 +2,7 @@
 export const LINE_LINK_FEEDBACK_RESULTS = ["success", "failure"] as const;
 
 /** LINE 連携フィードバックの結果。 */
-export type LineLinkFeedbackResult = (typeof LINE_LINK_FEEDBACK_RESULTS)[number];
+type LineLinkFeedbackResult = (typeof LINE_LINK_FEEDBACK_RESULTS)[number];
 
 /** LINE 連携フィードバックのコードの全値。 */
 export const LINE_LINK_FEEDBACK_CODES = [

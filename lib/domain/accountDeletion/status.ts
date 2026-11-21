@@ -5,7 +5,7 @@ export const accountDeletionActiveStatuses: readonly Exclude<
   "completed"
 >[] = ACCOUNT_DELETION_REQUEST_STATUSES.filter((status) => status !== "completed");
 
-export type AccountDeletionActiveStatus = (typeof accountDeletionActiveStatuses)[number];
+type AccountDeletionActiveStatus = (typeof accountDeletionActiveStatuses)[number];
 
 export function isActiveAccountDeletionStatus(
   status: string,

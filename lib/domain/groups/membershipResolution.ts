@@ -2,7 +2,7 @@
  * ユーザーのグループメンバーシップから active なグループを解決する純粋ドメインルール。
  */
 
-export type MembershipWithGroupId = {
+type MembershipWithGroupId = {
   groupId: string;
 };
 
