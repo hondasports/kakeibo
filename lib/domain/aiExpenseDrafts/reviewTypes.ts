@@ -27,7 +27,7 @@ import type {
 export type AiExpenseQueueDocumentType = AiExpenseDraftDocumentType;
 
 /** レビュー画面で扱う下書き状態。queued / analyzing の解析中 status はこの境界には出さない。 */
-export const REVIEWABLE_DRAFT_STATUSES = [
+const REVIEWABLE_DRAFT_STATUSES = [
   "ready",
   "needs_review",
   "failed",

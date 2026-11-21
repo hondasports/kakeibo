@@ -43,7 +43,7 @@ const RICH_MENU_POSTBACK_COMMAND_TEXT = new Map<string, string>([
   ...lineRichMenuCells.map((cell) => [cell.messageText, cell.messageText] as const),
 ]);
 
-export function normalizeLineCommandText(messageText: string): string {
+function normalizeLineCommandText(messageText: string): string {
   return messageText
     .replaceAll("\u3000", " ")
     .replace(/[？?！!。．.、，,]/g, " ")

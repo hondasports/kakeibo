@@ -4,7 +4,7 @@
  */
 
 export const LINE_WEB_APP_PATH = "/weeks/current/input";
-export const LINE_QUICK_REPLY_WEB_LABEL = "Webで見る";
+const LINE_QUICK_REPLY_WEB_LABEL = "Webで見る";
 const LINE_QUICK_REPLY_MAX_ITEMS = 13;
 const LINE_QUICK_REPLY_LABEL_MAX_LENGTH = 20;
 
@@ -71,7 +71,7 @@ export function buildLineQuickReplyActions(
   }
 }
 
-export function isAllowedLineQuickReplyAction(
+function isAllowedLineQuickReplyAction(
   action: LineQuickReplyAction,
   allowedWebUrl: string,
 ): boolean {

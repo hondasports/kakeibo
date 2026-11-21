@@ -12,7 +12,7 @@ import type {
 } from "./model";
 import type { TransactionalEmailJobRecord } from "./records";
 
-export const EMAIL_PROVIDER_NAME = "resend";
+const EMAIL_PROVIDER_NAME = "resend";
 
 export const TERMINAL_EMAIL_JOB_STATUSES = [
   "sent",
@@ -32,8 +32,8 @@ export function isTerminalEmailJobStatus(
 }
 
 export const EMAIL_CLEANUP_BATCH_SIZE = 100;
-export const EMAIL_RETENTION_DAYS = 30;
-export const EMAIL_RETENTION_MS = EMAIL_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const EMAIL_RETENTION_DAYS = 30;
+const EMAIL_RETENTION_MS = EMAIL_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 export function emailCleanupCutoff(now: number): number {
   return now - EMAIL_RETENTION_MS;

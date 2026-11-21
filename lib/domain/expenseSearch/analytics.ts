@@ -188,7 +188,7 @@ function inclusiveDayCount(startDate: string, endDate: string): number {
   return Math.floor((end - start) / 86_400_000) + 1;
 }
 
-export function chooseHistoryTrendGranularity(
+function chooseHistoryTrendGranularity(
   startDate: string,
   endDate: string,
 ): HistoryTrendGranularity {
