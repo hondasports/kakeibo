@@ -58,8 +58,10 @@ export function ReviewDialogBasicsSection({
           helperText={
             !form.shopName.trim() ? REVIEW_VALIDATION_MESSAGES.shopName.guidance : undefined
           }
+          sx={(theme) => ({
+            "& .MuiInputBase-input": theme.typography.h5,
+          })}
           slotProps={{
-            htmlInput: { style: { fontSize: "1.25rem", fontWeight: 600 } },
             inputLabel: { shrink: true },
           }}
           onChange={(event) => onFieldChange("shopName", event.target.value)}

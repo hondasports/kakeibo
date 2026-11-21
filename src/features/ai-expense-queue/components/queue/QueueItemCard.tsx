@@ -200,10 +200,7 @@ export function QueueItemCard({
         )}
 
         {(item.status === "analyzing" || item.status === "registering") && (
-          <LinearProgress
-            aria-label={`${secondaryLabel}の処理状況`}
-            sx={{ height: 4, borderRadius: 2 }}
-          />
+          <LinearProgress aria-label={`${secondaryLabel}の処理状況`} />
         )}
 
         <QueueItemActions
