@@ -97,7 +97,7 @@ function resolveCanonicalEnvPath(worktrees) {
     throw new Error(
       "preview worktree が見つかりません。\n" +
         "初回のみ、元の clone で `git fetch origin preview && git worktree add ../kakeibo-worktrees/preview preview` を実行してください。\n" +
-        "ローカル E2E を未実行のまま先へ進めず、preview worktree を用意してから再実行してください。",
+        "ローカルでの確認にこの環境が要るなら、preview worktree を用意してから再実行してください（PRのE2EはCIで判定します）。",
     );
   }
 
@@ -124,7 +124,7 @@ function ensureCanonicalEnv(canonicalPath, worktrees) {
       `preview worktree の正本 .env.local が見つかりません: ${canonicalPath}\n` +
         `bootstrap 元: ${bootstrapPath ?? "特定不能"}\n` +
         "最初の worktree の .env.local を復旧するか、preview worktree へ手動でコピーしてから再実行してください。\n" +
-        "環境不足を理由に E2E を省略して push / PR へ進めないでください。",
+        "ローカルでの確認にこの環境が要るなら、復旧してから再実行してください（PRのE2EはCIで判定します）。",
     );
   }
 

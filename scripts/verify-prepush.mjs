@@ -125,7 +125,7 @@ export function sanitizeHookEnv(env = process.env) {
 }
 
 function defaultRunStep(command, args, cwd, logFile, env) {
-  // e2e:isolated はconvexログを全部流すので既定の1MBでは溢れる
+  // 既定の1MBに戻さない: 出力が超えると子プロセスが止められ、検証の失敗と区別できなくなる
   const out = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
