@@ -551,6 +551,24 @@ describe("下書きの修正導線", () => {
   });
 });
 
+describe("読込中・不存在の表示", () => {
+  it("読込中はフォーム形のSkeletonを表示し、フォームは出さない", () => {
+    render(<ReviewDialog {...props} isReviewDraftLoading />);
+    expect(screen.getByLabelText("下書きを読み込んでいます")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "店名・内容" })).not.toBeInTheDocument();
+  });
+
+  it("不存在のときはAlertから閉じられる", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<ReviewDialog {...props} isReviewDraftNotFound onClose={onClose} />);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("下書きが見つかりません");
+    await user.click(within(alert).getByRole("button", { name: "閉じる" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("保存仕様の説明", () => {
   it("冒頭は短い案内に留め、実際のボタン文言と一致する呼称だけを使う", () => {
     render(<ReviewDialog {...props} />);
