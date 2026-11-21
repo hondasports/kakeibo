@@ -7,6 +7,7 @@ import {
   CircularProgress,
   FormControlLabel,
   Skeleton,
+  Snackbar,
   Stack,
   Switch,
   Typography,
@@ -21,7 +22,7 @@ type Channel = "email" | "line";
 export function NotificationSettingsPanel() {
   return (
     <Box id="notifications">
-      <Typography component="h2" variant="h6">
+      <Typography component="h2" variant="h5">
         通知設定
       </Typography>
       <Typography color="text.secondary" sx={{ mt: 0.75 }} variant="body2">
@@ -38,22 +39,20 @@ function NotificationSettingsContent() {
   const settings = useQuery(api.notifications.queries.getMyNotificationSettings);
   const updatePreference = useMutation(api.notifications.mutations.updateMyNotificationPreference);
   const [savingChannel, setSavingChannel] = useState<Channel | null>(null);
-  const [feedback, setFeedback] = useState<{
-    channel: Channel;
-    severity: "success" | "error";
-    message: string;
-  } | null>(null);
+  const [errorFeedback, setErrorFeedback] = useState<{ channel: Channel; message: string } | null>(
+    null,
+  );
+  const [snackbar, setSnackbar] = useState("");
 
   const handleToggle = async (channel: Channel, enabled: boolean) => {
     setSavingChannel(channel);
-    setFeedback(null);
+    setErrorFeedback(null);
     try {
       await updatePreference({ type: "ai_review_required", channel, enabled });
-      setFeedback({ channel, severity: "success", message: "通知設定を保存しました" });
+      setSnackbar("通知設定を保存しました");
     } catch {
-      setFeedback({
+      setErrorFeedback({
         channel,
-        severity: "error",
         message: "通知設定を保存できませんでした。もう一度お試しください",
       });
     } finally {
@@ -93,9 +92,9 @@ function NotificationSettingsContent() {
             AIレビューのメール通知は全体設定で停止されています。個人設定はそのまま保存されます。
           </Alert>
         ) : null}
-        {feedback?.channel === "email" ? (
-          <Alert severity={feedback.severity} sx={{ mt: 1 }} variant="outlined">
-            {feedback.message}
+        {errorFeedback?.channel === "email" ? (
+          <Alert severity="error" sx={{ mt: 1 }} variant="outlined">
+            {errorFeedback.message}
           </Alert>
         ) : null}
       </Box>
@@ -126,9 +125,9 @@ function NotificationSettingsContent() {
             AIレビューのLINE通知は全体設定で停止されています。個人設定はそのまま保存されます。
           </Alert>
         ) : null}
-        {feedback?.channel === "line" ? (
-          <Alert severity={feedback.severity} sx={{ mt: 1 }} variant="outlined">
-            {feedback.message}
+        {errorFeedback?.channel === "line" ? (
+          <Alert severity="error" sx={{ mt: 1 }} variant="outlined">
+            {errorFeedback.message}
           </Alert>
         ) : null}
       </Box>
@@ -149,6 +148,21 @@ function NotificationSettingsContent() {
           ))}
         </Box>
       </Box>
+      <Snackbar
+        anchorOrigin={{ horizontal: "center", vertical: "bottom" }}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar("")}
+        open={snackbar !== ""}
+      >
+        <Alert
+          aria-live="polite"
+          onClose={() => setSnackbar("")}
+          severity="success"
+          variant="filled"
+        >
+          {snackbar}
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }

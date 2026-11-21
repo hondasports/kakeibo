@@ -1,18 +1,34 @@
-import { Box, Button, Chip, Collapse, Stack, TextField, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Chip,
+  Collapse,
+  IconButton,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { designTokens } from "../../../designTokens";
 import type { Category, CategoryFieldErrors } from "../hooks/useCategorySettings";
 import { MAX_CATEGORY_DESCRIPTION_LENGTH } from "../../../../lib/domain/categories/category";
 import { CategoryColorSwatches } from "./CategoryColorSwatches";
 
 type CategorySettingsRowProps = {
+  canMoveDown: boolean;
+  canMoveUp: boolean;
   category: Category;
   clearEditFieldError: (field: keyof CategoryFieldErrors) => void;
   editColor: string;
   editDescription: string;
   editFieldErrors: CategoryFieldErrors;
+  editIsDirty: boolean;
   editName: string;
   isEditing: boolean;
+  onMove: (category: Category, direction: "up" | "down") => void;
   onBeginEdit: (category: Category) => void;
   onCancelEdit: () => void;
   onEditColorChange: (color: string) => void;
@@ -25,14 +41,18 @@ type CategorySettingsRowProps = {
 };
 
 export function CategorySettingsRow({
+  canMoveDown,
+  canMoveUp,
   category,
   clearEditFieldError,
   editColor,
   editDescription,
   editFieldErrors,
+  editIsDirty,
   editName,
   isEditing,
   onBeginEdit,
+  onMove,
   onCancelEdit,
   onEditColorChange,
   onEditDescriptionChange,
@@ -44,6 +64,8 @@ export function CategorySettingsRow({
 }: CategorySettingsRowProps) {
   const editSaving = savingTarget === `edit-${category._id}`;
   const reactivateSaving = savingTarget === `reactivate-${category._id}`;
+  const moveSaving = savingTarget === `move-${category._id}`;
+  const moveDisabled = editSaving || moveSaving;
 
   return (
     <Box aria-label={`カテゴリ ${category.name}`} className="category-settings-row" component="li">
@@ -70,12 +92,39 @@ export function CategorySettingsRow({
           size="small"
           variant="outlined"
         />
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexShrink: 0 }}>
+          <Tooltip title="上に移動">
+            <span>
+              <IconButton
+                aria-label={`${category.name}を上に移動`}
+                disabled={!canMoveUp || moveDisabled}
+                onClick={() => onMove(category, "up")}
+                size="small"
+              >
+                <KeyboardArrowUpIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="下に移動">
+            <span>
+              <IconButton
+                aria-label={`${category.name}を下に移動`}
+                disabled={!canMoveDown || moveDisabled}
+                onClick={() => onMove(category, "down")}
+                size="small"
+              >
+                <KeyboardArrowDownIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
         <Button
           aria-controls={`category-editor-${category._id}`}
           aria-expanded={isEditing}
           aria-label={`${category.name}を編集`}
+          disabled={isEditing}
           endIcon={<ChevronRightIcon />}
-          onClick={() => (isEditing ? onCancelEdit() : onBeginEdit(category))}
+          onClick={() => onBeginEdit(category)}
           size="small"
         >
           編集
@@ -85,7 +134,17 @@ export function CategorySettingsRow({
       <Collapse id={`category-editor-${category._id}`} in={isEditing} unmountOnExit>
         <Stack className="category-settings-editor" spacing={1.5}>
           <Box className="category-settings-editor-fields">
+            {editIsDirty ? (
+              <Typography
+                className="category-settings-dirty-notice"
+                color="warning.dark"
+                variant="caption"
+              >
+                未保存の変更があります。保存またはキャンセルしてください。
+              </Typography>
+            ) : null}
             <TextField
+              autoFocus
               className="category-settings-field-name"
               disabled={editSaving}
               error={Boolean(editFieldErrors.name)}
@@ -110,10 +169,7 @@ export function CategorySettingsRow({
                 onEditColorChange(event.target.value);
                 clearEditFieldError("color");
               }}
-              slotProps={{
-                htmlInput: { "aria-label": "カテゴリ色を編集" },
-                inputLabel: { shrink: true },
-              }}
+              slotProps={{ inputLabel: { shrink: true } }}
               type="color"
               value={editColor}
               sx={{ width: "100%" }}

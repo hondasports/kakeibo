@@ -1059,6 +1059,16 @@
   .settings-danger-row .MuiButton-root {
     align-self: flex-start;
   }
+
+  /* 誤タップのコストが高い操作も確実に押せるよう、SPではタップ対象を44px確保する */
+  .settings-ledger .MuiIconButton-root {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .settings-ledger .MuiButton-root {
+    min-height: 44px;
+  }
 }
 
 @media not all and (min-width: 900px) {

@@ -169,3 +169,34 @@ export async function reactivateCategory(
 
   return await store.get(categoryId);
 }
+
+export type MoveCategoryInput = {
+  categoryId: string;
+  direction: "up" | "down";
+};
+
+/**
+ * カテゴリを並び順で1つ移動する。先頭/末尾への移動や該当なしは no-op で対象を返す。
+ * sortOrder はスワップのみで、未整列（重複・欠番）でも他の行は書き換えない。
+ */
+export async function moveCategory(
+  store: CategoryStore,
+  groupId: string,
+  args: MoveCategoryInput,
+  now: number,
+): Promise<CategoryStoreRecord | null> {
+  const category = assertOwnedCategory(await store.get(args.categoryId), groupId);
+
+  const siblings = await store.listForSettings(groupId, MAX_CATEGORIES_PER_GROUP);
+  const index = siblings.findIndex((item) => item.id === args.categoryId);
+  const neighborIndex = args.direction === "up" ? index - 1 : index + 1;
+  if (index < 0 || neighborIndex < 0 || neighborIndex >= siblings.length) {
+    return category;
+  }
+
+  const neighbor = siblings[neighborIndex];
+  await store.patch(args.categoryId, { sortOrder: neighbor.sortOrder, updatedAt: now });
+  await store.patch(neighbor.id, { sortOrder: category.sortOrder, updatedAt: now });
+
+  return await store.get(args.categoryId);
+}

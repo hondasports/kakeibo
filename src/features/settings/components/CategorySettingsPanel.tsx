@@ -26,14 +26,17 @@ export function CategorySettingsPanel() {
     clearCreateFieldError,
     clearEditFieldError,
     createFieldErrors,
+    editBaseline,
     editDescription,
     editColor,
     editFieldErrors,
+    editIsDirty,
     editName,
     editingId,
     error,
     handleCreate,
     handleDeactivate,
+    handleMoveCategory,
     handleReactivate,
     handleUpdate,
     isCreateOpen,
@@ -55,6 +58,9 @@ export function CategorySettingsPanel() {
   } = useCategorySettings();
 
   const [pendingDeactivate, setPendingDeactivate] = useState<Category | null>(null);
+  const [pendingDiscard, setPendingDiscard] = useState<
+    { kind: "close" } | { kind: "switch"; target: Category } | null
+  >(null);
   const deactivateConfirming =
     pendingDeactivate !== null && savingTarget === `deactivate-${pendingDeactivate._id}`;
 
@@ -64,6 +70,38 @@ export function CategorySettingsPanel() {
     await handleDeactivate(categoryId);
     setPendingDeactivate(null);
   };
+
+  // 未保存の変更があるときは、別カテゴリへの切替やフォームを閉じる前に破棄の確認を挟む
+  const handleRequestBeginEdit = (category: Category) => {
+    if (editingId !== null && editingId !== category._id && editIsDirty) {
+      setPendingDiscard({ kind: "switch", target: category });
+      return;
+    }
+    beginEdit(category);
+  };
+
+  const handleRequestCancelEdit = () => {
+    if (editIsDirty) {
+      setPendingDiscard({ kind: "close" });
+      return;
+    }
+    setEditingId(null);
+  };
+
+  const handleConfirmDiscard = () => {
+    if (pendingDiscard === null) return;
+    if (pendingDiscard.kind === "switch") {
+      beginEdit(pendingDiscard.target);
+    } else {
+      setEditingId(null);
+    }
+    setPendingDiscard(null);
+  };
+
+  const discardDescription =
+    pendingDiscard?.kind === "switch"
+      ? `「${editBaseline?.name ?? ""}」の変更は保存されていません。破棄して「${pendingDiscard.target.name}」の編集に切り替えますか？`
+      : `「${editBaseline?.name ?? ""}」の変更は保存されていません。破棄して編集を終了しますか？`;
 
   return (
     <Stack spacing={2.5}>
@@ -116,13 +154,15 @@ export function CategorySettingsPanel() {
           editColor={editColor}
           editDescription={editDescription}
           editFieldErrors={editFieldErrors}
+          editIsDirty={editIsDirty}
           editName={editName}
           editingId={editingId}
-          onBeginEdit={beginEdit}
-          onCancelEdit={() => setEditingId(null)}
+          onBeginEdit={handleRequestBeginEdit}
+          onCancelEdit={handleRequestCancelEdit}
           onEditColorChange={setEditColor}
           onEditDescriptionChange={setEditDescription}
           onEditNameChange={setEditName}
+          onMove={(category, direction) => void handleMoveCategory(category._id, direction)}
           onReactivate={(categoryId) => void handleReactivate(categoryId)}
           onRequestDeactivate={setPendingDeactivate}
           onUpdate={() => void handleUpdate()}
@@ -144,6 +184,7 @@ export function CategorySettingsPanel() {
           <Box component="form" onSubmit={handleCreate} sx={{ mt: 1.5 }}>
             <Box className="category-settings-create-fields">
               <TextField
+                autoFocus
                 className="category-settings-field-name"
                 disabled={savingTarget === "create"}
                 error={Boolean(createFieldErrors.name)}
@@ -225,6 +266,16 @@ export function CategorySettingsPanel() {
         onConfirm={handleConfirmDeactivate}
         open={pendingDeactivate !== null}
         title="カテゴリを無効化しますか？"
+      />
+
+      <ConfirmDangerousActionDialog
+        confirmLabel="破棄する"
+        confirming={false}
+        description={discardDescription}
+        onCancel={() => setPendingDiscard(null)}
+        onConfirm={handleConfirmDiscard}
+        open={pendingDiscard !== null}
+        title="変更を破棄しますか？"
       />
 
       <Snackbar

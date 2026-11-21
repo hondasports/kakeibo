@@ -35,6 +35,7 @@ export type CategoryPatch = {
   color?: string;
   description?: string;
   isActive?: boolean;
+  sortOrder?: number;
   updatedAt: number;
 };
 
