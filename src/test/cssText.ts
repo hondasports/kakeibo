@@ -34,6 +34,8 @@ export function findEmotionClassName(
 /**
  * `@media (min-width:<minWidth>)` の中で `.className` に `declarations`
  * （正規表現の一部）がある規則にマッチする正規表現を返す。
+ * ブロック内の検索は `.class{...}` 1段の入れ子までに限定し、
+ * メディアブロックの閉じ括弧を越えた後続ルールにはマッチしない。
  */
 export function mediaMinWidthRule(
   className: string,
@@ -41,6 +43,6 @@ export function mediaMinWidthRule(
   declarations: string,
 ): RegExp {
   return new RegExp(
-    `@media \\(min-width:\\s*${minWidth}\\)\\s*\\{[^@]*\\.${className}\\s*\\{[^}]*${declarations}`,
+    `@media \\(min-width:\\s*${minWidth}\\)\\s*\\{(?:[^{}]|\\{[^}]*\\})*\\.${className}\\s*\\{[^}]*${declarations}`,
   );
 }
