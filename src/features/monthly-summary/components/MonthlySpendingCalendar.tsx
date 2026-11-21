@@ -203,7 +203,7 @@ export function MonthlySpendingCalendar({
                           ? `2px solid ${theme.palette.secondary.main}`
                           : "1px solid",
                         borderColor: isSelected ? "secondary.main" : "divider",
-                        borderRadius: 1.5,
+                        borderRadius: 1,
                         borderStyle: isUnrecordedFuture ? "dashed" : undefined,
                         color: isUnrecordedFuture
                           ? designTokens.color.text.secondary
@@ -235,7 +235,7 @@ export function MonthlySpendingCalendar({
                         component="span"
                         noWrap
                         sx={{
-                          fontSize: { xs: "0.62rem", sm: "0.7rem" },
+                          fontSize: { xs: "0.7rem", sm: "0.75rem" },
                           fontVariantNumeric: "tabular-nums",
                           mt: 0.5,
                           opacity: day.expenseAmountYen > 0 ? 1 : 0.55,
@@ -269,7 +269,7 @@ export function MonthlySpendingCalendar({
                             noWrap
                             sx={{
                               color: intensity >= 4 ? "inherit" : "success.dark",
-                              fontSize: { xs: "0.6rem", sm: "0.68rem" },
+                              fontSize: { xs: "0.7rem", sm: "0.75rem" },
                               fontVariantNumeric: "tabular-nums",
                               fontWeight: 700,
                             }}

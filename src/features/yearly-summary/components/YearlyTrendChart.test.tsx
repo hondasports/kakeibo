@@ -27,7 +27,7 @@ describe("YearlyTrendChart", () => {
     );
 
     expect(screen.getByRole("heading", { name: "月ごとの収支推移" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "月ごとの収支推移グラフ" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /月ごとの収支推移グラフ/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "収支の折れ線グラフ" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -42,7 +42,7 @@ describe("YearlyTrendChart", () => {
       <YearlyTrendChart chartData={chartData} mode="balance" onModeChange={onModeChange} />,
     );
 
-    await user.click(screen.getByRole("button", { name: "カテゴリ別の積み上げ面グラフ" }));
+    await user.click(screen.getByRole("button", { name: /カテゴリ別の積み上げ面グラフ/ }));
     expect(onModeChange).toHaveBeenCalledWith("category");
   });
 
@@ -74,7 +74,7 @@ describe("YearlyTrendChart", () => {
     renderWithProviders(
       <YearlyTrendChart chartData={chartData} mode="category" onModeChange={vi.fn()} />,
     );
-    expect(screen.getByRole("img", { name: "カテゴリ別の積み上げ面グラフ" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /カテゴリ別の積み上げ面グラフ/ })).toBeInTheDocument();
 
     const emptyData = buildYearlyTrendChartData(
       summarizeYearlyTrend({

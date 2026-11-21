@@ -4,7 +4,7 @@ import { renderWithProviders } from "../../../test/render";
 import { SummaryMetricsPanel } from "./SummaryMetricsPanel";
 
 describe("SummaryMetricsPanel", () => {
-  it("合計支出・前週差・2週平均比を表示する", () => {
+  it("合計支出・前週差・直前2週平均との増減率を表示する", () => {
     renderWithProviders(
       <SummaryMetricsPanel
         totalAmountYen={38_420}
@@ -21,6 +21,7 @@ describe("SummaryMetricsPanel", () => {
     expect(screen.getByText("−3,340円")).toBeInTheDocument();
     expect(screen.getByText("−5%")).toBeInTheDocument();
     expect(screen.getByLabelText("前週差")).toHaveTextContent("−3,340円");
+    expect(screen.getByText("直前2週平均との増減率")).toBeInTheDocument();
   });
 
   it("比較できない指標は比較データなしと表示する", () => {

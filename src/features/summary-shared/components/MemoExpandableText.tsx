@@ -135,7 +135,7 @@ export function MemoExpandableText({
             }
             onClick={() => setExpanded((current) => !current)}
             size="small"
-            sx={{ minHeight: 28, minWidth: 0, px: 0, textTransform: "none" }}
+            sx={{ minHeight: { xs: 44, sm: 28 }, minWidth: 0, px: 0, textTransform: "none" }}
             type="button"
             variant="text"
           >

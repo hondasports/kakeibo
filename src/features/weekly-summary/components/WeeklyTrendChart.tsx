@@ -9,6 +9,19 @@ import { formatYen, formatYenAxisTick } from "../../../../lib/domain/common/curr
 import { formatDateForDisplay } from "../../../utils/date";
 import { yAxisWidthForLabels, yenAxisTickLabels } from "../../../utils/chartAxisLayout";
 
+// 視覚的には隠しつつ、スクリーンリーダーには読み上げさせるための定番スタイル
+const visuallyHiddenSx = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
+
 type WeeklyTrendChartProps = {
   chartData?: WeeklyExpenseChartData;
   isLoading?: boolean;
@@ -16,7 +29,7 @@ type WeeklyTrendChartProps = {
 
 export function WeeklyTrendChart({ chartData, isLoading = false }: WeeklyTrendChartProps) {
   const theme = useTheme();
-  const isCompact = useMediaQuery(theme.breakpoints.down("sm"));
+  const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const items = chartData?.items ?? [];
   const series = chartData?.series ?? [];
   const dataset = chartData?.dataset ?? [];
@@ -24,7 +37,8 @@ export function WeeklyTrendChart({ chartData, isLoading = false }: WeeklyTrendCh
   // 縦軸の目盛りは幅が固定だと "6,000円" が切れるため、目盛りの文字数から幅を決める。
   const yAxisWidth = yAxisWidthForLabels(yenAxisTickLabels(axisMaxYen));
   const chartMargin = { bottom: 28, left: yAxisWidth, right: isCompact ? 8 : 12, top: 16 };
-  const chartHeight = isCompact ? 180 : 200;
+  // 正本（docs/ui-ux-design.md §5.3）では約220pxの固定高を指定している
+  const chartHeight = 220;
 
   if (isLoading) {
     return (
@@ -83,9 +97,12 @@ export function WeeklyTrendChart({ chartData, isLoading = false }: WeeklyTrendCh
           週別支出推移
         </Typography>
 
-        <Box className="weekly-chart-totals" aria-label="週ごとの支出合計">
+        <Box className="weekly-chart-totals" aria-label="週ごとの支出合計" role="group">
           {items.map((item) => (
             <Typography key={item.weekStartDate} sx={{ fontWeight: 700 }} variant="caption">
+              <Box component="span" sx={visuallyHiddenSx}>
+                {item.label}
+              </Box>
               {formatYen(item.amount)}
             </Typography>
           ))}
@@ -118,7 +135,7 @@ export function WeeklyTrendChart({ chartData, isLoading = false }: WeeklyTrendCh
             ]}
           />
         </Box>
-        <Box className="weekly-chart-ranges" aria-label="週ごとの期間">
+        <Box className="weekly-chart-ranges" aria-label="週ごとの期間" role="group">
           {items.map((item) => (
             <Typography key={item.weekStartDate} color="text.secondary" variant="caption">
               {formatDateForDisplay(item.weekStartDate)}〜{formatDateForDisplay(item.weekEndDate)}
@@ -129,6 +146,7 @@ export function WeeklyTrendChart({ chartData, isLoading = false }: WeeklyTrendCh
           <Stack
             aria-label="カテゴリ凡例"
             className="weekly-chart-legend"
+            role="group"
             direction="row"
             useFlexGap
           >

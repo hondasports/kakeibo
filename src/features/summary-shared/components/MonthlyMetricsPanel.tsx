@@ -17,6 +17,7 @@ function Metric({
     <Stack
       aria-label={label}
       data-metric={label}
+      role="group"
       spacing={0.5}
       sx={{ minWidth: 0, textAlign: "center" }}
     >
@@ -37,17 +38,28 @@ function Metric({
 export function MonthlyMetricsPanel({
   isLoading,
   netAmountYen,
+  scopeLabel,
   totalAmountYen,
   totalIncomeYen,
 }: {
   isLoading: boolean;
   netAmountYen: number;
+  scopeLabel?: string;
   totalAmountYen: number;
   totalIncomeYen: number;
 }) {
   return (
     <Paper className="paper-panel monthly-summary-metrics" elevation={0}>
       <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+        {scopeLabel && (
+          <Typography
+            color="text.secondary"
+            sx={{ display: "block", mb: 1, textAlign: "center" }}
+            variant="caption"
+          >
+            {scopeLabel}
+          </Typography>
+        )}
         {isLoading ? (
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
             {[0, 1, 2].map((key) => (

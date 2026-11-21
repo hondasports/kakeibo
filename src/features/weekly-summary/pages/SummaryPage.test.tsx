@@ -3,16 +3,23 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
+import { apiMockWith } from "../../../test/apiMock";
 import { SummaryPage } from "./SummaryPage";
 
 const useQueryMock = vi.fn();
+const useQueryExperimentalMock = vi.fn();
 const mutationMock = vi.fn();
 const useMutationMock = vi.fn(() => mutationMock);
 const navigateMock = vi.fn();
 const useParamsMock = vi.fn(() => ({ weekStartDate: "2026-06-15" }));
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
+  useQuery_experimental: (...args: unknown[]) => useQueryExperimentalMock(...args),
   useMutation: () => useMutationMock(),
+}));
+
+vi.mock("../../../../convex/_generated/api", () => ({
+  api: apiMockWith({ "users.queries.getUserProfile": "get-user-profile" }),
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -70,6 +77,22 @@ describe("SummaryPage", () => {
     useParamsMock.mockReturnValue({ weekStartDate: "2026-06-15" });
     useQueryMock.mockReset();
     useQueryMock.mockReturnValue(summaryResult);
+    useQueryExperimentalMock.mockReset();
+    useQueryExperimentalMock.mockImplementation((options: { query: unknown; args: unknown }) => {
+      if (options.query === "get-user-profile") {
+        return { status: "success", data: { weeklyStartDay: 1 } };
+      }
+      if (options.args && typeof options.args === "object" && "weekStartDate" in options.args) {
+        return { status: "success", data: { weeks: [] } };
+      }
+      return {
+        status: "success",
+        data: [
+          { _id: "cat-food", name: "食費", color: "#f97316" },
+          { _id: "cat-daily", name: "日用品", color: "#22c55e" },
+        ],
+      };
+    });
     useMutationMock.mockClear();
     mutationMock.mockReset().mockResolvedValue(undefined);
     navigateMock.mockReset();
@@ -111,12 +134,6 @@ describe("SummaryPage", () => {
 
   it("週開始曜日で正規化された週の月へのリンクを表示する", () => {
     useParamsMock.mockReturnValue({ weekStartDate: "2026-05-03" });
-    useQueryMock
-      .mockReset()
-      .mockReturnValueOnce({ weeklyStartDay: 1 })
-      .mockReturnValueOnce([])
-      .mockReturnValueOnce(summaryResult)
-      .mockReturnValueOnce({ weeks: [] });
 
     renderSummaryPage();
 
@@ -136,15 +153,7 @@ describe("SummaryPage", () => {
   });
 
   it("週次サマリーの取得に失敗した場合はエラーを表示する", () => {
-    let queryCall = 0;
-    useQueryMock.mockReset().mockImplementation(() => {
-      const index = queryCall % 4;
-      queryCall += 1;
-      if (index === 0) return { weeklyStartDay: 1 };
-      if (index === 1) return [];
-      if (index === 2) return null;
-      return { weeks: [] };
-    });
+    useQueryMock.mockReset().mockReturnValue(null);
 
     renderSummaryPage();
 
@@ -259,20 +268,7 @@ describe("SummaryPage", () => {
   });
 
   it("選択した明細のカテゴリ変更と一括削除を処理する", async () => {
-    let queryCall = 0;
-    useQueryMock.mockImplementation(() => {
-      const index = queryCall % 4;
-      queryCall += 1;
-      if (index === 0) return { weeklyStartDay: 1 };
-      if (index === 1) {
-        return [
-          { _id: "cat-food", name: "食費", color: "#f97316" },
-          { _id: "cat-daily", name: "日用品", color: "#22c55e" },
-        ];
-      }
-      if (index === 2) return summaryResult;
-      return { weeks: [] };
-    });
+    useQueryMock.mockReturnValue(summaryResult);
     mutationMock
       .mockResolvedValueOnce({ updatedCount: 2 })
       .mockResolvedValueOnce({ deletedCount: 2 });
