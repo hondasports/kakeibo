@@ -1,7 +1,7 @@
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
 
-export type HistoryNavigationProps = {
+type HistoryNavigationProps = {
   weeklyPath: string;
   monthlyPath: string;
   searchPath: string;
@@ -40,7 +40,7 @@ export function HistoryNavigation({ weeklyPath, monthlyPath, searchPath }: Histo
       sx={{
         border: "1px solid",
         borderColor: "divider",
-        borderRadius: 2,
+        borderRadius: 1,
         p: { xs: 1.25, sm: 1.5 },
       }}
     >

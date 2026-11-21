@@ -10,7 +10,7 @@ license: Apache-2.0
 
 アプリの振る舞いを変えるコード変更。pure docs・READMEだけの変更は対象外（pure docsの範囲は `skills/workspace-preflight` の「例外」に準ずる）。
 
-preflightの後、**最初の編集の前**に読む。コミット前にもう一度使う。exportされた関数・型の意味を変える、複数ディレクトリにまたがる、認可・永続データ・外部writeに触れる、または変更対象の識別子が分からない場合は、先に `skills/impact-analysis` で調べ、その結果を下の対応表に入れる。
+preflightの後、**最初の編集の前**に読む。コミット前にもう一度使う。`skills/impact-analysis` の起動条件に当たる変更は、先にそれで調べ、結果を下の対応表に入れる。
 
 ## 編集前: 何を証明するかを決める
 
@@ -57,7 +57,7 @@ preflightの後、**最初の編集の前**に読む。コミット前にもう�
 ## 実行する検証の選び方
 
 - 変更後は、型・lint・直接影響するunitを必ず流し直す。コマンドの成否は**終了コード**で確認し、出力の一部だけで判断しない。
-- browser層の受入条件は `skills/test-design` に従い確認方法を選ぶ。E2Eが必要な場合の実行範囲は `e2e/spec-map.json` の対応と `@smoke` を基準に選ぶ。pathだけを理由にローカル全E2Eを要求しない（`docs/development-process.md` の Functional E2E）。
+- browser層の受入条件は `skills/test-design` に従い確認方法を選ぶ。ローカルで証明が要る場面は `docs/development-process.md` の「Verification」に従う（マージ判定はCI）。ローカルで対象specを確かめるときは `pnpm run e2e:isolated -- <spec>` を使う。pathだけを理由にローカル全E2Eを要求しない。
 - repo全体の回帰はCIを正本とし、同じ全件をローカルで理由なく重複しない（`docs/development-process.md` の Verification）。
 - UI文言や表示の変更は、その文言を前提にしている既存のunit・E2Eを検索し、期待を更新する。
 

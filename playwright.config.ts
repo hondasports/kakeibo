@@ -57,7 +57,7 @@ export default defineConfig({
      * Vercel Protection Bypass for Automation cookie
      * GitHub Actions から PLAYWRIGHT_BYPASS_SECRET が渡された場合のみ有効になる。
      * ローカル実行時は undefined になるため影響なし。
-     * 詳細: docs/development-process.md「E2E 確認方針」
+     * 詳細: docs/environment-variables.md の PLAYWRIGHT_BYPASS_SECRET
      */
     storageState: process.env.PLAYWRIGHT_BYPASS_SECRET ? vercelBypassStatePath : undefined,
   },

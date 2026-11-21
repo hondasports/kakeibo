@@ -35,7 +35,7 @@ test.describe("履歴検索（Issue #537 / #637〜#643）", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
   });
 
-  test("収入も履歴検索の結果と種別フィルタに含まれる", async ({ page }) => {
+  test("@smoke 収入も履歴検索の結果と種別フィルタに含まれる", async ({ page }) => {
     await page.getByRole("tab", { name: "収入" }).click();
     await page.getByLabel("金額").fill("50000");
     await page.getByLabel("収入の内容・メモ").fill("検索用給与");

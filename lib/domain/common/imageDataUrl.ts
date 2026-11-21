@@ -4,7 +4,7 @@
  */
 export const MAX_IMAGE_DATA_URL_LENGTH = 900_000;
 
-export type ImageDataUrlError =
+type ImageDataUrlError =
   | "invalid_format"
   | "missing_base64_marker"
   | "too_large"

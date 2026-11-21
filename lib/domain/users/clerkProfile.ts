@@ -1,6 +1,6 @@
 import { normalizeEmail } from "./email";
 
-export type ClerkEmailAddress = {
+type ClerkEmailAddress = {
   id: string;
   emailAddress: string;
   verification: { status?: string } | null;

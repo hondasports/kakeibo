@@ -37,7 +37,7 @@ import type {
   AiExpenseDraftReviewReason,
 } from "./constants";
 
-export type DraftItem<TId = string> = {
+type DraftItem<TId = string> = {
   itemName: string;
   lineType?: ReceiptItemLineType;
   amountYen: number;
@@ -65,7 +65,7 @@ export type DraftItem<TId = string> = {
   warnings?: string[];
 };
 
-export type DraftArgs<TId = string> = {
+type DraftArgs<TId = string> = {
   documentType: AiExpenseDraftDocumentType;
   shopName?: string;
   paymentPlace?: string;

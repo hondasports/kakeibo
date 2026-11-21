@@ -33,9 +33,7 @@ export function docToLineNotificationJobRecord(
   };
 }
 
-export function createLineNotificationJobReader(
-  ctx: Pick<QueryCtx, "db">,
-): LineNotificationJobReader {
+function createLineNotificationJobReader(ctx: Pick<QueryCtx, "db">): LineNotificationJobReader {
   return {
     async getJob(jobId) {
       const doc = await ctx.db.get(jobId as Id<"lineNotificationJobs">);

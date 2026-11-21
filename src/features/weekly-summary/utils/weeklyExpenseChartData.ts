@@ -1,6 +1,7 @@
 import { calculateWeekEndDate } from "../../../../lib/domain/week/weekDates";
 import { formatYen } from "../../../../lib/domain/common/currency";
 import { formatDateForDisplay } from "../../../utils/date";
+import { designTokens } from "../../../designTokens";
 
 export type WeeklyCategoryBreakdown = {
   categoryId: string;
@@ -9,7 +10,7 @@ export type WeeklyCategoryBreakdown = {
   totalAmountYen: number;
 };
 
-export type WeeklyExpenseChartItem = {
+type WeeklyExpenseChartItem = {
   weekStartDate: string;
   weekEndDate: string;
   label: string;
@@ -20,7 +21,7 @@ export type WeeklyExpenseChartItem = {
   byCategory: WeeklyCategoryBreakdown[];
 };
 
-export type WeeklyExpenseChartSeries = {
+type WeeklyExpenseChartSeries = {
   dataKey: string;
   label: string;
   color: string;
@@ -40,7 +41,7 @@ type WeeklyExpenseSource = {
 
 export const OTHER_CATEGORY_ID = "__other__";
 export const MAX_STACKED_CATEGORIES = 5;
-const OTHER_CATEGORY_COLOR = "#AAB7C4";
+const OTHER_CATEGORY_COLOR = designTokens.color.brand.mist;
 
 export function toSeriesDataKey(categoryId: string): string {
   return `series_${categoryId.replace(/[^a-zA-Z0-9]/g, "_")}`;

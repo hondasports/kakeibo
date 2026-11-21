@@ -15,6 +15,7 @@ import {
   MAX_REASON_LENGTH,
   normalizeSystemAdminReason,
 } from "../../../../lib/domain/systemAdmin/reason";
+import { formatDateTimeForDisplay } from "../../../utils/date";
 
 type Props = {
   open: boolean;
@@ -59,7 +60,7 @@ export function SystemAdminInvitationRevokeDialog({
           <Typography>
             招待先: {invitation?.email ?? "不明"}
             <br />
-            作成日時: {invitation ? new Date(invitation.createdAt).toLocaleString("ja-JP") : "不明"}
+            作成日時: {invitation ? formatDateTimeForDisplay(invitation.createdAt) : "不明"}
           </Typography>
           <Typography color="warning.main" variant="body2">
             招待だけを取り消します。ユーザー、所属、家計データは変更しません。

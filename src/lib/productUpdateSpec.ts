@@ -7,18 +7,18 @@ import {
 export const UPDATE_SPEC_START_MARKER = "<!-- suzumemo-update:start -->";
 export const UPDATE_SPEC_END_MARKER = "<!-- suzumemo-update:end -->";
 
-export type PublishProductUpdateSpec = {
+type PublishProductUpdateSpec = {
   publish: true;
   category: ProductUpdateCategory;
   description: string;
 };
 
-export type SkipProductUpdateSpec = {
+type SkipProductUpdateSpec = {
   publish: false;
   reason: string;
 };
 
-export type ProductUpdateSpec = PublishProductUpdateSpec | SkipProductUpdateSpec;
+type ProductUpdateSpec = PublishProductUpdateSpec | SkipProductUpdateSpec;
 
 export type ProductUpdateSpecResult =
   | { ok: true; spec: ProductUpdateSpec }

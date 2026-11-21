@@ -39,6 +39,7 @@ import {
 } from "../lib/usecase/accountDeletion/requestMutations";
 import { recoverStrandedAccountDeletions as recoverStrandedAccountDeletionsUsecase } from "../lib/usecase/accountDeletion/recoverStrandedAccountDeletions";
 import { finalizeAccountDeletion as finalizeAccountDeletionUsecase } from "../lib/usecase/accountDeletion/finalizeAccountDeletion";
+import { ACCOUNT_DELETION_PURGE_OUTCOMES } from "../lib/domain/accountDeletion/request";
 
 /** テスト・他ドメインからの直接 import 互換シム。 */
 export async function loadAccountDeletionClassification(ctx: Pick<QueryCtx, "db">, userId: string) {
@@ -150,7 +151,7 @@ export const prepareAccountDeletionBatch = internalMutation({
 
 export const advanceAccountDeletionPurge = internalMutation({
   args: { requestId: v.id("accountDeletionRequests") },
-  returns: v.union(v.literal("waiting"), v.literal("ready"), v.literal("failed")),
+  returns: v.union(...ACCOUNT_DELETION_PURGE_OUTCOMES.map((outcome) => v.literal(outcome))),
   handler: async (ctx, args) =>
     await advanceAccountDeletionPurgeUsecase(createAccountDeletionMutationDeps(ctx), {
       requestId: args.requestId,

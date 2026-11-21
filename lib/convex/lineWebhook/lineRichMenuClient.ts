@@ -20,14 +20,14 @@ const MOCK_LINE_RICH_MENU_ID = "mock-rich-menu-id";
 
 export type LineFetch = typeof fetch;
 
-export type ApplyLineRichMenuResult = {
+type ApplyLineRichMenuResult = {
   dryRun: boolean;
   mode: "dry-run" | "mock" | "real";
   richMenuId: string | null;
   menu: LineRichMenuObject;
 };
 
-export type ApplyLineRichMenuOptions = {
+type ApplyLineRichMenuOptions = {
   imageBytes: Uint8Array;
   dryRun?: boolean;
   fetchImpl?: LineFetch;

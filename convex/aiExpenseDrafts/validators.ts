@@ -37,9 +37,7 @@ import {
   RECEIPT_RAW_OBSERVATION_SOURCES,
   RECEIPT_STRUCTURAL_LINE_ROLES,
 } from "../../lib/domain/receipt/observations";
-export const roundingMethodValidator = v.union(
-  ...ROUNDING_METHODS.map((method) => v.literal(method)),
-);
+const roundingMethodValidator = v.union(...ROUNDING_METHODS.map((method) => v.literal(method)));
 export const receiptItemLineTypeValidator = v.union(
   ...RECEIPT_ITEM_LINE_TYPES.map((lineType) => v.literal(lineType)),
 );
@@ -78,32 +76,32 @@ export const aiExpenseRegistrationModeValidator = v.union(
 );
 
 export const amountBasisValidator = v.union(...AMOUNT_BASES.map((value) => v.literal(value)));
-export const taxSummaryTaxRatePercentValidator = v.union(
+const taxSummaryTaxRatePercentValidator = v.union(
   ...TAX_RATE_PERCENTS.map((value) => v.literal(value)),
 );
-export const taxModeValidator = v.union(...TAX_MODES.map((value) => v.literal(value)));
+const taxModeValidator = v.union(...TAX_MODES.map((value) => v.literal(value)));
 export const receiptItemTaxRatePercentValidator = v.union(
   ...TAX_RATE_PERCENTS.map((rate) => v.literal(rate)),
   v.null(),
 );
-export const receiptMarkersValidator = v.array(v.string());
-export const taxResolutionStatusValidator = v.union(
+const receiptMarkersValidator = v.array(v.string());
+const taxResolutionStatusValidator = v.union(
   ...TAX_RESOLUTION_STATUSES.map((value) => v.literal(value)),
 );
-export const taxAllocationStatusValidator = v.union(
+const taxAllocationStatusValidator = v.union(
   ...TAX_ALLOCATION_STATUSES.map((value) => v.literal(value)),
 );
-export const taxSummaryDecisionStatusValidator = v.union(
+const taxSummaryDecisionStatusValidator = v.union(
   ...TAX_SUMMARY_DECISION_STATUSES.map((value) => v.literal(value)),
 );
 export const taxConfirmedFieldsValidator = v.array(
   v.union(...RECEIPT_ITEM_TAX_CONFIRMED_FIELDS.map((value) => v.literal(value))),
 );
 
-export const taxResolutionSourceValidator = v.union(
+const taxResolutionSourceValidator = v.union(
   ...TAX_RESOLUTION_SOURCES.map((value) => v.literal(value)),
 );
-export const receiptMarkerDefinitionValidator = v.object({
+const receiptMarkerDefinitionValidator = v.object({
   marker: v.string(),
   description: v.string(),
 });
@@ -139,7 +137,7 @@ export const taxSummaryValidator = v.object({
   ),
 });
 
-export const receiptTotalCandidateSourceValidator = v.union(
+const receiptTotalCandidateSourceValidator = v.union(
   ...RECEIPT_TOTAL_CANDIDATE_SOURCES.map((value) => v.literal(value)),
 );
 export const receiptTotalResolutionValidator = v.object({
@@ -161,7 +159,7 @@ export const priceTaxTreatmentValidator = v.union(
 export const taxRateCompositionValidator = v.union(
   ...TAX_RATE_COMPOSITIONS.map((value) => v.literal(value)),
 );
-export const receiptTaxDecisionSourceValidator = v.union(
+const receiptTaxDecisionSourceValidator = v.union(
   ...RECEIPT_TAX_DECISION_SOURCES.map((value) => v.literal(value)),
 );
 const receiptTaxDecisionCandidateValidator = v.object({
@@ -210,11 +208,9 @@ export const aiExpenseDraftItemConfidenceValidator = v.object({
   categoryId: v.optional(v.number()),
 });
 
-export const receiptLineRoleValidator = v.union(
-  ...RECEIPT_LINE_ROLES.map((value) => v.literal(value)),
-);
+const receiptLineRoleValidator = v.union(...RECEIPT_LINE_ROLES.map((value) => v.literal(value)));
 
-export const receiptObservationBoundingBoxValidator = v.object({
+const receiptObservationBoundingBoxValidator = v.object({
   left: v.number(),
   top: v.number(),
   width: v.number(),
@@ -238,7 +234,7 @@ export const receiptRawObservationValidator = v.object({
   lines: v.array(receiptRawObservationLineValidator),
 });
 
-export const receiptStructuralLineRoleValidator = v.union(
+const receiptStructuralLineRoleValidator = v.union(
   ...RECEIPT_STRUCTURAL_LINE_ROLES.map((value) => v.literal(value)),
 );
 
@@ -277,13 +273,13 @@ export const receiptDraftItemFields = {
   warnings: v.optional(v.array(v.string())),
 };
 
-export const receiptDraftItemSnapshotValidator = v.object({
+const receiptDraftItemSnapshotValidator = v.object({
   ...receiptDraftItemFields,
   discountTargetItemIndex: v.optional(v.number()),
   taxConfirmedFields: v.optional(taxConfirmedFieldsValidator),
 });
 
-export const receiptDraftValueSnapshotValidator = v.object({
+const receiptDraftValueSnapshotValidator = v.object({
   status: aiExpenseDraftStatusValidator,
   documentType: aiExpenseDraftDocumentTypeValidator,
   shopName: v.optional(v.string()),

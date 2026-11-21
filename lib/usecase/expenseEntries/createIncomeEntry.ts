@@ -3,7 +3,7 @@ import type { ExpenseEntryRepository } from "../../domain/expenseEntries/expense
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 
-export type CreateIncomeEntryUsecaseArgs = {
+type CreateIncomeEntryUsecaseArgs = {
   date: string;
   amountYen: number;
   title: string;

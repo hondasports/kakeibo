@@ -25,8 +25,7 @@ describe("WeeklySummaryPanel", () => {
     expect(screen.getByLabelText("合計収入")).toHaveTextContent("0円");
     expect(screen.queryByText("未設定")).not.toBeInTheDocument();
     expect(screen.queryByText("予算")).not.toBeInTheDocument();
-    expect(screen.getByText("まだ支出がありません")).toBeInTheDocument();
-    expect(screen.getByText("まだレシートがありません")).toBeInTheDocument();
+    expect(screen.getAllByText("まだ支出がありません")).toHaveLength(2);
     expect(screen.getByText("まだ収入がありません")).toBeInTheDocument();
   });
 

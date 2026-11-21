@@ -16,7 +16,7 @@ export type UpdateReceiptInput<TId = string> = {
   memo?: string;
 };
 
-export type NormalizedUpdateReceiptPatch = {
+type NormalizedUpdateReceiptPatch = {
   date?: string;
   shopName?: string;
   bankName?: string;

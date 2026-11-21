@@ -5,7 +5,7 @@ import type { ExpenseSearchFilters, SearchableHistoryGroup } from "./filter";
 import { ExpenseSearchDomainError } from "./searchResult";
 import { getHistoryTrendRangeError } from "./trendRange";
 
-export type HistoryCategoryInfo = {
+type HistoryCategoryInfo = {
   name: string;
   color: string;
 };
@@ -24,7 +24,7 @@ export type HistoryAggregate = {
 
 export const HISTORY_TREND_GRANULARITIES = ["day", "week", "month"] as const;
 
-export type HistoryTrendGranularity = (typeof HISTORY_TREND_GRANULARITIES)[number];
+type HistoryTrendGranularity = (typeof HISTORY_TREND_GRANULARITIES)[number];
 
 export type HistoryTrendPoint = {
   key: string;
@@ -36,12 +36,12 @@ export type HistoryTrendPoint = {
   netAmountYen: number;
 };
 
-export type PreviousHistoryPeriod = {
+type PreviousHistoryPeriod = {
   startDate: string;
   endDate: string;
 };
 
-export type HistoryCategoryChange = {
+type HistoryCategoryChange = {
   categoryId: string;
   categoryName: string;
   categoryColor: string;
@@ -188,7 +188,7 @@ function inclusiveDayCount(startDate: string, endDate: string): number {
   return Math.floor((end - start) / 86_400_000) + 1;
 }
 
-export function chooseHistoryTrendGranularity(
+function chooseHistoryTrendGranularity(
   startDate: string,
   endDate: string,
 ): HistoryTrendGranularity {

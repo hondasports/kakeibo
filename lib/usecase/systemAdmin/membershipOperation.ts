@@ -17,6 +17,7 @@ import type { GroupMembershipStatus } from "../../domain/groups/role";
 import { assertAccountDeletionNotInProgress } from "../accountDeletion/classification";
 import type { SystemAdminMutationDeps } from "./deps";
 import { requireSystemAdminActor } from "./actor";
+import { MAX_GROUP_OWNERS } from "../../domain/groups/role";
 
 type Deps = Pick<
   SystemAdminMutationDeps,
@@ -48,8 +49,12 @@ async function insertMembershipChangeNotifications(
 ) {
   const recipients = new Set<string>([targetUserId]);
   for (const groupId of new Set(groupIds.filter((id): id is string => !!id))) {
-    const owners = await deps.memberships.listByGroupAndRole(groupId, "owner", 101);
-    if (owners.length > 100) {
+    const owners = await deps.memberships.listByGroupAndRole(
+      groupId,
+      "owner",
+      MAX_GROUP_OWNERS + 1,
+    );
+    if (owners.length > MAX_GROUP_OWNERS) {
       throw new ConvexError("1グループあたりのowner数が上限を超えています");
     }
     for (const owner of owners) {

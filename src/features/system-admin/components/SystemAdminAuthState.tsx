@@ -1,11 +1,11 @@
 import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 
-export type SystemAdminAuthStateAction =
+type SystemAdminAuthStateAction =
   | { label: string; onClick: () => void }
   | { label: string; to: string };
 
-export type SystemAdminAuthStateProps = {
+type SystemAdminAuthStateProps = {
   severity: "error" | "warning";
   title: string;
   message?: string;

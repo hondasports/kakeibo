@@ -23,10 +23,15 @@ describe("ReceiptListCard", () => {
 
     expect(screen.getAllByTestId("receipt-row")).toHaveLength(5);
     const showMore = screen.getByRole("button", { name: "さらに2件を見る" });
+    expect(showMore).toHaveAttribute("aria-expanded", "false");
     await user.click(showMore);
 
     expect(screen.getAllByTestId("receipt-row")).toHaveLength(7);
     expect(screen.queryByRole("button", { name: "さらに2件を見る" })).not.toBeInTheDocument();
+    const collapse = screen.getByRole("button", { name: "閉じる" });
+    expect(collapse).toHaveAttribute("aria-expanded", "true");
+    await user.click(collapse);
+    expect(screen.getAllByTestId("receipt-row")).toHaveLength(5);
   });
 
   it("maxVisibleGroupsを指定すると初期表示件数を変えられる", () => {

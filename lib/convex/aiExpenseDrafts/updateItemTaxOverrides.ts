@@ -6,7 +6,7 @@ import { draftFieldsToDoc, draftItemFieldsToDoc } from "./draftRecordMapping";
 import type { AmountBasis } from "../../domain/receipt/tax/types";
 import type { ReceiptItemTaxRatePercent } from "../receiptImageExtraction/types";
 
-export type UpdateDraftItemTaxOverridesArgs = {
+type UpdateDraftItemTaxOverridesArgs = {
   draftId: Id<"aiExpenseDrafts">;
   itemId: Id<"aiExpenseDraftItems">;
   taxRatePercent?: ReceiptItemTaxRatePercent;

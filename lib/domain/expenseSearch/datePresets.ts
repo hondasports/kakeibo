@@ -10,7 +10,7 @@ export type HistoryDatePreset =
   | "thisYear"
   | "custom";
 
-export type HistoryDateRange = {
+type HistoryDateRange = {
   startDate: string;
   endDate: string;
 };

@@ -66,12 +66,12 @@ describe("WeeklyTrendChart", () => {
     expect(screen.getByRole("img", { name: "週別支出推移グラフ" })).toBeInTheDocument();
   });
 
-  it("デスクトップではチャートの高さを200pxに抑える", () => {
+  it("チャートの高さは220pxで固定する", () => {
     renderWithProviders(<WeeklyTrendChart chartData={chartData} />);
 
     expect(screen.getByRole("img", { name: "週別支出推移グラフ" })).toHaveAttribute(
       "data-chart-height",
-      "200",
+      "220",
     );
   });
 

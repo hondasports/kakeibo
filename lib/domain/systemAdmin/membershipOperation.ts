@@ -7,7 +7,7 @@ export const SYSTEM_ADMIN_MEMBERSHIP_OPERATIONS = [
 ] as const;
 export type MembershipOperation = (typeof SYSTEM_ADMIN_MEMBERSHIP_OPERATIONS)[number];
 
-export type ValidateMembershipOperationShapeError = "invalid_shape" | "same_source_target";
+type ValidateMembershipOperationShapeError = "invalid_shape" | "same_source_target";
 
 const membershipOperationShapeErrorMessages: Record<ValidateMembershipOperationShapeError, string> =
   {

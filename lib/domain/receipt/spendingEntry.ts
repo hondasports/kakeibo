@@ -1,5 +1,6 @@
 import type { EntryKind } from "../common/entryKind";
 import type { RecordType } from "../common/recordKind";
+import { DEFAULT_REGISTRATION_MODE } from "../aiExpenseDrafts/receiptDataContract";
 import type { AiExpenseRegistrationMode } from "../aiExpenseDrafts/receiptDataContract";
 
 export type SpendingEntry = {
@@ -30,7 +31,7 @@ export type IncomeListEntry = {
   recordType: RecordType;
 };
 
-export type ReceiptForSpending = {
+type ReceiptForSpending = {
   _id: string;
   date: string;
   type?: EntryKind;
@@ -55,7 +56,7 @@ export function mapReceiptToSpendingEntry(receipt: ReceiptForSpending): Spending
   };
 }
 
-export type ExpenseEntryForSpending = {
+type ExpenseEntryForSpending = {
   _id: string;
   date: string;
   amount: number;
@@ -67,7 +68,7 @@ export type ExpenseEntryForSpending = {
   aiExpenseDraftId?: string;
 };
 
-export type ExpenseEntryToSpendingError = "missing_category";
+type ExpenseEntryToSpendingError = "missing_category";
 
 export function mapExpenseEntryToSpendingEntry(
   expenseEntry: ExpenseEntryForSpending,
@@ -94,7 +95,7 @@ export function mapExpenseEntryToSpendingEntry(
   };
 }
 
-export type ExpenseEntryForIncomeList = {
+type ExpenseEntryForIncomeList = {
   _id: string;
   date: string;
   amount: number;
@@ -116,7 +117,7 @@ export function mapIncomeExpenseEntryToListEntry(
   };
 }
 
-export type ReceiptForIncomeList = {
+type ReceiptForIncomeList = {
   _id: string;
   date: string;
   bankName?: string;
@@ -164,7 +165,7 @@ export type EnrichSpendingEntryAiExpenseDraftItem = {
   itemName: string;
 };
 
-export type EnrichSpendingEntryArgs = {
+type EnrichSpendingEntryArgs = {
   sourceDocument?: EnrichSpendingEntrySourceDocument;
   aiExpenseDraft?: EnrichSpendingEntryAiExpenseDraft;
   aiExpenseDraftItems?: EnrichSpendingEntryAiExpenseDraftItem[];
@@ -197,7 +198,7 @@ export function enrichSpendingEntry(
         aiExpenseDraft.shopName ?? aiExpenseDraft.payeeName ?? entry.shopName ?? "不明",
       receiptTotalAmountYen: aiExpenseDraft.amountYen ?? entry.amountYen,
       aiExpenseDraftId: aiExpenseDraft._id,
-      registrationMode: aiExpenseDraft.registrationMode ?? "detailed",
+      registrationMode: aiExpenseDraft.registrationMode ?? DEFAULT_REGISTRATION_MODE,
       itemName:
         aiExpenseDraft.registrationMode === "totalOnly"
           ? undefined
@@ -237,20 +238,20 @@ export function enrichSpendingEntries(
 }
 
 /** エンリッチメント判定に必要な永続化ドキュメントの最小形状。 */
-export type ReceiptEnrichmentSourceDocumentDoc = EnrichSpendingEntrySourceDocument & {
+type ReceiptEnrichmentSourceDocumentDoc = EnrichSpendingEntrySourceDocument & {
   groupId: string;
 };
 
-export type ReceiptEnrichmentAiExpenseDraftDoc = EnrichSpendingEntryAiExpenseDraft & {
+type ReceiptEnrichmentAiExpenseDraftDoc = EnrichSpendingEntryAiExpenseDraft & {
   groupId: string;
 };
 
-export type ReceiptEnrichmentDraftItemDoc = {
+type ReceiptEnrichmentDraftItemDoc = {
   categoryId?: string;
   itemName?: string;
 };
 
-export type ReceiptEnrichmentMaps = {
+type ReceiptEnrichmentMaps = {
   sourceDocumentMap: Map<string, EnrichSpendingEntrySourceDocument>;
   aiExpenseDraftMap: Map<string, EnrichSpendingEntryAiExpenseDraft>;
   aiExpenseDraftItemsMap: Map<string, EnrichSpendingEntryAiExpenseDraftItem[]>;

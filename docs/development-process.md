@@ -28,9 +28,9 @@
 task branch
   ↓ PR
 preview
-  ↓ PREVIEW確認
+  ↓ PREVIEW確認・本番反映の承認（昇格PRのマージ）
 main
-  ↓ release candidate / approval
+  ↓ release candidate E2E
 Production
 ```
 
@@ -43,9 +43,9 @@ Production
 
 通常のAgent Delivery baseは `preview`、targetは `merge_ready`。
 
-preview向けPRの本文には `.github/pull_request_template.md` の更新履歴欄（`suzumemo-update` ブロック）に掲載方針と原稿または非掲載理由を必ず記入する。PR検証CIで欠落・不正はエラーになる。例外は更新履歴ブロックを持たないbot作成PR（dependabot等）のみで、マーカーを記入したbot PRは人間のPRと同じく検証される。
+preview向けPRの本文には、`.github/pull_request_template.md` の更新履歴欄（`suzumemo-update` ブロック）を記入する。書き方・CIの検証・bot PRの例外は `skills/pr-update-spec` を正本とする。
 
-`PR created` はcheckpointであり完了ではない。PR作成後にどこまで確認するかは完了地点で決まる（`skills/delivery-loop`）。
+PR作成後にどこまで確認するかは完了地点で決まる（`skills/delivery-loop`）。
 
 公開前にstaged diffを確認し、タスク固有の作業ファイルや秘密値を含めない。
 
@@ -106,7 +106,7 @@ repository fileを変更するtaskは、**最初の編集前**にtask worktree r
 
 ## 3. `.env.local` とローカル環境
 
-`preview` worktreeの `.env.local` をローカルE2E用の正本とする。
+`preview` worktreeの `.env.local` をローカルE2E用の正本とする。`KAKEIBO_E2E_ENV_CANONICAL` が設定されていればそのpathを正本とし、指定先に無ければ同期は失敗する（`scripts/sync-e2e-env.mjs`）。
 
 初回bootstrap時、preview側に無ければclone元の `.env.local` からコピーできる。どちらにも無い場合は環境を復旧するまで進めない。
 
@@ -178,11 +178,7 @@ Agent taskで残す価値があるもの:
 
 ## 5. Agent作業
 
-`AGENTS.md` はCodex・Devin・Claude Code共通の契約とする。契約本体を各Runtimeの個別設定へ複製しない。
-
-Issueは詳細仕様を必須としない。Agentはrepository、既存仕様、テストを調査してGoal・Acceptance Criteria・Non-goals・Assumptions・Verification Strategyを補完する。調査で解ける疑問は自力で解決し、既存patternに沿う可逆・低影響な判断はAssumptionとして記録する。Product / UX / Security / Data semanticsをmaterially変える未確定事項だけユーザーへ確認する。
-
-実装・targeted test・debug・修正・再検証は同じAgent Run内で回す。PR作成後はCI・レビュー指摘・承認・競合・mergeabilityをlatest HEADで確認する。
+`AGENTS.md` はCodex・Devin・Claude Code共通の契約とする。契約本体を各Runtimeの個別設定やこの文書へ複製しない。Issueの補完、ユーザーへ確認する範囲、同じRun内での反復は `AGENTS.md` の「Core contract」、PR作成後の確認は「開発ループ」を正本とする。
 
 ## 6. Verification
 
@@ -194,7 +190,7 @@ HEAD/baseが更新されたら、旧HEAD/baseの検証結果を現在の必須�
 
 - changed / directly affected tests
 - scopeable lint / format / type / build
-- browser層の受入条件は `skills/test-design` に従い確認方法を選び、必要なfunctional E2Eを実行する
+- browser層の受入条件は `skills/test-design` に従い確認方法を選ぶ。PRのマージ判定はCIのE2E（[Functional E2E](#functional-e2e)）で、ローカルE2Eは一律には要求しない。CIが走らない完了地点（`local_verified`、親PR方式の子等）でブラウザの受入条件を証明するときは、対象specかそれと同等の観測をローカルで行い、手段が無ければ未検証として止める
 - shared/auth/data/financial変更に必要なcaller / denial / failure-path test
 
 repo-wide regression checkはlatest contentのCIを正本にできる。
@@ -211,7 +207,7 @@ required checksがPASSした後は、content change / material failure / unresol
 
 ### Functional E2E
 
-push前の検証は `.husky/pre-push` から走る `pnpm run verify:prepush` に一本化する。内容は型（`tsc -b`）→ lint/format → `vitest related`（差分に関係するunit）→ 対象E2E（`e2e:isolated`）。unitのrelated対象は `scripts/unit-related-map.json` の変更パスglobで、import グラフに乗らない fs 読み込み依存のテストも合流させる（テストがrepo内ファイルを `readFileSync` 等で読む構造を追加したらmapへ追記する）。E2Eの対象specは `e2e/spec-map.json` の変更パスglobで選び、`@smoke` のspecを最低ラインとして必ず合流させる。mapにないパスを変更した場合は安全側に `@smoke` + `@public` 全件を選び、map追記を促すファイル名を表示する。ローカル実行はマージ判定材料ではない（判定はCIのcheckが正本）。
+push前の検証は `.husky/pre-push` から走る `node scripts/verify-prepush.mjs`（手動で流すときは同じ処理の `pnpm run verify:prepush`）に一本化する。内容は型（`tsc -b`）→ lint/format → `vitest related`（差分に関係するunit）。unitのrelated対象は `scripts/unit-related-map.json` の変更パスglobで、import グラフに乗らない fs 読み込み依存のテストも合流させる（テストがrepo内ファイルを `readFileSync` 等で読む構造を追加したらmapへ追記する）。pre-push からは E2E を起動しない（Issue #1333: E2EはCIに集約し、ローカルとの2重実行を廃止）。E2E を任意にローカル実行する場合は `pnpm run e2e:isolated -- <spec>` を使う。ローカル実行はマージ判定材料ではない（判定はCIのcheckが正本）。
 
 E2Eをどのbackendで実行するかは次の通り。cloudのConvexはDatabase I/OをFree枠のteam合算で消費するため、全件を流さない。
 
@@ -224,26 +220,26 @@ E2Eをどのbackendで実行するかは次の通り。cloudのConvexはDatabase
 
 `@staging` は `@smoke` のうち、ローカルbackendでは検知できないstaging固有の確認だけに付ける。付ける数を増やす前に、ローカルbackendで足りないか確認する。
 
-CIで失敗したテストをローカルで再現するときは `--include` で対象を追加する（複数指定可）。
+CIで失敗したE2Eをローカルで再現するときは `pnpm run e2e:isolated -- <spec>` で対象を指定する（複数指定可）。`verify:prepush` の `--include` は unit test だけを受け付ける。
 
 ```bash
-pnpm run verify:prepush -- --include e2e/settings.spec.ts --include src/features/foo/foo.test.ts
+pnpm run e2e:isolated -- e2e/settings.spec.ts
 ```
 
-E2Eの実行には事前条件がある。満たさない場合はE2Eを実行せずに満たしていない条件と対処方法を表示して止まる。どうしても迂回する場合は `git push --no-verify` を使い、その事実をPR本文に記載する。
+E2Eの実行には事前条件がある（`e2e:isolated` の起動時にも検査される）。
 
 - Convex local backendのバイナリが取得済み、またはダウンロードできるネットワークがあること（macOS/Linuxのバイナリキャッシュは `~/.cache/convex/binaries/` 配下。制限された環境では先に `pnpm run e2e:isolated -- --probe` で取得しておく）
-- 使用するVite・Convex API・HTTP actionsのポートが空いていること（既定は `5173` / `3210` / `3211`）。別作業が使用中の場合は、そのサーバーを停止せず下記の別ポート指定を使う
+- 使用するVite・Convex API・HTTP actionsのポートが空いていること（既定は `5173` / `3210` / `3211`）。別作業が使用中の場合は、そのサーバーを停止しない（並行の条件は下記）
 - `.env.local` に `VITE_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` / `E2E_CLERK_USER_EMAIL` があること（`docs/environment-variables.md` 参照）
 - PlaywrightのChromiumがインストール済みであること（`pnpm exec playwright install chromium`）
 
-別作業のサーバーを維持する場合は、Vite・Convex API・HTTP actionsに空いている別々のポートを指定できる。事前検査、匿名backend、Playwrightの起動先は同じ設定を使い、既存サーバーを再利用しない。
+同じworktreeのwatcher・E2Eとは並行させない（`.env.local` の退避・復元が重なる）。同じClerkテストユーザーを使うE2Eも並行させない。別のworktreeのサーバーを維持する場合は、Vite・Convex API・HTTP actionsに空いている別々のポートを指定できる。事前検査、匿名backend、Playwrightの起動先は同じ設定を使い、既存サーバーを再利用しない。
 
 ```bash
-E2E_VITE_PORT=15173 E2E_CONVEX_CLOUD_PORT=13210 E2E_CONVEX_SITE_PORT=13211 pnpm run verify:prepush
+E2E_VITE_PORT=15173 E2E_CONVEX_CLOUD_PORT=13210 E2E_CONVEX_SITE_PORT=13211 pnpm run e2e:isolated -- e2e/settings.spec.ts
 ```
 
-同じ環境変数は `pnpm run e2e:isolated -- <spec>` と `git push` のpre-push hookでも使用できる。指定しない場合は従来の `5173` / `3210` / `3211` を使う。
+指定しない場合は従来の `5173` / `3210` / `3211` を使う。
 
 ローカルE2Eは実DB、Clerk認証、Convex HTTP／mutation、画面の状態遷移をまとめて確認する層とし、関数単位の分岐は `convex-test`、外部公開URLが必要な確認だけcloud deploymentへ分ける。レシート抽出は `RECEIPT_IMAGE_EXTRACTOR_MODE=mock` とし、OpenAI APIは呼ばない。
 
@@ -339,7 +335,15 @@ AGENTS.mdのルールが独自に「常に1 approval」を追加しない。
 
 観点ごとのrepo固有の確認点（セキュリティ・技術スタック・ユニットテスト・E2E）は `skills/repo-code-review` を参照する。
 
-認証・認可、永続データ・schema/migration、削除・retention、外部write/webhook等の高リスク変更は、セルフレビューに加えて新しいコンテキストの独立Reviewerでレビューする。Reviewerには目的・Acceptance Criteria・差分・検証結果・関連caller/契約を渡し、実装担当の結論を先に見せない。
+次のいずれかを変更する場合は高リスク変更として扱い、セルフレビューに加えて新しいコンテキストの独立Reviewerでレビューする。この一覧を独立Reviewerの要否の正本とする。
+
+- 認証・認可・所有権、tenant / group / user間のデータ境界
+- 特権環境（privileged env）・secretの境界
+- ユーザー入力、ユーザー制御のHTML・URL・redirect・file / path・MIME
+- 永続データ・schema / migration、削除・retention
+- webhook（署名・送信元等の検証を含む）、外部write（その境界を含む）
+
+Reviewerには目的・Acceptance Criteria・差分・検証結果・関連caller/契約を渡し、実装担当の結論を先に見せない。
 
 ---
 
@@ -356,11 +360,9 @@ preview
   ↓
 Preview deployment / CI-E2E
   ↓
-main
+main（昇格PRのマージが本番反映の承認）
   ↓
-release candidate
-  ↓
-production approval
+release candidate E2E
   ↓
 Production
 ```
@@ -418,7 +420,7 @@ Hotfixも原則Pull Requestを経由する。
 - required Verification / CIを維持
 - production / irreversible操作はユーザー承認必須
 - 障害内容を記録し、繰り返される種類の問題はスキル・AGENTS.mdへ書き戻す
-- 必要なfollow-upをIssue化
+- 見つけたfollow-upの対応と起票は `skills/delivery-loop` の「報告」に従う
 
 緊急性を通常のreview/CI回避手段にしない。
 
@@ -434,4 +436,4 @@ Hotfixも原則Pull Requestを経由する。
 - **Delivery**: 検証済みの変更を許可されたbranch / PRへ公開する工程。
 - **Checker chain**: 必須条件（セルフレビュー必須項目、policy・ユーザー指定のCIと承認）と補助観点（利用可能なボット指摘）に分けた確認系列。自己評価は独立レビューの代替にならない。
 - **収束（convergence）**: open findingが0件（全件に根拠あり）になった状態。受入条件を満たせない指摘の先送りは収束に数えない。
-- **再開情報**: 区切り・待機時に Issue / PR へ残す再開用の最小情報（目的と完了地点・branch/HEAD・未コミット作業・未解決findingと根拠・検証証跡・次の1手・外部待ち解除条件）。
+- **再開情報**: 区切り・待機時に作業報告へ書く（依頼で許されていれば Issue / PR にも残す）再開用の最小情報（目的と完了地点・branch/HEAD・未コミット作業・未解決findingと根拠・検証証跡・次の1手・外部待ち解除条件）。

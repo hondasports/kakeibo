@@ -1,11 +1,11 @@
-export const GROUP_DELETION_ERROR_CATEGORIES = new Set([
+const GROUP_DELETION_ERROR_CATEGORIES = new Set([
   "batch_processing_failed",
   "identity_deletion_failed",
   "finalization_failed",
   "unknown",
 ] as const);
 
-export type GroupDeletionErrorCategory =
+type GroupDeletionErrorCategory =
   typeof GROUP_DELETION_ERROR_CATEGORIES extends Set<infer T> ? T : never;
 
 export function sanitizeGroupDeletionErrorCategory(

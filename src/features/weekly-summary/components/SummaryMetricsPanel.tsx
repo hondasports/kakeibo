@@ -27,7 +27,7 @@ function Metric({
   const color =
     tone === "good" ? "success.main" : tone === "warning" ? "error.main" : "text.primary";
   return (
-    <Box aria-label={label} className="weekly-summary-metric">
+    <Box aria-label={label} className="weekly-summary-metric" role="group">
       <Typography color="text.secondary" variant="body2">
         {label}
       </Typography>
@@ -75,7 +75,7 @@ export function SummaryMetricsPanel({
             tone={previousDiff === null ? "default" : previousDiff <= 0 ? "good" : "warning"}
           />
           <Metric
-            label="2週平均比"
+            label="直前2週平均との増減率"
             value={formatSignedRate(averageRate)}
             tone={averageRate === null ? "default" : averageRate <= 0 ? "good" : "warning"}
           />

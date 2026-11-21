@@ -8,6 +8,15 @@ const dateTimeFormatter = new Intl.DateTimeFormat("ja-JP", {
   minute: "2-digit",
 });
 
+const dateTimeWithSecondsFormatter = new Intl.DateTimeFormat("ja-JP", {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
 /**
  * ISO 形式の日付文字列 (YYYY-MM-DD) を "M/D" 形式にフォーマットする。
  * 例: "2026-05-18" → "5/18"
@@ -32,6 +41,14 @@ export function formatDateWithYearForDisplay(isoDate: string): string {
  */
 export function formatDateTimeForDisplay(timestamp: number): string {
   return dateTimeFormatter.format(new Date(timestamp));
+}
+
+/**
+ * Unix タイムスタンプを秒まで含む日本語の日時表記に変換する。
+ * 監査ログのように秒精度が必要な場面で使う。
+ */
+export function formatDateTimeWithSecondsForDisplay(timestamp: number): string {
+  return dateTimeWithSecondsFormatter.format(new Date(timestamp));
 }
 
 /**

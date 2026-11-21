@@ -5,7 +5,7 @@ export type LineImageContent = {
   contentType: string;
 };
 
-export type LineImageDataUrlError = "empty" | "unsupported_mime_type" | "too_large";
+type LineImageDataUrlError = "empty" | "unsupported_mime_type" | "too_large";
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const DATA_URL_BASE64_PREFIX_SUFFIX = ";base64,";

@@ -11,7 +11,7 @@ export const RECEIPT_LINE_ROLES = [
 
 export type ReceiptLineRole = (typeof RECEIPT_LINE_ROLES)[number];
 
-export type ReceiptObservationBoundingBox = {
+type ReceiptObservationBoundingBox = {
   left: number;
   top: number;
   width: number;
@@ -31,7 +31,7 @@ export type ReceiptRawObservationLine = {
 
 export const RECEIPT_RAW_OBSERVATION_SOURCES = ["ai_ocr", "legacy_projection"] as const;
 
-export type ReceiptRawObservationSource = (typeof RECEIPT_RAW_OBSERVATION_SOURCES)[number];
+type ReceiptRawObservationSource = (typeof RECEIPT_RAW_OBSERVATION_SOURCES)[number];
 
 export type ReceiptRawObservation = {
   source: ReceiptRawObservationSource;
@@ -42,7 +42,7 @@ export type ReceiptRawObservation = {
 const AMOUNT_ONLY_TEXT = /^[¥￥]?(-?\d{1,3}(?:,\d{3})+|-?\d+)円?$/;
 
 /** 金額だけが書かれた文字列（例: `￥4,810`）を円に変換する。金額以外が混じる文字列は読まない。 */
-export function parseAmountOnlyText(amountText: string | null): number | null {
+function parseAmountOnlyText(amountText: string | null): number | null {
   if (amountText === null) return null;
   const match = AMOUNT_ONLY_TEXT.exec(amountText.normalize("NFKC").replace(/\s+/g, ""));
   if (match === null) return null;
@@ -89,7 +89,7 @@ export type ReceiptLineClassificationCandidate = {
 
 export const RECEIPT_LINE_CLASSIFICATION_STATUSES = ["classified", "ambiguous"] as const;
 
-export type ReceiptLineClassificationStatus = (typeof RECEIPT_LINE_CLASSIFICATION_STATUSES)[number];
+type ReceiptLineClassificationStatus = (typeof RECEIPT_LINE_CLASSIFICATION_STATUSES)[number];
 
 export type ReceiptLineClassification = {
   sourceLineIndex: number;

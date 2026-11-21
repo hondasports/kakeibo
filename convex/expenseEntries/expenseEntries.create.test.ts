@@ -81,6 +81,29 @@ describe("createExpenseEntriesHandler", () => {
     );
   });
 
+  it("項目が100件まで作成でき、101件以上は拒否する", async () => {
+    const ctx = createMutationCtx(createIdentity(), {
+      getDocById: {
+        "cat-food": activeFoodCategory,
+      },
+    });
+    const items = (count: number) =>
+      Array.from({ length: count }, () => ({
+        categoryId: catFoodId,
+        amountYen: 100,
+        title: "食料品",
+        memo: undefined,
+      }));
+
+    await createExpenseEntriesHandler(ctx, { date: "2026-06-07", items: items(100) });
+    expect(ctx.db.insert).toHaveBeenCalledTimes(100);
+
+    await expect(
+      createExpenseEntriesHandler(ctx, { date: "2026-06-07", items: items(101) }),
+    ).rejects.toBeInstanceOf(ConvexError);
+    expect(ctx.db.insert).toHaveBeenCalledTimes(100);
+  });
+
   it("手入力でも0円以下の支出項目は保存しない", async () => {
     const ctx = createMutationCtx(createIdentity(), {
       getDocById: { "cat-food": activeFoodCategory },

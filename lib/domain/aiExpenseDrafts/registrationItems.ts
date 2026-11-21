@@ -1,4 +1,5 @@
 import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
+import { DEFAULT_REGISTRATION_MODE } from "./receiptDataContract";
 import type { AiExpenseRegistrationMode } from "./receiptDataContract";
 import { resolveReceiptShopNameFromDraft } from "./shopName";
 import { aggregateDraftItemsByCategory, getDraftItemAggregationErrorMessage } from "./reviewItems";
@@ -13,7 +14,7 @@ export type DraftRegistrationItem = {
 };
 
 /** 登録可否判定に必要な下書きの形状。 */
-export type DraftForRegistration = Pick<
+type DraftForRegistration = Pick<
   AiExpenseDraftFields,
   | "rawObservation"
   | "receiptInterpretation"
@@ -32,13 +33,13 @@ export type DraftForRegistration = Pick<
 >;
 
 /** 登録可否判定に必要な明細の形状。 */
-export type DraftItemForRegistration = AiExpenseDraftItemFields;
+type DraftItemForRegistration = AiExpenseDraftItemFields;
 
 /** 登録モードを解決する。未設定の既存下書きは detailed として扱う。 */
 export function resolveRegistrationMode(draft: {
   registrationMode?: AiExpenseRegistrationMode;
 }): AiExpenseRegistrationMode {
-  return draft.registrationMode ?? "detailed";
+  return draft.registrationMode ?? DEFAULT_REGISTRATION_MODE;
 }
 
 function assertUserConfirmedReceiptTotal(draft: DraftForRegistration): void {

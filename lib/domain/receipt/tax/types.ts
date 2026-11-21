@@ -5,7 +5,7 @@ export type ReceiptItemTaxConfirmedField = (typeof RECEIPT_ITEM_TAX_CONFIRMED_FI
 import type { ReceiptItemLineType } from "../discountItems";
 export const TAX_RATE_PERCENTS = [0, 8, 10] as const;
 
-export const RECEIPT_TOTAL_SOURCES = ["explicit_label", "user_confirmed", "ai_estimate"] as const;
+const RECEIPT_TOTAL_SOURCES = ["explicit_label", "user_confirmed", "ai_estimate"] as const;
 
 export type ReceiptTotalSource = (typeof RECEIPT_TOTAL_SOURCES)[number];
 
@@ -67,18 +67,16 @@ export const RECEIPT_TAX_AMOUNT_DECISION_SOURCES = [
   "user",
 ] as const;
 
-export type ReceiptTaxAmountDecisionSource = (typeof RECEIPT_TAX_AMOUNT_DECISION_SOURCES)[number];
+type ReceiptTaxAmountDecisionSource = (typeof RECEIPT_TAX_AMOUNT_DECISION_SOURCES)[number];
 export const TAX_SUMMARY_DECISION_STATUSES = ["verified", "ambiguous", "contradictory"] as const;
 
 export type TaxSummaryDecisionStatus = (typeof TAX_SUMMARY_DECISION_STATUSES)[number];
-export const LEGACY_TAX_SUMMARY_CONSISTENCY_STATUSES = [
+const LEGACY_TAX_SUMMARY_CONSISTENCY_STATUSES = [
   "coherent",
   "reconcilable",
   "conflicting",
 ] as const;
 
-export type LegacyTaxSummaryConsistencyStatus =
-  (typeof LEGACY_TAX_SUMMARY_CONSISTENCY_STATUSES)[number];
 /** Legacy values remain readable until the observation contract migration in #667. */
 export const TAX_SUMMARY_CONSISTENCY_STATUSES = [
   ...TAX_SUMMARY_DECISION_STATUSES,
@@ -129,11 +127,11 @@ export const TAX_SUMMARY_USER_EDITED_FIELDS = [
   "taxIncludedAmountYen",
 ] as const;
 
-export type TaxSummaryUserEditedField = (typeof TAX_SUMMARY_USER_EDITED_FIELDS)[number];
+type TaxSummaryUserEditedField = (typeof TAX_SUMMARY_USER_EDITED_FIELDS)[number];
 
 export const TAX_SUMMARY_VALUE_ORIGIN_SOURCES = ["items", "user", "unknown"] as const;
 
-export type TaxSummaryValueOriginSource = (typeof TAX_SUMMARY_VALUE_ORIGIN_SOURCES)[number];
+type TaxSummaryValueOriginSource = (typeof TAX_SUMMARY_VALUE_ORIGIN_SOURCES)[number];
 
 export type ExtractedTaxSummary = {
   /** 対象額の出所とは別に、個別フィールドの手修正を保持する。 */
@@ -224,7 +222,7 @@ export const RECEIPT_TOTAL_CANDIDATE_SOURCES = [
   "tax_arithmetic",
 ] as const;
 
-export type ReceiptTotalCandidateSource = (typeof RECEIPT_TOTAL_CANDIDATE_SOURCES)[number];
+type ReceiptTotalCandidateSource = (typeof RECEIPT_TOTAL_CANDIDATE_SOURCES)[number];
 
 export type ReceiptTotalCandidate = {
   amountYen: number;

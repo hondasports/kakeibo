@@ -27,11 +27,27 @@ test.describe("設定台帳（Issue #375）", () => {
     const weekSection = ledger.locator(".settings-ledger-section", {
       has: page.getByRole("heading", { name: "週の設定", level: 2 }),
     });
+
+    // 値が未変更だと保存ボタンは無効なので、現在値と違う曜日を選ぶ
+    const startDaySelect = weekSection.getByRole("combobox", { name: "週の始まり" });
+    const currentLabel = (await startDaySelect.innerText()).trim();
+    await startDaySelect.click();
+    const options = page.getByRole("listbox").getByRole("option");
+    const optionCount = await options.count();
+    for (let i = 0; i < optionCount; i += 1) {
+      const option = options.nth(i);
+      if ((await option.innerText()).trim() !== currentLabel) {
+        await option.click();
+        break;
+      }
+    }
+
+    await expect(weekSection.getByRole("button", { name: "変更を保存" })).toBeEnabled();
     await weekSection.getByRole("button", { name: "変更を保存" }).click();
     await expect(page.getByText("週の設定を保存しました")).toBeVisible({ timeout: 15_000 });
   });
 
-  test("/categories 互換ルートでも同じ設定台帳を表示する", async ({ page }) => {
+  test("@smoke /categories 互換ルートでも同じ設定台帳を表示する", async ({ page }) => {
     await page.goto("/categories");
     await expect(page).toHaveURL("/categories");
     await expect(page.getByTestId("settings-ledger")).toBeVisible();
@@ -49,7 +65,7 @@ test.describe("設定台帳（Issue #510 カテゴリ分類ヒント）", () => 
     await cleanupTestCategories();
   });
 
-  test("P1 分類ヒントを保存して再読み込み後も保持する", async ({ page }) => {
+  test("@smoke P1 分類ヒントを保存して再読み込み後も保持する", async ({ page }) => {
     const categoryName = `E2Eカテゴリ-分類ヒント-${Date.now()}`;
     const description = "食品以外のペット用品\n衛生用品や消耗品を分類する";
 

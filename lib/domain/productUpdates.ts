@@ -21,7 +21,7 @@ export type ProductUpdate = ProductUpdateDraft & {
   publishedAt: string;
 };
 
-export const PULL_REQUEST_DECISION_OUTCOMES = [
+const PULL_REQUEST_DECISION_OUTCOMES = [
   "published",
   "skipped",
   "exempt_bot",
@@ -29,7 +29,7 @@ export const PULL_REQUEST_DECISION_OUTCOMES = [
   "not_merged",
 ] as const;
 
-export type PullRequestDecisionOutcome = (typeof PULL_REQUEST_DECISION_OUTCOMES)[number];
+type PullRequestDecisionOutcome = (typeof PULL_REQUEST_DECISION_OUTCOMES)[number];
 
 export type PullRequestDecision = {
   pullRequest: number;
@@ -55,7 +55,7 @@ export class ProductUpdateValidationError extends Error {
   }
 }
 
-export type ValidateAppVersionOptions = {
+type ValidateAppVersionOptions = {
   allowLocal?: boolean;
 };
 
@@ -77,7 +77,7 @@ export function validateAppVersion(
   return version;
 }
 
-export function parseVersion(version: string): {
+function parseVersion(version: string): {
   year: number;
   month: number;
   day: number;

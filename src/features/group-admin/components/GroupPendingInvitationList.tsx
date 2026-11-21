@@ -45,10 +45,10 @@ export function GroupPendingInvitationList({
         <Box className="group-member-row" component="li" key={invitation._id}>
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0 }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 700 }} noWrap>
+              <Typography sx={{ fontWeight: 700, overflowWrap: "anywhere" }}>
                 {invitation.email}
               </Typography>
-              <Typography color="text.secondary" variant="body2" noWrap>
+              <Typography color="text.secondary" sx={{ overflowWrap: "anywhere" }} variant="body2">
                 {getInvitationSentAtLabel(invitation.createdAt)}
               </Typography>
             </Box>

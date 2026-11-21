@@ -7,6 +7,7 @@ import {
   historyTrendGranularityValidator,
 } from "../lib/convex/expenseSearch/validators";
 import { entryKindValidator, recordTypeValidator } from "../lib/convex/receipts/validators";
+import { categorySummaryValidator } from "./lib/validators";
 
 const expenseSearchReceiptValidator = v.object({
   _id: v.string(),
@@ -26,14 +27,6 @@ const expenseSearchReceiptValidator = v.object({
   receiptTotalAmountYen: v.optional(v.number()),
 });
 
-const historyCategorySummaryValidator = v.object({
-  categoryId: v.string(),
-  categoryName: v.string(),
-  categoryColor: v.string(),
-  totalAmountYen: v.number(),
-  count: v.number(),
-});
-
 const historyAggregateValidator = v.object({
   count: v.number(),
   expenseCount: v.number(),
@@ -41,7 +34,7 @@ const historyAggregateValidator = v.object({
   totalExpenseYen: v.number(),
   totalIncomeYen: v.number(),
   netAmountYen: v.number(),
-  byCategory: v.array(historyCategorySummaryValidator),
+  byCategory: v.array(categorySummaryValidator),
 });
 
 const historyComparisonValidator = v.union(
@@ -95,7 +88,7 @@ export const searchExpenses = query({
     totalExpenseYen: v.number(),
     totalIncomeYen: v.number(),
     netAmountYen: v.number(),
-    byCategory: v.array(historyCategorySummaryValidator),
+    byCategory: v.array(categorySummaryValidator),
     trend: v.array(
       v.object({
         key: v.string(),

@@ -2,7 +2,7 @@ import { Box, Divider, Stack, Typography } from "@mui/material";
 import type { ProductUpdate } from "../../../../lib/domain/productUpdates";
 import { ProductUpdateItem } from "./ProductUpdateItem";
 
-export type ProductUpdateListProps = {
+type ProductUpdateListProps = {
   productUpdates: ProductUpdate[];
 };
 

@@ -3,12 +3,12 @@ import type { DraftRegistrationItem } from "./registrationItems";
 export class ReconcileExpenseEntriesDomainError extends Error {}
 
 /** 調整対象として必要な既存エントリの形状。 */
-export type ReconcilableExpenseEntry = {
+type ReconcilableExpenseEntry = {
   _id: string;
   categoryId?: string;
 };
 
-export type ExpenseEntryPatchFields = {
+type ExpenseEntryPatchFields = {
   date: string;
   amount: number;
   categoryId: string;
@@ -19,7 +19,7 @@ export type ExpenseEntryPatchFields = {
   updatedAt: number;
 };
 
-export type ExpenseEntryInsertFields = {
+type ExpenseEntryInsertFields = {
   groupId: string;
   createdByUserId: string;
   aiExpenseDraftId: string;
@@ -34,11 +34,11 @@ export type ExpenseEntryInsertFields = {
   updatedAt: number;
 };
 
-export type ExpenseEntryReconciliationOp =
+type ExpenseEntryReconciliationOp =
   | { kind: "patch"; entryId: string; categoryId: string; fields: ExpenseEntryPatchFields }
   | { kind: "insert"; categoryId: string; fields: ExpenseEntryInsertFields };
 
-export type ExpenseEntryReconciliationPlan = {
+type ExpenseEntryReconciliationPlan = {
   /** 明細と同順の適用ops。infraは各op適用前にカテゴリ検証を行う。 */
   ops: ExpenseEntryReconciliationOp[];
   /** ops適用後に削除する既存エントリID。 */

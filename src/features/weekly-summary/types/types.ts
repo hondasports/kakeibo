@@ -13,6 +13,9 @@ export type WeeklySummaryPanelProps = {
   isLoading?: boolean;
   weekStartDate: string;
   weeklyExpenseTrend?: WeeklyExpenseChartData | null;
+  fourWeeksStatus?: "pending" | "success" | "error";
+  onTrendRetry?: () => void;
+  currentWeekStartDate?: string;
   onDeleteReceipt?: (receipt: ReceiptItem) => void;
   onEditReceipt?: (receipt: ReceiptItem) => void;
   selectionEnabled?: boolean;

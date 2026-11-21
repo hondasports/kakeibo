@@ -1,6 +1,6 @@
 import { mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { requireGroupMembership } from "../groups/membership";
 import { DEFAULT_CATEGORIES, MAX_CATEGORIES_PER_GROUP } from "../../lib/domain/categories/defaults";
@@ -14,9 +14,12 @@ import { CategoryDomainError } from "../../lib/domain/categories/rules";
 import {
   createCategory as createCategoryUsecase,
   deactivateCategory as deactivateCategoryUsecase,
+  moveCategory as moveCategoryUsecase,
+  reactivateCategory as reactivateCategoryUsecase,
   seedDefaultCategories as seedDefaultCategoriesUsecase,
   updateCategory as updateCategoryUsecase,
 } from "../../lib/usecase/categories";
+import { toConvexEndpointError } from "../lib/errors";
 
 export { MAX_CATEGORY_DESCRIPTION_LENGTH, MAX_CATEGORY_NAME_LENGTH } from "./normalize";
 export { DEFAULT_CATEGORIES, MAX_CATEGORIES_PER_GROUP };
@@ -24,11 +27,7 @@ export { shouldRefreshLegacyDefaultCategoryColor } from "../../lib/domain/catego
 export { E2E_CATEGORY_NAME_PREFIX };
 
 function convexError(error: unknown): never {
-  if (error instanceof ConvexError) throw error;
-  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
-  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
-  if (error instanceof CategoryDomainError) throw new ConvexError(error.message);
-  throw error;
+  toConvexEndpointError(error, [CategoryDomainError]);
 }
 
 /** seedDefaultCategories mutation の handler ロジック（テスト用に export） */
@@ -105,6 +104,48 @@ export async function deactivateCategoryHandler(
   }
 }
 
+type MoveCategoryArgs = {
+  categoryId: Id<"categories">;
+  direction: "up" | "down";
+};
+
+/** moveCategory mutation の handler ロジック（テスト用に export） */
+export async function moveCategoryHandler(
+  ctx: MutationCtx,
+  args: MoveCategoryArgs,
+): Promise<Doc<"categories"> | null> {
+  const { groupId } = await requireGroupMembership(ctx);
+  try {
+    const record = await moveCategoryUsecase(createCategoryStore(ctx), groupId, args, Date.now());
+    return record === null ? null : categoryRecordToDoc(record);
+  } catch (error) {
+    convexError(error);
+  }
+}
+
+type ReactivateCategoryArgs = {
+  categoryId: Id<"categories">;
+};
+
+/** reactivateCategory mutation の handler ロジック（テスト用に export） */
+export async function reactivateCategoryHandler(
+  ctx: MutationCtx,
+  args: ReactivateCategoryArgs,
+): Promise<Doc<"categories"> | null> {
+  const { groupId } = await requireGroupMembership(ctx);
+  try {
+    const record = await reactivateCategoryUsecase(
+      createCategoryStore(ctx),
+      groupId,
+      args.categoryId,
+      Date.now(),
+    );
+    return record === null ? null : categoryRecordToDoc(record);
+  } catch (error) {
+    convexError(error);
+  }
+}
+
 /**
  * 初回ログイン時にデフォルトカテゴリを seed する mutation。
  * groupId はサーバー側でグループメンバーシップから解決するため、
@@ -139,4 +180,19 @@ export const deactivateCategory = mutation({
     categoryId: v.id("categories"),
   },
   handler: deactivateCategoryHandler,
+});
+
+export const reactivateCategory = mutation({
+  args: {
+    categoryId: v.id("categories"),
+  },
+  handler: reactivateCategoryHandler,
+});
+
+export const moveCategory = mutation({
+  args: {
+    categoryId: v.id("categories"),
+    direction: v.union(v.literal("up"), v.literal("down")),
+  },
+  handler: moveCategoryHandler,
 });

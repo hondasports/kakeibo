@@ -3,6 +3,7 @@ import {
   getExpenseItemFieldErrorMessage,
   validateExpenseItemInput,
   validateExpenseItems as validateExpenseItemsDomain,
+  validateExpenseMemo,
   type ExpenseItemErrors,
 } from "../../../../lib/domain/expenseEntries/expenseEntryItem";
 
@@ -13,7 +14,7 @@ export type ExpenseItemEntryInput = {
   memo?: string;
 };
 
-export type ExpenseItemEntryParsed = {
+type ExpenseItemEntryParsed = {
   categoryId: Id<"categories">;
   amountYen: number;
   title: string;
@@ -67,10 +68,24 @@ export function validateExpenseItemEntry(
   return { success: false, errors: mapExpenseItemErrors(result.errors) };
 }
 
-export type ValidateExpenseItemsInput = {
+type ValidateExpenseItemsInput = {
   sourceAmount: number | undefined;
   items: ExpenseItemEntryInput[];
 };
+
+/**
+ * 支出全体のメモ（明細とは別のフォーム状態）を検証する。
+ * 失敗時はユーザー向けメッセージを返す。
+ */
+export function validateExpenseMemoEntry(
+  memo: string,
+): { success: true } | { success: false; error: string } {
+  const result = validateExpenseMemo(memo === "" ? undefined : memo);
+  if (result.success) {
+    return { success: true };
+  }
+  return { success: false, error: getExpenseItemFieldErrorMessage("memo", result.error) };
+}
 
 type ValidateExpenseItemsSuccess = {
   success: true;

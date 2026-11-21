@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LINE_IMAGE_INVALID_MESSAGE, LINE_IMAGE_TOO_LARGE_MESSAGE } from "../lineImage/reply";
 import {
   LINE_UNLINKED_GUIDANCE_MESSAGE,
   replyForCompletedImageJob,
@@ -14,6 +15,11 @@ describe("replyForImageSkipReason", () => {
     expect(replyForImageSkipReason("invalid_image")).toBeTruthy();
     expect(replyForImageSkipReason("too_large")).toBeTruthy();
     expect(replyForImageSkipReason("fetch_failed")).toBeTruthy();
+  });
+
+  it("画像の容量超過と形式不正は別の案内文を返す", () => {
+    expect(replyForImageSkipReason("too_large")).toBe(LINE_IMAGE_TOO_LARGE_MESSAGE);
+    expect(replyForImageSkipReason("invalid_image")).toBe(LINE_IMAGE_INVALID_MESSAGE);
   });
 });
 

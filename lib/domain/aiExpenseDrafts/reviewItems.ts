@@ -6,14 +6,14 @@ import type { ReceiptItemLineType } from "../receipt/discountItems";
 import { analyzeRegistrationAmounts } from "./draftAmountTaxJudgment";
 import { resolveReceiptShopNameFromDraft } from "./shopName";
 
-export type ItemConfidence = {
+type ItemConfidence = {
   itemName?: number;
   amountYen?: number;
   categoryName?: number;
   categoryId?: number;
 };
 
-export type ReviewItemLike = {
+type ReviewItemLike = {
   amountYen: number;
   normalizedAmountYen?: number;
   categoryId?: string;
@@ -88,7 +88,7 @@ export function validatePositiveCategoryTotals(
   ).nonPositiveCategoryTotal;
 }
 
-export type DraftForAggregation = {
+type DraftForAggregation = {
   amountYen: number;
   categoryId: string;
   documentType?: AiExpenseDraftDocumentType;
@@ -98,7 +98,7 @@ export type DraftForAggregation = {
   paymentPurpose?: string;
 };
 
-export type DraftItemForAggregation = {
+type DraftItemForAggregation = {
   itemName: string;
   lineType?: ReceiptItemLineType;
   amountYen: number;
@@ -107,7 +107,7 @@ export type DraftItemForAggregation = {
   confidence: ItemConfidence;
 };
 
-export type DraftItemAggregationError =
+type DraftItemAggregationError =
   | "invalid_item_amount"
   | "missing_category"
   | "low_confidence"

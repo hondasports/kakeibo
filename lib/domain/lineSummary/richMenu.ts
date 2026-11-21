@@ -9,14 +9,14 @@ export const LINE_RICH_MENU_SIZE = { width: 2500, height: 1686 } as const;
 export const LINE_RICH_MENU_NAME = "suzumemo-readonly-summary-v1";
 export const LINE_RICH_MENU_CHAT_BAR_TEXT = "家計簿";
 
-export type LineRichMenuBounds = {
+type LineRichMenuBounds = {
   x: number;
   y: number;
   width: number;
   height: number;
 };
 
-export type LineRichMenuCell = {
+type LineRichMenuCell = {
   id: "week_summary" | "week_expense" | "week_income" | "week_categories" | "week_trend" | "help";
   label: string;
   messageText: string;

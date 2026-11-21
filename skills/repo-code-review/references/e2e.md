@@ -7,9 +7,9 @@ spec作成の手順は `skills/e2e-spec-authoring` を正本とする。ここ�
 - browser層の受入条件が適切なテストで確認されているか。E2Eが不要な場合は、代替のテスト層と残る保証の差を確認する（判断は `skills/test-design`）
 - 認可はサーバー側で確認し、画面の出し分けや結合経路をE2Eでも確認する必要があるか判断したか
 
-## spec-map
+## E2Eタグ
 
-- 新しい `src/features/*` や `convex/*` 配下を追加したとき、`e2e/spec-map.json` に対応specを追記しているか。未登録だと `pnpm verify:prepush` が毎回 @smoke + @public 全件を選ぶ
+- 新規・変更した `test(` にタグ（`@smoke` / `@public` / `@staging`）が付いているか。CIのE2Eはタグ経由でだけ選定するため、タグなしテストはどこでも実行されない
 
 ## specの作法
 

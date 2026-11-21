@@ -51,6 +51,24 @@ describe("DashboardInputPanel", () => {
     expect(screen.getByRole("link", { name: "支出・収入を入力する" })).toBeInTheDocument();
   });
 
+  it("件数0の場合は同義の「新しく入力する」を並べない", () => {
+    renderPanel({ count: 0, status: "draft", weekStartDate: "2026-06-15" });
+
+    expect(screen.queryByRole("link", { name: "新しく入力する" })).not.toBeInTheDocument();
+  });
+
+  it("入力途中は「新しく入力する」と役割を説明する補助文を表示する", () => {
+    renderPanel({ count: 3, status: "draft", weekStartDate: "2026-06-15" });
+
+    expect(screen.getByRole("link", { name: "新しく入力する" })).toHaveAttribute(
+      "href",
+      "/weeks/current/input",
+    );
+    expect(
+      screen.getByText("これまでの記録を残したまま、今週にさらに記録を追加します"),
+    ).toBeInTheDocument();
+  });
+
   it("完了済みの場合は今週のサマリーを見るを表示する", () => {
     renderPanel({ count: 12, status: "completed", weekStartDate: "2026-06-15" });
 

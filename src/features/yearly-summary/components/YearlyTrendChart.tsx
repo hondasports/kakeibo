@@ -18,7 +18,12 @@ import {
   yAxisWidthForLabels,
   yenAxisTickLabels,
 } from "../../../utils/chartAxisLayout";
-import { buildYearlyLineSeries, type YearlyTrendChartData } from "../utils/yearlyTrendChartData";
+import { designTokens } from "../../../designTokens";
+import {
+  buildYearlyChartAriaLabel,
+  buildYearlyLineSeries,
+  type YearlyTrendChartData,
+} from "../utils/yearlyTrendChartData";
 
 export type YearlyChartMode = "balance" | "category";
 
@@ -120,7 +125,11 @@ export function YearlyTrendChart({
         ) : (
           <Box
             aria-label={
-              mode === "balance" ? "月ごとの収支推移グラフ" : "カテゴリ別の積み上げ面グラフ"
+              chartData
+                ? buildYearlyChartAriaLabel(mode, chartData)
+                : mode === "balance"
+                  ? "月ごとの収支推移グラフ"
+                  : "カテゴリ別の積み上げ面グラフ"
             }
             data-chart-height={chartHeight}
             role="img"
@@ -142,7 +151,7 @@ export function YearlyTrendChart({
                   series,
                 },
                 {
-                  expense: theme.palette.error.main,
+                  expense: designTokens.color.brand.sparrow,
                   income: theme.palette.success.main,
                 },
               )}

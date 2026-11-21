@@ -1,42 +1,71 @@
-import { Box, Button, Chip, Collapse, Stack, TextField, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Chip,
+  Collapse,
+  IconButton,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { designTokens } from "../../../designTokens";
-import type { Category } from "../hooks/useCategorySettings";
+import type { Category, CategoryFieldErrors } from "../hooks/useCategorySettings";
 import { MAX_CATEGORY_DESCRIPTION_LENGTH } from "../../../../lib/domain/categories/category";
+import { CategoryColorSwatches } from "./CategoryColorSwatches";
 
 type CategorySettingsRowProps = {
+  canMoveDown: boolean;
+  canMoveUp: boolean;
   category: Category;
+  clearEditFieldError: (field: keyof CategoryFieldErrors) => void;
   editColor: string;
   editDescription: string;
+  editFieldErrors: CategoryFieldErrors;
+  editIsDirty: boolean;
   editName: string;
   isEditing: boolean;
+  onMove: (category: Category, direction: "up" | "down") => void;
   onBeginEdit: (category: Category) => void;
   onCancelEdit: () => void;
-  onDeactivate: (categoryId: Category["_id"]) => void;
   onEditColorChange: (color: string) => void;
   onEditDescriptionChange: (description: string) => void;
   onEditNameChange: (name: string) => void;
+  onReactivate: (categoryId: Category["_id"]) => void;
+  onRequestDeactivate: (category: Category) => void;
   onUpdate: () => void;
   savingTarget: string | null;
 };
 
 export function CategorySettingsRow({
+  canMoveDown,
+  canMoveUp,
   category,
+  clearEditFieldError,
   editColor,
   editDescription,
+  editFieldErrors,
+  editIsDirty,
   editName,
   isEditing,
   onBeginEdit,
+  onMove,
   onCancelEdit,
-  onDeactivate,
   onEditColorChange,
   onEditDescriptionChange,
   onEditNameChange,
+  onReactivate,
+  onRequestDeactivate,
   onUpdate,
   savingTarget,
 }: CategorySettingsRowProps) {
   const editSaving = savingTarget === `edit-${category._id}`;
-  const deactivateSaving = savingTarget === `deactivate-${category._id}`;
+  const reactivateSaving = savingTarget === `reactivate-${category._id}`;
+  const moveSaving = savingTarget === `move-${category._id}`;
+  const moveDisabled = editSaving || moveSaving;
 
   return (
     <Box aria-label={`カテゴリ ${category.name}`} className="category-settings-row" component="li">
@@ -63,12 +92,39 @@ export function CategorySettingsRow({
           size="small"
           variant="outlined"
         />
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexShrink: 0 }}>
+          <Tooltip title="上に移動">
+            <span>
+              <IconButton
+                aria-label={`${category.name}を上に移動`}
+                disabled={!canMoveUp || moveDisabled}
+                onClick={() => onMove(category, "up")}
+                size="small"
+              >
+                <KeyboardArrowUpIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="下に移動">
+            <span>
+              <IconButton
+                aria-label={`${category.name}を下に移動`}
+                disabled={!canMoveDown || moveDisabled}
+                onClick={() => onMove(category, "down")}
+                size="small"
+              >
+                <KeyboardArrowDownIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
         <Button
           aria-controls={`category-editor-${category._id}`}
           aria-expanded={isEditing}
           aria-label={`${category.name}を編集`}
+          disabled={isEditing}
           endIcon={<ChevronRightIcon />}
-          onClick={() => (isEditing ? onCancelEdit() : onBeginEdit(category))}
+          onClick={() => onBeginEdit(category)}
           size="small"
         >
           編集
@@ -78,39 +134,71 @@ export function CategorySettingsRow({
       <Collapse id={`category-editor-${category._id}`} in={isEditing} unmountOnExit>
         <Stack className="category-settings-editor" spacing={1.5}>
           <Box className="category-settings-editor-fields">
+            {editIsDirty ? (
+              <Typography
+                className="category-settings-dirty-notice"
+                color="warning.dark"
+                variant="caption"
+              >
+                未保存の変更があります。保存またはキャンセルしてください。
+              </Typography>
+            ) : null}
             <TextField
+              autoFocus
               className="category-settings-field-name"
               disabled={editSaving}
+              error={Boolean(editFieldErrors.name)}
               fullWidth
+              helperText={editFieldErrors.name}
               label="カテゴリ名を編集"
               name="editCategoryName"
-              onChange={(event) => onEditNameChange(event.target.value)}
+              onChange={(event) => {
+                onEditNameChange(event.target.value);
+                clearEditFieldError("name");
+              }}
               value={editName}
             />
             <TextField
               className="category-settings-field-color"
               disabled={editSaving}
+              error={Boolean(editFieldErrors.color)}
+              helperText={editFieldErrors.color}
               label="カテゴリ色"
               name="editCategoryColor"
-              onChange={(event) => onEditColorChange(event.target.value)}
-              slotProps={{
-                htmlInput: { "aria-label": "カテゴリ色を編集" },
-                inputLabel: { shrink: true },
+              onChange={(event) => {
+                onEditColorChange(event.target.value);
+                clearEditFieldError("color");
               }}
+              slotProps={{ inputLabel: { shrink: true } }}
               type="color"
               value={editColor}
               sx={{ width: "100%" }}
             />
+            <CategoryColorSwatches
+              disabled={editSaving}
+              onChange={(color) => {
+                onEditColorChange(color);
+                clearEditFieldError("color");
+              }}
+              value={editColor}
+            />
             <TextField
               className="category-settings-field-description"
               disabled={editSaving}
+              error={Boolean(editFieldErrors.description)}
               fullWidth
-              helperText={`${editDescription.length}/${MAX_CATEGORY_DESCRIPTION_LENGTH}`}
+              helperText={
+                editFieldErrors.description ??
+                `${editDescription.length}/${MAX_CATEGORY_DESCRIPTION_LENGTH}`
+              }
               label="カテゴリのAI分類ヒント"
               name="editCategoryDescription"
               multiline
               minRows={4}
-              onChange={(event) => onEditDescriptionChange(event.target.value)}
+              onChange={(event) => {
+                onEditDescriptionChange(event.target.value);
+                clearEditFieldError("description");
+              }}
               slotProps={{ htmlInput: { maxLength: MAX_CATEGORY_DESCRIPTION_LENGTH } }}
               value={editDescription}
             />
@@ -135,16 +223,27 @@ export function CategorySettingsRow({
             </Stack>
           </Box>
           <Box className="category-settings-deactivate">
-            <Button
-              aria-label={`${category.name}を無効化`}
-              color="error"
-              disabled={deactivateSaving || !category.isActive}
-              onClick={() => void onDeactivate(category._id)}
-              size="small"
-              variant="outlined"
-            >
-              {deactivateSaving ? "無効化中…" : "無効化"}
-            </Button>
+            {category.isActive ? (
+              <Button
+                aria-label={`${category.name}を無効化`}
+                color="error"
+                onClick={() => onRequestDeactivate(category)}
+                size="small"
+                variant="outlined"
+              >
+                無効化
+              </Button>
+            ) : (
+              <Button
+                aria-label={`${category.name}を有効化`}
+                disabled={reactivateSaving}
+                onClick={() => onReactivate(category._id)}
+                size="small"
+                variant="outlined"
+              >
+                {reactivateSaving ? "有効化中…" : "有効化"}
+              </Button>
+            )}
           </Box>
         </Stack>
       </Collapse>

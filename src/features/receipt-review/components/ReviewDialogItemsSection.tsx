@@ -9,7 +9,7 @@ import type { AmountBasis } from "../../../../lib/domain/receipt/tax/types";
 import { ReviewItemCard } from "./ReviewItemCard";
 import { ReviewItemRow } from "./ReviewItemRow";
 
-export type ReviewDialogItemsSectionProps = {
+type ReviewDialogItemsSectionProps = {
   items: ReviewItemValues[];
   products: ReviewItemValues[];
   guidance: ReviewGuidanceItem[];

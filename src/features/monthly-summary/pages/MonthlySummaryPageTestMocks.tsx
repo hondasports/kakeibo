@@ -4,6 +4,7 @@ import type { NavigateOptions } from "react-router-dom";
 import { apiMockWith } from "../../../test/apiMock";
 
 const useQueryMock = vi.hoisted(() => vi.fn());
+const useQueryExperimentalMock = vi.hoisted(() => vi.fn());
 const useMutationMock = vi.hoisted(() => vi.fn(() => vi.fn()));
 const navigateMock = vi.hoisted(() => vi.fn());
 const routeMonth = vi.hoisted(() => ({ value: "2026-07" as string | undefined }));
@@ -16,6 +17,7 @@ vi.mock("../../../../lib/domain/common/month", async (importOriginal) => {
 vi.mock("convex/react", () => ({
   useMutation: () => useMutationMock(),
   useQuery: (...args: unknown[]) => useQueryMock(...args),
+  useQuery_experimental: (...args: unknown[]) => useQueryExperimentalMock(...args),
 }));
 
 vi.mock("../../../../convex/_generated/api", () => ({
@@ -45,6 +47,19 @@ beforeEach(() => {
   routeMonth.value = "2026-07";
   useMutationMock.mockReset();
   useMutationMock.mockImplementation(() => vi.fn());
+  useQueryExperimentalMock.mockReset();
+  useQueryExperimentalMock.mockImplementation((options: { query: unknown; args: unknown }) => {
+    if (options.query === "get-user-profile") {
+      return { status: "success", data: { weeklyStartDay: 3 } };
+    }
+    return {
+      status: "success",
+      data: [
+        { _id: "category-food", name: "食費" },
+        { _id: "category-daily", name: "日用品" },
+      ],
+    };
+  });
   useQueryMock.mockImplementation((_query: unknown, args: unknown) => {
     if (_query === "get-user-profile") {
       return { weeklyStartDay: 3 };
@@ -97,4 +112,4 @@ beforeEach(() => {
   navigateMock.mockReset();
 });
 
-export { useQueryMock, useMutationMock, navigateMock, routeMonth };
+export { useQueryMock, useQueryExperimentalMock, useMutationMock, navigateMock, routeMonth };

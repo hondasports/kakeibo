@@ -46,8 +46,8 @@ describe("DashboardSummaryRow", () => {
     expect(
       screen.getByText((_, element) => element?.getAttribute("data-value") === "12 件"),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("前週比")).toHaveTextContent("92% ↓");
-    expect(screen.getByLabelText("前週比")).not.toHaveTextContent("円");
+    expect(screen.getByText("前週比")).toBeInTheDocument();
+    expect(screen.getByText("92% ↓")).toBeInTheDocument();
   });
 
   it("前週データがない場合は前週データなしを表示する", () => {
@@ -61,7 +61,7 @@ describe("DashboardSummaryRow", () => {
       weekStartDate: "2026-06-15",
     });
 
-    expect(screen.getByLabelText("前週比")).toHaveTextContent("前週データなし");
+    expect(screen.getByText("前週データなし")).toBeInTheDocument();
   });
 
   it("前週より支出が増えた場合は増加表示にする", () => {
@@ -75,7 +75,7 @@ describe("DashboardSummaryRow", () => {
       weekStartDate: "2026-06-15",
     });
 
-    expect(screen.getByLabelText("前週比")).toHaveTextContent("125% ↑");
+    expect(screen.getByText("125% ↑")).toBeInTheDocument();
   });
 
   it("前週と支出が同じ場合は同値表示にする", () => {
@@ -89,7 +89,7 @@ describe("DashboardSummaryRow", () => {
       weekStartDate: "2026-06-15",
     });
 
-    expect(screen.getByLabelText("前週比")).toHaveTextContent("100%");
+    expect(screen.getByText("100%")).toBeInTheDocument();
   });
 
   it("コンパクト表示では明細数と前週比を下段に表示する", () => {
@@ -106,8 +106,43 @@ describe("DashboardSummaryRow", () => {
     });
 
     expect(screen.getByText("入力済み")).toBeInTheDocument();
-    expect(screen.getByLabelText("前週比")).toHaveTextContent("120% ↑");
+    expect(screen.getByText("120% ↑")).toBeInTheDocument();
     expect(screen.queryByText("今週のサマリーを見る ›")).not.toBeInTheDocument();
+  });
+
+  it("完了済みの週はフッターの週次サマリーリンクを表示しない", () => {
+    renderSummaryRow({
+      count: 3,
+      currentTotalAmountYen: 1200,
+      totalIncomeYen: 8000,
+      isLoading: false,
+      prevWeekTotalAmountYen: 1000,
+      status: "completed",
+      weekEndDate: "2026-06-21",
+      weekStartDate: "2026-06-15",
+    });
+
+    expect(screen.queryByRole("link", { name: "今週のサマリーを見る ›" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "今月の月次サマリーを見る ›" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "今年の年次サマリーを見る ›" })).toBeInTheDocument();
+  });
+
+  it("未完了の週はフッターの週次サマリーリンクを表示する", () => {
+    renderSummaryRow({
+      count: 3,
+      currentTotalAmountYen: 1200,
+      totalIncomeYen: 8000,
+      isLoading: false,
+      prevWeekTotalAmountYen: 1000,
+      status: "draft",
+      weekEndDate: "2026-06-21",
+      weekStartDate: "2026-06-15",
+    });
+
+    expect(screen.getByRole("link", { name: "今週のサマリーを見る ›" })).toHaveAttribute(
+      "href",
+      "/weeks/2026-06-15",
+    );
   });
 
   it("ローディング中は金額・件数・前週比をスケルトンで表示する", () => {
@@ -122,7 +157,7 @@ describe("DashboardSummaryRow", () => {
     });
 
     expect(screen.getAllByText("今週の支出")).toHaveLength(1);
-    expect(screen.getByLabelText("前週比")).toBeInTheDocument();
+    expect(screen.getByText("前週比")).toBeInTheDocument();
     expect(document.querySelectorAll(".MuiSkeleton-root").length).toBeGreaterThan(0);
     expect(screen.queryByText("0円")).not.toBeInTheDocument();
   });

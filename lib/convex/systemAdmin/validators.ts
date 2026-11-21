@@ -9,6 +9,7 @@ import { SYSTEM_ADMIN_MEMBERSHIP_OPERATIONS } from "../../domain/systemAdmin/mem
 import { SYSTEM_ADMIN_NOTIFICATION_ACTIONS } from "../../domain/systemAdmin/notificationStore";
 import { GROUP_SEARCH_TYPES, USER_SEARCH_TYPES } from "../../domain/systemAdmin/searchQuery";
 import { SYSTEM_ADMIN_STATUSES } from "../../domain/systemAdmin/systemAdminStore";
+import { SYSTEM_ADMIN_ROLE_OPERATIONS } from "../../domain/systemAdmin/roleOperation";
 import { GROUP_MEMBERSHIP_STATUSES } from "../../domain/groups/role";
 
 export const systemAdminAuditActionValidator = v.union(
@@ -49,4 +50,8 @@ export const userSearchTypeValidator = v.union(
 
 export const groupQueryTypeValidator = v.union(
   ...GROUP_SEARCH_TYPES.map((queryType) => v.literal(queryType)),
+);
+
+export const systemAdminRoleOperationValidator = v.union(
+  ...SYSTEM_ADMIN_ROLE_OPERATIONS.map((operation) => v.literal(operation)),
 );

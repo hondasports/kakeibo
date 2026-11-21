@@ -16,17 +16,14 @@ import {
   createReceiptAnalysisBatch,
   retryReceiptAnalysisJob,
 } from "../../lib/usecase/receiptAnalysisJobs/operations";
+import { toConvexEndpointError } from "../lib/errors";
 
-export type CreateBatchArgs = { fileNames: string[] };
-export type RetryImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs"> };
-export type CancelImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs"> };
+type CreateBatchArgs = { fileNames: string[] };
+type RetryImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs"> };
+type CancelImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs"> };
 
 function convexError(error: unknown): never {
-  if (error instanceof ConvexError) throw error;
-  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
-  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
-  if (error instanceof ReceiptAnalysisJobDomainError) throw new ConvexError(error.message);
-  throw error;
+  toConvexEndpointError(error, [ReceiptAnalysisJobDomainError]);
 }
 
 export async function createBatchHandler(

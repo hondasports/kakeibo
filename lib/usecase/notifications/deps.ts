@@ -23,10 +23,6 @@ import type { SystemAdminReadStore } from "../../domain/systemAdmin/systemAdminS
 import type { EmailJobScheduler, TransactionalEmailJobStore } from "../../domain/email/store";
 import type { UserStore } from "../../domain/users/store";
 
-export type NotificationSettingQueryDeps = {
-  settings: NotificationSettingReader;
-};
-
 export type NotificationUserQueryDeps = {
   settings: NotificationSettingReader;
   users: Pick<UserStore, "findByUserId">;

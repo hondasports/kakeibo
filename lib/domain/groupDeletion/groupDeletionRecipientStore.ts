@@ -18,7 +18,7 @@ export type GroupDeletionRecipientRecord = {
 };
 
 /** ページネーション結果（groupMembers スキャン用）。 */
-export type MemberPage = {
+type MemberPage = {
   page: { userId: string }[];
   isDone: boolean;
   continueCursor: string;

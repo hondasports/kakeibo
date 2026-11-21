@@ -29,7 +29,7 @@ export function isLineNotificationJobDue(
   return (job.leaseUntil ?? 0) <= now;
 }
 
-export type LineNotificationRetryPlan =
+type LineNotificationRetryPlan =
   | { kind: "retry"; nextRetryAt: number; delayMs: number }
   | { kind: "exhausted"; errorCode: string };
 

@@ -5,7 +5,7 @@
 
 import { lineRichMenuCells } from "./richMenu";
 
-export type LineSummaryCommand =
+type LineSummaryCommand =
   | { type: "week_summary" }
   | { type: "week_expense" }
   | { type: "week_income" }
@@ -43,7 +43,7 @@ const RICH_MENU_POSTBACK_COMMAND_TEXT = new Map<string, string>([
   ...lineRichMenuCells.map((cell) => [cell.messageText, cell.messageText] as const),
 ]);
 
-export function normalizeLineCommandText(messageText: string): string {
+function normalizeLineCommandText(messageText: string): string {
   return messageText
     .replaceAll("\u3000", " ")
     .replace(/[？?！!。．.、，,]/g, " ")

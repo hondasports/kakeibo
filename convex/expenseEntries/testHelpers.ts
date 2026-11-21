@@ -21,7 +21,7 @@ export type CategoryDoc = {
   updatedAt: number;
 };
 
-export type AiExpenseDraftDoc = {
+type AiExpenseDraftDoc = {
   _id: string;
   _creationTime: number;
   groupId: string;
@@ -44,7 +44,7 @@ export type AiExpenseDraftDoc = {
   updatedAt: number;
 };
 
-export type AiExpenseDraftItemDoc = {
+type AiExpenseDraftItemDoc = {
   _id: string;
   _creationTime: number;
   draftId: string;
@@ -74,7 +74,6 @@ export type ExpenseEntryDoc = {
 
 export const catFoodId = "cat-food" as Id<"categories">;
 export const catDailyId = "cat-daily" as Id<"categories">;
-export const draftReadyId = "draft-ready" as Id<"aiExpenseDrafts">;
 export const sourceDocumentId = "source-doc-1" as Id<"sourceDocuments">;
 export const entryId = "entry-001" as Id<"expenseEntries">;
 

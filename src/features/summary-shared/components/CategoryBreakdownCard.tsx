@@ -5,8 +5,9 @@ import type { CategorySummary } from "../types/types";
 export function CategoryBreakdownCard({
   byCategory,
   count,
-  emptyMessage = "まだレシートがありません",
+  emptyMessage = "まだ支出がありません",
   isLoading,
+  scopeLabel,
   showPercentage = false,
   title = "カテゴリ別",
   totalAmountYen,
@@ -15,6 +16,7 @@ export function CategoryBreakdownCard({
   count: number;
   emptyMessage?: string;
   isLoading: boolean;
+  scopeLabel?: string;
   showPercentage?: boolean;
   title?: string;
   totalAmountYen: number;
@@ -27,9 +29,16 @@ export function CategoryBreakdownCard({
             direction="row"
             sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}
           >
-            <Typography component="h2" variant="h6">
-              {title}
-            </Typography>
+            <Stack spacing={0.25} sx={{ minWidth: 0 }}>
+              <Typography component="h2" variant="h6">
+                {title}
+              </Typography>
+              {scopeLabel && (
+                <Typography color="text.secondary" variant="caption">
+                  {scopeLabel}
+                </Typography>
+              )}
+            </Stack>
             {showPercentage && (
               <Typography color="text.secondary" variant="body2">
                 金額 (円)
@@ -70,11 +79,9 @@ export function CategoryBreakdownCard({
                           }}
                         />
                         <Typography variant="body2">{cat.categoryName}</Typography>
-                        {!showPercentage && (
-                          <Typography color="text.secondary" variant="caption">
-                            <AnimatedCounter value={cat.count} suffix="件" />
-                          </Typography>
-                        )}
+                        <Typography color="text.secondary" variant="caption">
+                          <AnimatedCounter value={cat.count} suffix="件" />
+                        </Typography>
                       </Stack>
                       <Typography sx={{ fontWeight: 700, flexShrink: 0 }} variant="body2">
                         {showPercentage ? (

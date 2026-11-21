@@ -12,7 +12,7 @@ import {
 
 import type { EntryKind } from "../common/entryKind";
 
-export type ExpenseEntryType = EntryKind;
+type ExpenseEntryType = EntryKind;
 
 export const EXPENSE_ENTRY_SOURCES = ["manual", "ai_suggested", "imported"] as const;
 
@@ -37,7 +37,7 @@ export type ExpenseEntryFields = {
 };
 
 /** 手動入力の支出エントリ作成入力。 */
-export type ManualExpenseInput = {
+type ManualExpenseInput = {
   groupId: string;
   createdByUserId: string;
   sourceDocumentId?: string;
@@ -49,7 +49,7 @@ export type ManualExpenseInput = {
 };
 
 /** 手動入力の収入エントリ作成入力。 */
-export type ManualIncomeInput = {
+type ManualIncomeInput = {
   groupId: string;
   createdByUserId: string;
   date: string;
@@ -58,7 +58,7 @@ export type ManualIncomeInput = {
 };
 
 /** 更新入力（未指定フィールドは変更しない）。 */
-export type ExpenseEntryUpdateInput = {
+type ExpenseEntryUpdateInput = {
   date?: string;
   amountYen?: number;
   categoryId?: string;

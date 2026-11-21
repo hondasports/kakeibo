@@ -1,6 +1,6 @@
 import { normalizeEmail } from "../users/email";
 
-export type ValidateEmailError = "empty";
+type ValidateEmailError = "empty";
 
 export function validateEmail(
   email: string,
@@ -19,7 +19,7 @@ const MAX_EMAIL_LOCAL_PART_LENGTH = 64;
 /** 保守的な形式: @ はちょうど 1 つ、空白なし、ドメインは「.」区切りで 2 ラベル以上。 */
 const EMAIL_FORMAT_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 
-export type ValidateInvitationEmailError = ValidateEmailError | "too_long" | "invalid_format";
+type ValidateInvitationEmailError = ValidateEmailError | "too_long" | "invalid_format";
 
 /**
  * 招待・メンバー追加で受け付けるメールアドレスの検証。
@@ -63,7 +63,7 @@ export function getInvitationEmailKey(email: string): string {
   return normalizeGmailAddress(normalized) ?? normalized;
 }
 
-export type PendingInvitationLike = {
+type PendingInvitationLike = {
   email: string;
   createdAt: number;
 };

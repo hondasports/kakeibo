@@ -1,6 +1,6 @@
 import type { GroupRole } from "./role";
 
-export type GroupMemberLike = {
+type GroupMemberLike = {
   userId: string;
   role: GroupRole;
   displayName: string;

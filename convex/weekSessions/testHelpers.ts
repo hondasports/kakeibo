@@ -269,17 +269,6 @@ export const sampleSession: WeekSessionDoc = {
   updatedAt: 1000,
 };
 
-export const otherGroupSession: WeekSessionDoc = {
-  _id: "session-other",
-  _creationTime: 1000,
-  groupId: OTHER_GROUP_ID,
-  weekStartDate: "2024-01-08",
-  weekEndDate: "2024-01-14",
-  status: "draft",
-  createdAt: 1000,
-  updatedAt: 1000,
-};
-
 // ---------------------------------------------------------------------------
 // getOrCreateCurrentWeekSession テスト
 // ---------------------------------------------------------------------------

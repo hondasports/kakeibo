@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Box, Button, Paper, Skeleton, Stack, Typography } from "@mui/material";
 import { ReceiptRow } from "./ReceiptRow";
@@ -25,6 +25,7 @@ export function IncomeListCard({
   onEditIncome?: (income: IncomeItem) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const listId = useId();
   const hasRowActions = Boolean(onEditIncome || onDeleteIncome);
   const orderedIncomes = incomes
     .map((income, index) => ({ income, index }))
@@ -43,6 +44,7 @@ export function IncomeListCard({
 
           <Box
             aria-label={listAriaLabel}
+            id={listId}
             className={`receipt-list receipt-list--income${hasRowActions ? "" : " receipt-list--no-actions"}${dateFormat === "yearMonthDay" ? " receipt-list--with-year" : ""}`}
             role={!isLoading && count > 0 ? "table" : undefined}
           >
@@ -81,14 +83,21 @@ export function IncomeListCard({
               </>
             )}
           </Box>
-          {!isLoading && remainingCount > 0 && (
+          {!isLoading && count > 0 && (remainingCount > 0 || expanded) && (
             <Button
+              aria-controls={listId}
+              aria-expanded={expanded}
               endIcon={<ExpandMoreIcon />}
-              onClick={() => setExpanded(true)}
-              sx={{ alignSelf: "center", minHeight: 44, minWidth: 204 }}
+              onClick={() => setExpanded((current) => !current)}
+              sx={{
+                alignSelf: "center",
+                minHeight: 44,
+                minWidth: 204,
+                ...(expanded && { "& .MuiButton-endIcon": { transform: "rotate(180deg)" } }),
+              }}
               variant="outlined"
             >
-              さらに{remainingCount}件を見る
+              {expanded ? "閉じる" : `さらに${remainingCount}件を見る`}
             </Button>
           )}
         </Stack>

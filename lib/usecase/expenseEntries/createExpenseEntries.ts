@@ -4,12 +4,13 @@ import type { ExpenseEntryRepository } from "../../domain/expenseEntries/expense
 import type { CategoryRepository } from "../../domain/categories/categoryRepository";
 import { SourceDocument } from "../../domain/sourceDocuments/sourceDocument";
 import type { SourceDocumentRepository } from "../../domain/sourceDocuments/sourceDocumentRepository";
+import { MAX_EXPENSE_ENTRY_ITEMS } from "../../domain/expenseEntries/expenseEntryItem";
 import { isValidIsoDateString } from "../../domain/week/weekDates";
 import { assertUsableCategory } from "../categories/assertUsableCategory";
 import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 
-export type CreateExpenseEntriesUsecaseArgs = {
+type CreateExpenseEntriesUsecaseArgs = {
   date: string;
   shopName?: string;
   sourceAmountYen?: number;
@@ -38,6 +39,12 @@ export async function createExpenseEntries(
   // items が空でも sourceDocument / エントリへ書き込むため、先に日付を検証する
   if (!isValidIsoDateString(args.date)) {
     throw new ConvexError("Date must be a valid YYYY-MM-DD value");
+  }
+
+  if (args.items.length > MAX_EXPENSE_ENTRY_ITEMS) {
+    throw new ConvexError(
+      `At most ${MAX_EXPENSE_ENTRY_ITEMS} expense items can be created at once`,
+    );
   }
 
   // 既存 sourceDocumentId が指定された場合は存在とグループ所属を検証する

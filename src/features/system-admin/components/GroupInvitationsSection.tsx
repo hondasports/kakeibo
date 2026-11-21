@@ -1,5 +1,6 @@
 import { Alert, Button, List, ListItem, Paper, Stack, Typography } from "@mui/material";
 import type { GroupDetail, GroupDetailInvitation } from "../hooks/useSystemAdminGroupDetail";
+import { formatDateTimeForDisplay } from "../../../utils/date";
 
 type GroupInvitationsSectionProps = {
   invitations: GroupDetail["invitations"];
@@ -30,7 +31,7 @@ export function GroupInvitationsSection({
               >
                 <Typography sx={{ flex: 1 }}>
                   {invitation.email} / {invitation.status} /{" "}
-                  {new Date(invitation.createdAt).toLocaleString("ja-JP")}
+                  {formatDateTimeForDisplay(invitation.createdAt)}
                 </Typography>
                 {invitation.status === "pending" ? (
                   <Button

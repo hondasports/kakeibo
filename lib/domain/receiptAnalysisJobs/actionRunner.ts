@@ -1,8 +1,9 @@
 import type { ReceiptAnalysisJobRecord } from "./records";
+import type { DraftResultImageJobStatus } from "./status";
 
-export type AnalysisDraftResult = {
+type AnalysisDraftResult = {
   id: string;
-  status: "ready" | "needs_review" | "failed";
+  status: DraftResultImageJobStatus;
   updatedAt: number;
   warnings?: string[];
 };
@@ -39,7 +40,7 @@ export interface ReceiptAnalysisActionRunner {
     expectedDraftId: string | null;
     expectedDraftUpdatedAt?: number;
     newDraftId: string;
-    status: "ready" | "needs_review" | "failed";
+    status: DraftResultImageJobStatus;
     error?: string;
   }): Promise<{ applied: boolean } | undefined>;
   incrementBatchProcessedCount(batchId: string): Promise<void>;

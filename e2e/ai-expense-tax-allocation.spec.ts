@@ -6,7 +6,7 @@ import { expandDetailsIfClosed } from "./helpers/receiptQueue";
 
 test.use({ actionTimeout: 15000 });
 
-test("#748 未配分の13明細を確認して税込合計・税額を保存後も維持する", async ({ page }) => {
+test("@smoke #748 未配分の13明細を確認して税込合計・税額を保存後も維持する", async ({ page }) => {
   test.setTimeout(120000);
   await gotoAuthenticated(page, "/weeks/current/input");
   const userId = await getCurrentClerkTokenIdentifier(page);

@@ -35,7 +35,6 @@ import {
 export const DRAFT_CATEGORY_NOT_IN_GROUP_MESSAGE = "Category does not belong to the current group";
 export const DRAFT_NOT_FOUND_AFTER_CREATION_MESSAGE =
   "AI expense draft was not found after creation";
-export const ACTIVE_GROUP_REQUIRED_MESSAGE = "Active group is required";
 
 export type ExtractedDraftItemInput<TCategoryId extends string = string> = {
   itemName: string;
@@ -90,7 +89,7 @@ export type ExtractedDraftInput<TCategoryId extends string = string> = {
   items?: ExtractedDraftItemInput<TCategoryId>[];
 };
 
-export type DraftActor<TGroupId extends string = string> = {
+type DraftActor<TGroupId extends string = string> = {
   userId: string;
   groupId: TGroupId;
 };

@@ -4,6 +4,7 @@ import {
   calculateRetryDelayMs,
   isMaxRetryAttemptsReached,
 } from "../common/retry";
+import { EMAIL_WEBHOOK_EVENT_TYPES } from "./model";
 import type {
   EmailWebhookEventType,
   TransactionalEmailJobStatus,
@@ -11,7 +12,7 @@ import type {
 } from "./model";
 import type { TransactionalEmailJobRecord } from "./records";
 
-export const EMAIL_PROVIDER_NAME = "resend";
+const EMAIL_PROVIDER_NAME = "resend";
 
 export const TERMINAL_EMAIL_JOB_STATUSES = [
   "sent",
@@ -31,8 +32,8 @@ export function isTerminalEmailJobStatus(
 }
 
 export const EMAIL_CLEANUP_BATCH_SIZE = 100;
-export const EMAIL_RETENTION_DAYS = 30;
-export const EMAIL_RETENTION_MS = EMAIL_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const EMAIL_RETENTION_DAYS = 30;
+const EMAIL_RETENTION_MS = EMAIL_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 export function emailCleanupCutoff(now: number): number {
   return now - EMAIL_RETENTION_MS;
@@ -79,7 +80,7 @@ export function buildNewEmailJobFields(args: {
   };
 }
 
-export type SendFailurePlan =
+type SendFailurePlan =
   | { kind: "failed" }
   | { kind: "retry"; nextAttempt: number; nextRetryAt: number; delayMs: number };
 
@@ -98,7 +99,7 @@ export function planSendFailure(
   return { kind: "retry", nextAttempt, nextRetryAt: now + delay, delayMs: delay };
 }
 
-export type ResendWebhookPayloadFields = {
+type ResendWebhookPayloadFields = {
   providerMessageId?: string;
   recipientEmail?: string;
 };
@@ -124,16 +125,6 @@ export function extractResendEventFields(
   };
 }
 
-export const RESEND_WEBHOOK_EVENT_TYPES: readonly EmailWebhookEventType[] = [
-  "email.sent",
-  "email.delivered",
-  "email.delivery_delayed",
-  "email.complained",
-  "email.bounced",
-  "email.failed",
-  "email.suppressed",
-];
-
 export function isResendWebhookEventType(type: string): type is EmailWebhookEventType {
-  return (RESEND_WEBHOOK_EVENT_TYPES as readonly string[]).includes(type);
+  return (EMAIL_WEBHOOK_EVENT_TYPES as readonly string[]).includes(type);
 }

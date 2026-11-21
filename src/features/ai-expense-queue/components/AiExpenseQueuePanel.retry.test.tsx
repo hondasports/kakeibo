@@ -5,6 +5,7 @@ import "./AiExpenseQueuePanelTestMocks";
 import { renderWithProviders } from "../../../test/render";
 import { AiExpenseQueuePanel } from "./AiExpenseQueuePanel";
 import { queueItems, rejectImageDecoding } from "../../receipt-review/utils/testFixtures";
+import type { AiExpenseQueueItem } from "../../../types/aiExpenseQueue";
 import {
   registerReadyDraftsAsExpenseEntriesMock,
   createBatchMock,
@@ -69,6 +70,193 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
       expect(
         screen.queryByText("登録に失敗しました。時間をおいて再度お試しください。"),
       ).not.toBeInTheDocument();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("登録エラーのAlertから失敗した下書きをそのまま再試行できる", async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    registerReadyDraftsAsExpenseEntriesMock
+      .mockRejectedValueOnce(new Error("登録処理に失敗しました"))
+      .mockResolvedValueOnce(undefined);
+
+    try {
+      renderWithProviders(<AiExpenseQueuePanel initialItems={[queueItems[0]]} />);
+
+      const readySection = screen.getByRole("region", { name: "登録できます" });
+      await user.click(within(readySection).getByRole("button", { name: "登録する" }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
+      });
+      expect(
+        screen.getByText("登録に失敗しました。時間をおいて再度お試しください。"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("下書きは残っています。もう一度登録をお試しください。"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("ok-receipt.png")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "再試行" }));
+      await waitFor(() => {
+        expect(registerReadyDraftsAsExpenseEntriesMock).toHaveBeenCalledTimes(2);
+      });
+      expect(registerReadyDraftsAsExpenseEntriesMock).toHaveBeenLastCalledWith({
+        draftIds: ["draft-ready"],
+      });
+      await waitFor(() => {
+        expect(screen.queryByRole("button", { name: "再試行" })).not.toBeInTheDocument();
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("登録失敗後に下書きを削除すると再試行対象から外れる", async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const secondReadyItem: AiExpenseQueueItem = {
+      ...queueItems[0],
+      id: "draft-ready-2",
+      fileName: "second-receipt.png",
+      title: "ドラッグストアB",
+    };
+    registerReadyDraftsAsExpenseEntriesMock.mockRejectedValueOnce(
+      new Error("登録処理に失敗しました"),
+    );
+
+    try {
+      renderWithProviders(<AiExpenseQueuePanel initialItems={[queueItems[0], secondReadyItem]} />);
+
+      await user.click(screen.getByRole("button", { name: "まとめて登録（2件）" }));
+      const confirmDialog = screen.getByRole("dialog");
+      await user.click(within(confirmDialog).getByRole("button", { name: "登録する" }));
+
+      await waitFor(() => {
+        expect(registerReadyDraftsAsExpenseEntriesMock).toHaveBeenCalledWith({
+          draftIds: ["draft-ready", "draft-ready-2"],
+        });
+      });
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
+      });
+
+      const secondCard = screen
+        .getByText("ドラッグストアB")
+        .closest<HTMLElement>(".ai-expense-queue-item");
+      expect(secondCard).not.toBeNull();
+      await user.click(
+        within(secondCard as HTMLElement).getByRole("button", { name: "一覧から削除" }),
+      );
+      await waitFor(() => {
+        expect(screen.queryByText("ドラッグストアB")).not.toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "再試行" }));
+      await waitFor(() => {
+        expect(registerReadyDraftsAsExpenseEntriesMock).toHaveBeenLastCalledWith({
+          draftIds: ["draft-ready"],
+        });
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("登録失敗した下書きをすべて削除すると再試行ボタンを表示しない", async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    registerReadyDraftsAsExpenseEntriesMock.mockRejectedValueOnce(
+      new Error("登録処理に失敗しました"),
+    );
+
+    try {
+      renderWithProviders(<AiExpenseQueuePanel initialItems={[queueItems[0], queueItems[1]]} />);
+
+      const readySection = screen.getByRole("region", { name: "登録できます" });
+      await user.click(within(readySection).getByRole("button", { name: "登録する" }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
+      });
+
+      const card = screen.getByText("スーパー北浜").closest<HTMLElement>(".ai-expense-queue-item");
+      expect(card).not.toBeNull();
+      await user.click(within(card as HTMLElement).getByRole("button", { name: "一覧から削除" }));
+      await waitFor(() => {
+        expect(screen.queryByText("スーパー北浜")).not.toBeInTheDocument();
+      });
+
+      expect(
+        screen.getByText("登録に失敗しました。時間をおいて再度お試しください。"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("下書きは残っています。もう一度登録をお試しください。"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "再試行" })).not.toBeInTheDocument();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("登録の待機中にキューから外れた下書きは再試行対象に含めない", async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const secondReadyItem: AiExpenseQueueItem = {
+      ...queueItems[0],
+      id: "draft-ready-2",
+      fileName: "second-receipt.png",
+      title: "ドラッグストアB",
+    };
+    let rejectRegistration: ((error: Error) => void) | undefined;
+    registerReadyDraftsAsExpenseEntriesMock.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectRegistration = reject;
+        }),
+    );
+
+    try {
+      renderWithProviders(<AiExpenseQueuePanel initialItems={[queueItems[0], secondReadyItem]} />);
+
+      await user.click(screen.getByRole("button", { name: "まとめて登録（2件）" }));
+      const confirmDialog = screen.getByRole("dialog");
+      await user.click(within(confirmDialog).getByRole("button", { name: "登録する" }));
+
+      await waitFor(() => {
+        expect(registerReadyDraftsAsExpenseEntriesMock).toHaveBeenCalledWith({
+          draftIds: ["draft-ready", "draft-ready-2"],
+        });
+      });
+
+      // 登録の応答を待つ間に確認ダイアログを閉じて2件目を削除する
+      await user.click(screen.getByRole("button", { name: "キャンセル" }));
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+      const readySection = screen.getByRole("region", { name: "登録できます" });
+      const deleteButtons = within(readySection).getAllByRole("button", {
+        name: "一覧から削除",
+      });
+      expect(deleteButtons).toHaveLength(2);
+      await user.click(deleteButtons[1]);
+      await waitFor(() => {
+        expect(screen.queryByText("ドラッグストアB")).not.toBeInTheDocument();
+      });
+
+      rejectRegistration?.(new Error("登録処理に失敗しました"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole("button", { name: "再試行" }));
+      await waitFor(() => {
+        expect(registerReadyDraftsAsExpenseEntriesMock).toHaveBeenLastCalledWith({
+          draftIds: ["draft-ready"],
+        });
+      });
     } finally {
       consoleError.mockRestore();
     }

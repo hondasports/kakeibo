@@ -6,7 +6,7 @@ import type { MutationCtx, QueryCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { NewUserFields, UserPatch, UserRecord, UserStore } from "../../domain/users/store";
 
-export function docToUserRecord(doc: Doc<"users">): UserRecord {
+function docToUserRecord(doc: Doc<"users">): UserRecord {
   return {
     id: doc._id,
     creationTime: doc._creationTime,
@@ -27,7 +27,7 @@ export function docToUserRecord(doc: Doc<"users">): UserRecord {
 }
 
 /** query 側でも使える読み取り専用メソッド。 */
-export type UserReader = Pick<UserStore, "findByUserId" | "findByEmail">;
+type UserReader = Pick<UserStore, "findByUserId" | "findByEmail">;
 
 export function createUserReader(ctx: Pick<QueryCtx, "db">): UserReader {
   return {

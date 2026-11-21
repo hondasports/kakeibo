@@ -6,7 +6,7 @@ import type { GroupInvitationReadRepository } from "../../domain/groups/groupInv
 import { dedupePendingInvitationsByEmail } from "../../domain/groups/email";
 import type { UsecaseGroupContext } from "../context";
 
-export type PendingGroupInvitationItem = {
+type PendingGroupInvitationItem = {
   invitationId: string;
   email: string;
   status: "pending";

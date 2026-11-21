@@ -8,8 +8,10 @@ import {
   QueuePanelRegistered,
 } from "../../ai-expense-queue";
 import { ConfirmDifferenceDialog } from "./ConfirmDifferenceDialog";
+import { ExitMultiModeDialog } from "./ExitMultiModeDialog";
 import { ExpenseFormActions } from "./ExpenseFormActions";
 import { ExpenseFormHeading } from "./ExpenseFormHeading";
+import { ExpenseMemoField } from "./ExpenseMemoField";
 import { MultiEntryFields } from "./MultiEntryFields";
 import { SingleEntryFields } from "./SingleEntryFields";
 import { SourceSummary } from "./SourceSummary";
@@ -34,6 +36,8 @@ export function ExpenseEntryWorkbench({
   shopNameError,
   sourceAmountError,
   itemErrors,
+  memo,
+  memoError,
   difference,
   status,
   apiError,
@@ -42,11 +46,16 @@ export function ExpenseEntryWorkbench({
   pendingDifference,
   setShopName,
   setSourceAmount,
+  setMemo,
   setDate,
   handleEnterMultiMode,
   handleAddItem,
   handleRemoveItem,
   handleItemChange,
+  showExitMultiConfirm,
+  handleExitMultiMode,
+  handleConfirmExitMultiMode,
+  handleCancelExitMultiMode,
   handleSubmit,
   handleConfirmSave,
   handleCancelConfirm,
@@ -88,12 +97,14 @@ export function ExpenseEntryWorkbench({
                 categories={categories}
                 categoryError={itemErrors[0]?.categoryId}
                 itemCategoryId={items[0]?.categoryId}
-                memo={items[0]?.memo ?? ""}
+                memo={memo}
+                memoError={memoError}
                 shopName={shopName}
                 shopNameError={shopNameError}
                 sourceAmount={sourceAmount}
                 sourceAmountError={sourceAmountError}
-                onItemChange={(field, value) => handleItemChange(0, field, value)}
+                onCategoryChange={(categoryId) => handleItemChange(0, "categoryId", categoryId)}
+                onMemoChange={setMemo}
                 onShopNameChange={setShopName}
                 onSourceAmountChange={setSourceAmount}
               />
@@ -103,13 +114,19 @@ export function ExpenseEntryWorkbench({
               <MultiEntryFields
                 categories={categories}
                 difference={difference}
+                isSubmitting={status === "submitting"}
                 itemErrors={itemErrors}
                 items={items}
                 sourceAmount={sourceAmountNum}
                 onAddItem={handleAddItem}
                 onItemChange={handleItemChange}
                 onRemoveItem={handleRemoveItem}
+                onExitMultiMode={handleExitMultiMode}
               />
+            )}
+
+            {isMultiMode && (
+              <ExpenseMemoField memo={memo} memoError={memoError} onMemoChange={setMemo} />
             )}
 
             <ExpenseFormActions
@@ -132,6 +149,12 @@ export function ExpenseEntryWorkbench({
         pendingDifference={pendingDifference}
       />
 
+      <ExitMultiModeDialog
+        onCancel={handleCancelExitMultiMode}
+        onConfirm={handleConfirmExitMultiMode}
+        open={showExitMultiConfirm}
+      />
+
       <Snackbar
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         autoHideDuration={3000}
@@ -140,7 +163,7 @@ export function ExpenseEntryWorkbench({
       >
         <Alert
           onClose={handleSnackbarClose}
-          severity={snackbar.severity}
+          severity="success"
           sx={{ width: "100%" }}
           variant="filled"
         >

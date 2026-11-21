@@ -1,4 +1,4 @@
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { action, internalAction } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
@@ -9,20 +9,13 @@ import {
   analyzeReceiptImageJob,
   checkReceiptAiReviewRequired,
 } from "../../lib/usecase/receiptAnalysisJobs/actions";
+import { toConvexEndpointError } from "../lib/errors";
 
-export type CheckAiReviewRequiredArgs = { batchId: Id<"receiptAnalysisBatches"> };
-export type AnalyzeImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs">; imageDataUrl: string };
+type CheckAiReviewRequiredArgs = { batchId: Id<"receiptAnalysisBatches"> };
+type AnalyzeImageJobArgs = { jobId: Id<"receiptAnalysisImageJobs">; imageDataUrl: string };
 
 function convexError(error: unknown): never {
-  if (error instanceof ConvexError) throw error;
-  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
-  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
-  if (
-    error instanceof ReceiptAnalysisJobDomainError ||
-    error instanceof ReceiptImageExtractionDomainError
-  )
-    throw new ConvexError(error.message);
-  throw error;
+  toConvexEndpointError(error, [ReceiptAnalysisJobDomainError, ReceiptImageExtractionDomainError]);
 }
 
 export async function analyzeImageJobHandler(ctx: ActionCtx, args: AnalyzeImageJobArgs) {

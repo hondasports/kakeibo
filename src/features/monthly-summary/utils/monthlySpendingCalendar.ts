@@ -21,7 +21,7 @@ export type MonthlyCalendarDay = {
   incomeCount: number;
 };
 
-export type MonthlySpendingCalendarData = {
+type MonthlySpendingCalendarData = {
   cells: Array<MonthlyCalendarDay | null>;
   days: MonthlyCalendarDay[];
   maxExpenseAmountYen: number;

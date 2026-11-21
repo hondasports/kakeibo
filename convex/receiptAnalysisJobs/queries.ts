@@ -15,6 +15,7 @@ import {
   listActiveReceiptAnalysisJobs,
   listReceiptAnalysisJobsByBatch,
 } from "../../lib/usecase/receiptAnalysisJobs/queries";
+import { toConvexEndpointError } from "../lib/errors";
 
 const jobDocumentValidator = v.object({
   ...schema.tables.receiptAnalysisImageJobs.validator.fields,
@@ -23,11 +24,7 @@ const jobDocumentValidator = v.object({
 });
 
 function convexError(error: unknown): never {
-  if (error instanceof ConvexError) throw error;
-  // ドメインエラーだけを endpoint 契約の ConvexError へ変換する。
-  // DB・アダプタ由来の予期しないエラーはそのまま再送出し、メッセージを露出させない。
-  if (error instanceof ReceiptAnalysisJobDomainError) throw new ConvexError(error.message);
-  throw error;
+  toConvexEndpointError(error, [ReceiptAnalysisJobDomainError]);
 }
 
 export async function listActiveJobsHandler(ctx: QueryCtx) {

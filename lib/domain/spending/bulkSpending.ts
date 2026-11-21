@@ -6,7 +6,7 @@ import type { EntryKind } from "../common/entryKind";
 
 export const MAX_BULK_SPENDING_SELECTION = 100;
 
-export type BulkSpendingIdSets = {
+type BulkSpendingIdSets = {
   expenseEntryIds: string[];
   receiptIds: string[];
 };
@@ -27,9 +27,9 @@ export function canSelectAnotherSpendingRecord(selectedCount: number): boolean {
   return selectedCount < MAX_BULK_SPENDING_SELECTION;
 }
 
-export type BulkSpendingIdsError = "empty" | "too_many";
+type BulkSpendingIdsError = "empty" | "too_many";
 
-export type NormalizedBulkSpendingIds = {
+type NormalizedBulkSpendingIds = {
   expenseEntryIds: string[];
   receiptIds: string[];
   totalCount: number;

@@ -69,6 +69,8 @@ import type * as groups_queries from "../groups/queries.js";
 import type * as groups_testHelpers from "../groups/testHelpers.js";
 import type * as groups_validators from "../groups/validators.js";
 import type * as http from "../http.js";
+import type * as lib_errors from "../lib/errors.js";
+import type * as lib_validators from "../lib/validators.js";
 import type * as lineLink_actions from "../lineLink/actions.js";
 import type * as lineLink_internal from "../lineLink/internal.js";
 import type * as lineLink_model from "../lineLink/model.js";
@@ -184,6 +186,8 @@ declare const fullApi: ApiFromModules<{
   "groups/testHelpers": typeof groups_testHelpers;
   "groups/validators": typeof groups_validators;
   http: typeof http;
+  "lib/errors": typeof lib_errors;
+  "lib/validators": typeof lib_validators;
   "lineLink/actions": typeof lineLink_actions;
   "lineLink/internal": typeof lineLink_internal;
   "lineLink/model": typeof lineLink_model;

@@ -1,7 +1,7 @@
 import { isValidCalendarDate } from "../common/date";
 import { getCurrentYear } from "../common/year";
 
-export type ReceiptDateError = "no_candidate" | "ambiguous" | "range_expression" | "invalid";
+type ReceiptDateError = "no_candidate" | "ambiguous" | "range_expression" | "invalid";
 
 const RANGE_EXPRESSION_PATTERN = /[~〜～]|から|まで/;
 

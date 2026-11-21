@@ -20,7 +20,7 @@ export function getConfiguredRedirectOrigins() {
 }
 
 /** localhost の戻り先は APP_ENV が厳密に development の deployment だけ許可する（未設定・不明値は拒否） */
-export function getInvitationRedirectOptions() {
+function getInvitationRedirectOptions() {
   return { allowLocalhost: process.env.APP_ENV === "development" };
 }
 

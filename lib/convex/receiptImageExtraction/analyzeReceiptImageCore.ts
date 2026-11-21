@@ -7,7 +7,7 @@ import { mapExtractionToDraftArgs } from "../../../lib/domain/aiExpenseDrafts/ex
 import { extractReceiptFieldsHandler } from "../../../convex/receiptImageExtraction/extraction";
 import { measureReceiptExtractionSave } from "./telemetry";
 
-export type AnalyzeReceiptImageCoreArgs = {
+type AnalyzeReceiptImageCoreArgs = {
   groupId: Id<"groups">;
   imageDataUrl: string;
   imageFileName?: string;

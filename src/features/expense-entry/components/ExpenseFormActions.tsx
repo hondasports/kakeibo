@@ -1,5 +1,6 @@
 import { Button, Stack } from "@mui/material";
 import { AnimatedButton } from "../../ui";
+import { stickyBottomBarSx } from "./stickyBottomBarSx";
 
 interface ExpenseFormActionsProps {
   isMultiMode: boolean;
@@ -19,17 +20,10 @@ export function ExpenseFormActions({
       direction="row"
       spacing={1.5}
       sx={{
-        bottom: {
-          xs: "calc(var(--size-bottom-nav-height) + env(safe-area-inset-bottom) + 8px)",
-          sm: "auto",
-        },
+        ...stickyBottomBarSx,
         flexWrap: "wrap",
         justifyContent: "flex-end",
         minWidth: 0,
-        position: { xs: "sticky", sm: "static" },
-        py: { xs: 1, sm: 0 },
-        zIndex: { xs: 1, sm: "auto" },
-        bgcolor: { xs: "background.paper", sm: "transparent" },
       }}
     >
       {!isMultiMode && (

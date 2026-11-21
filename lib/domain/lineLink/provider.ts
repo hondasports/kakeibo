@@ -15,7 +15,7 @@ export type LineProviderInput = {
   redirectUri: string;
 };
 
-export type LineProviderIdentity = { lineUserId: string; nonceHash: string };
+type LineProviderIdentity = { lineUserId: string; nonceHash: string };
 
 export interface LineProviderClient {
   exchangeAndVerify(input: LineProviderInput): Promise<LineProviderIdentity>;

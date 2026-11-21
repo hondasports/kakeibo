@@ -10,6 +10,8 @@ import {
 import type { SystemAdminAuditResult } from "../../domain/systemAdmin/auditLog";
 import type { SystemAdminMutationDeps, SystemAdminQueryDeps } from "./deps";
 import { requireSystemAdminActor } from "./actor";
+import { MAX_GROUP_OWNERS } from "../../domain/groups/role";
+import { MAX_ACTIVE_SYSTEM_ADMINS } from "../../domain/systemAdmin/systemAdminStore";
 
 const ACTION = "system_admin_group_invitation_revoked" as const;
 
@@ -74,14 +76,15 @@ async function enqueueNotifications(
   email: string,
 ) {
   const recipients = new Set<string>();
-  const owners = await deps.memberships.listByGroupAndRole(groupId, "owner", 101);
-  if (owners.length > 100) throw new ConvexError("owner数が上限を超えています");
+  const owners = await deps.memberships.listByGroupAndRole(groupId, "owner", MAX_GROUP_OWNERS + 1);
+  if (owners.length > MAX_GROUP_OWNERS) throw new ConvexError("owner数が上限を超えています");
   for (const owner of owners) {
     const user = await deps.users.findByUserId(owner.userId);
     if (user) recipients.add(user.docId);
   }
-  const admins = await deps.admins.takeByStatus("active", 101);
-  if (admins.length > 100) throw new ConvexError("active system admin数が上限を超えています");
+  const admins = await deps.admins.takeByStatus("active", MAX_ACTIVE_SYSTEM_ADMINS + 1);
+  if (admins.length > MAX_ACTIVE_SYSTEM_ADMINS)
+    throw new ConvexError("active system admin数が上限を超えています");
   for (const admin of admins) recipients.add(admin.userId);
 
   const payloadJson = JSON.stringify({ action: ACTION, groupId, invitationId, email });

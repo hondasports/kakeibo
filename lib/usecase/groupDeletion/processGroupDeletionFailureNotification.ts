@@ -7,7 +7,7 @@ import { FAILURE_NOTIFICATION_MAX_DELAY_MS } from "../../domain/groupDeletion/co
 import type { GroupDeletionMutationDeps } from "./deps";
 
 /** テストが差し替え可能な失敗メール enqueue（ドメイン形状）。 */
-export type EnqueueFailureEmail = (args: {
+type EnqueueFailureEmail = (args: {
   groupName: string;
   jobId: string;
   recipientEmail: string | undefined;

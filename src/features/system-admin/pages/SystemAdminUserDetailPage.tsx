@@ -1,4 +1,4 @@
-import { Alert, CircularProgress, Stack, Typography } from "@mui/material";
+import { Alert } from "@mui/material";
 import { useParams } from "react-router-dom";
 import { SystemAdminMembershipChangeDialog } from "../components/SystemAdminMembershipChangeDialog";
 import { UserInvitationsSection } from "../components/UserInvitationsSection";
@@ -11,6 +11,7 @@ import {
   SystemAdminErrorState,
   SystemAdminPageFrame,
 } from "./SystemAdminPageFrame";
+import { LoadingDetail } from "../components/LoadingDetail";
 
 export function SystemAdminUserDetailPage() {
   const { userId } = useParams();
@@ -100,14 +101,5 @@ export function SystemAdminUserDetailPage() {
         targetGroup={dialog?.targetGroup}
       />
     </SystemAdminPageFrame>
-  );
-}
-
-function LoadingDetail() {
-  return (
-    <Stack spacing={1} sx={{ alignItems: "center" }}>
-      <CircularProgress aria-label="詳細を読み込み中" />
-      <Typography>詳細を読み込んでいます。</Typography>
-    </Stack>
   );
 }

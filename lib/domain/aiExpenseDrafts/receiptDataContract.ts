@@ -73,7 +73,7 @@ export type ReceiptDraftValueSnapshot<TCategoryId = string> = {
 
 export const RECEIPT_INTERPRETATION_SOURCES = ["ai", "legacy_projection"] as const;
 
-export type ReceiptInterpretationSource = (typeof RECEIPT_INTERPRETATION_SOURCES)[number];
+type ReceiptInterpretationSource = (typeof RECEIPT_INTERPRETATION_SOURCES)[number];
 
 export type ReceiptInterpretationSnapshot<TCategoryId = string> = {
   source: ReceiptInterpretationSource;
@@ -98,6 +98,9 @@ export const RECEIPT_TAX_CHOICE_FIELDS = {
 export const AI_EXPENSE_REGISTRATION_MODES = ["detailed", "totalOnly"] as const;
 
 export type AiExpenseRegistrationMode = (typeof AI_EXPENSE_REGISTRATION_MODES)[number];
+
+/** 登録モード未設定時の既定値。既存データは detailed として扱う。 */
+export const DEFAULT_REGISTRATION_MODE: AiExpenseRegistrationMode = "detailed";
 
 export const REGISTRATION_DESTINATIONS = ["receipt", "expense_entries"] as const;
 
@@ -169,7 +172,7 @@ export function applyReceiptUserOverride<TCategoryId>(
 }
 
 /** スナップショット構築に必要な draft の最小形状。warnings 未設定は空配列へ正規化する。 */
-export type ReceiptDraftSnapshotSource<TCategoryId = string> = Omit<
+type ReceiptDraftSnapshotSource<TCategoryId = string> = Omit<
   ReceiptDraftValueSnapshot<TCategoryId>,
   "items" | "warnings" | "receiptLineClassifications"
 > & {

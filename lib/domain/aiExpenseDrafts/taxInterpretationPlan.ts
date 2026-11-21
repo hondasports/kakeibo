@@ -28,7 +28,7 @@ import {
   type DraftTaxOverride,
 } from "../receipt/tax/reinterpretDraftTax";
 
-export type TaxInterpretationEligibilityError =
+type TaxInterpretationEligibilityError =
   | "not_found"
   | "wrong_group"
   | "missing_amount_or_summaries";
@@ -63,14 +63,14 @@ export function validateTaxInterpretationEligibility(
   return { success: true, draft: { ...draft, amountYen: draft.amountYen } };
 }
 
-export type TaxInterpretationPlanArgs = {
+type TaxInterpretationPlanArgs = {
   preservedNonTaxReasons?: AiExpenseDraftReviewReason[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
   receiptTotalSource?: ReceiptTotalSource;
 };
 
-export type DraftItemTaxPatch = {
+type DraftItemTaxPatch = {
   printedAmountYen: number;
   amountYen: number;
   amountBasis?: AiExpenseDraftItemFields["amountBasis"];
@@ -86,7 +86,7 @@ export type DraftItemTaxPatch = {
   updatedAt: number;
 };
 
-export type DraftTaxInterpretationPatch = {
+type DraftTaxInterpretationPatch = {
   status: "ready" | "needs_review";
   receiptInterpretation: AiExpenseDraftFields["receiptInterpretation"];
   taxSummaries: AiExpenseDraftFields["taxSummaries"];
@@ -97,7 +97,7 @@ export type DraftTaxInterpretationPatch = {
   updatedAt: number;
 };
 
-export type TaxInterpretationPlan = {
+type TaxInterpretationPlan = {
   amountAndTaxResolved: boolean;
   listSummary: DraftListSummary;
   itemPatches: Array<{ itemId: string; patch: DraftItemTaxPatch }>;

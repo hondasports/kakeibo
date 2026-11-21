@@ -35,7 +35,7 @@ import { ReceiptItemTaxDetail } from "./ReceiptItemTaxDetail";
 import { ReviewItemCategoryControl } from "./ReviewItemCategoryControl";
 import { TaxRateSelect } from "./TaxRateSelect";
 
-export type ReviewItemCardProps = {
+type ReviewItemCardProps = {
   item: ReviewItemValues;
   index: number;
   categories: AiExpenseQueueCategory[];
@@ -232,52 +232,57 @@ export function ReviewItemCard({
         )}
 
         {inlineTaxEditing && enableItemTaxEditing && (
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            <TaxRateSelect
-              disabled={isTaxUpdating}
-              discount={discount}
-              label={`${item.itemName || `明細 ${index + 1}`}の${discount ? "割引対象税率" : "税率"}`}
-              value={item.taxRatePercent}
-              onChange={(value) => onTaxRateChange?.(item.id, value)}
-            />
-            <TextField
-              select
-              fullWidth
-              disabled={isTaxUpdating}
-              label={`${item.itemName || `明細 ${index + 1}`}の${discount ? "割引額の扱い" : "表示価格"}`}
-              value={item.amountBasis ?? "unknown"}
-              onChange={(event) =>
-                onAmountBasisChange?.(item.id, event.target.value as AmountBasis)
-              }
-            >
-              <MenuItem
-                value="tax_included"
-                onClick={() => {
-                  if ((item.amountBasis ?? "unknown") === "tax_included")
-                    onAmountBasisChange?.(item.id, "tax_included");
-                }}
+          <Stack spacing={0.5}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+              <TaxRateSelect
+                disabled={isTaxUpdating}
+                discount={discount}
+                label={`${item.itemName || `明細 ${index + 1}`}の${discount ? "割引対象税率" : "税率"}`}
+                value={item.taxRatePercent}
+                onChange={(value) => onTaxRateChange?.(item.id, value)}
+              />
+              <TextField
+                select
+                fullWidth
+                disabled={isTaxUpdating}
+                label={`${item.itemName || `明細 ${index + 1}`}の${discount ? "割引額の扱い" : "表示価格"}`}
+                value={item.amountBasis ?? "unknown"}
+                onChange={(event) =>
+                  onAmountBasisChange?.(item.id, event.target.value as AmountBasis)
+                }
               >
-                {discount ? "税込金額から引く" : "税込"}
-              </MenuItem>
-              <MenuItem
-                value="tax_excluded"
-                onClick={() => {
-                  if ((item.amountBasis ?? "unknown") === "tax_excluded")
-                    onAmountBasisChange?.(item.id, "tax_excluded");
-                }}
-              >
-                {discount ? "税抜金額から引く" : "税抜"}
-              </MenuItem>
-              <MenuItem
-                value="unknown"
-                onClick={() => {
-                  if ((item.amountBasis ?? "unknown") === "unknown")
-                    onAmountBasisChange?.(item.id, "unknown");
-                }}
-              >
-                不明
-              </MenuItem>
-            </TextField>
+                <MenuItem
+                  value="tax_included"
+                  onClick={() => {
+                    if ((item.amountBasis ?? "unknown") === "tax_included")
+                      onAmountBasisChange?.(item.id, "tax_included");
+                  }}
+                >
+                  {discount ? "税込金額から引く" : "税込"}
+                </MenuItem>
+                <MenuItem
+                  value="tax_excluded"
+                  onClick={() => {
+                    if ((item.amountBasis ?? "unknown") === "tax_excluded")
+                      onAmountBasisChange?.(item.id, "tax_excluded");
+                  }}
+                >
+                  {discount ? "税抜金額から引く" : "税抜"}
+                </MenuItem>
+                <MenuItem
+                  value="unknown"
+                  onClick={() => {
+                    if ((item.amountBasis ?? "unknown") === "unknown")
+                      onAmountBasisChange?.(item.id, "unknown");
+                  }}
+                >
+                  不明
+                </MenuItem>
+              </TextField>
+            </Stack>
+            <Typography color="text.secondary" variant="caption">
+              税率・税込／税抜の変更は、その都度下書きに保存されます
+            </Typography>
           </Stack>
         )}
         {inlineTaxEditing &&

@@ -18,7 +18,7 @@ export function normalizeWeekStartDay(weekStartDay?: number): number {
     : DEFAULT_WEEK_START_DAY;
 }
 
-export type WeekDayError = "invalid";
+type WeekDayError = "invalid";
 
 /** 曜日（0=日〜6=土）が有効かを検証する */
 export function validateWeekDay(

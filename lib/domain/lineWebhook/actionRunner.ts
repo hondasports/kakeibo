@@ -11,7 +11,7 @@ import type { LineCategoryHint } from "./summaryDataReader";
 import type { SummaryReplyJobArgs } from "./scheduler";
 
 /** getImageJob の応答形状（ドメイン側）。 */
-export type LineImageJobView = {
+type LineImageJobView = {
   webhookEventId: string;
   userId: string;
   messageId: string;
@@ -43,7 +43,7 @@ export interface LineImageContextReader {
 }
 
 /** 画像から下書き生成まで（抽出+永続化の内部 mutation 相当）。 */
-export type LineImageDraftResult = { status: string; draftId: string };
+type LineImageDraftResult = { status: string; draftId: string };
 
 export interface LineImageDraftRunner {
   createDraftFromImage(input: {
@@ -77,7 +77,7 @@ export interface LineSummaryRunner {
   ): Promise<{ replyText: string; replyKind: LineReplyKind }>;
 }
 
-export type SendUnlinkedGuideJobArgs = { replyToken: string; attempt?: number };
+type SendUnlinkedGuideJobArgs = { replyToken: string; attempt?: number };
 
 // 旧形式では予約時のリンクを復元できないため、現在のリンクで補完しない。
 export type SendSummaryReplyJobArgs = Omit<SummaryReplyJobArgs, "linkId" | "lineUserId"> &

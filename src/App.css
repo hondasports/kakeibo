@@ -216,7 +216,7 @@
 }
 
 .dashboard-comparison-bar--vertical {
-  border-radius: 12px 12px 0 0;
+  border-radius: 8px 8px 0 0;
 }
 
 .dashboard-comparison-bar--horizontal {
@@ -228,7 +228,7 @@
 }
 
 .dashboard-comparison-bar--previous {
-  background: #b8c4ce;
+  background: var(--color-brand-mist);
 }
 
 .dashboard-comparison-bar--current {
@@ -287,7 +287,6 @@
 
 .week-day-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--space-xs);
 }
 
@@ -308,7 +307,6 @@
 
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-xs);
 }
 
@@ -1061,6 +1059,16 @@
   .settings-danger-row .MuiButton-root {
     align-self: flex-start;
   }
+
+  /* 誤タップのコストが高い操作も確実に押せるよう、SPではタップ対象を44px確保する */
+  .settings-ledger .MuiIconButton-root {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .settings-ledger .MuiButton-root {
+    min-height: 44px;
+  }
 }
 
 @media not all and (min-width: 900px) {
@@ -1276,14 +1284,6 @@
     grid-template-columns: 1fr;
   }
 
-  .week-day-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .category-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .category-button {
     white-space: normal;
     overflow-wrap: anywhere;
@@ -1324,7 +1324,6 @@
   }
 
   .week-day-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: calc(var(--space-xs) - 2px);
   }
 
@@ -1337,7 +1336,6 @@
   }
 
   .category-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: calc(var(--space-xs) - 2px);
   }
 
@@ -1364,7 +1362,6 @@
   }
 
   .week-day-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--space-2xs);
   }
 
@@ -1377,7 +1374,6 @@
   }
 
   .category-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2xs);
   }
 

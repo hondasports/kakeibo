@@ -52,7 +52,7 @@ export type ReinterpretDraftTaxInput = {
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
 };
 
-export type ReinterpretDraftTaxResult = {
+type ReinterpretDraftTaxResult = {
   interpretation: ReceiptTaxInterpretation;
   itemFields: (ReturnType<typeof interpretedItemToDraftFields> &
     Pick<DraftItemTaxFields, "taxConfirmedFields">)[];

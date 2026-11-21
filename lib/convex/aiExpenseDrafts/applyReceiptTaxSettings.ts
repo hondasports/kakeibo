@@ -5,7 +5,7 @@ import { createAiExpenseDraftDeps } from "./draftUsecaseDeps";
 import { draftFieldsToDoc, draftItemFieldsToDoc } from "./draftRecordMapping";
 import type { AmountBasis, ReceiptItemTaxRatePercent } from "../receiptImageExtraction/types";
 
-export type ApplyReceiptTaxSettingsArgs = {
+type ApplyReceiptTaxSettingsArgs = {
   draftId: Id<"aiExpenseDrafts">;
   taxRatePercent?: ReceiptItemTaxRatePercent;
   amountBasis?: AmountBasis;

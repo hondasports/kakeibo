@@ -13,7 +13,7 @@ export type BulkSpendingAuditRecord = {
   categoryId?: string;
 };
 
-export type BulkSpendingAuditSnapshot = {
+type BulkSpendingAuditSnapshot = {
   recordCount: number;
   expenseEntryIds: string[];
   receiptIds: string[];
@@ -24,7 +24,7 @@ export type BulkSpendingAuditSnapshot = {
   categoryName?: string;
 };
 
-export function uniqueInOrder(values: Array<string | undefined>): string[] {
+function uniqueInOrder(values: Array<string | undefined>): string[] {
   const seen = new Set<string>();
   const unique: string[] = [];
   for (const value of values) {

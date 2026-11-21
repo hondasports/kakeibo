@@ -15,7 +15,7 @@ import { MAX_RECEIPT_ANALYSIS_BATCH_FILES } from "../../domain/receiptAnalysisJo
 import { enqueueTransactionalEmailJob } from "../email/enqueueJob";
 import type { AiReviewNotificationEnqueueDeps } from "./deps";
 
-export type EnqueueAiReviewNotificationsArgs = {
+type EnqueueAiReviewNotificationsArgs = {
   batchId: string;
   userId: string;
 };

@@ -121,7 +121,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
       new File(["second"], "batch-second.png", { type: "image/png" }),
     ]);
 
-    expect(await screen.findByText("今回の追加 0/2件が登録準備OK")).toBeInTheDocument();
+    expect(await screen.findByText("今回の追加 0/2件が登録できます")).toBeInTheDocument();
     expect(screen.getByText("解析待ち 2件")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "まとめて登録（0件）" })).toBeDisabled();
 
@@ -139,7 +139,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("今回の追加 1/2件が登録準備OK")).toBeInTheDocument();
+      expect(screen.getByText("今回の追加 1/2件が登録できます")).toBeInTheDocument();
       expect(screen.getAllByText("確認待ち 1件")).toHaveLength(2);
     });
     expect(screen.getByRole("button", { name: "まとめて登録（1件）" })).toBeDisabled();
@@ -155,7 +155,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("今回の追加 2/2件が登録準備OK")).toBeInTheDocument();
+      expect(screen.getByText("今回の追加 2/2件が登録できます")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "まとめて登録（2件）" })).toBeEnabled();
     });
     await user.click(screen.getByRole("button", { name: "まとめて登録（2件）" }));
@@ -179,7 +179,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
       </ThemeProvider>,
     );
     await waitFor(() => {
-      expect(screen.queryByText("今回の追加 2/2件が登録準備OK")).not.toBeInTheDocument();
+      expect(screen.queryByText("今回の追加 2/2件が登録できます")).not.toBeInTheDocument();
     });
   });
 
@@ -235,7 +235,7 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
         new File(["first"], "batch-first.png", { type: "image/png" }),
         new File(["second"], "batch-second.png", { type: "image/png" }),
       ]);
-      expect(await screen.findByText("今回の追加 0/2件が登録準備OK")).toBeInTheDocument();
+      expect(await screen.findByText("今回の追加 0/2件が登録できます")).toBeInTheDocument();
 
       jobs = batchJobs;
       rerender(
@@ -252,13 +252,13 @@ describe("AiExpenseQueuePanel（アップロード）", () => {
       await waitFor(() => {
         expect(screen.queryByText(/今回の追加/)).not.toBeInTheDocument();
       });
-      expect(screen.queryByText(/反映待ち/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/読み取り結果待ち/)).not.toBeInTheDocument();
     });
 
     it("未登録の一覧を読み込み中の間は登録済みとみなさない", async () => {
       await uploadBatch("loading");
 
-      expect(await screen.findByText(/反映待ち 1件/)).toBeInTheDocument();
+      expect(await screen.findByText(/読み取り結果待ち 1件/)).toBeInTheDocument();
     });
   });
 

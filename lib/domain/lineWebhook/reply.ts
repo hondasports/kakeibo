@@ -35,7 +35,7 @@ export function replyForImageSkipReason(reason: LineImageSkipReason): string {
   }
 }
 
-export type LineImageJobSnapshot = {
+type LineImageJobSnapshot = {
   status: LineImageJobStatus;
   skipReason?: LineImageSkipReason;
   draftId?: string;

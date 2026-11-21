@@ -17,7 +17,7 @@ import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import { loadDraftInGroup } from "./loadDraftInGroup";
 
-export type UpdateDraftItemTaxOverridesUsecaseArgs = {
+type UpdateDraftItemTaxOverridesUsecaseArgs = {
   draftId: string;
   itemId: string;
   taxRatePercent?: TaxRatePercent | null;

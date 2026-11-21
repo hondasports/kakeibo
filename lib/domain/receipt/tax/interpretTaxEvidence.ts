@@ -1,3 +1,4 @@
+import { RECEIPT_TAX_DECISION_SOURCES } from "./types";
 import type {
   AmountBasis,
   ExtractedReceiptItem,
@@ -21,19 +22,10 @@ export type AxisEvidence<TValue> = {
   evidence: string[];
 };
 
-export const SOURCE_PRIORITY: ReceiptTaxDecisionSource[] = [
-  "user",
-  "explicitLabel",
-  "marker",
-  "position",
-  "reconciliation",
-  "ai",
-];
-
-export const BUSINESS_ATTRIBUTE_PATTERN =
+const BUSINESS_ATTRIBUTE_PATTERN =
   /(?:免税事業者|適格請求書発行事業者ではない|インボイス(?:未登録|非登録)|登録番号なし)/;
-export const INCLUDED_LABEL_PATTERN = /(?:税込|内税|税を含む)/;
-export const EXCLUDED_LABEL_PATTERN = /(?:税抜|外税|税別)/;
+const INCLUDED_LABEL_PATTERN = /(?:税込|内税|税を含む)/;
+const EXCLUDED_LABEL_PATTERN = /(?:税抜|外税|税別)/;
 export const TAX_AMOUNT_LABEL_PATTERN = /(?:消費税(?!\s*率)(?:額|計)?|税額|内税額|外税額|税合計)/;
 export const EXCLUDED_STRUCTURAL_ROLES = new Set([
   "itemDiscount",
@@ -71,15 +63,16 @@ export function isNonTaxEvidenceLine(
     : EXCLUDED_STRUCTURAL_ROLES.has(classifiedRole);
 }
 
+// 決定ソースの優先順位は RECEIPT_TAX_DECISION_SOURCES の宣言順を正本とする。
 export function sourceRank(source: ReceiptTaxDecisionSource) {
-  return SOURCE_PRIORITY.indexOf(source);
+  return RECEIPT_TAX_DECISION_SOURCES.indexOf(source);
 }
 
-export function knownBases(items: ExtractedReceiptItem[]) {
+function knownBases(items: ExtractedReceiptItem[]) {
   return new Set<AmountBasis>(items.map((item) => item.amountBasis));
 }
 
-export function treatmentFromBases(bases: Set<AmountBasis>): PriceTaxTreatment {
+function treatmentFromBases(bases: Set<AmountBasis>): PriceTaxTreatment {
   if (bases.has("unknown")) return "unknown";
   const included = bases.has("tax_included");
   const excluded = bases.has("tax_excluded");
@@ -89,7 +82,7 @@ export function treatmentFromBases(bases: Set<AmountBasis>): PriceTaxTreatment {
   return "unknown";
 }
 
-export function compositionFromRates(rates: Iterable<TaxRatePercent | null>): TaxRateComposition {
+function compositionFromRates(rates: Iterable<TaxRatePercent | null>): TaxRateComposition {
   const known = new Set([...rates].filter((rate): rate is 8 | 10 => rate === 8 || rate === 10));
   if (known.has(8) && known.has(10)) return "mixed";
   if (known.has(8)) return "rate8";

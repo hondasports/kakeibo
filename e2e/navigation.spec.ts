@@ -5,7 +5,7 @@ import { getCurrentMonth, getCurrentWeekStartDate } from "./helpers/currentPerio
 import { saveExpense } from "./helpers/expenseEntry";
 
 test.describe("ナビゲーション（Issue #49）", () => {
-  test("@navigation シナリオN-1.1: SP幅でBottomNavigationの非選択項目と選択状態が視認できる", async ({
+  test("@smoke @navigation シナリオN-1.1: SP幅でBottomNavigationの非選択項目と選択状態が視認できる", async ({
     page,
   }) => {
     await gotoAuthenticated(page);
@@ -232,8 +232,8 @@ test.describe("ナビゲーション（Issue #49）", () => {
       await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
 
       for (const viewport of [
-        { width: 390, height: 844, expectedChartHeight: "180" },
-        { width: 1280, height: 800, expectedChartHeight: "200" },
+        { width: 390, height: 844, expectedChartHeight: "220" },
+        { width: 1280, height: 800, expectedChartHeight: "220" },
       ]) {
         await page.setViewportSize(viewport);
 

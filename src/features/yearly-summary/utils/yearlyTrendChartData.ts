@@ -1,11 +1,12 @@
 import type { YearlySummary } from "../../../../lib/domain/receipt/yearlySummary";
 import { formatYen } from "../../../../lib/domain/common/currency";
+import { designTokens } from "../../../designTokens";
 
 export const OTHER_SERIES_DATA_KEY = "__yearly_other__";
 export const MAX_STACKED_CATEGORIES = 5;
-const OTHER_CATEGORY_COLOR = "#AAB7C4";
+const OTHER_CATEGORY_COLOR = designTokens.color.brand.mist;
 
-export type YearlyChartSeries = {
+type YearlyChartSeries = {
   dataKey: string;
   label: string;
   color: string;
@@ -19,14 +20,14 @@ export type YearlyTrendChartData = {
   dataset: Array<Record<string, string | number>>;
 };
 
-export type YearlyBalanceLineSeries = {
+type YearlyBalanceLineSeries = {
   color: string;
   dataKey: string;
   label: string;
   valueFormatter: (value: number | null, context: { dataIndex: number }) => string;
 };
 
-export type YearlyCategoryLineSeries = {
+type YearlyCategoryLineSeries = {
   area: true;
   color: string;
   dataKey: string;
@@ -92,6 +93,34 @@ export function buildYearlyTrendChartData(summary: YearlySummary): YearlyTrendCh
   });
 
   return { labels, expense, income, series, dataset };
+}
+
+/**
+ * グラフの代替テキスト。モードに応じて月ごとの支出・収入、
+ * またはカテゴリ別内訳をテキストで列挙する（スクリーンリーダー向け）。
+ */
+export function buildYearlyChartAriaLabel(
+  mode: "balance" | "category",
+  chartData: YearlyTrendChartData,
+): string {
+  if (mode === "balance") {
+    const months = chartData.dataset.map(
+      (row) =>
+        `${String(row.label)} 支出${formatYen(Number(row.expense))} 収入${formatYen(
+          Number(row.income),
+        )}`,
+    );
+    return `月ごとの収支推移グラフ。${months.join("。")}`;
+  }
+
+  const months = chartData.dataset.map(
+    (row) =>
+      `${String(row.label)} ` +
+      chartData.series
+        .map((entry) => `${entry.label}${formatYen(Number(row[entry.dataKey] ?? 0))}`)
+        .join("、"),
+  );
+  return `カテゴリ別の積み上げ面グラフ。${months.join("。")}`;
 }
 
 export function formatYearlyBalanceTooltip(

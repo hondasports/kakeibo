@@ -1,4 +1,4 @@
-import { Box, Stack } from "@mui/material";
+import { Alert, Box, Button, Stack } from "@mui/material";
 import { WeeklyTrendChart } from "./WeeklyTrendChart";
 import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
 import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
@@ -28,6 +28,8 @@ export function WeeklySummaryPanel({
   incomes = [],
   isLoading = false,
   weeklyExpenseTrend,
+  fourWeeksStatus,
+  onTrendRetry,
   onDeleteReceipt,
   onEditReceipt,
   weekStartDate,
@@ -44,6 +46,7 @@ export function WeeklySummaryPanel({
   onBulkChangeCategory,
   onBulkDelete,
 }: WeeklySummaryPanelProps) {
+  const trendStatus = fourWeeksStatus ?? (weeklyExpenseTrend === undefined ? "pending" : "success");
   const targetWeek = weeklyExpenseTrend?.items.at(-1);
   const previousDiff =
     targetWeek?.previousDiff ??
@@ -53,18 +56,31 @@ export function WeeklySummaryPanel({
     <Stack spacing={2.5}>
       <SummaryMetricsPanel
         averageRate={targetWeek?.averageRate ?? null}
-        isLoading={isLoading || weeklyExpenseTrend === undefined}
+        isLoading={isLoading || trendStatus === "pending"}
         previousDiff={previousDiff}
         totalAmountYen={totalAmountYen}
         totalIncomeYen={totalIncomeYen}
       />
 
       <Box className="weekly-summary-analysis-grid">
-        {weeklyExpenseTrend !== null && (
-          <WeeklyTrendChart
-            chartData={weeklyExpenseTrend}
-            isLoading={weeklyExpenseTrend === undefined}
-          />
+        {trendStatus === "error" ? (
+          <Stack spacing={1.5}>
+            <Alert severity="error" variant="outlined">
+              週別支出推移を読み込めませんでした。
+            </Alert>
+            {onTrendRetry && (
+              <Button onClick={onTrendRetry} sx={{ alignSelf: "flex-start" }} variant="outlined">
+                再試行
+              </Button>
+            )}
+          </Stack>
+        ) : (
+          weeklyExpenseTrend !== null && (
+            <WeeklyTrendChart
+              chartData={weeklyExpenseTrend}
+              isLoading={weeklyExpenseTrend === undefined}
+            />
+          )
         )}
         <WeeklyCategoryBreakdown
           byCategory={byCategory}

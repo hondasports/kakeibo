@@ -1,8 +1,8 @@
-export type ExtractorMode = "mock" | "real";
+type ExtractorMode = "mock" | "real";
 
 import { APP_ENV_INVALID_MESSAGE, parseKnownAppEnv } from "../common/appEnv";
 
-export type ResolveExtractorModeError = "missing_required" | "invalid" | "invalid_app_env";
+type ResolveExtractorModeError = "missing_required" | "invalid" | "invalid_app_env";
 
 const extractorModeErrorMessages: Record<ResolveExtractorModeError, string> = {
   missing_required: "RECEIPT_IMAGE_EXTRACTOR_MODE を production では必ず設定してください",

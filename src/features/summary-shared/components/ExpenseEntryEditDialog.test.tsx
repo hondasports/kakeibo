@@ -124,6 +124,8 @@ describe("ExpenseEntryEditDialog AI draft history", () => {
           shopName: "スーパー青葉",
           amountYen: 1500,
           categoryId: "cat-food",
+          categoryName: "食費",
+          categoryColor: "#f97316",
           recordType: "expenseEntry",
           aiExpenseDraftId: "draft-1",
           registrationMode: "totalOnly",

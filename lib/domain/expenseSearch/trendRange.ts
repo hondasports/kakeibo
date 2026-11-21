@@ -1,4 +1,4 @@
-export const MAX_HISTORY_TREND_BUCKETS = 1200;
+const MAX_HISTORY_TREND_BUCKETS = 1200;
 
 export function getHistoryTrendRangeError(
   startDate: string | undefined,

@@ -1,6 +1,6 @@
 import type { GroupRole } from "./role";
 
-export type GroupAdminErrorKey =
+type GroupAdminErrorKey =
   | "owner_only"
   | "not_active_group"
   | "self_operation_forbidden"

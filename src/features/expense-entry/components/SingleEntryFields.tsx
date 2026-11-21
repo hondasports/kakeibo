@@ -2,12 +2,14 @@ import { Stack, TextField, Typography } from "@mui/material";
 import { currencyFormatter } from "../../../../lib/domain/common/currency";
 import { extractAmountDigits } from "../../../utils/currency";
 import { CategoryGrid } from "./CategoryGrid";
+import { ExpenseMemoField } from "./ExpenseMemoField";
 import type { ExpenseEntryCategory } from "../types/types";
 
 interface SingleEntryFieldsProps {
   categories: ExpenseEntryCategory[];
   itemCategoryId?: string;
   memo: string;
+  memoError: string;
   shopName: string;
   shopNameError: string;
   sourceAmount: string;
@@ -15,13 +17,15 @@ interface SingleEntryFieldsProps {
   categoryError?: string;
   onShopNameChange: (value: string) => void;
   onSourceAmountChange: (value: string) => void;
-  onItemChange: (field: "categoryId" | "memo", value: string) => void;
+  onMemoChange: (value: string) => void;
+  onCategoryChange: (categoryId: string) => void;
 }
 
 export function SingleEntryFields({
   categories,
   itemCategoryId,
   memo,
+  memoError,
   shopName,
   shopNameError,
   sourceAmount,
@@ -29,7 +33,8 @@ export function SingleEntryFields({
   categoryError,
   onShopNameChange,
   onSourceAmountChange,
-  onItemChange,
+  onMemoChange,
+  onCategoryChange,
 }: SingleEntryFieldsProps) {
   return (
     <>
@@ -73,20 +78,11 @@ export function SingleEntryFields({
           ariaLabel="カテゴリ候補"
           categories={categories}
           selectedCategoryId={itemCategoryId}
-          onSelect={(categoryId) => onItemChange("categoryId", categoryId)}
+          onSelect={onCategoryChange}
         />
       </Stack>
 
-      <TextField
-        fullWidth
-        id="expense-memo"
-        label="メモ（任意）"
-        minRows={2}
-        multiline
-        onChange={(event) => onItemChange("memo", event.target.value)}
-        value={memo}
-        slotProps={{ htmlInput: { "aria-label": "メモ" } }}
-      />
+      <ExpenseMemoField memo={memo} memoError={memoError} onMemoChange={onMemoChange} />
     </>
   );
 }

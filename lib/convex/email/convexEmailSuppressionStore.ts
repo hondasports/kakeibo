@@ -26,7 +26,7 @@ export function toEmailSuppressionRecord(doc: Doc<"emailSuppressions">): EmailSu
   };
 }
 
-export function createEmailSuppressionReader(
+function createEmailSuppressionReader(
   ctx: Pick<QueryCtx, "db">,
 ): Pick<EmailSuppressionStore, "findByNormalizedEmail" | "listByNormalizedEmail"> {
   return {

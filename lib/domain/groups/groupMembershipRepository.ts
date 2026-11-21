@@ -7,7 +7,7 @@ import type { GroupMemberFields, GroupMemberRecord } from "./groupMember";
 import type { GroupRole } from "./role";
 
 /** ページネーション結果（メンバーシップ走査用）。 */
-export type GroupMembershipPage = {
+type GroupMembershipPage = {
   page: GroupMemberRecord[];
   isDone: boolean;
   continueCursor: string;
