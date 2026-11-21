@@ -84,24 +84,27 @@ export function InputPage() {
             message="カテゴリを読み込んでいます…"
             variant="page"
           />
-        ) : categories.length === 0 ? (
-          <Alert
-            action={
-              <Button color="inherit" component={RouterLink} size="small" to="/settings">
-                カテゴリ設定を開く
-              </Button>
-            }
-            severity="info"
-            variant="outlined"
-          >
-            カテゴリがまだ登録されていません。支出を記録するには、設定でカテゴリを追加してください。
-          </Alert>
         ) : (
-          <ExpenseEntryForm
-            weekStartDate={weekStartDate}
-            weekEndDate={weekEndDate}
-            categories={categories}
-          />
+          <>
+            {categories.length === 0 && (
+              <Alert
+                action={
+                  <Button color="inherit" component={RouterLink} size="small" to="/settings">
+                    カテゴリ設定を開く
+                  </Button>
+                }
+                severity="info"
+                variant="outlined"
+              >
+                カテゴリがまだ登録されていません。支出を記録するには、設定でカテゴリを追加してください。
+              </Alert>
+            )}
+            <ExpenseEntryForm
+              weekStartDate={weekStartDate}
+              weekEndDate={weekEndDate}
+              categories={categories}
+            />
+          </>
         )}
       </Stack>
     </Box>

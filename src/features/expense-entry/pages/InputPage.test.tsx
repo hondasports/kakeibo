@@ -137,7 +137,7 @@ describe("InputPage", () => {
     expect(screen.getByTestId("week-navigator")).toBeInTheDocument();
   });
 
-  it("カテゴリが0件と確定したら空状態を表示しフォームは出さない", () => {
+  it("カテゴリが0件と確定したら空状態を表示しフォーム（収入入力）も出す", () => {
     useQueryMock.mockReturnValueOnce([]).mockReturnValueOnce(undefined);
 
     renderInputPage();
@@ -147,7 +147,7 @@ describe("InputPage", () => {
       "href",
       "/settings",
     );
-    expect(screen.queryByTestId("expense-entry-form")).not.toBeInTheDocument();
+    expect(screen.getByTestId("expense-entry-form")).toBeInTheDocument();
     expect(screen.queryByTestId("loading")).not.toBeInTheDocument();
   });
 

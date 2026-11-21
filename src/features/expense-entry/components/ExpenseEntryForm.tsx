@@ -19,6 +19,9 @@ export function ExpenseEntryForm({
   categories,
 }: ExpenseEntryFormProps) {
   const [entryType, setEntryType] = useState<EntryKind>("expense");
+  // 支出はカテゴリ必須、収入はカテゴリ不要。カテゴリ0件では支出タブを無効化して収入だけ使えるようにする
+  const expenseUnavailable = categories.length === 0;
+  const activeEntryType = expenseUnavailable ? "income" : entryType;
   const expense = useExpenseEntryForm({ weekStartDate, weekEndDate, categories });
   const income = useIncomeEntry(expense.date);
 
@@ -28,15 +31,15 @@ export function ExpenseEntryForm({
         <Stack spacing={2.5}>
           <Tabs
             aria-label="支出・収入切り替え"
-            value={entryType}
+            value={activeEntryType}
             variant="fullWidth"
             onChange={(_event, value: EntryKind) => setEntryType(value)}
           >
-            <Tab label="支出" value="expense" />
+            <Tab disabled={expenseUnavailable} label="支出" value="expense" />
             <Tab label="収入" value="income" />
           </Tabs>
 
-          {entryType === "expense" ? (
+          {activeEntryType === "expense" ? (
             <ExpenseEntryWorkbench
               categories={categories}
               weekEndDate={weekEndDate}
