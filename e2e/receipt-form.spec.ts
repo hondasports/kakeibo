@@ -174,10 +174,15 @@ test.describe("[Issue #17] カテゴリ管理の反映確認（P1 / regression�
     await expect(page).toHaveURL("/settings");
     await page.getByRole("button", { name: `${updatedCategoryName}を編集` }).click();
     await page.getByRole("button", { name: `${updatedCategoryName}を無効化` }).click();
-    // 無効化後: ボタンが disabled になること（設定画面では無効カテゴリも表示される）
-    await expect(page.getByRole("button", { name: `${updatedCategoryName}を無効化` })).toBeDisabled(
-      { timeout: 15_000 },
-    );
+    // 確認ダイアログで影響を確認してから無効化を確定する
+    const deactivateDialog = page.getByRole("dialog");
+    await expect(deactivateDialog).toBeVisible();
+    await expect(deactivateDialog).toContainText("過去の家計記録や集計には影響しません");
+    await deactivateDialog.getByRole("button", { name: "無効化する" }).click();
+    // 無効化後: 有効化ボタンに切り替わること（設定画面では無効カテゴリも表示される）
+    await expect(page.getByRole("button", { name: `${updatedCategoryName}を有効化` })).toBeVisible({
+      timeout: 15_000,
+    });
 
     // 入力画面でカテゴリ候補から消えていることを確認
     await page.getByRole("link", { name: "入力", exact: true }).click();

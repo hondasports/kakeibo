@@ -25,7 +25,7 @@ export function NotificationSettingsPanel() {
         通知設定
       </Typography>
       <Typography color="text.secondary" sx={{ mt: 0.75 }} variant="body2">
-        AIレビューの通知をどこで受け取るか設定できます。
+        AIレビューの通知をどこで受け取るか設定できます。変更は切り替えた時点ですぐに保存されます。
       </Typography>
       <SettingsSectionErrorBoundary>
         <NotificationSettingsContent />

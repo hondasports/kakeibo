@@ -17,6 +17,7 @@ vi.mock("../../../../convex/_generated/api", () => ({
       mutations: {
         createCategory: "categories.mutations.createCategory",
         deactivateCategory: "categories.mutations.deactivateCategory",
+        reactivateCategory: "categories.mutations.reactivateCategory",
         updateCategory: "categories.mutations.updateCategory",
       },
     },

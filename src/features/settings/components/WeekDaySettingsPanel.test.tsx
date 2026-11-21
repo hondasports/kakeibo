@@ -96,6 +96,8 @@ describe("WeekDaySettingsPanel", () => {
 
     renderWithProviders(<WeekDaySettingsPanel />);
 
+    await userEvent.click(screen.getByLabelText("週の始まり"));
+    await userEvent.click(screen.getByRole("option", { name: "火曜日" }));
     await userEvent.click(screen.getByRole("button", { name: "変更を保存" }));
 
     expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
@@ -103,6 +105,25 @@ describe("WeekDaySettingsPanel", () => {
     if (resolveMutation) {
       resolveMutation();
     }
+  });
+
+  it("値が未変更なら保存ボタンは無効で、変更すると未保存表示になる", async () => {
+    useQueryMock.mockReturnValue({
+      monthlyIncome: null,
+      weeklyStartDay: 1,
+      weeklyEndDay: 0,
+    });
+
+    renderWithProviders(<WeekDaySettingsPanel />);
+
+    expect(screen.getByRole("button", { name: "変更を保存" })).toBeDisabled();
+    expect(screen.queryByText("未保存の変更があります")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("週の始まり"));
+    await userEvent.click(screen.getByRole("option", { name: "火曜日" }));
+
+    expect(screen.getByRole("button", { name: "変更を保存" })).toBeEnabled();
+    expect(screen.getByText("未保存の変更があります")).toBeInTheDocument();
   });
 
   it("保存に失敗したらエラー通知を表示する", async () => {
@@ -114,6 +135,9 @@ describe("WeekDaySettingsPanel", () => {
     });
 
     renderWithProviders(<WeekDaySettingsPanel />);
+
+    await userEvent.click(screen.getByLabelText("週の始まり"));
+    await userEvent.click(screen.getByRole("option", { name: "火曜日" }));
     await userEvent.click(screen.getByRole("button", { name: "変更を保存" }));
 
     const errorMessage = await screen.findByText("週の設定を保存できませんでした");

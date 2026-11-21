@@ -2,6 +2,7 @@ import type { Id } from "../_generated/dataModel";
 import {
   createCategoryHandler,
   deactivateCategoryHandler,
+  reactivateCategoryHandler,
   updateCategoryHandler,
 } from "./mutations";
 import { listForSettingsHandler, listActiveHandler } from "./queries";
@@ -308,6 +309,40 @@ describe("category management", () => {
       deactivateCategoryHandler(ctx, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         categoryId: "cat-active" as any,
+      }),
+    ).rejects.toBeInstanceOf(ConvexError);
+  });
+
+  it("reactivateCategory は無効化した所有カテゴリを有効化する", async () => {
+    const ctx = createMutationCtx(identityOwner, [inactiveCategory], groupMemberOwner);
+
+    await reactivateCategoryHandler(ctx, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      categoryId: "cat-inactive" as any,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dbPatch = (ctx.db as any).patch as ReturnType<typeof vi.fn>;
+    expect(dbPatch).toHaveBeenCalledWith(
+      "cat-inactive",
+      expect.objectContaining({
+        isActive: true,
+        updatedAt: expect.any(Number),
+      }),
+    );
+  });
+
+  it("他グループのカテゴリは再有効化できない", async () => {
+    const otherGroupCategory: CategoryDoc = {
+      ...inactiveCategory,
+      groupId: OTHER_GROUP_ID,
+    };
+    const ctx = createMutationCtx(identityOwner, [otherGroupCategory], groupMemberOwner);
+
+    await expect(
+      reactivateCategoryHandler(ctx, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        categoryId: "cat-inactive" as any,
       }),
     ).rejects.toBeInstanceOf(ConvexError);
   });

@@ -12,6 +12,7 @@ import type {
 import {
   createCategory,
   deactivateCategory,
+  reactivateCategory,
   seedDefaultCategories,
   updateCategory,
 } from "./operations";
@@ -224,6 +225,25 @@ describe("deactivateCategory", () => {
     const store = createStore();
     await expect(deactivateCategory(store, "g1", "cat-x", 5000)).rejects.toThrow(
       "Category not found",
+    );
+  });
+});
+
+describe("reactivateCategory", () => {
+  it("所有カテゴリを isActive:true で patch する", async () => {
+    const target = record({ id: "cat-1", isActive: false });
+    const store = createStore({ get: vi.fn().mockResolvedValue(target) });
+    await reactivateCategory(store, "g1", "cat-1", 5000);
+    expect(store.patch).toHaveBeenCalledWith("cat-1", {
+      isActive: true,
+      updatedAt: 5000,
+    });
+  });
+
+  it("別グループ所属は拒否する", async () => {
+    const store = createStore({ get: vi.fn().mockResolvedValue(record({ groupId: "g2" })) });
+    await expect(reactivateCategory(store, "g1", "cat-1", 5000)).rejects.toThrow(
+      "Category does not belong to the current group",
     );
   });
 });

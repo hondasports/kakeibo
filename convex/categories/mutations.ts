@@ -14,6 +14,7 @@ import { CategoryDomainError } from "../../lib/domain/categories/rules";
 import {
   createCategory as createCategoryUsecase,
   deactivateCategory as deactivateCategoryUsecase,
+  reactivateCategory as reactivateCategoryUsecase,
   seedDefaultCategories as seedDefaultCategoriesUsecase,
   updateCategory as updateCategoryUsecase,
 } from "../../lib/usecase/categories";
@@ -102,6 +103,29 @@ export async function deactivateCategoryHandler(
   }
 }
 
+type ReactivateCategoryArgs = {
+  categoryId: Id<"categories">;
+};
+
+/** reactivateCategory mutation の handler ロジック（テスト用に export） */
+export async function reactivateCategoryHandler(
+  ctx: MutationCtx,
+  args: ReactivateCategoryArgs,
+): Promise<Doc<"categories"> | null> {
+  const { groupId } = await requireGroupMembership(ctx);
+  try {
+    const record = await reactivateCategoryUsecase(
+      createCategoryStore(ctx),
+      groupId,
+      args.categoryId,
+      Date.now(),
+    );
+    return record === null ? null : categoryRecordToDoc(record);
+  } catch (error) {
+    convexError(error);
+  }
+}
+
 /**
  * 初回ログイン時にデフォルトカテゴリを seed する mutation。
  * groupId はサーバー側でグループメンバーシップから解決するため、
@@ -136,4 +160,11 @@ export const deactivateCategory = mutation({
     categoryId: v.id("categories"),
   },
   handler: deactivateCategoryHandler,
+});
+
+export const reactivateCategory = mutation({
+  args: {
+    categoryId: v.id("categories"),
+  },
+  handler: reactivateCategoryHandler,
 });

@@ -2,6 +2,7 @@ export { assertUsableCategory } from "./assertUsableCategory";
 export {
   createCategory,
   deactivateCategory,
+  reactivateCategory,
   seedDefaultCategories,
   updateCategory,
   type CreateCategoryInput,

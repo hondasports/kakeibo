@@ -1,5 +1,6 @@
 import { Box, Stack, Typography } from "@mui/material";
 import { CategorySettingsPanel } from "../components/CategorySettingsPanel";
+import { SettingsSectionErrorBoundary } from "../components/SettingsSectionErrorBoundary";
 
 export function CategoriesPage() {
   return (
@@ -8,7 +9,9 @@ export function CategoriesPage() {
         <Typography component="h1" variant="h5">
           カテゴリ管理
         </Typography>
-        <CategorySettingsPanel />
+        <SettingsSectionErrorBoundary>
+          <CategorySettingsPanel />
+        </SettingsSectionErrorBoundary>
       </Stack>
     </Box>
   );
