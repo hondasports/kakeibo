@@ -41,7 +41,13 @@ export function ExpenseItemRow({
             項目 {index + 1}
           </Typography>
           {canRemove && (
-            <IconButton aria-label="削除" size="small" color="error" onClick={onRemove}>
+            <IconButton
+              aria-label={`項目${index + 1}を削除`}
+              size="small"
+              color="error"
+              onClick={onRemove}
+              sx={{ minWidth: { xs: 44, md: "auto" }, minHeight: { xs: 44, md: "auto" } }}
+            >
               <DeleteIcon fontSize="small" />
             </IconButton>
           )}

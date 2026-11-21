@@ -1,20 +1,7 @@
+import { collectDocumentCssText } from "../../../test/cssText";
 import { renderWithProviders } from "../../../test/render";
 import { describe, expect, it } from "vitest";
 import { ExpenseFormActions } from "./ExpenseFormActions";
-
-function collectCssText(): string {
-  const parts: string[] = [];
-  document.querySelectorAll("style").forEach((styleEl) => {
-    parts.push(styleEl.textContent ?? "");
-    const sheet = styleEl.sheet;
-    if (sheet) {
-      for (const rule of Array.from(sheet.cssRules)) {
-        parts.push(rule.cssText);
-      }
-    }
-  });
-  return parts.join("\n");
-}
 
 function renderActions() {
   return renderWithProviders(
@@ -33,7 +20,7 @@ describe("ExpenseFormActions", () => {
     const stack = container.firstElementChild;
     expect(stack).not.toBeNull();
 
-    const css = collectCssText();
+    const css = collectDocumentCssText();
     const className = Array.from(stack!.classList)
       .filter((name) => name.startsWith("css-"))
       .find((name) => new RegExp(`\\.${name}\\s*\\{[^}]*position:[^;}]*sticky`).test(css));

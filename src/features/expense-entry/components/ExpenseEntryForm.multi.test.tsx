@@ -186,7 +186,9 @@ describe("ExpenseEntryForm（multi）", () => {
 
       // 2項目目を削除
       await user.click(
-        within(screen.getByTestId("expense-item-1")).getByRole("button", { name: "削除" }),
+        within(screen.getByTestId("expense-item-1")).getByRole("button", {
+          name: "項目2を削除",
+        }),
       );
 
       // 1項目だけ残る
