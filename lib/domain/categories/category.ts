@@ -10,7 +10,7 @@ export const MAX_CATEGORY_NAME_LENGTH = 40;
 export const MAX_CATEGORY_DESCRIPTION_LENGTH = 200;
 
 /** カテゴリ名の検証失敗理由。 */
-export type CategoryNameError = "empty" | "too_long";
+type CategoryNameError = "empty" | "too_long";
 
 /**
  * カテゴリ名を trim し、空文字・長さ超過を検証する。
@@ -29,7 +29,7 @@ export function validateCategoryName(
 }
 
 /** カテゴリカラーの検証失敗理由。 */
-export type CategoryColorError = "invalid_hex";
+type CategoryColorError = "invalid_hex";
 
 /**
  * カテゴリカラーを trim し、6 桁の hex 値かどうか検証する。
@@ -45,7 +45,7 @@ export function validateCategoryColor(
 }
 
 /** カテゴリ説明の検証失敗理由。 */
-export type CategoryDescriptionError = "too_long";
+type CategoryDescriptionError = "too_long";
 
 /**
  * カテゴリ説明が指定されていれば長さを検証する。

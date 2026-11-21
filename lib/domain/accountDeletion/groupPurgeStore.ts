@@ -8,10 +8,9 @@ export const ACCOUNT_DELETION_GROUP_PURGE_STATUSES = [
   "failed",
   "completed",
 ] as const;
-export type AccountDeletionGroupPurgeStatus =
-  (typeof ACCOUNT_DELETION_GROUP_PURGE_STATUSES)[number];
+type AccountDeletionGroupPurgeStatus = (typeof ACCOUNT_DELETION_GROUP_PURGE_STATUSES)[number];
 
-export type AccountDeletionGroupPurgeFields = {
+type AccountDeletionGroupPurgeFields = {
   requestId: string;
   groupDeletionJobId: string;
   targetGroupIdSnapshot: string;

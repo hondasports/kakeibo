@@ -4,22 +4,20 @@
  */
 
 /** 利用可否判定に必要なカテゴリの最小形状。 */
-export type CategoryUsabilityTarget = {
+type CategoryUsabilityTarget = {
   id: string;
   groupId: string;
   isActive: boolean;
 };
 
-export type CategoryUsabilityError = "not_found" | "wrong_group" | "inactive";
+type CategoryUsabilityError = "not_found" | "wrong_group" | "inactive";
 
-export type CategoryUsabilityOptions = {
+type CategoryUsabilityOptions = {
   /** 現在値と同じカテゴリであれば、非活性でも許容する（既存レコードの維持用）。 */
   allowInactiveWhenUnchangedFrom?: string;
 };
 
-export type CategoryUsabilityResult =
-  | { usable: true }
-  | { usable: false; error: CategoryUsabilityError };
+type CategoryUsabilityResult = { usable: true } | { usable: false; error: CategoryUsabilityError };
 
 /**
  * カテゴリがエントリに利用可能かを判定する。

@@ -16,7 +16,7 @@ type ExistingSeedCategory = {
   sortOrder: number;
 };
 
-export type SeedCategoryPatch = {
+type SeedCategoryPatch = {
   color?: string;
   description?: string;
   updatedAt: number;

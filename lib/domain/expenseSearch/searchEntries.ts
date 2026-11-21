@@ -23,7 +23,7 @@ export function dedupeSearchEntries<T extends { _id: string; recordType: string 
   });
 }
 
-export type SearchKindPartition<T> = {
+type SearchKindPartition<T> = {
   expenses: T[];
   incomes: T[];
 };

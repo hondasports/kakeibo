@@ -7,7 +7,7 @@ import type { GroupDeletionPreviewCount } from "./groupDeletionWorkflow";
 /** プレビュー集計の打ち切り上限。 */
 export const DELETION_PREVIEW_LIMIT = 100;
 
-export type BoundedPreview<Document> = {
+type BoundedPreview<Document> = {
   /** 上限内のドキュメント（派生集計に利用）。 */
   documents: Document[];
   result: GroupDeletionPreviewCount;

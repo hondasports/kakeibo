@@ -12,11 +12,11 @@ export const SOURCE_DOCUMENT_SOURCE_TYPES = [
   "unknown",
 ] as const;
 
-export type SourceDocumentSourceType = (typeof SOURCE_DOCUMENT_SOURCE_TYPES)[number];
+type SourceDocumentSourceType = (typeof SOURCE_DOCUMENT_SOURCE_TYPES)[number];
 
 export const SOURCE_DOCUMENT_STATUSES = ["draft", "ready", "finalized"] as const;
 
-export type SourceDocumentStatus = (typeof SOURCE_DOCUMENT_STATUSES)[number];
+type SourceDocumentStatus = (typeof SOURCE_DOCUMENT_STATUSES)[number];
 
 export type SourceDocumentFields = {
   groupId: string;
@@ -34,7 +34,7 @@ export type SourceDocumentFields = {
 };
 
 /** 手動入力 sourceDocument の作成入力。 */
-export type ManualSourceDocumentInput = {
+type ManualSourceDocumentInput = {
   groupId: string;
   date: string;
   shopName: string;

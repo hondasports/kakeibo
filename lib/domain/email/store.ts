@@ -89,7 +89,7 @@ export interface EmailSuppressionStore {
   deleteSuppression(id: string): Promise<void>;
 }
 
-export type NewEmailWebhookEventFields = Omit<EmailWebhookEventRecord, "id" | "creationTime">;
+type NewEmailWebhookEventFields = Omit<EmailWebhookEventRecord, "id" | "creationTime">;
 
 export interface EmailWebhookEventReader {
   findEventBySvixId(svixId: string): Promise<EmailWebhookEventRecord | null>;

@@ -22,7 +22,7 @@ export const ACCOUNT_DELETION_PURGE_OUTCOMES = ["waiting", "ready", "failed"] as
 export type AccountDeletionPurgeOutcome = (typeof ACCOUNT_DELETION_PURGE_OUTCOMES)[number];
 
 /** accountDeletionRequests ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
-export type AccountDeletionRequestFields = {
+type AccountDeletionRequestFields = {
   userId: string;
   clerkUserId: string;
   recipientEmailSnapshot?: string;

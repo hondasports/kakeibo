@@ -8,7 +8,7 @@ import type { LineWebhookEventType } from "./payload";
 export const LINE_WEBHOOK_DELIVERIES = ["linked", "unlinked"] as const;
 
 /** webhook イベントの連携状態別配送区分。 */
-export type LineWebhookDelivery = (typeof LINE_WEBHOOK_DELIVERIES)[number];
+type LineWebhookDelivery = (typeof LINE_WEBHOOK_DELIVERIES)[number];
 
 export type LineWebhookEventFields = {
   webhookEventId: string;

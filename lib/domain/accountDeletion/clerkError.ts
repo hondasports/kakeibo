@@ -2,7 +2,7 @@
  * Clerk 削除エラーの分類ルール（純粋ドメイン関数）。
  * 404 は削除済みとして扱い、429/5xx/不明ステータスはリトライ可能とする。
  */
-export type ClerkDeletionErrorResult =
+type ClerkDeletionErrorResult =
   | { kind: "already_deleted" }
   | { kind: "retryable"; code: string; message: string }
   | { kind: "failed"; code: string; message: string };

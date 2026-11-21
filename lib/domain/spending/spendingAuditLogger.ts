@@ -11,7 +11,7 @@ export type SpendingAuditAction =
   | typeof BULK_SPENDING_CATEGORY_CHANGED_ACTION
   | typeof BULK_SPENDING_DELETED_ACTION;
 
-export type SpendingAuditEntry = {
+type SpendingAuditEntry = {
   groupId: string;
   actorUserId: string;
   action: SpendingAuditAction;

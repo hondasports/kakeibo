@@ -7,10 +7,10 @@
 export const MAX_GROUP_NAME_LENGTH = 50;
 
 /** グループ名検証の失敗理由。 */
-export type GroupNameValidationError = { type: "empty" } | { type: "too_long"; maxLength: number };
+type GroupNameValidationError = { type: "empty" } | { type: "too_long"; maxLength: number };
 
 /** 検証結果。 */
-export type GroupNameValidationResult =
+type GroupNameValidationResult =
   | { success: true; name: string }
   | { success: false; error: GroupNameValidationError };
 

@@ -18,7 +18,7 @@ export const SYSTEM_ADMIN_NOTIFICATION_ACTIONS = [
 export type SystemAdminNotificationAction = (typeof SYSTEM_ADMIN_NOTIFICATION_ACTIONS)[number];
 
 /** systemAdminNotifications ドキュメントのフィールド（書き込み用）。 */
-export type SystemAdminNotificationFields = {
+type SystemAdminNotificationFields = {
   action: SystemAdminNotificationAction;
   recipientUserId?: string;
   recipientEmail?: string;

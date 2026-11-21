@@ -3,7 +3,7 @@ import type { GroupRole } from "../groups/role";
 export const ACCOUNT_DELETION_GROUP_MEMBERSHIP_INVARIANT_MESSAGE =
   "Group membership invariant violation";
 
-export type AccountDeletionMembership = {
+type AccountDeletionMembership = {
   groupId: string;
   groupName: string;
   role: GroupRole;

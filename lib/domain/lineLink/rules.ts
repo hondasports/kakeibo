@@ -1,6 +1,6 @@
 import type { LineAccountLinkRecord, LineLinkRequestRecord } from "./records";
 
-export type ClaimRequestPlan =
+type ClaimRequestPlan =
   | { kind: "invalid" }
   | { kind: "expired" }
   | { kind: "claim"; requestId: string; nonceHash: string; codeVerifier: string };

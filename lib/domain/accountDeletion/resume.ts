@@ -1,4 +1,4 @@
-export type AccountDeletionResumeState = {
+type AccountDeletionResumeState = {
   identityDeletedAt?: number;
   preparationCompletedAt?: number;
 };

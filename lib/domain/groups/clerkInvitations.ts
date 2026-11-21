@@ -1,16 +1,12 @@
 export const INVITATION_ACCEPT_PATH = "/group/invitations/accept";
 
-export type InvitationRedirectError =
-  | "invalid_url"
-  | "invalid_protocol"
-  | "invalid_path"
-  | "not_allowed";
+type InvitationRedirectError = "invalid_url" | "invalid_protocol" | "invalid_path" | "not_allowed";
 
-export type BuildInvitationRedirectUrlResult =
+type BuildInvitationRedirectUrlResult =
   | { success: true; redirectUrl: string }
   | { success: false; error: InvitationRedirectError };
 
-export type InvitationRedirectOptions = {
+type InvitationRedirectOptions = {
   /** localhost / 127.0.0.1 を許可するか。APP_ENV=development の deployment だけ true にする */
   allowLocalhost?: boolean;
 };

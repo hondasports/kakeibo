@@ -24,7 +24,7 @@ export const NOTIFICATION_CHANNEL_LABELS: Record<NotificationChannel, string> = 
   line: "LINE",
 };
 
-export type NotificationCatalogEntry = {
+type NotificationCatalogEntry = {
   type: TransactionalEmailType;
   label: string;
   mandatory: boolean;
@@ -80,7 +80,7 @@ export const DEFAULT_USER_NOTIFICATION_PREFERENCES: UserNotificationPreferences 
   aiReviewRequiredLineEnabled: false,
 };
 
-export type NotificationDisabledReason =
+type NotificationDisabledReason =
   | "globally_disabled"
   | "user_opted_out"
   | "line_not_opted_in"

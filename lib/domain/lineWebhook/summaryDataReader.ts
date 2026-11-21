@@ -5,7 +5,7 @@
 import type { IncomeListEntry, SpendingEntry } from "../receipt/spendingEntry";
 
 /** カテゴリ名+色の写像（byCategory 集計用）。 */
-export type CategoryInfo = { name: string; color: string };
+type CategoryInfo = { name: string; color: string };
 
 /** カテゴリ検索・画像解析ヒント用の最小形状。 */
 export type LineCategoryHint = { id: string; name: string; description?: string };
