@@ -24,7 +24,7 @@ function DashboardSummarySection({
   weekSession,
 }: {
   currentMonth: string;
-  currentYear: number;
+  currentYear: string;
   isCompact: boolean;
   weekSession: WeekSession;
 }) {
