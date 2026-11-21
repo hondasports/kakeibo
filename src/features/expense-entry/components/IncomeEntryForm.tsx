@@ -3,6 +3,7 @@ import { currencyFormatter } from "../../../../lib/domain/common/currency";
 import { extractAmountDigits } from "../../../utils/currency";
 import type { useIncomeEntry } from "../hooks/useIncomeEntry";
 import { ExpenseFormHeading } from "./ExpenseFormHeading";
+import { stickyBottomBarSx } from "./stickyBottomBarSx";
 import { WeekDaySelector } from "./WeekDaySelector";
 
 type IncomeEntryFormProps = {
@@ -83,16 +84,19 @@ export function IncomeEntryForm({
             value={incomeTitle}
           />
 
-          <Button
-            aria-busy={incomeSubmitting}
-            disabled={incomeSubmitting}
-            size="large"
-            sx={{ minHeight: 44 }}
-            type="submit"
-            variant="contained"
-          >
-            {incomeSubmitting ? "保存中…" : "保存して次へ"}
-          </Button>
+          <Box sx={stickyBottomBarSx}>
+            <Button
+              aria-busy={incomeSubmitting}
+              disabled={incomeSubmitting}
+              fullWidth
+              size="large"
+              sx={{ minHeight: 44 }}
+              type="submit"
+              variant="contained"
+            >
+              {incomeSubmitting ? "保存中…" : "保存して次へ"}
+            </Button>
+          </Box>
         </Stack>
       </form>
 

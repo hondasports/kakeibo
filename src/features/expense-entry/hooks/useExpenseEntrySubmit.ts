@@ -4,6 +4,7 @@ import { useMutation } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import {
   validateExpenseItems,
+  validateExpenseMemoEntry,
   type ExpenseItemEntryErrors,
   type ExpenseItemEntryInput,
 } from "../validation/expenseItems";
@@ -16,12 +17,14 @@ type UseExpenseEntrySubmitArgs = {
   sourceAmount: string;
   isMultiMode: boolean;
   items: ExpenseItemState[];
+  memo: string;
   difference: number | null;
   singleAmountNum: number;
   sourceAmountNum: number;
   setShopNameError: (error: string) => void;
   setSourceAmountError: (error: string) => void;
   setItemErrors: (errors: ExpenseItemEntryErrors[]) => void;
+  setMemoError: (error: string) => void;
   resetAfterSave: () => void;
 };
 
@@ -32,21 +35,22 @@ export function useExpenseEntrySubmit({
   sourceAmount,
   isMultiMode,
   items,
+  memo,
   difference,
   singleAmountNum,
   sourceAmountNum,
   setShopNameError,
   setSourceAmountError,
   setItemErrors,
+  setMemoError,
   resetAfterSave,
 }: UseExpenseEntrySubmitArgs) {
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [apiError, setApiError] = useState("");
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    severity: "success" | "error";
-    message: string;
-  }>({ open: false, severity: "success", message: "" });
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({
+    open: false,
+    message: "",
+  });
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingDifference, setPendingDifference] = useState(0);
 
@@ -56,19 +60,28 @@ export function useExpenseEntrySubmit({
     setStatus("submitting");
     setApiError("");
 
+    // 支出全体のメモは明細とは別のフォーム状態。保存データの形（明細ごとの memo）に
+    // 合わせて先頭明細へ割り当てる。検証失敗時はメモ欄にエラーを出す
+    const memoValidation = validateExpenseMemoEntry(memo);
+    if (!memoValidation.success) {
+      setMemoError(memoValidation.error);
+      setStatus("idle");
+      return;
+    }
+
     const itemInputs: ExpenseItemEntryInput[] = isMultiMode
-      ? items.map((item) => ({
+      ? items.map((item, index) => ({
           categoryId: item.categoryId,
           amountYen: item.amountYen,
           title: item.title,
-          memo: item.memo || undefined,
+          memo: (index === 0 ? memo : item.memo) || undefined,
         }))
       : [
           {
             categoryId: items[0]?.categoryId ?? "",
             amountYen: singleAmountNum > 0 ? String(singleAmountNum) : sourceAmount,
             title: shopName,
-            memo: items[0]?.memo || undefined,
+            memo: memo || undefined,
           },
         ];
 
@@ -109,13 +122,12 @@ export function useExpenseEntrySubmit({
       // 保存成功 → リセット
       resetAfterSave();
       setStatus("idle");
-      setSnackbar({ open: true, severity: "success", message: "支出項目を保存しました" });
+      setSnackbar({ open: true, message: "支出項目を保存しました" });
     } catch (err) {
       setStatus("error");
-      const message =
-        err instanceof Error ? err.message : "保存に失敗しました。もう一度お試しください。";
-      setApiError(message);
-      setSnackbar({ open: true, severity: "error", message });
+      setApiError(
+        err instanceof Error ? err.message : "保存に失敗しました。もう一度お試しください。",
+      );
     }
   };
 

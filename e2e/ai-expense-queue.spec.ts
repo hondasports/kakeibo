@@ -74,7 +74,7 @@ test.describe("Issue #144 読み取りUI", () => {
     await expect(processingSection.getByText("2件")).toBeVisible();
 
     // 解析直後の下書きは常に user_confirmation_required で確認待ちになるため、
-    // 2件とも「確認待ち」に並び登録準備OKは0件のまま確定する
+    // 2件とも「確認待ち」に並び登録できる下書きは0件のまま確定する
     // 「確認待ち N件」は状態サマリーのチップとバッチ内訳の両方に出るため、
     // キュー状態の確認対象である状態サマリー側に絞る
     const statusSummary = queue.locator(".ai-expense-queue-status-summary");
@@ -82,7 +82,7 @@ test.describe("Issue #144 読み取りUI", () => {
     const reviewSection = queue.getByRole("region", { name: "確認待ち" });
     await expect(reviewSection.getByText(`ai-queue-receipt-${stamp}.jpg`).first()).toBeVisible();
     await expect(reviewSection.getByText(`ai-queue-payment-${stamp}.jpg`).first()).toBeVisible();
-    await expect(queue.getByText("今回の追加 0/2件が登録準備OK")).toBeVisible();
+    await expect(queue.getByText("今回の追加 0/2件が登録できます")).toBeVisible();
     await expect(queue.getByRole("button", { name: "まとめて登録（0件）" })).toBeDisabled();
 
     await expect(page.getByRole("region", { name: "画像から入力" })).toHaveCount(0);

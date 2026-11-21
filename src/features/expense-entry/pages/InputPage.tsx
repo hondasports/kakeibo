@@ -1,13 +1,16 @@
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
-import { Alert, Box, Stack } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
+import { Alert, Box, Button, Stack, useMediaQuery } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { ExpenseEntryForm } from "../components/ExpenseEntryForm";
-import { WeekNavigator } from "../../week";
-import { WeekStatusPanel } from "../../week";
+import { WEEK_SESSION_LOAD_ERROR_MESSAGE, WeekNavigator, WeekStatusPanel } from "../../week";
 import { useInputPageWeek } from "../hooks/useInputPageWeek";
 import { SuzumemoLoadingState } from "../../ui";
 
 export function InputPage() {
+  const theme = useTheme();
+  const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const {
     weekStartDate,
     weekEndDate,
@@ -17,9 +20,10 @@ export function InputPage() {
     isCurrentWeek,
     goToPreviousWeek,
     goToNextWeek,
+    retrySession,
   } = useInputPageWeek();
 
-  const categories = useQuery(api.categories.queries.listActive) ?? [];
+  const categories = useQuery(api.categories.queries.listActive);
   const weekSummary = useQuery(api.receipts.summaries.getWeekSummary, {
     weekStartDate,
   });
@@ -37,8 +41,16 @@ export function InputPage() {
   if (sessionError || (!isLoading && !weekSession)) {
     return (
       <Box className="app-main">
-        <Alert severity="error" variant="outlined">
-          {sessionError || "週次セッションの読み込みに失敗しました。"}
+        <Alert
+          action={
+            <Button color="inherit" onClick={retrySession} size="small">
+              再試行
+            </Button>
+          }
+          severity="error"
+          variant="outlined"
+        >
+          {sessionError || WEEK_SESSION_LOAD_ERROR_MESSAGE}
         </Alert>
       </Box>
     );
@@ -48,6 +60,7 @@ export function InputPage() {
     <Box className="app-main" sx={{ minWidth: 0, maxWidth: "100%" }}>
       <Stack spacing={3}>
         <WeekNavigator
+          compactOnMobile={isCompact}
           weekStartDate={weekStartDate}
           weekEndDate={weekEndDate}
           isCurrentWeek={isCurrentWeek}
@@ -55,13 +68,43 @@ export function InputPage() {
           onNextWeek={goToNextWeek}
         />
 
-        {weekSummary !== undefined && <WeekStatusPanel count={weekSummary.count} />}
+        {weekSummary !== undefined && (
+          <WeekStatusPanel
+            count={weekSummary.count}
+            isCurrentWeek={isCurrentWeek}
+            totalAmountYen={weekSummary.totalAmountYen}
+            weekStartDate={weekStartDate}
+          />
+        )}
 
-        <ExpenseEntryForm
-          weekStartDate={weekStartDate}
-          weekEndDate={weekEndDate}
-          categories={categories}
-        />
+        {categories === undefined ? (
+          <SuzumemoLoadingState
+            label="カテゴリを読み込み中"
+            message="カテゴリを読み込んでいます…"
+            variant="page"
+          />
+        ) : (
+          <>
+            {categories.length === 0 && (
+              <Alert
+                action={
+                  <Button color="inherit" component={RouterLink} size="small" to="/settings">
+                    カテゴリ設定を開く
+                  </Button>
+                }
+                severity="info"
+                variant="outlined"
+              >
+                カテゴリがまだ登録されていません。支出を記録するには、設定でカテゴリを追加してください。
+              </Alert>
+            )}
+            <ExpenseEntryForm
+              weekStartDate={weekStartDate}
+              weekEndDate={weekEndDate}
+              categories={categories}
+            />
+          </>
+        )}
       </Stack>
     </Box>
   );

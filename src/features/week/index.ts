@@ -12,4 +12,5 @@ export {
   normalizeWeekStartDay,
   normalizeWeekStartDate,
 } from "./lib/weekNavigation";
+export { WEEK_SESSION_LOAD_ERROR_MESSAGE } from "./lib/weekSession";
 export { formatDateForDisplay } from "../../utils/date";

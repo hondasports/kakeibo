@@ -1,12 +1,16 @@
 import "./ExpenseEntryFormTestMocks";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
 import { ExpenseEntryForm } from "./ExpenseEntryForm";
 import { createExpenseEntriesMock, categories } from "./ExpenseEntryFormTestMocks";
 
 describe("ExpenseEntryForm（single）", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("単一支出項目モード（デフォルト）", () => {
     it("初期状態で単一モードのフォームが表示される", () => {
       renderWithProviders(
@@ -21,6 +25,35 @@ describe("ExpenseEntryForm（single）", () => {
       expect(screen.getByRole("button", { name: "保存して次へ" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" })).toBeInTheDocument();
       expect(screen.getByRole("option", { name: /食費/ })).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("表示週に今日が含まれるとき、日付の初期選択は今日になる", () => {
+      // JST 2026-06-04（木）。週は 6/2〜6/8
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-04T03:00:00Z"));
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+      const dayOptions = within(screen.getByRole("listbox", { name: "週内の日付候補" }));
+      expect(dayOptions.getByRole("option", { selected: true })).toHaveAccessibleName(/6\/4/);
+    });
+
+    it("表示週に今日が含まれないとき、日付の初期選択は週初日になる", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-04T03:00:00Z"));
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-05-26"
+          weekEndDate="2026-06-01"
+          categories={categories}
+        />,
+      );
+      const dayOptions = within(screen.getByRole("listbox", { name: "週内の日付候補" }));
+      expect(dayOptions.getByRole("option", { selected: true })).toHaveAccessibleName(/5\/26/);
     });
 
     it("店舗名・金額・カテゴリを入力して単一項目を保存できる", async () => {
@@ -134,6 +167,99 @@ describe("ExpenseEntryForm（single）", () => {
         const amountInput = screen.getByLabelText("合計金額") as HTMLInputElement;
         expect(amountInput.value).toBe("");
       });
+    });
+
+    it("保存後、次の入力には前回選択したカテゴリが引き継がれる", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "2000");
+      await user.click(
+        within(screen.getByRole("listbox", { name: "カテゴリ候補" })).getByRole("option", {
+          name: /日用品/,
+        }),
+      );
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("");
+      });
+      const categoryOptions = within(screen.getByRole("listbox", { name: "カテゴリ候補" }));
+      expect(categoryOptions.getByRole("option", { name: /日用品/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(categoryOptions.getByRole("option", { name: /食費/ })).toHaveAttribute(
+        "aria-selected",
+        "false",
+      );
+    });
+
+    it("保存失敗時はフォーム上部のAlertだけにエラーを出し、入力内容を保持する", async () => {
+      createExpenseEntriesMock.mockRejectedValueOnce(new Error("保存に失敗しました"));
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "2000");
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      // 同じメッセージがAlertとSnackbarに二重表示されない
+      await waitFor(() => {
+        expect(screen.getAllByText("保存に失敗しました")).toHaveLength(1);
+      });
+      expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("スーパー北浜");
+      expect(screen.getByLabelText("合計金額")).toHaveValue("2,000");
+    });
+
+    it("保存成功時はSnackbarで通知する", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "2000");
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      expect(await screen.findByText("支出項目を保存しました")).toBeInTheDocument();
+    });
+
+    it("500文字を超えるメモは保存せずエラーを表示する", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "2000");
+      fireEvent.change(screen.getByLabelText("メモ"), { target: { value: "あ".repeat(501) } });
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      expect(await screen.findByText("メモは 500 文字以内です")).toBeInTheDocument();
+      expect(createExpenseEntriesMock).not.toHaveBeenCalled();
+      expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("スーパー北浜");
     });
   });
 });
