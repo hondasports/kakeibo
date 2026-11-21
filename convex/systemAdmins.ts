@@ -16,6 +16,7 @@ import {
   resolveAppEnvironment,
   type AppEnvironment,
 } from "../lib/domain/systemAdmin/environment";
+import { SYSTEM_ADMIN_CONTEXT_STATUSES } from "../lib/domain/systemAdmin/systemAdminStore";
 import {
   createSystemAdminMutationDeps,
   createSystemAdminQueryDeps,
@@ -39,10 +40,16 @@ function getAppEnvironment(expected?: string): AppEnvironment {
   return result.environment;
 }
 
+const [contextActive, contextRevoked, contextNone] = SYSTEM_ADMIN_CONTEXT_STATUSES;
+
 const systemAdminContextValidator = v.union(
-  v.object({ status: v.literal("active"), environment: v.string(), userId: v.id("users") }),
-  v.object({ status: v.literal("revoked"), environment: v.string() }),
-  v.object({ status: v.literal("none"), environment: v.string() }),
+  v.object({
+    status: v.literal(contextActive),
+    environment: v.string(),
+    userId: v.id("users"),
+  }),
+  v.object({ status: v.literal(contextRevoked), environment: v.string() }),
+  v.object({ status: v.literal(contextNone), environment: v.string() }),
 );
 const systemAdminListItemValidator = v.object({
   id: v.id("systemAdmins"),
