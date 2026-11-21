@@ -11,9 +11,11 @@ export type ExpenseItemState = {
   memo: string;
 };
 
+type EntryCategory = { _id: Id<"categories">; name: string; color: string };
+
 type UseExpenseEntryModeArgs = {
   weekStartDate: string;
-  categories: Array<{ _id: Id<"categories">; name: string; color: string }>;
+  categories: EntryCategory[];
 };
 
 /**
@@ -24,6 +26,20 @@ export function resolveEntryDefaultDate(weekStartDate: string, todayDate?: strin
   const today = todayDate ?? getTodayDateStringInJapan();
   const weekEndDate = getWeekEndDate(weekStartDate);
   return weekStartDate <= today && today <= weekEndDate ? today : weekStartDate;
+}
+
+/**
+ * カテゴリの初期値を返す。引き継ぎたいカテゴリが一覧にあればそれを、
+ * 無ければ先頭カテゴリを返す（docs/ui-ux-design.md §6.4・§6.6）。
+ */
+function resolveEntryCategoryId(
+  preferred: Id<"categories"> | "" | undefined,
+  categories: EntryCategory[],
+): Id<"categories"> | "" {
+  if (preferred && categories.some((category) => category._id === preferred)) {
+    return preferred;
+  }
+  return categories[0]?._id ?? "";
 }
 
 export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEntryModeArgs) {
@@ -53,7 +69,9 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
     if (firstCategoryId) {
       setItems((prev) =>
         prev.map((item, i) =>
-          i === 0 && !item.categoryId ? { ...item, categoryId: firstCategoryId } : item,
+          i === 0 && !categories.some((category) => category._id === item.categoryId)
+            ? { ...item, categoryId: firstCategoryId }
+            : item,
         ),
       );
     }
@@ -106,9 +124,11 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
   };
 
   const resetAfterSave = () => {
+    // §6.6: 保存後はカテゴリを引き継ぐ。一覧に無い場合は先頭へフォールバック
+    const carriedCategoryId = resolveEntryCategoryId(items[0]?.categoryId, categories);
     setShopNameState("");
     setSourceAmountState("");
-    setItems([{ categoryId: categories[0]?._id ?? "", amountYen: "", title: "", memo: "" }]);
+    setItems([{ categoryId: carriedCategoryId, amountYen: "", title: "", memo: "" }]);
     setItemErrors([{}]);
     setIsMultiMode(false);
   };

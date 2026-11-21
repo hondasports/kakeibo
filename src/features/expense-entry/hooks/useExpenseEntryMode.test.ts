@@ -95,3 +95,53 @@ describe("useExpenseEntryMode 日付の初期値", () => {
     expect(result.current.date).toBe("2026-11-20");
   });
 });
+
+describe("useExpenseEntryMode カテゴリの引き継ぎ", () => {
+  it("初期値はカテゴリ一覧の先頭になる", () => {
+    const { result } = renderMode("2026-11-16");
+    expect(result.current.items[0]?.categoryId).toBe("cat-food");
+  });
+
+  it("保存後のリセットで前回選択したカテゴリを引き継ぐ", () => {
+    const { result } = renderMode("2026-11-16");
+    act(() => result.current.handleItemChange(0, "categoryId", "cat-daily"));
+    act(() => result.current.resetAfterSave());
+
+    expect(result.current.items[0]?.categoryId).toBe("cat-daily");
+  });
+
+  it("引き継ぐカテゴリが一覧に無いときは先頭カテゴリへフォールバックする", () => {
+    const { result } = renderMode("2026-11-16");
+    act(() => result.current.handleItemChange(0, "categoryId", "cat-deleted"));
+    act(() => result.current.resetAfterSave());
+
+    expect(result.current.items[0]?.categoryId).toBe("cat-food");
+  });
+
+  it("複数項目モードで保存したあとのリセットでも先頭項目のカテゴリを引き継ぐ", () => {
+    const { result } = renderMode("2026-11-16");
+    act(() => {
+      result.current.setShopName("スーパー北浜");
+      result.current.setSourceAmount("5000");
+    });
+    act(() => result.current.handleEnterMultiMode());
+    expect(result.current.isMultiMode).toBe(true);
+
+    act(() => result.current.handleItemChange(0, "categoryId", "cat-daily"));
+    act(() => result.current.resetAfterSave());
+
+    expect(result.current.isMultiMode).toBe(false);
+    expect(result.current.items[0]?.categoryId).toBe("cat-daily");
+  });
+
+  it("カテゴリが後からロードされたとき、未選択の先頭項目には先頭カテゴリが入る", () => {
+    const { result, rerender } = renderHook(
+      ({ cats }) => useExpenseEntryMode({ weekStartDate: "2026-11-16", categories: cats }),
+      { initialProps: { cats: [] as typeof categories } },
+    );
+    expect(result.current.items[0]?.categoryId).toBe("");
+
+    rerender({ cats: categories });
+    expect(result.current.items[0]?.categoryId).toBe("cat-food");
+  });
+});

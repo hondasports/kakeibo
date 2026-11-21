@@ -168,5 +168,38 @@ describe("ExpenseEntryForm（single）", () => {
         expect(amountInput.value).toBe("");
       });
     });
+
+    it("保存後、次の入力には前回選択したカテゴリが引き継がれる", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "2000");
+      await user.click(
+        within(screen.getByRole("listbox", { name: "カテゴリ候補" })).getByRole("option", {
+          name: /日用品/,
+        }),
+      );
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("");
+      });
+      const categoryOptions = within(screen.getByRole("listbox", { name: "カテゴリ候補" }));
+      expect(categoryOptions.getByRole("option", { name: /日用品/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(categoryOptions.getByRole("option", { name: /食費/ })).toHaveAttribute(
+        "aria-selected",
+        "false",
+      );
+    });
   });
 });
