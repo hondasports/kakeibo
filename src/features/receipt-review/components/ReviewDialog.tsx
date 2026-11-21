@@ -325,7 +325,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                     ? "変更を保存しています…"
                     : reviewError
                       ? "変更を保存できませんでした。内容を確認して再試行してください。"
-                      : "商品の税率・税込／税抜は変更ごとに下書きへ保存されます。金額・名前・カテゴリは最後の「この内容で保存」で保存します。支出への登録は一覧から行います。"}
+                      : "変更は下書きに保存されます。登録は一覧の「登録する」から行います。"}
                 </Typography>
                 <ReviewDialogBasicsSection
                   form={form}

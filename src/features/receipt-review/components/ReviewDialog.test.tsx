@@ -551,6 +551,18 @@ describe("下書きの修正導線", () => {
   });
 });
 
+describe("保存仕様の説明", () => {
+  it("冒頭は短い案内に留め、実際のボタン文言と一致する呼称だけを使う", () => {
+    render(<ReviewDialog {...props} />);
+    const status = screen.getByLabelText("保存状態");
+    expect(status).toHaveTextContent(
+      "変更は下書きに保存されます。登録は一覧の「登録する」から行います。",
+    );
+    expect(status).not.toHaveTextContent("変更ごとに下書きへ保存されます");
+    expect(status).not.toHaveTextContent("この内容で保存」で保存します");
+  });
+});
+
 describe("Issue #892 現在の税内訳に揃えた表示", () => {
   it.each(Object.entries(legacyTaxSummaryVariants()))(
     "1782円の混在税（旧形式 %s）も確認0件で、原文を確認でき内部値の編集はない",
