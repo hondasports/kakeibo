@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { getTodayDateStringInJapan } from "../../../../lib/domain/common/date";
+import { getWeekEndDate } from "../../week";
 import type { ExpenseItemEntryErrors } from "../validation/expenseItems";
 
 export type ExpenseItemState = {
@@ -14,10 +16,20 @@ type UseExpenseEntryModeArgs = {
   categories: Array<{ _id: Id<"categories">; name: string; color: string }>;
 };
 
+/**
+ * 日付の初期値を返す。表示週に今日（JST）が含まれれば今日、含まれなければ週初日
+ * （docs/ui-ux-design.md §6.1）。
+ */
+export function resolveEntryDefaultDate(weekStartDate: string, todayDate?: string): string {
+  const today = todayDate ?? getTodayDateStringInJapan();
+  const weekEndDate = getWeekEndDate(weekStartDate);
+  return weekStartDate <= today && today <= weekEndDate ? today : weekStartDate;
+}
+
 export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEntryModeArgs) {
   const [shopName, setShopNameState] = useState("");
   const [sourceAmount, setSourceAmountState] = useState("");
-  const [date, setDate] = useState(weekStartDate);
+  const [date, setDate] = useState(() => resolveEntryDefaultDate(weekStartDate));
   const [isMultiMode, setIsMultiMode] = useState(false);
   const [items, setItems] = useState<ExpenseItemState[]>([
     { categoryId: categories[0]?._id ?? "", amountYen: "", title: "", memo: "" },
@@ -30,7 +42,7 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
   const [prevWeekStartDate, setPrevWeekStartDate] = useState(weekStartDate);
   if (prevWeekStartDate !== weekStartDate) {
     setPrevWeekStartDate(weekStartDate);
-    setDate(weekStartDate);
+    setDate(resolveEntryDefaultDate(weekStartDate));
   }
 
   // ANALYSIS#1: categories が非同期ロードされたとき items[0].categoryId を更新

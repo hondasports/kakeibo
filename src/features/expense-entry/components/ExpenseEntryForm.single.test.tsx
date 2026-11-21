@@ -1,12 +1,16 @@
 import "./ExpenseEntryFormTestMocks";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
 import { ExpenseEntryForm } from "./ExpenseEntryForm";
 import { createExpenseEntriesMock, categories } from "./ExpenseEntryFormTestMocks";
 
 describe("ExpenseEntryForm（single）", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("単一支出項目モード（デフォルト）", () => {
     it("初期状態で単一モードのフォームが表示される", () => {
       renderWithProviders(
@@ -21,6 +25,35 @@ describe("ExpenseEntryForm（single）", () => {
       expect(screen.getByRole("button", { name: "保存して次へ" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" })).toBeInTheDocument();
       expect(screen.getByRole("option", { name: /食費/ })).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("表示週に今日が含まれるとき、日付の初期選択は今日になる", () => {
+      // JST 2026-06-04（木）。週は 6/2〜6/8
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-04T03:00:00Z"));
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+      const dayOptions = within(screen.getByRole("listbox", { name: "週内の日付候補" }));
+      expect(dayOptions.getByRole("option", { selected: true })).toHaveAccessibleName(/6\/4/);
+    });
+
+    it("表示週に今日が含まれないとき、日付の初期選択は週初日になる", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-04T03:00:00Z"));
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-05-26"
+          weekEndDate="2026-06-01"
+          categories={categories}
+        />,
+      );
+      const dayOptions = within(screen.getByRole("listbox", { name: "週内の日付候補" }));
+      expect(dayOptions.getByRole("option", { selected: true })).toHaveAccessibleName(/5\/26/);
     });
 
     it("店舗名・金額・カテゴリを入力して単一項目を保存できる", async () => {
