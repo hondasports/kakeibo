@@ -22,7 +22,7 @@ function toRecord(doc: Doc<"lineLinkRequests">): LineLinkRequestRecord {
   };
 }
 
-export function createLineLinkRequestReader(ctx: Pick<QueryCtx, "db">): LineLinkRequestReader {
+function createLineLinkRequestReader(ctx: Pick<QueryCtx, "db">): LineLinkRequestReader {
   return {
     async findByStateHash(stateHash) {
       const doc = await ctx.db

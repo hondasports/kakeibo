@@ -58,7 +58,7 @@ export function toEmailJobRecord(doc: Doc<"transactionalEmailJobs">): Transactio
   };
 }
 
-export function createEmailJobReader(ctx: Pick<QueryCtx, "db">): TransactionalEmailJobReader {
+function createEmailJobReader(ctx: Pick<QueryCtx, "db">): TransactionalEmailJobReader {
   return {
     async getJob(jobId) {
       const doc = await ctx.db.get(jobId as Id<"transactionalEmailJobs">);

@@ -12,7 +12,7 @@ import type {
   NewCategoryFields,
 } from "../../domain/categories/store";
 
-export function docToCategoryRecord(doc: Doc<"categories">): CategoryStoreRecord {
+function docToCategoryRecord(doc: Doc<"categories">): CategoryStoreRecord {
   return {
     id: doc._id,
     creationTime: doc._creationTime,

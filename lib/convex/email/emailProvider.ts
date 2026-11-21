@@ -2,7 +2,7 @@ import { Resend } from "resend";
 import type { EmailProvider } from "../../email/model";
 import { createResendEmailProvider } from "../../email/providers/resendEmailProvider";
 
-export function mockEmailProvider(): EmailProvider {
+function mockEmailProvider(): EmailProvider {
   return {
     async send({ idempotencyKey }) {
       return {

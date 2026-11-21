@@ -19,7 +19,7 @@ export const groupPendingInvitationListItemValidator = v.object({
   createdAt: v.number(),
 });
 
-export const groupDeletionPreviewCountValidator = v.object({
+const groupDeletionPreviewCountValidator = v.object({
   count: v.number(),
   accuracy: v.union(v.literal("exact"), v.literal("at_least"), v.literal("unknown")),
 });

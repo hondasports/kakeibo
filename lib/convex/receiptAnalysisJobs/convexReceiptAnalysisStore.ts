@@ -22,7 +22,7 @@ export const getReceiptAnalysisJobDocument = (
   id: Id<"receiptAnalysisImageJobs">,
 ) => ctx.db.get(id);
 
-export function toBatchRecord(doc: Doc<"receiptAnalysisBatches">): ReceiptAnalysisBatchRecord {
+function toBatchRecord(doc: Doc<"receiptAnalysisBatches">): ReceiptAnalysisBatchRecord {
   return {
     id: doc._id,
     creationTime: doc._creationTime,
