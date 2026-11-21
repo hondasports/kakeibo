@@ -25,7 +25,7 @@ import { validateReviewInput } from "./reviewValidation";
 import { takeDraftJudgmentItems } from "./judgmentItemWindow";
 import type { AiExpenseDraftJudgmentInput } from "./reviewTypes";
 
-export type DraftAmountTaxJudgment = (
+type DraftAmountTaxJudgment = (
   | { status: "not_applicable"; reasons: [] }
   | { status: "resolved"; reasons: [] }
   | {

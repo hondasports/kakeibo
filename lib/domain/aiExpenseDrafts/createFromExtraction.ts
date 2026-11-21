@@ -89,7 +89,7 @@ export type ExtractedDraftInput<TCategoryId extends string = string> = {
   items?: ExtractedDraftItemInput<TCategoryId>[];
 };
 
-export type DraftActor<TGroupId extends string = string> = {
+type DraftActor<TGroupId extends string = string> = {
   userId: string;
   groupId: TGroupId;
 };

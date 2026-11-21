@@ -6,7 +6,7 @@ export type QueueItemSummary = {
   amountYen?: number;
 };
 
-export type QueueGroupedItems<T extends QueueItemSummary> = {
+type QueueGroupedItems<T extends QueueItemSummary> = {
   processing: T[];
   ready: T[];
   needs_review: T[];
@@ -14,7 +14,7 @@ export type QueueGroupedItems<T extends QueueItemSummary> = {
   registered: T[];
 };
 
-export type QueueContentSummary<T extends QueueItemSummary> = {
+type QueueContentSummary<T extends QueueItemSummary> = {
   failedCount: number;
   firstReviewItem: T | undefined;
   needsReviewCount: number;

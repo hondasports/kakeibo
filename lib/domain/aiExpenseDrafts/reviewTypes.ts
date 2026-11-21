@@ -34,7 +34,7 @@ const REVIEWABLE_DRAFT_STATUSES = [
   "registered",
 ] as const satisfies readonly PersistedDraftStatus[];
 
-export type ReviewableDraftStatus = (typeof REVIEWABLE_DRAFT_STATUSES)[number];
+type ReviewableDraftStatus = (typeof REVIEWABLE_DRAFT_STATUSES)[number];
 
 export function isReviewableDraftStatus(
   status: PersistedDraftStatus,
@@ -92,7 +92,7 @@ export type DraftListSummary = {
  */
 export type AiExpenseDraftJudgmentInput = Omit<AiExpenseDraft, "_id" | "status">;
 
-export type AiExpenseItemTaxDetails = {
+type AiExpenseItemTaxDetails = {
   printedAmountYen?: number;
   amountBasis?: AmountBasis;
   taxRatePercent?: TaxRatePercent | null;

@@ -1,6 +1,6 @@
 import type { AmountBasis, TaxResolutionStatus } from "../receipt/tax/types";
 
-export type ReviewItemForDisplay = {
+type ReviewItemForDisplay = {
   amountYen: number;
   printedAmountYen?: number;
   normalizedAmountYen?: number;
@@ -8,7 +8,7 @@ export type ReviewItemForDisplay = {
   amountBasis?: AmountBasis;
 };
 
-export type ReviewReplacePreviousItem = {
+type ReviewReplacePreviousItem = {
   amountYen: number;
   printedAmountYen?: number;
   normalizedAmountYen?: number;

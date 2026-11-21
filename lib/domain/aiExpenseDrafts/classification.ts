@@ -8,7 +8,7 @@ import {
 } from "./constants";
 import { mergeReviewReasons } from "./reviewReasons";
 
-export type AiExpenseDraftClassificationInput = {
+type AiExpenseDraftClassificationInput = {
   documentType: AiExpenseDraftDocumentType;
   shopName?: string;
   paymentPlace?: string;
@@ -152,7 +152,7 @@ export function classifyAiExpenseDraft(input: AiExpenseDraftClassificationInput)
   };
 }
 
-export type CreatedDraftClassificationInput = AiExpenseDraftClassificationInput & {
+type CreatedDraftClassificationInput = AiExpenseDraftClassificationInput & {
   reviewReasons?: AiExpenseDraftReviewReason[];
 };
 

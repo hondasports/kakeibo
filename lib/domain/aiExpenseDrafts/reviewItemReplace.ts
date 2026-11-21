@@ -13,7 +13,7 @@ import type { AiExpenseDraftItemFields, DraftReviewItemInput } from "./aiExpense
 import { DRAFT_JUDGMENT_ITEM_LIMIT } from "./judgmentItemWindow";
 import { resolveReviewItemAmountsForReplace } from "./reviewItemAmounts";
 
-export type ReviewItemReplaceError =
+type ReviewItemReplaceError =
   | "existing_items_exceed_window"
   | "too_many_items"
   | "duplicate_item_id"

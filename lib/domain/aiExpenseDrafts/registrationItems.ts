@@ -14,7 +14,7 @@ export type DraftRegistrationItem = {
 };
 
 /** 登録可否判定に必要な下書きの形状。 */
-export type DraftForRegistration = Pick<
+type DraftForRegistration = Pick<
   AiExpenseDraftFields,
   | "rawObservation"
   | "receiptInterpretation"
@@ -33,7 +33,7 @@ export type DraftForRegistration = Pick<
 >;
 
 /** 登録可否判定に必要な明細の形状。 */
-export type DraftItemForRegistration = AiExpenseDraftItemFields;
+type DraftItemForRegistration = AiExpenseDraftItemFields;
 
 /** 登録モードを解決する。未設定の既存下書きは detailed として扱う。 */
 export function resolveRegistrationMode(draft: {

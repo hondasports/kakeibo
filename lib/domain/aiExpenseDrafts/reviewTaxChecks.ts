@@ -13,7 +13,7 @@ import type {
   TaxSummary,
 } from "./reviewCheckUtils";
 import { effectiveTaxRateOf, itemPrintedYen, summaryAmountBasis } from "./reviewCheckUtils";
-export type ReviewTaxRateRow = {
+type ReviewTaxRateRow = {
   taxRatePercent: TaxRatePercent;
   taxMode?: TaxMode;
   taxableAmountBasis?: AmountBasis;

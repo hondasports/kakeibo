@@ -16,7 +16,7 @@ import {
   getTaxResolutionSourceLabel,
 } from "./receiptTaxLabels";
 
-export type ReceiptItemTaxViewModel = {
+type ReceiptItemTaxViewModel = {
   itemName: string;
   printedAmountLabel: string;
   normalizedAmountLabel: string;

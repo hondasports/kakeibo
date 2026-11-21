@@ -73,7 +73,7 @@ export type ReceiptDraftValueSnapshot<TCategoryId = string> = {
 
 export const RECEIPT_INTERPRETATION_SOURCES = ["ai", "legacy_projection"] as const;
 
-export type ReceiptInterpretationSource = (typeof RECEIPT_INTERPRETATION_SOURCES)[number];
+type ReceiptInterpretationSource = (typeof RECEIPT_INTERPRETATION_SOURCES)[number];
 
 export type ReceiptInterpretationSnapshot<TCategoryId = string> = {
   source: ReceiptInterpretationSource;
@@ -172,7 +172,7 @@ export function applyReceiptUserOverride<TCategoryId>(
 }
 
 /** スナップショット構築に必要な draft の最小形状。warnings 未設定は空配列へ正規化する。 */
-export type ReceiptDraftSnapshotSource<TCategoryId = string> = Omit<
+type ReceiptDraftSnapshotSource<TCategoryId = string> = Omit<
   ReceiptDraftValueSnapshot<TCategoryId>,
   "items" | "warnings" | "receiptLineClassifications"
 > & {

@@ -17,7 +17,7 @@ export type ReviewSummaryCategoryInput = {
   name: string;
 };
 
-export type ReviewCategoryAggregate = {
+type ReviewCategoryAggregate = {
   categoryId: string;
   categoryName: string;
   amountYen: number;

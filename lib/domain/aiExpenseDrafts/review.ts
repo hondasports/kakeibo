@@ -4,7 +4,7 @@ import { isValidIsoDateString } from "../week/weekDates";
 import type { AiExpenseDraftConfidence, AiExpenseDraftDocumentType } from "./constants";
 import type { AiExpenseRegistrationMode } from "./receiptDataContract";
 
-export type HasCounterpartyArgs = {
+type HasCounterpartyArgs = {
   documentType: AiExpenseDraftDocumentType;
   shopName?: string;
   paymentPlace?: string;
@@ -27,12 +27,12 @@ export function hasCounterparty(args: HasCounterpartyArgs): boolean {
   );
 }
 
-export type ReviewUpdateReadyArgs = HasCounterpartyArgs & {
+type ReviewUpdateReadyArgs = HasCounterpartyArgs & {
   date: string;
   amountYen: number;
 };
 
-export type ReviewUpdateReadyError =
+type ReviewUpdateReadyError =
   | "unknown_document_type"
   | "missing_date"
   | "invalid_date"
@@ -66,7 +66,7 @@ export function validateReviewUpdateCanBecomeReady(
   return { success: true };
 }
 
-export type ReviewConfidenceInput = {
+type ReviewConfidenceInput = {
   shopName?: string;
   paymentPlace?: string;
   payeeName?: string;
