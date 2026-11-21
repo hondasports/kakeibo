@@ -9,6 +9,7 @@ export function useBulkRegister({ readyItemIds }: { readyItemIds: string[] }) {
   const [selectedReadyIds, setSelectedReadyIds] = useState<string[]>([]);
   const [registeringIds, setRegisteringIds] = useState<string[]>([]);
   const [registrationError, setRegistrationError] = useState("");
+  const [registrationErrorDraftIds, setRegistrationErrorDraftIds] = useState<string[]>([]);
 
   const registerReadyDraftsAsExpenseEntries = useMutation(
     api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries,
@@ -44,6 +45,7 @@ export function useBulkRegister({ readyItemIds }: { readyItemIds: string[] }) {
       return;
     }
     setRegistrationError("");
+    setRegistrationErrorDraftIds([]);
     setRegisteringIds(draftIds);
     try {
       await registerReadyDraftsAsExpenseEntries({
@@ -53,6 +55,7 @@ export function useBulkRegister({ readyItemIds }: { readyItemIds: string[] }) {
     } catch (error) {
       console.error("AI expense queue registration failed", error);
       setRegistrationError(getAiExpenseQueueRegistrationErrorMessage());
+      setRegistrationErrorDraftIds(draftIds);
     } finally {
       setRegisteringIds([]);
     }
@@ -66,6 +69,7 @@ export function useBulkRegister({ readyItemIds }: { readyItemIds: string[] }) {
     selectedReadyIds,
     registeringIds,
     registrationError,
+    registrationErrorDraftIds,
     setSelectedReadyIds,
     setRegisteringIds,
     setRegistrationError,

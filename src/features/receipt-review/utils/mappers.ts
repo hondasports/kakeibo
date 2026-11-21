@@ -35,7 +35,7 @@ export function mapDraftToQueueItem(
   }));
   return {
     id: draft._id,
-    fileName: draft.imageFileName ?? "AI支出下書き",
+    fileName: draft.imageFileName,
     previewImageDataUrl,
     failureHint: getImageCaptureFailureHint(draft.status, draft.warnings),
     warnings: draft.warnings,

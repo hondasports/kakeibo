@@ -1,4 +1,4 @@
-import { Alert, Button, Divider, Stack } from "@mui/material";
+import { Alert, Button, Divider, Stack, Typography } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import type { QueueContentProps } from "./queueContentTypes";
 import { getQueueContentSummary } from "../../utils/queueContent";
@@ -17,6 +17,7 @@ export function QueueActiveContent({
   unbatchedReadyItems,
   registeringIds,
   registrationError,
+  registrationErrorDraftIds,
   selectedReadyIds,
   onClearOpenQueue,
   onDeleteQueueItem,
@@ -36,8 +37,25 @@ export function QueueActiveContent({
   return (
     <Stack className="queue-content queue-content-active" spacing={2}>
       {registrationError && (
-        <Alert severity="error" variant="outlined">
+        <Alert
+          action={
+            <Button
+              disabled={registeringIds.length > 0 || registrationErrorDraftIds.length === 0}
+              onClick={() => void onRegisterReady(registrationErrorDraftIds)}
+              size="small"
+              type="button"
+            >
+              再試行
+            </Button>
+          }
+          aria-live="assertive"
+          severity="error"
+          variant="outlined"
+        >
           {registrationError}
+          <Typography component="span" sx={{ display: "block" }} variant="body2">
+            下書きは残っています。もう一度登録をお試しください。
+          </Typography>
         </Alert>
       )}
 
