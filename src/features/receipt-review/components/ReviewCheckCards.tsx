@@ -53,7 +53,7 @@ export function CheckCard({
         border: "1px solid",
         borderColor:
           status === "matched" ? "success.main" : status === "mismatch" ? "error.main" : "divider",
-        borderRadius: 1.5,
+        borderRadius: 1,
         p: 1.5,
         minWidth: 0,
       }}
