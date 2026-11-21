@@ -21,7 +21,7 @@ export type ProductUpdate = ProductUpdateDraft & {
   publishedAt: string;
 };
 
-export const PULL_REQUEST_DECISION_OUTCOMES = [
+const PULL_REQUEST_DECISION_OUTCOMES = [
   "published",
   "skipped",
   "exempt_bot",
@@ -77,7 +77,7 @@ export function validateAppVersion(
   return version;
 }
 
-export function parseVersion(version: string): {
+function parseVersion(version: string): {
   year: number;
   month: number;
   day: number;

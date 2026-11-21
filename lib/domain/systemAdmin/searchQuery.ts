@@ -3,8 +3,8 @@
  * クエリ正規化・ページ件数検証・SHA-256 ハッシュ・監査 queryType 写像。
  */
 
-export const MAX_SEARCH_QUERY_LENGTH = 200;
-export const MAX_SEARCH_PAGE_SIZE = 100;
+const MAX_SEARCH_QUERY_LENGTH = 200;
+const MAX_SEARCH_PAGE_SIZE = 100;
 export const DETAIL_LIST_LIMIT = 50;
 
 export const USER_SEARCH_TYPES = ["displayName", "email", "userId"] as const;

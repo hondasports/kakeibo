@@ -4,7 +4,7 @@
  */
 
 /** Convex値同士の deep-equal。plain object・配列・プリミティブを再帰比較する。 */
-export function recordValuesEqual(a: unknown, b: unknown): boolean {
+function recordValuesEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) {
     return false;

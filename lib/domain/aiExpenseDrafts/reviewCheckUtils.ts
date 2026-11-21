@@ -20,7 +20,7 @@ export type ReviewMatchKind = "exact" | "approx";
 
 export type TaxSummary = NonNullable<AiExpenseDraft["taxSummaries"]>[number];
 
-export function parseYenInput(value: string): number | undefined {
+function parseYenInput(value: string): number | undefined {
   if (value.trim() === "") return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;

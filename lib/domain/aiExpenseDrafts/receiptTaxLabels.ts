@@ -5,7 +5,7 @@ import type {
 } from "../receipt/tax/types";
 import { formatYen } from "../common/currency";
 
-export const TAX_RESOLUTION_SOURCE_LABELS = {
+const TAX_RESOLUTION_SOURCE_LABELS = {
   item_explicit: "レシート明細に税率表記があります",
   single_summary: "レシート小計と商品合計が一致しました",
   summary_reconciliation: "レシート小計との照合で判定しました",
@@ -14,7 +14,7 @@ export const TAX_RESOLUTION_SOURCE_LABELS = {
   paid_total_reconciliation: "お支払いと商品合計の差から外税として判定しました",
 } satisfies Record<TaxResolutionSource, string>;
 
-export const TAX_REVIEW_REASON_LABELS: Record<string, string> = {
+const TAX_REVIEW_REASON_LABELS: Record<string, string> = {
   item_identity_changed: "商品名・行の種類を変更したため、税率を選び直してください",
   multiple_tax_summaries: "複数の税率があり、明細との対応を特定できませんでした",
   cannot_reconcile_item_amounts: "商品合計とレシート小計が一致しませんでした",
@@ -24,13 +24,13 @@ export const TAX_REVIEW_REASON_LABELS: Record<string, string> = {
   normalized_amount_mismatch: "お支払いと商品合計が一致しません",
 };
 
-export const AMOUNT_BASIS_LABELS = {
+const AMOUNT_BASIS_LABELS = {
   tax_included: "税込",
   tax_excluded: "税抜",
   unknown: "不明",
 } satisfies Record<AmountBasis, string>;
 
-export const TAX_SUMMARY_CONFLICT_LABELS: Record<TaxSummaryConsistencyReason, string> = {
+const TAX_SUMMARY_CONFLICT_LABELS: Record<TaxSummaryConsistencyReason, string> = {
   included_mode_with_tax_excluded_basis:
     "内税として読み取りましたが、対象額は税抜として読み取られています",
   external_mode_with_tax_included_basis:

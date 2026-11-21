@@ -1,4 +1,4 @@
-export const GROUP_DELETION_ERROR_CATEGORIES = new Set([
+const GROUP_DELETION_ERROR_CATEGORIES = new Set([
   "batch_processing_failed",
   "identity_deletion_failed",
   "finalization_failed",
