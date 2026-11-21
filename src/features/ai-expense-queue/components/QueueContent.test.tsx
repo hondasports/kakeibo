@@ -475,6 +475,45 @@ describe("登録エラーの再試行", () => {
     expect(onRegisterReady).toHaveBeenCalledWith(["ready-draft"]);
   });
 
+  it("再試行対象がないときは案内文と再試行ボタンを表示しない", () => {
+    const groupedItems = {
+      processing: [],
+      ready: [readyItem],
+      needs_review: [],
+      failed: [],
+      registered: [],
+    };
+    render(
+      <QueueActiveContent
+        clearableCount={0}
+        deletingIds={[]}
+        groupedItems={groupedItems}
+        itemCount={1}
+        readyItems={[readyItem]}
+        sessionBatchSummaries={[]}
+        unbatchedReadyItems={[readyItem]}
+        registeringIds={[]}
+        registrationError="登録に失敗しました。時間をおいて再度お試しください。"
+        registrationErrorDraftIds={[]}
+        selectedReadyIds={[]}
+        onClearOpenQueue={vi.fn(async () => {})}
+        onDeleteQueueItem={vi.fn(async () => {})}
+        onOpenReview={vi.fn()}
+        onRegisterReady={vi.fn(async () => {})}
+        onRetry={vi.fn(async () => {})}
+        onToggleReadySelection={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("登録に失敗しました。時間をおいて再度お試しください。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("下書きは残っています。もう一度登録をお試しください。"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "再試行" })).not.toBeInTheDocument();
+  });
+
   it("登録処理中は再試行ボタンを無効化する", () => {
     const groupedItems = {
       processing: [],

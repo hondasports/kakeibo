@@ -1,5 +1,5 @@
 import { api } from "../../../../convex/_generated/api";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { getAiExpenseQueueRegistrationErrorMessage } from "../../../../lib/domain/aiExpenseDrafts/userFacingErrors";
@@ -27,10 +27,6 @@ export function useBulkRegister({ readyItemIds }: { readyItemIds: string[] }) {
         return current;
       }
       return next;
-    });
-    setRegistrationErrorDraftIds((current) => {
-      const retained = current.filter((id) => readyItemIds.includes(id));
-      return retained.length === current.length ? current : retained;
     });
     previousReadyItemIdsRef.current = readyItemIds;
   }, [readyItemIds]);
@@ -69,11 +65,17 @@ export function useBulkRegister({ readyItemIds }: { readyItemIds: string[] }) {
     setSelectedReadyIds((current) => current.filter((id) => id !== itemId));
   };
 
+  // 失敗時のIDは保持したまま、再試行・表示にはその時点で登録できる下書きだけを使う
+  const retryableErrorDraftIds = useMemo(
+    () => registrationErrorDraftIds.filter((id) => readyItemIds.includes(id)),
+    [registrationErrorDraftIds, readyItemIds],
+  );
+
   return {
     selectedReadyIds,
     registeringIds,
     registrationError,
-    registrationErrorDraftIds,
+    registrationErrorDraftIds: retryableErrorDraftIds,
     setSelectedReadyIds,
     setRegisteringIds,
     setRegistrationError,
