@@ -1,3 +1,4 @@
+import { RECEIPT_TAX_DECISION_SOURCES } from "./types";
 import type {
   AmountBasis,
   ExtractedReceiptItem,
@@ -20,15 +21,6 @@ export type AxisEvidence<TValue> = {
   source: ReceiptTaxDecisionSource;
   evidence: string[];
 };
-
-export const SOURCE_PRIORITY: ReceiptTaxDecisionSource[] = [
-  "user",
-  "explicitLabel",
-  "marker",
-  "position",
-  "reconciliation",
-  "ai",
-];
 
 export const BUSINESS_ATTRIBUTE_PATTERN =
   /(?:免税事業者|適格請求書発行事業者ではない|インボイス(?:未登録|非登録)|登録番号なし)/;
@@ -71,8 +63,9 @@ export function isNonTaxEvidenceLine(
     : EXCLUDED_STRUCTURAL_ROLES.has(classifiedRole);
 }
 
+// 決定ソースの優先順位は RECEIPT_TAX_DECISION_SOURCES の宣言順を正本とする。
 export function sourceRank(source: ReceiptTaxDecisionSource) {
-  return SOURCE_PRIORITY.indexOf(source);
+  return RECEIPT_TAX_DECISION_SOURCES.indexOf(source);
 }
 
 export function knownBases(items: ExtractedReceiptItem[]) {
