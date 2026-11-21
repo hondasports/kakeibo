@@ -39,14 +39,16 @@ export function QueueActiveContent({
       {registrationError && (
         <Alert
           action={
-            <Button
-              disabled={registeringIds.length > 0 || registrationErrorDraftIds.length === 0}
-              onClick={() => void onRegisterReady(registrationErrorDraftIds)}
-              size="small"
-              type="button"
-            >
-              再試行
-            </Button>
+            registrationErrorDraftIds.length > 0 ? (
+              <Button
+                disabled={registeringIds.length > 0}
+                onClick={() => void onRegisterReady(registrationErrorDraftIds)}
+                size="small"
+                type="button"
+              >
+                再試行
+              </Button>
+            ) : undefined
           }
           aria-live="assertive"
           severity="error"
