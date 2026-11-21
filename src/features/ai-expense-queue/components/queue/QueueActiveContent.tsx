@@ -55,9 +55,11 @@ export function QueueActiveContent({
           variant="outlined"
         >
           {registrationError}
-          <Typography component="span" sx={{ display: "block" }} variant="body2">
-            下書きは残っています。もう一度登録をお試しください。
-          </Typography>
+          {registrationErrorDraftIds.length > 0 && (
+            <Typography component="span" sx={{ display: "block" }} variant="body2">
+              下書きは残っています。もう一度登録をお試しください。
+            </Typography>
+          )}
         </Alert>
       )}
 

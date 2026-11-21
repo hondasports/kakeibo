@@ -192,7 +192,71 @@ describe("AiExpenseQueuePanel（再試行・削除）", () => {
       expect(
         screen.getByText("登録に失敗しました。時間をおいて再度お試しください。"),
       ).toBeInTheDocument();
+      expect(
+        screen.queryByText("下書きは残っています。もう一度登録をお試しください。"),
+      ).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "再試行" })).not.toBeInTheDocument();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("登録の待機中にキューから外れた下書きは再試行対象に含めない", async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const secondReadyItem: AiExpenseQueueItem = {
+      ...queueItems[0],
+      id: "draft-ready-2",
+      fileName: "second-receipt.png",
+      title: "ドラッグストアB",
+    };
+    let rejectRegistration: ((error: Error) => void) | undefined;
+    registerReadyDraftsAsExpenseEntriesMock.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectRegistration = reject;
+        }),
+    );
+
+    try {
+      renderWithProviders(<AiExpenseQueuePanel initialItems={[queueItems[0], secondReadyItem]} />);
+
+      await user.click(screen.getByRole("button", { name: "まとめて登録（2件）" }));
+      const confirmDialog = screen.getByRole("dialog");
+      await user.click(within(confirmDialog).getByRole("button", { name: "登録する" }));
+
+      await waitFor(() => {
+        expect(registerReadyDraftsAsExpenseEntriesMock).toHaveBeenCalledWith({
+          draftIds: ["draft-ready", "draft-ready-2"],
+        });
+      });
+
+      // 登録の応答を待つ間に確認ダイアログを閉じて2件目を削除する
+      await user.click(screen.getByRole("button", { name: "キャンセル" }));
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+      const readySection = screen.getByRole("region", { name: "登録できます" });
+      const deleteButtons = within(readySection).getAllByRole("button", {
+        name: "一覧から削除",
+      });
+      expect(deleteButtons).toHaveLength(2);
+      await user.click(deleteButtons[1]);
+      await waitFor(() => {
+        expect(screen.queryByText("ドラッグストアB")).not.toBeInTheDocument();
+      });
+
+      rejectRegistration?.(new Error("登録処理に失敗しました"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole("button", { name: "再試行" }));
+      await waitFor(() => {
+        expect(registerReadyDraftsAsExpenseEntriesMock).toHaveBeenLastCalledWith({
+          draftIds: ["draft-ready"],
+        });
+      });
     } finally {
       consoleError.mockRestore();
     }
