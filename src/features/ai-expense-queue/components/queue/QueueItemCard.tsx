@@ -52,9 +52,7 @@ export function QueueItemCard({
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
-  // mapper は画像ファイル名が無い下書きに "AI支出下書き" を fileName へ入れるため、
-  // キューではファイル名なしとして「レシート画像」を表示名にする
-  const fileName = item.fileName === "AI支出下書き" ? undefined : item.fileName;
+  const fileName = item.fileName;
   const secondaryLabel = fileName ?? "レシート画像";
   const imageAlt = fileName ? `${fileName}のレシート画像` : "レシート画像";
   const previewButtonLabel = fileName

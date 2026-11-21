@@ -201,21 +201,17 @@ describe("AiExpenseQueuePanel（表示）", () => {
     const previewImageDataUrl = "data:image/jpeg;base64,preview-image";
     renderWithProviders(
       <AiExpenseQueuePanel
-        initialItems={[
-          { ...queueItems[0], fileName: undefined, previewImageDataUrl },
-          { ...queueItems[1], fileName: "AI支出下書き", previewImageDataUrl },
-        ]}
+        initialItems={[{ ...queueItems[0], fileName: undefined, previewImageDataUrl }]}
       />,
     );
 
-    const previewButtons = screen.getAllByRole("button", {
+    expect(screen.getByRole("img", { name: "レシート画像" })).toBeInTheDocument();
+    const previewButton = screen.getByRole("button", {
       name: "レシート画像をプレビュー",
     });
-    expect(previewButtons).toHaveLength(2);
-    expect(screen.getAllByRole("img", { name: "レシート画像" })).toHaveLength(2);
-    expect(screen.queryByText("AI支出下書き")).not.toBeInTheDocument();
+    expect(previewButton).toBeInTheDocument();
 
-    await user.click(previewButtons[0]);
+    await user.click(previewButton);
     expect(screen.getByRole("dialog", { name: "レシート画像のプレビュー" })).toBeInTheDocument();
   });
 

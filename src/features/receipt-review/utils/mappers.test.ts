@@ -373,6 +373,35 @@ describe("mapDraftItemsToReviewItems", () => {
 
     expect(item.amountYen).toBe("99");
   });
+
+  it("画像ファイル名が無い下書きは fileName を未設定のまま返す", () => {
+    const item = mapDraftToQueueItem(
+      {
+        _id: "draft-no-image-name",
+        status: "ready",
+        documentType: "receipt",
+        reviewReasons: [],
+      },
+      {},
+    );
+
+    expect(item.fileName).toBeUndefined();
+  });
+
+  it("画像ファイル名がある下書きは fileName にそのまま写す", () => {
+    const item = mapDraftToQueueItem(
+      {
+        _id: "draft-with-image-name",
+        status: "ready",
+        documentType: "receipt",
+        imageFileName: "receipt.png",
+        reviewReasons: [],
+      },
+      {},
+    );
+
+    expect(item.fileName).toBe("receipt.png");
+  });
 });
 
 describe("mapDraftToQueueItem の金額・税内訳の確認理由", () => {
