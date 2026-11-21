@@ -1,5 +1,10 @@
 import { Box, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import type { ReviewFormValues } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
+import { REVIEW_VALIDATION_MESSAGES } from "../../../../lib/domain/aiExpenseDrafts/reviewValidation";
+import {
+  EXPENSE_ENTRY_AMOUNT_MAX,
+  parseExpenseAmountString,
+} from "../../../../lib/domain/expenseEntries/expenseEntryItem";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { documentTypeLabels, reviewDocumentTypeOptions } from "./labels";
 import { extractAmountDigits } from "../../../utils/currency";
@@ -23,6 +28,12 @@ export function ReviewDialogBasicsSection({
   onToggleDocument,
   onFieldChange,
 }: ReviewDialogBasicsSectionProps) {
+  const amountResult = parseExpenseAmountString(form.amountYen);
+  const amountErrorMessage = amountResult.success
+    ? undefined
+    : amountResult.error === "too_large"
+      ? `合計金額は ${EXPENSE_ENTRY_AMOUNT_MAX.toLocaleString("ja-JP")} 円以下で入力してください。`
+      : REVIEW_VALIDATION_MESSAGES.amount.guidance;
   return (
     <Box
       component="fieldset"
@@ -44,6 +55,9 @@ export function ReviewDialogBasicsSection({
           fullWidth
           value={form.shopName}
           error={!form.shopName.trim()}
+          helperText={
+            !form.shopName.trim() ? REVIEW_VALIDATION_MESSAGES.shopName.guidance : undefined
+          }
           slotProps={{
             htmlInput: { style: { fontSize: "1.25rem", fontWeight: 600 } },
             inputLabel: { shrink: true },
@@ -67,6 +81,8 @@ export function ReviewDialogBasicsSection({
             label="合計金額"
             fullWidth
             value={form.amountYen}
+            error={!amountResult.success}
+            helperText={amountErrorMessage}
             slotProps={{ htmlInput: { inputMode: "numeric" } }}
             onChange={(event) =>
               onFieldChange("amountYen", extractAmountDigits(event.target.value))
@@ -80,6 +96,7 @@ export function ReviewDialogBasicsSection({
             fullWidth
             value={form.categoryId}
             error={!form.categoryId}
+            helperText={!form.categoryId ? REVIEW_VALIDATION_MESSAGES.category.guidance : undefined}
             onChange={(event) => onFieldChange("categoryId", event.target.value)}
           >
             {categories.map((category) => (
@@ -105,6 +122,11 @@ export function ReviewDialogBasicsSection({
           <TextField
             label="書類種別"
             error={form.documentType === "unknown"}
+            helperText={
+              form.documentType === "unknown"
+                ? REVIEW_VALIDATION_MESSAGES.document.guidance
+                : undefined
+            }
             select
             fullWidth
             value={form.documentType === "unknown" ? "" : form.documentType}

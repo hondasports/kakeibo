@@ -281,7 +281,7 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
 
     await user.click(screen.getByRole("button", { name: "修正が必要な項目へ" }));
 
-    expect(within(dialog).getByText("書類種別を選択してください。")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("書類種別を選択してください。").length).toBeGreaterThan(0);
     expect(updateForReviewMock).not.toHaveBeenCalled();
   });
 
