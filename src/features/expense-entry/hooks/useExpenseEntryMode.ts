@@ -53,6 +53,10 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
   const [shopNameError, setShopNameError] = useState("");
   const [sourceAmountError, setSourceAmountError] = useState("");
   const [itemErrors, setItemErrors] = useState<ExpenseItemEntryErrors[]>([{}]);
+  // 支出全体のメモは明細（items）とは別のフォーム状態として持つ。
+  // 明細行の増減で値が失われないようにするため（#1346）。
+  const [memo, setMemoState] = useState("");
+  const [memoError, setMemoError] = useState("");
 
   // BUG#1: weekStartDate が変わったら date をリセット（WeekNavigator 週移動時のstale防止）
   const [prevWeekStartDate, setPrevWeekStartDate] = useState(weekStartDate);
@@ -98,13 +102,14 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
       return;
     }
     setIsMultiMode(true);
-    // 既存の入力内容を最初の項目として引き継ぐ（メモ・カテゴリは単一モードの選択を維持）
+    // 既存の入力内容を最初の項目として引き継ぐ（カテゴリは単一モードの選択を維持。
+    // メモは支出全体のフォーム状態に保持されるため明細には入れない）
     setItems([
       {
         categoryId: resolveEntryCategoryId(items[0]?.categoryId, categories),
         amountYen: "",
         title: shopName,
-        memo: items[0]?.memo ?? "",
+        memo: "",
       },
     ]);
     setItemErrors([{}]);
@@ -135,6 +140,8 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
     const carriedCategoryId = resolveEntryCategoryId(items[0]?.categoryId, categories);
     setShopNameState("");
     setSourceAmountState("");
+    setMemoState("");
+    setMemoError("");
     setItems([{ categoryId: carriedCategoryId, amountYen: "", title: "", memo: "" }]);
     setItemErrors([{}]);
     setIsMultiMode(false);
@@ -159,7 +166,7 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
         categoryId: resolveEntryCategoryId(firstItem?.categoryId, categories),
         amountYen: "",
         title: "",
-        memo: firstItem?.memo ?? "",
+        memo: "",
       },
     ]);
     setItemErrors([{}]);
@@ -193,6 +200,8 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
     shopNameError,
     sourceAmountError,
     itemErrors,
+    memo,
+    memoError,
     difference,
     singleAmountNum,
     sourceAmountNum,
@@ -204,6 +213,11 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
       setSourceAmountState(v);
       if (v && parseInt(v, 10) > 0) setSourceAmountError("");
     },
+    setMemo: (v: string) => {
+      setMemoState(v);
+      setMemoError("");
+    },
+    setMemoError,
     setDate,
     setShopNameError,
     setSourceAmountError,

@@ -241,5 +241,25 @@ describe("ExpenseEntryForm（single）", () => {
 
       expect(await screen.findByText("支出項目を保存しました")).toBeInTheDocument();
     });
+
+    it("500文字を超えるメモは保存せずエラーを表示する", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "2000");
+      fireEvent.change(screen.getByLabelText("メモ"), { target: { value: "あ".repeat(501) } });
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      expect(await screen.findByText("メモは 500 文字以内です")).toBeInTheDocument();
+      expect(createExpenseEntriesMock).not.toHaveBeenCalled();
+      expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("スーパー北浜");
+    });
   });
 });

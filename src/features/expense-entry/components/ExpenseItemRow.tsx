@@ -17,6 +17,7 @@ export function ExpenseItemRow({
   onItemChange,
   onRemove,
   canRemove,
+  disabled = false,
 }: {
   index: number;
   item: ExpenseEntryItem;
@@ -25,6 +26,7 @@ export function ExpenseItemRow({
   onItemChange: (field: keyof ExpenseEntryItem, value: string) => void;
   onRemove: () => void;
   canRemove: boolean;
+  disabled?: boolean;
 }) {
   return (
     <Box
@@ -46,6 +48,7 @@ export function ExpenseItemRow({
               size="small"
               color="error"
               onClick={onRemove}
+              disabled={disabled}
               sx={{ minWidth: { xs: 44, md: "auto" }, minHeight: { xs: 44, md: "auto" } }}
             >
               <DeleteIcon fontSize="small" />

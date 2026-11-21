@@ -1,5 +1,5 @@
 import "./ExpenseEntryFormTestMocks";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { renderWithProviders } from "../../../test/render";
@@ -315,6 +315,94 @@ describe("ExpenseEntryForm（multi）", () => {
       await user.click(screen.getByRole("button", { name: "内訳をやめる" }));
 
       expect(screen.getByLabelText("メモ")).toHaveValue("週末の買い物");
+    });
+
+    it("先頭の明細を削除しても支出全体のメモが失われない", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "5000");
+      await user.type(screen.getByLabelText("メモ"), "立替分");
+      await user.click(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" }));
+
+      // 複数項目モードでも支出全体のメモ欄が見え、値が引き継がれている
+      expect(screen.getByLabelText("メモ")).toHaveValue("立替分");
+
+      // 2行目を追加してから1行目（メモを持つ行）を削除する
+      await user.click(screen.getByRole("button", { name: "項目を追加" }));
+      await user.click(screen.getByRole("button", { name: "項目1を削除" }));
+
+      await user.click(screen.getByRole("button", { name: "内訳をやめる" }));
+
+      expect(screen.getByLabelText("メモ")).toHaveValue("立替分");
+    });
+
+    it("500文字を超えるメモは複数項目モードでも理由が分かるエラーになる", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "3000");
+      const longMemo = "あ".repeat(501);
+      fireEvent.change(screen.getByLabelText("メモ"), { target: { value: longMemo } });
+      await user.click(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" }));
+
+      // 複数項目モードのメモ欄にも値が残る
+      expect(screen.getByLabelText("メモ")).toHaveValue(longMemo);
+
+      const item0 = screen.getByTestId("expense-item-0");
+      await user.type(within(item0).getByLabelText("金額"), "3000");
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      expect(await screen.findByText("メモは 500 文字以内です")).toBeInTheDocument();
+      expect(createExpenseEntriesMock).not.toHaveBeenCalled();
+    });
+
+    it("保存中は内訳の操作ボタンが無効になる", async () => {
+      createExpenseEntriesMock.mockReturnValueOnce(new Promise(() => {}));
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "5000");
+      await user.click(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" }));
+
+      const item0 = screen.getByTestId("expense-item-0");
+      await user.type(within(item0).getByLabelText("金額"), "3000");
+      await user.click(screen.getByRole("button", { name: "項目を追加" }));
+      const item1 = screen.getByTestId("expense-item-1");
+      await user.type(within(item1).getByLabelText("内容"), "日用品");
+      await user.type(within(item1).getByLabelText("金額"), "2000");
+
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      // 送信が始まると保存ボタンがローディング（disabled）になる
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "保存して次へ" })).toBeDisabled();
+      });
+      expect(screen.getByRole("button", { name: "内訳をやめる" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "項目を追加" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "項目1を削除" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "項目2を削除" })).toBeDisabled();
     });
   });
 });

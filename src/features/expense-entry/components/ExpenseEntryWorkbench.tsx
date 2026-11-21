@@ -11,6 +11,7 @@ import { ConfirmDifferenceDialog } from "./ConfirmDifferenceDialog";
 import { ExitMultiModeDialog } from "./ExitMultiModeDialog";
 import { ExpenseFormActions } from "./ExpenseFormActions";
 import { ExpenseFormHeading } from "./ExpenseFormHeading";
+import { ExpenseMemoField } from "./ExpenseMemoField";
 import { MultiEntryFields } from "./MultiEntryFields";
 import { SingleEntryFields } from "./SingleEntryFields";
 import { SourceSummary } from "./SourceSummary";
@@ -35,6 +36,8 @@ export function ExpenseEntryWorkbench({
   shopNameError,
   sourceAmountError,
   itemErrors,
+  memo,
+  memoError,
   difference,
   status,
   apiError,
@@ -43,6 +46,7 @@ export function ExpenseEntryWorkbench({
   pendingDifference,
   setShopName,
   setSourceAmount,
+  setMemo,
   setDate,
   handleEnterMultiMode,
   handleAddItem,
@@ -93,12 +97,14 @@ export function ExpenseEntryWorkbench({
                 categories={categories}
                 categoryError={itemErrors[0]?.categoryId}
                 itemCategoryId={items[0]?.categoryId}
-                memo={items[0]?.memo ?? ""}
+                memo={memo}
+                memoError={memoError}
                 shopName={shopName}
                 shopNameError={shopNameError}
                 sourceAmount={sourceAmount}
                 sourceAmountError={sourceAmountError}
-                onItemChange={(field, value) => handleItemChange(0, field, value)}
+                onCategoryChange={(categoryId) => handleItemChange(0, "categoryId", categoryId)}
+                onMemoChange={setMemo}
                 onShopNameChange={setShopName}
                 onSourceAmountChange={setSourceAmount}
               />
@@ -108,6 +114,7 @@ export function ExpenseEntryWorkbench({
               <MultiEntryFields
                 categories={categories}
                 difference={difference}
+                isSubmitting={status === "submitting"}
                 itemErrors={itemErrors}
                 items={items}
                 sourceAmount={sourceAmountNum}
@@ -116,6 +123,10 @@ export function ExpenseEntryWorkbench({
                 onRemoveItem={handleRemoveItem}
                 onExitMultiMode={handleExitMultiMode}
               />
+            )}
+
+            {isMultiMode && (
+              <ExpenseMemoField memo={memo} memoError={memoError} onMemoChange={setMemo} />
             )}
 
             <ExpenseFormActions
