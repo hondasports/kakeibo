@@ -1,6 +1,6 @@
 ---
 name: service-ops-safety
-description: Clerk・Convex・Vercel・GitHub・LINE・OAuth等の外部サービスへのwrite、env・secret・deploy・DNS/domain・本番・破壊的な外部操作を行う前に使う。対象環境の確認、ユーザー承認が要る操作、secretの扱い。
+description: 外部サービスへのwrite、環境設定、本番・破壊的な操作の前に確かめる、対象環境・ユーザー承認・secret・復旧の手順。
 license: Apache-2.0
 ---
 

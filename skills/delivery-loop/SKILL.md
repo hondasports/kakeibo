@@ -1,6 +1,6 @@
 ---
 name: delivery-loop
-description: PR作成後の監視・指摘対応・マージ、複数のIssue・PRをまとめて進める依頼、完了地点の前でturnを終える・作業を区切って報告するときに使う。完了地点の決め方、観測→対応のループ、止めてよい理由と報告の形の正本。
+description: 実装・PR依頼の完了地点の決め方と、PR作成後の監視・指摘対応・マージ、複数対象の進め方、途中で止めるときの報告の手順。起動条件はAGENTS.mdのCapability表。
 license: Apache-2.0
 ---
 
