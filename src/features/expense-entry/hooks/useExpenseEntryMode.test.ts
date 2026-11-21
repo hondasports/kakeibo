@@ -145,3 +145,94 @@ describe("useExpenseEntryMode カテゴリの引き継ぎ", () => {
     expect(result.current.items[0]?.categoryId).toBe("cat-food");
   });
 });
+
+describe("useExpenseEntryMode 複数項目モードとの行き来", () => {
+  function enterMultiMode(result: ReturnType<typeof renderMode>["result"]) {
+    act(() => {
+      result.current.setShopName("スーパー北浜");
+      result.current.setSourceAmount("5000");
+    });
+    act(() => result.current.handleEnterMultiMode());
+  }
+
+  it("単一→複数モード移行時にメモとカテゴリを引き継ぐ", () => {
+    const { result } = renderMode("2026-11-16");
+    act(() => result.current.handleItemChange(0, "categoryId", "cat-daily"));
+    act(() => result.current.handleItemChange(0, "memo", "定期購入"));
+    enterMultiMode(result);
+
+    expect(result.current.isMultiMode).toBe(true);
+    expect(result.current.items[0]?.memo).toBe("定期購入");
+    expect(result.current.items[0]?.categoryId).toBe("cat-daily");
+    expect(result.current.items[0]?.title).toBe("スーパー北浜");
+  });
+
+  it("入力済みの明細が2件未満なら確認なしで単一モードへ戻り、合計を金額に入れる", () => {
+    const { result } = renderMode("2026-11-16");
+    act(() => result.current.handleItemChange(0, "memo", "定期購入"));
+    enterMultiMode(result);
+    act(() => result.current.handleItemChange(0, "amountYen", "3000"));
+
+    act(() => result.current.handleExitMultiMode());
+
+    expect(result.current.showExitMultiConfirm).toBe(false);
+    expect(result.current.isMultiMode).toBe(false);
+    expect(result.current.sourceAmount).toBe("3000");
+    expect(result.current.items[0]?.memo).toBe("定期購入");
+    expect(result.current.items[0]?.categoryId).toBe("cat-food");
+    expect(result.current.shopName).toBe("スーパー北浜");
+  });
+
+  it("明細が未入力なら既存の合計金額を保持したまま単一モードへ戻る", () => {
+    const { result } = renderMode("2026-11-16");
+    enterMultiMode(result);
+
+    act(() => result.current.handleExitMultiMode());
+
+    expect(result.current.isMultiMode).toBe(false);
+    expect(result.current.sourceAmount).toBe("5000");
+  });
+
+  it("入力済みの明細が2件以上あるときは確認を出し、確認で単一モードへ戻る", () => {
+    const { result } = renderMode("2026-11-16");
+    act(() => result.current.handleItemChange(0, "categoryId", "cat-daily"));
+    act(() => result.current.handleItemChange(0, "memo", "定期購入"));
+    enterMultiMode(result);
+    act(() => result.current.handleItemChange(0, "amountYen", "3000"));
+    act(() => result.current.handleAddItem());
+    act(() => result.current.handleItemChange(1, "title", "日用品"));
+    act(() => result.current.handleItemChange(1, "amountYen", "2000"));
+
+    act(() => result.current.handleExitMultiMode());
+
+    expect(result.current.showExitMultiConfirm).toBe(true);
+    expect(result.current.isMultiMode).toBe(true);
+
+    act(() => result.current.handleConfirmExitMultiMode());
+
+    expect(result.current.showExitMultiConfirm).toBe(false);
+    expect(result.current.isMultiMode).toBe(false);
+    // 金額は明細合計、カテゴリは先頭項目のもの、メモは引き継ぐ
+    expect(result.current.sourceAmount).toBe("5000");
+    expect(result.current.items[0]?.categoryId).toBe("cat-daily");
+    expect(result.current.items[0]?.memo).toBe("定期購入");
+    expect(result.current.shopName).toBe("スーパー北浜");
+  });
+
+  it("確認をキャンセルすると複数項目モードと入力内容が保持される", () => {
+    const { result } = renderMode("2026-11-16");
+    enterMultiMode(result);
+    act(() => result.current.handleItemChange(0, "amountYen", "3000"));
+    act(() => result.current.handleAddItem());
+    act(() => result.current.handleItemChange(1, "amountYen", "2000"));
+
+    act(() => result.current.handleExitMultiMode());
+    act(() => result.current.handleCancelExitMultiMode());
+
+    expect(result.current.showExitMultiConfirm).toBe(false);
+    expect(result.current.isMultiMode).toBe(true);
+    expect(result.current.items).toHaveLength(2);
+    expect(result.current.items[0]?.amountYen).toBe("3000");
+    expect(result.current.items[1]?.amountYen).toBe("2000");
+  });
+});

@@ -98,8 +98,15 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
       return;
     }
     setIsMultiMode(true);
-    // 既存の入力内容を最初の項目として引き継ぐ
-    setItems([{ categoryId: categories[0]?._id ?? "", amountYen: "", title: shopName, memo: "" }]);
+    // 既存の入力内容を最初の項目として引き継ぐ（メモ・カテゴリは単一モードの選択を維持）
+    setItems([
+      {
+        categoryId: resolveEntryCategoryId(items[0]?.categoryId, categories),
+        amountYen: "",
+        title: shopName,
+        memo: items[0]?.memo ?? "",
+      },
+    ]);
     setItemErrors([{}]);
   };
 
@@ -133,6 +140,50 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
     setIsMultiMode(false);
   };
 
+  // 複数項目モード → 単一モードへ戻る。店名・日付・メモは引き継ぎ、
+  // 金額は明細合計を入れる（明細が未入力なら既存の合計金額を保持）
+  const [showExitMultiConfirm, setShowExitMultiConfirm] = useState(false);
+
+  const hasItemInput = (item: ExpenseItemState) =>
+    item.amountYen.trim() !== "" || item.title.trim() !== "" || item.memo.trim() !== "";
+
+  const exitMultiMode = () => {
+    const totalAmount = items.reduce(
+      (sum, item) => sum + (parseInt(item.amountYen || "0", 10) || 0),
+      0,
+    );
+    const firstItem = items[0];
+    setSourceAmountState(totalAmount > 0 ? String(totalAmount) : sourceAmount);
+    setItems([
+      {
+        categoryId: resolveEntryCategoryId(firstItem?.categoryId, categories),
+        amountYen: "",
+        title: "",
+        memo: firstItem?.memo ?? "",
+      },
+    ]);
+    setItemErrors([{}]);
+    setIsMultiMode(false);
+  };
+
+  const handleExitMultiMode = () => {
+    // 入力済みの明細が2件以上あるときだけ、内訳が破棄されることを確認する
+    if (items.filter(hasItemInput).length >= 2) {
+      setShowExitMultiConfirm(true);
+      return;
+    }
+    exitMultiMode();
+  };
+
+  const handleConfirmExitMultiMode = () => {
+    setShowExitMultiConfirm(false);
+    exitMultiMode();
+  };
+
+  const handleCancelExitMultiMode = () => {
+    setShowExitMultiConfirm(false);
+  };
+
   return {
     shopName,
     sourceAmount,
@@ -161,6 +212,10 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
     handleAddItem,
     handleRemoveItem,
     handleItemChange,
+    showExitMultiConfirm,
+    handleExitMultiMode,
+    handleConfirmExitMultiMode,
+    handleCancelExitMultiMode,
     resetAfterSave,
   };
 }
