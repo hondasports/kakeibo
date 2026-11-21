@@ -64,7 +64,14 @@ export function InputPage() {
           onNextWeek={goToNextWeek}
         />
 
-        {weekSummary !== undefined && <WeekStatusPanel count={weekSummary.count} />}
+        {weekSummary !== undefined && (
+          <WeekStatusPanel
+            count={weekSummary.count}
+            isCurrentWeek={isCurrentWeek}
+            totalAmountYen={weekSummary.totalAmountYen}
+            weekStartDate={weekStartDate}
+          />
+        )}
 
         <ExpenseEntryForm
           weekStartDate={weekStartDate}

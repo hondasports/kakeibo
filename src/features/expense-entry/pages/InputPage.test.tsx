@@ -19,7 +19,21 @@ vi.mock("../hooks/useInputPageWeek", () => ({
 
 vi.mock("../../week", () => ({
   WeekNavigator: () => <div data-testid="week-navigator" />,
-  WeekStatusPanel: ({ count }: { count: number }) => <div data-testid="week-status">{count}</div>,
+  WeekStatusPanel: ({
+    count,
+    totalAmountYen,
+    weekStartDate,
+    isCurrentWeek,
+  }: {
+    count: number;
+    totalAmountYen: number;
+    weekStartDate: string;
+    isCurrentWeek: boolean;
+  }) => (
+    <div data-testid="week-status">
+      {count}:{totalAmountYen}:{weekStartDate}:{String(isCurrentWeek)}
+    </div>
+  ),
 }));
 
 vi.mock("../components/ExpenseEntryForm", () => ({
@@ -56,6 +70,19 @@ describe("InputPage", () => {
     render(<InputPage />);
 
     expect(screen.queryByTestId("week-status")).not.toBeInTheDocument();
+  });
+
+  it("週集計の件数・合計金額・表示週を週ステータスへ渡す", () => {
+    useQueryMock.mockReturnValueOnce([]).mockReturnValueOnce({
+      count: 3,
+      totalAmountYen: 12345,
+      prevWeekReceiptCount: 0,
+      prevWeekTotalAmountYen: null,
+    });
+
+    render(<InputPage />);
+
+    expect(screen.getByTestId("week-status")).toHaveTextContent("3:12345:2026-06-15:true");
   });
 
   it("セッション読込エラー時はAlertと再試行ボタンを表示し、再試行を実行できる", async () => {
