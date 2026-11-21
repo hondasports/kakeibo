@@ -16,7 +16,7 @@ license: Apache-2.0
 
 - `convex/**` を編集する前に `convex/_generated/ai/guidelines.md` を読む
 - `pnpm run dev` のwatcherはlocal deploymentへ自動反映する。1回だけ反映したい場合はlocal環境同期後に `pnpm run convex:dev -- --once`
-- GitHub ActionsのE2Eはジョブごとの匿名使い捨てlocal deploymentで走るため、cloud devへの反映は要らない。ローカルから共有cloud devを検証したい場合だけ `pnpm run convex:dev:cloud -- --once` を明示する
+- PRと `preview` pushの `local-e2e` のE2Eはジョブごとの匿名使い捨てlocal deploymentで走り、staging固有の確認とrelease candidateは固定stagingで走る（`docs/development-process.md` のFunctional E2E）。どちらも共有cloud devへの反映は要らない。ローカルから共有cloud devを検証したい場合だけ `pnpm run convex:dev:cloud -- --once` を明示する
 - schema・migration変更、データ削除・retention変更は高リスク変更として扱い、影響範囲と移行・復旧手順を確認してから進める
 - required environment不足、env sync失敗、Convex CLI未反映を「未実行理由」にして先へ進まない。復旧できなければblockerとして報告する
 - 秘密値・deployment実値をログ・PR・Issueへ出さない

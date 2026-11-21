@@ -43,7 +43,7 @@ license: Apache-2.0
 末尾に必ず次の3つを付ける。
 
 - 変更とテストの対応表（`references/unit-test.md` の形式）
-- 独立Reviewerの要否と理由。判定条件は `docs/development-process.md` の「Review / branch protection」と `skills/security-review` の「入力・起動」に従い、ここで条件を絞らない
+- 独立Reviewerの要否と理由。判定条件は `docs/development-process.md` の「Review / branch protection」に従い、ここで条件を絞らない
 - 最終行に判定を1行で付ける: `VERDICT: CLEAN` または `VERDICT: NEEDS_FIX`
   - CLEAN: 指摘なし、または残る指摘がすべて Minor 以下でマージを止めない場合に限る。判定の根拠（通したチェックとその結果）を2〜3行で添える
   - NEEDS_FIX: Blocker / Major が1件でも残る場合。未解決の指摘一覧への参照を添える
