@@ -19,7 +19,6 @@ import { useWeeklyBulkSelection } from "../hooks/useWeeklyBulkSelection";
 import { buildWeeklyExpenseChartData } from "../utils/weeklyExpenseChartData";
 import { SuzumemoLoadingState } from "../../ui";
 import type { ReceiptItem } from "../../summary-shared/types/types";
-import type { CategoryOption } from "../../summary-shared/components/ExpenseEntryDraftItemsEditor";
 import {
   addWeeks,
   getCurrentWeekStartDate,
@@ -31,17 +30,15 @@ import {
 const EMPTY_RECEIPTS: ReceiptItem[] = [];
 
 type WeeklySummarySectionProps = {
-  categories: CategoryOption[];
   currentWeekStartDate: string;
   weekStartDate: string;
-  onTrendRetry: () => void;
+  onRetry: () => void;
 };
 
 function WeeklySummarySection({
-  categories,
   currentWeekStartDate,
   weekStartDate,
-  onTrendRetry,
+  onRetry,
 }: WeeklySummarySectionProps) {
   const [editingReceipt, setEditingReceipt] = useState<ReceiptItem | null>(null);
   const [deletingReceipt, setDeletingReceipt] = useState<ReceiptItem | null>(null);
@@ -65,6 +62,14 @@ function WeeklySummarySection({
   const weeklySummary = useQuery(api.receipts.summaries.getWeekSummaryWithCategories, {
     weekStartDate,
   });
+  const categoriesResult = useQuery_experimental({
+    query: api.categories.queries.listActive,
+    args: {},
+  });
+  const categories =
+    categoriesResult.status === "success" && Array.isArray(categoriesResult.data)
+      ? categoriesResult.data
+      : [];
 
   const fourWeeksResult = useQuery_experimental({
     query: api.receipts.summaries.getFourWeeksSummary,
@@ -169,6 +174,16 @@ function WeeklySummarySection({
 
   return (
     <>
+      {categoriesResult.status === "error" && (
+        <Stack spacing={1.5}>
+          <Alert severity="error" variant="outlined">
+            カテゴリを読み込めませんでした。カテゴリの変更はできません。
+          </Alert>
+          <Button onClick={onRetry} sx={{ alignSelf: "flex-start" }} variant="outlined">
+            再試行
+          </Button>
+        </Stack>
+      )}
       {deleteError && (
         <Alert severity="error" variant="outlined" onClose={() => setDeleteError("")}>
           {deleteError}
@@ -188,7 +203,7 @@ function WeeklySummarySection({
         weekStartDate={weekStartDate}
         weeklyExpenseTrend={weeklyExpenseTrend}
         fourWeeksStatus={fourWeeksResult.status}
-        onTrendRetry={onTrendRetry}
+        onTrendRetry={onRetry}
         onDeleteReceipt={setDeletingReceipt}
         onEditReceipt={setEditingReceipt}
         isSelected={bulkSelection.isSelected}
@@ -261,15 +276,7 @@ export function SummaryPage() {
     query: api.users.queries.getUserProfile,
     args: {},
   });
-  const categoriesResult = useQuery_experimental({
-    query: api.categories.queries.listActive,
-    args: {},
-  });
   const userProfile = userProfileResult.status === "success" ? userProfileResult.data : undefined;
-  const categories =
-    categoriesResult.status === "success" && Array.isArray(categoriesResult.data)
-      ? categoriesResult.data
-      : [];
 
   const weeklyStartDay = userProfile?.weeklyStartDay ?? 1;
   const currentWeekStartDate = getCurrentWeekStartDate(weeklyStartDay);
@@ -363,10 +370,9 @@ export function SummaryPage() {
         <SummarySectionErrorBoundary message="週次サマリーを読み込めませんでした。">
           <WeeklySummarySection
             key={sectionRetryKey}
-            categories={categories}
             currentWeekStartDate={currentWeekStartDate}
             weekStartDate={weekStartDate}
-            onTrendRetry={() => setSectionRetryKey((key) => key + 1)}
+            onRetry={() => setSectionRetryKey((key) => key + 1)}
           />
         </SummarySectionErrorBoundary>
       </Stack>

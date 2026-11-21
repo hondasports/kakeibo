@@ -6,7 +6,6 @@ import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { ExpenseEntryDeleteDialog } from "../../summary-shared/components/ExpenseEntryDeleteDialog";
 import { ExpenseEntryEditDialog } from "../../summary-shared/components/ExpenseEntryEditDialog";
-import type { CategoryOption } from "../../summary-shared/components/ExpenseEntryDraftItemsEditor";
 import { CategoryBreakdownCard } from "../../summary-shared/components/CategoryBreakdownCard";
 import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
 import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
@@ -33,13 +32,7 @@ function scrollToDetailHeading(heading: HTMLElement) {
   heading.focus({ preventScroll: true });
 }
 
-function MonthlySummarySection({
-  categories,
-  month,
-}: {
-  categories: CategoryOption[];
-  month: string;
-}) {
+function MonthlySummarySection({ month, onRetry }: { month: string; onRetry: () => void }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   // 利用者が日付を選んだ直後だけ true にする。?date= 付きの初回表示や戻る/進むではスクロールしない
@@ -54,6 +47,14 @@ function MonthlySummarySection({
   const deleteExpenseEntry = useMutation(api.expenseEntries.mutations.deleteExpenseEntry);
   const deleteReceipt = useMutation(api.receipts.crud.deleteReceipt);
   const monthlySummary = useQuery(api.receipts.summaries.getMonthSummaryWithCategories, { month });
+  const categoriesResult = useQuery_experimental({
+    query: api.categories.queries.listActive,
+    args: {},
+  });
+  const categories =
+    categoriesResult.status === "success" && Array.isArray(categoriesResult.data)
+      ? categoriesResult.data
+      : [];
   const isSummaryLoading = monthlySummary === undefined;
   const summary = monthlySummary ?? {
     byCategory: [],
@@ -118,6 +119,16 @@ function MonthlySummarySection({
 
   return (
     <>
+      {categoriesResult.status === "error" && (
+        <Stack spacing={1.5}>
+          <Alert severity="error" variant="outlined">
+            カテゴリを読み込めませんでした。カテゴリの変更はできません。
+          </Alert>
+          <Button onClick={onRetry} sx={{ alignSelf: "flex-start" }} variant="outlined">
+            再試行
+          </Button>
+        </Stack>
+      )}
       <MonthlySpendingCalendar
         expenses={summary.receipts}
         incomes={summary.incomes}
@@ -241,6 +252,7 @@ export function MonthlySummaryPage() {
   const { month: rawMonth } = useParams<{ month: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [sectionRetryKey, setSectionRetryKey] = useState(0);
 
   const currentMonth = getCurrentMonth();
   const normalizedMonth = rawMonth ? normalizeMonth(rawMonth) : null;
@@ -253,15 +265,7 @@ export function MonthlySummaryPage() {
     query: api.users.queries.getUserProfile,
     args: {},
   });
-  const categoriesResult = useQuery_experimental({
-    query: api.categories.queries.listActive,
-    args: {},
-  });
   const userProfile = userProfileResult.status === "success" ? userProfileResult.data : undefined;
-  const categories =
-    categoriesResult.status === "success" && Array.isArray(categoriesResult.data)
-      ? categoriesResult.data
-      : [];
   const weeklyStartDay = userProfile?.weeklyStartDay;
   const dateQuery = searchParams.get("date");
   const monthlyHistoryPath =
@@ -325,7 +329,11 @@ export function MonthlySummaryPage() {
         </Button>
 
         <SummarySectionErrorBoundary message="月次サマリーを読み込めませんでした。">
-          <MonthlySummarySection categories={categories} month={month} />
+          <MonthlySummarySection
+            key={sectionRetryKey}
+            month={month}
+            onRetry={() => setSectionRetryKey((key) => key + 1)}
+          />
         </SummarySectionErrorBoundary>
       </Stack>
     </Box>
