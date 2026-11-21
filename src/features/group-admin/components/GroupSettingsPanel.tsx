@@ -132,7 +132,10 @@ function GroupSettingsPanelContent({ defaultExpanded = true }: GroupSettingsPane
 
         {error ? (
           <Alert severity="error" variant="outlined">
-            {error}
+            <Typography variant="body2">{error}</Typography>
+            <Typography color="text.secondary" variant="caption">
+              内容を確認して、もう一度操作してください。
+            </Typography>
           </Alert>
         ) : null}
 

@@ -152,3 +152,20 @@ export async function deactivateCategory(
 
   return await store.get(categoryId);
 }
+
+export async function reactivateCategory(
+  store: CategoryStore,
+  groupId: string,
+  categoryId: string,
+  now: number,
+): Promise<CategoryStoreRecord | null> {
+  const category = await store.get(categoryId);
+  assertOwnedCategory(category, groupId);
+
+  await store.patch(categoryId, {
+    isActive: true,
+    updatedAt: now,
+  });
+
+  return await store.get(categoryId);
+}

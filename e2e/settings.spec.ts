@@ -27,6 +27,21 @@ test.describe("設定台帳（Issue #375）", () => {
     const weekSection = ledger.locator(".settings-ledger-section", {
       has: page.getByRole("heading", { name: "週の設定", level: 2 }),
     });
+
+    // 値が未変更だと保存ボタンは無効なので、現在値と違う曜日を選ぶ
+    const startDaySelect = weekSection.getByRole("combobox", { name: "週の始まり" });
+    await startDaySelect.click();
+    const currentLabel = (await startDaySelect.innerText()).trim();
+    const options = page.getByRole("option");
+    const optionCount = await options.count();
+    for (let i = 0; i < optionCount; i += 1) {
+      const option = options.nth(i);
+      if ((await option.innerText()).trim() !== currentLabel) {
+        await option.click();
+        break;
+      }
+    }
+
     await weekSection.getByRole("button", { name: "変更を保存" }).click();
     await expect(page.getByText("週の設定を保存しました")).toBeVisible({ timeout: 15_000 });
   });

@@ -32,6 +32,7 @@ export function WeekDaySettingsPanel() {
   const userProfile = useQuery(api.users.queries.getUserProfile);
   const updateWeeklyDays = useMutation(api.users.mutations.updateWeeklyDays);
   const [startDay, setStartDay] = useState(1);
+  const [savedStartDay, setSavedStartDay] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{
     message: string;
@@ -43,6 +44,7 @@ export function WeekDaySettingsPanel() {
     setPrevUserProfile(userProfile);
     if (userProfile) {
       setStartDay(userProfile.weeklyStartDay ?? 1);
+      setSavedStartDay(userProfile.weeklyStartDay ?? 1);
     }
   }
 
@@ -63,10 +65,13 @@ export function WeekDaySettingsPanel() {
     setStartDay(Number(event.target.value));
   };
 
+  const isDirty = startDay !== savedStartDay;
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
       await updateWeeklyDays({ weeklyStartDay: startDay, weeklyEndDay: endDay });
+      setSavedStartDay(startDay);
       setFeedback({ message: "週の設定を保存しました", severity: "success" });
     } catch {
       setFeedback({ message: "週の設定を保存できませんでした", severity: "error" });
@@ -82,7 +87,7 @@ export function WeekDaySettingsPanel() {
           週の設定
         </Typography>
         <Typography color="text.secondary" variant="body2">
-          週の始まりから7日間を集計します。週の終わりは自動で決まります。
+          週の始まりから7日間を集計します。週の終わりは自動で決まります。変更は「変更を保存」を押すまで反映されません。
         </Typography>
       </Box>
 
@@ -134,13 +139,18 @@ export function WeekDaySettingsPanel() {
             </Typography>
           </Box>
           <Button
-            disabled={isSaving}
+            disabled={isSaving || !isDirty}
             onClick={handleSave}
             startIcon={isSaving ? <CircularProgress size={16} /> : undefined}
             variant="contained"
           >
             {isSaving ? "保存中…" : "変更を保存"}
           </Button>
+          {isDirty && !isSaving ? (
+            <Typography aria-live="polite" color="warning.dark" variant="caption">
+              未保存の変更があります
+            </Typography>
+          ) : null}
         </Stack>
       </Box>
 
