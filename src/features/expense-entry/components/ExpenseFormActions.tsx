@@ -21,15 +21,15 @@ export function ExpenseFormActions({
       sx={{
         bottom: {
           xs: "calc(var(--size-bottom-nav-height) + env(safe-area-inset-bottom) + 8px)",
-          sm: "auto",
+          md: "auto",
         },
         flexWrap: "wrap",
         justifyContent: "flex-end",
         minWidth: 0,
-        position: { xs: "sticky", sm: "static" },
-        py: { xs: 1, sm: 0 },
-        zIndex: { xs: 1, sm: "auto" },
-        bgcolor: { xs: "background.paper", sm: "transparent" },
+        position: { xs: "sticky", md: "static" },
+        py: { xs: 1, md: 0 },
+        zIndex: { xs: 1, md: "auto" },
+        bgcolor: { xs: "background.paper", md: "transparent" },
       }}
     >
       {!isMultiMode && (
