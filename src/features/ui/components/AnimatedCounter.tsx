@@ -1,4 +1,4 @@
-import { motion, useSpring, useTransform } from "framer-motion";
+import { motion, useReducedMotion, useSpring, useTransform } from "framer-motion";
 import { useEffect } from "react";
 
 /**
@@ -33,19 +33,20 @@ export function AnimatedCounter({
     duration,
     bounce: 0,
   });
+  const shouldReduceMotion = useReducedMotion();
 
   const display = useTransform(spring, (current) => Math.round(current).toLocaleString("ja-JP"));
 
   useEffect(() => {
-    spring.set(value);
-  }, [spring, value]);
+    if (shouldReduceMotion) {
+      spring.jump(value);
+    } else {
+      spring.set(value);
+    }
+  }, [shouldReduceMotion, spring, value]);
 
   return (
-    <span
-      aria-live="polite"
-      aria-atomic="true"
-      data-value={`${prefix}${value.toLocaleString("ja-JP")}${suffix}`}
-    >
+    <span data-value={`${prefix}${value.toLocaleString("ja-JP")}${suffix}`}>
       {prefix}
       <motion.span>{display}</motion.span>
       {suffix}

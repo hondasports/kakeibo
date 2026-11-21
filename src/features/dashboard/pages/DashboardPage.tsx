@@ -4,6 +4,7 @@ import { Alert, Box, Button, Stack, Typography, useMediaQuery } from "@mui/mater
 import { useTheme } from "@mui/material/styles";
 import { WEEK_SESSION_LOAD_ERROR_MESSAGE } from "../../week";
 import { CategoryBreakdownCard } from "../../summary-shared/components/CategoryBreakdownCard";
+import { SummarySectionErrorBoundary } from "../../summary-shared/components/SummarySectionErrorBoundary";
 import { SuzumemoLoadingState } from "../../ui";
 import { DashboardInputPanel } from "../components/DashboardInputPanel";
 import { DashboardMonthlySummaryLink } from "../components/DashboardMonthlySummaryLink";
@@ -12,9 +13,108 @@ import { DashboardPeriodRow } from "../components/DashboardPeriodRow";
 import { DashboardSummaryLink } from "../components/DashboardSummaryLink";
 import { DashboardSummaryRow } from "../components/DashboardSummaryRow";
 import { WeekComparisonChart } from "../components/WeekComparisonChart";
-import { useWeekSession } from "../hooks/useWeekSession";
+import { useWeekSession, type WeekSession } from "../hooks/useWeekSession";
 import { getCurrentMonth } from "../../../../lib/domain/common/month";
 import { getCurrentYear } from "../../../../lib/domain/common/year";
+
+function DashboardSummarySection({
+  currentMonth,
+  currentYear,
+  isCompact,
+  weekSession,
+}: {
+  currentMonth: string;
+  currentYear: number;
+  isCompact: boolean;
+  weekSession: WeekSession;
+}) {
+  const summary = useQuery(api.receipts.summaries.getWeekSummaryWithCategories, {
+    weekStartDate: weekSession.weekStartDate,
+  });
+
+  const { weekEndDate, weekStartDate, status } = weekSession;
+  const isLoading = summary === undefined;
+  const count = summary?.count ?? 0;
+  const totalAmountYen = summary?.totalAmountYen ?? 0;
+  const totalIncomeYen = summary?.totalIncomeYen ?? 0;
+  const prevWeekTotalAmountYen = summary?.prevWeekTotalAmountYen ?? null;
+  const byCategory = summary?.byCategory ?? [];
+
+  const categorySection = (
+    <CategoryBreakdownCard
+      byCategory={byCategory}
+      count={count}
+      emptyMessage="まだ記録がありません"
+      isLoading={isLoading}
+      showPercentage
+      title="支出カテゴリ"
+      totalAmountYen={totalAmountYen}
+    />
+  );
+
+  const inputPanel = (
+    <DashboardInputPanel
+      count={count}
+      isLoading={isLoading}
+      status={status}
+      weekStartDate={weekStartDate}
+    />
+  );
+
+  return isCompact ? (
+    <>
+      <DashboardSummaryRow
+        count={count}
+        currentTotalAmountYen={totalAmountYen}
+        totalIncomeYen={totalIncomeYen}
+        isLoading={isLoading}
+        prevWeekTotalAmountYen={prevWeekTotalAmountYen}
+        status={status}
+        weekEndDate={weekEndDate}
+        weekStartDate={weekStartDate}
+      />
+
+      {inputPanel}
+
+      <DashboardPeriodRow weekEndDate={weekEndDate} weekStartDate={weekStartDate} />
+
+      <WeekComparisonChart
+        currentTotalAmountYen={totalAmountYen}
+        isLoading={isLoading}
+        prevWeekTotalAmountYen={prevWeekTotalAmountYen}
+      />
+
+      {categorySection}
+      {status !== "completed" && <DashboardSummaryLink weekStartDate={weekStartDate} />}
+      <DashboardMonthlySummaryLink month={currentMonth} />
+      <DashboardYearlySummaryLink year={currentYear} />
+    </>
+  ) : (
+    <>
+      <DashboardSummaryRow
+        count={count}
+        currentTotalAmountYen={totalAmountYen}
+        totalIncomeYen={totalIncomeYen}
+        isLoading={isLoading}
+        prevWeekTotalAmountYen={prevWeekTotalAmountYen}
+        status={status}
+        weekEndDate={weekEndDate}
+        weekStartDate={weekStartDate}
+      />
+
+      <Box className="dashboard-grid">
+        {inputPanel}
+        {categorySection}
+      </Box>
+
+      <WeekComparisonChart
+        currentTotalAmountYen={totalAmountYen}
+        isLoading={isLoading}
+        prevWeekTotalAmountYen={prevWeekTotalAmountYen}
+      />
+    </>
+  );
+}
 
 export function DashboardPage() {
   const { weekSession, sessionError, retrySession } = useWeekSession();
@@ -22,11 +122,6 @@ export function DashboardPage() {
   const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const currentMonth = getCurrentMonth();
   const currentYear = getCurrentYear();
-
-  const summary = useQuery(
-    api.receipts.summaries.getWeekSummaryWithCategories,
-    weekSession ? { weekStartDate: weekSession.weekStartDate } : "skip",
-  );
 
   if (!weekSession && !sessionError) {
     return (
@@ -56,34 +151,6 @@ export function DashboardPage() {
     );
   }
 
-  const { weekEndDate, weekStartDate, status } = weekSession;
-  const isLoading = summary === undefined;
-  const count = summary?.count ?? 0;
-  const totalAmountYen = summary?.totalAmountYen ?? 0;
-  const totalIncomeYen = summary?.totalIncomeYen ?? 0;
-  const prevWeekTotalAmountYen = summary?.prevWeekTotalAmountYen ?? null;
-  const byCategory = summary?.byCategory ?? [];
-
-  const categorySection = (
-    <CategoryBreakdownCard
-      byCategory={byCategory}
-      count={count}
-      isLoading={isLoading}
-      showPercentage
-      title="支出カテゴリ"
-      totalAmountYen={totalAmountYen}
-    />
-  );
-
-  const inputPanel = (
-    <DashboardInputPanel
-      count={count}
-      isLoading={isLoading}
-      status={status}
-      weekStartDate={weekStartDate}
-    />
-  );
-
   return (
     <Box className="app-main">
       <Stack spacing={2.5}>
@@ -96,7 +163,7 @@ export function DashboardPage() {
               sx={{ height: 28, width: 28 }}
             />
             <Typography component="h1" variant="h5">
-              今週
+              今週のダッシュボード
             </Typography>
           </Stack>
         ) : (
@@ -105,40 +172,14 @@ export function DashboardPage() {
           </Typography>
         )}
 
-        <DashboardSummaryRow
-          count={count}
-          currentTotalAmountYen={totalAmountYen}
-          totalIncomeYen={totalIncomeYen}
-          isLoading={isLoading}
-          prevWeekTotalAmountYen={prevWeekTotalAmountYen}
-          weekEndDate={weekEndDate}
-          weekStartDate={weekStartDate}
-        />
-
-        {isCompact && (
-          <DashboardPeriodRow weekEndDate={weekEndDate} weekStartDate={weekStartDate} />
-        )}
-
-        <WeekComparisonChart
-          currentTotalAmountYen={totalAmountYen}
-          isLoading={isLoading}
-          prevWeekTotalAmountYen={prevWeekTotalAmountYen}
-        />
-
-        {isCompact ? (
-          <>
-            {inputPanel}
-            {categorySection}
-            <DashboardSummaryLink weekStartDate={weekStartDate} />
-            <DashboardMonthlySummaryLink month={currentMonth} />
-            <DashboardYearlySummaryLink year={currentYear} />
-          </>
-        ) : (
-          <Box className="dashboard-grid">
-            {categorySection}
-            {inputPanel}
-          </Box>
-        )}
+        <SummarySectionErrorBoundary message="今週のサマリーを読み込めませんでした。">
+          <DashboardSummarySection
+            currentMonth={currentMonth}
+            currentYear={currentYear}
+            isCompact={isCompact}
+            weekSession={weekSession}
+          />
+        </SummarySectionErrorBoundary>
       </Stack>
     </Box>
   );

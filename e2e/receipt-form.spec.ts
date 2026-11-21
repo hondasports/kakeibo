@@ -465,7 +465,7 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
     await expect(page.getByRole("heading", { name: "今週のダッシュボード" })).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "前週との比較", level: 2 })).toBeVisible();
-    await expect(page.getByRole("img", { name: "前週との比較グラフ" })).toBeVisible({
+    await expect(page.getByRole("img", { name: /^前週との比較グラフ/ })).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByText("前週との比較データがあると表示されます")).toHaveCount(0);

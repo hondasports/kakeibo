@@ -149,18 +149,85 @@ describe("DashboardPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "今週" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "今週のダッシュボード" })).toBeInTheDocument();
     expect(screen.getByText(/集計期間：6\/15（月）〜6\/21（日）/)).toBeInTheDocument();
     const inputPanel = screen
       .getByRole("link", { name: "入力を再開" })
       .closest(".dashboard-input-panel--compact");
     const categoryHeading = screen.getByRole("heading", { name: "支出カテゴリ" });
+    const comparisonChart = screen.getByTestId("week-comparison-chart");
     expect(inputPanel).not.toBeNull();
     expect(
       inputPanel!.compareDocumentPosition(categoryHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    // 入力導線は比較グラフより前（サマリー行の直下）に置く
+    expect(
+      inputPanel!.compareDocumentPosition(comparisonChart) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.getByRole("link", { name: /^今月の月次サマリーを見る/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^今年の年次サマリーを見る/ })).toBeInTheDocument();
+  });
+
+  it("完了済みの週では週次サマリーへの重複導線を表示しない", () => {
+    stubViewportWidth(390);
+    useQueryMock.mockReturnValue({
+      byCategory: [],
+      count: 3,
+      prevWeekTotalAmountYen: 7000,
+      totalAmountYen: 6280,
+    });
+    useWeekSessionMock.mockReturnValue({
+      isLoading: false,
+      retrySession: retrySessionMock,
+      sessionError: "",
+      setWeekSession: vi.fn(),
+      weekSession: {
+        status: "completed",
+        weekEndDate: "2026-06-21",
+        weekStartDate: "2026-06-15",
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
+
+    // 主ボタンだけが週次サマリー導線になり、下部の同名リンクは出ない
+    expect(screen.getAllByRole("link", { name: "今週のサマリーを見る" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: /^今月の月次サマリーを見る/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^今年の年次サマリーを見る/ })).toBeInTheDocument();
+  });
+
+  it("サマリー取得に失敗しても見出しを残してセクション内エラーと再試行を表示する", async () => {
+    const user = userEvent.setup();
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    useQueryMock.mockImplementation(() => {
+      throw new Error("summary failure");
+    });
+
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "今週のダッシュボード" })).toBeInTheDocument();
+    expect(screen.getByText("今週のサマリーを読み込めませんでした。")).toBeInTheDocument();
+    const retryButton = screen.getByRole("button", { name: "再試行" });
+
+    useQueryMock.mockReset();
+    useQueryMock.mockReturnValue({
+      byCategory: [],
+      count: 0,
+      prevWeekTotalAmountYen: null,
+      totalAmountYen: 0,
+    });
+    await user.click(retryButton);
+
+    expect(screen.queryByText("今週のサマリーを読み込めませんでした。")).not.toBeInTheDocument();
+    consoleErrorSpy.mockRestore();
   });
 
   it("サマリー読み込み中でもセッションの画面枠を表示する", () => {

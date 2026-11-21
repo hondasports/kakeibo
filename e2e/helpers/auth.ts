@@ -97,9 +97,10 @@ async function ensureE2eGroup(page: Page) {
   await page.goto("/");
 
   const setupHeading = page.getByRole("heading", { name: "家族グループを作成" });
-  const dashboardHeading = page
-    .getByRole("heading", { level: 1, name: "今週のダッシュボード" })
-    .or(page.getByRole("heading", { level: 1, name: "今週", exact: true }));
+  const dashboardHeading = page.getByRole("heading", {
+    level: 1,
+    name: "今週のダッシュボード",
+  });
 
   const destination = await Promise.any([
     dashboardHeading.waitFor({ state: "visible", timeout: 30_000 }).then(() => "dashboard"),

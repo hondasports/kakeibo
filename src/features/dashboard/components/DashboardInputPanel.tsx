@@ -109,17 +109,22 @@ export function DashboardInputPanel({
                 >
                   {primaryLabel}
                 </Button>
-                {!isCompleted && (
-                  <Button
-                    component={Link}
-                    size="large"
-                    startIcon={<EditOutlinedIcon />}
-                    sx={{ minHeight: 44 }}
-                    to="/weeks/current/input"
-                    variant="outlined"
-                  >
-                    新しく入力する
-                  </Button>
+                {!isCompleted && count > 0 && (
+                  <>
+                    <Button
+                      component={Link}
+                      size="large"
+                      startIcon={<EditOutlinedIcon />}
+                      sx={{ minHeight: 44 }}
+                      to="/weeks/current/input"
+                      variant="outlined"
+                    >
+                      新しく入力する
+                    </Button>
+                    <Typography color="text.secondary" variant="caption">
+                      これまでの記録を残したまま、今週にさらに記録を追加します
+                    </Typography>
+                  </>
                 )}
               </>
             )}
