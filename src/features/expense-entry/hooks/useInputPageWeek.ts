@@ -10,6 +10,9 @@ export type InputPageWeekSession = {
   reviewMemo?: string;
 };
 
+export const WEEK_SESSION_LOAD_ERROR_MESSAGE =
+  "週次セッションの読み込みに失敗しました。もう一度お試しください。";
+
 /**
  * 入力ページで任意週のセッションを取得または作成するカスタムフック。
  * 前週・次週ナビゲーションもサポートする。
@@ -30,6 +33,7 @@ export function useInputPageWeek() {
   const [weekSession, setWeekSession] = useState<InputPageWeekSession | null>(null);
   const [sessionError, setSessionError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionRetryCount, setSessionRetryCount] = useState(0);
 
   if (userProfile !== undefined && !settingsApplied) {
     setSettingsApplied(true);
@@ -58,13 +62,13 @@ export function useInputPageWeek() {
       .catch((err: unknown) => {
         if (cancelled) return;
         console.error("週次セッション初期化失敗:", err);
-        setSessionError("週次セッションの初期化に失敗しました。ページをリロードしてください。");
+        setSessionError(WEEK_SESSION_LOAD_ERROR_MESSAGE);
         setIsLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [getOrCreateSession, settingsApplied, userProfile, weekStartDate]);
+  }, [getOrCreateSession, settingsApplied, userProfile, weekStartDate, sessionRetryCount]);
 
   const goToPreviousWeek = () => {
     setWeekStartDate((prev) => addWeeks(prev, -1));
@@ -79,6 +83,14 @@ export function useInputPageWeek() {
 
   const isCurrentWeek = weekStartDate === currentWeekStartDate;
 
+  const retrySession = () => {
+    if (isLoading) return;
+    setWeekSession(null);
+    setSessionError("");
+    setIsLoading(true);
+    setSessionRetryCount((count) => count + 1);
+  };
+
   return {
     weekStartDate,
     weekEndDate,
@@ -89,5 +101,6 @@ export function useInputPageWeek() {
     isCurrentWeek,
     goToPreviousWeek,
     goToNextWeek,
+    retrySession,
   };
 }

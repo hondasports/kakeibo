@@ -1,10 +1,10 @@
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
-import { Alert, Box, Stack } from "@mui/material";
+import { Alert, Box, Button, Stack } from "@mui/material";
 import { ExpenseEntryForm } from "../components/ExpenseEntryForm";
 import { WeekNavigator } from "../../week";
 import { WeekStatusPanel } from "../../week";
-import { useInputPageWeek } from "../hooks/useInputPageWeek";
+import { useInputPageWeek, WEEK_SESSION_LOAD_ERROR_MESSAGE } from "../hooks/useInputPageWeek";
 import { SuzumemoLoadingState } from "../../ui";
 
 export function InputPage() {
@@ -17,6 +17,7 @@ export function InputPage() {
     isCurrentWeek,
     goToPreviousWeek,
     goToNextWeek,
+    retrySession,
   } = useInputPageWeek();
 
   const categories = useQuery(api.categories.queries.listActive) ?? [];
@@ -37,8 +38,16 @@ export function InputPage() {
   if (sessionError || (!isLoading && !weekSession)) {
     return (
       <Box className="app-main">
-        <Alert severity="error" variant="outlined">
-          {sessionError || "週次セッションの読み込みに失敗しました。"}
+        <Alert
+          action={
+            <Button color="inherit" onClick={retrySession} size="small">
+              再試行
+            </Button>
+          }
+          severity="error"
+          variant="outlined"
+        >
+          {sessionError || WEEK_SESSION_LOAD_ERROR_MESSAGE}
         </Alert>
       </Box>
     );
