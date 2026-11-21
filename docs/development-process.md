@@ -420,7 +420,7 @@ Hotfixも原則Pull Requestを経由する。
 - required Verification / CIを維持
 - production / irreversible操作はユーザー承認必須
 - 障害内容を記録し、繰り返される種類の問題はスキル・AGENTS.mdへ書き戻す
-- 必要なfollow-upをIssue化
+- 見つけたfollow-upの対応と起票は `skills/delivery-loop` の「報告」に従う
 
 緊急性を通常のreview/CI回避手段にしない。
 
@@ -436,4 +436,4 @@ Hotfixも原則Pull Requestを経由する。
 - **Delivery**: 検証済みの変更を許可されたbranch / PRへ公開する工程。
 - **Checker chain**: 必須条件（セルフレビュー必須項目、policy・ユーザー指定のCIと承認）と補助観点（利用可能なボット指摘）に分けた確認系列。自己評価は独立レビューの代替にならない。
 - **収束（convergence）**: open findingが0件（全件に根拠あり）になった状態。受入条件を満たせない指摘の先送りは収束に数えない。
-- **再開情報**: 区切り・待機時に Issue / PR へ残す再開用の最小情報（目的と完了地点・branch/HEAD・未コミット作業・未解決findingと根拠・検証証跡・次の1手・外部待ち解除条件）。
+- **再開情報**: 区切り・待機時に作業報告へ書く（依頼で許されていれば Issue / PR にも残す）再開用の最小情報（目的と完了地点・branch/HEAD・未コミット作業・未解決findingと根拠・検証証跡・次の1手・外部待ち解除条件）。

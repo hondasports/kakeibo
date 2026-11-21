@@ -57,7 +57,7 @@ preflightの後、**最初の編集の前**に読む。コミット前にもう�
 ## 実行する検証の選び方
 
 - 変更後は、型・lint・直接影響するunitを必ず流し直す。コマンドの成否は**終了コード**で確認し、出力の一部だけで判断しない。
-- browser層の受入条件は `skills/test-design` に従い確認方法を選ぶ。E2Eが必要な場合は `pnpm run e2e:isolated -- <spec>` で対象specを任意実行する。pathだけを理由にローカル全E2Eを要求しない（`docs/development-process.md` の Functional E2E）。
+- browser層の受入条件は `skills/test-design` に従い確認方法を選ぶ。ローカルで証明が要る場面は `docs/development-process.md` の「Verification」に従う（マージ判定はCI）。ローカルで対象specを確かめるときは `pnpm run e2e:isolated -- <spec>` を使う。pathだけを理由にローカル全E2Eを要求しない。
 - repo全体の回帰はCIを正本とし、同じ全件をローカルで理由なく重複しない（`docs/development-process.md` の Verification）。
 - UI文言や表示の変更は、その文言を前提にしている既存のunit・E2Eを検索し、期待を更新する。
 
