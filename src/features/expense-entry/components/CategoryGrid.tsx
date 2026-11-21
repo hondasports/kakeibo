@@ -1,4 +1,7 @@
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, useMediaQuery } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { useRef, type KeyboardEvent } from "react";
+import { getListboxTargetIndex } from "../../../utils/listboxNavigation";
 import type { ExpenseEntryCategory } from "../types/types";
 
 export function CategoryGrid({
@@ -14,9 +17,43 @@ export function CategoryGrid({
   onSelect: (categoryId: string) => void;
   compact?: boolean;
 }) {
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+  // .category-grid の列数（App.css: md未満は2列、md以上は5列）
+  const columnCount = isDesktop ? 5 : 2;
+  const gridRef = useRef<HTMLDivElement>(null);
+  const selectedIndex = categories.findIndex((category) => category._id === selectedCategoryId);
+  const tabbableIndex = selectedIndex >= 0 ? selectedIndex : 0;
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>, index: number) => {
+    const category = categories[index];
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect(category._id);
+      return;
+    }
+    const targetIndex = getListboxTargetIndex({
+      columnCount,
+      currentIndex: index,
+      itemCount: categories.length,
+      key: event.key,
+    });
+    if (targetIndex === null) {
+      return;
+    }
+    event.preventDefault();
+    if (targetIndex !== index) {
+      onSelect(categories[targetIndex]._id);
+    }
+    const target = gridRef.current?.children[targetIndex];
+    if (target instanceof HTMLElement) {
+      target.focus();
+    }
+  };
+
   return (
-    <Box className="category-grid" aria-label={ariaLabel} role="listbox">
-      {categories.map((category) => {
+    <Box ref={gridRef} className="category-grid" aria-label={ariaLabel} role="listbox">
+      {categories.map((category, index) => {
         const isSelected = selectedCategoryId === category._id;
         return (
           <Box
@@ -25,14 +62,9 @@ export function CategoryGrid({
             aria-selected={isSelected}
             className="category-button"
             role="option"
-            tabIndex={0}
+            tabIndex={index === tabbableIndex ? 0 : -1}
             onClick={() => onSelect(category._id)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onSelect(category._id);
-              }
-            }}
+            onKeyDown={(event) => handleKeyDown(event, index)}
             sx={{
               border: "1px solid",
               borderColor: isSelected ? "primary.main" : "divider",
