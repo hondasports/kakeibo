@@ -21,7 +21,7 @@ export function ExitMultiModeDialog({
       <DialogTitle>内訳をやめますか？</DialogTitle>
       <DialogContent>
         <Typography variant="body2">
-          単一項目の入力に戻ります。店舗名・日付・メモは引き継がれ、金額には入力済みの明細の合計が入ります。
+          単一項目の入力に戻ります。店舗名・日付・メモは引き継がれ、金額には明細の合計が入ります（明細の金額が未入力なら、今の金額のままです）。
         </Typography>
         <Typography variant="body2" sx={{ mt: 1 }}>
           入力済みの明細の内訳（カテゴリ・内容・金額）は破棄されます。

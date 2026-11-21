@@ -278,6 +278,11 @@ describe("ExpenseEntryForm（multi）", () => {
 
       const dialog = await screen.findByRole("dialog");
       expect(within(dialog).getByText("内訳をやめますか？")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          "単一項目の入力に戻ります。店舗名・日付・メモは引き継がれ、金額には明細の合計が入ります（明細の金額が未入力なら、今の金額のままです）。",
+        ),
+      ).toBeInTheDocument();
 
       // キャンセルすると複数項目モードに留まる
       await user.click(within(dialog).getByRole("button", { name: "キャンセル" }));
@@ -291,6 +296,36 @@ describe("ExpenseEntryForm（multi）", () => {
       const confirmDialog = await screen.findByRole("dialog");
       await user.click(within(confirmDialog).getByRole("button", { name: "内訳をやめる" }));
 
+      await waitFor(() => {
+        expect(screen.queryByTestId("expense-item-0")).not.toBeInTheDocument();
+        expect(screen.getByLabelText("合計金額")).toHaveValue("5,000");
+      });
+    });
+
+    it("明細の金額が未入力のまま戻るときは、切り替え前の金額を保持する", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "5000");
+      await user.click(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" }));
+
+      // 金額は入力せず、内容だけ入れた明細を2件にする（確認ダイアログが出る条件）
+      await user.click(screen.getByRole("button", { name: "項目を追加" }));
+      const item1 = screen.getByTestId("expense-item-1");
+      await user.type(within(item1).getByLabelText("内容"), "日用品");
+
+      await user.click(screen.getByRole("button", { name: "内訳をやめる" }));
+      const dialog = await screen.findByRole("dialog");
+      await user.click(within(dialog).getByRole("button", { name: "内訳をやめる" }));
+
+      // 明細合計が0円なので、切り替え前の合計金額が保持される
       await waitFor(() => {
         expect(screen.queryByTestId("expense-item-0")).not.toBeInTheDocument();
         expect(screen.getByLabelText("合計金額")).toHaveValue("5,000");
