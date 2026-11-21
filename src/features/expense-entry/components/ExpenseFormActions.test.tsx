@@ -1,4 +1,8 @@
-import { collectDocumentCssText } from "../../../test/cssText";
+import {
+  collectDocumentCssText,
+  findEmotionClassName,
+  mediaMinWidthRule,
+} from "../../../test/cssText";
 import { renderWithProviders } from "../../../test/render";
 import { describe, expect, it } from "vitest";
 import { ExpenseFormActions } from "./ExpenseFormActions";
@@ -20,16 +24,12 @@ describe("ExpenseFormActions", () => {
     const stack = container.firstElementChild;
     expect(stack).not.toBeNull();
 
-    const css = collectDocumentCssText();
-    const className = Array.from(stack!.classList)
-      .filter((name) => name.startsWith("css-"))
-      .find((name) => new RegExp(`\\.${name}\\s*\\{[^}]*position:[^;}]*sticky`).test(css));
+    const className = findEmotionClassName(stack!, "position:[^;}]*sticky");
     expect(className).toBeTruthy();
 
+    const css = collectDocumentCssText();
     const mediaRule = (query: string, declarations: string) =>
-      new RegExp(
-        `@media \\(min-width:\\s*${query}\\)\\s*\\{[^@]*\\.${className}\\s*\\{[^}]*${declarations}`,
-      );
+      mediaMinWidthRule(className!, query, declarations);
 
     expect(css).toMatch(mediaRule("0px", "bottom:\\s*calc\\("));
     expect(css).toMatch(mediaRule("0px", "position:[^;}]*sticky"));

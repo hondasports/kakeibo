@@ -4,6 +4,9 @@ import { useRef, type KeyboardEvent } from "react";
 import { getListboxTargetIndex } from "../../../utils/listboxNavigation";
 import type { ExpenseEntryCategory } from "../types/types";
 
+// 列数の正本。sx の gridTemplateColumns とキーボード移動の両方が参照するため App.css には書かない
+const CATEGORY_GRID_COLUMNS = { xs: 2, md: 5 } as const;
+
 export function CategoryGrid({
   ariaLabel,
   categories,
@@ -19,8 +22,7 @@ export function CategoryGrid({
 }) {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
-  // .category-grid の列数（App.css: md未満は2列、md以上は5列）
-  const columnCount = isDesktop ? 5 : 2;
+  const columnCount = isDesktop ? CATEGORY_GRID_COLUMNS.md : CATEGORY_GRID_COLUMNS.xs;
   const gridRef = useRef<HTMLDivElement>(null);
   const selectedIndex = categories.findIndex((category) => category._id === selectedCategoryId);
   const tabbableIndex = selectedIndex >= 0 ? selectedIndex : 0;
@@ -52,7 +54,18 @@ export function CategoryGrid({
   };
 
   return (
-    <Box ref={gridRef} className="category-grid" aria-label={ariaLabel} role="listbox">
+    <Box
+      ref={gridRef}
+      className="category-grid"
+      aria-label={ariaLabel}
+      role="listbox"
+      sx={{
+        gridTemplateColumns: {
+          xs: `repeat(${CATEGORY_GRID_COLUMNS.xs}, minmax(0, 1fr))`,
+          md: `repeat(${CATEGORY_GRID_COLUMNS.md}, minmax(0, 1fr))`,
+        },
+      }}
+    >
       {categories.map((category, index) => {
         const isSelected = selectedCategoryId === category._id;
         return (

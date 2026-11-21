@@ -15,3 +15,32 @@ export function collectDocumentCssText(): string {
   });
   return parts.join("\n");
 }
+
+/**
+ * 要素に付いた emotion のクラス（`css-` 接頭辞）のうち、
+ * `declarationPattern`（正規表現の一部）を含む規則を持つものを返す。
+ * メディアクエリ内の規則も対象にする。
+ */
+export function findEmotionClassName(
+  element: Element,
+  declarationPattern: string,
+): string | undefined {
+  const css = collectDocumentCssText();
+  return Array.from(element.classList)
+    .filter((name) => name.startsWith("css-"))
+    .find((name) => new RegExp(`\\.${name}\\s*\\{[^}]*${declarationPattern}`).test(css));
+}
+
+/**
+ * `@media (min-width:<minWidth>)` の中で `.className` に `declarations`
+ * （正規表現の一部）がある規則にマッチする正規表現を返す。
+ */
+export function mediaMinWidthRule(
+  className: string,
+  minWidth: string,
+  declarations: string,
+): RegExp {
+  return new RegExp(
+    `@media \\(min-width:\\s*${minWidth}\\)\\s*\\{[^@]*\\.${className}\\s*\\{[^}]*${declarations}`,
+  );
+}

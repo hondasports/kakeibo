@@ -2,6 +2,11 @@ import { useState } from "react";
 import { screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  collectDocumentCssText,
+  findEmotionClassName,
+  mediaMinWidthRule,
+} from "../../../test/cssText";
 import { renderWithProviders } from "../../../test/render";
 import { DEFAULT_TEST_VIEWPORT_WIDTH, stubViewportWidth } from "../../../test/viewport";
 import { WeekDaySelector } from "./WeekDaySelector";
@@ -130,5 +135,20 @@ describe("WeekDaySelector", () => {
     options[2].focus();
     await user.keyboard("{Enter}");
     expect(options[2]).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("グリッド列数はsxのgridTemplateColumnsで900px境界に切り替わる", () => {
+    const listbox = renderSelector();
+
+    const className = findEmotionClassName(listbox, "grid-template-columns");
+    expect(className).toBeTruthy();
+
+    const css = collectDocumentCssText();
+    expect(css).toMatch(
+      mediaMinWidthRule(className!, "0px", "grid-template-columns:[^;}]*repeat\\(4\\s*,"),
+    );
+    expect(css).toMatch(
+      mediaMinWidthRule(className!, "900px", "grid-template-columns:[^;}]*repeat\\(7\\s*,"),
+    );
   });
 });

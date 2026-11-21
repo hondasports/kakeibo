@@ -2,7 +2,11 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { collectDocumentCssText } from "../../../test/cssText";
+import {
+  collectDocumentCssText,
+  findEmotionClassName,
+  mediaMinWidthRule,
+} from "../../../test/cssText";
 import { renderWithProviders } from "../../../test/render";
 import type { ExpenseEntryCategory, ExpenseEntryItem } from "../types/types";
 import { ExpenseItemRow } from "./ExpenseItemRow";
@@ -85,15 +89,11 @@ describe("ExpenseItemRow", () => {
     const button = screen.getByRole("button", { name: "項目1を削除" });
 
     const css = collectDocumentCssText();
-    const className = Array.from(button.classList)
-      .filter((name) => name.startsWith("css-"))
-      .find((name) => new RegExp(`\\.${name}\\s*\\{[^}]*min-`).test(css));
+    const className = findEmotionClassName(button, "min-");
     expect(className).toBeTruthy();
 
     const mediaRule = (query: string, declarations: string) =>
-      new RegExp(
-        `@media \\(min-width:\\s*${query}\\)\\s*\\{[^@]*\\.${className}\\s*\\{[^}]*${declarations}`,
-      );
+      mediaMinWidthRule(className!, query, declarations);
 
     expect(css).toMatch(mediaRule("0px", "min-width:\\s*44px"));
     expect(css).toMatch(mediaRule("0px", "min-height:\\s*44px"));
