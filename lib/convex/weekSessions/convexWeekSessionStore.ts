@@ -11,7 +11,7 @@ import type {
   WeekSessionStore,
 } from "../../domain/weekSessions/store";
 
-export function docToWeekSessionRecord(doc: Doc<"weekSessions">): WeekSessionRecord {
+function docToWeekSessionRecord(doc: Doc<"weekSessions">): WeekSessionRecord {
   return {
     id: doc._id,
     creationTime: doc._creationTime,

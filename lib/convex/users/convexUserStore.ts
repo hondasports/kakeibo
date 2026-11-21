@@ -6,7 +6,7 @@ import type { MutationCtx, QueryCtx } from "../../../convex/_generated/server";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { NewUserFields, UserPatch, UserRecord, UserStore } from "../../domain/users/store";
 
-export function docToUserRecord(doc: Doc<"users">): UserRecord {
+function docToUserRecord(doc: Doc<"users">): UserRecord {
   return {
     id: doc._id,
     creationTime: doc._creationTime,

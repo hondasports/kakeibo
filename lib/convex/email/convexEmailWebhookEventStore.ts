@@ -39,7 +39,7 @@ export function toEmailWebhookEventRecord(doc: Doc<"emailWebhookEvents">): Email
   };
 }
 
-export function createEmailWebhookEventReader(ctx: Pick<QueryCtx, "db">): EmailWebhookEventReader {
+function createEmailWebhookEventReader(ctx: Pick<QueryCtx, "db">): EmailWebhookEventReader {
   return {
     async findEventBySvixId(svixId) {
       const doc = await ctx.db

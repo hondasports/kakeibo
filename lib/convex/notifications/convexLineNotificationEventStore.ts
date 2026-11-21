@@ -3,7 +3,7 @@ import type { MutationCtx, QueryCtx } from "../../../convex/_generated/server";
 import type { LineNotificationEventRecord } from "../../domain/notifications/records";
 import type { LineNotificationEventStore } from "../../domain/notifications/store";
 
-export function docToLineNotificationEventRecord(
+function docToLineNotificationEventRecord(
   doc: Doc<"lineNotificationEvents">,
 ): LineNotificationEventRecord {
   return {
@@ -19,7 +19,7 @@ export function docToLineNotificationEventRecord(
   };
 }
 
-export function createLineNotificationEventReader(
+function createLineNotificationEventReader(
   ctx: Pick<QueryCtx, "db">,
 ): Pick<LineNotificationEventStore, "findByDedupeKey" | "listCreatedBefore"> {
   return {

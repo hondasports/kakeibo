@@ -8,10 +8,7 @@ import {
 import { SYSTEM_ADMIN_MEMBERSHIP_OPERATIONS } from "../../domain/systemAdmin/membershipOperation";
 import { SYSTEM_ADMIN_NOTIFICATION_ACTIONS } from "../../domain/systemAdmin/notificationStore";
 import { GROUP_SEARCH_TYPES, USER_SEARCH_TYPES } from "../../domain/systemAdmin/searchQuery";
-import {
-  SYSTEM_ADMIN_CONTEXT_STATUSES,
-  SYSTEM_ADMIN_STATUSES,
-} from "../../domain/systemAdmin/systemAdminStore";
+import { SYSTEM_ADMIN_STATUSES } from "../../domain/systemAdmin/systemAdminStore";
 import { SYSTEM_ADMIN_ROLE_OPERATIONS } from "../../domain/systemAdmin/roleOperation";
 import { GROUP_MEMBERSHIP_STATUSES } from "../../domain/groups/role";
 
@@ -57,8 +54,4 @@ export const groupQueryTypeValidator = v.union(
 
 export const systemAdminRoleOperationValidator = v.union(
   ...SYSTEM_ADMIN_ROLE_OPERATIONS.map((operation) => v.literal(operation)),
-);
-
-export const systemAdminContextStatusValidator = v.union(
-  ...SYSTEM_ADMIN_CONTEXT_STATUSES.map((status) => v.literal(status)),
 );
