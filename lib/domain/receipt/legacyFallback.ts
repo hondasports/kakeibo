@@ -14,7 +14,7 @@ export type FallbackExpenseEntry = { entryType: EntryKind };
 /** 判定に必要な receipts の最小形状。type 未設定は支出扱い。 */
 export type FallbackReceipt = { type?: EntryKind };
 
-export function isEntryOfKind(entry: FallbackExpenseEntry, kind: EntryKind): boolean {
+function isEntryOfKind(entry: FallbackExpenseEntry, kind: EntryKind): boolean {
   return kind === "income" ? entry.entryType === "income" : entry.entryType !== "income";
 }
 

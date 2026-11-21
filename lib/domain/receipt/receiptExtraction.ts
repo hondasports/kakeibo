@@ -4,7 +4,7 @@ import { isPlausibleReceiptYear } from "./receiptDate";
 
 export type ReceiptShopNameError = "empty" | "too_long";
 
-export const RECEIPT_SHOP_NAME_MAX_LENGTH = 100;
+const RECEIPT_SHOP_NAME_MAX_LENGTH = 100;
 
 /** レシートの店舗名・支払先を検証・正規化する。空文字 / 超過を拒否し、trim して返す。 */
 export function validateReceiptShopName(

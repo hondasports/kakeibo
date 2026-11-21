@@ -14,7 +14,7 @@ export const RECEIPT_ITEM_LINE_TYPES = [
 
 export type ReceiptItemLineType = (typeof RECEIPT_ITEM_LINE_TYPES)[number];
 
-export function isAdjustmentLineType(lineType: ReceiptItemLineType | undefined): boolean {
+function isAdjustmentLineType(lineType: ReceiptItemLineType | undefined): boolean {
   return lineType === "discount" || lineType === "promotion_adjustment";
 }
 

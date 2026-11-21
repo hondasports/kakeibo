@@ -5,7 +5,7 @@ export type ReceiptItemTaxConfirmedField = (typeof RECEIPT_ITEM_TAX_CONFIRMED_FI
 import type { ReceiptItemLineType } from "../discountItems";
 export const TAX_RATE_PERCENTS = [0, 8, 10] as const;
 
-export const RECEIPT_TOTAL_SOURCES = ["explicit_label", "user_confirmed", "ai_estimate"] as const;
+const RECEIPT_TOTAL_SOURCES = ["explicit_label", "user_confirmed", "ai_estimate"] as const;
 
 export type ReceiptTotalSource = (typeof RECEIPT_TOTAL_SOURCES)[number];
 
@@ -71,7 +71,7 @@ export type ReceiptTaxAmountDecisionSource = (typeof RECEIPT_TAX_AMOUNT_DECISION
 export const TAX_SUMMARY_DECISION_STATUSES = ["verified", "ambiguous", "contradictory"] as const;
 
 export type TaxSummaryDecisionStatus = (typeof TAX_SUMMARY_DECISION_STATUSES)[number];
-export const LEGACY_TAX_SUMMARY_CONSISTENCY_STATUSES = [
+const LEGACY_TAX_SUMMARY_CONSISTENCY_STATUSES = [
   "coherent",
   "reconcilable",
   "conflicting",

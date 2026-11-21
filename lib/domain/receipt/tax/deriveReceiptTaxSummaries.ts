@@ -10,8 +10,8 @@ import {
   isTaxRateDeclarationLine,
 } from "./summaryEvidence";
 
-export const TAX_EVIDENCE_CONFLICT = "contradictory_receipt_tax_evidence";
-export const TAX_EVIDENCE_MISSING = "unresolved_receipt_tax_evidence";
+const TAX_EVIDENCE_CONFLICT = "contradictory_receipt_tax_evidence";
+const TAX_EVIDENCE_MISSING = "unresolved_receipt_tax_evidence";
 
 function isAggregateTaxLine(rawText: string): boolean {
   const text = rawText.normalize("NFKC").replace(/\s+/g, "");
