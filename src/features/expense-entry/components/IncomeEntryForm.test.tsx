@@ -1,5 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  collectDocumentCssText,
+  findEmotionClassName,
+  mediaMinWidthRule,
+} from "../../../test/cssText";
 import { useIncomeEntry } from "../hooks/useIncomeEntry";
 import { IncomeEntryForm } from "./IncomeEntryForm";
 
@@ -62,5 +67,25 @@ describe("IncomeEntryForm", () => {
     expect(screen.getByLabelText(field)).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText(message)).toBeInTheDocument();
     expect(createIncomeEntry).not.toHaveBeenCalled();
+  });
+
+  it("「保存して次へ」は900px未満で画面下部に固定し、900px以上では固定しない", () => {
+    render(<Form />);
+    const button = screen.getByRole("button", { name: "保存して次へ" });
+    const bar = button.parentElement;
+    expect(bar).not.toBeNull();
+
+    const className = findEmotionClassName(bar!, "position:[^;}]*sticky");
+    expect(className).toBeTruthy();
+
+    const css = collectDocumentCssText();
+    const mediaRule = (query: string, declarations: string) =>
+      mediaMinWidthRule(className!, query, declarations);
+
+    expect(css).toMatch(mediaRule("0px", "bottom:\\s*calc\\("));
+    expect(css).toMatch(mediaRule("0px", "position:[^;}]*sticky"));
+    expect(css).toMatch(mediaRule("900px", "position:\\s*static"));
+    expect(css).toMatch(mediaRule("900px", "bottom:\\s*auto"));
+    expect(css).not.toMatch(mediaRule("600px", "position:"));
   });
 });
