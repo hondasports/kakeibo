@@ -21,7 +21,7 @@ import type {
 } from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import type { AmountBasis } from "../../../../lib/domain/receipt/tax/types";
-import { ReviewDialogActions } from "./ReviewDialogActions";
+import { getReviewSubmitLabel, ReviewDialogActions } from "./ReviewDialogActions";
 import { ReviewDialogBasicsSection } from "./ReviewDialogBasicsSection";
 import { ReviewDialogItemsSection } from "./ReviewDialogItemsSection";
 import { ReviewDialogReferenceSection } from "./ReviewDialogReferenceSection";
@@ -164,6 +164,12 @@ export function ReviewDialog(props: ReviewDialogProps) {
   const recommendationCount = recommendations.length + checkUncomparableCount;
   const busy = props.reviewSubmitting || props.taxUpdatingItemId != null;
   const unavailable = isReviewDraftLoading || isReviewDraftNotFound || categories.length === 0;
+  const submitLabel = getReviewSubmitLabel({
+    requiredCount: required.length,
+    totalOnly,
+    checkMismatchCount,
+    recommendationCount,
+  });
   const products = items.filter((item) => !isDiscountLine(item.itemName, item.lineType));
   const categoryNames = new Map(categories.map((category) => [category._id, category.name]));
 
@@ -348,7 +354,12 @@ export function ReviewDialog(props: ReviewDialogProps) {
                     ? "変更を保存しています…"
                     : reviewError
                       ? "変更を保存できませんでした。内容を確認して再試行してください。"
-                      : "変更は下書きに保存されます。登録は一覧の「登録する」から行います。"}
+                      : required.length > 0
+                        ? "修正が必要な項目を直すと下書きに保存できます。登録は一覧の「登録する」から行います。"
+                        : `入力した内容は「${submitLabel}」で下書きに保存されます。登録は一覧の「登録する」から行います。`}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  閉じると未保存の入力は失われます。
                 </Typography>
                 <ReviewDialogBasicsSection
                   form={form}

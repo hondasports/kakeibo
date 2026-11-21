@@ -570,14 +570,25 @@ describe("読込中・不存在の表示", () => {
 });
 
 describe("保存仕様の説明", () => {
-  it("冒頭は短い案内に留め、実際のボタン文言と一致する呼称だけを使う", () => {
+  it("冒頭は実際の保存タイミングと保存ボタンの文言に一致する", () => {
     render(<ReviewDialog {...props} />);
     const status = screen.getByLabelText("保存状態");
-    expect(status).toHaveTextContent(
-      "変更は下書きに保存されます。登録は一覧の「登録する」から行います。",
-    );
+    const saveButton = screen.getByRole("button", { name: "下書きを保存" });
+    expect(status).toHaveTextContent(`「${saveButton.textContent}」で下書きに保存されます`);
+    expect(status).toHaveTextContent("登録は一覧の「登録する」から行います");
+    expect(status).not.toHaveTextContent("変更は下書きに保存されます");
     expect(status).not.toHaveTextContent("変更ごとに下書きへ保存されます");
     expect(status).not.toHaveTextContent("この内容で保存」で保存します");
+    expect(screen.getByText("閉じると未保存の入力は失われます。")).toBeInTheDocument();
+  });
+
+  it("修正必須があるときは保存ではなく修正導線であることが分かる文言にする", () => {
+    render(<ReviewDialog {...props} reviewForm={{ ...props.reviewForm, shopName: "" }} />);
+    const status = screen.getByLabelText("保存状態");
+    expect(screen.getByRole("button", { name: "修正が必要な項目へ" })).toBeInTheDocument();
+    expect(status).toHaveTextContent("修正が必要な項目を直すと下書きに保存できます");
+    expect(status).toHaveTextContent("登録は一覧の「登録する」から行います");
+    expect(status).not.toHaveTextContent("で下書きに保存されます");
   });
 });
 
