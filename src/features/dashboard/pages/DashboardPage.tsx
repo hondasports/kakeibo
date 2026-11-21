@@ -1,7 +1,8 @@
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
-import { Alert, Box, Stack, Typography, useMediaQuery } from "@mui/material";
+import { Alert, Box, Button, Stack, Typography, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { WEEK_SESSION_LOAD_ERROR_MESSAGE } from "../../week";
 import { CategoryBreakdownCard } from "../../summary-shared/components/CategoryBreakdownCard";
 import { SuzumemoLoadingState } from "../../ui";
 import { DashboardInputPanel } from "../components/DashboardInputPanel";
@@ -16,7 +17,7 @@ import { getCurrentMonth } from "../../../../lib/domain/common/month";
 import { getCurrentYear } from "../../../../lib/domain/common/year";
 
 export function DashboardPage() {
-  const { weekSession, sessionError } = useWeekSession();
+  const { weekSession, sessionError, retrySession } = useWeekSession();
   const theme = useTheme();
   const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const currentMonth = getCurrentMonth();
@@ -40,8 +41,16 @@ export function DashboardPage() {
   if (sessionError || !weekSession) {
     return (
       <Box className="app-main">
-        <Alert severity="error" variant="outlined">
-          {sessionError || "週次セッションの読み込みに失敗しました。"}
+        <Alert
+          action={
+            <Button color="inherit" onClick={retrySession} size="small">
+              再試行
+            </Button>
+          }
+          severity="error"
+          variant="outlined"
+        >
+          {sessionError || WEEK_SESSION_LOAD_ERROR_MESSAGE}
         </Alert>
       </Box>
     );

@@ -1,10 +1,12 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_TEST_VIEWPORT_WIDTH, stubViewportWidth } from "../../../test/viewport";
 import { DashboardPage } from "./DashboardPage";
 
 const useQueryMock = vi.fn();
+const retrySessionMock = vi.fn();
 
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
@@ -34,6 +36,8 @@ describe("DashboardPage", () => {
     stubViewportWidth(DEFAULT_TEST_VIEWPORT_WIDTH);
     useQueryMock.mockReset();
     useWeekSessionMock.mockReturnValue({
+      isLoading: false,
+      retrySession: retrySessionMock,
       sessionError: "",
       setWeekSession: vi.fn(),
       weekSession: {
@@ -51,6 +55,8 @@ describe("DashboardPage", () => {
 
   it("セッション読み込み中はローディングを表示する", () => {
     useWeekSessionMock.mockReturnValue({
+      isLoading: true,
+      retrySession: retrySessionMock,
       sessionError: "",
       setWeekSession: vi.fn(),
       weekSession: null,
@@ -65,9 +71,12 @@ describe("DashboardPage", () => {
     expect(screen.getByTestId("loading")).toBeInTheDocument();
   });
 
-  it("セッションエラー時はエラーを表示する", () => {
+  it("セッションエラー時はエラーと再試行ボタンを表示し、再試行を実行できる", async () => {
+    const user = userEvent.setup();
     useWeekSessionMock.mockReturnValue({
-      sessionError: "週次セッションの初期化に失敗しました。",
+      isLoading: false,
+      retrySession: retrySessionMock,
+      sessionError: "週次セッションの読み込みに失敗しました。もう一度お試しください。",
       setWeekSession: vi.fn(),
       weekSession: null,
     });
@@ -78,7 +87,13 @@ describe("DashboardPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("週次セッションの初期化に失敗しました。")).toBeInTheDocument();
+    expect(
+      screen.getByText("週次セッションの読み込みに失敗しました。もう一度お試しください。"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "再試行" }));
+
+    expect(retrySessionMock).toHaveBeenCalledOnce();
   });
 
   it("サマリー取得後に主要セクションを表示する", () => {
