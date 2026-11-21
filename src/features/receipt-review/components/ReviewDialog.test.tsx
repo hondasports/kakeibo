@@ -551,6 +551,36 @@ describe("下書きの修正導線", () => {
   });
 });
 
+describe("読込中・不存在の表示", () => {
+  it("読込中はフォーム形のSkeletonを表示し、フォームは出さない", () => {
+    render(<ReviewDialog {...props} isReviewDraftLoading />);
+    expect(screen.getByLabelText("下書きを読み込んでいます")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "店名・内容" })).not.toBeInTheDocument();
+  });
+
+  it("不存在のときはAlertから閉じられる", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<ReviewDialog {...props} isReviewDraftNotFound onClose={onClose} />);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("下書きが見つかりません");
+    await user.click(within(alert).getByRole("button", { name: "閉じる" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("保存仕様の説明", () => {
+  it("冒頭は短い案内に留め、実際のボタン文言と一致する呼称だけを使う", () => {
+    render(<ReviewDialog {...props} />);
+    const status = screen.getByLabelText("保存状態");
+    expect(status).toHaveTextContent(
+      "変更は下書きに保存されます。登録は一覧の「登録する」から行います。",
+    );
+    expect(status).not.toHaveTextContent("変更ごとに下書きへ保存されます");
+    expect(status).not.toHaveTextContent("この内容で保存」で保存します");
+  });
+});
+
 describe("Issue #892 現在の税内訳に揃えた表示", () => {
   it.each(Object.entries(legacyTaxSummaryVariants()))(
     "1782円の混在税（旧形式 %s）も確認0件で、原文を確認でき内部値の編集はない",

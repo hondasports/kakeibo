@@ -3,10 +3,12 @@ import CloseIcon from "@mui/icons-material/Close";
 import {
   Alert,
   Box,
+  Button,
   Dialog,
   DialogContent,
   DialogTitle,
   IconButton,
+  Skeleton,
   Stack,
   Typography,
   useMediaQuery,
@@ -238,10 +240,31 @@ export function ReviewDialog(props: ReviewDialogProps) {
       </DialogTitle>
       <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
         {isReviewDraftLoading ? (
-          <Typography>下書きを読み込んでいます。</Typography>
+          <Stack aria-label="下書きを読み込んでいます" role="status" spacing={2}>
+            <Skeleton height={20} width="70%" />
+            <Skeleton height={44} variant="rounded" />
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+              <Skeleton height={44} variant="rounded" />
+              <Skeleton height={44} variant="rounded" />
+              <Skeleton height={44} variant="rounded" />
+            </Stack>
+            <Skeleton height={44} variant="rounded" />
+            <Stack spacing={1}>
+              <Skeleton height={64} variant="rounded" />
+              <Skeleton height={64} variant="rounded" />
+              <Skeleton height={64} variant="rounded" />
+            </Stack>
+          </Stack>
         ) : isReviewDraftNotFound ? (
-          <Alert severity="error">
-            下書きが見つかりません。一覧を更新してもう一度確認してください。
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" onClick={props.onClose} size="small" type="button">
+                閉じる
+              </Button>
+            }
+          >
+            下書きが見つかりません。閉じて一覧を更新し、もう一度確認してください。
           </Alert>
         ) : (
           <>
@@ -325,7 +348,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                     ? "変更を保存しています…"
                     : reviewError
                       ? "変更を保存できませんでした。内容を確認して再試行してください。"
-                      : "商品の税率・税込／税抜は変更ごとに下書きへ保存されます。金額・名前・カテゴリは最後の「この内容で保存」で保存します。支出への登録は一覧から行います。"}
+                      : "変更は下書きに保存されます。登録は一覧の「登録する」から行います。"}
                 </Typography>
                 <ReviewDialogBasicsSection
                   form={form}

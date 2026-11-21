@@ -210,7 +210,7 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
     await user.click(screen.getByRole("button", { name: "確認する" }));
 
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText("下書きを読み込んでいます。")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("下書きを読み込んでいます")).toBeInTheDocument();
     expect(
       within(dialog).getByRole("button", {
         name: /この内容で保存|下書きを保存|修正が必要な項目へ/,
@@ -235,9 +235,11 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
     await user.click(screen.getByRole("button", { name: "確認する" }));
 
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).queryByText("下書きを読み込んでいます。")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("下書きを読み込んでいます")).not.toBeInTheDocument();
     expect(
-      within(dialog).getByText("下書きが見つかりません。一覧を更新してもう一度確認してください。"),
+      within(dialog).getByText(
+        "下書きが見つかりません。閉じて一覧を更新し、もう一度確認してください。",
+      ),
     ).toBeInTheDocument();
     expect(
       within(dialog).getByRole("button", {
@@ -281,7 +283,7 @@ describe("AiExpenseQueuePanel（レビュー送信・一括登録）", () => {
 
     await user.click(screen.getByRole("button", { name: "修正が必要な項目へ" }));
 
-    expect(within(dialog).getByText("書類種別を選択してください。")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("書類種別を選択してください。").length).toBeGreaterThan(0);
     expect(updateForReviewMock).not.toHaveBeenCalled();
   });
 

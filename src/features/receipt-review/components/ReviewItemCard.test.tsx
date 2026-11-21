@@ -273,6 +273,20 @@ it("表示済みの税率と価格区分も選び直して明示確認できる"
   expect(onAmountBasisChange).toHaveBeenCalledExactlyOnceWith("item-1", "tax_included");
 });
 
+it("税編集があるときは変更がその都度下書きへ保存される旨を税項目の近くに示す", () => {
+  renderCard({ inlineTaxEditing: true, enableItemTaxEditing: true });
+  expect(
+    screen.getByText("税率・税込／税抜の変更は、その都度下書きに保存されます"),
+  ).toBeInTheDocument();
+});
+
+it("税編集がないときは保存タイミングの補足を表示しない", () => {
+  renderCard({});
+  expect(
+    screen.queryByText("税率・税込／税抜の変更は、その都度下書きに保存されます"),
+  ).not.toBeInTheDocument();
+});
+
 it("負額の行種別確認で税価格区分を変更しない", async () => {
   const user = userEvent.setup();
   const onAmountBasisChange = vi.fn();
