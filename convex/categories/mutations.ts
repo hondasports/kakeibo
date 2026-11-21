@@ -14,6 +14,7 @@ import { CategoryDomainError } from "../../lib/domain/categories/rules";
 import {
   createCategory as createCategoryUsecase,
   deactivateCategory as deactivateCategoryUsecase,
+  moveCategory as moveCategoryUsecase,
   reactivateCategory as reactivateCategoryUsecase,
   seedDefaultCategories as seedDefaultCategoriesUsecase,
   updateCategory as updateCategoryUsecase,
@@ -103,6 +104,25 @@ export async function deactivateCategoryHandler(
   }
 }
 
+type MoveCategoryArgs = {
+  categoryId: Id<"categories">;
+  direction: "up" | "down";
+};
+
+/** moveCategory mutation の handler ロジック（テスト用に export） */
+export async function moveCategoryHandler(
+  ctx: MutationCtx,
+  args: MoveCategoryArgs,
+): Promise<Doc<"categories"> | null> {
+  const { groupId } = await requireGroupMembership(ctx);
+  try {
+    const record = await moveCategoryUsecase(createCategoryStore(ctx), groupId, args, Date.now());
+    return record === null ? null : categoryRecordToDoc(record);
+  } catch (error) {
+    convexError(error);
+  }
+}
+
 type ReactivateCategoryArgs = {
   categoryId: Id<"categories">;
 };
@@ -167,4 +187,12 @@ export const reactivateCategory = mutation({
     categoryId: v.id("categories"),
   },
   handler: reactivateCategoryHandler,
+});
+
+export const moveCategory = mutation({
+  args: {
+    categoryId: v.id("categories"),
+    direction: v.union(v.literal("up"), v.literal("down")),
+  },
+  handler: moveCategoryHandler,
 });

@@ -71,7 +71,13 @@ type FailedAction =
   | { kind: "create"; groupId: Id<"groups"> | null }
   | { kind: "update"; groupId: Id<"groups"> | null }
   | { kind: "deactivate"; categoryId: Id<"categories">; groupId: Id<"groups"> | null }
-  | { kind: "reactivate"; categoryId: Id<"categories">; groupId: Id<"groups"> | null };
+  | { kind: "reactivate"; categoryId: Id<"categories">; groupId: Id<"groups"> | null }
+  | {
+      kind: "move";
+      categoryId: Id<"categories">;
+      direction: "up" | "down";
+      groupId: Id<"groups"> | null;
+    };
 
 function getErrorMessage(error: unknown, fallback: string) {
   return getConvexErrorMessage(error, fallback);
@@ -85,6 +91,7 @@ export function useCategorySettings() {
   const updateCategory = useMutation(api.categories.mutations.updateCategory);
   const deactivateCategory = useMutation(api.categories.mutations.deactivateCategory);
   const reactivateCategory = useMutation(api.categories.mutations.reactivateCategory);
+  const moveCategory = useMutation(api.categories.mutations.moveCategory);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -94,6 +101,7 @@ export function useCategorySettings() {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editColor, setEditColor] = useState<string>(DEFAULT_NEW_COLOR);
+  const [editBaseline, setEditBaseline] = useState<CategoryFieldValues | null>(null);
   const [createFieldErrors, setCreateFieldErrors] = useState<CategoryFieldErrors>({});
   const [editFieldErrors, setEditFieldErrors] = useState<CategoryFieldErrors>({});
   const [savingTarget, setSavingTarget] = useState<string | null>(null);
@@ -110,9 +118,22 @@ export function useCategorySettings() {
     setEditName(category.name);
     setEditDescription(category.description ?? "");
     setEditColor(category.color);
+    setEditBaseline({
+      name: category.name,
+      color: category.color,
+      description: category.description ?? "",
+    });
     setEditFieldErrors({});
     setError("");
   };
+
+  // 編集開始時の値と現在値が違うときだけ「未保存の変更がある」とみなす
+  const editIsDirty =
+    editingId !== null &&
+    editBaseline !== null &&
+    (editName !== editBaseline.name ||
+      editColor !== editBaseline.color ||
+      editDescription !== (editBaseline.description ?? ""));
 
   const clearCreateFieldError = (field: keyof CategoryFieldErrors) => {
     setCreateFieldErrors((current) =>
@@ -208,6 +229,25 @@ export function useCategorySettings() {
     await submitUpdate();
   };
 
+  const submitMove = async (categoryId: Id<"categories">, direction: "up" | "down") => {
+    setSavingTarget(`move-${categoryId}`);
+    setError("");
+    try {
+      await moveCategory({ categoryId, direction });
+      setSnackbar("並び順を更新しました");
+      setLastFailedAction(null);
+    } catch (caughtError) {
+      setLastFailedAction({ kind: "move", categoryId, direction, groupId: currentGroupId });
+      setError(getErrorMessage(caughtError, "並び順を変更できませんでした。"));
+    } finally {
+      setSavingTarget(null);
+    }
+  };
+
+  const handleMoveCategory = async (categoryId: Id<"categories">, direction: "up" | "down") => {
+    await submitMove(categoryId, direction);
+  };
+
   const submitDeactivate = async (categoryId: Id<"categories">) => {
     setSavingTarget(`deactivate-${categoryId}`);
     setError("");
@@ -261,6 +301,9 @@ export function useCategorySettings() {
       case "reactivate":
         await submitReactivate(lastFailedAction.categoryId);
         break;
+      case "move":
+        await submitMove(lastFailedAction.categoryId, lastFailedAction.direction);
+        break;
     }
   };
 
@@ -269,14 +312,17 @@ export function useCategorySettings() {
     canRetry,
     categories,
     createFieldErrors,
+    editBaseline,
     editDescription,
     editColor,
     editFieldErrors,
+    editIsDirty,
     editName,
     editingId,
     error,
     handleCreate,
     handleDeactivate,
+    handleMoveCategory,
     handleReactivate,
     handleUpdate,
     isCreateOpen,

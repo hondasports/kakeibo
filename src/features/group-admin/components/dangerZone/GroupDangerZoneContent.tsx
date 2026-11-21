@@ -4,6 +4,7 @@ import {
   AccordionSummary,
   Alert,
   Divider,
+  Skeleton,
   Snackbar,
   Stack,
   Typography,
@@ -48,7 +49,17 @@ export function GroupDangerZoneContent() {
   } = useGroupDangerZone();
 
   if (group === undefined || groups === undefined || members === undefined) {
-    return null;
+    return (
+      <Stack aria-label="危険な操作を読み込んでいます" spacing={1.5}>
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+          <WarningAmberIcon color="error" />
+          <Typography color="error" component="h2" variant="h5">
+            危険な操作
+          </Typography>
+        </Stack>
+        <Skeleton height={48} variant="rounded" />
+      </Stack>
+    );
   }
   if (group === null || group.role !== "owner") {
     return snackbar ? (

@@ -297,3 +297,56 @@ describe("E2E categories", () => {
     );
   });
 });
+
+describe("moveCategory", () => {
+  const siblings = () => [
+    record({ id: "cat-1", sortOrder: 1 }),
+    record({ id: "cat-2", sortOrder: 2 }),
+    record({ id: "cat-3", sortOrder: 3 }),
+  ];
+
+  it("down は隣と sortOrder をスワップする", async () => {
+    const store = createStore({
+      get: vi.fn().mockResolvedValue(record({ id: "cat-1", sortOrder: 1 })),
+      listForSettings: vi.fn().mockResolvedValue(siblings()),
+    });
+    const { moveCategory } = await import("./operations");
+    await moveCategory(store, "g1", { categoryId: "cat-1", direction: "down" }, 5000);
+    expect(store.patch).toHaveBeenCalledWith("cat-1", { sortOrder: 2, updatedAt: 5000 });
+    expect(store.patch).toHaveBeenCalledWith("cat-2", { sortOrder: 1, updatedAt: 5000 });
+  });
+
+  it("up は隣と sortOrder をスワップする", async () => {
+    const store = createStore({
+      get: vi.fn().mockResolvedValue(record({ id: "cat-3", sortOrder: 3 })),
+      listForSettings: vi.fn().mockResolvedValue(siblings()),
+    });
+    const { moveCategory } = await import("./operations");
+    await moveCategory(store, "g1", { categoryId: "cat-3", direction: "up" }, 5000);
+    expect(store.patch).toHaveBeenCalledWith("cat-3", { sortOrder: 2, updatedAt: 5000 });
+    expect(store.patch).toHaveBeenCalledWith("cat-2", { sortOrder: 3, updatedAt: 5000 });
+  });
+
+  it("先頭への up・末尾への down は何もしない", async () => {
+    const { moveCategory } = await import("./operations");
+    for (const [id, sortOrder, direction] of [
+      ["cat-1", 1, "up"],
+      ["cat-3", 3, "down"],
+    ] as const) {
+      const store = createStore({
+        get: vi.fn().mockResolvedValue(record({ id, sortOrder })),
+        listForSettings: vi.fn().mockResolvedValue(siblings()),
+      });
+      await moveCategory(store, "g1", { categoryId: id, direction }, 5000);
+      expect(store.patch).not.toHaveBeenCalled();
+    }
+  });
+
+  it("別グループ所属は拒否する", async () => {
+    const { moveCategory } = await import("./operations");
+    const store = createStore({ get: vi.fn().mockResolvedValue(record({ groupId: "g2" })) });
+    await expect(
+      moveCategory(store, "g1", { categoryId: "cat-1", direction: "up" }, 5000),
+    ).rejects.toThrow("Category does not belong to the current group");
+  });
+});

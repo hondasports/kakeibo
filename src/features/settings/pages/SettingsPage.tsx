@@ -53,7 +53,7 @@ export function SettingsPage() {
             </Box>
             <Divider />
             <Box className="settings-ledger-section settings-ledger-section--danger">
-              <Typography component="h2" variant="h6">
+              <Typography component="h2" variant="h5">
                 アカウント
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 0.75 }} variant="body2">

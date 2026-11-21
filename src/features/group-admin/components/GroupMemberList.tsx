@@ -87,12 +87,16 @@ export function GroupMemberList({
               </Avatar>
               <Box sx={{ minWidth: 0 }}>
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                  <Typography sx={{ fontWeight: 700 }} noWrap>
+                  <Typography sx={{ fontWeight: 700, overflowWrap: "anywhere" }}>
                     {primaryLabel}
                   </Typography>
                   {isCurrentUser ? <Chip label="あなた" size="small" variant="outlined" /> : null}
                 </Stack>
-                <Typography color="text.secondary" variant="body2" noWrap>
+                <Typography
+                  color="text.secondary"
+                  sx={{ overflowWrap: "anywhere" }}
+                  variant="body2"
+                >
                   {secondaryLabel}
                 </Typography>
               </Box>
