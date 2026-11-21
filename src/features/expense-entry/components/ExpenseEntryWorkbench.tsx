@@ -114,6 +114,7 @@ export function ExpenseEntryWorkbench({
               <MultiEntryFields
                 categories={categories}
                 difference={difference}
+                isSubmitting={status === "submitting"}
                 itemErrors={itemErrors}
                 items={items}
                 sourceAmount={sourceAmountNum}

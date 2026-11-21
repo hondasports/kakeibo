@@ -370,5 +370,39 @@ describe("ExpenseEntryForm（multi）", () => {
       expect(await screen.findByText("メモは 500 文字以内です")).toBeInTheDocument();
       expect(createExpenseEntriesMock).not.toHaveBeenCalled();
     });
+
+    it("保存中は内訳の操作ボタンが無効になる", async () => {
+      createExpenseEntriesMock.mockReturnValueOnce(new Promise(() => {}));
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "5000");
+      await user.click(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" }));
+
+      const item0 = screen.getByTestId("expense-item-0");
+      await user.type(within(item0).getByLabelText("金額"), "3000");
+      await user.click(screen.getByRole("button", { name: "項目を追加" }));
+      const item1 = screen.getByTestId("expense-item-1");
+      await user.type(within(item1).getByLabelText("内容"), "日用品");
+      await user.type(within(item1).getByLabelText("金額"), "2000");
+
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      // 送信が始まると保存ボタンがローディング（disabled）になる
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "保存して次へ" })).toBeDisabled();
+      });
+      expect(screen.getByRole("button", { name: "内訳をやめる" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "項目を追加" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "項目1を削除" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "項目2を削除" })).toBeDisabled();
+    });
   });
 });
