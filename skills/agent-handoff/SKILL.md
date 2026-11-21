@@ -51,7 +51,7 @@ license: Apache-2.0
 - 待つ間は `skills/delivery-loop` の「待ち方」に従い、最終行が書かれたら再開する仕組みを仕掛ける。
 - 長く報告が更新されず、terminalの出力も進まないときは、止まっている（承認待ち・プロセス終了・端末のスリープ等）とみなして状態を確かめ、必要なら同じ依頼で再開させる。
 - 受け取ったら `git status` と `git stash list` も確かめる。禁止してもstashを使われたことがある。
-- 報告は委譲先の主張として扱う。`git log`・`git diff`・テストの再実行で確かめてから、ユーザーへの報告やPRに使う（`skills/prompt-injection-guard`）。
+- 報告は委譲先の主張として扱う。`git log`・`git diff` と、変更に応じた検証（テストの再実行等）で確かめてから、ユーザーへの報告やPRに使う（`skills/prompt-injection-guard`）。
 - 差し戻すときは `review-round<N>.md` に指摘を書き、同じ送り方でpathを渡す。
 - 委譲先が質問してきたら、調査で答えられるものは答え、Product / UX / Security / Data semanticsに関わるものだけユーザーへ確認する。ユーザーへは選択肢と推奨を添えて渡す。
 - 独立レビューを委譲するときは、新しいセッション（または `/new` したterminal）に、実装担当の報告を渡さずに依頼する（`docs/development-process.md` の「Review / branch protection」）。

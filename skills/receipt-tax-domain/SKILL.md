@@ -21,4 +21,4 @@ license: Apache-2.0
 - 混在税率・割引・明細置換・片側欠損の負例を確認する
 - 回帰資産: `receiptTaxInvariants.test.ts`（不変条件）、`receiptTaxGoldenCases.test.ts`（golden）、`receiptTaxCorruptionMatrix.test.ts`（破損パターン）、`ai-expense-queue.tax-regression.spec.ts`・`ai-expense-tax-allocation.spec.ts`（E2E）
 
-変更時はinvariants系テストとgolden caseを更新し、品質指標が悪化していないか確認する。
+変更時はinvariants系テストとgolden caseを流し、契約が変わる箇所と足りない回帰ケースだけ期待値・ケースを更新する。品質指標が悪化していないかも確かめる。

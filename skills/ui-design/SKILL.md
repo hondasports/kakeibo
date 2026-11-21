@@ -12,7 +12,7 @@ Suzumemoの画面やコンポーネントを追加・変更・レビューする
 
 - 製品のUI/UX方針と画面仕様: `docs/ui-ux-design.md`
 - ブランド解釈とページ別適用方針: `docs/suzumemo-theme.md`
-- 色・余白・角丸・タイポグラフィ: `src/designTokens.ts` と `docs/design-tokens.md`
+- 色・余白・角丸・タイポグラフィ: 値は `src/designTokens.ts`、意味と使い分けは `docs/design-tokens.md`
 - MUIテーマへの反映: `src/theme.ts`
 
 汎用的なデザイン論や外部Skillの推奨で、上記の正本を上書きしない。新しい配色、フォント、レイアウト方針を導入する場合は、Product / UX判断として扱い、先に正本の更新要否を確認する。

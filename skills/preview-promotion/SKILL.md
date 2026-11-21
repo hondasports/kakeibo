@@ -18,7 +18,7 @@ license: Apache-2.0
 4. `git merge --ff-only --no-overwrite-ignore origin/preview` だけを実行する。reset・stash・削除・上書きで場所を空けない。
 5. 2で記録した各pathのmodeとSHA-256、未コミットのpathのindexの内容が変わっていないこと、`HEAD` が `origin/preview` と同じSHAになったこと、`git rev-list --left-right --count preview...origin/preview` が `0 0` であることを確認する。
 
-3〜5のどこかで条件を満たさなければ、何も変えずに止めて報告する（`AGENTS.md` の「開発ループ」の停止理由）。
+3で条件を満たさなければ同期せずに止める。4の後に5の照合が合わなければ、それ以上の操作（reset等での復元を含む）をせず、観測した差分を報告する（`AGENTS.md` の「開発ループ」の停止理由）。
 
 ## B. 昇格PR
 
@@ -38,8 +38,7 @@ license: Apache-2.0
 ### 監視とマージ
 
 - 昇格PRのE2Eは、`preview` push時に同じHEADを検証済みとしてskipされる（`docs/development-process.md` の「PR CI E2Eの差分判定」）。代わりに、`preview-deploy.yml` の同じSHAの結果を確認する。
-- `main` はrequired checksに最新化を求め、未解決threadがあるとマージできない。前回の昇格のmerge commitが `preview` に無いと、PRは `BEHIND` になる。
-- `BEHIND` の解消は `gh pr update-branch <番号>`（`main` を `preview` へmergeするcommitをGitHubが作る）で行う。`preview` への書き込みになるため、ユーザーの明示承認を得てから実行する。承認が無ければ承認待ちで止める。
-- マージは、ユーザーが明示したときだけ行う（完了地点 `merged`）。マージ方式は直近の昇格PRと同じmerge commitにする。
-- 昇格PRのマージは本番反映の承認を兼ねる。`main` へのマージで `production-release.yml` が起動し、release candidate E2Eが成功すれば承認待ちなしでProductionへ反映される（`docs/production-release.md`）。マージは本番操作として扱う。マージの依頼が本番反映に触れていなければ、本番に出ることを伝えて明示承認を得てからマージする（承認待ち）。
+- `main` のruleset（`gh api repos/{owner}/{repo}/rules/branches/main`）は未解決threadがあるとマージさせない。required checksの最新化（strict）は求めないので、前回の昇格のmerge commitが `preview` に無いだけの `BEHIND` は、それだけを理由に更新しない。マージを阻んでいる条件（strictが戻っていないか・check・競合・thread）を確かめる。最新化が要るなら `gh pr update-branch <番号>` は `preview` への書き込みなので、ユーザーの明示承認を得てから実行する。
+- 昇格PRのマージは本番反映の承認を兼ねる。`main` へのマージで `production-release.yml` が起動し、release candidate E2Eが成功すれば承認待ちなしでProductionへ反映される（`docs/production-release.md`）。マージは本番操作として扱い、完了地点 `merged` の明示に加えて本番反映の明示承認を得る。マージの依頼が本番反映に触れていなければ、本番に出ることを伝えて承認を待つ（承認待ち）。
+- rulesetには `update` 規則があり、bypassを持つのはユーザーだけ。このrepoでは、Agentはマージを試みず、次の順でユーザーにPR画面でのマージを頼む: 承認を得る → `skills/delivery-loop` の「マージ」の条件を最新HEAD・baseで取り直す → 確かめたHEAD SHAとPRを示して、直近の昇格PRと同じmerge commitでのマージを依頼する（人の操作待ち）。待つ間にHEADかbaseが変わったら、マージを止めてもらい取り直す。
 - マージ後は `main` の新しいSHAと、`production-release.yml` のrelease candidate E2E・Deploy Productionの結果を報告する。

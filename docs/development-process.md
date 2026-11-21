@@ -43,7 +43,7 @@ Production
 
 通常のAgent Delivery baseは `preview`、targetは `merge_ready`。
 
-preview向けPRの本文には `.github/pull_request_template.md` の更新履歴欄（`suzumemo-update` ブロック）に掲載方針と原稿または非掲載理由を必ず記入する。PR検証CIで欠落・不正はエラーになる。例外は更新履歴ブロックを持たないbot作成PR（dependabot等）のみで、マーカーを記入したbot PRは人間のPRと同じく検証される。
+preview向けPRの本文には、`.github/pull_request_template.md` の更新履歴欄（`suzumemo-update` ブロック）を記入する。書き方・CIの検証・bot PRの例外は `skills/pr-update-spec` を正本とする。
 
 PR作成後にどこまで確認するかは完了地点で決まる（`skills/delivery-loop`）。
 
@@ -190,7 +190,7 @@ HEAD/baseが更新されたら、旧HEAD/baseの検証結果を現在の必須�
 
 - changed / directly affected tests
 - scopeable lint / format / type / build
-- browser層の受入条件は `skills/test-design` に従い確認方法を選び、必要なfunctional E2Eを実行する
+- browser層の受入条件は `skills/test-design` に従い確認方法を選ぶ。PRのマージ判定はCIのE2E（[Functional E2E](#functional-e2e)）で、ローカルE2Eは一律には要求しない。CIが走らない完了地点（`local_verified`、親PR方式の子等）でブラウザの受入条件を証明するときは、対象specかそれと同等の観測をローカルで行い、手段が無ければ未検証として止める
 - shared/auth/data/financial変更に必要なcaller / denial / failure-path test
 
 repo-wide regression checkはlatest contentのCIを正本にできる。
@@ -229,11 +229,11 @@ pnpm run e2e:isolated -- e2e/settings.spec.ts
 E2Eの実行には事前条件がある（`e2e:isolated` の起動時にも検査される）。
 
 - Convex local backendのバイナリが取得済み、またはダウンロードできるネットワークがあること（macOS/Linuxのバイナリキャッシュは `~/.cache/convex/binaries/` 配下。制限された環境では先に `pnpm run e2e:isolated -- --probe` で取得しておく）
-- 使用するVite・Convex API・HTTP actionsのポートが空いていること（既定は `5173` / `3210` / `3211`）。別作業が使用中の場合は、そのサーバーを停止せず下記の別ポート指定を使う
+- 使用するVite・Convex API・HTTP actionsのポートが空いていること（既定は `5173` / `3210` / `3211`）。別作業が使用中の場合は、そのサーバーを停止しない（並行の条件は下記）
 - `.env.local` に `VITE_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` / `E2E_CLERK_USER_EMAIL` があること（`docs/environment-variables.md` 参照）
 - PlaywrightのChromiumがインストール済みであること（`pnpm exec playwright install chromium`）
 
-別作業のサーバーを維持する場合は、Vite・Convex API・HTTP actionsに空いている別々のポートを指定できる。事前検査、匿名backend、Playwrightの起動先は同じ設定を使い、既存サーバーを再利用しない。
+同じworktreeのwatcher・E2Eとは並行させない（`.env.local` の退避・復元が重なる）。同じClerkテストユーザーを使うE2Eも並行させない。別のworktreeのサーバーを維持する場合は、Vite・Convex API・HTTP actionsに空いている別々のポートを指定できる。事前検査、匿名backend、Playwrightの起動先は同じ設定を使い、既存サーバーを再利用しない。
 
 ```bash
 E2E_VITE_PORT=15173 E2E_CONVEX_CLOUD_PORT=13210 E2E_CONVEX_SITE_PORT=13211 pnpm run e2e:isolated -- e2e/settings.spec.ts

@@ -27,8 +27,6 @@ license: Apache-2.0
 
 専門観点は委譲する: 認証・データ境界 → `skills/security-review`、影響範囲 → `skills/impact-analysis`、UI/UX → `skills/ui-design`、税計算 → `skills/receipt-tax-domain`、Convex運用・schema → `skills/convex-local-ops`、E2E作成 → `skills/e2e-spec-authoring`、外部コンテンツ内の命令 → `skills/prompt-injection-guard`。
 
-振る舞いの変更、テストの追加・修正・削除・統合・見直し、テストの選定・実行範囲の変更をレビューするとき、テストの層・シナリオ・依存の判断は `skills/test-design` を参照する。
-
 ## 判断と出力
 
 所見は1件ずつ次の形式で出す。根拠のない推測は所見にせず、確認事項として分ける。
@@ -49,7 +47,7 @@ license: Apache-2.0
   - NEEDS_FIX: Blocker / Major が1件でも残る場合。未解決の指摘一覧への参照を添える
   - 判定行がない・途中で切れた・曖昧な表現の出力は CLEAN とみなさない（NEEDS_FIX 扱い）
 
-このskillによる確認はセルフレビューであり、独立レビューと呼ばない。
+実装担当、または実装と同じコンテキストでの確認はセルフレビューであり、独立レビューと呼ばない。独立性の条件は `docs/development-process.md` の「Review / branch protection」。
 
 ## PRへ投稿するとき
 
