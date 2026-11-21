@@ -1,6 +1,29 @@
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { Alert, Box, Button, Chip, DialogActions, Typography } from "@mui/material";
 
+export function getReviewSubmitLabel({
+  requiredCount,
+  totalOnly,
+  checkMismatchCount = 0,
+  recommendationCount,
+}: {
+  requiredCount: number;
+  totalOnly: boolean;
+  checkMismatchCount?: number;
+  recommendationCount: number;
+}): string {
+  if (requiredCount > 0) {
+    return "修正が必要な項目へ";
+  }
+  if (totalOnly) {
+    return "レシート合計だけ保存";
+  }
+  if (checkMismatchCount > 0 || recommendationCount > 0) {
+    return "下書きを保存";
+  }
+  return "この内容で保存";
+}
+
 export function ReviewDialogActions({
   unavailable = false,
   reviewError,
@@ -72,14 +95,12 @@ export function ReviewDialogActions({
           : recommendationCount > 0
             ? "確認事項あり"
             : "金額を確認済み";
-  const submitLabel =
-    requiredCount > 0
-      ? "修正が必要な項目へ"
-      : totalOnly
-        ? "レシート合計だけ保存"
-        : checkMismatchCount > 0 || recommendationCount > 0
-          ? "下書きを保存"
-          : "この内容で保存";
+  const submitLabel = getReviewSubmitLabel({
+    requiredCount,
+    totalOnly,
+    checkMismatchCount,
+    recommendationCount,
+  });
 
   return (
     <Box
