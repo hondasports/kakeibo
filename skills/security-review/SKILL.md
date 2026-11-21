@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: 認証・認可・group境界・secret・ユーザー入力・webhook検証・外部writeを変更するときに、セルフレビューへ追加する観点。独立Reviewerが必須になる条件を含む。
+description: 認証・認可・group境界・secret・ユーザー入力・webhook検証・外部writeを変更するときに、セルフレビューへ追加する観点。独立Reviewerの要否は docs/development-process.md の「Review / branch protection」で判定する。
 license: Apache-2.0
 ---
 
@@ -15,7 +15,7 @@ license: Apache-2.0
 - ユーザー入力、ユーザー制御のHTML・URL・redirect・file / path・MIME
 - webhookの署名・送信元等の検証、外部write境界
 
-該当する変更は高リスク変更として扱い、セルフレビューに加えて新しいコンテキストの独立Reviewerによるレビューを必須とする（`docs/development-process.md` の「Review / branch protection」と同じ条件）。
+独立Reviewerの要否は、この一覧ではなく `docs/development-process.md` の「Review / branch protection」で判定する（上の一覧はそこに含まれる）。
 
 ## 判断と出力
 

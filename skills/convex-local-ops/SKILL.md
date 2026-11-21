@@ -8,15 +8,15 @@ license: Apache-2.0
 
 ## 適用
 
-- `convex/**` の関数・schemaを変更する
-- local E2EやCI E2Eへ変更を反映する
+- `convex/**` を編集する（関数・schema）
+- local deploymentへ変更を反映する
 - migration・deployment操作が必要
 
 ## 判断と出力
 
 - `convex/**` を編集する前に `convex/_generated/ai/guidelines.md` を読む
 - `pnpm run dev` のwatcherはlocal deploymentへ自動反映する。1回だけ反映したい場合はlocal環境同期後に `pnpm run convex:dev -- --once`
-- GitHub ActionsのE2Eはジョブごとの匿名使い捨てlocal deploymentで走るため、cloud devへの反映は要らない。ローカルから共有cloud devを検証したい場合だけ `pnpm run convex:dev:cloud -- --once` を明示する
+- CIのE2Eのbackendは `docs/development-process.md` のFunctional E2Eが正本で、どれも共有cloud devへの反映は要らない。ローカルから共有cloud devを検証したい場合だけ `pnpm run convex:dev:cloud -- --once` を明示する
 - schema・migration変更、データ削除・retention変更は高リスク変更として扱い、影響範囲と移行・復旧手順を確認してから進める
 - required environment不足、env sync失敗、Convex CLI未反映を「未実行理由」にして先へ進まない。復旧できなければblockerとして報告する
 - 秘密値・deployment実値をログ・PR・Issueへ出さない

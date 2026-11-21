@@ -13,7 +13,7 @@
 ## B. 見えていないテスト（あるのに気付けない・選ばれない）
 
 - **同じ関数のテストが分かれていないか。** shim や re-export を通して正本の関数を検証しているテストがないか。import をたどって、正本のテストと重なり・漏れがないかを見る。
-- **E2E タグの漏れ。** CI の E2E は `@smoke` / `@public` / `@staging` のタグ経由でだけ spec・テストを選ぶ（pre-push は E2E を起動しない）。タグを持たない `test(` が残っていないか（`grep -rEn 'test\("([^"@])|test\(`' e2e/` で 0 件であること）、既存テストからタグが外れていないかを確かめる。
+- **E2E タグの漏れ。** CI の E2E は `@smoke` / `@public` / `@staging` のタグ経由でだけ spec・テストを選ぶ（pre-push は E2E を起動しない）。タグを持たない `test(` が残っていないか、既存テストからタグが外れていないかを確かめる。テンプレート文字列のタイトルは条件付きでタグを付けることがある（例: `${width === 1280 ? "@smoke " : ""}`）ので、grepの一致だけで判定せず、`pnpm exec playwright test --list --grep-invert '@smoke|@public|@staging'` の一覧に、`[setup]` projectの global setup 以外が出ないことを確かめる。
 - **文書を検査するテスト。** `tests/workflow/*.test.ts` のように `readFileSync` で文書を読むテストは、`vitest related` では選ばれない。何を検査しているかと、検査先が正本になっているかを見る。
 - **不安定なテスト。** CI の flaky の集計（`scripts/report-flaky-e2e.mjs` の出力、GitHub Step Summary）や、リトライで通ったテストを見て、繰り返し不安定なものを挙げる。
 

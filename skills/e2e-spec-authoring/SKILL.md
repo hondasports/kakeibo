@@ -16,10 +16,9 @@ E2Eを選ぶ判断は `skills/test-design` を正本とし、このskillはE2E s
 - specが作ったデータはcleanup helper（`e2e/helpers/cleanup.ts`）で後始末し、spec間で状態を共有しない
 - Issue固有の状態は必要最小限のfixtureにする
 - projectは `setup` と `chromium` を使い、`--grep @smoke` でsmoke、`--grep @public` で公開面を選択できる
-- すべての `test(` はタグ必須（原則 `@smoke`。公開面は `@public`、staging固有は `@staging`）。CI の選定はタグ経由だけなので、タグなしテストはどこでも実行されない。CIの選定条件は `docs/development-process.md` のFunctional E2Eとworkflowを正本とする
+- specのテスト本体（`test(`）はすべてタグ必須（原則 `@smoke`。公開面は `@public`、staging固有は `@staging`）。CI の選定はタグ経由だけなので、タグなしのテスト本体はCIで実行されない。`e2e/global-setup.ts` は `chromium` が依存する `setup` projectとして別に実行される。CIの選定条件は `docs/development-process.md` のFunctional E2Eとworkflowを正本とする
 - レシート抽出は `RECEIPT_IMAGE_EXTRACTOR_MODE=mock`（OpenAI APIは呼ばない）
-- `skills/test-design` でE2Eが必要と判断した受入条件・不変条件について、対象specをlocal実行する。`src/**`・`e2e/**` のpathだけを理由にローカル全E2Eは要求しない
+- ローカル実行が要る場面は `docs/development-process.md` の「Verification」に従う（PRのマージ判定はCI）。追加・修正したspecは、CIの往復を減らすため `pnpm run e2e:isolated -- <spec>` で先に通しておいてよい。pathだけを理由にローカル全E2Eは要求しない
 - PR上のE2E要否は `scripts/classify-e2e-relevance.mjs` が機械判定するので、手動でskip判断しない
-- 広い主要導線を変えた場合だけ、必要に応じてlocal実行の範囲を広げる
 
 実行手順は `skills/local-dev-env`、PR CIの差分判定の背景は `docs/development-process.md#pr-ci-e2eの差分判定` を参照する。
