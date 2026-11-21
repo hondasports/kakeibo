@@ -1,6 +1,7 @@
 import { api } from "../../../../convex/_generated/api";
 import { useCallback, useEffect, useState } from "react";
 import { useMutation } from "convex/react";
+import { WEEK_SESSION_LOAD_ERROR_MESSAGE } from "../../week";
 export type WeekSession = {
   weekStartDate: string;
   weekEndDate: string;
@@ -19,13 +20,17 @@ export function useWeekSession() {
   const getOrCreateSession = useMutation(api.weekSessions.mutations.getOrCreateCurrentWeekSession);
   const [weekSession, setWeekSession] = useState<WeekSession | null>(null);
   const [sessionError, setSessionError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   const initSession = useCallback(() => {
     getOrCreateSession()
       .then(setWeekSession)
       .catch((err: unknown) => {
         console.error("週次セッション初期化失敗:", err);
-        setSessionError("週次セッションの初期化に失敗しました。ページをリロードしてください。");
+        setSessionError(WEEK_SESSION_LOAD_ERROR_MESSAGE);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   }, [getOrCreateSession]);
 
@@ -33,5 +38,12 @@ export function useWeekSession() {
     initSession();
   }, [initSession]);
 
-  return { weekSession, setWeekSession, sessionError };
+  const retrySession = () => {
+    if (isLoading) return;
+    setSessionError("");
+    setIsLoading(true);
+    initSession();
+  };
+
+  return { weekSession, setWeekSession, sessionError, isLoading, retrySession };
 }

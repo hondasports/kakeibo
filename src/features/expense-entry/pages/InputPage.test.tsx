@@ -16,11 +16,11 @@ vi.mock("convex/react", () => ({
 
 vi.mock("../hooks/useInputPageWeek", () => ({
   useInputPageWeek: () => useInputPageWeekMock(),
-  WEEK_SESSION_LOAD_ERROR_MESSAGE:
-    "週次セッションの読み込みに失敗しました。もう一度お試しください。",
 }));
 
 vi.mock("../../week", () => ({
+  WEEK_SESSION_LOAD_ERROR_MESSAGE:
+    "週次セッションの読み込みに失敗しました。もう一度お試しください。",
   WeekNavigator: (props: Record<string, unknown>) => {
     weekNavigatorPropsMock(props);
     return <div data-testid="week-navigator" />;

@@ -1,7 +1,13 @@
 import { api } from "../../../../convex/_generated/api";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { addWeeks, getCurrentWeekStartDate, getWeekEndDate, isFutureWeek } from "../../week";
+import {
+  addWeeks,
+  getCurrentWeekStartDate,
+  getWeekEndDate,
+  isFutureWeek,
+  WEEK_SESSION_LOAD_ERROR_MESSAGE,
+} from "../../week";
 
 export type InputPageWeekSession = {
   weekStartDate: string;
@@ -9,9 +15,6 @@ export type InputPageWeekSession = {
   status: "draft" | "completed";
   reviewMemo?: string;
 };
-
-export const WEEK_SESSION_LOAD_ERROR_MESSAGE =
-  "週次セッションの読み込みに失敗しました。もう一度お試しください。";
 
 /**
  * 入力ページで任意週のセッションを取得または作成するカスタムフック。
