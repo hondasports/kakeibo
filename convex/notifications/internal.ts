@@ -18,6 +18,7 @@ import {
   recoverStaleLineNotificationJobs as recoverStaleLineNotificationJobsUsecase,
 } from "../../lib/usecase/notifications/lineJobLifecycle";
 import { docToLineNotificationJobRecord } from "../../lib/convex/notifications/convexLineNotificationJobStore";
+import { LINE_NOTIFICATION_COMPLETION_OUTCOMES } from "../../lib/domain/notifications/runner";
 import { createLineNotificationScheduler } from "../../lib/convex/notifications/convexNotificationScheduler";
 import type { Id } from "../_generated/dataModel";
 
@@ -48,22 +49,25 @@ export const enqueueAiReviewNotifications = internalMutation({
   },
 });
 
+const [outcomeSent, outcomeRetrying, outcomeFailed, outcomeSuppressed] =
+  LINE_NOTIFICATION_COMPLETION_OUTCOMES;
+
 const lineNotificationCompletionValidator = v.union(
   v.object({
-    outcome: v.literal("sent"),
+    outcome: v.literal(outcomeSent),
     providerRequestId: v.optional(v.string()),
   }),
   v.object({
-    outcome: v.literal("retrying"),
+    outcome: v.literal(outcomeRetrying),
     nextRetryAt: v.number(),
     errorCode: v.optional(v.string()),
   }),
   v.object({
-    outcome: v.literal("failed"),
+    outcome: v.literal(outcomeFailed),
     errorCode: v.optional(v.string()),
   }),
   v.object({
-    outcome: v.literal("suppressed"),
+    outcome: v.literal(outcomeSuppressed),
     errorCode: v.optional(v.string()),
   }),
 );

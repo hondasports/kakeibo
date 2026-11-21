@@ -16,6 +16,12 @@ export const LINE_LINK_STATUSES = ["active", "revoked"] as const;
 /** LINE アカウント連携の状態。 */
 export type LineLinkStatus = (typeof LINE_LINK_STATUSES)[number];
 
+/** クライアントへ返すLINE連携状態の全値。API validator・usecaseの戻り値はこの並びに合わせる。 */
+export const LINE_LINK_VIEW_STATUSES = ["unlinked", "multiple", "linked"] as const;
+
+/** クライアントへ返すLINE連携状態。 */
+export type LineLinkViewStatus = (typeof LINE_LINK_VIEW_STATUSES)[number];
+
 /** LINE 連携の監査アクションの全値。 */
 export const LINE_LINK_AUDIT_ACTIONS = ["started", "linked", "unlinked", "failed"] as const;
 

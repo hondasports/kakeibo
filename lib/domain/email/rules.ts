@@ -4,6 +4,7 @@ import {
   calculateRetryDelayMs,
   isMaxRetryAttemptsReached,
 } from "../common/retry";
+import { EMAIL_WEBHOOK_EVENT_TYPES } from "./model";
 import type {
   EmailWebhookEventType,
   TransactionalEmailJobStatus,
@@ -124,16 +125,6 @@ export function extractResendEventFields(
   };
 }
 
-export const RESEND_WEBHOOK_EVENT_TYPES: readonly EmailWebhookEventType[] = [
-  "email.sent",
-  "email.delivered",
-  "email.delivery_delayed",
-  "email.complained",
-  "email.bounced",
-  "email.failed",
-  "email.suppressed",
-];
-
 export function isResendWebhookEventType(type: string): type is EmailWebhookEventType {
-  return (RESEND_WEBHOOK_EVENT_TYPES as readonly string[]).includes(type);
+  return (EMAIL_WEBHOOK_EVENT_TYPES as readonly string[]).includes(type);
 }

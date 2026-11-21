@@ -5,6 +5,17 @@ export type LineNotificationClaimResult =
   | { claimed: true; job: LineNotificationJobRecord }
   | { claimed: false };
 
+/** LINE通知ジョブ完了報告のoutcomeの全値。Convex側のvalidatorはこの並びに合わせる。 */
+export const LINE_NOTIFICATION_COMPLETION_OUTCOMES = [
+  "sent",
+  "retrying",
+  "failed",
+  "suppressed",
+] as const;
+
+export type LineNotificationCompletionOutcome =
+  (typeof LINE_NOTIFICATION_COMPLETION_OUTCOMES)[number];
+
 export type LineNotificationCompletion =
   | { outcome: "sent"; providerRequestId?: string }
   | { outcome: "retrying"; nextRetryAt: number; errorCode?: string }
