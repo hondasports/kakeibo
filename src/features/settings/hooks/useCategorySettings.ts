@@ -14,6 +14,7 @@ import { getConvexErrorMessage } from "../../auth";
 
 export type Category = {
   _id: Id<"categories">;
+  groupId: Id<"groups">;
   name: string;
   description?: string;
   color: string;
@@ -67,10 +68,10 @@ function serverErrorField(message: string): keyof CategoryFieldErrors | null {
 }
 
 type FailedAction =
-  | { kind: "create" }
-  | { kind: "update" }
-  | { kind: "deactivate"; categoryId: Id<"categories"> }
-  | { kind: "reactivate"; categoryId: Id<"categories"> };
+  | { kind: "create"; groupId: Id<"groups"> | null }
+  | { kind: "update"; groupId: Id<"groups"> | null }
+  | { kind: "deactivate"; categoryId: Id<"categories">; groupId: Id<"groups"> | null }
+  | { kind: "reactivate"; categoryId: Id<"categories">; groupId: Id<"groups"> | null };
 
 function getErrorMessage(error: unknown, fallback: string) {
   return getConvexErrorMessage(error, fallback);
@@ -99,6 +100,10 @@ export function useCategorySettings() {
   const [error, setError] = useState("");
   const [snackbar, setSnackbar] = useState("");
   const [lastFailedAction, setLastFailedAction] = useState<FailedAction | null>(null);
+
+  // 再試行は失敗した時点のグループでのみ有効にする（グループ切替後の誤登録防止）
+  const currentGroupId = categories?.[0]?.groupId ?? null;
+  const canRetry = lastFailedAction !== null && lastFailedAction.groupId === currentGroupId;
 
   const beginEdit = (category: Category) => {
     setEditingId(category._id);
@@ -156,7 +161,7 @@ export function useCategorySettings() {
       setSnackbar("カテゴリを追加しました");
       setLastFailedAction(null);
     } catch (caughtError) {
-      setLastFailedAction({ kind: "create" });
+      setLastFailedAction({ kind: "create", groupId: currentGroupId });
       applyServerError(caughtError, "カテゴリを追加できませんでした。", setCreateFieldErrors);
     } finally {
       setSavingTarget(null);
@@ -192,7 +197,7 @@ export function useCategorySettings() {
       setSnackbar("カテゴリを更新しました");
       setLastFailedAction(null);
     } catch (caughtError) {
-      setLastFailedAction({ kind: "update" });
+      setLastFailedAction({ kind: "update", groupId: currentGroupId });
       applyServerError(caughtError, "カテゴリを更新できませんでした。", setEditFieldErrors);
     } finally {
       setSavingTarget(null);
@@ -211,7 +216,7 @@ export function useCategorySettings() {
       setSnackbar("カテゴリを無効化しました");
       setLastFailedAction(null);
     } catch (caughtError) {
-      setLastFailedAction({ kind: "deactivate", categoryId });
+      setLastFailedAction({ kind: "deactivate", categoryId, groupId: currentGroupId });
       setError(getErrorMessage(caughtError, "カテゴリを無効化できませんでした。"));
     } finally {
       setSavingTarget(null);
@@ -230,7 +235,7 @@ export function useCategorySettings() {
       setSnackbar("カテゴリを有効化しました");
       setLastFailedAction(null);
     } catch (caughtError) {
-      setLastFailedAction({ kind: "reactivate", categoryId });
+      setLastFailedAction({ kind: "reactivate", categoryId, groupId: currentGroupId });
       setError(getErrorMessage(caughtError, "カテゴリを有効化できませんでした。"));
     } finally {
       setSavingTarget(null);
@@ -261,6 +266,7 @@ export function useCategorySettings() {
 
   return {
     beginEdit,
+    canRetry,
     categories,
     createFieldErrors,
     editDescription,
@@ -274,7 +280,6 @@ export function useCategorySettings() {
     handleReactivate,
     handleUpdate,
     isCreateOpen,
-    lastFailedAction,
     newColor,
     newDescription,
     newName,

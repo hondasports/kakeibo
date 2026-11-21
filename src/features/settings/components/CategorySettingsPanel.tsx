@@ -21,6 +21,7 @@ import { MAX_CATEGORY_DESCRIPTION_LENGTH } from "../../../../lib/domain/categori
 export function CategorySettingsPanel() {
   const {
     beginEdit,
+    canRetry,
     categories,
     clearCreateFieldError,
     clearEditFieldError,
@@ -36,7 +37,6 @@ export function CategorySettingsPanel() {
     handleReactivate,
     handleUpdate,
     isCreateOpen,
-    lastFailedAction,
     newColor,
     newDescription,
     newName,
@@ -79,7 +79,7 @@ export function CategorySettingsPanel() {
       {error ? (
         <Alert
           action={
-            lastFailedAction !== null ? (
+            canRetry ? (
               <Button color="inherit" onClick={() => void retryLastFailed()} size="small">
                 再試行
               </Button>

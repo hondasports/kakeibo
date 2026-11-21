@@ -7,6 +7,7 @@ import { CategorySettingsPanel } from "./CategorySettingsPanel";
 
 type Category = {
   _id: Id<"categories">;
+  groupId: Id<"groups">;
   name: string;
   description?: string;
   color: string;
@@ -54,6 +55,7 @@ vi.mock("convex/react", () => ({
 const categories: Category[] = [
   {
     _id: "cat-food" as Id<"categories">,
+    groupId: "group-1" as Id<"groups">,
     name: "食費",
     color: "#AAB7C4",
     isActive: true,
@@ -61,6 +63,7 @@ const categories: Category[] = [
   },
   {
     _id: "cat-old" as Id<"categories">,
+    groupId: "group-1" as Id<"groups">,
     name: "旧カテゴリ",
     color: "#765F4F",
     isActive: false,
@@ -284,6 +287,30 @@ describe("CategorySettingsPanel", () => {
       expect(deactivateCategoryMock).toHaveBeenCalledTimes(2);
     });
     expect(screen.getByText("カテゴリを無効化しました")).toBeInTheDocument();
+  });
+
+  it("失敗後に別グループへ切り替わると再試行ボタンは出ない", async () => {
+    createCategoryMock.mockRejectedValueOnce(new Error("network failed"));
+    const user = userEvent.setup();
+    const { rerender } = renderWithProviders(<CategorySettingsPanel />);
+
+    await user.click(screen.getByRole("button", { name: "カテゴリを追加" }));
+    await user.type(screen.getByLabelText("新しいカテゴリ名"), "交通");
+    await user.click(screen.getByRole("button", { name: "追加する" }));
+
+    expect(await screen.findByRole("button", { name: "再試行" })).toBeInTheDocument();
+
+    // 別グループのカテゴリ一覧に差し替わると再試行は無効になる
+    useQueryMock.mockReturnValue([
+      {
+        ...categories[0],
+        _id: "cat-other" as Id<"categories">,
+        groupId: "group-2" as Id<"groups">,
+      },
+    ]);
+    rerender(<CategorySettingsPanel />);
+
+    expect(screen.queryByRole("button", { name: "再試行" })).not.toBeInTheDocument();
   });
 
   it("ブランドカラーのスウォッチからカテゴリ色を選べる", async () => {
