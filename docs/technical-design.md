@@ -956,7 +956,7 @@ Convex関数を実装する時点で、未認証の場合に拒否されるこ�
 - `setActiveGroup` は、ログイン中ユーザーが所属しているグループだけを active にできる。
 - `removeMember` はユーザー本人の `users` レコードや Clerk アカウントは削除しない。
 - `requestGroupDeletion` はjob作成、`groups.status = deleting`、依頼者の`activeGroupId`解除を同一transactionで行い、bounded workerへ委譲する。Clerk アカウントや`users`レコードは削除しない（#224）。
-- owner削除のworkerは`recipientSnapshot → startedEnqueue → purge registry → finalSweep → completedEnqueue → recipientCleanup`の順で進める。通知はbusiness keyでdedupeし、全recipientのenqueue/skipとcleanup完了後だけjobを`completed`にする。
+- owner削除のworkerは`recipientSnapshot → startedEnqueue → purge registry → finalSweep → completedEnqueue → recipientCleanup`の順で進める。`finalSweep`でpurge registryの対象データが残っていれば、最初に残っているpurge stageへ戻して再実行する。通知はbusiness keyでdedupeし、全recipientのenqueue/skipとcleanup完了後だけjobを`completed`にする。
 - deleting groupは通常のmembership解決と招待受諾から除外し、background処理も結果保存transactionでgroup lifecycleを再確認する。
 - `transferGroupOwnership` と `requestGroupDeletion` は owner のみが UI と mutation から実行できる。
 - グループ未所属または activeGroupId 未選択のユーザーは、設定や家計データへ進めない。
