@@ -158,18 +158,18 @@ describe("useExpenseEntryMode 複数項目モードとの行き来", () => {
   it("単一→複数モード移行時にメモとカテゴリを引き継ぐ", () => {
     const { result } = renderMode("2026-11-16");
     act(() => result.current.handleItemChange(0, "categoryId", "cat-daily"));
-    act(() => result.current.handleItemChange(0, "memo", "定期購入"));
+    act(() => result.current.setMemo("定期購入"));
     enterMultiMode(result);
 
     expect(result.current.isMultiMode).toBe(true);
-    expect(result.current.items[0]?.memo).toBe("定期購入");
+    expect(result.current.memo).toBe("定期購入");
     expect(result.current.items[0]?.categoryId).toBe("cat-daily");
     expect(result.current.items[0]?.title).toBe("スーパー北浜");
   });
 
   it("入力済みの明細が2件未満なら確認なしで単一モードへ戻り、合計を金額に入れる", () => {
     const { result } = renderMode("2026-11-16");
-    act(() => result.current.handleItemChange(0, "memo", "定期購入"));
+    act(() => result.current.setMemo("定期購入"));
     enterMultiMode(result);
     act(() => result.current.handleItemChange(0, "amountYen", "3000"));
 
@@ -178,7 +178,7 @@ describe("useExpenseEntryMode 複数項目モードとの行き来", () => {
     expect(result.current.showExitMultiConfirm).toBe(false);
     expect(result.current.isMultiMode).toBe(false);
     expect(result.current.sourceAmount).toBe("3000");
-    expect(result.current.items[0]?.memo).toBe("定期購入");
+    expect(result.current.memo).toBe("定期購入");
     expect(result.current.items[0]?.categoryId).toBe("cat-food");
     expect(result.current.shopName).toBe("スーパー北浜");
   });
@@ -196,7 +196,7 @@ describe("useExpenseEntryMode 複数項目モードとの行き来", () => {
   it("入力済みの明細が2件以上あるときは確認を出し、確認で単一モードへ戻る", () => {
     const { result } = renderMode("2026-11-16");
     act(() => result.current.handleItemChange(0, "categoryId", "cat-daily"));
-    act(() => result.current.handleItemChange(0, "memo", "定期購入"));
+    act(() => result.current.setMemo("定期購入"));
     enterMultiMode(result);
     act(() => result.current.handleItemChange(0, "amountYen", "3000"));
     act(() => result.current.handleAddItem());
@@ -215,7 +215,7 @@ describe("useExpenseEntryMode 複数項目モードとの行き来", () => {
     // 金額は明細合計、カテゴリは先頭項目のもの、メモは引き継ぐ
     expect(result.current.sourceAmount).toBe("5000");
     expect(result.current.items[0]?.categoryId).toBe("cat-daily");
-    expect(result.current.items[0]?.memo).toBe("定期購入");
+    expect(result.current.memo).toBe("定期購入");
     expect(result.current.shopName).toBe("スーパー北浜");
   });
 
@@ -234,5 +234,20 @@ describe("useExpenseEntryMode 複数項目モードとの行き来", () => {
     expect(result.current.items).toHaveLength(2);
     expect(result.current.items[0]?.amountYen).toBe("3000");
     expect(result.current.items[1]?.amountYen).toBe("2000");
+  });
+
+  it("先頭の明細を削除しても支出全体のメモは保持される", () => {
+    const { result } = renderMode("2026-11-16");
+    act(() => result.current.setMemo("立替分"));
+    enterMultiMode(result);
+    act(() => result.current.handleAddItem());
+    act(() => result.current.handleRemoveItem(0));
+
+    expect(result.current.memo).toBe("立替分");
+
+    act(() => result.current.handleExitMultiMode());
+
+    expect(result.current.isMultiMode).toBe(false);
+    expect(result.current.memo).toBe("立替分");
   });
 });
