@@ -152,7 +152,7 @@ export function ExpenseEntryWorkbench({
       >
         <Alert
           onClose={handleSnackbarClose}
-          severity={snackbar.severity}
+          severity="success"
           sx={{ width: "100%" }}
           variant="filled"
         >

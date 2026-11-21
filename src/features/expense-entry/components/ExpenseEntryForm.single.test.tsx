@@ -201,5 +201,45 @@ describe("ExpenseEntryForm（single）", () => {
         "false",
       );
     });
+
+    it("保存失敗時はフォーム上部のAlertだけにエラーを出し、入力内容を保持する", async () => {
+      createExpenseEntriesMock.mockRejectedValueOnce(new Error("保存に失敗しました"));
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "2000");
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      // 同じメッセージがAlertとSnackbarに二重表示されない
+      await waitFor(() => {
+        expect(screen.getAllByText("保存に失敗しました")).toHaveLength(1);
+      });
+      expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("スーパー北浜");
+      expect(screen.getByLabelText("合計金額")).toHaveValue("2,000");
+    });
+
+    it("保存成功時はSnackbarで通知する", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "2000");
+      await user.click(screen.getByRole("button", { name: "保存して次へ" }));
+
+      expect(await screen.findByText("支出項目を保存しました")).toBeInTheDocument();
+    });
   });
 });
