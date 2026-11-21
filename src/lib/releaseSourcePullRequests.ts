@@ -2,7 +2,7 @@ import { sanitizeExternalText } from "./generateProductUpdates";
 import type { ProductUpdateDraft, PullRequestDecision } from "../../lib/domain/productUpdates";
 import { readProductUpdateSpec, UPDATE_SPEC_START_MARKER } from "./productUpdateSpec";
 
-export type ClassifiedCommit =
+type ClassifiedCommit =
   | { kind: "pull_request"; number: number; headRef?: string; sha: string }
   | { kind: "branch_sync"; sha: string; subject: string }
   | { kind: "unresolved"; sha: string; subject: string };
@@ -94,7 +94,7 @@ export function classifyCommitSubjects(
   });
 }
 
-export type ReleaseBoundary =
+type ReleaseBoundary =
   | { kind: "resolved"; boundarySha: string; note?: string }
   | { kind: "initial_release" }
   | { kind: "error"; reason: string };
@@ -167,7 +167,7 @@ export function titleForProductUpdate(title: string): string {
   return cleaned === "" ? sanitized : cleaned;
 }
 
-export type PullRequestCollection = {
+type PullRequestCollection = {
   decisions: PullRequestDecision[];
   drafts: ProductUpdateDraft[];
   errors: string[];

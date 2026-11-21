@@ -7,7 +7,7 @@ import { requireGroupMembership } from "../../../convex/groups/membership";
 import { deleteReceipt } from "../../usecase/receipts/deleteReceipt";
 import { createReceiptRepository } from "./receiptRepository";
 
-export type DeleteReceiptArgs = {
+type DeleteReceiptArgs = {
   receiptId: Id<"receipts">;
 };
 

@@ -1,7 +1,7 @@
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
 
-export type HistoryNavigationProps = {
+type HistoryNavigationProps = {
   weeklyPath: string;
   monthlyPath: string;
   searchPath: string;

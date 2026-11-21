@@ -35,7 +35,7 @@ import { ReceiptItemTaxDetail } from "./ReceiptItemTaxDetail";
 import { ReviewItemCategoryControl } from "./ReviewItemCategoryControl";
 import { TaxRateSelect } from "./TaxRateSelect";
 
-export type ReviewItemCardProps = {
+type ReviewItemCardProps = {
   item: ReviewItemValues;
   index: number;
   categories: AiExpenseQueueCategory[];

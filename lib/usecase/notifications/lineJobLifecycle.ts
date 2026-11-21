@@ -21,7 +21,7 @@ import type {
   StaleLineNotificationRecoveryDeps,
 } from "./deps";
 
-export type ClaimLineNotificationJobArgs = {
+type ClaimLineNotificationJobArgs = {
   jobId: string;
   retryKeyCandidate: string;
   leaseMs: number;

@@ -14,7 +14,7 @@ export type { GroupMembership } from "./lib/groupTypes";
 
 export { MAX_GROUP_NAME_LENGTH, normalizeGroupName } from "./lib/groupName";
 
-export type ActiveGroupResolution =
+type ActiveGroupResolution =
   | { status: "resolved"; membership: GroupMembership }
   | { status: "no_group" }
   | { status: "unresolved" };

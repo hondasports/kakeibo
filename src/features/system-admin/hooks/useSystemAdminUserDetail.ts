@@ -21,7 +21,7 @@ export type UserDetail = {
 
 export type GroupCandidate = { id: string; name: string; status: string };
 
-export type DialogState = {
+type DialogState = {
   operation: MembershipOperation;
   sourceGroup?: MembershipDialogGroup;
   targetGroup?: MembershipDialogGroup;

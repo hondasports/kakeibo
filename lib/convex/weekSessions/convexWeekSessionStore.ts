@@ -41,7 +41,7 @@ export function weekSessionRecordToDoc(record: WeekSessionRecord): Doc<"weekSess
 }
 
 /** query 側でも使える読み取り専用メソッド。 */
-export type WeekSessionReader = Pick<WeekSessionStore, "findByGroupAndWeekStart" | "get">;
+type WeekSessionReader = Pick<WeekSessionStore, "findByGroupAndWeekStart" | "get">;
 
 export function createWeekSessionReader(ctx: Pick<QueryCtx, "db">): WeekSessionReader {
   return {

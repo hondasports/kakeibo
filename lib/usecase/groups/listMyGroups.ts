@@ -5,7 +5,7 @@
 import type { GroupReadRepository } from "../../domain/groups/groupRepository";
 import type { GroupRole } from "../../domain/groups/role";
 
-export type MyGroupListItem = {
+type MyGroupListItem = {
   groupId: string;
   name: string;
   clerkOrganizationId: string | null;

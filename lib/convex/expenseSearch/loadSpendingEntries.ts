@@ -85,7 +85,7 @@ async function fetchReceiptsForSearch(
   };
 }
 
-export type SearchHistoryEntries = {
+type SearchHistoryEntries = {
   entries: SpendingEntry[];
   incomes: IncomeListEntry[];
   truncated: boolean;

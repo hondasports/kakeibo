@@ -18,7 +18,7 @@ import type { UsecaseGroupContext } from "../context";
 import { toConvexError } from "../errors";
 import { loadEditableDraft } from "./updateDraftItemTaxOverrides";
 
-export type ApplyReceiptTaxSettingsUsecaseArgs = {
+type ApplyReceiptTaxSettingsUsecaseArgs = {
   draftId: string;
   taxRatePercent?: TaxRatePercent | null;
   amountBasis?: AmountBasis;

@@ -10,7 +10,7 @@ export type WeeklyCategoryBreakdown = {
   totalAmountYen: number;
 };
 
-export type WeeklyExpenseChartItem = {
+type WeeklyExpenseChartItem = {
   weekStartDate: string;
   weekEndDate: string;
   label: string;
@@ -21,7 +21,7 @@ export type WeeklyExpenseChartItem = {
   byCategory: WeeklyCategoryBreakdown[];
 };
 
-export type WeeklyExpenseChartSeries = {
+type WeeklyExpenseChartSeries = {
   dataKey: string;
   label: string;
   color: string;

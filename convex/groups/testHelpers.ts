@@ -34,7 +34,7 @@ export type GroupMemberDoc = {
   updatedAt: number;
 };
 
-export type GroupInvitationDoc = {
+type GroupInvitationDoc = {
   _id: Id<"groupInvitations">;
   groupId: Id<"groups">;
   email: string;

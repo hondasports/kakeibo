@@ -29,7 +29,7 @@ import type { AiExpenseDraftDeps } from "./deps";
 import { assertActiveCategoryForDraft } from "./assertActiveCategoryForDraft";
 import { loadDraftInGroup } from "./loadDraftInGroup";
 
-export type UpdateRegisteredDraftUsecaseArgs = {
+type UpdateRegisteredDraftUsecaseArgs = {
   draftId: string;
   date: string;
   amountYen: number;

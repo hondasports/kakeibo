@@ -3,7 +3,7 @@ import { ExpenseEntry } from "../../domain/expenseEntries/expenseEntry";
 import type { ExpenseEntryRepository } from "../../domain/expenseEntries/expenseEntryRepository";
 import type { UsecaseGroupContext } from "../context";
 
-export type DeleteExpenseEntryUsecaseArgs = {
+type DeleteExpenseEntryUsecaseArgs = {
   expenseEntryId: string;
 };
 

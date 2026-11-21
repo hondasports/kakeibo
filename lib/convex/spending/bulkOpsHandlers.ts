@@ -17,7 +17,7 @@ import { createReceiptRepository } from "../receipts/receiptRepository";
 import { createCategoryRepository } from "../categories/categoryRepository";
 import { createSpendingAuditLogger } from "./spendingAuditLogger";
 
-export type BulkSpendingIdArgs = {
+type BulkSpendingIdArgs = {
   expenseEntryIds: Id<"expenseEntries">[];
   receiptIds: Id<"receipts">[];
 };

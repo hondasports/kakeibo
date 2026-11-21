@@ -8,7 +8,7 @@ import { sortGroupMembersForDisplay } from "../../domain/groups/members";
 import type { GroupRole } from "../../domain/groups/role";
 import type { UsecaseGroupContext } from "../context";
 
-export type GroupMemberListItemResult = {
+type GroupMemberListItemResult = {
   userId: string;
   role: GroupRole;
   displayName: string;

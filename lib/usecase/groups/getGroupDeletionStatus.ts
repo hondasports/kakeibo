@@ -6,7 +6,7 @@ import type { GroupDeletionJobReader } from "../../domain/groupDeletion/groupDel
 import type { GroupDeletionJobStatus } from "../../domain/groupDeletion/groupDeletionJob";
 import type { UsecaseGroupContext } from "../context";
 
-export type GroupDeletionStatusResult = {
+type GroupDeletionStatusResult = {
   jobId: string;
   groupName: string;
   status: GroupDeletionJobStatus;

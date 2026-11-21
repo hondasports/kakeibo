@@ -3,7 +3,7 @@ import { Receipt } from "../../domain/receipt/receipt";
 import type { ReceiptRepository } from "../../domain/receipt/receiptRepository";
 import type { UsecaseGroupContext } from "../context";
 
-export type DeleteReceiptUsecaseArgs = {
+type DeleteReceiptUsecaseArgs = {
   receiptId: string;
 };
 

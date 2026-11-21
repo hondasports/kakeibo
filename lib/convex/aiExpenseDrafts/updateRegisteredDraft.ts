@@ -6,7 +6,7 @@ import { updateRegisteredAiExpenseDraft } from "../../usecase/aiExpenseDrafts/up
 import type { UpdateForReviewItem } from "./reviewValidation";
 import { createAiExpenseDraftDeps } from "./draftUsecaseDeps";
 
-export type UpdateRegisteredDraftArgs = {
+type UpdateRegisteredDraftArgs = {
   draftId: Id<"aiExpenseDrafts">;
   date: string;
   amountYen: number;

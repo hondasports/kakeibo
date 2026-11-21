@@ -2,7 +2,6 @@ import { ConvexError, v } from "convex/values";
 import type { Infer } from "convex/values";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
 import {
   groupDeletionCountsValidator,
   groupDeletionSourceValidator,
@@ -77,5 +76,3 @@ export const resumeGroupDeletion = mutation({
     });
   },
 });
-
-export type SystemAdminGroupDeletionJobId = Id<"groupDeletionJobs">;

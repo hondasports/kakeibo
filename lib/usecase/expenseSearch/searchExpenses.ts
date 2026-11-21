@@ -40,7 +40,7 @@ export type ExpenseSearchStore = {
   ) => Promise<Map<string, { name: string; color: string }>>;
 };
 
-export type SearchExpensesInput = {
+type SearchExpensesInput = {
   entryType?: HistoryEntryType;
   shopQuery?: string;
   categoryId?: string;

@@ -9,7 +9,7 @@ import type { AccountDeletionPurgeOutcome } from "../../domain/accountDeletion/r
 const GROUP_BATCH_SIZE = 25;
 const PURGE_POLL_DELAY_MS = 60_000;
 
-export type AdvancePurgeResult = AccountDeletionPurgeOutcome;
+type AdvancePurgeResult = AccountDeletionPurgeOutcome;
 
 export async function advanceAccountDeletionPurge(
   deps: Pick<

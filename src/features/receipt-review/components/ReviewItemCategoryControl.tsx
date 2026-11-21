@@ -3,7 +3,7 @@ import type { ReviewItemValues } from "../../../../lib/domain/aiExpenseDrafts/re
 import type { AiExpenseQueueCategory } from "../../../types/aiExpenseQueue";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
 
-export type ReviewItemCategoryControlProps = {
+type ReviewItemCategoryControlProps = {
   item: ReviewItemValues;
   disabled?: boolean;
   categories: AiExpenseQueueCategory[];

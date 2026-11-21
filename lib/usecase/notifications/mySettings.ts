@@ -10,7 +10,7 @@ import {
 } from "../../domain/notifications/model";
 import type { NotificationUserMutationDeps, NotificationUserQueryDeps } from "./deps";
 
-export type MyNotificationSettings = {
+type MyNotificationSettings = {
   emailEnabled: boolean;
   lineEnabled: boolean;
   lineLinked: boolean;

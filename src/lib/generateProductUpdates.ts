@@ -1,6 +1,6 @@
 import type { ProductUpdate } from "../../lib/domain/productUpdates";
 
-export type MergedPullRequest = {
+type MergedPullRequest = {
   number: number;
   title: string;
   body: string | null;

@@ -18,7 +18,7 @@ import { loadHistoryEntriesForSearch } from "./loadSpendingEntries";
 
 export type { ExpenseSearchReceipt, ExpenseSearchResult };
 
-export type ExpenseSearchArgs = {
+type ExpenseSearchArgs = {
   entryType?: HistoryEntryType;
   shopQuery?: string;
   categoryId?: Id<"categories">;

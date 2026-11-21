@@ -27,7 +27,7 @@ function docToUserRecord(doc: Doc<"users">): UserRecord {
 }
 
 /** query 側でも使える読み取り専用メソッド。 */
-export type UserReader = Pick<UserStore, "findByUserId" | "findByEmail">;
+type UserReader = Pick<UserStore, "findByUserId" | "findByEmail">;
 
 export function createUserReader(ctx: Pick<QueryCtx, "db">): UserReader {
   return {
