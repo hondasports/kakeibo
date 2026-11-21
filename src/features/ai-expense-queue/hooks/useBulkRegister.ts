@@ -28,6 +28,10 @@ export function useBulkRegister({ readyItemIds }: { readyItemIds: string[] }) {
       }
       return next;
     });
+    setRegistrationErrorDraftIds((current) => {
+      const retained = current.filter((id) => readyItemIds.includes(id));
+      return retained.length === current.length ? current : retained;
+    });
     previousReadyItemIdsRef.current = readyItemIds;
   }, [readyItemIds]);
 
