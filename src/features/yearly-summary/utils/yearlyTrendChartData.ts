@@ -95,6 +95,34 @@ export function buildYearlyTrendChartData(summary: YearlySummary): YearlyTrendCh
   return { labels, expense, income, series, dataset };
 }
 
+/**
+ * グラフの代替テキスト。モードに応じて月ごとの支出・収入、
+ * またはカテゴリ別内訳をテキストで列挙する（スクリーンリーダー向け）。
+ */
+export function buildYearlyChartAriaLabel(
+  mode: "balance" | "category",
+  chartData: YearlyTrendChartData,
+): string {
+  if (mode === "balance") {
+    const months = chartData.dataset.map(
+      (row) =>
+        `${String(row.label)} 支出${formatYen(Number(row.expense))} 収入${formatYen(
+          Number(row.income),
+        )}`,
+    );
+    return `月ごとの収支推移グラフ。${months.join("。")}`;
+  }
+
+  const months = chartData.dataset.map(
+    (row) =>
+      `${String(row.label)} ` +
+      chartData.series
+        .map((entry) => `${entry.label}${formatYen(Number(row[entry.dataKey] ?? 0))}`)
+        .join("、"),
+  );
+  return `カテゴリ別の積み上げ面グラフ。${months.join("。")}`;
+}
+
 export function formatYearlyBalanceTooltip(
   monthLabel: string,
   expenseYen: number,

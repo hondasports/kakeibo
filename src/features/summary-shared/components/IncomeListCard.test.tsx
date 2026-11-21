@@ -22,9 +22,14 @@ describe("IncomeListCard", () => {
     expect(screen.getByText("収入一覧（7件）")).toBeInTheDocument();
     expect(screen.getAllByTestId("receipt-row")).toHaveLength(5);
     const showMore = screen.getByRole("button", { name: "さらに2件を見る" });
+    expect(showMore).toHaveAttribute("aria-expanded", "false");
     await user.click(showMore);
 
     expect(screen.getAllByTestId("receipt-row")).toHaveLength(7);
+    const collapse = screen.getByRole("button", { name: "閉じる" });
+    expect(collapse).toHaveAttribute("aria-expanded", "true");
+    await user.click(collapse);
+    expect(screen.getAllByTestId("receipt-row")).toHaveLength(5);
   });
 
   it("dateFormatを指定すると収入一覧の日付に年を出す", () => {

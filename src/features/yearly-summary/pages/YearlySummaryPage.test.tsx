@@ -6,6 +6,7 @@ import { renderWithDatePickers } from "../../../test/render";
 import { YearlySummaryPage } from "./YearlySummaryPage";
 
 const useQueryMock = vi.hoisted(() => vi.fn());
+const useQueryExperimentalMock = vi.hoisted(() => vi.fn());
 const navigateMock = vi.hoisted(() => vi.fn());
 const routeYear = vi.hoisted(() => ({ value: "2025" as string | undefined }));
 
@@ -16,6 +17,7 @@ vi.mock("../../../../lib/domain/common/year", async (importOriginal) => {
 
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
+  useQuery_experimental: (...args: unknown[]) => useQueryExperimentalMock(...args),
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -79,6 +81,8 @@ describe("YearlySummaryPage", () => {
     navigateMock.mockReset();
     useQueryMock.mockReset();
     useQueryMock.mockReturnValue(summaryResult);
+    useQueryExperimentalMock.mockReset();
+    useQueryExperimentalMock.mockReturnValue({ status: "success", data: { weeklyStartDay: 0 } });
   });
 
   it("年次サマリーの指標・グラフ・月次導線を表示する", () => {

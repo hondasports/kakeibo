@@ -312,7 +312,7 @@ test.describe("週次サマリーパネル（Issue #15 受け入れ確認）", (
     await expect(page.getByRole("heading", { name: "週次サマリー", level: 1 })).toBeVisible();
     await expect(page.getByText("合計支出")).toBeVisible();
     await expect(page.getByText("前週差")).toBeVisible();
-    await expect(page.getByText("2週平均比")).toBeVisible();
+    await expect(page.getByText("直前2週平均との増減率")).toBeVisible();
 
     const analysisGrid = page.locator(".weekly-summary-analysis-grid");
     const chartPanel = analysisGrid.locator(".paper-panel").first();
@@ -488,7 +488,7 @@ test.describe("週別支出推移グラフ（Issue #47, #232）", () => {
 
     // データがある場合はグラフだけでなく上部3指標も読める
     await expect(page.getByText("合計支出")).toBeVisible();
-    await expect(page.getByText("2週平均比")).toBeVisible();
+    await expect(page.getByText("直前2週平均との増減率")).toBeVisible();
     await expectChartLabelsWithinBounds(graph);
     const bar = graph.locator(`.${barClasses.element}`).last();
     await expect(bar).toBeVisible();

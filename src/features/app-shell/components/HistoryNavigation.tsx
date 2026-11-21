@@ -40,7 +40,7 @@ export function HistoryNavigation({ weeklyPath, monthlyPath, searchPath }: Histo
       sx={{
         border: "1px solid",
         borderColor: "divider",
-        borderRadius: 2,
+        borderRadius: 1,
         p: { xs: 1.25, sm: 1.5 },
       }}
     >
