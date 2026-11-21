@@ -1,6 +1,6 @@
 import type { ReceiptAnalysisJobStatus } from "./records";
 
-export const TERMINAL_IMAGE_JOB_STATUSES = [
+const TERMINAL_IMAGE_JOB_STATUSES = [
   "ready",
   "needs_review",
   "failed",

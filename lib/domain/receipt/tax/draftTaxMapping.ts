@@ -6,10 +6,7 @@ import type { AiExpenseDraftReviewReason } from "../../aiExpenseDrafts/constants
 import type {
   AmountBasis,
   ExtractedReceiptItem,
-  ExtractedTaxSummary,
   InterpretedReceiptItem,
-  ReceiptMarkerDefinition,
-  ReceiptTaxInput,
   ReceiptTaxInterpretation,
   TaxContextResolution,
   TaxAllocationStatus,
@@ -177,20 +174,6 @@ export function draftItemToExtractedReceiptItem(item: DraftItemTaxFields): Extra
     quantity: item.quantity,
     unitPriceYen: item.unitPriceYen,
     warnings: item.warnings ?? [],
-  };
-}
-
-export function buildReceiptTaxInput(args: {
-  amountYen: number;
-  items: DraftItemTaxFields[];
-  taxSummaries: ExtractedTaxSummary[];
-  markerDefinitions?: ReceiptMarkerDefinition[];
-}): ReceiptTaxInput {
-  return {
-    amountYen: args.amountYen,
-    items: args.items.map(draftItemToExtractedReceiptItem),
-    taxSummaries: args.taxSummaries,
-    markerDefinitions: args.markerDefinitions,
   };
 }
 

@@ -38,7 +38,7 @@ export const RECEIPT_EXTRACTION_PROMPT_LINES = [
   "読み取れない項目は空文字列または0を使用し、該当項目の confidence を低くしてください。",
 ] as const;
 
-export const RECEIPT_EXTRACTION_JSON_SCHEMA = {
+const RECEIPT_EXTRACTION_JSON_SCHEMA = {
   type: "object",
   properties: {
     documentType: {

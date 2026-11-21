@@ -111,7 +111,7 @@ export function parseConfidence(value: unknown): ExtractionConfidence {
   };
 }
 
-export function parseConfidenceScore(value: unknown, fieldName: string): number {
+function parseConfidenceScore(value: unknown, fieldName: string): number {
   if (typeof value !== "number" || value < 0 || value > 1) {
     throw new Error(
       `OpenAI レスポンスの confidence.${fieldName} は 0.0〜1.0 の数値である必要があります`,
