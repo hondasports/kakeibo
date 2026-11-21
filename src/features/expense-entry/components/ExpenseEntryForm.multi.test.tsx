@@ -222,5 +222,97 @@ describe("ExpenseEntryForm（multi）", () => {
         expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("");
       });
     });
+
+    it("「内訳をやめる」で確認なしに単一モードへ戻り、金額に明細合計が入る", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "5000");
+      await user.click(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" }));
+
+      const item0 = screen.getByTestId("expense-item-0");
+      await user.type(within(item0).getByLabelText("金額"), "3000");
+
+      await user.click(screen.getByRole("button", { name: "内訳をやめる" }));
+
+      // 店名・金額を引き継いで単一モードに戻り、金額は明細合計になる
+      expect(screen.queryByTestId("expense-item-0")).not.toBeInTheDocument();
+      expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("スーパー北浜");
+      expect(screen.getByLabelText("合計金額")).toHaveValue("3,000");
+
+      // 戻ったあとは再編集できる
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "ドラッグストア");
+      expect(screen.getByLabelText("店舗名 / 支払先")).toHaveValue("スーパー北浜ドラッグストア");
+    });
+
+    it("入力済みの明細が2件以上あるときは確認ダイアログを出し、キャンセルで留まり確認で戻る", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "5000");
+      await user.click(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" }));
+
+      const item0 = screen.getByTestId("expense-item-0");
+      await user.type(within(item0).getByLabelText("金額"), "3000");
+      await user.click(screen.getByRole("button", { name: "項目を追加" }));
+      const item1 = screen.getByTestId("expense-item-1");
+      await user.type(within(item1).getByLabelText("金額"), "2000");
+
+      await user.click(screen.getByRole("button", { name: "内訳をやめる" }));
+
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("内訳をやめますか？")).toBeInTheDocument();
+
+      // キャンセルすると複数項目モードに留まる
+      await user.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+      expect(screen.getByTestId("expense-item-1")).toBeInTheDocument();
+
+      // もう一度開いて確認すると単一モードへ戻る
+      await user.click(screen.getByRole("button", { name: "内訳をやめる" }));
+      const confirmDialog = await screen.findByRole("dialog");
+      await user.click(within(confirmDialog).getByRole("button", { name: "内訳をやめる" }));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("expense-item-0")).not.toBeInTheDocument();
+        expect(screen.getByLabelText("合計金額")).toHaveValue("5,000");
+      });
+    });
+
+    it("単一モードで入力したメモが複数モードへの移行と復帰で引き継がれる", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ExpenseEntryForm
+          weekStartDate="2026-06-02"
+          weekEndDate="2026-06-08"
+          categories={categories}
+        />,
+      );
+
+      await user.type(screen.getByLabelText("店舗名 / 支払先"), "スーパー北浜");
+      await user.type(screen.getByLabelText("合計金額"), "5000");
+      await user.type(screen.getByLabelText("メモ"), "週末の買い物");
+      await user.click(screen.getByRole("button", { name: "カテゴリ別の内訳を追加" }));
+
+      await user.click(screen.getByRole("button", { name: "内訳をやめる" }));
+
+      expect(screen.getByLabelText("メモ")).toHaveValue("週末の買い物");
+    });
   });
 });

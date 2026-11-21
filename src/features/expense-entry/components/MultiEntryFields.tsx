@@ -20,6 +20,7 @@ interface MultiEntryFieldsProps {
     value: string,
   ) => void;
   onRemoveItem: (index: number) => void;
+  onExitMultiMode: () => void;
 }
 
 export function MultiEntryFields({
@@ -31,6 +32,7 @@ export function MultiEntryFields({
   onAddItem,
   onItemChange,
   onRemoveItem,
+  onExitMultiMode,
 }: MultiEntryFieldsProps) {
   return (
     <Stack spacing={1.5}>
@@ -52,6 +54,16 @@ export function MultiEntryFields({
 
       <Button variant="outlined" size="small" onClick={onAddItem} aria-label="項目を追加">
         + 項目を追加
+      </Button>
+
+      <Button
+        variant="text"
+        size="small"
+        onClick={onExitMultiMode}
+        aria-label="内訳をやめる"
+        sx={{ alignSelf: "flex-start", minHeight: 44 }}
+      >
+        内訳をやめる
       </Button>
 
       <Divider />

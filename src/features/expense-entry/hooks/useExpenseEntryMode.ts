@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { getTodayDateStringInJapan } from "../../../../lib/domain/common/date";
+import { getWeekEndDate } from "../../week";
 import type { ExpenseItemEntryErrors } from "../validation/expenseItems";
 
 export type ExpenseItemState = {
@@ -9,15 +11,41 @@ export type ExpenseItemState = {
   memo: string;
 };
 
+type EntryCategory = { _id: Id<"categories">; name: string; color: string };
+
 type UseExpenseEntryModeArgs = {
   weekStartDate: string;
-  categories: Array<{ _id: Id<"categories">; name: string; color: string }>;
+  categories: EntryCategory[];
 };
+
+/**
+ * 日付の初期値を返す。表示週に今日（JST）が含まれれば今日、含まれなければ週初日
+ * （docs/ui-ux-design.md §6.1）。
+ */
+export function resolveEntryDefaultDate(weekStartDate: string, todayDate?: string): string {
+  const today = todayDate ?? getTodayDateStringInJapan();
+  const weekEndDate = getWeekEndDate(weekStartDate);
+  return weekStartDate <= today && today <= weekEndDate ? today : weekStartDate;
+}
+
+/**
+ * カテゴリの初期値を返す。引き継ぎたいカテゴリが一覧にあればそれを、
+ * 無ければ先頭カテゴリを返す（docs/ui-ux-design.md §6.4・§6.6）。
+ */
+function resolveEntryCategoryId(
+  preferred: Id<"categories"> | "" | undefined,
+  categories: EntryCategory[],
+): Id<"categories"> | "" {
+  if (preferred && categories.some((category) => category._id === preferred)) {
+    return preferred;
+  }
+  return categories[0]?._id ?? "";
+}
 
 export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEntryModeArgs) {
   const [shopName, setShopNameState] = useState("");
   const [sourceAmount, setSourceAmountState] = useState("");
-  const [date, setDate] = useState(weekStartDate);
+  const [date, setDate] = useState(() => resolveEntryDefaultDate(weekStartDate));
   const [isMultiMode, setIsMultiMode] = useState(false);
   const [items, setItems] = useState<ExpenseItemState[]>([
     { categoryId: categories[0]?._id ?? "", amountYen: "", title: "", memo: "" },
@@ -30,7 +58,7 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
   const [prevWeekStartDate, setPrevWeekStartDate] = useState(weekStartDate);
   if (prevWeekStartDate !== weekStartDate) {
     setPrevWeekStartDate(weekStartDate);
-    setDate(weekStartDate);
+    setDate(resolveEntryDefaultDate(weekStartDate));
   }
 
   // ANALYSIS#1: categories が非同期ロードされたとき items[0].categoryId を更新
@@ -41,7 +69,9 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
     if (firstCategoryId) {
       setItems((prev) =>
         prev.map((item, i) =>
-          i === 0 && !item.categoryId ? { ...item, categoryId: firstCategoryId } : item,
+          i === 0 && !categories.some((category) => category._id === item.categoryId)
+            ? { ...item, categoryId: firstCategoryId }
+            : item,
         ),
       );
     }
@@ -68,8 +98,15 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
       return;
     }
     setIsMultiMode(true);
-    // 既存の入力内容を最初の項目として引き継ぐ
-    setItems([{ categoryId: categories[0]?._id ?? "", amountYen: "", title: shopName, memo: "" }]);
+    // 既存の入力内容を最初の項目として引き継ぐ（メモ・カテゴリは単一モードの選択を維持）
+    setItems([
+      {
+        categoryId: resolveEntryCategoryId(items[0]?.categoryId, categories),
+        amountYen: "",
+        title: shopName,
+        memo: items[0]?.memo ?? "",
+      },
+    ]);
     setItemErrors([{}]);
   };
 
@@ -94,11 +131,57 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
   };
 
   const resetAfterSave = () => {
+    // §6.6: 保存後はカテゴリを引き継ぐ。一覧に無い場合は先頭へフォールバック
+    const carriedCategoryId = resolveEntryCategoryId(items[0]?.categoryId, categories);
     setShopNameState("");
     setSourceAmountState("");
-    setItems([{ categoryId: categories[0]?._id ?? "", amountYen: "", title: "", memo: "" }]);
+    setItems([{ categoryId: carriedCategoryId, amountYen: "", title: "", memo: "" }]);
     setItemErrors([{}]);
     setIsMultiMode(false);
+  };
+
+  // 複数項目モード → 単一モードへ戻る。店名・日付・メモは引き継ぎ、
+  // 金額は明細合計を入れる（明細が未入力なら既存の合計金額を保持）
+  const [showExitMultiConfirm, setShowExitMultiConfirm] = useState(false);
+
+  const hasItemInput = (item: ExpenseItemState) =>
+    item.amountYen.trim() !== "" || item.title.trim() !== "" || item.memo.trim() !== "";
+
+  const exitMultiMode = () => {
+    const totalAmount = items.reduce(
+      (sum, item) => sum + (parseInt(item.amountYen || "0", 10) || 0),
+      0,
+    );
+    const firstItem = items[0];
+    setSourceAmountState(totalAmount > 0 ? String(totalAmount) : sourceAmount);
+    setItems([
+      {
+        categoryId: resolveEntryCategoryId(firstItem?.categoryId, categories),
+        amountYen: "",
+        title: "",
+        memo: firstItem?.memo ?? "",
+      },
+    ]);
+    setItemErrors([{}]);
+    setIsMultiMode(false);
+  };
+
+  const handleExitMultiMode = () => {
+    // 入力済みの明細が2件以上あるときだけ、内訳が破棄されることを確認する
+    if (items.filter(hasItemInput).length >= 2) {
+      setShowExitMultiConfirm(true);
+      return;
+    }
+    exitMultiMode();
+  };
+
+  const handleConfirmExitMultiMode = () => {
+    setShowExitMultiConfirm(false);
+    exitMultiMode();
+  };
+
+  const handleCancelExitMultiMode = () => {
+    setShowExitMultiConfirm(false);
   };
 
   return {
@@ -129,6 +212,10 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
     handleAddItem,
     handleRemoveItem,
     handleItemChange,
+    showExitMultiConfirm,
+    handleExitMultiMode,
+    handleConfirmExitMultiMode,
+    handleCancelExitMultiMode,
     resetAfterSave,
   };
 }

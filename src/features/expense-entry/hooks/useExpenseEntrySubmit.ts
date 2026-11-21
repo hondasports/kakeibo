@@ -42,11 +42,10 @@ export function useExpenseEntrySubmit({
 }: UseExpenseEntrySubmitArgs) {
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [apiError, setApiError] = useState("");
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    severity: "success" | "error";
-    message: string;
-  }>({ open: false, severity: "success", message: "" });
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({
+    open: false,
+    message: "",
+  });
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingDifference, setPendingDifference] = useState(0);
 
@@ -109,13 +108,12 @@ export function useExpenseEntrySubmit({
       // 保存成功 → リセット
       resetAfterSave();
       setStatus("idle");
-      setSnackbar({ open: true, severity: "success", message: "支出項目を保存しました" });
+      setSnackbar({ open: true, message: "支出項目を保存しました" });
     } catch (err) {
       setStatus("error");
-      const message =
-        err instanceof Error ? err.message : "保存に失敗しました。もう一度お試しください。";
-      setApiError(message);
-      setSnackbar({ open: true, severity: "error", message });
+      setApiError(
+        err instanceof Error ? err.message : "保存に失敗しました。もう一度お試しください。",
+      );
     }
   };
 

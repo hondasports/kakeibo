@@ -8,6 +8,7 @@ import {
   QueuePanelRegistered,
 } from "../../ai-expense-queue";
 import { ConfirmDifferenceDialog } from "./ConfirmDifferenceDialog";
+import { ExitMultiModeDialog } from "./ExitMultiModeDialog";
 import { ExpenseFormActions } from "./ExpenseFormActions";
 import { ExpenseFormHeading } from "./ExpenseFormHeading";
 import { MultiEntryFields } from "./MultiEntryFields";
@@ -47,6 +48,10 @@ export function ExpenseEntryWorkbench({
   handleAddItem,
   handleRemoveItem,
   handleItemChange,
+  showExitMultiConfirm,
+  handleExitMultiMode,
+  handleConfirmExitMultiMode,
+  handleCancelExitMultiMode,
   handleSubmit,
   handleConfirmSave,
   handleCancelConfirm,
@@ -109,6 +114,7 @@ export function ExpenseEntryWorkbench({
                 onAddItem={handleAddItem}
                 onItemChange={handleItemChange}
                 onRemoveItem={handleRemoveItem}
+                onExitMultiMode={handleExitMultiMode}
               />
             )}
 
@@ -132,6 +138,12 @@ export function ExpenseEntryWorkbench({
         pendingDifference={pendingDifference}
       />
 
+      <ExitMultiModeDialog
+        onCancel={handleCancelExitMultiMode}
+        onConfirm={handleConfirmExitMultiMode}
+        open={showExitMultiConfirm}
+      />
+
       <Snackbar
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         autoHideDuration={3000}
@@ -140,7 +152,7 @@ export function ExpenseEntryWorkbench({
       >
         <Alert
           onClose={handleSnackbarClose}
-          severity={snackbar.severity}
+          severity="success"
           sx={{ width: "100%" }}
           variant="filled"
         >
