@@ -66,7 +66,7 @@ license: Apache-2.0
 
 - checkの完了まで `gh pr checks <番号> --watch --fail-fast` で待つ。sleepで巡回せず、コマンドが時間切れならwatchを再実行。
 - 委譲の完了は `skills/agent-handoff` の報告ファイルで判定。
-- 再開の合図（背景実行・Monitorの通知等）を仕掛けてからturnを終える。合図が期限切れなら張り直す。待機中に進められる別対象は進める。
+- 待つためにturnを終える前に、完了時にAgentを再開させる通知（Claude CodeのBash `run_in_background` の完了通知・Monitorの通知等）を仕掛ける。通知の無い背景実行だけでturnを終えない。合図が期限切れなら張り直す。待機中に進められる別対象は進める。
 
 ### マージ
 
