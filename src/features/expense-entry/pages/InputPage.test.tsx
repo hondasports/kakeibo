@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InputPage } from "./InputPage";
 
@@ -56,6 +57,16 @@ const defaultWeek = {
   retrySession: retrySessionMock,
 };
 
+const category = { _id: "cat1", name: "食費", color: "#2563eb" };
+
+function renderInputPage() {
+  return render(
+    <MemoryRouter>
+      <InputPage />
+    </MemoryRouter>,
+  );
+}
+
 describe("InputPage", () => {
   beforeEach(() => {
     useQueryMock.mockReset();
@@ -67,7 +78,7 @@ describe("InputPage", () => {
   it("週集計の読み込み中は0件と表示しない", () => {
     useQueryMock.mockReturnValueOnce([]).mockReturnValueOnce(undefined);
 
-    render(<InputPage />);
+    renderInputPage();
 
     expect(screen.queryByTestId("week-status")).not.toBeInTheDocument();
   });
@@ -80,7 +91,7 @@ describe("InputPage", () => {
       prevWeekTotalAmountYen: null,
     });
 
-    render(<InputPage />);
+    renderInputPage();
 
     expect(screen.getByTestId("week-status")).toHaveTextContent("3:12345:2026-06-15:true");
   });
@@ -94,7 +105,7 @@ describe("InputPage", () => {
       sessionError: "週次セッションの読み込みに失敗しました。もう一度お試しください。",
     });
 
-    render(<InputPage />);
+    renderInputPage();
 
     expect(
       screen.getByText("週次セッションの読み込みに失敗しました。もう一度お試しください。"),
@@ -103,5 +114,37 @@ describe("InputPage", () => {
     await user.click(screen.getByRole("button", { name: "再試行" }));
 
     expect(retrySessionMock).toHaveBeenCalledOnce();
+  });
+
+  it("カテゴリ読込中はフォームの代わりにローディングを表示する", () => {
+    useQueryMock.mockReturnValueOnce(undefined).mockReturnValueOnce(undefined);
+
+    renderInputPage();
+
+    expect(screen.getByTestId("loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("expense-entry-form")).not.toBeInTheDocument();
+    expect(screen.getByTestId("week-navigator")).toBeInTheDocument();
+  });
+
+  it("カテゴリが0件と確定したら空状態を表示しフォームは出さない", () => {
+    useQueryMock.mockReturnValueOnce([]).mockReturnValueOnce(undefined);
+
+    renderInputPage();
+
+    expect(screen.getByText(/カテゴリがまだ登録されていません/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "カテゴリ設定を開く" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
+    expect(screen.queryByTestId("expense-entry-form")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("loading")).not.toBeInTheDocument();
+  });
+
+  it("カテゴリが読み込めたらフォームを表示する", () => {
+    useQueryMock.mockReturnValueOnce([category]).mockReturnValueOnce(undefined);
+
+    renderInputPage();
+
+    expect(screen.getByTestId("expense-entry-form")).toBeInTheDocument();
   });
 });

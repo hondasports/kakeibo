@@ -1,5 +1,6 @@
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
+import { Link as RouterLink } from "react-router-dom";
 import { Alert, Box, Button, Stack } from "@mui/material";
 import { ExpenseEntryForm } from "../components/ExpenseEntryForm";
 import { WeekNavigator } from "../../week";
@@ -20,7 +21,7 @@ export function InputPage() {
     retrySession,
   } = useInputPageWeek();
 
-  const categories = useQuery(api.categories.queries.listActive) ?? [];
+  const categories = useQuery(api.categories.queries.listActive);
   const weekSummary = useQuery(api.receipts.summaries.getWeekSummary, {
     weekStartDate,
   });
@@ -73,11 +74,31 @@ export function InputPage() {
           />
         )}
 
-        <ExpenseEntryForm
-          weekStartDate={weekStartDate}
-          weekEndDate={weekEndDate}
-          categories={categories}
-        />
+        {categories === undefined ? (
+          <SuzumemoLoadingState
+            label="カテゴリを読み込み中"
+            message="カテゴリを読み込んでいます…"
+            variant="page"
+          />
+        ) : categories.length === 0 ? (
+          <Alert
+            action={
+              <Button color="inherit" component={RouterLink} size="small" to="/settings">
+                カテゴリ設定を開く
+              </Button>
+            }
+            severity="info"
+            variant="outlined"
+          >
+            カテゴリがまだ登録されていません。支出を記録するには、設定でカテゴリを追加してください。
+          </Alert>
+        ) : (
+          <ExpenseEntryForm
+            weekStartDate={weekStartDate}
+            weekEndDate={weekEndDate}
+            categories={categories}
+          />
+        )}
       </Stack>
     </Box>
   );
