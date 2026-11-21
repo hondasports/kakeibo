@@ -74,7 +74,7 @@ export const REVIEW_VALIDATION_MESSAGES = {
   { guidance: string | null; submit: string | null }
 >;
 
-export type ReviewValidationIssue = {
+type ReviewValidationIssue = {
   code: ReviewValidationCode;
   field: string;
   itemIndex?: number;

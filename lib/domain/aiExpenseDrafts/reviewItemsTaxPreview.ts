@@ -68,7 +68,7 @@ type ReviewTaxEvidenceSource = Pick<
 >;
 
 /** buildReviewTaxPreview へ渡す証拠欄。支払額は呼び出し側が合成する。 */
-export type ReviewTaxEvidence = Pick<
+type ReviewTaxEvidence = Pick<
   ReviewTaxPreviewArgs,
   | "taxSummaries"
   | "sourceTaxSummaries"

@@ -4,18 +4,14 @@ import type {
   RegistrationDestination,
 } from "./receiptDataContract";
 
-export type ReadyDraftForRegistration = {
+type ReadyDraftForRegistration = {
   status: string;
   date?: string;
   amountYen?: number;
   categoryId?: string | null;
 };
 
-export type ValidateReadyDraftError =
-  | "not_ready"
-  | "missing_date"
-  | "missing_amount"
-  | "missing_category";
+type ValidateReadyDraftError = "not_ready" | "missing_date" | "missing_amount" | "missing_category";
 
 export function validateReadyDraftForRegistration(
   draft: ReadyDraftForRegistration,
@@ -39,7 +35,7 @@ export function dedupeDraftIds<T extends string>(draftIds: T[]): T[] {
   return [...new Set(draftIds)];
 }
 
-export type RegisteredDraftCheck = {
+type RegisteredDraftCheck = {
   status: string;
   registeredReceiptId?: string;
 };

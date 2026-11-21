@@ -5,7 +5,7 @@ import { checkCategoryUsability } from "../categories/usability";
  * usecase / infra の双方から利用し、判定ロジックを一箇所に集約する。
  */
 
-export type ReviewCategoryError = "not_in_group" | "inactive";
+type ReviewCategoryError = "not_in_group" | "inactive";
 
 const reviewCategoryErrorMessages: Record<ReviewCategoryError, string> = {
   not_in_group: "Category does not belong to the current group",

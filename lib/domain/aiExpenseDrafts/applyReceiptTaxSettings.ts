@@ -1,9 +1,9 @@
 import { resolveAmountBasisFromSummary } from "../receipt/tax/reinterpretDraftTax";
 import type { AmountBasis, ExtractedTaxSummary, ResolvedAmountBasis } from "../receipt/tax/types";
 
-export type DeriveBulkTaxSettingsError = "unknown_tax_mode" | "cannot_derive_amount_basis";
+type DeriveBulkTaxSettingsError = "unknown_tax_mode" | "cannot_derive_amount_basis";
 
-export type DeriveBulkTaxSettingsArgs = {
+type DeriveBulkTaxSettingsArgs = {
   summary: ExtractedTaxSummary;
   taxRatePercent?: number;
   amountBasis?: AmountBasis;

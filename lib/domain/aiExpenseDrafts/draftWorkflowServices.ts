@@ -15,7 +15,7 @@ import type { AiExpenseDraftItemFields, DraftReviewItemInput } from "./aiExpense
 import type { DraftRegistrationItem } from "./registrationItems";
 
 /** 税再解釈の永続化リクエスト。 */
-export type DraftTaxInterpretationRequest = {
+type DraftTaxInterpretationRequest = {
   draftId: string;
   groupId: string;
   /** 既に読み込んだ下書き。渡せば DB 再取得を省略する。 */
