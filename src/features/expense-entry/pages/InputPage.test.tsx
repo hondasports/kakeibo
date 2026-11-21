@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_TEST_VIEWPORT_WIDTH, stubViewportWidth } from "../../../test/viewport";
 import { InputPage } from "./InputPage";
 
 const useQueryMock = vi.fn();
@@ -73,11 +74,16 @@ function renderInputPage() {
 
 describe("InputPage", () => {
   beforeEach(() => {
+    stubViewportWidth(DEFAULT_TEST_VIEWPORT_WIDTH);
     useQueryMock.mockReset();
     useInputPageWeekMock.mockReset();
     retrySessionMock.mockReset();
     weekNavigatorPropsMock.mockReset();
     useInputPageWeekMock.mockReturnValue(defaultWeek);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("週集計の読み込み中は0件と表示しない", () => {
@@ -153,13 +159,25 @@ describe("InputPage", () => {
     expect(screen.getByTestId("expense-entry-form")).toBeInTheDocument();
   });
 
-  it("週ナビゲーターをSPで1行に収まるコンパクト表示にする", () => {
+  it("SPでは週ナビゲーターを1行に収まるコンパクト表示にする", () => {
+    stubViewportWidth(390);
     useQueryMock.mockReturnValueOnce([category]).mockReturnValueOnce(undefined);
 
     renderInputPage();
 
     expect(weekNavigatorPropsMock).toHaveBeenCalledWith(
       expect.objectContaining({ compactOnMobile: true }),
+    );
+  });
+
+  it("PCでは週ナビゲーターをコンパクトにしない", () => {
+    stubViewportWidth(DEFAULT_TEST_VIEWPORT_WIDTH);
+    useQueryMock.mockReturnValueOnce([category]).mockReturnValueOnce(undefined);
+
+    renderInputPage();
+
+    expect(weekNavigatorPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ compactOnMobile: false }),
     );
   });
 });

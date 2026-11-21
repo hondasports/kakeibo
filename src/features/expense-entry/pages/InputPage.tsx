@@ -1,7 +1,8 @@
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
 import { Link as RouterLink } from "react-router-dom";
-import { Alert, Box, Button, Stack } from "@mui/material";
+import { Alert, Box, Button, Stack, useMediaQuery } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { ExpenseEntryForm } from "../components/ExpenseEntryForm";
 import { WeekNavigator } from "../../week";
 import { WeekStatusPanel } from "../../week";
@@ -9,6 +10,8 @@ import { useInputPageWeek, WEEK_SESSION_LOAD_ERROR_MESSAGE } from "../hooks/useI
 import { SuzumemoLoadingState } from "../../ui";
 
 export function InputPage() {
+  const theme = useTheme();
+  const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const {
     weekStartDate,
     weekEndDate,
@@ -58,7 +61,7 @@ export function InputPage() {
     <Box className="app-main" sx={{ minWidth: 0, maxWidth: "100%" }}>
       <Stack spacing={3}>
         <WeekNavigator
-          compactOnMobile
+          compactOnMobile={isCompact}
           weekStartDate={weekStartDate}
           weekEndDate={weekEndDate}
           isCurrentWeek={isCurrentWeek}
