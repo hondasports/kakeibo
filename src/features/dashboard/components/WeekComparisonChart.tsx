@@ -20,9 +20,9 @@ function formatDiffSummary(diff: number | null, rate: number | null): string {
   }
   const diffText = formatPrevWeekDiff(diff);
   if (rate === null) {
-    return `差額 ${diffText}`;
+    return `前週より ${diffText}`;
   }
-  return `差額 ${diffText} (${formatPrevWeekRate(rate)})`;
+  return `前週より ${formatPrevWeekRate(rate)}（差額 ${diffText}）`;
 }
 
 function hasComparisonData(
@@ -48,10 +48,12 @@ function barSizePercent(amount: number, maxAmount: number): number {
 }
 
 function ComparisonBars({
+  ariaLabel,
   bars,
   isCompact,
   maxAmount,
 }: {
+  ariaLabel: string;
   bars: ComparisonBar[];
   isCompact: boolean;
   maxAmount: number;
@@ -59,7 +61,7 @@ function ComparisonBars({
   if (isCompact) {
     return (
       <Box
-        aria-label="前週との比較グラフ"
+        aria-label={ariaLabel}
         className="dashboard-comparison-bars dashboard-comparison-sp-grid"
         role="img"
       >
@@ -88,7 +90,7 @@ function ComparisonBars({
   }
 
   return (
-    <Box aria-label="前週との比較グラフ" className="dashboard-comparison-plot" role="img">
+    <Box aria-label={ariaLabel} className="dashboard-comparison-plot" role="img">
       <Box className="dashboard-comparison-plot-amounts">
         {bars.map((bar) => (
           <Typography
@@ -158,6 +160,10 @@ export function WeekComparisonChart({
     prevWeekTotalAmountYen === null ||
     !hasComparisonData(currentTotalAmountYen, prevWeekTotalAmountYen)
   ) {
+    const emptyMessage =
+      prevWeekTotalAmountYen === null
+        ? "前週との比較データがあると表示されます"
+        : "今週・前週とも支出はまだありません";
     return (
       <Paper className="paper-panel" data-testid="week-comparison-empty" elevation={0}>
         <Box sx={{ p: 2.5 }}>
@@ -165,7 +171,7 @@ export function WeekComparisonChart({
             前週との比較
           </Typography>
           <Typography color="text.secondary" variant="body2">
-            前週との比較データがあると表示されます
+            {emptyMessage}
           </Typography>
         </Box>
       </Paper>
@@ -178,6 +184,9 @@ export function WeekComparisonChart({
   ];
 
   const maxAmount = Math.max(...bars.map((bar) => bar.amount), 1);
+  const comparisonAriaLabel = `前週との比較グラフ。前週 ${formatYen(
+    prevWeekTotalAmountYen,
+  )}、今週 ${formatYen(currentTotalAmountYen)}、${diffSummary}`;
 
   return (
     <Paper className="paper-panel" data-testid="week-comparison-chart" elevation={0}>
@@ -201,7 +210,12 @@ export function WeekComparisonChart({
           </Typography>
         )}
 
-        <ComparisonBars bars={bars} isCompact={isCompact} maxAmount={maxAmount} />
+        <ComparisonBars
+          ariaLabel={comparisonAriaLabel}
+          bars={bars}
+          isCompact={isCompact}
+          maxAmount={maxAmount}
+        />
 
         {isCompact && (
           <Typography

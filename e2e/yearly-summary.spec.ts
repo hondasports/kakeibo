@@ -22,7 +22,9 @@ test.describe("年次サマリー（Issue #541）", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
-    await expect(page.getByRole("heading", { name: "今週", exact: true })).toBeVisible({
+    await expect(
+      page.getByRole("heading", { name: "今週のダッシュボード", exact: true }),
+    ).toBeVisible({
       timeout: 15_000,
     });
     await page.getByRole("link", { name: "今年の年次サマリーを見る", exact: true }).click();

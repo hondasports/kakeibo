@@ -7,6 +7,7 @@ import { jaJP } from "@mui/x-date-pickers/locales";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { MotionConfig } from "framer-motion";
 import "dayjs/locale/ja";
 import "./index.css";
 import App from "./App.tsx";
@@ -39,9 +40,11 @@ createRoot(document.getElementById("root")!).render(
             localeText={jaJP.components.MuiLocalizationProvider.defaultProps.localeText}
           >
             <CssBaseline />
-            <AppErrorBoundary>
-              <App />
-            </AppErrorBoundary>
+            <MotionConfig reducedMotion="user">
+              <AppErrorBoundary>
+                <App />
+              </AppErrorBoundary>
+            </MotionConfig>
           </LocalizationProvider>
         </ThemeProvider>
       </ConvexProviderWithClerk>

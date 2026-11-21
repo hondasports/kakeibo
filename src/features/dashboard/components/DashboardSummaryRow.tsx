@@ -15,6 +15,7 @@ type DashboardSummaryRowProps = {
   totalIncomeYen: number;
   isLoading?: boolean;
   prevWeekTotalAmountYen: number | null;
+  status?: "draft" | "completed";
   weekEndDate: string;
   weekStartDate: string;
 };
@@ -36,7 +37,7 @@ function PrevWeekRateDisplay({
   const valueColor = isIncrease ? "error.main" : isDecrease ? "success.main" : "text.secondary";
 
   return (
-    <Stack aria-label="前週比" className="dashboard-summary-metric" spacing={0.75}>
+    <Stack className="dashboard-summary-metric" spacing={0.75}>
       <Typography color="text.secondary" variant="body2">
         前週比
       </Typography>
@@ -63,9 +64,11 @@ function MetricBlock({ children, label }: { children: ReactNode; label: string }
 }
 
 function SummaryFooter({
+  status,
   weekEndDate,
   weekStartDate,
 }: {
+  status: "draft" | "completed";
   weekEndDate: string;
   weekStartDate: string;
 }) {
@@ -89,22 +92,24 @@ function SummaryFooter({
           spacing={{ xs: 0, sm: 1.5 }}
           sx={{ alignItems: { xs: "flex-end", sm: "center" } }}
         >
-          <Typography
-            component={Link}
-            sx={{
-              color: "primary.main",
-              fontWeight: 700,
-              minHeight: 44,
-              display: "inline-flex",
-              alignItems: "center",
-              textDecoration: "none",
-              "&:hover": { textDecoration: "underline" },
-            }}
-            to={`/weeks/${weekStartDate}`}
-            variant="body2"
-          >
-            今週のサマリーを見る ›
-          </Typography>
+          {status !== "completed" && (
+            <Typography
+              component={Link}
+              sx={{
+                color: "primary.main",
+                fontWeight: 700,
+                minHeight: 44,
+                display: "inline-flex",
+                alignItems: "center",
+                textDecoration: "none",
+                "&:hover": { textDecoration: "underline" },
+              }}
+              to={`/weeks/${weekStartDate}`}
+              variant="body2"
+            >
+              今週のサマリーを見る ›
+            </Typography>
+          )}
           <Typography
             component={Link}
             sx={{
@@ -184,6 +189,7 @@ export function DashboardSummaryRow({
   totalIncomeYen,
   isLoading = false,
   prevWeekTotalAmountYen,
+  status = "draft",
   weekEndDate,
   weekStartDate,
 }: DashboardSummaryRowProps) {
@@ -275,7 +281,7 @@ export function DashboardSummaryRow({
             />
           </Stack>
 
-          <SummaryFooter weekEndDate={weekEndDate} weekStartDate={weekStartDate} />
+          <SummaryFooter status={status} weekEndDate={weekEndDate} weekStartDate={weekStartDate} />
         </Stack>
       </Box>
     </Paper>
