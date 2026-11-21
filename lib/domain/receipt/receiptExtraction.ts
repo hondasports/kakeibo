@@ -2,7 +2,7 @@ import { validateExpenseAmount, type ExpenseAmountError } from "../expenseEntrie
 import { isValidIsoDateString } from "../week/weekDates";
 import { isPlausibleReceiptYear } from "./receiptDate";
 
-export type ReceiptShopNameError = "empty" | "too_long";
+type ReceiptShopNameError = "empty" | "too_long";
 
 const RECEIPT_SHOP_NAME_MAX_LENGTH = 100;
 
@@ -20,7 +20,7 @@ export function validateReceiptShopName(
   return { success: true, shopName: trimmed };
 }
 
-export type ExtractedIsoDateError = "invalid";
+type ExtractedIsoDateError = "invalid";
 
 /** OCR 抽出された ISO 日付を検証する。空文字を許容する。 */
 export function validateExtractedIsoDate(

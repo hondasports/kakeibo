@@ -18,7 +18,7 @@ export type ExtractionEnvironment = {
   openAiApiKey: string | undefined;
 };
 
-export type ExtractionPlan = { kind: "mock" } | { kind: "real"; apiKey: string };
+type ExtractionPlan = { kind: "mock" } | { kind: "real"; apiKey: string };
 
 /** imageDataUrl を検証し、失敗時はドメインエラーを投げる。 */
 export function assertValidImageDataUrl(imageDataUrl: string): void {

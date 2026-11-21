@@ -1,7 +1,7 @@
 import type { ReceiptAnalysisJobRecord } from "./records";
 import type { DraftResultImageJobStatus } from "./status";
 
-export type AnalysisDraftResult = {
+type AnalysisDraftResult = {
   id: string;
   status: DraftResultImageJobStatus;
   updatedAt: number;

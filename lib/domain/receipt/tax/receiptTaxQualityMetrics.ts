@@ -5,14 +5,14 @@ type AvailableReceiptTaxGoldenCase = ReceiptTaxGoldenCase & {
   input: NonNullable<ReceiptTaxGoldenCase["input"]>;
 };
 
-export type ReceiptTaxQualityMetric = {
+type ReceiptTaxQualityMetric = {
   id: "OFF01" | "OFF02" | "OFF03" | "OFF04" | "OFF05" | "OFF06" | "OFF07";
   numerator: number;
   denominator: number;
   percentage: number | null;
 };
 
-export type ReceiptTaxQualityMetrics = {
+type ReceiptTaxQualityMetrics = {
   totalCases: number;
   availableCases: number;
   unavailableCases: number;

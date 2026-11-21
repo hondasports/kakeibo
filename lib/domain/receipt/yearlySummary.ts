@@ -7,7 +7,7 @@ export type YearlyMonthSource = {
   incomes: Array<{ amountYen: number }>;
 };
 
-export type YearlyMonthPoint = {
+type YearlyMonthPoint = {
   month: string;
   totalAmountYen: number;
   totalIncomeYen: number;

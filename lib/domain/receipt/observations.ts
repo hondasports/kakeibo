@@ -11,7 +11,7 @@ export const RECEIPT_LINE_ROLES = [
 
 export type ReceiptLineRole = (typeof RECEIPT_LINE_ROLES)[number];
 
-export type ReceiptObservationBoundingBox = {
+type ReceiptObservationBoundingBox = {
   left: number;
   top: number;
   width: number;
@@ -31,7 +31,7 @@ export type ReceiptRawObservationLine = {
 
 export const RECEIPT_RAW_OBSERVATION_SOURCES = ["ai_ocr", "legacy_projection"] as const;
 
-export type ReceiptRawObservationSource = (typeof RECEIPT_RAW_OBSERVATION_SOURCES)[number];
+type ReceiptRawObservationSource = (typeof RECEIPT_RAW_OBSERVATION_SOURCES)[number];
 
 export type ReceiptRawObservation = {
   source: ReceiptRawObservationSource;
@@ -89,7 +89,7 @@ export type ReceiptLineClassificationCandidate = {
 
 export const RECEIPT_LINE_CLASSIFICATION_STATUSES = ["classified", "ambiguous"] as const;
 
-export type ReceiptLineClassificationStatus = (typeof RECEIPT_LINE_CLASSIFICATION_STATUSES)[number];
+type ReceiptLineClassificationStatus = (typeof RECEIPT_LINE_CLASSIFICATION_STATUSES)[number];
 
 export type ReceiptLineClassification = {
   sourceLineIndex: number;

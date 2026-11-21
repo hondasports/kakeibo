@@ -1,6 +1,6 @@
 import type { TaxRatePercent } from "./types";
 
-export type TaxRoundingMethod = "floor" | "round" | "ceil";
+type TaxRoundingMethod = "floor" | "round" | "ceil";
 
 export function calculateTaxYen(args: {
   taxableAmountYen: number;

@@ -30,14 +30,11 @@ export const RECEIPT_TAX_GOLDEN_FAILURE_CLASSES = [
   "persistence_or_registration",
 ] as const;
 
-export type ReceiptTaxGoldenFailureClass = (typeof RECEIPT_TAX_GOLDEN_FAILURE_CLASSES)[number];
+type ReceiptTaxGoldenFailureClass = (typeof RECEIPT_TAX_GOLDEN_FAILURE_CLASSES)[number];
 
-export type ReceiptTaxGoldenSourceAvailability =
-  | "approved_image"
-  | "anonymized_lines"
-  | "unavailable";
+type ReceiptTaxGoldenSourceAvailability = "approved_image" | "anonymized_lines" | "unavailable";
 
-export type ReceiptTaxGoldenFixtureOrigin = "survey_anonymized" | "synthetic" | "unavailable";
+type ReceiptTaxGoldenFixtureOrigin = "survey_anonymized" | "synthetic" | "unavailable";
 
 export const RECEIPT_TAX_GOLDEN_UNAVAILABLE_MISSING_EVIDENCE = [
   "approved_image_or_anonymized_lines",
@@ -48,7 +45,7 @@ export const RECEIPT_TAX_GOLDEN_UNAVAILABLE_MISSING_EVIDENCE = [
   "registration_outcome",
 ] as const;
 
-export type ReceiptTaxGoldenObservationLine = {
+type ReceiptTaxGoldenObservationLine = {
   rawText: string;
   amountText?: string;
   amountYen?: number | null;
@@ -56,13 +53,13 @@ export type ReceiptTaxGoldenObservationLine = {
   lineRoleCandidates: string[];
 };
 
-export type ReceiptTaxGoldenTotalCandidate = {
+type ReceiptTaxGoldenTotalCandidate = {
   amountYen: number;
   sourceLineIndex: number;
   evidence: string[];
 };
 
-export type ReceiptTaxGoldenExpected = {
+type ReceiptTaxGoldenExpected = {
   receiptTotalYen: number | null;
   priceTaxTreatment: PriceTaxTreatment;
   taxRateComposition: TaxRateComposition;
