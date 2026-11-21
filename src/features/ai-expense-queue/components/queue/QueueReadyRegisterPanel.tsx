@@ -38,6 +38,37 @@ export function QueueReadyRegisterPanel({
       batchSummary ? selectedBatchReadyIds.includes(item.id) : selectedReadyIds.includes(item.id),
     )
     .reduce((total, item) => total + (item.amountYen ?? 0), 0);
+  const isRegisterDisabled =
+    !canRegisterBatch ||
+    (!batchSummary && selectedReadyIds.length === 0) ||
+    registeringIds.length > 0;
+  const disabledReason = (() => {
+    if (!isRegisterDisabled) {
+      return null;
+    }
+    if (batchSummary) {
+      if (!batchSummary.isAllReady) {
+        if (batchSummary.processingCount > 0) {
+          return "解析が終わるまで登録できません";
+        }
+        const unresolvedCount =
+          batchSummary.needsReviewCount + batchSummary.failedCount + batchSummary.missingCount;
+        if (unresolvedCount > 0) {
+          return "すべての下書きが登録できる状態になると登録できます";
+        }
+        return "登録済みの下書きを含むため、この追加分はまとめて登録できません";
+      }
+      if (selectedBatchReadyIds.length !== readyItemIds.length) {
+        return selectedBatchReadyIds.length === 0
+          ? "登録する下書きにチェックを入れてください"
+          : "すべての下書きを選択すると登録できます";
+      }
+    } else if (selectedReadyIds.length === 0) {
+      return "登録する下書きにチェックを入れてください";
+    }
+    return "登録処理中です";
+  })();
+  const disabledReasonId = `queue-register-disabled-reason-${batchSummary?.batchId ?? "default"}`;
 
   const handleConfirmRegister = async () => {
     if (confirmInFlight) {
@@ -83,13 +114,10 @@ export function QueueReadyRegisterPanel({
         </Typography>
       )}
       <Button
+        aria-describedby={disabledReason ? disabledReasonId : undefined}
         color="primary"
         startIcon={<CheckCircleIcon />}
-        disabled={
-          !canRegisterBatch ||
-          (!batchSummary && selectedReadyIds.length === 0) ||
-          registeringIds.length > 0
-        }
+        disabled={isRegisterDisabled}
         onClick={() => setConfirmOpen(true)}
         type="button"
         variant="contained"
@@ -97,6 +125,11 @@ export function QueueReadyRegisterPanel({
       >
         まとめて登録（{batchSummary ? readyItems.length : selectedReadyIds.length}件）
       </Button>
+      {disabledReason && (
+        <Typography color="text.secondary" id={disabledReasonId} variant="body2">
+          {disabledReason}
+        </Typography>
+      )}
 
       <BulkRegisterConfirmDialog
         confirmDisabled={confirmInFlight || registeringIds.length > 0}
