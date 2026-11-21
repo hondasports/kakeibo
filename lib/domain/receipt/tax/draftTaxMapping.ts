@@ -36,7 +36,7 @@ export type DraftItemTaxFields = {
   taxConfirmedFields?: ReceiptItemTaxConfirmedField[];
 };
 
-export type DraftItemTaxFieldsSource = {
+type DraftItemTaxFieldsSource = {
   itemName: string;
   lineType?: ReceiptItemLineType;
   printedAmountYen?: number | null;

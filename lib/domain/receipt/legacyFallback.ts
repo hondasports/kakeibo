@@ -40,7 +40,7 @@ export function filterReceiptsByKind<T extends FallbackReceipt>(
  * 週の収入ソース判定。
  * 収入の新形式があればそれを使い、支出だけ新形式がある週は旧形式で補完しない。
  */
-export type WeekIncomeSource = "new" | "none" | "legacy";
+type WeekIncomeSource = "new" | "none" | "legacy";
 
 export function resolveWeekIncomeSource(
   entries: readonly FallbackExpenseEntry[],
@@ -54,7 +54,7 @@ export function resolveWeekIncomeSource(
  * 支出一覧のソース判定。
  * 新形式の支出エントリが1件でもあればそれを使い、無ければ旧レシートへフォールバックする。
  */
-export type SpendingEntriesSource = "new" | "legacy";
+type SpendingEntriesSource = "new" | "legacy";
 
 export function resolveSpendingEntriesSource(
   entries: readonly FallbackExpenseEntry[],
@@ -84,13 +84,13 @@ export function needsLegacyReceiptsForYearAggregation(
 export type AggregationExpense = { amountYen: number; categoryId: string };
 export type AggregationIncome = { amountYen: number };
 
-export type AggregationExpenseEntry = FallbackExpenseEntry & {
+type AggregationExpenseEntry = FallbackExpenseEntry & {
   amount: number;
   categoryId?: string;
 };
-export type AggregationReceipt = FallbackReceipt & { amountYen: number; categoryId: string };
+type AggregationReceipt = FallbackReceipt & { amountYen: number; categoryId: string };
 
-export type AggregationEntriesError = "expense_category_required";
+type AggregationEntriesError = "expense_category_required";
 
 export const AGGREGATION_EXPENSE_CATEGORY_REQUIRED_MESSAGE =
   "Expense entry category is required for spending aggregation";
