@@ -7,6 +7,7 @@ import { InputPage } from "./InputPage";
 const useQueryMock = vi.fn();
 const useInputPageWeekMock = vi.fn();
 const retrySessionMock = vi.fn();
+const weekNavigatorPropsMock = vi.fn();
 
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
@@ -19,7 +20,10 @@ vi.mock("../hooks/useInputPageWeek", () => ({
 }));
 
 vi.mock("../../week", () => ({
-  WeekNavigator: () => <div data-testid="week-navigator" />,
+  WeekNavigator: (props: Record<string, unknown>) => {
+    weekNavigatorPropsMock(props);
+    return <div data-testid="week-navigator" />;
+  },
   WeekStatusPanel: ({
     count,
     totalAmountYen,
@@ -72,6 +76,7 @@ describe("InputPage", () => {
     useQueryMock.mockReset();
     useInputPageWeekMock.mockReset();
     retrySessionMock.mockReset();
+    weekNavigatorPropsMock.mockReset();
     useInputPageWeekMock.mockReturnValue(defaultWeek);
   });
 
@@ -146,5 +151,15 @@ describe("InputPage", () => {
     renderInputPage();
 
     expect(screen.getByTestId("expense-entry-form")).toBeInTheDocument();
+  });
+
+  it("週ナビゲーターをSPで1行に収まるコンパクト表示にする", () => {
+    useQueryMock.mockReturnValueOnce([category]).mockReturnValueOnce(undefined);
+
+    renderInputPage();
+
+    expect(weekNavigatorPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ compactOnMobile: true }),
+    );
   });
 });

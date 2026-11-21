@@ -58,6 +58,7 @@ export function InputPage() {
     <Box className="app-main" sx={{ minWidth: 0, maxWidth: "100%" }}>
       <Stack spacing={3}>
         <WeekNavigator
+          compactOnMobile
           weekStartDate={weekStartDate}
           weekEndDate={weekEndDate}
           isCurrentWeek={isCurrentWeek}
