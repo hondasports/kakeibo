@@ -196,6 +196,29 @@ describe("AiExpenseQueuePanel（表示）", () => {
     });
   });
 
+  it("ファイル名が無い下書きは「レシート画像」として表示・プレビューする", async () => {
+    const user = userEvent.setup();
+    const previewImageDataUrl = "data:image/jpeg;base64,preview-image";
+    renderWithProviders(
+      <AiExpenseQueuePanel
+        initialItems={[
+          { ...queueItems[0], fileName: undefined, previewImageDataUrl },
+          { ...queueItems[1], fileName: "AI支出下書き", previewImageDataUrl },
+        ]}
+      />,
+    );
+
+    const previewButtons = screen.getAllByRole("button", {
+      name: "レシート画像をプレビュー",
+    });
+    expect(previewButtons).toHaveLength(2);
+    expect(screen.getAllByRole("img", { name: "レシート画像" })).toHaveLength(2);
+    expect(screen.queryByText("AI支出下書き")).not.toBeInTheDocument();
+
+    await user.click(previewButtons[0]);
+    expect(screen.getByRole("dialog", { name: "レシート画像のプレビュー" })).toBeInTheDocument();
+  });
+
   it("画像のデコードに失敗した場合は画像なし表示へフォールバックする", () => {
     const previewImageDataUrl = "data:image/jpeg;base64,broken-image";
     const { rerender } = renderWithProviders(

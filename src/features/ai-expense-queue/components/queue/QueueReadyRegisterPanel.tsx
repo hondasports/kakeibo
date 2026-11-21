@@ -92,7 +92,7 @@ export function QueueReadyRegisterPanel({
       {batchSummary ? (
         <>
           <Typography variant="body2">
-            今回の追加 {batchSummary.readyCount}/{batchSummary.totalCount}件が登録準備OK
+            今回の追加 {batchSummary.readyCount}/{batchSummary.totalCount}件が登録できます
           </Typography>
           <Typography color="text.secondary" variant="body2">
             {[
@@ -100,7 +100,7 @@ export function QueueReadyRegisterPanel({
               batchSummary.analyzingCount > 0 && `解析中 ${batchSummary.analyzingCount}件`,
               batchSummary.needsReviewCount > 0 && `確認待ち ${batchSummary.needsReviewCount}件`,
               batchSummary.failedCount > 0 && `読み取り失敗 ${batchSummary.failedCount}件`,
-              batchSummary.missingCount > 0 && `反映待ち ${batchSummary.missingCount}件`,
+              batchSummary.missingCount > 0 && `読み取り結果待ち ${batchSummary.missingCount}件`,
             ]
               .filter(Boolean)
               .join(" ・ ") || "すべて確認できます"}

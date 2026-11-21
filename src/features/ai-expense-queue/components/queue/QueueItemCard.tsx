@@ -52,7 +52,15 @@ export function QueueItemCard({
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
-  const secondaryLabel = item.fileName ?? "AI支出下書き";
+  // mapper は画像ファイル名が無い下書きに "AI支出下書き" を fileName へ入れるため、
+  // キューではファイル名なしとして「レシート画像」を表示名にする
+  const fileName = item.fileName === "AI支出下書き" ? undefined : item.fileName;
+  const secondaryLabel = fileName ?? "レシート画像";
+  const imageAlt = fileName ? `${fileName}のレシート画像` : "レシート画像";
+  const previewButtonLabel = fileName
+    ? `${fileName}の画像をプレビュー`
+    : "レシート画像をプレビュー";
+  const previewDialogLabel = fileName ? `${fileName}の画像プレビュー` : "レシート画像のプレビュー";
   const canPreview = Boolean(item.previewImageDataUrl) && !imageLoadFailed;
   const [prevImageUrl, setPrevImageUrl] = useState(item.previewImageDataUrl);
   if (prevImageUrl !== item.previewImageDataUrl) {
@@ -92,7 +100,7 @@ export function QueueItemCard({
           )}
           {canPreview ? (
             <Button
-              aria-label={`${secondaryLabel}の画像をプレビュー`}
+              aria-label={previewButtonLabel}
               onClick={() => setPreviewOpen(true)}
               sx={{
                 border: 1,
@@ -105,7 +113,7 @@ export function QueueItemCard({
               type="button"
             >
               <Box
-                alt={`${secondaryLabel}のレシート画像`}
+                alt={imageAlt}
                 component="img"
                 onError={() => setImageLoadFailed(true)}
                 src={item.previewImageDataUrl}
@@ -120,7 +128,7 @@ export function QueueItemCard({
             </Button>
           ) : (
             <Button
-              aria-label={`${secondaryLabel}の画像をプレビュー`}
+              aria-label={previewButtonLabel}
               disabled
               sx={{
                 border: 1,
@@ -229,7 +237,7 @@ export function QueueItemCard({
         aria-labelledby={`${item.id}-image-preview-title`}
       >
         <DialogTitle id={`${item.id}-image-preview-title`} sx={{ pr: 6 }}>
-          {secondaryLabel}の画像プレビュー
+          {previewDialogLabel}
         </DialogTitle>
         <IconButton
           aria-label="プレビューを閉じる"
@@ -241,7 +249,7 @@ export function QueueItemCard({
         <DialogContent dividers sx={{ overscrollBehavior: "contain", textAlign: "center" }}>
           {canPreview ? (
             <Box
-              alt={`${secondaryLabel}のレシート画像`}
+              alt={imageAlt}
               component="img"
               onError={() => setImageLoadFailed(true)}
               src={item.previewImageDataUrl}
