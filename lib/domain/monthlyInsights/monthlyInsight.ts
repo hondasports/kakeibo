@@ -206,8 +206,10 @@ const formatYen = (n: number) => n.toLocaleString("ja-JP");
 
 /** 保存済みコメントを再生成せず再利用する期間（有料API呼出しの節約） */
 export const INSIGHT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-/** グループ×月あたりの生成回数上限（有料API呼出しの上限） */
-export const INSIGHT_MAX_GENERATIONS = 3;
+/** グループ×月あたりの再生成回数上限（初回の生成は含まない。有料API呼出しの上限） */
+export const INSIGHT_MAX_REGENERATIONS = 3;
+/** 生成枠の予約が失効するまでの時間。予約してからこの時間内に保存されなければ別の生成を許可する */
+export const INSIGHT_RESERVATION_TTL_MS = 60 * 1000;
 
 /** "YYYY-MM" 形式か（存在する月か）。 */
 export function isValidMonthString(month: string): boolean {

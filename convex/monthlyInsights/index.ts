@@ -14,7 +14,8 @@ import {
   currentMonthInJapanTime,
   getPreviousMonth,
   INSIGHT_CACHE_TTL_MS,
-  INSIGHT_MAX_GENERATIONS,
+  INSIGHT_MAX_REGENERATIONS,
+  INSIGHT_RESERVATION_TTL_MS,
   insightNumbersAreConsistent,
   replaceCategorySymbols,
   isValidMonthString,
@@ -62,8 +63,10 @@ type GenerateMonthlyInsightResult = {
   source: "ai" | "fallback";
   // 有料APIを叩かず保存済みを返したとき true
   cached: boolean;
-  // 生成回数の上限に達していて再生成できないとき true
+  // 再生成回数の上限に達していて再生成できないとき true
   generationLimitReached?: boolean;
+  // 別の生成が進行中で今回は新たに生成しなかったとき true
+  generationInProgress?: boolean;
 };
 
 export const generateMonthlyInsight = action({
@@ -82,22 +85,37 @@ export const generateMonthlyInsight = action({
       throw new ConvexError("グループに所属していません");
     }
     // 直近に生成済みなら保存済みを返す（有料APIを叩かない）。
-    // 生成回数の上限（group×月 INSIGHT_MAX_GENERATIONS 回）に達した後も
-    // 保存済みを返し、保存が無ければ上限到達を通知する。
     const existing = await ctx.runQuery(api.monthlyInsights.index.getMonthlyInsight, {
       month: args.month,
     });
-    const usedGenerations = existing === null ? 0 : (existing.generationCount ?? 1);
-    if (
-      existing !== null &&
-      (Date.now() - existing.generatedAt < INSIGHT_CACHE_TTL_MS ||
-        usedGenerations >= INSIGHT_MAX_GENERATIONS)
-    ) {
+    if (existing !== null && Date.now() - existing.generatedAt < INSIGHT_CACHE_TTL_MS) {
       return {
         commentText: existing.commentText,
         source: existing.source,
         cached: true,
-        generationLimitReached: usedGenerations >= INSIGHT_MAX_GENERATIONS,
+      };
+    }
+    // 生成枠を予約してから有料APIを呼ぶ。mutation は直列化されるため、
+    // 同じ group×月への並列呼び出しが同時に生成へ進むことはない。
+    // 再生成の回数上限は group×月あたり INSIGHT_MAX_REGENERATIONS 回（初回は含まない）。
+    const reservation = await ctx.runMutation(
+      internal.monthlyInsights.index.reserveMonthlyInsightGeneration,
+      { groupId: group._id, month: args.month },
+    );
+    if (reservation === "limit") {
+      return {
+        commentText: existing?.commentText ?? "",
+        source: existing?.source ?? "fallback",
+        cached: true,
+        generationLimitReached: true,
+      };
+    }
+    if (reservation === "in_progress") {
+      return {
+        commentText: existing?.commentText ?? "",
+        source: existing?.source ?? "fallback",
+        cached: true,
+        generationInProgress: true,
       };
     }
     const current = await ctx.runQuery(api.receipts.summaries.getMonthSummaryWithCategories, {
@@ -165,6 +183,53 @@ async function assertSameActiveGroup(ctx: ActionCtx, expectedGroupId: Id<"groups
     throw new ConvexError("利用中のグループが変更されたため生成を中止しました");
   }
 }
+
+// 生成枠の予約。同じ group×月への並列呼び出しを直列化して、
+// 有料API呼出しが重ならないようにする。上限超過・進行中は生成を拒否する。
+export async function reserveMonthlyInsightGenerationHandler(
+  ctx: MutationCtx,
+  args: { groupId: Id<"groups">; month: string },
+): Promise<"reserved" | "in_progress" | "limit"> {
+  const now = Date.now();
+  const existing = await ctx.db
+    .query("monthlyInsights")
+    .withIndex("by_group_id_and_month", (q) =>
+      q.eq("groupId", args.groupId).eq("month", args.month),
+    )
+    .unique();
+  if (existing !== null) {
+    if (existing.generatingUntil !== undefined && existing.generatingUntil > now) {
+      return "in_progress";
+    }
+    // 再生成の回数 = 累計の生成回数 - 初回の1回
+    const regenerations = Math.max(0, (existing.generationCount ?? 1) - 1);
+    if (regenerations >= INSIGHT_MAX_REGENERATIONS) {
+      return "limit";
+    }
+    await ctx.db.patch(existing._id, {
+      generationCount: (existing.generationCount ?? 1) + 1,
+      generatingUntil: now + INSIGHT_RESERVATION_TTL_MS,
+    });
+    return "reserved";
+  }
+  // 初回の生成。保存前の予約レコードとして作成し、保存時に本文へ差し替える
+  await ctx.db.insert("monthlyInsights", {
+    groupId: args.groupId,
+    month: args.month,
+    commentText: "",
+    source: "fallback",
+    generatedAt: now,
+    generationCount: 1,
+    generatingUntil: now + INSIGHT_RESERVATION_TTL_MS,
+  });
+  return "reserved";
+}
+
+export const reserveMonthlyInsightGeneration = internalMutation({
+  args: { groupId: v.id("groups"), month: v.string() },
+  returns: v.union(v.literal("reserved"), v.literal("in_progress"), v.literal("limit")),
+  handler: reserveMonthlyInsightGenerationHandler,
+});
 
 export const saveMonthlyInsight = internalMutation({
   args: {

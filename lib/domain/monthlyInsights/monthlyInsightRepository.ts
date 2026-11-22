@@ -6,6 +6,8 @@ export type MonthlyInsightRecord = {
   source: "ai" | "fallback";
   generatedAt: number;
   generationCount?: number;
+  /** 生成枠を予約中の期限（この時刻以降は予約失効とみなす）。未設定なら生成中でない */
+  generatingUntil?: number;
 };
 
 export interface MonthlyInsightRepository {

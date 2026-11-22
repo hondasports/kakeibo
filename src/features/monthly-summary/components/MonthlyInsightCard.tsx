@@ -2,6 +2,7 @@ import { useAction, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { Alert, Button, Card, CardContent, Stack, Typography } from "@mui/material";
+import { INSIGHT_MAX_REGENERATIONS } from "../../../../lib/domain/monthlyInsights/monthlyInsight";
 
 /**
  * 月次インサイト。生成は利用者のボタン押下時のみ（自動生成しない）。
@@ -27,7 +28,11 @@ export function MonthlyInsightCard({ month }: { month: string }) {
 
   if (insight === undefined) return null;
 
-  const generationLimitReached = insight !== null && (insight.generationCount ?? 1) >= 3;
+  // 再生成の回数 = 累計の生成回数 - 初回の1回（上限は再生成のみに掛かる）
+  const regenerationsUsed = insight === null ? 0 : Math.max(0, (insight.generationCount ?? 1) - 1);
+  const generationLimitReached = regenerationsUsed >= INSIGHT_MAX_REGENERATIONS;
+  const generationInProgress =
+    insight?.generatingUntil !== undefined && insight.generatingUntil > Date.now();
 
   return (
     <Card variant="outlined">
@@ -48,23 +53,28 @@ export function MonthlyInsightCard({ month }: { month: string }) {
           {error ? <Alert severity="error">{error}</Alert> : null}
           {generationLimitReached ? (
             <Alert severity="info">
-              再生成の上限（月3回）に達したため、保存済みのコメントを表示しています。
+              再生成の上限（月{INSIGHT_MAX_REGENERATIONS}
+              回）に達したため、保存済みのコメントを表示しています。
             </Alert>
           ) : null}
           <Button
-            disabled={generating || generationLimitReached}
+            disabled={generating || generationLimitReached || generationInProgress}
             onClick={onGenerate}
             sx={{ alignSelf: "flex-start" }}
             variant="outlined"
           >
-            {generating ? "生成しています…" : insight ? "コメントを再生成" : "コメントを生成"}
+            {generating || generationInProgress
+              ? "生成しています…"
+              : insight
+                ? "コメントを再生成"
+                : "コメントを生成"}
           </Button>
           <Typography color="text.secondary" variant="caption">
             金額と件数の集計値だけを外部のAIサービスに送ります。カテゴリ名・明細・店名は送りません。
             {insight && !generationLimitReached
-              ? ` 再生成は残り${Math.max(0, 3 - (insight.generationCount ?? 1))}回までです（生成から24時間以内は保存済みを表示します）。`
+              ? ` 再生成は残り${Math.max(0, INSIGHT_MAX_REGENERATIONS - regenerationsUsed)}回までです（生成から24時間以内は保存済みを表示します）。`
               : !generationLimitReached
-                ? " 生成は月ごとに3回までです。"
+                ? ` 再生成は月ごとに${INSIGHT_MAX_REGENERATIONS}回までです。`
                 : ""}
           </Typography>
         </Stack>

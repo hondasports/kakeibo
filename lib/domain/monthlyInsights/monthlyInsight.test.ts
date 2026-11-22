@@ -3,7 +3,7 @@ import {
   buildFallbackInsight,
   currentMonthInJapanTime,
   INSIGHT_CACHE_TTL_MS,
-  INSIGHT_MAX_GENERATIONS,
+  INSIGHT_MAX_REGENERATIONS,
   isValidMonthString,
   buildMonthlyInsightPrompt,
   extractYenAmounts,
@@ -58,7 +58,7 @@ describe("月バリデーション・生成上限の定数", () => {
   });
   it("キャッシュTTLは24時間・上限は3回", () => {
     expect(INSIGHT_CACHE_TTL_MS).toBe(24 * 60 * 60 * 1000);
-    expect(INSIGHT_MAX_GENERATIONS).toBe(3);
+    expect(INSIGHT_MAX_REGENERATIONS).toBe(3);
   });
 });
 
