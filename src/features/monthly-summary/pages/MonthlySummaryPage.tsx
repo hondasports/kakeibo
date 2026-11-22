@@ -158,6 +158,7 @@ function MonthlySummarySection({ month, onRetry }: { month: string; onRetry: () 
         monthlyBudgetYen={myGroup?.monthlyBudgetYen ?? undefined}
         netAmountYen={summary.netAmountYen}
         scopeLabel={selectedDate ? "集計範囲：月全体" : undefined}
+        showBudget={month === currentMonth}
         totalAmountYen={summary.totalAmountYen}
         totalIncomeYen={summary.totalIncomeYen}
       />

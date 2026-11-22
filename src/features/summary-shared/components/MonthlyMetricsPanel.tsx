@@ -41,6 +41,7 @@ export function MonthlyMetricsPanel({
   monthlyBudgetYen,
   netAmountYen,
   scopeLabel,
+  showBudget = false,
   totalAmountYen,
   totalIncomeYen,
 }: {
@@ -48,6 +49,8 @@ export function MonthlyMetricsPanel({
   monthlyBudgetYen?: number;
   netAmountYen: number;
   scopeLabel?: string;
+  // 予算の消化率・残額は「今月」を表示しているときだけ出す（過去月には出さない）
+  showBudget?: boolean;
   totalAmountYen: number;
   totalIncomeYen: number;
 }) {
@@ -95,7 +98,7 @@ export function MonthlyMetricsPanel({
             />
           </Box>
         )}
-        {!isLoading && monthlyBudgetYen !== undefined && (
+        {!isLoading && showBudget && monthlyBudgetYen !== undefined && (
           <MonthlyBudgetStrip budgetYen={monthlyBudgetYen} spentYen={totalAmountYen} />
         )}
       </Box>
@@ -103,7 +106,7 @@ export function MonthlyMetricsPanel({
   );
 }
 
-/** 月予算に対する消化率と残額。予算未設定の月は表示しない。 */
+/** 月予算に対する消化率と残額。今月・予算設定済みのときのみ表示する。 */
 function MonthlyBudgetStrip({ budgetYen, spentYen }: { budgetYen: number; spentYen: number }) {
   const { remainingYen, usedPercent } = monthlyBudgetProgress(budgetYen, spentYen);
   const over = remainingYen < 0;
