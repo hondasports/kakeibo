@@ -1,4 +1,5 @@
 import { api } from "../../../../convex/_generated/api";
+import { validateMonthlyIncome } from "../../../../lib/domain/users/rules";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -13,8 +14,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-
-const MAX_MONTHLY_INCOME_YEN = 999_999_999;
 
 function formatIncome(value: number): string {
   return value.toLocaleString("ja-JP");
@@ -52,11 +51,7 @@ export function MonthlyIncomeSettingsPanel() {
   const trimmed = incomeText.trim();
   const parsed = trimmed === "" ? undefined : Number(trimmed);
   const inputError =
-    trimmed !== "" &&
-    (parsed === undefined ||
-      !Number.isInteger(parsed) ||
-      parsed < 0 ||
-      parsed > MAX_MONTHLY_INCOME_YEN);
+    trimmed !== "" && (!Number.isFinite(parsed) || !validateMonthlyIncome(parsed).success);
 
   const isDirty = (parsed ?? null) !== savedIncome;
 
