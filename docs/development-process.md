@@ -152,6 +152,8 @@ Issueには最低限:
 - 期待する結果
 - 完了条件
 
+依頼者が書けなかった項目は、Agentが要求工程（`skills/requirements`）で補い、Issueのコメントに残す。
+
 Issue / PRのタイトル・本文・コメントは原則日本語。コード、コマンド、固有名詞、log等は原文可。
 
 ### Issueは判断履歴であって実行ログではない
@@ -178,7 +180,7 @@ Agent taskで残す価値があるもの:
 
 ## 5. Agent作業
 
-`AGENTS.md` はCodex・Devin・Claude Code共通の契約とする。契約本体を各Runtimeの個別設定やこの文書へ複製しない。Issueの補完、ユーザーへ確認する範囲、同じRun内での反復は `AGENTS.md` の「Core contract」、PR作成後の確認は「開発ループ」を正本とする。
+`AGENTS.md` はCodex・Devin・Claude Code共通の契約とする。契約本体を各Runtimeの個別設定やこの文書へ複製しない。Issueの補完、ユーザーへ確認する範囲、同じRun内での反復は `AGENTS.md` の「Core contract」（補完の手順と書式は `skills/requirements`）、PR作成後の確認は「開発ループ」を正本とする。
 
 ## 6. Verification
 
@@ -324,6 +326,7 @@ AGENTS.mdのルールが独自に「常に1 approval」を追加しない。
 
 レビュー観点:
 
+- acceptance criteria（受入条件を全件満たすか）
 - correctness
 - user impact
 - data impact
@@ -428,7 +431,7 @@ Hotfixも原則Pull Requestを経由する。
 
 ## 15. 用語
 
-- **受入条件（Acceptance Criteria）**: 外から観測できる形で定義した完了条件。要求工程でbullet化し、完了時に全件照合する。
+- **受入条件（Acceptance Criteria）**: 外から観測できる形で定義した完了条件。要求工程（`skills/requirements`）でbullet化し、完了時に全件照合する（`skills/repo-code-review`）。
 - **不変条件（invariant）**: 変更の前後で維持すべき性質。
 - **必須確認（Required Controls）**: 変更の種別ごとに必要とされる確認。
 - **finding**: レビュー・指摘対応の管理単位。id・状態・根拠つきで追跡し、修正確認か棄却根拠で閉じる。
