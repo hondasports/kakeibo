@@ -127,19 +127,23 @@ export function extractProfileFieldErrors(error: unknown) {
     };
     const paramName =
       typeof clerkError.meta?.paramName === "string" ? clerkError.meta.paramName : "";
-    const message =
+    const rawMessage =
       typeof clerkError.longMessage === "string" && clerkError.longMessage !== ""
         ? clerkError.longMessage
         : typeof clerkError.message === "string" && clerkError.message !== ""
           ? clerkError.message
           : undefined;
-    if (message === undefined) {
-      continue;
-    }
     if (firstNameFieldNames.has(paramName)) {
-      result.firstName = message;
+      // Clerkの文言は英語のことが多いため、表示はアプリ側の文言に寄せる（生文言は開発時のみ）
+      result.firstName =
+        import.meta.env.DEV && rawMessage
+          ? `名を確認してください（${rawMessage}）`
+          : "名を確認してください";
     } else if (lastNameFieldNames.has(paramName)) {
-      result.lastName = message;
+      result.lastName =
+        import.meta.env.DEV && rawMessage
+          ? `姓を確認してください（${rawMessage}）`
+          : "姓を確認してください";
     }
   }
   return result;

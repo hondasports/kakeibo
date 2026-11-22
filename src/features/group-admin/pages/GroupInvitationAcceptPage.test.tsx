@@ -604,8 +604,9 @@ describe("GroupInvitationAcceptPage", () => {
     fireEvent.change(screen.getByLabelText(/姓/), { target: { value: "Yamada" } });
     fireEvent.submit(screen.getByRole("button", { name: "招待を完了する" }).closest("form")!);
 
-    expect(await screen.findByText("名が長すぎます")).toBeInTheDocument();
-    expect(await screen.findByText("姓の形式が不正です")).toBeInTheDocument();
+    // 項目に対応するエラーはアプリ側の文言で各フィールドの下に出す
+    expect(await screen.findByText(/名を確認してください/)).toBeInTheDocument();
+    expect(await screen.findByText(/姓を確認してください/)).toBeInTheDocument();
     // 項目に対応しないエラーだけが全体Alertに出る。
     expect(screen.queryByText(/プロフィールを更新できませんでした/)).not.toBeInTheDocument();
   });
