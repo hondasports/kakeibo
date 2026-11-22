@@ -38,7 +38,7 @@ function GroupDeletionStatusContent() {
   const status = useQuery(api.groups.deletion.getGroupDeletionStatus, jobId ? { jobId } : "skip");
   const groups = useQuery(
     api.groups.queries.listMyGroups,
-    status?.status === "completed" ? {} : "skip",
+    !jobId || status === null || status?.status === "completed" ? {} : "skip",
   );
   const resume = useMutation(api.groups.deletion.resumeGroupDeletion);
   const navigate = useNavigate();
@@ -46,6 +46,7 @@ function GroupDeletionStatusContent() {
   const [retryError, setRetryError] = useState("");
 
   if (!jobId || status === null) {
+    const hasGroups = (groups?.length ?? 0) > 0;
     return (
       <Box className="app-main">
         <Paper className="settings-ledger" elevation={0}>
@@ -56,6 +57,13 @@ function GroupDeletionStatusContent() {
             <Typography color="text.secondary">
               この削除状況を表示できません。URLまたはログイン中のアカウントをご確認ください。
             </Typography>
+            <Button
+              disabled={groups === undefined}
+              onClick={() => navigate(hasGroups ? "/group/select" : "/group/setup")}
+              variant="contained"
+            >
+              {hasGroups ? "グループ選択へ進む" : "新しいグループを作成する"}
+            </Button>
           </Stack>
         </Paper>
       </Box>
@@ -120,13 +128,16 @@ function GroupDeletionStatusContent() {
               onClick={() => navigate((groups?.length ?? 0) > 0 ? "/group/select" : "/group/setup")}
               variant="contained"
             >
-              続ける
+              {(groups?.length ?? 0) > 0 ? "グループ選択へ進む" : "新しいグループを作成する"}
             </Button>
           ) : (
             <>
-              <Typography color="text.secondary">
-                完全削除はバックグラウンドで進みます。この画面を閉じても処理は継続します。
-              </Typography>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                <CircularProgress aria-label="削除を処理中" size={24} />
+                <Typography color="text.secondary">
+                  完全削除はバックグラウンドで進みます。この画面を閉じても処理は継続します。
+                </Typography>
+              </Stack>
               <Typography color="text.secondary">この処理は取り消し・復元できません。</Typography>
             </>
           )}

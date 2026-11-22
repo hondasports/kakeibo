@@ -26,6 +26,8 @@ function setup(authenticated = true) {
       activeGroupId: null,
       activeGroupName: null,
       isExistingMember: false,
+      invitedByName: null,
+      recipientEmail: "secondary@example.test",
     }),
     runMutation: vi.fn().mockResolvedValue("group-new"),
   };

@@ -51,6 +51,7 @@ export async function previewGroupInvitationForVerifiedEmails(
     ? await deps.memberships.findByGroupAndUser(activeGroupId, args.acceptedUserId)
     : null;
   const activeGroup = activeMembership ? await deps.groups.get(activeMembership.groupId) : null;
+  const inviter = await deps.users.findByUserId(invite.invitedByUserId);
   return {
     groupId: invite.groupId,
     groupName: group.name,
@@ -58,5 +59,7 @@ export async function previewGroupInvitationForVerifiedEmails(
     activeGroupName: activeGroup?.name ?? null,
     isExistingMember:
       (await deps.memberships.findByGroupAndUser(invite.groupId, args.acceptedUserId)) !== null,
+    invitedByName: inviter?.displayName ?? null,
+    recipientEmail: invite.email,
   };
 }

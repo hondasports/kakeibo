@@ -16,6 +16,8 @@ const preview = {
     activeGroupId: "group-current",
     activeGroupName: "現在の家計",
     isExistingMember: false,
+    invitedByName: null,
+    recipientEmail: "recipient@example.test",
   },
 };
 

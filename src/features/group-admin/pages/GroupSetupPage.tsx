@@ -2,6 +2,7 @@ import { api } from "../../../../convex/_generated/api";
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "convex/react";
+import { useClerk } from "@clerk/react";
 import {
   Alert,
   Box,
@@ -14,6 +15,7 @@ import {
 } from "@mui/material";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import { MAX_GROUP_NAME_LENGTH } from "../../../../lib/domain/groups/groupName";
+import { useGroupMembership } from "../hooks/useGroupMembership";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -21,21 +23,25 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export function GroupSetupPage() {
   const navigate = useNavigate();
+  const { signOut } = useClerk();
+  const { hasGroups, isLoading: isMembershipLoading } = useGroupMembership();
   const createGroup = useMutation(api.groups.mutations.createGroup);
   const [groupName, setGroupName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [nameError, setNameError] = useState("");
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault();
     const name = groupName.trim();
     if (!name) {
-      setError("グループ名を入力してください。");
+      setNameError("グループ名を入力してください。");
       return;
     }
 
     setIsSaving(true);
     setError("");
+    setNameError("");
     try {
       await createGroup({ name });
       navigate("/", { replace: true });
@@ -52,7 +58,7 @@ export function GroupSetupPage() {
         <Stack spacing={3}>
           <Box>
             <Typography component="h1" variant="h4">
-              家族グループを作成
+              グループを作成
             </Typography>
             <Typography color="text.secondary">家計データはグループ単位で共有されます。</Typography>
           </Box>
@@ -71,10 +77,15 @@ export function GroupSetupPage() {
             <Stack spacing={2}>
               <TextField
                 autoFocus
+                error={nameError !== ""}
                 fullWidth
+                helperText={nameError || `${groupName.length} / ${MAX_GROUP_NAME_LENGTH}文字`}
                 label="グループ名"
                 name="groupName"
-                onChange={(event) => setGroupName(event.target.value)}
+                onChange={(event) => {
+                  setGroupName(event.target.value);
+                  setNameError("");
+                }}
                 slotProps={{ htmlInput: { maxLength: MAX_GROUP_NAME_LENGTH } }}
                 value={groupName}
               />
@@ -88,6 +99,21 @@ export function GroupSetupPage() {
               </Button>
             </Stack>
           </Box>
+
+          {!isMembershipLoading && hasGroups ? (
+            <Button onClick={() => navigate("/group/select")} variant="text">
+              グループ選択へ戻る
+            </Button>
+          ) : null}
+          {!isMembershipLoading && !hasGroups ? (
+            <Typography color="text.secondary" variant="body2">
+              グループを作成しない場合は、
+              <Button onClick={() => signOut({ redirectUrl: "/" })} variant="text">
+                ログアウト
+              </Button>
+              できます。
+            </Typography>
+          ) : null}
         </Stack>
       </Paper>
     </Box>

@@ -2,10 +2,12 @@ import { api } from "../../../../convex/_generated/api";
 import { formatGroupRoleLabel, type GroupRole } from "../../../../lib/domain/groups/role";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation } from "convex/react";
-import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
+import { useState } from "react";
+import { Alert, Box, Button, CircularProgress, Paper, Stack, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useGroupMembership } from "../hooks/useGroupMembership";
 import { SuzumemoLoadingState } from "../../ui";
+import { formatDateTimeForDisplay } from "../../../utils/date";
 
 type MyGroup = {
   _id: string;
@@ -19,6 +21,8 @@ export function GroupSelectPage() {
   const navigate = useNavigate();
   const { groups, hasGroups, isLoading } = useGroupMembership();
   const setActiveGroup = useMutation(api.groups.mutations.setActiveGroup);
+  const [selectingGroupId, setSelectingGroupId] = useState<string | null>(null);
+  const [selectError, setSelectError] = useState("");
 
   if (isLoading) {
     return (
@@ -37,8 +41,18 @@ export function GroupSelectPage() {
   const typedGroups = (groups ?? []) as MyGroup[];
 
   const handleSelect = async (groupId: string) => {
-    await setActiveGroup({ groupId: groupId as never });
-    navigate("/", { replace: true });
+    if (selectingGroupId !== null) {
+      return;
+    }
+    setSelectingGroupId(groupId);
+    setSelectError("");
+    try {
+      await setActiveGroup({ groupId: groupId as never });
+      navigate("/", { replace: true });
+    } catch {
+      setSelectError("グループを切り替えできませんでした。もう一度お試しください。");
+      setSelectingGroupId(null);
+    }
   };
 
   return (
@@ -53,6 +67,12 @@ export function GroupSelectPage() {
               複数のグループに所属しています。使いたいグループを選んでください。
             </Typography>
           </Box>
+
+          {selectError ? (
+            <Alert severity="error" variant="outlined">
+              {selectError}
+            </Alert>
+          ) : null}
 
           <Stack spacing={1.5}>
             {typedGroups.map((group) => (
@@ -78,16 +98,24 @@ export function GroupSelectPage() {
                         ) : null}
                       </Stack>
                       <Typography color="text.secondary" variant="body2">
-                        {formatGroupRoleLabel(group.role)}
+                        {formatGroupRoleLabel(group.role)}・作成{" "}
+                        {formatDateTimeForDisplay(group.createdAt)}
                       </Typography>
                     </Box>
 
                     <Button
-                      disabled={group.isActive}
+                      disabled={group.isActive || selectingGroupId !== null}
                       onClick={() => handleSelect(group._id)}
+                      startIcon={
+                        selectingGroupId === group._id ? <CircularProgress size={16} /> : undefined
+                      }
                       variant={group.isActive ? "outlined" : "contained"}
                     >
-                      {group.isActive ? "選択中" : "このグループを使う"}
+                      {group.isActive
+                        ? "選択中"
+                        : selectingGroupId === group._id
+                          ? "切り替え中..."
+                          : "このグループを使う"}
                     </Button>
                   </Stack>
                 </Box>
