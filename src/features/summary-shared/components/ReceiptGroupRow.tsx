@@ -10,6 +10,7 @@ import { formatYen } from "../../../../lib/domain/common/currency";
 export function ReceiptGroupRow({
   group,
   dateFormat = "monthDay",
+  onCopy,
   onDelete,
   onEdit,
   selectionEnabled = false,
@@ -20,6 +21,7 @@ export function ReceiptGroupRow({
 }: {
   group: ReceiptGroup;
   dateFormat?: ReceiptDateFormat;
+  onCopy?: (receipt: ReceiptItem) => void;
   onDelete?: (receipt: ReceiptItem) => void;
   onEdit?: (receipt: ReceiptItem) => void;
   selectionEnabled?: boolean;
@@ -43,6 +45,7 @@ export function ReceiptGroupRow({
         receipt={singleItem}
         dateFormat={dateFormat}
         combinedShopName={hasBreakdown ? group.shopName : undefined}
+        onCopy={onCopy}
         onDelete={onDelete}
         onEdit={onEdit}
         previewCategory={previewCategory}
@@ -112,6 +115,7 @@ export function ReceiptGroupRow({
             isDetail
             receipt={item}
             showCategory={item.itemName !== undefined}
+            onCopy={onCopy}
             onDelete={onDelete}
             onEdit={onEdit}
             previewCategory={previewCategory}
