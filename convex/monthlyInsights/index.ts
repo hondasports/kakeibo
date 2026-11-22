@@ -11,8 +11,12 @@ import { createMonthlyInsightGeneratorDeps } from "../../lib/convex/monthlyInsig
 import {
   buildFallbackInsight,
   buildMonthlyInsightPrompt,
+  currentMonthInJapanTime,
   getPreviousMonth,
+  INSIGHT_CACHE_TTL_MS,
+  INSIGHT_MAX_GENERATIONS,
   insightNumbersAreConsistent,
+  isValidMonthString,
   type MonthlyInsightInput,
   type MonthlyInsightMonthPoint,
 } from "../../lib/domain/monthlyInsights/monthlyInsight";
@@ -52,13 +56,48 @@ function toMonthPoint(summary: MonthSummary): MonthlyInsightMonthPoint {
   };
 }
 
+type GenerateMonthlyInsightResult = {
+  commentText: string;
+  source: "ai" | "fallback";
+  // 有料APIを叩かず保存済みを返したとき true
+  cached: boolean;
+  // 生成回数の上限に達していて再生成できないとき true
+  generationLimitReached?: boolean;
+};
+
 export const generateMonthlyInsight = action({
   args: { month: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<GenerateMonthlyInsightResult> => {
+    // 有料API呼出しの入口: month の形式と未来月を先に弾く
+    if (!isValidMonthString(args.month)) {
+      throw new ConvexError("monthはYYYY-MM形式で指定してください");
+    }
+    if (args.month > currentMonthInJapanTime(Date.now())) {
+      throw new ConvexError("未来の月は生成できません");
+    }
     // 所属は getMyGroup（未所属なら null）と集計クエリの requireGroupMembership で検証する
     const group = await ctx.runQuery(api.groups.queries.getMyGroup, {});
     if (group === null) {
       throw new ConvexError("グループに所属していません");
+    }
+    // 直近に生成済みなら保存済みを返す（有料APIを叩かない）。
+    // 生成回数の上限（group×月 INSIGHT_MAX_GENERATIONS 回）に達した後も
+    // 保存済みを返し、保存が無ければ上限到達を通知する。
+    const existing = await ctx.runQuery(api.monthlyInsights.index.getMonthlyInsight, {
+      month: args.month,
+    });
+    const usedGenerations = existing === null ? 0 : (existing.generationCount ?? 1);
+    if (
+      existing !== null &&
+      (Date.now() - existing.generatedAt < INSIGHT_CACHE_TTL_MS ||
+        usedGenerations >= INSIGHT_MAX_GENERATIONS)
+    ) {
+      return {
+        commentText: existing.commentText,
+        source: existing.source,
+        cached: true,
+        generationLimitReached: usedGenerations >= INSIGHT_MAX_GENERATIONS,
+      };
     }
     const current = await ctx.runQuery(api.receipts.summaries.getMonthSummaryWithCategories, {
       month: args.month,
@@ -114,7 +153,7 @@ export const generateMonthlyInsight = action({
       commentText,
       source,
     });
-    return { commentText, source };
+    return { commentText, source, cached: false };
   },
 });
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildFallbackInsight,
+  currentMonthInJapanTime,
+  INSIGHT_CACHE_TTL_MS,
+  INSIGHT_MAX_GENERATIONS,
+  isValidMonthString,
   buildMonthlyInsightPrompt,
   extractYenAmounts,
   getPreviousMonth,
@@ -34,6 +38,26 @@ describe("getPreviousMonth", () => {
   it("年またぎと通常月を返す", () => {
     expect(getPreviousMonth("2025-01")).toBe("2024-12");
     expect(getPreviousMonth("2025-11")).toBe("2025-10");
+  });
+});
+
+describe("月バリデーション・生成上限の定数", () => {
+  it("YYYY-MM 形式のみ受理する", () => {
+    expect(isValidMonthString("2026-11")).toBe(true);
+    expect(isValidMonthString("2026-13")).toBe(false);
+    expect(isValidMonthString("2026-00")).toBe(false);
+    expect(isValidMonthString("2026/11")).toBe(false);
+    expect(isValidMonthString("2026-1")).toBe(false);
+  });
+  it("JST で現在月を返す（月初・月末のUTCずれを含む）", () => {
+    // 2026-11-01T00:30 JST = 2026-10-31T15:30 UTC
+    expect(currentMonthInJapanTime(Date.UTC(2026, 9, 31, 15, 30))).toBe("2026-11");
+    // 2026-10-31T23:30 JST = 2026-10-31T14:30 UTC
+    expect(currentMonthInJapanTime(Date.UTC(2026, 9, 31, 14, 30))).toBe("2026-10");
+  });
+  it("キャッシュTTLは24時間・上限は3回", () => {
+    expect(INSIGHT_CACHE_TTL_MS).toBe(24 * 60 * 60 * 1000);
+    expect(INSIGHT_MAX_GENERATIONS).toBe(3);
   });
 });
 

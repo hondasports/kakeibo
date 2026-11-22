@@ -21,6 +21,7 @@ export function createMonthlyInsightRepository(ctx: { db: Db }): MonthlyInsightR
         commentText: row.commentText,
         source: row.source,
         generatedAt: row.generatedAt,
+        generationCount: row.generationCount,
       };
     },
     async upsert(record) {
@@ -35,11 +36,14 @@ export function createMonthlyInsightRepository(ctx: { db: Db }): MonthlyInsightR
           commentText: record.commentText,
           source: record.source,
           generatedAt: record.generatedAt,
+          // 生成回数は保存のたびに増やす（有料API呼出しの上限管理）
+          generationCount: (existing.generationCount ?? 1) + 1,
         });
       } else {
         await ctx.db.insert("monthlyInsights", {
           ...record,
           groupId: record.groupId as Id<"groups">,
+          generationCount: 1,
         });
       }
     },

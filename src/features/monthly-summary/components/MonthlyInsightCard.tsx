@@ -54,6 +54,9 @@ export function MonthlyInsightCard({ month }: { month: string }) {
           </Button>
           <Typography color="text.secondary" variant="caption">
             カテゴリ別の集計値のみを外部サービスに送信してAIが生成します。明細・店名・個人情報は送信しません。
+            {insight
+              ? ` 再生成は残り${Math.max(0, 3 - (insight.generationCount ?? 1))}回までです（上限到達後・生成から24時間以内は保存済みを表示します）。`
+              : " 生成は月ごとに3回までです。"}
           </Typography>
         </Stack>
       </CardContent>

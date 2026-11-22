@@ -762,5 +762,7 @@ export default defineSchema({
     commentText: v.string(),
     source: v.union(v.literal("ai"), v.literal("fallback")),
     generatedAt: v.number(),
+    // 有料APIの呼び出し回数管理: 生成（再生成含む）ごとにインクリメント
+    generationCount: v.optional(v.number()),
   }).index("by_group_id_and_month", ["groupId", "month"]),
 });

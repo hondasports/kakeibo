@@ -148,6 +148,21 @@ function topCategory(p: MonthlyInsightMonthPoint): MonthlyInsightCategoryPoint |
  */
 const formatYen = (n: number) => n.toLocaleString("ja-JP");
 
+/** 保存済みコメントを再生成せず再利用する期間（有料API呼出しの節約） */
+export const INSIGHT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+/** グループ×月あたりの生成回数上限（有料API呼出しの上限） */
+export const INSIGHT_MAX_GENERATIONS = 3;
+
+/** "YYYY-MM" 形式か（存在する月か）。 */
+export function isValidMonthString(month: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
+}
+
+/** JST で現在の月を "YYYY-MM" で返す（未来月の拒否に使う）。 */
+export function currentMonthInJapanTime(nowMs: number): string {
+  return new Date(nowMs + 9 * 60 * 60 * 1000).toISOString().slice(0, 7);
+}
+
 export function buildFallbackInsight(input: MonthlyInsightInput): string {
   const parts: string[] = [
     `${input.month}の支出は合計${formatYen(input.current.totalAmountYen)}円（${input.current.count}件）でした。`,
