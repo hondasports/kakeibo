@@ -17,6 +17,25 @@ const dateTimeWithSecondsFormatter = new Intl.DateTimeFormat("ja-JP", {
   second: "2-digit",
 });
 
+// 監査ログなど「日付の絞り込みがJST基準」の画面で表示側もJSTに揃えるためのフォーマッタ。
+const dateTimeWithSecondsJapanFormatter = new Intl.DateTimeFormat("ja-JP", {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+  timeZone: "Asia/Tokyo",
+});
+
+/**
+ * タイムスタンプをJSTで "2026/5/18 14:32:07" 形式にフォーマットする。
+ * 絞り込み条件がJST基準の画面で、表示と検索の日付を一致させるために使う。
+ */
+export function formatDateTimeWithSecondsInJapanTime(timestamp: number): string {
+  return dateTimeWithSecondsJapanFormatter.format(new Date(timestamp));
+}
+
 /**
  * ISO 形式の日付文字列 (YYYY-MM-DD) を "M/D" 形式にフォーマットする。
  * 例: "2026-05-18" → "5/18"

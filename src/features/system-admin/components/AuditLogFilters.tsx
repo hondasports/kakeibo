@@ -76,7 +76,7 @@ export function AuditLogFilters({
           />
           <TextField
             error={dateRangeInvalid}
-            helperText={dateRangeInvalid ? dateError : undefined}
+            helperText={dateRangeInvalid ? dateError : "期間はJST基準です"}
             slotProps={{ inputLabel: { shrink: true } }}
             label="終了日"
             onChange={(event) => onToDateChange(event.target.value)}
