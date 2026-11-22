@@ -19,7 +19,9 @@ const KIND_LABELS: Record<ExportEntryKind, string> = {
 };
 
 function csvEscape(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  // Excel等で数式として評価されないよう、式になりうる先頭文字は ' でエスケープする。
+  const sanitized = /^[\t\r\n=+\-@]/.test(value) ? `'${value}` : value;
+  return /[",\r\n]/.test(sanitized) ? `"${sanitized.replace(/"/g, '""')}"` : sanitized;
 }
 
 export function buildExportCsv(rows: ExportCsvRow[]): string {

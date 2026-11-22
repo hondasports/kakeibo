@@ -42,6 +42,23 @@ describe("buildExportCsv", () => {
     expect(csv.split("\r\n")[1]).toBe('2026-06-01,支出,"店""A"",B",食費,100,"一行目\n二行目"');
   });
 
+  it("数式になりうる先頭文字のセルを ' でエスケープする", () => {
+    const csv = buildExportCsv([
+      {
+        date: "2026-06-01",
+        kind: "expense",
+        title: '=HYPERLINK("https://evil.example")',
+        categoryName: "+1+2",
+        amountYen: 100,
+        memo: "@sum(1)",
+      },
+    ]);
+    const row = csv.split("\r\n")[1].split(",");
+    expect(row[2]).toBe(`"'=HYPERLINK(""https://evil.example"")"`);
+    expect(row[3]).toBe("'+1+2");
+    expect(row[5]).toBe("'@sum(1)");
+  });
+
   it("0件でもヘッダーだけ返す", () => {
     expect(buildExportCsv([])).toBe("日付,種別,タイトル,カテゴリ,金額,メモ");
   });

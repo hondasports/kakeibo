@@ -26,7 +26,11 @@ function currentMonthRange(): { start: string; end: string } {
   const now = new Date();
   const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return { start, end: end.toISOString().slice(0, 10) };
+  // toISOString はUTC変換で日付が1日ずれるため、ローカル日付のまま組み立てる。
+  const endText = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(
+    end.getDate(),
+  ).padStart(2, "0")}`;
+  return { start, end: endText };
 }
 
 function downloadCsv(fileName: string, csv: string) {
