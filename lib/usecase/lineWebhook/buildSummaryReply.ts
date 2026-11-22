@@ -159,10 +159,7 @@ export async function buildSummaryReply(
   // （week_summary・category_lookup・help）に限定する。category_lookup は
   // 上のブロックで既に処理済み。receipt_guide のような
   // 他分類では下書きが作られないため、作成済みと返信してはいけない。
-  if (
-    expenseInput !== null &&
-    (command.type === "week_summary" || command.type === "help")
-  ) {
+  if (expenseInput !== null && (command.type === "week_summary" || command.type === "help")) {
     return reply("expense_draft", formatExpenseDraftReply(expenseInput));
   }
   if (command.type === "help") {
