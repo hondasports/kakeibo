@@ -456,6 +456,26 @@ export default defineSchema({
     .index("by_group_id_and_source_document_id", ["groupId", "sourceDocumentId"])
     .index("by_group_id_and_ai_expense_draft_id", ["groupId", "aiExpenseDraftId"]),
 
+  recurringEntryRules: defineTable({
+    groupId: v.id("groups"),
+    createdByUserId: v.optional(v.string()),
+    kind: entryKindValidator,
+    title: v.string(),
+    amountYen: v.number(),
+    // 支出の場合に必須。収入はカテゴリを持たないため optional。
+    categoryId: v.optional(v.id("categories")),
+    shopName: v.optional(v.string()),
+    memo: v.optional(v.string()),
+    frequency: v.union(v.literal("weekly"), v.literal("monthly")),
+    dayOfWeek: v.optional(v.number()),
+    dayOfMonth: v.optional(v.number()),
+    active: v.boolean(),
+    // 最後に登録した発生日（YYYY-MM-DD）。同じ発生日の二重登録を防ぐ。
+    lastRegisteredFor: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_group_id", ["groupId"]),
+
   receipts: defineTable({
     groupId: v.id("groups"),
     // 既存データとの後方互換性を保ちつつ、E2E cleanupの削除範囲を限定する。

@@ -4,6 +4,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { Alert, Box, Button, Stack, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { ExpenseEntryForm } from "../components/ExpenseEntryForm";
+import { RecurringDueSection } from "../components/RecurringDueSection";
 import { WEEK_SESSION_LOAD_ERROR_MESSAGE, WeekNavigator, WeekStatusPanel } from "../../week";
 import { useInputPageWeek } from "../hooks/useInputPageWeek";
 import { SuzumemoLoadingState } from "../../ui";
@@ -98,6 +99,7 @@ export function InputPage() {
                 カテゴリがまだ登録されていません。支出を記録するには、設定でカテゴリを追加してください。
               </Alert>
             )}
+            <RecurringDueSection />
             <ExpenseEntryForm
               weekStartDate={weekStartDate}
               weekEndDate={weekEndDate}
