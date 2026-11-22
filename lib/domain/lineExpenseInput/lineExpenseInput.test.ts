@@ -1,0 +1,21 @@
+import { describe, expect, it } from "vitest";
+import { parseLineExpenseInput } from "./lineExpenseInput";
+
+describe("parseLineExpenseInput", () => {
+  it("内容＋金額を解析する", () => {
+    expect(parseLineExpenseInput("コンビニ 500")).toEqual({ title: "コンビニ", amountYen: 500 });
+    expect(parseLineExpenseInput("食費 1,200円")).toEqual({ title: "食費", amountYen: 1200 });
+    expect(parseLineExpenseInput("500 コンビニ")).toEqual({ title: "コンビニ", amountYen: 500 });
+    expect(parseLineExpenseInput("電車代４００円")).toEqual({ title: "電車代", amountYen: 400 });
+  });
+  it("金額のみ・内容のみ・コマンド語は受理しない", () => {
+    expect(parseLineExpenseInput("500")).toBeNull();
+    expect(parseLineExpenseInput("コンビニ")).toBeNull();
+    expect(parseLineExpenseInput("今週の支出")).toBeNull();
+    expect(parseLineExpenseInput("")).toBeNull();
+  });
+  it("範囲外の金額は受理しない", () => {
+    expect(parseLineExpenseInput("何か 0円")).toBeNull();
+    expect(parseLineExpenseInput("何か 10000000円")).toBeNull();
+  });
+});

@@ -7,6 +7,7 @@ import { createGroupReadRepository } from "../groups/convexGroupRepository";
 import { createUserSettingsRepository } from "../users/userSettingsRepository";
 import { createLineAccountLinkReader } from "../lineLink/convexLineAccountLinkStore";
 import { createLineActiveGroupResolver } from "./convexLineActiveGroupResolver";
+import { createLineExpenseDraftStore } from "./convexLineExpenseDraftStore";
 import { createLineImageJobReader, createLineImageJobStore } from "./convexLineImageJobStore";
 import { createLineSummaryDataReader } from "./convexLineSummaryDataReader";
 import {
@@ -30,6 +31,10 @@ export function createLineWebhookMutationDeps(ctx: MutationCtx) {
     imageJobs: createLineImageJobStore(ctx),
     accountLinks: createLineAccountLinkReader(ctx),
     scheduler: createLineWebhookScheduler(ctx),
+    activeGroup: createLineActiveGroupResolver(ctx),
+    groups: createGroupReadRepository(ctx),
+    summaryData: createLineSummaryDataReader(ctx),
+    expenseDrafts: createLineExpenseDraftStore(ctx),
   };
 }
 

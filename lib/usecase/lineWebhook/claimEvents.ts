@@ -3,7 +3,19 @@
  * claim と案内・画像ジョブ予約を同一 mutation 内で行い、LINE再送時の取りこぼしを防ぐ。
  */
 import { ConvexError } from "convex/values";
-import { resolveLineEventCommandText } from "../../domain/lineSummary/commands";
+import {
+  parseLineSummaryCommand,
+  resolveCategoryLookup,
+  resolveLineEventCommandText,
+} from "../../domain/lineSummary/commands";
+import { parseLineExpenseInput } from "../../domain/lineExpenseInput/lineExpenseInput";
+import { MAX_CATEGORIES_PER_GROUP } from "../../domain/categories/defaults";
+import { getTodayDateStringInJapan } from "../../domain/common/date";
+import { isGroupDeleted } from "../../domain/groups/lifecycle";
+import type { LineActiveGroupResolver } from "../../domain/lineWebhook/activeGroupResolver";
+import type { GroupReadRepository } from "../../domain/groups/groupRepository";
+import type { LineSummaryDataReader } from "../../domain/lineWebhook/summaryDataReader";
+import type { LineExpenseDraftStore } from "../../domain/lineWebhook/lineExpenseDraftStore";
 import {
   buildLinkedWebhookEventFields,
   buildPendingImageJobFields,
@@ -22,6 +34,10 @@ export type ClaimEventsDeps = {
   imageJobs: LineImageJobStore;
   accountLinks: LineAccountLinkReader;
   scheduler: LineWebhookScheduler;
+  activeGroup: LineActiveGroupResolver;
+  groups: GroupReadRepository;
+  summaryData: LineSummaryDataReader;
+  expenseDrafts: LineExpenseDraftStore;
 };
 
 export type ClaimEventsResult = {
@@ -79,6 +95,15 @@ export async function claimEvents(
           nowMs: event.eventTimestamp ?? now,
         });
         scheduledSummaryCount += 1;
+        // 「内容＋金額」のテキストは支出下書きをclaimと同じmutationで作成する。
+        // webhookEventId dedupによりLINE再送での二重作成は起きない。
+        await maybeCreateExpenseDraft(
+          deps,
+          commandText,
+          activeUserId,
+          event.eventTimestamp ?? now,
+          now,
+        );
       }
       if (event.eventType === "image" && event.messageId) {
         await deps.imageJobs.insert(
@@ -111,4 +136,43 @@ export async function claimEvents(
     scheduledSummaryCount,
     scheduledImageCount,
   };
+}
+
+/**
+ * サマリーコマンドとしても解釈できない「内容＋金額」だけ下書き化する。
+ * グループ解決・削除済みチェックは buildSummaryReply と同じ手順に揃える。
+ */
+async function maybeCreateExpenseDraft(
+  deps: ClaimEventsDeps,
+  commandText: string,
+  activeUserId: string,
+  eventAtMs: number,
+  now: number,
+): Promise<void> {
+  const command = parseLineSummaryCommand(commandText);
+  if (command.type !== "week_summary" && command.type !== "category_lookup") {
+    return;
+  }
+  const expenseInput = parseLineExpenseInput(commandText);
+  if (expenseInput === null) return;
+
+  const groupResolution = await deps.activeGroup.resolve(activeUserId);
+  if (groupResolution.status !== "resolved") return;
+  const group = await deps.groups.get(groupResolution.groupId);
+  if (group === null || isGroupDeleted(group)) return;
+
+  const categories = await deps.summaryData.listActiveCategories(
+    groupResolution.groupId,
+    MAX_CATEGORIES_PER_GROUP,
+  );
+  const category = resolveCategoryLookup(expenseInput.title, categories);
+  await deps.expenseDrafts.createFromLineText({
+    groupId: groupResolution.groupId,
+    createdByUserId: activeUserId,
+    title: expenseInput.title,
+    amountYen: expenseInput.amountYen,
+    categoryId: category?.id,
+    date: getTodayDateStringInJapan(eventAtMs),
+    now,
+  });
 }

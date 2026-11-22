@@ -261,6 +261,7 @@ LINEはClerk認証を置き換えるログイン方式ではなく、認証済�
 - 連携済みtextメッセージからの読み取り専用サマリー返信（今週の支出・収入・カテゴリ別・週別推移。未知テキストは使い方案内のみ。代表的な自然文はルールベースで既存intentへ正規化する）
 - サマリー返信と使い方へのクイックリプライ（既存テキストコマンドと `APP_BASE_URL` の `/weeks/current/input`。未連携案内には家計操作を付けない）
 - 連携済みimageメッセージの一時取得とAI支出下書き作成（Web確認必須。LINE側での登録・編集・削除はしない）
+- 連携済みtextメッセージのうち「内容＋金額」（例: 「コンビニ 500」「食費 1,200円」）を支出入力として解析し、claim mutation内で `aiExpenseDrafts` 下書き（`sourceType: "line_text"`, status `ready`）を作成。サマリーコマンド語のみの入力・金額/内容が片方だけの入力は対象外。作成後は「下書きを作成した」返信＋Web導線を返す。登録の成立時点はWeb側の確認・登録操作で、誤登録時の取消は下書きの破棄または登録後エントリの編集・削除
 - Messaging API channel 向け default Rich Menu のセル定義（`lib/domain/lineSummary/richMenu.ts`）、設置用画像、および mock-safe な apply client（`lib/convex/lineWebhook/lineRichMenuClient.ts`）。実行時の自動適用はしない。人間が `pnpm run line:rich-menu -- --apply` で非Production channelへ設置する。セルは読み取り専用サマリーの message action のみで、レシート送信と Web 起動はクイックリプライ側に置く
 
 関連テーブル:
@@ -268,7 +269,7 @@ LINEはClerk認証を置き換えるログイン方式ではなく、認証済�
 - `lineWebhookEvents`
 - `lineImageJobs`
 
-LINEからの家計データ登録・更新・削除は「実装済み」とは扱わない。画像intakeの登録面は既存のWeb AI支出下書きキューである。
+LINEからの家計データ登録・更新・削除は「実装済み」とは扱わない。画像・テキストintakeの登録面はどちらも既存のWeb AI支出下書きキューである。
 
 ### 8.3 LINE環境変数
 

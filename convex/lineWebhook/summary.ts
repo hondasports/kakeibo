@@ -19,6 +19,7 @@ const lineReplyKindValidator = v.union(
   v.literal("week_trend"),
   v.literal("category_lookup"),
   v.literal("receipt_guide"),
+  v.literal("expense_draft"),
 );
 
 const summaryReplyValidator = v.object({

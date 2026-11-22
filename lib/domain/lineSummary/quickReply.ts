@@ -20,7 +20,8 @@ export type LineReplyKind =
   | "week_categories"
   | "week_trend"
   | "category_lookup"
-  | "receipt_guide";
+  | "receipt_guide"
+  | "expense_draft";
 
 export type LineQuickReplyAction =
   | { type: "message"; label: string; text: string }
@@ -61,6 +62,8 @@ export function buildLineQuickReplyActions(
       return [summary, expense, web];
     case "category_lookup":
       return [categories, expense, web];
+    case "expense_draft":
+      return [web];
     case "receipt_guide":
       return [web];
     case "no_group":

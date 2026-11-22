@@ -155,3 +155,8 @@ export function formatWeekTrendReply(input: WeekTrendReplyInput): string {
   });
   return clipReply(["直近3週間の支出", ...lines].join("\n"));
 }
+
+/** LINEテキスト支出入力の下書き作成応答。 */
+export function formatExpenseDraftReply(input: { title: string; amountYen: number }): string {
+  return `下書きを作成したよ\n${input.title} ${input.amountYen.toLocaleString("ja-JP")}円\nWebで確認して登録してね。`;
+}

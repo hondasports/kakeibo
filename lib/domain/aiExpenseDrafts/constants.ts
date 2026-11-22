@@ -12,7 +12,7 @@ export const AI_EXPENSE_DRAFT_STATUSES = [
 
 export type AiExpenseDraftStatus = (typeof AI_EXPENSE_DRAFT_STATUSES)[number];
 
-export const AI_EXPENSE_DRAFT_SOURCE_TYPES = ["image_upload"] as const;
+export const AI_EXPENSE_DRAFT_SOURCE_TYPES = ["image_upload", "line_text"] as const;
 
 export type AiExpenseDraftSourceType = (typeof AI_EXPENSE_DRAFT_SOURCE_TYPES)[number];
 

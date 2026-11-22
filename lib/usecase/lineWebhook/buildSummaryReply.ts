@@ -14,6 +14,7 @@ import type { LineSummaryDataReader } from "../../domain/lineWebhook/summaryData
 import type { SummaryReplyJobArgs } from "../../domain/lineWebhook/scheduler";
 import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../domain/lineWebhook/reply";
 import { parseLineSummaryCommand, resolveCategoryLookup } from "../../domain/lineSummary/commands";
+import { parseLineExpenseInput } from "../../domain/lineExpenseInput/lineExpenseInput";
 import type { LineReplyKind } from "../../domain/lineSummary/quickReply";
 import {
   LINE_HELP_MESSAGE,
@@ -21,6 +22,7 @@ import {
   LINE_RECEIPT_GUIDE_MESSAGE,
   LINE_UNRESOLVED_GROUP_MESSAGE,
   formatCategoryReply,
+  formatExpenseDraftReply,
   formatWeekCategoriesReply,
   formatWeekExpenseReply,
   formatWeekIncomeReply,
@@ -138,10 +140,21 @@ export async function buildSummaryReply(
     );
     const category = resolveCategoryLookup(command.name, categories);
     if (category === undefined) {
+      const expenseInput = parseLineExpenseInput(args.messageText);
+      if (expenseInput !== null) {
+        return reply("expense_draft", formatExpenseDraftReply(expenseInput));
+      }
       return reply("help", LINE_HELP_MESSAGE);
     }
     const matched = weekSummary.byCategory.find((entry) => entry.categoryId === category.id);
     return reply("category_lookup", formatCategoryReply(weekSummary, category.name, matched));
+  }
+
+  // 既定の週サマリーへ落とす前に「内容＋金額」の支出入力か判定する。
+  // 下書き自体は claim 時の mutation で作成済み（作成できた場合のみこの応答に辿り着く）。
+  const expenseInput = parseLineExpenseInput(args.messageText);
+  if (expenseInput !== null) {
+    return reply("expense_draft", formatExpenseDraftReply(expenseInput));
   }
 
   return reply("week_summary", formatWeekSummaryReply(weekSummary));
