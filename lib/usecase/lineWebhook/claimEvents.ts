@@ -89,6 +89,17 @@ export async function claimEvents(
       await deps.webhookEvents.insert(buildLinkedWebhookEventFields(event, activeUserId, now));
       const commandText = resolveLineEventCommandText(event);
       if (commandText !== undefined && event.replyToken) {
+        // 「内容＋金額」のテキストは支出下書きをclaimと同じmutationで作成する。
+        // webhookEventId dedupによりLINE再送での二重作成は起きない。
+        // 結果は返信jobへ渡し、返信側が保存済み下書きの時刻を推測し直さない
+        // ようにする（連投・日跨ぎで他イベントの下書きと混同しない）。
+        const expenseDraftStatus = await maybeCreateExpenseDraft(
+          deps,
+          commandText,
+          activeUserId,
+          event.eventTimestamp ?? now,
+          now,
+        );
         await deps.scheduler.scheduleSummaryReply({
           replyToken: event.replyToken,
           userId: activeUserId,
@@ -96,17 +107,9 @@ export async function claimEvents(
           lineUserId: event.lineUserId,
           messageText: commandText,
           nowMs: event.eventTimestamp ?? now,
+          ...(expenseDraftStatus ? { expenseDraftStatus } : {}),
         });
         scheduledSummaryCount += 1;
-        // 「内容＋金額」のテキストは支出下書きをclaimと同じmutationで作成する。
-        // webhookEventId dedupによりLINE再送での二重作成は起きない。
-        await maybeCreateExpenseDraft(
-          deps,
-          commandText,
-          activeUserId,
-          event.eventTimestamp ?? now,
-          now,
-        );
       }
       if (event.eventType === "image" && event.messageId) {
         await deps.imageJobs.insert(
@@ -151,7 +154,7 @@ async function maybeCreateExpenseDraft(
   activeUserId: string,
   eventAtMs: number,
   now: number,
-): Promise<void> {
+): Promise<"created" | "limit" | null> {
   const command = parseLineSummaryCommand(commandText);
   // help 分類（日本語を含まない入力等）も支出入力の可能性があるため対象にする。
   // 「使い方」等の実コマンドは parseLineExpenseInput が金額不在で弾く。
@@ -160,15 +163,15 @@ async function maybeCreateExpenseDraft(
     command.type !== "category_lookup" &&
     command.type !== "help"
   ) {
-    return;
+    return null;
   }
   const expenseInput = parseLineExpenseInput(commandText);
-  if (expenseInput === null) return;
+  if (expenseInput === null) return null;
 
   const groupResolution = await deps.activeGroup.resolve(activeUserId);
-  if (groupResolution.status !== "resolved") return;
+  if (groupResolution.status !== "resolved") return null;
   const group = await deps.groups.get(groupResolution.groupId);
-  if (group === null || isGroupDeleted(group)) return;
+  if (group === null || isGroupDeleted(group)) return null;
 
   const categories = await deps.summaryData.listActiveCategories(
     groupResolution.groupId,
@@ -185,7 +188,7 @@ async function maybeCreateExpenseDraft(
     activeUserId,
     startOfDayInJapanMs(now),
   );
-  if (createdAts.length >= LINE_TEXT_DRAFT_DAILY_LIMIT) return;
+  if (createdAts.length >= LINE_TEXT_DRAFT_DAILY_LIMIT) return "limit";
   await deps.expenseDrafts.createFromLineText({
     groupId: groupResolution.groupId,
     createdByUserId: activeUserId,
@@ -193,9 +196,9 @@ async function maybeCreateExpenseDraft(
     amountYen: expenseInput.amountYen,
     categoryId: category?.id,
     date: getTodayDateStringInJapan(eventAtMs),
-    // createdAt はイベント時刻で打つ。返信側が「このイベント時刻以降の
-    // 下書き」で作成可否を判定するため、claim 時刻で打つと同時刻に連投
-    // された別イベントの下書きを自分の分と誤認する。
-    now: eventAtMs,
+    // createdAt は claim 時刻で打つ。日次上限は「作成日」で数えるため、
+    // 日をまたいで届いたイベント分も当日のカウントに含める。
+    now,
   });
+  return "created";
 }

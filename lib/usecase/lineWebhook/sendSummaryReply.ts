@@ -39,6 +39,7 @@ export async function sendSummaryReply(
         lineUserId: args.lineUserId,
         messageText: args.messageText,
         nowMs: args.nowMs,
+        expenseDraftStatus: args.expenseDraftStatus,
       });
       replyText = result.replyText;
       replyKind = result.replyKind ?? "unavailable";

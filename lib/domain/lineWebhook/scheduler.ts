@@ -12,6 +12,11 @@ export type SummaryReplyJobArgs = {
   lineUserId: string;
   messageText: string;
   nowMs: number;
+  /**
+   * claim 時点でのこのイベントの支出下書き結果。返信側は
+   * 保存済み下書きの時刻推測ではなくこの値で作成可否を判定する。
+   */
+  expenseDraftStatus?: "created" | "limit";
 };
 
 type ProcessLinkedImageJobArgs = {

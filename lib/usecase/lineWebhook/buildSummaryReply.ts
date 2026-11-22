@@ -61,6 +61,15 @@ async function resolveExpenseDraftReply(
   args: Omit<SummaryReplyJobArgs, "replyToken">,
   expenseInput: NonNullable<ReturnType<typeof parseLineExpenseInput>>,
 ) {
+  // claim がjob引数で渡した作成結果をそのまま使う（時刻推測はしない）。
+  if (args.expenseDraftStatus === "limit") {
+    return reply("expense_draft_limit", LINE_TEXT_DRAFT_DAILY_LIMIT_MESSAGE);
+  }
+  if (args.expenseDraftStatus === "created") {
+    return reply("expense_draft", formatExpenseDraftReply(expenseInput));
+  }
+  // 引数を持たない在庫job向けのフォールバック: 「このイベント時刻以降の
+  // line_text 下書きがあるか」で判定する（createdAt は claim 時刻）。
   const createdAts = await deps.expenseDrafts.lineTextDraftCreatedAtsSince(
     args.userId,
     startOfDayInJapanMs(args.nowMs),
