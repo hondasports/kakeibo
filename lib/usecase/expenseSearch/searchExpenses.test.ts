@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ExpenseSearchDomainError } from "../../domain/expenseSearch/searchResult";
 import {
   AGGREGATE_RESCAN_MAX_RECORDS,
+  PREVIOUS_PERIOD_MAX_RECORDS,
   searchExpenses,
   type ExpenseSearchStore,
   type SearchHistorySource,
@@ -157,7 +158,14 @@ describe("searchExpenses", () => {
     expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
     expect(loadHistoryEntries).toHaveBeenNthCalledWith(1, "g1", "2026-01-01", "2026-01-31", "desc");
     // 前期間比較も集計と同様に並び順に依存せず、常に新しい側の範囲を読む。
-    expect(loadHistoryEntries).toHaveBeenNthCalledWith(2, "g1", "2025-12-01", "2025-12-31", "desc");
+    expect(loadHistoryEntries).toHaveBeenNthCalledWith(
+      2,
+      "g1",
+      "2025-12-01",
+      "2025-12-31",
+      "desc",
+      PREVIOUS_PERIOD_MAX_RECORDS,
+    );
     expect(result.comparison).not.toBeNull();
   });
 
@@ -304,6 +312,7 @@ describe("searchExpenses", () => {
           "2025-12-01",
           "2025-12-31",
           "desc",
+          PREVIOUS_PERIOD_MAX_RECORDS,
         );
         expect(loadHistoryEntries).toHaveBeenCalledTimes(3);
       } else {
@@ -323,6 +332,7 @@ describe("searchExpenses", () => {
           "2025-12-01",
           "2025-12-31",
           "desc",
+          PREVIOUS_PERIOD_MAX_RECORDS,
         );
         expect(loadHistoryEntries).toHaveBeenCalledTimes(3);
       }

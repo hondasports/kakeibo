@@ -34,7 +34,10 @@ export type SearchHistorySource = {
 // 一覧用の取得（各テーブル SEARCH_MAX_RECORDS+1 件まで走査）と合わせても
 // Convex の1クエリあたりのドキュメント走査上限（32,000件）を超えないよう絞る
 // （最悪 20,002 + 10,001 = 30,003 件の走査）。
-export const AGGREGATE_RESCAN_MAX_RECORDS = 5_000;
+// 1クエリのドキュメント走査上限（約32,000件）を、一覧（2テーブル×10,001件）、
+// 集計用の再読（同×3,001件）、前期間（同×2,001件）で分け合う配分にする。
+export const AGGREGATE_RESCAN_MAX_RECORDS = 3_000;
+export const PREVIOUS_PERIOD_MAX_RECORDS = 2_000;
 
 export type ExpenseSearchStore = {
   getCategoryGroupId: (categoryId: string) => Promise<string | undefined>;
@@ -140,6 +143,7 @@ export async function searchExpenses(
       previousPeriod.startDate,
       previousPeriod.endDate,
       "desc",
+      PREVIOUS_PERIOD_MAX_RECORDS,
     );
     previousTruncated = previousSource.truncated;
     previousGroups = filterHistoryGroups(
