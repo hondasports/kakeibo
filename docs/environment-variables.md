@@ -168,6 +168,9 @@ publishable keyから得たissuerとユーザーIDを組み合わせて`E2E_CLER
 | `VITE_APP_MAINTENANCE_ETA` | メンテナンス画面に表示する復旧見込み（同上） | 任意 | 任意 | 任意 | 任意 | ❌ | .env.local / Vercel Env |
 | `VITE_ENABLE_E2E_ROUTES` | 本番相当ビルドで `/__e2e__/*` ルートを有効化（`"1"` のみ有効。`src/routing/e2eRoutes.tsx`） | 不要（`import.meta.env.DEV` で常時有効） | ❌ | `production-release.yml` がビルド時に `=1` を export | ❌ | ❌ | workflow のみ（手動設定しない） |
 
+`VITE_APP_MAINTENANCE_*` はビルド時にバンドルへ埋め込まれるため、変更は
+再デプロイしてから反映される。Vercel Env を更新しただけでは配信中の画面は切り替わらない。
+
 `VITE_ENABLE_E2E_ROUTES` は CI 専用の内部変数で、`.env.example` にはコメントのみ記載し
 `.env.local` の設定対象にしない（リリース候補ビルドでだけ必要になるため）。
 

@@ -173,7 +173,8 @@ function HeaderBrand({ headerBrand }: { headerBrand: PublicStatusHeaderBrand }) 
         sx={{
           alignItems: "center",
           bgcolor: designTokens.color.surface.sunken,
-          borderRadius: designTokens.radius.lg,
+          // ブランドロゴの枠はパネル（radius.lg=16px）より小さく丸める
+          borderRadius: "12px",
           display: "inline-flex",
           justifyContent: "center",
           p: designTokens.space.sm,

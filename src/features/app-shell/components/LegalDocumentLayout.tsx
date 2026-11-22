@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Children, isValidElement } from "react";
+import { Children, isValidElement, useEffect } from "react";
 import { Box, Link as MuiLink, Stack, Typography } from "@mui/material";
 import { SiteCreditsFooter } from "./SiteCreditsFooter";
 
@@ -33,6 +33,16 @@ export function LegalDocumentLayout({
   children,
 }: LegalDocumentLayoutProps) {
   const sections = collectSections(children);
+
+  // /terms#節 などフラグメント付きの直接アクセスでは、
+  // SPA側で要素がマウントされた後にスクロールし直す
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const target = document.getElementById(decodeURIComponent(hash));
+    target?.scrollIntoView();
+  }, []);
+
   const revisedDateLabel =
     lastRevisedDate && lastRevisedDate !== effectiveDate ? `／最終改定日: ${lastRevisedDate}` : "";
 
