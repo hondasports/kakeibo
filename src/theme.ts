@@ -67,7 +67,7 @@ export const theme = createTheme({
     },
     MuiButton: {
       styleOverrides: {
-        root: {
+        root: ({ theme }) => ({
           minHeight: designTokens.size.buttonMinHeight,
           borderRadius: designTokens.radius.md,
           boxShadow: "none",
@@ -75,7 +75,20 @@ export const theme = createTheme({
           "&:hover": {
             boxShadow: "none",
           },
-        },
+          // SPのタップ対象は44px以上に揃える（App.cssの後勝ち詳細度ではなくテーマで指定）
+          [theme.breakpoints.down("md")]: {
+            minHeight: designTokens.size.buttonMinHeightSp,
+          },
+        }),
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          [theme.breakpoints.down("md")]: {
+            minHeight: designTokens.size.buttonMinHeightSp,
+          },
+        }),
       },
     },
     MuiChip: {
@@ -143,10 +156,13 @@ export const theme = createTheme({
     },
     MuiTab: {
       styleOverrides: {
-        root: {
+        root: ({ theme }) => ({
           minHeight: designTokens.size.buttonMinHeight,
           paddingInline: designTokens.space.md,
-        },
+          [theme.breakpoints.down("md")]: {
+            minHeight: designTokens.size.buttonMinHeightSp,
+          },
+        }),
       },
     },
     MuiTextField: {

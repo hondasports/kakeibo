@@ -169,7 +169,7 @@ function AccountDeletionPageContent() {
           />
           {accountEmail !== "" ? (
             <TextField
-              helperText={`本人確認のため、ログイン中のメールアドレス（${accountEmail}）を入力してください`}
+              helperText="誤操作を防ぐため、ログイン中のメールアドレスを入力してください"
               label="メールアドレス入力"
               onChange={(event) => setConfirmationEmail(event.target.value)}
               type="email"
