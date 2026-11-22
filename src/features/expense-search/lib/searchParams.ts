@@ -1,9 +1,12 @@
 import {
+  getAmountRangeError,
+  getAmountYenError,
+  getDateRangeError,
+  getIsoDateError,
+  getShopQueryError,
   parseExpenseSearchFilters,
   type HistoryEntryType,
 } from "../../../../lib/domain/expenseSearch/filter";
-import { getHistoryTrendRangeError } from "../../../../lib/domain/expenseSearch/trendRange";
-import { isValidIsoDateString } from "../../../../lib/domain/week/weekDates";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
 export type ExpenseSearchFormState = {
@@ -111,58 +114,57 @@ export type ExpenseSearchFormValidation = {
   formError: string | null;
 };
 
-const SHOP_QUERY_MAX_LENGTH = 80;
-
-// エラー文言は lib/domain/expenseSearch/filter.ts の parseExpenseSearchFilters と揃える。
+// 判定・文言は lib/domain/expenseSearch/filter.ts が正本。
 // parse は先頭の1件だけ返すため、項目ごとの近接表示にはこちらで各フィールドへ割り当てる。
 export function validateExpenseSearchForm(
   state: ExpenseSearchFormState,
 ): ExpenseSearchFormValidation {
   const fieldErrors: ExpenseSearchFieldErrors = {};
 
-  if (state.shopQuery.trim().length > SHOP_QUERY_MAX_LENGTH) {
-    fieldErrors.shopQuery = `検索語は${SHOP_QUERY_MAX_LENGTH}文字以内で指定してください`;
+  const shopQueryError = getShopQueryError(state.shopQuery.trim());
+  if (shopQueryError !== null) {
+    fieldErrors.shopQuery = shopQueryError;
   }
 
   const minAmountYen = parseOptionalInteger(state.minAmountYen);
   const maxAmountYen = parseOptionalInteger(state.maxAmountYen);
-  if (Number.isNaN(minAmountYen)) {
-    fieldErrors.minAmountYen = "金額は0以上の整数で指定してください";
+  if (minAmountYen !== undefined) {
+    const error = getAmountYenError(minAmountYen);
+    if (error !== null) {
+      fieldErrors.minAmountYen = error;
+    }
   }
-  if (Number.isNaN(maxAmountYen)) {
-    fieldErrors.maxAmountYen = "金額は0以上の整数で指定してください";
+  if (maxAmountYen !== undefined) {
+    const error = getAmountYenError(maxAmountYen);
+    if (error !== null) {
+      fieldErrors.maxAmountYen = error;
+    }
   }
-  if (
-    minAmountYen !== undefined &&
-    maxAmountYen !== undefined &&
-    !Number.isNaN(minAmountYen) &&
-    !Number.isNaN(maxAmountYen) &&
-    minAmountYen > maxAmountYen
-  ) {
-    fieldErrors.minAmountYen = "金額の下限は上限以下にしてください";
+  if (fieldErrors.minAmountYen === undefined && fieldErrors.maxAmountYen === undefined) {
+    const rangeError = getAmountRangeError(minAmountYen, maxAmountYen);
+    if (rangeError !== null) {
+      fieldErrors.minAmountYen = rangeError;
+    }
   }
 
-  const hasStartDate = state.startDate.length > 0;
-  const hasEndDate = state.endDate.length > 0;
-  const startDateValid = !hasStartDate || isValidIsoDateString(state.startDate);
-  const endDateValid = !hasEndDate || isValidIsoDateString(state.endDate);
-  if (!startDateValid) {
-    fieldErrors.startDate = "日付はYYYY-MM-DD形式で指定してください";
+  const startDate = state.startDate.length > 0 ? state.startDate : undefined;
+  const endDate = state.endDate.length > 0 ? state.endDate : undefined;
+  if (startDate !== undefined) {
+    const error = getIsoDateError(startDate);
+    if (error !== null) {
+      fieldErrors.startDate = error;
+    }
   }
-  if (!endDateValid) {
-    fieldErrors.endDate = "日付はYYYY-MM-DD形式で指定してください";
+  if (endDate !== undefined) {
+    const error = getIsoDateError(endDate);
+    if (error !== null) {
+      fieldErrors.endDate = error;
+    }
   }
-  if (startDateValid && endDateValid) {
-    if (hasStartDate && hasEndDate && state.startDate > state.endDate) {
-      fieldErrors.startDate = "開始日は終了日以前にしてください";
-    } else {
-      const trendRangeError = getHistoryTrendRangeError(
-        hasStartDate ? state.startDate : undefined,
-        hasEndDate ? state.endDate : undefined,
-      );
-      if (trendRangeError !== null) {
-        fieldErrors.startDate = trendRangeError;
-      }
+  if (fieldErrors.startDate === undefined && fieldErrors.endDate === undefined) {
+    const rangeError = getDateRangeError(startDate, endDate);
+    if (rangeError !== null) {
+      fieldErrors.startDate = rangeError;
     }
   }
 
