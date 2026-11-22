@@ -154,8 +154,10 @@ describe("searchExpenses", () => {
       endDate: "2026-01-31",
     });
     expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
-    expect(loadHistoryEntries).toHaveBeenNthCalledWith(1, "g1", "2026-01-01", "2026-01-31");
-    expect(loadHistoryEntries).toHaveBeenNthCalledWith(2, "g1", "2025-12-01", "2025-12-31");
+    expect(loadHistoryEntries).toHaveBeenNthCalledWith(1, "g1", "2026-01-01", "2026-01-31", "desc");
+    // 前期間比較は preview と同じ上限（store既定の SEARCH_MAX_RECORDS）で
+    // 新しい側を読む（maxRecords 未指定）。
+    expect(loadHistoryEntries).toHaveBeenNthCalledWith(2, "g1", "2025-12-01", "2025-12-31", "desc");
     expect(result.comparison).not.toBeNull();
   });
 
@@ -222,4 +224,99 @@ describe("searchExpenses", () => {
     const incomeItem = result.page.find((item) => item.type === "income");
     expect(incomeItem).toMatchObject({ _id: "i1", bankName: "銀行", amountYen: 200000 });
   });
+
+  it.each([
+    ["dateAsc", "asc"],
+    ["dateDesc", "desc"],
+    ["amountDesc", "desc"],
+  ] as const)(
+    "sortOrder=%s のとき取得順 %s で読み込む（打ち切り時は表示順の先頭側が残る）",
+    async (sortOrder, expectedOrder) => {
+      const { store, loadHistoryEntries } = createStore();
+      await searchExpenses(store, "group-1", { ...baseArgs, sortOrder });
+      expect(loadHistoryEntries).toHaveBeenNthCalledWith(
+        1,
+        "group-1",
+        undefined,
+        undefined,
+        expectedOrder,
+      );
+    },
+  );
+
+  it.each(["dateAsc", "dateDesc", "amountDesc"] as const)(
+    "打ち切り時でも sortOrder=%s で集計値は同じ（集計は並び順に依存しない）",
+    async (sortOrder) => {
+      const entries = [
+        {
+          _id: "e1",
+          date: "2026-01-10",
+          amountYen: 800,
+          categoryId: "cat-a",
+          recordType: "expenseEntry",
+        },
+        {
+          _id: "e2",
+          date: "2026-01-20",
+          amountYen: 400,
+          categoryId: "cat-a",
+          recordType: "expenseEntry",
+        },
+      ];
+      const loadHistoryEntries = vi.fn(
+        async (
+          _g: string,
+          _s: string | undefined,
+          _e: string | undefined,
+          order?: "asc" | "desc",
+        ) => ({
+          entries: order === "desc" ? [entries[1]!] : [entries[0]!],
+          incomes: [],
+          truncated: true,
+        }),
+      );
+      const { store } = createStore({ loadHistoryEntries });
+      const result = await searchExpenses(store, "g1", {
+        ...baseArgs,
+        sortOrder,
+        startDate: "2026-01-01",
+        endDate: "2026-01-31",
+      });
+      // 集計は常に新しい側（e2=400）を対象にする。
+      expect(result.totalExpenseYen).toBe(400);
+      expect(result.expenseCount).toBe(1);
+      expect(result.matchedGroupCount).toBe(1);
+      // 前期間読込みと合わせて新しい側は必ず読まれている。
+      if (sortOrder === "dateAsc") {
+        // dateAsc では一覧（asc）・集計用の再読（desc・一覧と同じ上限）・
+        // 前期間（desc）の3回読む。
+        expect(loadHistoryEntries).toHaveBeenNthCalledWith(
+          2,
+          "g1",
+          "2026-01-01",
+          "2026-01-31",
+          "desc",
+        );
+        expect(loadHistoryEntries).toHaveBeenNthCalledWith(
+          3,
+          "g1",
+          "2025-12-01",
+          "2025-12-31",
+          "desc",
+        );
+        expect(loadHistoryEntries).toHaveBeenCalledTimes(3);
+      } else {
+        // dateDesc/amountDesc は読み直しをせず、一覧用に読んだ groups を
+        // そのまま集計に使う（一覧・前期間の2回だけ）。
+        expect(loadHistoryEntries).toHaveBeenNthCalledWith(
+          2,
+          "g1",
+          "2025-12-01",
+          "2025-12-31",
+          "desc",
+        );
+        expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
+      }
+    },
+  );
 });

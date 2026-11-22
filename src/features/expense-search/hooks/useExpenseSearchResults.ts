@@ -28,6 +28,7 @@ export function useExpenseSearchResults(applied: ExpenseSearchFormState, applied
   const activeCursor = loadedKey === appliedKey ? paginationCursor : null;
   const searchQueryKey = `historySearch:${searchRequestId}`;
   const searchEntryType = queryArgs.ok ? queryArgs.args.entryType : undefined;
+  const searchSortOrder = queryArgs.ok ? queryArgs.args.sortOrder : undefined;
   const searchShopQuery = queryArgs.ok ? queryArgs.args.shopQuery : undefined;
   const searchCategoryId = queryArgs.ok ? queryArgs.args.categoryId : undefined;
   const searchMinAmountYen = queryArgs.ok ? queryArgs.args.minAmountYen : undefined;
@@ -41,6 +42,7 @@ export function useExpenseSearchResults(applied: ExpenseSearchFormState, applied
     return {
       paginationOpts: { numItems: PAGE_SIZE, cursor: activeCursor },
       ...(searchEntryType !== undefined ? { entryType: searchEntryType } : {}),
+      ...(searchSortOrder !== undefined ? { sortOrder: searchSortOrder } : {}),
       ...(searchShopQuery !== undefined ? { shopQuery: searchShopQuery } : {}),
       ...(searchCategoryId !== undefined ? { categoryId: searchCategoryId } : {}),
       ...(searchMinAmountYen !== undefined ? { minAmountYen: searchMinAmountYen } : {}),
@@ -57,6 +59,7 @@ export function useExpenseSearchResults(applied: ExpenseSearchFormState, applied
     searchMaxAmountYen,
     searchMinAmountYen,
     searchShopQuery,
+    searchSortOrder,
     searchStartDate,
   ]);
   const searchQueries = useMemo(
@@ -136,5 +139,16 @@ export function useExpenseSearchResults(applied: ExpenseSearchFormState, applied
     parsedError: parsed.ok ? null : parsed.error,
     retrySearch: () => setSearchRequestId((current) => current + 1),
     loadMore: () => setPaginationCursor(displayResult?.continueCursor ?? null),
+    // 編集・削除・一括操作の後に読み込み済み分を破棄して先頭ページから取り直す。
+    // 追加読み込み後は初回ページしかsubscribeしていないため、マージでは更新できない。
+    refreshResults: () => {
+      setHasLoadedPage(false);
+      setLoadedItems([]);
+      setLoadedCursor(null);
+      setPaginationCursor(null);
+      setLastSearchResult(null);
+      setInitialSearchResult(null);
+      setSearchRequestId((current) => current + 1);
+    },
   };
 }

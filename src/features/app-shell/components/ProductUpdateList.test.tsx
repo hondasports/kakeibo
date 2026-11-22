@@ -46,7 +46,34 @@ describe("ProductUpdateList", () => {
     expect(screen.getByText("履歴を表示")).toBeInTheDocument();
   });
 
-  test("sort order follows the provided array", () => {
+  test("renders updates in publishedAt descending order", () => {
+    render(
+      <ProductUpdateList
+        productUpdates={[
+          {
+            id: "older",
+            title: "古い更新",
+            summary: "古い概要",
+            version: "2026.06.01-400",
+            publishedAt: "2026-06-01",
+          },
+          ...sampleUpdates,
+          {
+            id: "newest",
+            title: "新しい更新",
+            summary: "新しい概要",
+            version: "2026.08.01-500",
+            publishedAt: "2026-08-01",
+          },
+        ]}
+      />,
+    );
+
+    const headings = screen.getAllByRole("heading").map((h) => h.textContent);
+    expect(headings).toEqual(["新しい更新", "X 機能を追加", "Y 改善", "古い更新"]);
+  });
+
+  test("keeps the original order for updates on the same publishedAt", () => {
     render(<ProductUpdateList productUpdates={sampleUpdates} />);
 
     const headings = screen.getAllByRole("heading").map((h) => h.textContent);

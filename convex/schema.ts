@@ -318,7 +318,9 @@ export default defineSchema({
       "targetUserId",
       "createdAt",
     ])
-    .index("by_target_kind_and_target_id_and_created_at", ["targetKind", "targetId", "createdAt"]),
+    .index("by_target_kind_and_target_id_and_created_at", ["targetKind", "targetId", "createdAt"])
+    .index("by_source_group_id_and_created_at", ["sourceGroupId", "createdAt"])
+    .index("by_target_group_id_and_created_at", ["targetGroupId", "createdAt"]),
 
   systemAdminNotifications: defineTable({
     action: systemAdminNotificationActionValidator,

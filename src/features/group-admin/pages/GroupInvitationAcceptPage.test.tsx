@@ -80,6 +80,8 @@ describe("GroupInvitationAcceptPage", () => {
       activeGroupId: null,
       activeGroupName: null,
       isExistingMember: false,
+      invitedByName: null,
+      recipientEmail: "recipient@example.test",
     });
     acceptGroupInvitationMock.mockReset();
     signInSsoMock.mockReset();
@@ -165,6 +167,8 @@ describe("GroupInvitationAcceptPage", () => {
       activeGroupId: "group-current",
       activeGroupName: "現在の家計",
       isExistingMember: false,
+      invitedByName: null,
+      recipientEmail: "recipient@example.test",
     });
     renderPage();
     await screen.findByText("招待先の家計");
@@ -210,6 +214,8 @@ describe("GroupInvitationAcceptPage", () => {
       activeGroupId: "group-current",
       activeGroupName: "現在の家計",
       isExistingMember: false,
+      invitedByName: null,
+      recipientEmail: "recipient@example.test",
     });
     acceptGroupInvitationMock.mockRejectedValueOnce(new Error("active group changed"));
     renderPage();
@@ -485,6 +491,124 @@ describe("GroupInvitationAcceptPage", () => {
     await act(async () => {
       finishSignOut();
     });
+  });
+
+  it("preview取得中は読み込み中であることが分かる", async () => {
+    authenticateToken();
+    previewInvitationMock.mockImplementation(() => new Promise(() => {}));
+    renderPage();
+
+    expect(
+      await screen.findByRole("progressbar", { name: "招待内容を確認中" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("招待内容を確認しています。")).toBeInTheDocument();
+  });
+
+  it("招待元と宛先メールアドレスを確認画面に表示する", async () => {
+    authenticateToken();
+    previewInvitationMock.mockResolvedValue({
+      groupId: "group-001",
+      groupName: "招待先の家計",
+      activeGroupId: null,
+      activeGroupName: null,
+      isExistingMember: false,
+      invitedByName: "Hanako",
+      recipientEmail: "recipient@example.test",
+    });
+    renderPage();
+
+    await screen.findByText("招待先の家計");
+    expect(
+      screen.getByText(/Hanakoさんからの招待（宛先: recipient@example\.test）/),
+    ).toBeInTheDocument();
+  });
+
+  it("すでに参加済みなら参加ボタンではなく表示導線にする", async () => {
+    const navigateMock = vi.fn();
+    useNavigateMock.mockReturnValue(navigateMock);
+    authenticateToken();
+    previewInvitationMock.mockResolvedValue({
+      groupId: "group-001",
+      groupName: "招待先の家計",
+      activeGroupId: null,
+      activeGroupName: null,
+      isExistingMember: true,
+      invitedByName: null,
+      recipientEmail: "recipient@example.test",
+    });
+    renderPage();
+
+    await screen.findByText("このグループにはすでに参加しています。");
+    expect(
+      screen.queryByRole("button", { name: "招待を受け入れて参加する" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "このグループを表示する" }));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/", { replace: true }));
+  });
+
+  it("必須の名前が空なら項目ごとにエラーを表示し、保存しない", async () => {
+    useSignUpMock.mockReturnValue({
+      signUp: {
+        finalize: signUpFinalizeMock,
+        missingFields: ["first_name", "last_name"],
+        sso: signUpSsoMock,
+        status: "missing_requirements",
+        ticket: signUpTicketMock,
+        update: signUpUpdateMock,
+      },
+    });
+    signUpTicketMock.mockResolvedValue({
+      error: null,
+      missingFields: ["first_name", "last_name"],
+    });
+
+    renderPage();
+
+    await screen.findByRole("heading", { name: "招待を完了する" });
+    fireEvent.submit(screen.getByRole("button", { name: "招待を完了する" }).closest("form")!);
+
+    expect(await screen.findByText("名を入力してください。")).toBeInTheDocument();
+    expect(await screen.findByText("姓を入力してください。")).toBeInTheDocument();
+    expect(signUpUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("サーバーが判定したfirst_name/last_nameのエラーは各入力項目の下に表示する", async () => {
+    useSignUpMock.mockReturnValue({
+      signUp: {
+        finalize: signUpFinalizeMock,
+        missingFields: ["first_name", "last_name"],
+        sso: signUpSsoMock,
+        status: "missing_requirements",
+        ticket: signUpTicketMock,
+        update: signUpUpdateMock,
+      },
+    });
+    signUpTicketMock.mockResolvedValue({
+      error: null,
+      missingFields: ["first_name", "last_name"],
+    });
+    signUpUpdateMock.mockResolvedValue({
+      error: {
+        errors: [
+          { longMessage: "名が長すぎます", meta: { paramName: "first_name" } },
+          { message: "姓の形式が不正です", meta: { paramName: "last_name" } },
+        ],
+      },
+      missingFields: ["first_name", "last_name"],
+    });
+
+    renderPage();
+
+    await screen.findByRole("heading", { name: "招待を完了する" });
+    fireEvent.change(screen.getByLabelText(/名/), { target: { value: "Taro" } });
+    fireEvent.change(screen.getByLabelText(/姓/), { target: { value: "Yamada" } });
+    fireEvent.submit(screen.getByRole("button", { name: "招待を完了する" }).closest("form")!);
+
+    // 項目に対応するエラーはアプリ側の文言で各フィールドの下に出す
+    expect(await screen.findByText(/名を確認してください/)).toBeInTheDocument();
+    expect(await screen.findByText(/姓を確認してください/)).toBeInTheDocument();
+    // 項目に対応しないエラーだけが全体Alertに出る。
+    expect(screen.queryByText(/プロフィールを更新できませんでした/)).not.toBeInTheDocument();
   });
 
   it("アカウント切り替えに失敗したら説明を表示し、再操作で続行できる", async () => {

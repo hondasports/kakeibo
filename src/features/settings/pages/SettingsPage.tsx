@@ -3,6 +3,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { CategorySettingsPanel } from "../components/CategorySettingsPanel";
 import { GroupDangerZone, GroupSettingsPanel, GroupSettingsProvider } from "../../group-admin";
 import { WeekDaySettingsPanel } from "../components/WeekDaySettingsPanel";
+import { MonthlyIncomeSettingsPanel } from "../components/MonthlyIncomeSettingsPanel";
 import { LineLinkSettingsPanel } from "../components/LineLinkSettingsPanel";
 import { MonthlyBudgetSettingsPanel } from "../components/MonthlyBudgetSettingsPanel";
 import { NotificationSettingsPanel } from "../components/NotificationSettingsPanel";
@@ -44,6 +45,12 @@ export function SettingsPage() {
             <Box className="settings-ledger-section">
               <SettingsSectionErrorBoundary>
                 <MonthlyBudgetSettingsPanel />
+              </SettingsSectionErrorBoundary>
+            </Box>
+            <Divider />
+            <Box className="settings-ledger-section">
+              <SettingsSectionErrorBoundary>
+                <MonthlyIncomeSettingsPanel />
               </SettingsSectionErrorBoundary>
             </Box>
             <Divider />

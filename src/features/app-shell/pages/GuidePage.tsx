@@ -1,6 +1,7 @@
 import HelpOutlinedIcon from "@mui/icons-material/HelpOutlined";
 import { Box, Button, Container, List, ListItem, Paper, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
+import { getCurrentMonth } from "../../../../lib/domain/common/month";
 
 type GuideSectionProps = {
   title: string;
@@ -25,7 +26,17 @@ function GuideSection({ title, children }: GuideSectionProps) {
 
 function GuideSteps({ children }: { children: React.ReactNode }) {
   return (
-    <List dense disablePadding sx={{ pl: 2 }}>
+    <List
+      component="ol"
+      dense
+      disablePadding
+      sx={{
+        listStyle: "decimal",
+        listStylePosition: "inside",
+        pl: 2,
+        "& .MuiListItem-root": { display: "list-item", px: 0 },
+      }}
+    >
       {children}
     </List>
   );
@@ -49,12 +60,10 @@ export function GuidePage() {
 
         <GuideSection title="まずやること">
           <GuideSteps>
-            <ListItem disableGutters>1. 「入力」から支出または収入を選びます。</ListItem>
+            <ListItem disableGutters>「入力」から支出または収入を選びます。</ListItem>
+            <ListItem disableGutters>日付、支払先、金額、カテゴリを入力して保存します。</ListItem>
             <ListItem disableGutters>
-              2. 日付、支払先、金額、カテゴリを入力して保存します。
-            </ListItem>
-            <ListItem disableGutters>
-              3. 「履歴」で週の合計とカテゴリ別の傾向を振り返ります。
+              「履歴」で週や月の合計を、「検索」で過去の明細を振り返ります。
             </ListItem>
           </GuideSteps>
           <Button
@@ -89,6 +98,40 @@ export function GuidePage() {
               内容を確認してから登録します。候補は自動確定されません。
             </ListItem>
           </GuideSteps>
+        </GuideSection>
+
+        <GuideSection title="月次サマリーを見る">
+          <Typography color="text.secondary" variant="body2">
+            月次サマリーでは、選択した月の支出・収入、カテゴリ別集計、日別の支出カレンダー、明細を確認できます。
+          </Typography>
+          <GuideSteps>
+            <ListItem disableGutters>週次・年次サマリーやダッシュボードから月を開きます。</ListItem>
+            <ListItem disableGutters>月の切り替えで、前後の月を確認します。</ListItem>
+            <ListItem disableGutters>
+              カレンダーやカテゴリ別の金額から、使いすぎに気づいた項目を振り返ります。
+            </ListItem>
+          </GuideSteps>
+          <Button
+            component={RouterLink}
+            to={`/months/${getCurrentMonth()}`}
+            variant="outlined"
+            sx={{ mt: 1 }}
+          >
+            今月のサマリーを開く
+          </Button>
+        </GuideSection>
+
+        <GuideSection title="履歴を検索する">
+          <Typography color="text.secondary" variant="body2">
+            「検索」では、期間・キーワード・カテゴリなどの条件で過去の明細を探せます。
+          </Typography>
+          <GuideSteps>
+            <ListItem disableGutters>期間やキーワード、カテゴリを選んで検索します。</ListItem>
+            <ListItem disableGutters>条件に合った明細の一覧と合計を確認できます。</ListItem>
+          </GuideSteps>
+          <Button component={RouterLink} to="/search" variant="outlined" sx={{ mt: 1 }}>
+            検索を開く
+          </Button>
         </GuideSection>
 
         <GuideSection title="週次サマリーを見る">

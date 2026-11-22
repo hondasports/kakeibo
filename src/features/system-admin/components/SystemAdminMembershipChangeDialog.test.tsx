@@ -57,7 +57,7 @@ describe("SystemAdminMembershipChangeDialog", () => {
     );
     expect(screen.getByRole("heading", { name: "ownerへ昇格を確認" })).toBeInTheDocument();
     expect(
-      screen.getByText(/対象グループ: A（group-a） \/ role: member → owner/),
+      screen.getByText(/対象グループ: A（group-a） \/ role: メンバー → オーナー/),
     ).toBeInTheDocument();
 
     rerender(

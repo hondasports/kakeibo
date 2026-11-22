@@ -19,7 +19,7 @@ export type UserDetail = {
   invitationsTruncated?: boolean;
 };
 
-export type GroupCandidate = { id: string; name: string; status: string };
+export type GroupCandidate = { id: string; name: string; status: string; createdAt: number };
 
 type DialogState = {
   operation: MembershipOperation;
@@ -36,6 +36,12 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
   const [error, setError] = useState(false);
   const [groupQuery, setGroupQuery] = useState("");
   const [candidates, setCandidates] = useState<GroupCandidate[]>([]);
+  // 先頭20件で打ち切られたか。0件メッセージの文言に使う（true=先頭に無いだけの可能性）。
+  const [candidatesTruncated, setCandidatesTruncated] = useState(false);
+  const [candidateOutcome, setCandidateOutcome] = useState<
+    { query: string; tick: number; state: "done" | "error" } | undefined
+  >();
+  const [candidateRetryTick, setCandidateRetryTick] = useState(0);
   const [selectedSource, setSelectedSource] = useState<MembershipDialogGroup | undefined>();
   const [dialog, setDialog] = useState<DialogState>(null);
   const [confirming, setConfirming] = useState(false);
@@ -81,28 +87,40 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
   }, [getUserDetail, userId]);
 
   useEffect(() => {
+    const query = groupQuery.trim();
+    if (query.length === 0) return;
     let cancelled = false;
-    if (groupQuery.trim().length === 0) {
-      return;
-    }
     void searchGroups({
       queryType: "name",
       query: groupQuery,
       paginationOpts: { numItems: 20, cursor: null },
     })
       .then((response) => {
-        if (!cancelled) setCandidates(response.page.filter((group) => group.status === "active"));
+        if (!cancelled) {
+          setCandidates(response.page.filter((group) => group.status === "active"));
+          setCandidatesTruncated(response.isDone === false);
+          setCandidateOutcome({ query: groupQuery, tick: candidateRetryTick, state: "done" });
+        }
       })
       .catch(() => {
-        if (!cancelled) setCandidates([]);
+        if (!cancelled) {
+          setCandidateOutcome({ query: groupQuery, tick: candidateRetryTick, state: "error" });
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [groupQuery, searchGroups]);
+  }, [groupQuery, searchGroups, candidateRetryTick]);
+
+  const candidateSearch: "idle" | "loading" | "done" | "error" =
+    groupQuery.trim().length === 0
+      ? "idle"
+      : candidateOutcome?.query === groupQuery && candidateOutcome.tick === candidateRetryTick
+        ? candidateOutcome.state
+        : "loading";
 
   const selectSource = (source: MembershipDialogGroup) => {
-    setSelectedSource(source);
+    setSelectedSource((current) => (current?.id === source.id ? undefined : source));
   };
 
   const requestOperation = (
@@ -132,9 +150,20 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
         targetGroupId: dialog.targetGroup?.id as Id<"groups"> | undefined,
         reason,
       });
+      const userName = detail.displayName || detail.userId;
+      const groupName = dialog.targetGroup?.name ?? dialog.sourceGroup?.name ?? "グループ";
+      const sourceName = dialog.sourceGroup?.name ?? "グループ";
+      const targetName = dialog.targetGroup?.name ?? "グループ";
+      const messageByOperation: Record<MembershipOperation, string> = {
+        add: `「${userName}」を「${groupName}」に追加しました`,
+        remove: `「${userName}」を「${groupName}」から解除しました`,
+        transfer: `「${userName}」を「${sourceName}」から「${targetName}」へ移動しました`,
+        set_active: `「${userName}」のactiveグループを「${groupName}」に設定しました`,
+        clear_active: `「${userName}」のactiveグループを解除しました`,
+      };
       setDialog(null);
       setSelectedSource(undefined);
-      setSuccess("操作を完了しました。監査ログと通知outboxに記録しました。");
+      setSuccess(`${messageByOperation[dialog.operation]}（監査ログに記録済み）`);
       await load();
     } catch (cause) {
       setOperationError(cause instanceof Error ? cause.message : "操作に失敗しました");
@@ -146,11 +175,16 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
   return {
     detail,
     error,
+    load,
     success,
     setSuccess,
     groupQuery,
     setGroupQuery,
-    candidates: groupQuery.trim().length === 0 ? [] : candidates,
+    // 検索中・失敗時は前の検索語の候補を出さない（現在のクエリに対する結果のみ表示）
+    candidates: candidateSearch === "done" ? candidates : [],
+    candidatesTruncated: groupQuery.trim().length !== 0 && candidatesTruncated,
+    candidateSearch,
+    retryCandidateSearch: () => setCandidateRetryTick((tick) => tick + 1),
     selectedSource,
     selectSource,
     dialog,

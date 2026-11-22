@@ -65,8 +65,8 @@ describe("GroupSelectPage", () => {
     useGroupMembershipMock.mockReturnValue({
       group: null,
       groups: [
-        { _id: "group-001", name: "佐藤家", role: "owner", isActive: true },
-        { _id: "group-002", name: "鈴木家", role: "member", isActive: false },
+        { _id: "group-001", name: "佐藤家", role: "owner", isActive: true, createdAt: 1000 },
+        { _id: "group-002", name: "鈴木家", role: "member", isActive: false, createdAt: 2000 },
       ],
       hasGroups: true,
       needsSelection: true,
@@ -88,8 +88,8 @@ describe("GroupSelectPage", () => {
     useGroupMembershipMock.mockReturnValue({
       group: null,
       groups: [
-        { _id: "group-001", name: "佐藤家", role: "owner", isActive: true },
-        { _id: "group-002", name: "鈴木家", role: "member", isActive: false },
+        { _id: "group-001", name: "佐藤家", role: "owner", isActive: true, createdAt: 1000 },
+        { _id: "group-002", name: "鈴木家", role: "member", isActive: false, createdAt: 2000 },
       ],
       hasGroups: true,
       needsSelection: true,
@@ -103,6 +103,39 @@ describe("GroupSelectPage", () => {
     await waitFor(() => {
       expect(setActiveGroupMock).toHaveBeenCalledWith({ groupId: "group-002" });
       expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
+    });
+  });
+
+  it("切替に失敗するとエラーを表示し、再試行できる", async () => {
+    const user = userEvent.setup();
+    const navigateMock = vi.fn();
+    useNavigateMock.mockReturnValue(navigateMock);
+    useGroupMembershipMock.mockReturnValue({
+      group: null,
+      groups: [
+        { _id: "group-001", name: "佐藤家", role: "owner", isActive: true, createdAt: 1000 },
+        { _id: "group-002", name: "鈴木家", role: "member", isActive: false, createdAt: 2000 },
+      ],
+      hasGroups: true,
+      needsSelection: true,
+      isLoading: false,
+    });
+    setActiveGroupMock.mockRejectedValueOnce(new Error("network")).mockResolvedValue("group-002");
+
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "このグループを使う" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("グループを切り替えできませんでした。もう一度お試しください。"),
+      ).toBeInTheDocument();
+    });
+    expect(navigateMock).not.toHaveBeenCalledWith("/", { replace: true });
+
+    await user.click(screen.getByRole("button", { name: "このグループを使う" }));
+    await waitFor(() => {
+      expect(setActiveGroupMock).toHaveBeenCalledTimes(2);
     });
   });
 });

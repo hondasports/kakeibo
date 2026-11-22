@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Box, Button, Paper, Stack, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { designTokens } from "../../../designTokens";
 import { SiteCreditsFooter } from "./SiteCreditsFooter";
 
@@ -81,7 +82,9 @@ function StatusBadge({ label, tone }: { label: string; tone: PublicStatusLabelTo
     <Box
       sx={{
         alignItems: "center",
-        bgcolor: isError ? "rgba(184, 90, 76, 0.12)" : designTokens.color.surface.sunken,
+        bgcolor: isError
+          ? alpha(designTokens.color.error.main, 0.12)
+          : designTokens.color.surface.sunken,
         borderRadius: designTokens.radius.pill,
         color: isError ? designTokens.color.error.main : designTokens.color.text.secondary,
         display: "inline-flex",
@@ -170,7 +173,7 @@ function HeaderBrand({ headerBrand }: { headerBrand: PublicStatusHeaderBrand }) 
         sx={{
           alignItems: "center",
           bgcolor: designTokens.color.surface.sunken,
-          borderRadius: "12px",
+          borderRadius: designTokens.radius.brandMark,
           display: "inline-flex",
           justifyContent: "center",
           p: designTokens.space.sm,
@@ -226,8 +229,8 @@ export function PublicStatusPage({
           className="paper-panel"
           elevation={0}
           sx={{
-            borderRadius: "16px",
-            boxShadow: "0 12px 40px rgba(61, 44, 34, 0.08)",
+            borderRadius: designTokens.radius.lg,
+            boxShadow: designTokens.shadow.panel,
             px: { xs: designTokens.space.lg, sm: designTokens.space.xl },
             py: { xs: designTokens.space.lg, sm: "calc(var(--space-xl) + var(--space-xs))" },
             width: "100%",

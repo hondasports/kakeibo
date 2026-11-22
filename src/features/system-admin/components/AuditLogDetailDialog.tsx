@@ -1,6 +1,20 @@
-import { Dialog, DialogContent, DialogTitle, Stack, Typography } from "@mui/material";
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Stack,
+  Typography,
+} from "@mui/material";
 import type { SystemAdminAuditItem } from "../types";
-import { formatDateTimeWithSecondsForDisplay } from "../../../utils/date";
+import { formatDateTimeWithSecondsInJapanTime } from "../../../utils/date";
+import {
+  auditResultLabels,
+  displayLabel,
+  membershipStatusLabels,
+  systemAdminStatusLabels,
+} from "../lib/displayLabels";
 
 type AuditLogDetailDialogProps = {
   selected: SystemAdminAuditItem | null;
@@ -20,43 +34,59 @@ export function AuditLogDetailDialog({
         {selected ? (
           <Stack spacing={1}>
             <Typography>操作: {formatAction(selected.action)}</Typography>
-            <Typography>結果: {selected.result}</Typography>
-            <Typography>日時: {formatDateTimeWithSecondsForDisplay(selected.createdAt)}</Typography>
-            <Typography sx={{ overflowWrap: "anywhere" }}>
-              actor: {selected.actorDisplayName ?? selected.actorUserId ?? selected.actorType}
+            <Typography>結果: {displayLabel(auditResultLabels, selected.result)}</Typography>
+            <Typography>
+              日時: {formatDateTimeWithSecondsInJapanTime(selected.createdAt)}
             </Typography>
             <Typography sx={{ overflowWrap: "anywhere" }}>
-              target:{" "}
+              操作者: {selected.actorDisplayName ?? selected.actorUserId ?? selected.actorType}
+            </Typography>
+            <Typography sx={{ overflowWrap: "anywhere" }}>
+              対象:{" "}
               {selected.targetDisplayName ?? selected.targetUserId ?? selected.targetId ?? "-"}
             </Typography>
             {selected.sourceUserId ? (
               <Typography sx={{ overflowWrap: "anywhere" }}>
-                source user: {selected.sourceUserDisplayName ?? selected.sourceUserId}
+                移動元ユーザー: {selected.sourceUserDisplayName ?? selected.sourceUserId}
               </Typography>
             ) : null}
             {selected.previousStatus || selected.newStatus ? (
               <Typography>
-                status: {selected.previousStatus ?? "-"} → {selected.newStatus ?? "-"}
+                管理者権限:{" "}
+                {selected.previousStatus
+                  ? displayLabel(systemAdminStatusLabels, selected.previousStatus)
+                  : "-"}{" "}
+                →{" "}
+                {selected.newStatus
+                  ? displayLabel(systemAdminStatusLabels, selected.newStatus)
+                  : "-"}
               </Typography>
             ) : null}
             {selected.sourceGroupId || selected.targetGroupId ? (
               <Typography sx={{ overflowWrap: "anywhere" }}>
-                group: {selected.sourceGroupNameSnapshot ?? selected.sourceGroupId ?? "-"} →{" "}
+                グループ（移動元 → 移動先）:{" "}
+                {selected.sourceGroupNameSnapshot ?? selected.sourceGroupId ?? "-"} →{" "}
                 {selected.targetGroupNameSnapshot ?? selected.targetGroupId ?? "-"}
               </Typography>
             ) : null}
             {selected.beforeActiveGroupId !== undefined ||
             selected.afterActiveGroupId !== undefined ? (
               <Typography sx={{ overflowWrap: "anywhere" }}>
-                activeGroupId: {selected.beforeActiveGroupId ?? "未選択"} →{" "}
+                activeグループ: {selected.beforeActiveGroupId ?? "未選択"} →{" "}
                 {selected.afterActiveGroupId ?? "未選択"}
               </Typography>
             ) : null}
             {selected.beforeMembershipStatus !== undefined ||
             selected.afterMembershipStatus !== undefined ? (
               <Typography>
-                membership: {selected.beforeMembershipStatus ?? "未所属"} →{" "}
-                {selected.afterMembershipStatus ?? "未所属"}
+                所属状態:{" "}
+                {selected.beforeMembershipStatus
+                  ? displayLabel(membershipStatusLabels, selected.beforeMembershipStatus)
+                  : "未所属"}{" "}
+                →{" "}
+                {selected.afterMembershipStatus
+                  ? displayLabel(membershipStatusLabels, selected.afterMembershipStatus)
+                  : "未所属"}
               </Typography>
             ) : null}
             {selected.beforeOwnerCount !== undefined || selected.afterOwnerCount !== undefined ? (
@@ -71,12 +101,21 @@ export function AuditLogDetailDialog({
                 {selected.afterNotificationEnabled ? "ON" : "OFF"}
               </Typography>
             ) : null}
+            {selected.resultCount !== undefined ? (
+              <Typography>検索結果の件数: {selected.resultCount}</Typography>
+            ) : null}
+            {selected.reason ? (
+              <Typography sx={{ overflowWrap: "anywhere" }}>理由: {selected.reason}</Typography>
+            ) : null}
             <Typography color="text.secondary" variant="caption">
-              理由・検索語・token・secret・家計データは表示しません。
+              検索語の中身・token・secret・家計データは表示しません。
             </Typography>
           </Stack>
         ) : null}
       </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>閉じる</Button>
+      </DialogActions>
     </Dialog>
   );
 }

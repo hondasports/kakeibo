@@ -15,11 +15,13 @@ import {
   normalizeSystemAdminReason,
 } from "../../../../lib/domain/systemAdmin/reason";
 import type { GroupDetailMember } from "../hooks/useSystemAdminGroupDetail";
+import { SystemAdminEnvironmentNotice } from "./SystemAdminEnvironmentNotice";
 
 type GroupOwnerlessRecoveryDialogProps = {
   open: boolean;
   group: { id: string; name: string };
   target: GroupDetailMember | null;
+  environment: string;
   reason: string;
   recovering: boolean;
   error: string;
@@ -32,6 +34,7 @@ export function GroupOwnerlessRecoveryDialog({
   open,
   group,
   target,
+  environment,
   reason,
   recovering,
   error,
@@ -51,6 +54,7 @@ export function GroupOwnerlessRecoveryDialog({
       <DialogTitle>owner不在を復旧</DialogTitle>
       <DialogContent>
         <Stack spacing={1} sx={{ pt: 1 }}>
+          <SystemAdminEnvironmentNotice environment={environment} />
           <Typography>
             グループ: {group.name}（{group.id}）
           </Typography>
