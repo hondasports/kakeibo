@@ -180,6 +180,7 @@ export function useSystemAdminAuditLog() {
     setToDate,
     cursor,
     setCursor,
+    applied,
     selected,
     setSelected,
     applyFilters,

@@ -2,7 +2,7 @@ import { Button, Chip, Paper, Stack, Typography } from "@mui/material";
 import { auditResultLabels, displayLabel } from "../lib/displayLabels";
 import { SystemAdminEmptyState } from "../pages/SystemAdminPageFrame";
 import type { SystemAdminAuditItem } from "../types";
-import { formatDateTimeWithSecondsForDisplay } from "../../../utils/date";
+import { formatDateTimeWithSecondsInJapanTime } from "../../../utils/date";
 
 type AuditLogListProps = {
   logs: { page: unknown[]; isDone: boolean; continueCursor: string } | undefined;
@@ -64,7 +64,7 @@ export function AuditLogList({
                   {formatAction(item.action)}
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
-                  {formatDateTimeWithSecondsForDisplay(item.createdAt)}
+                  {formatDateTimeWithSecondsInJapanTime(item.createdAt)}
                 </Typography>
                 <Typography
                   color="text.secondary"

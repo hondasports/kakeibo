@@ -43,6 +43,7 @@ function SystemAdminAuditLogPageContent() {
     applyFilters,
     clearFilters,
     hasFilter,
+    applied,
     dateRangeInvalid,
     actorInvalid,
     targetInvalid,
@@ -81,13 +82,19 @@ function SystemAdminAuditLogPageContent() {
         onTargetChange={setTarget}
         onToDateChange={setToDate}
       />
-      <AuditLogList
-        formatAction={formatAction}
-        hasFilter={hasFilter}
-        logs={logs}
-        onLoadMore={(cursor) => setCursor(cursor)}
-        onSelect={(item) => setSelected(item)}
-      />
+      <SystemAdminErrorBoundary
+        key={JSON.stringify(applied)}
+        label="AuditLogList"
+        renderError={(retry) => <SystemAdminErrorState onRetry={retry} />}
+      >
+        <AuditLogList
+          formatAction={formatAction}
+          hasFilter={hasFilter}
+          logs={logs}
+          onLoadMore={(cursor) => setCursor(cursor)}
+          onSelect={(item) => setSelected(item)}
+        />
+      </SystemAdminErrorBoundary>
       <AuditLogDetailDialog
         formatAction={formatAction}
         onClose={() => setSelected(null)}
