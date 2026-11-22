@@ -5,11 +5,16 @@ import {
   LEGAL_EFFECTIVE_DATE,
   LEGAL_OPERATOR_ADDRESS_DISCLOSURE,
   LEGAL_OPERATOR_NAME,
+  PRIVACY_LAST_REVISED_DATE,
 } from "../lib/legalDocumentMeta";
 
 export function PrivacyPolicyPage() {
   return (
-    <LegalDocumentLayout effectiveDate={LEGAL_EFFECTIVE_DATE} title="プライバシーポリシー">
+    <LegalDocumentLayout
+      effectiveDate={LEGAL_EFFECTIVE_DATE}
+      lastRevisedDate={PRIVACY_LAST_REVISED_DATE}
+      title="プライバシーポリシー"
+    >
       <Typography color="text.secondary" variant="body2">
         Suzumemo（以下「本サービス」）は、ユーザーの個人情報を適切に取り扱うため、本プライバシーポリシーを定めます。
       </Typography>

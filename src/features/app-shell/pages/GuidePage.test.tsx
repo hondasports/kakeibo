@@ -1,6 +1,7 @@
 import { MemoryRouter } from "react-router-dom";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { getCurrentMonth } from "../../../../lib/domain/common/month";
 import { GuidePage } from "./GuidePage";
 
 function renderGuide() {
@@ -24,6 +25,10 @@ describe("GuidePage", () => {
       screen.getByRole("heading", { name: "レシートから入力する", level: 2 }),
     ).toBeInTheDocument();
     expect(
+      screen.getByRole("heading", { name: "月次サマリーを見る", level: 2 }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "履歴を検索する", level: 2 })).toBeInTheDocument();
+    expect(
       screen.getByRole("heading", { name: "週次サマリーを見る", level: 2 }),
     ).toBeInTheDocument();
     expect(
@@ -44,7 +49,25 @@ describe("GuidePage", () => {
       "href",
       "/weeks/current/input",
     );
+    expect(screen.getByRole("link", { name: "検索を開く" })).toHaveAttribute("href", "/search");
+    expect(screen.getByRole("link", { name: "今月のサマリーを開く" })).toHaveAttribute(
+      "href",
+      `/months/${getCurrentMonth()}`,
+    );
     expect(screen.getByRole("link", { name: "設定を開く" })).toHaveAttribute("href", "/settings");
     expect(screen.getByRole("link", { name: "ホームへ戻る" })).toHaveAttribute("href", "/");
+  });
+
+  it("手順は順序付きリストとしてマークアップされている", () => {
+    renderGuide();
+
+    const steps = screen.getAllByRole("list");
+    expect(steps.length).toBeGreaterThan(0);
+    for (const stepList of steps) {
+      expect(stepList.tagName).toBe("OL");
+      for (const item of within(stepList).getAllByRole("listitem")) {
+        expect(item.textContent).not.toMatch(/^\d+\./);
+      }
+    }
   });
 });

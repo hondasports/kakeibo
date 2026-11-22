@@ -5,11 +5,16 @@ import {
   LEGAL_EFFECTIVE_DATE,
   LEGAL_OPERATOR_ADDRESS_DISCLOSURE,
   LEGAL_OPERATOR_NAME,
+  TERMS_LAST_REVISED_DATE,
 } from "../lib/legalDocumentMeta";
 
 export function TermsPage() {
   return (
-    <LegalDocumentLayout effectiveDate={LEGAL_EFFECTIVE_DATE} title="利用規約">
+    <LegalDocumentLayout
+      effectiveDate={LEGAL_EFFECTIVE_DATE}
+      lastRevisedDate={TERMS_LAST_REVISED_DATE}
+      title="利用規約"
+    >
       <Typography color="text.secondary" variant="body2">
         本利用規約（以下「本規約」）は、Suzumemo（以下「本サービス」）の利用条件を定めるものです。
         ユーザーは本規約およびプライバシーポリシーに同意のうえ、本サービスを利用してください。
