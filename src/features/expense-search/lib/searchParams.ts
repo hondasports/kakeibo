@@ -95,7 +95,7 @@ export function diffExpenseSearchFormState(
   const diff: Partial<ExpenseSearchFormState> = {};
   for (const key of Object.keys(before) as Array<keyof ExpenseSearchFormState>) {
     if (before[key] !== after[key]) {
-      diff[key] = after[key];
+      (diff as ExpenseSearchFormState)[key] = after[key];
     }
   }
   return diff;
