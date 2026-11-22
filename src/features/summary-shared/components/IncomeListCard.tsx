@@ -15,6 +15,7 @@ export function IncomeListCard({
   onDeleteIncome,
   onEditIncome,
   weekSummaryPath,
+  preserveOrder,
 }: {
   count: number;
   dateFormat?: ReceiptDateFormat;
@@ -24,15 +25,19 @@ export function IncomeListCard({
   listAriaLabel?: string;
   onDeleteIncome?: (income: IncomeItem) => void;
   onEditIncome?: (income: IncomeItem) => void;
+  /** true のとき入力順をそのまま表示する。検索結果のようにサーバー側で並び順が決まっている場合に使う */
+  preserveOrder?: boolean;
   weekSummaryPath?: (date: string) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
   const hasRowActions = Boolean(onEditIncome || onDeleteIncome || weekSummaryPath);
-  const orderedIncomes = incomes
-    .map((income, index) => ({ income, index }))
-    .sort((a, b) => b.income.date.localeCompare(a.income.date) || b.index - a.index)
-    .map(({ income }) => income);
+  const orderedIncomes = preserveOrder
+    ? incomes
+    : incomes
+        .map((income, index) => ({ income, index }))
+        .sort((a, b) => b.income.date.localeCompare(a.income.date) || b.index - a.index)
+        .map(({ income }) => income);
   const visibleIncomes = expanded ? orderedIncomes : orderedIncomes.slice(0, 5);
   const remainingCount = Math.max(incomes.length - visibleIncomes.length, 0);
 

@@ -30,6 +30,7 @@ export function ReceiptListCard({
   onBulkChangeCategory,
   onBulkDelete,
   weekSummaryPath,
+  preserveOrder,
 }: {
   count: number;
   dateFormat?: ReceiptDateFormat;
@@ -38,6 +39,8 @@ export function ReceiptListCard({
   isLoading: boolean;
   listAriaLabel?: string;
   maxVisibleGroups?: number;
+  /** true のとき入力順をそのまま表示する。検索結果のようにサーバー側で並び順が決まっている場合に使う */
+  preserveOrder?: boolean;
   receipts: ReceiptItem[];
   onDeleteReceipt?: (receipt: ReceiptItem) => void;
   onEditReceipt?: (receipt: ReceiptItem) => void;
@@ -58,10 +61,13 @@ export function ReceiptListCard({
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
   const hasRowActions = Boolean(onEditReceipt || onDeleteReceipt || weekSummaryPath);
-  const orderedReceiptGroups = groupReceiptItems(receipts)
-    .map((group, index) => ({ group, index }))
-    .sort((a, b) => b.group.date.localeCompare(a.group.date) || b.index - a.index)
-    .map(({ group }) => group);
+  const receiptGroups = groupReceiptItems(receipts);
+  const orderedReceiptGroups = preserveOrder
+    ? receiptGroups
+    : receiptGroups
+        .map((group, index) => ({ group, index }))
+        .sort((a, b) => b.group.date.localeCompare(a.group.date) || b.index - a.index)
+        .map(({ group }) => group);
   const visibleReceiptGroups =
     expanded || maxVisibleGroups === Number.POSITIVE_INFINITY
       ? orderedReceiptGroups

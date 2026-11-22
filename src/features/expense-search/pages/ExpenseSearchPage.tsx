@@ -414,6 +414,7 @@ export function ExpenseSearchPage() {
                     isLoading={false}
                     listAriaLabel="支出の検索結果"
                     maxVisibleGroups={Number.POSITIVE_INFINITY}
+                    preserveOrder
                     receipts={expenseItems}
                     onDeleteReceipt={setDeletingReceipt}
                     onEditReceipt={setEditingReceipt}
@@ -440,6 +441,7 @@ export function ExpenseSearchPage() {
                     incomes={incomeItems}
                     isLoading={false}
                     listAriaLabel="収入の検索結果"
+                    preserveOrder
                     onDeleteIncome={(income) => setDeletingReceipt(incomeItemToReceiptItem(income))}
                     onEditIncome={(income) => setEditingReceipt(incomeItemToReceiptItem(income))}
                     weekSummaryPath={weekSummaryPath}
