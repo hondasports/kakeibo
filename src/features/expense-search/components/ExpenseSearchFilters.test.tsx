@@ -4,7 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithDatePickers } from "../../../test/render";
 
-const { useMediaQueryMock } = vi.hoisted(() => ({ useMediaQueryMock: vi.fn(() => false) }));
+const { useMediaQueryMock } = vi.hoisted(() => ({
+  useMediaQueryMock: vi.fn((_query?: unknown) => false),
+}));
 
 vi.mock("@mui/material", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@mui/material")>();
