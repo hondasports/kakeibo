@@ -15,6 +15,7 @@ import {
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useTheme } from "@mui/material/styles";
+import { designTokens } from "../../../designTokens";
 import {
   DRAWER_WIDTH,
   DRAWER_WIDTH_MINI,
@@ -78,7 +79,12 @@ export function AppDrawer({ navItems, onToggleSidebar, sidebarOpen }: AppDrawerP
               alt=""
               component="img"
               src="/suzumemo-app-icon.svg"
-              sx={{ height: 34, width: 34, flex: "0 0 auto", borderRadius: 2 }}
+              sx={{
+                height: 34,
+                width: 34,
+                flex: "0 0 auto",
+                borderRadius: designTokens.radius.md,
+              }}
             />
             <Box sx={{ minWidth: 0 }}>
               <Typography

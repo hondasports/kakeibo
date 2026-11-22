@@ -54,6 +54,40 @@ type ParsedExpenseSearchFilters =
 
 const SHOP_QUERY_MAX_LENGTH = 80;
 
+// 項目ごとの近接エラー表示（画面）とparse時の先頭エラー（API）で同じ判定・文言を使う。
+export function getShopQueryError(shopQuery: string): string | null {
+  return shopQuery.length > SHOP_QUERY_MAX_LENGTH
+    ? `検索語は${SHOP_QUERY_MAX_LENGTH}文字以内で指定してください`
+    : null;
+}
+
+export function getAmountYenError(value: number): string | null {
+  return isNonNegativeInteger(value) ? null : "金額は0以上の整数で指定してください";
+}
+
+export function getAmountRangeError(
+  minAmountYen: number | undefined,
+  maxAmountYen: number | undefined,
+): string | null {
+  return minAmountYen !== undefined && maxAmountYen !== undefined && minAmountYen > maxAmountYen
+    ? "金額の下限は上限以下にしてください"
+    : null;
+}
+
+export function getIsoDateError(value: string): string | null {
+  return isValidIsoDateString(value) ? null : "日付はYYYY-MM-DD形式で指定してください";
+}
+
+export function getDateRangeError(
+  startDate: string | undefined,
+  endDate: string | undefined,
+): string | null {
+  if (startDate !== undefined && endDate !== undefined && startDate > endDate) {
+    return "開始日は終了日以前にしてください";
+  }
+  return getHistoryTrendRangeError(startDate, endDate);
+}
+
 function normalizeSearchText(value: string | undefined): string {
   return (value ?? "").normalize("NFKC").trim().toLocaleLowerCase("ja");
 }
@@ -291,8 +325,9 @@ export function parseExpenseSearchFilters(
 
   const shopQuery = input.shopQuery?.trim();
   if (shopQuery) {
-    if (shopQuery.length > SHOP_QUERY_MAX_LENGTH) {
-      return { ok: false, error: `検索語は${SHOP_QUERY_MAX_LENGTH}文字以内で指定してください` };
+    const shopQueryError = getShopQueryError(shopQuery);
+    if (shopQueryError !== null) {
+      return { ok: false, error: shopQueryError };
     }
     filters.shopQuery = shopQuery;
   }
@@ -302,52 +337,45 @@ export function parseExpenseSearchFilters(
   }
 
   if (input.minAmountYen !== undefined) {
-    if (!isNonNegativeInteger(input.minAmountYen)) {
-      return { ok: false, error: "金額は0以上の整数で指定してください" };
+    const amountError = getAmountYenError(input.minAmountYen);
+    if (amountError !== null) {
+      return { ok: false, error: amountError };
     }
     filters.minAmountYen = input.minAmountYen;
   }
 
   if (input.maxAmountYen !== undefined) {
-    if (!isNonNegativeInteger(input.maxAmountYen)) {
-      return { ok: false, error: "金額は0以上の整数で指定してください" };
+    const amountError = getAmountYenError(input.maxAmountYen);
+    if (amountError !== null) {
+      return { ok: false, error: amountError };
     }
     filters.maxAmountYen = input.maxAmountYen;
   }
 
-  if (
-    filters.minAmountYen !== undefined &&
-    filters.maxAmountYen !== undefined &&
-    filters.minAmountYen > filters.maxAmountYen
-  ) {
-    return { ok: false, error: "金額の下限は上限以下にしてください" };
+  const amountRangeError = getAmountRangeError(filters.minAmountYen, filters.maxAmountYen);
+  if (amountRangeError !== null) {
+    return { ok: false, error: amountRangeError };
   }
 
   if (input.startDate !== undefined && input.startDate.length > 0) {
-    if (!isValidIsoDateString(input.startDate)) {
-      return { ok: false, error: "日付はYYYY-MM-DD形式で指定してください" };
+    const dateError = getIsoDateError(input.startDate);
+    if (dateError !== null) {
+      return { ok: false, error: dateError };
     }
     filters.startDate = input.startDate;
   }
 
   if (input.endDate !== undefined && input.endDate.length > 0) {
-    if (!isValidIsoDateString(input.endDate)) {
-      return { ok: false, error: "日付はYYYY-MM-DD形式で指定してください" };
+    const dateError = getIsoDateError(input.endDate);
+    if (dateError !== null) {
+      return { ok: false, error: dateError };
     }
     filters.endDate = input.endDate;
   }
 
-  if (
-    filters.startDate !== undefined &&
-    filters.endDate !== undefined &&
-    filters.startDate > filters.endDate
-  ) {
-    return { ok: false, error: "開始日は終了日以前にしてください" };
-  }
-
-  const trendRangeError = getHistoryTrendRangeError(filters.startDate, filters.endDate);
-  if (trendRangeError !== null) {
-    return { ok: false, error: trendRangeError };
+  const dateRangeError = getDateRangeError(filters.startDate, filters.endDate);
+  if (dateRangeError !== null) {
+    return { ok: false, error: dateRangeError };
   }
 
   return { ok: true, filters };

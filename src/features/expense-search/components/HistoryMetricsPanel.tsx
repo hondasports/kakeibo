@@ -47,6 +47,8 @@ export function HistoryMetricsPanel({
   totalExpenseYen,
   totalIncomeYen,
   netAmountYen,
+  periodLabel,
+  truncated = false,
 }: {
   totalCount: number;
   expenseCount: number;
@@ -54,10 +56,18 @@ export function HistoryMetricsPanel({
   totalExpenseYen: number;
   totalIncomeYen: number;
   netAmountYen: number;
+  periodLabel?: string;
+  truncated?: boolean;
 }) {
   return (
     <Paper className="paper-panel history-search-metrics" elevation={0}>
       <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+        {periodLabel !== undefined ? (
+          <Typography color="text.secondary" sx={{ mb: 1.5 }} variant="body2">
+            対象期間: {periodLabel}
+            {truncated ? "（先頭の一部を集計）" : ""}
+          </Typography>
+        ) : null}
         <Box
           sx={{
             display: "grid",
