@@ -159,7 +159,8 @@ describe("AccountDeletionPage", () => {
     renderWithProviders(<AccountDeletionPage />);
 
     const emailInput = screen.getByRole("textbox", { name: "メールアドレス入力" });
-    expect(screen.getByText(/me@example.com/)).toBeInTheDocument();
+    // 誤操作防止の確認入力であり、正解のメールアドレスは画面に出さない
+    expect(screen.queryByText(/me@example.com/)).not.toBeInTheDocument();
     const deleteButton = screen.getByRole("button", { name: "アカウントを削除する" });
 
     await user.type(screen.getByRole("textbox", { name: "確認用入力" }), "削除");

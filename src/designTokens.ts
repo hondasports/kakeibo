@@ -74,6 +74,8 @@ export const designTokens = {
   },
   size: {
     buttonMinHeight: "40px",
+    // SPでは台帳の40pxより指先の44pxを優先する（MuiButton/MuiTab/MuiIconButton が使用）
+    buttonMinHeightSp: "44px",
     inputMinHeight: "36px",
     bottomNavHeight: "56px",
   },

@@ -574,13 +574,6 @@
   .input-workbench .MuiInputBase-root {
     min-height: 44px;
   }
-
-  /* SPのタップ対象は44px以上に揃える（テーマの40pxより大きい値をここで上書き） */
-  .MuiButton-root,
-  .MuiIconButton-root,
-  .MuiTab-root {
-    min-height: 44px;
-  }
 }
 
 .ai-expense-queue-status-summary {
