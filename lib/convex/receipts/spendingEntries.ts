@@ -149,6 +149,9 @@ export function mapExpenseEntriesToReceiptLinkages(
 
 // 履歴検索ではカテゴリ未設定の記録を「未分類」として表示対象に含めるため、
 // missing_category で落とさず空の categoryId として載せる。
+// 未設定の記録は新旧データ移行の棚卸し対象であり、実在を前提としない。
+// 月次・週次の集計は mapExpenseEntriesToReceiptLinkages の契約
+// （支出には必ずカテゴリがある）のままにし、検索で未分類を探し出せるようにする。
 export function mapExpenseEntriesToSearchLinkages(
   entries: Doc<"expenseEntries">[],
 ): ReceiptLinkage[] {

@@ -130,15 +130,21 @@ export function ExpenseSearchPage() {
   const hasUnappliedChanges = Object.keys(diffExpenseSearchFormState(applied, draft)).length > 0;
 
   const currentSearchPath = `${location.pathname}${location.search}`;
-  const appliedCategory = allCategories.find((category) => category._id === applied.categoryId);
+  // まず有効カテゴリ（listActive）で解決し、無効化済みかの判定だけ listForSettings に頼る。
+  // どちらの結果も来ていない間は「読み込み中」として「指定」と区別する。
+  const activeCategory = categories.find((category) => category._id === applied.categoryId);
+  const appliedCategory =
+    activeCategory ?? allCategories.find((category) => category._id === applied.categoryId);
   const categoryLabel =
     applied.categoryId === UNCATEGORIZED_CATEGORY_ID
       ? "未分類"
       : appliedCategory
-        ? appliedCategory.isActive
-          ? appliedCategory.name
-          : `${appliedCategory.name}（無効化済み）`
-        : undefined;
+        ? appliedCategory.isActive === false
+          ? `${appliedCategory.name}（無効化済み）`
+          : appliedCategory.name
+        : applied.categoryId && allCategoriesQuery === undefined
+          ? "読み込み中"
+          : undefined;
 
   // 期間が複数月にまたがるときは開始日側の月・週を代表として使う。
   const representativeDate =
@@ -409,6 +415,11 @@ export function ExpenseSearchPage() {
               </Stack>
             ) : (
               <>
+                {deletingReceipt === null && deleteError ? (
+                  <Alert severity="error" variant="outlined" onClose={() => setDeleteError("")}>
+                    {deleteError}
+                  </Alert>
+                ) : null}
                 {applied.entryType !== "income" && expenseItems.length > 0 ? (
                   <ReceiptListCard
                     count={expenseItems.length}
@@ -420,7 +431,10 @@ export function ExpenseSearchPage() {
                     maxVisibleGroups={Number.POSITIVE_INFINITY}
                     preserveOrder
                     receipts={expenseItems}
-                    onDeleteReceipt={setDeletingReceipt}
+                    onDeleteReceipt={(receipt) => {
+                      setDeleteError("");
+                      setDeletingReceipt(receipt);
+                    }}
                     onEditReceipt={setEditingReceipt}
                     isSelected={bulkSelection.isSelected}
                     limitMessage={bulkSelection.limitMessage}
@@ -446,7 +460,10 @@ export function ExpenseSearchPage() {
                     isLoading={false}
                     listAriaLabel="収入の検索結果"
                     preserveOrder
-                    onDeleteIncome={(income) => setDeletingReceipt(incomeItemToReceiptItem(income))}
+                    onDeleteIncome={(income) => {
+                      setDeleteError("");
+                      setDeletingReceipt(incomeItemToReceiptItem(income));
+                    }}
                     onEditIncome={(income) => setEditingReceipt(incomeItemToReceiptItem(income))}
                     weekSummaryPath={weekSummaryPath}
                   />
@@ -473,12 +490,6 @@ export function ExpenseSearchPage() {
           </>
         )}
 
-        {deleteError ? (
-          <Alert severity="error" variant="outlined" onClose={() => setDeleteError("")}>
-            {deleteError}
-          </Alert>
-        ) : null}
-
         <ExpenseEntryEditDialog
           categories={categories}
           open={editingReceipt !== null}
@@ -491,9 +502,14 @@ export function ExpenseSearchPage() {
         />
 
         <ExpenseEntryDeleteDialog
+          error={deleteError || undefined}
+          impactMessage="削除すると元に戻せません。各サマリーの集計からも外れます。"
           open={deletingReceipt !== null}
           saving={deleteSaving}
-          onCancel={() => setDeletingReceipt(null)}
+          onCancel={() => {
+            setDeletingReceipt(null);
+            setDeleteError("");
+          }}
           onConfirm={() => void handleConfirmDelete()}
         />
 
@@ -514,6 +530,7 @@ export function ExpenseSearchPage() {
           open={bulkDeleteOpen}
           saving={bulkSaving}
           selectedCount={bulkSelection.selectedCount}
+          impactMessage="削除すると元に戻せません。各サマリーの集計からも外れます。"
           onCancel={() => setBulkDeleteOpen(false)}
           onConfirm={() => void handleBulkDelete()}
         />

@@ -41,7 +41,6 @@ const pickerPaperSx = {
 
 const KEYWORD_FIELD_HELP =
   '店名・品名・銀行名・メモを部分一致で探します。空白区切りでAND、先頭「-」で除外、「"..."」でそのまま検索';
-
 const datePresetOptions: Array<{ label: string; value: Exclude<HistoryDatePreset, "custom"> }> = [
   { label: "今週", value: "thisWeek" },
   { label: "今月", value: "thisMonth" },
@@ -190,7 +189,7 @@ export function ExpenseSearchFilters({
             helperText={
               state.entryType === "income"
                 ? "カテゴリは支出にのみ適用されます"
-                : "明細のどれかがこのカテゴリの支出が対象です"
+                : "明細の1つでもこのカテゴリに当たる支出が対象です"
             }
             select
             label="カテゴリ"
@@ -232,7 +231,7 @@ export function ExpenseSearchFilters({
             <Button
               onClick={() => onChange({ ...state, startDate: "", endDate: "" })}
               sx={{ minHeight: 44 }}
-              variant={selectedPreset === "custom" && hasDateRange ? "contained" : "outlined"}
+              variant={hasDateRange ? "outlined" : "contained"}
             >
               期間を指定しない
             </Button>
@@ -335,14 +334,21 @@ export function ExpenseSearchFilters({
 
   return (
     <Box>
-      <Button
-        aria-expanded={filtersOpen}
-        onClick={() => setFiltersOpen((open) => !open)}
-        sx={{ minHeight: 44 }}
-        variant="outlined"
-      >
-        {filtersOpen ? "絞り込み条件を閉じる" : "絞り込み条件を開く"}
-      </Button>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+        <Button
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((open) => !open)}
+          sx={{ minHeight: 44 }}
+          variant="outlined"
+        >
+          {filtersOpen ? "絞り込み条件を閉じる" : "絞り込み条件を開く"}
+        </Button>
+        {hasUnappliedChanges ? (
+          <Typography color="text.secondary" variant="caption">
+            変更はまだ適用されていません
+          </Typography>
+        ) : null}
+      </Stack>
       <Collapse in={filtersOpen}>
         <Box sx={{ pt: 2 }}>{form}</Box>
       </Collapse>

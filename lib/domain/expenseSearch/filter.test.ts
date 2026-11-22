@@ -245,6 +245,13 @@ describe("parseSearchQueryTerms", () => {
     ]);
   });
 
+  it("全角の引用符とハイフンも解析対象にする", () => {
+    expect(parseSearchQueryTerms("－菓子")).toEqual([{ raw: "菓子", exclude: true }]);
+    expect(parseSearchQueryTerms("＂白 ご飯＂")).toEqual([{ raw: "白 ご飯", exclude: false }]);
+    expect(parseSearchQueryTerms("“特売 品”")).toEqual([{ raw: "特売 品", exclude: false }]);
+    expect(parseSearchQueryTerms("＂－特売＂")).toEqual([{ raw: "-特売", exclude: false }]);
+  });
+
   it("「-」だけは除外指定にならずリテラルとして残る", () => {
     expect(parseSearchQueryTerms("-")).toEqual([{ raw: "-", exclude: false }]);
     expect(parseSearchQueryTerms('  - " "  ')).toEqual([
