@@ -13,10 +13,13 @@ export function createLineExpenseDraftReader(ctx: QueryCtx | MutationCtx): LineE
     async lineTextDraftCreatedAtsSince(createdByUserId, sinceMs) {
       const rows = await ctx.db
         .query("aiExpenseDrafts")
+        // 範囲条件は index 内の gte で指定する（filter だと全履歴走査になる）
         .withIndex("by_created_by_user_id_and_source_type_and_created_at", (q) =>
-          q.eq("createdByUserId", createdByUserId).eq("sourceType", "line_text"),
+          q
+            .eq("createdByUserId", createdByUserId)
+            .eq("sourceType", "line_text")
+            .gte("createdAt", sinceMs),
         )
-        .range((q) => q.gte(q.field("createdAt"), sinceMs))
         .order("desc")
         .take(LINE_TEXT_DRAFT_DAILY_LIMIT + 1);
       return rows.map((row) => row.createdAt);
