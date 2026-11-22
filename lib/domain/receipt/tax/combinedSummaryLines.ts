@@ -3,6 +3,7 @@ import { taxSummaryLineKind } from "./summaryEvidence";
 
 const LABELED_AMOUNT = /[¥￥]\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\s*円)?|(\d{1,3}(?:,\d{3})+|\d+)\s*円/g;
 const RATE_PREFIX = /^(\d+(?:\.\d+)?%)/;
+const ENCLOSING_PARENS = /^\((.*)\)$/;
 // 符号・小数・判読できない桁が隣接する金額は、数字の一部だけを読むことになるので分けない。
 const UNSAFE_BEFORE = /[-−▲△\d.,?？]$/;
 const UNSAFE_AFTER = /^[\d.,?？]/;
@@ -26,10 +27,14 @@ function amounts(text: string): { yen: number; start: number; end: number }[] | 
  * ラベルと金額が一意に対応しない行は分けず、読めない税の根拠として残す。
  */
 function splitCombinedLine(line: ReceiptRawObservationLine): ReceiptRawObservationLine[] {
-  if (line.amountYen !== null || !line.amountText) return [line];
-  const text = line.rawText.normalize("NFKC").trim();
+  if (!line.amountText) return [line];
+  const rawText = line.rawText.normalize("NFKC").trim();
+  const text = (ENCLOSING_PARENS.exec(rawText)?.[1] ?? rawText).trim();
   const printed = amounts(text);
   if (printed?.length !== 2) return [line];
+  // 行内のどの金額とも違う amountYen は、別の行の金額と取り違えている可能性があるので分けない。
+  if (line.amountYen !== null && !printed.some((amount) => amount.yen === line.amountYen))
+    return [line];
   const reported = amounts(line.amountText.normalize("NFKC"))?.map((amount) => amount.yen);
   if (reported?.join() !== printed.map((amount) => amount.yen).join()) return [line];
   if (text.slice(printed[1].end).trim() !== "") return [line];

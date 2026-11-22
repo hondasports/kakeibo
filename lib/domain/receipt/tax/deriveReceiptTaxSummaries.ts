@@ -264,6 +264,13 @@ export function deriveReceiptTaxSummaries(args: {
             )
           )
             return false;
+          // 別の行の対象額は、税額と組で印字された証拠にならないので税抜の対象額と認めない。
+          if (
+            basis === "tax_included" &&
+            line.amountYen === excluded &&
+            taxLines.some((taxLine) => taxLine.sourceLineIndex === line.sourceLineIndex)
+          )
+            return false;
           return line.amountYen !== target;
         });
       const missing =

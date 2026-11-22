@@ -236,3 +236,114 @@ describe("対象額と消費税額が1行に並ぶ印字行（Issue #1280）", (
     expect(result.itemFields[0].taxAllocationStatus).toBe("unallocated");
   });
 });
+
+/**
+ * 本番観測を匿名化した形。内税のレシートで「(8%対象 ¥519 消費税 ¥41)」のように
+ * 税抜の対象額と税額が括弧つきの1行に並び、AIは `amountYen` に先頭の金額を入れていた。
+ */
+function parenthesizedIncludedTaxReceipt(
+  overrides: { rateLine?: string; rateAmountYen?: number | null; rateAmountText?: string } = {},
+) {
+  const rateLine = overrides.rateLine ?? "(8%対象 ¥519 消費税 ¥41)";
+  const item = (itemName: string, printedAmountYen: number) => ({
+    itemName,
+    lineType: "item" as const,
+    printedAmountYen,
+    amountBasis: "tax_included" as const,
+    taxRatePercent: 8 as const,
+    markers: ["※"],
+    warnings: [],
+    taxResolutionStatus: "resolved" as const,
+    taxResolutionSource: "item_explicit" as const,
+  });
+  return {
+    amountYen: 560,
+    receiptTotalSource: "explicit_label" as const,
+    items: [item("商品1", 183), item("商品2", 183), item("商品3", 194)],
+    taxSummaries: [],
+    markerDefinitions: [{ marker: "※", description: "軽減税率対象商品を示す記号" }],
+    rawObservationLines: [
+      line(0, "商品1 1点※ ¥183", 183, ["item"]),
+      line(1, "商品2 1点※ ¥183", 183, ["item"]),
+      line(2, "商品3 1点※ ¥194", 194, ["item"]),
+      line(3, "[10小計] 3点 ¥560", 560, ["subtotal"]),
+      line(4, "合計 ¥560", 560, ["total"]),
+      line(5, "(10%対象 ¥0 消費税 ¥0)", 0, ["tax"], "¥0"),
+      line(
+        6,
+        rateLine,
+        overrides.rateAmountYen === undefined ? 519 : overrides.rateAmountYen,
+        ["tax"],
+        overrides.rateAmountText ?? "¥519 / ¥41",
+      ),
+      line(7, "電子マネー ¥560", 560, ["payment"]),
+    ],
+    receiptLineClassifications: [
+      classification(0, "classified", [["item", 0.75]]),
+      classification(1, "classified", [["item", 0.75]]),
+      classification(2, "classified", [["item", 0.75]]),
+      classification(3, "classified", [["subtotal", 0.97]]),
+      classification(4, "classified", [["totalCandidate", 0.98]]),
+      classification(5, "classified", [["tax", 1]]),
+      classification(6, "classified", [["tax", 1]]),
+      classification(7, "classified", [["paymentMethodAmount", 0.98]]),
+    ],
+  };
+}
+
+describe("括弧つきの1行に税抜の対象額と税額が並ぶ内税レシート", () => {
+  it("税込の商品に税額を配分し、税率別集計を確定する", () => {
+    const result = reinterpretDraftTax(parenthesizedIncludedTaxReceipt());
+    expect(result.interpretation.taxSummaries).toEqual([
+      expect.objectContaining({
+        taxRatePercent: 8,
+        status: "verified",
+        taxableAmountYen: 560,
+        taxableAmountBasis: "tax_included",
+        taxYen: 41,
+      }),
+    ]);
+    expect(result.itemFields.map((item) => item.taxAllocationStatus)).toEqual([
+      "allocated",
+      "allocated",
+      "allocated",
+    ]);
+    expect(result.itemFields.reduce((sum, item) => sum + (item.allocatedTaxYen ?? 0), 0)).toBe(41);
+  });
+
+  it("AIが amountYen を null にしても同じように配分する", () => {
+    const result = reinterpretDraftTax(parenthesizedIncludedTaxReceipt({ rateAmountYen: null }));
+    expect(result.itemFields.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+  });
+
+  it("括弧を外し、後ろの税額の行にも税率を付けて分ける", () => {
+    const lines = splitCombinedSummaryLines([
+      line(6, "(8%対象 ¥519 消費税 ¥41)", 519, ["tax"], "¥519 / ¥41"),
+    ]);
+    expect(lines).toEqual([
+      expect.objectContaining({ rawText: "8%対象 ¥519", amountYen: 519 }),
+      expect.objectContaining({ rawText: "8%消費税 ¥41", amountYen: 41 }),
+    ]);
+  });
+
+  it.each([
+    ["印字された税額が税率の計算と合わない", "(8%対象 ¥519 消費税 ¥40)", "¥519 / ¥40", 519],
+    ["対象額が税込合計から税額を引いた額と合わない", "(8%対象 ¥520 消費税 ¥41)", "¥520 / ¥41", 520],
+    ["amountYen が行内のどの金額とも違う", "(8%対象 ¥519 消費税 ¥41)", "¥519 / ¥41", 560],
+  ])("%s行は配分せずに止める", (_, rateLine, rateAmountText, rateAmountYen) => {
+    const result = reinterpretDraftTax(
+      parenthesizedIncludedTaxReceipt({ rateLine, rateAmountText, rateAmountYen }),
+    );
+    expect(result.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+  });
+
+  it("税額の印字が無ければ、税抜と読める対象額だけでは配分しない", () => {
+    const result = reinterpretDraftTax(
+      parenthesizedIncludedTaxReceipt({
+        rateLine: "(8%対象 ¥519)",
+        rateAmountText: "¥519",
+      }),
+    );
+    expect(result.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+  });
+});
