@@ -10,6 +10,7 @@ import {
   createEntryFavoriteReadRepository,
   createEntryFavoriteRepository,
 } from "./convexEntryFavoriteRepository";
+import { createCategoryRepository } from "../categories/categoryRepository";
 import {
   deleteEntryFavorite,
   listEntryFavorites,
@@ -34,7 +35,10 @@ export async function saveEntryFavoriteHandler(
   const { groupId, userId } = await requireGroupMembership(ctx);
   return (await saveEntryFavorite(
     { groupId, userId },
-    { entryFavorites: createEntryFavoriteRepository(ctx) },
+    {
+      entryFavorites: createEntryFavoriteRepository(ctx),
+      categories: createCategoryRepository(ctx),
+    },
     args,
     Date.now(),
   )) as Id<"entryFavorites">;

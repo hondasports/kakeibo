@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EntryFavoriteFields } from "../../domain/entryFavorites/entryFavorite";
+import type { CategoryRecord } from "../../domain/categories/categoryRepository";
 import type { EntryFavoriteRepository } from "../../domain/entryFavorites/entryFavoriteRepository";
 import { deleteEntryFavorite, listEntryFavorites, saveEntryFavorite } from "./entryFavorites";
 
@@ -26,12 +27,28 @@ function makeRepo(initial: EntryFavoriteFields[] = []) {
 
 const ctx = { userId: "u1", groupId: "g1" };
 
+const ownCategory: CategoryRecord = {
+  id: "c1",
+  groupId: "g1",
+  name: "食費",
+  isActive: true,
+};
+
+function makeCategories(records: CategoryRecord[] = [ownCategory]) {
+  return { findById: async (id: string) => records.find((r) => r.id === id) ?? null };
+}
+
+const deps = (repo: ReturnType<typeof makeRepo>["repo"], records?: CategoryRecord[]) => ({
+  entryFavorites: repo,
+  categories: makeCategories(records),
+});
+
 describe("saveEntryFavorite", () => {
   it("有効な入力でお気に入りを保存する", async () => {
     const { repo, store } = makeRepo();
     const id = await saveEntryFavorite(
       ctx,
-      { entryFavorites: repo },
+      { ...deps(repo) },
       { title: "スーパー", categoryId: "c1", amountYen: 3000, memo: "週末まとめ買い" },
       100,
     );
@@ -53,27 +70,49 @@ describe("saveEntryFavorite", () => {
     await expect(
       saveEntryFavorite(
         ctx,
-        { entryFavorites: repo },
+        { ...deps(repo) },
         { title: " ", categoryId: "c1", amountYen: 100 },
         0,
       ),
     ).rejects.toThrow("店舗名 / 支払先は必須です");
     await expect(
-      saveEntryFavorite(
-        ctx,
-        { entryFavorites: repo },
-        { title: "a", categoryId: "c1", amountYen: 0 },
-        0,
-      ),
+      saveEntryFavorite(ctx, { ...deps(repo) }, { title: "a", categoryId: "c1", amountYen: 0 }, 0),
     ).rejects.toThrow("金額は1円以上の整数で入力してください");
+    await expect(
+      saveEntryFavorite(ctx, { ...deps(repo) }, { title: "a", categoryId: " ", amountYen: 100 }, 0),
+    ).rejects.toThrow("カテゴリを選択してください");
+  });
+
+  it("別グループのカテゴリIDでは保存できない", async () => {
+    const { repo, store } = makeRepo();
+    const otherGroupCategory: CategoryRecord = {
+      id: "c-other",
+      groupId: "g2",
+      name: "食費",
+      isActive: true,
+    };
     await expect(
       saveEntryFavorite(
         ctx,
-        { entryFavorites: repo },
-        { title: "a", categoryId: " ", amountYen: 100 },
+        { ...deps(repo, [otherGroupCategory]) },
+        { title: "a", categoryId: "c-other", amountYen: 100 },
         0,
       ),
-    ).rejects.toThrow("カテゴリを選択してください");
+    ).rejects.toThrow("Category does not belong to the current group");
+    expect(store.size).toBe(0);
+  });
+
+  it("無効化したカテゴリでは保存できない", async () => {
+    const { repo, store } = makeRepo();
+    await expect(
+      saveEntryFavorite(
+        ctx,
+        { ...deps(repo, [{ ...ownCategory, isActive: false }]) },
+        { title: "a", categoryId: "c1", amountYen: 100 },
+        0,
+      ),
+    ).rejects.toThrow();
+    expect(store.size).toBe(0);
   });
 });
 

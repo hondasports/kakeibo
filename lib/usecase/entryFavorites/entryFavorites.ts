@@ -13,16 +13,22 @@ import type {
   EntryFavoriteRepository,
 } from "../../domain/entryFavorites/entryFavoriteRepository";
 import type { UsecaseGroupContext } from "../context";
+import type { CategoryRepository } from "../../domain/categories/categoryRepository";
+import { assertUsableCategory } from "../categories/assertUsableCategory";
 
 export type { EntryFavoriteFields, EntryFavoriteInput };
 
 export async function saveEntryFavorite(
   ctx: UsecaseGroupContext,
-  deps: { entryFavorites: EntryFavoriteRepository },
+  deps: { entryFavorites: EntryFavoriteRepository; categories: CategoryRepository },
   input: EntryFavoriteInput,
   now: number,
 ): Promise<string> {
-  return await deps.entryFavorites.insert(buildEntryFavoriteFields(ctx, input, now));
+  // 入力検証を先に済ませてから、他グループ・無効化カテゴリへの参照が
+  // 保存に残らないよう実績作成と同じ検証を行う。
+  const fields = buildEntryFavoriteFields(ctx, input, now);
+  await assertUsableCategory(deps.categories, input.categoryId, ctx.groupId);
+  return await deps.entryFavorites.insert(fields);
 }
 
 export async function listEntryFavorites(
