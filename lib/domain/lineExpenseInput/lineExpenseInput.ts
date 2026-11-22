@@ -51,19 +51,22 @@ function toHalfWidthDigits(value: string): string {
 
 /** メッセージを支出入力として解析する。解釈できなければ null。 */
 export function parseLineExpenseInput(messageText: string): LineExpenseInput | null {
-  // 全角数字・全角カンマは半角にそろえてから照合する
+  const text = messageText.trim();
+  // 金額の照合だけは全角数字・全角カンマを半角にそろえた文字列で行う
   // （「１，２００円」が「１」と「２００円」に分かれないように）。
-  const text = toHalfWidthDigits(messageText.trim()).replace(/，/g, ",");
+  // 置換は1文字→1文字なので位置は変わらず、内容は原文から取り出す
+  // （「１００均」のような全角数字を含む内容・カテゴリ名を維持する）。
+  const normalized = toHalfWidthDigits(text).replace(/，/g, ",");
   if (text.length === 0) return null;
 
   // 「内容 金額」が基本形。金額は空白・端で区切られた独立した数字列のみ
   // （「100均」の100のように語に食い込んだ数字は内容の一部）。
   // 独立した数字列が複数ある入力は金額が一意に決まらないため受理しない。
-  const matches = [...text.matchAll(AMOUNT_PATTERN)];
+  const matches = [...normalized.matchAll(AMOUNT_PATTERN)];
   const standalone = matches.filter((m) => {
     const index = m.index ?? -1;
-    const before = index <= 0 ? " " : (text[index - 1] ?? "");
-    const after = text[index + m[0].length] ?? " ";
+    const before = index <= 0 ? " " : (normalized[index - 1] ?? "");
+    const after = normalized[index + m[0].length] ?? " ";
     const boundedBefore = /\s/.test(before);
     const boundedAfter = after === "" || /\s/.test(after);
     // 「円」付きは語に食い込んでいても金額（「電車代４００円」）。

@@ -15,6 +15,14 @@ describe("parseLineExpenseInput", () => {
     expect(parseLineExpenseInput("食費 1，200円")).toEqual({ title: "食費", amountYen: 1200 });
     expect(parseLineExpenseInput("食費 １２，３４５")).toEqual({ title: "食費", amountYen: 12345 });
   });
+  it("内容の全角数字はそのまま保持する", () => {
+    // カテゴリ名「１００均」のような全角数字を含む内容を半角へ潰さない
+    expect(parseLineExpenseInput("１００均 500")).toEqual({ title: "１００均", amountYen: 500 });
+    expect(parseLineExpenseInput("１００均 １，２００")).toEqual({
+      title: "１００均",
+      amountYen: 1200,
+    });
+  });
   it("金額のみ・内容のみ・コマンド語は受理しない", () => {
     expect(parseLineExpenseInput("500")).toBeNull();
     expect(parseLineExpenseInput("コンビニ")).toBeNull();
