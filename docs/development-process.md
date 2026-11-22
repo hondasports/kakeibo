@@ -324,6 +324,7 @@ AGENTS.mdのルールが独自に「常に1 approval」を追加しない。
 
 レビュー観点:
 
+- acceptance criteria（受入条件を全件満たすか）
 - correctness
 - user impact
 - data impact

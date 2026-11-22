@@ -1,6 +1,6 @@
 ---
 name: repo-code-review
-description: 差分・PRをレビューするとき（セルフレビュー・PRへのinline投稿を含む）に使う。変更パスに応じて、security・stack・unit-test・E2Eのrepo固有チェックを読み分ける。
+description: 差分・PRをレビューするとき（セルフレビュー・PRへのinline投稿を含む）に使う。Issueの受入条件を満たすかを自分で照合し、変更パスに応じて、security・stack・unit-test・E2Eのrepo固有チェックを読み分ける。
 license: Apache-2.0
 ---
 
@@ -8,7 +8,7 @@ license: Apache-2.0
 
 ## 入力・起動
 
-差分またはPRをレビューするとき（セルフレビューを含む）に使う。入力は対象diff（`git diff origin/preview...HEAD` 等）、Issueの目的とAcceptance Criteria、実行済みの検証結果。
+差分またはPRをレビューするとき（セルフレビューを含む）に使う。入力は対象diff（`git diff origin/preview...HEAD` 等）と実行済みの検証結果。Issueの目的とAcceptance Criteriaは渡されるのを待たず、`references/spec-conformance.md` に従って自分で取得する。
 
 レビュー観点の正本は `docs/development-process.md` の「Review / branch protection」。このskillはrepo固有の確認点だけを持つが、レビューの範囲はそれに限らない。正本の観点（correctness・user impact等）に沿った汎用的な不具合も、見つけたら所見に含める。CodeRabbit等の自動レビューは補助であり、代わりにはならない。
 
@@ -18,6 +18,7 @@ license: Apache-2.0
 
 | 変更パス・内容 | 読むもの |
 | --- | --- |
+| 全てのレビュー（変更パスを問わない） | `references/spec-conformance.md` |
 | `convex/**`、webhook、`vercel.json`、認証・認可に関わる `src/**` | `references/security.md`、`references/stack.md` |
 | `src/**`、`lib/**` | `references/stack.md`、`references/unit-test.md` |
 | 画面・コンポーネント・レイアウト・状態表示・文言の変更 | `skills/ui-design` |
@@ -38,13 +39,14 @@ license: Apache-2.0
 委譲: 該当skill（あれば）
 ```
 
-末尾に必ず次の3つを付ける。
+末尾に必ず次の4つを付ける。
 
+- 受入条件の照合表（`references/spec-conformance.md` の形式）
 - 変更とテストの対応表（`references/unit-test.md` の形式）
 - 独立Reviewerの要否と理由。判定条件は `docs/development-process.md` の「Review / branch protection」に従い、ここで条件を絞らない
 - 最終行に判定を1行で付ける: `VERDICT: CLEAN` または `VERDICT: NEEDS_FIX`
-  - CLEAN: 指摘なし、または残る指摘がすべて Minor 以下でマージを止めない場合に限る。判定の根拠（通したチェックとその結果）を2〜3行で添える
-  - NEEDS_FIX: Blocker / Major が1件でも残る場合。未解決の指摘一覧への参照を添える
+  - CLEAN: 照合表が全件 `満たす` で、指摘なし、または残る指摘がすべて Minor 以下でマージを止めない場合に限る。判定の根拠（通したチェックとその結果）を2〜3行で添える
+  - NEEDS_FIX: Blocker / Major が1件でも残る場合、または照合表に `不足`・`証明できない` が残る場合。未解決の指摘一覧への参照を添える
   - 判定行がない・途中で切れた・曖昧な表現の出力は CLEAN とみなさない（NEEDS_FIX 扱い）
 
 実装担当、または実装と同じコンテキストでの確認はセルフレビューであり、独立レビューと呼ばない。独立性の条件は `docs/development-process.md` の「Review / branch protection」。
@@ -66,5 +68,6 @@ license: Apache-2.0
 - VERDICT: CLEAN / NEEDS_FIX（最終レビュー時点のもの。更新したら日時と HEAD SHA を添えて書き換える）
 - 実施したレビュー: セルフレビュー / Devin Review / Codex Review / CodeRabbit（実施したものだけ）
 - 指摘件数: 未対応 N 件（内訳 Blocker n / Major n / Minor n）
+- 受入条件: 満たす n / 不足 n / 証明できない n（照合したIssue番号）
 - 証跡: 各レビューの確認先 URL
 ```
