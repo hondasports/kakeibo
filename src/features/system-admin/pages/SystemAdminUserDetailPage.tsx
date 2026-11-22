@@ -23,6 +23,9 @@ export function SystemAdminUserDetailPage() {
     groupQuery,
     setGroupQuery,
     candidates,
+    candidatesTruncated,
+    candidateSearch,
+    retryCandidateSearch,
     selectedSource,
     selectSource,
     dialog,
@@ -31,12 +34,14 @@ export function SystemAdminUserDetailPage() {
     requestOperation,
     cancelDialog,
     executeOperation,
+    load,
   } = useSystemAdminUserDetail(userId);
 
   if (error) {
     return (
       <SystemAdminPageFrame title="ユーザー詳細">
-        <SystemAdminErrorState />
+        <SystemAdminErrorState onRetry={() => void load()} />
+        <SystemAdminBackLink to="/admin/users">ユーザー検索へ戻る</SystemAdminBackLink>
       </SystemAdminPageFrame>
     );
   }
@@ -69,11 +74,14 @@ export function SystemAdminUserDetailPage() {
       <UserProfileCard detail={detail} onClearActive={() => requestOperation("clear_active")} />
       <UserMembershipsSection
         candidates={candidates}
+        candidatesTruncated={candidatesTruncated}
+        candidateSearch={candidateSearch}
         detail={detail}
         groupQuery={groupQuery}
         selectedSource={selectedSource}
         onGroupQueryChange={setGroupQuery}
         onRequestOperation={requestOperation}
+        onRetryCandidateSearch={retryCandidateSearch}
         onSelectSource={selectSource}
       />
       <UserInvitationsSection

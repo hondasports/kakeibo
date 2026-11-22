@@ -102,3 +102,49 @@ export function isExistingAccountInvitationError(error: unknown) {
 export function buildInvitationFallbackUrl(token: string | null) {
   return buildInvitationFallbackUrlDomain(token);
 }
+
+/**
+ * signUp.update のエラーから first_name / last_name 各フィールド向けの
+ * メッセージを取り出す。paramName が一致しない項目は返さない（全体Alert側に委ねる）。
+ */
+export function extractProfileFieldErrors(error: unknown) {
+  const result: { firstName?: string; lastName?: string } = {};
+  if (!error || typeof error !== "object") {
+    return result;
+  }
+  const errors = (error as { errors?: unknown }).errors;
+  if (!Array.isArray(errors)) {
+    return result;
+  }
+  for (const item of errors) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const clerkError = item as {
+      longMessage?: unknown;
+      message?: unknown;
+      meta?: { paramName?: unknown };
+    };
+    const paramName =
+      typeof clerkError.meta?.paramName === "string" ? clerkError.meta.paramName : "";
+    const rawMessage =
+      typeof clerkError.longMessage === "string" && clerkError.longMessage !== ""
+        ? clerkError.longMessage
+        : typeof clerkError.message === "string" && clerkError.message !== ""
+          ? clerkError.message
+          : undefined;
+    if (firstNameFieldNames.has(paramName)) {
+      // Clerkの文言は英語のことが多いため、表示はアプリ側の文言に寄せる（生文言は開発時のみ）
+      result.firstName =
+        import.meta.env.DEV && rawMessage
+          ? `名を確認してください（${rawMessage}）`
+          : "名を確認してください";
+    } else if (lastNameFieldNames.has(paramName)) {
+      result.lastName =
+        import.meta.env.DEV && rawMessage
+          ? `姓を確認してください（${rawMessage}）`
+          : "姓を確認してください";
+    }
+  }
+  return result;
+}

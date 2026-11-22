@@ -102,6 +102,8 @@ it("招待確認は宛先と切替元を返し、membership・active group・招
     activeGroupId: "group-old",
     activeGroupName: "現在の家計",
     isExistingMember: false,
+    invitedByName: null,
+    recipientEmail: "recipient@example.test",
   });
   expect(ctx.db.insert).not.toHaveBeenCalled();
   expect(ctx.db.patch).not.toHaveBeenCalled();

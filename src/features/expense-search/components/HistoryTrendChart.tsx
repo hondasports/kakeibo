@@ -2,7 +2,11 @@ import { BarChart } from "@mui/x-charts/BarChart";
 import { Box, Paper, Skeleton, Stack, Typography, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { HistoryTrendPoint } from "../../../../lib/domain/expenseSearch/analytics";
-import { formatYenAxisTick, formatYenCompact } from "../../../../lib/domain/common/currency";
+import {
+  formatYen,
+  formatYenAxisTick,
+  formatYenCompact,
+} from "../../../../lib/domain/common/currency";
 import { formatDateForDisplay } from "../../../utils/date";
 import { yAxisWidthForLabels, yenAxisTickLabels } from "../../../utils/chartAxisLayout";
 
@@ -75,7 +79,7 @@ export function HistoryTrendChart({
               <BarChart
                 axisHighlight={{ x: "band" }}
                 borderRadius={6}
-                colors={[theme.palette.error.main, theme.palette.success.main]}
+                colors={[theme.palette.primary.main, theme.palette.success.main]}
                 dataset={dataset}
                 height={chartHeight}
                 hideLegend
@@ -110,7 +114,7 @@ export function HistoryTrendChart({
               />
             </Box>
             <Stack aria-label="期間推移の凡例" direction="row" spacing={2} useFlexGap>
-              <Typography color="error.main" variant="caption">
+              <Typography color="primary.main" variant="caption">
                 支出
               </Typography>
               <Typography color="success.main" variant="caption">
@@ -148,7 +152,7 @@ export function HistoryTrendChart({
                   <option value="">期間を選択</option>
                   {points.map((point) => (
                     <option key={point.key} value={point.key}>
-                      {pointLabel(point)}
+                      {`${pointLabel(point)} 支出${formatYen(point.totalExpenseYen)}・収入${formatYen(point.totalIncomeYen)}`}
                     </option>
                   ))}
                 </Box>

@@ -65,6 +65,7 @@ export function SystemAdminGroupDeletionPage() {
         />
       ) : null}
       <GroupDeletionResumeDialog
+        environment={environment}
         error={error}
         open={selected !== undefined && selected !== null}
         reason={reason}

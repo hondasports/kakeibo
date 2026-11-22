@@ -37,7 +37,7 @@ export function ExpenseSearchBox() {
         fullWidth
         label="履歴を検索"
         name="q"
-        placeholder="店名・内容で検索"
+        placeholder="店名・品名・銀行名・メモで検索"
         size="small"
         type="search"
         value={shopQuery}

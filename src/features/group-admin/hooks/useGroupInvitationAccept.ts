@@ -7,6 +7,7 @@ import { useAction, useConvexAuth } from "convex/react";
 import {
   buildInvitationFallbackUrl,
   CLERK_STATUS_SIGN_IN,
+  extractProfileFieldErrors,
   firstNameFieldNames,
   lastNameFieldNames,
   type ClerkSignIn,
@@ -40,6 +41,8 @@ export function useGroupInvitationAccept() {
   );
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [firstNameError, setFirstNameError] = useState("");
+  const [lastNameError, setLastNameError] = useState("");
   const hasStartedClerkInvitation = useRef(false);
   const hasAccepted = useRef(false);
 
@@ -144,6 +147,18 @@ export function useGroupInvitationAccept() {
       return;
     }
 
+    const needsFirstName = state.missingProfileFields.some((field) =>
+      firstNameFieldNames.has(field),
+    );
+    const needsLastName = state.missingProfileFields.some((field) => lastNameFieldNames.has(field));
+    const nextFirstNameError = needsFirstName && !firstName.trim() ? "名を入力してください。" : "";
+    const nextLastNameError = needsLastName && !lastName.trim() ? "姓を入力してください。" : "";
+    setFirstNameError(nextFirstNameError);
+    setLastNameError(nextLastNameError);
+    if (nextFirstNameError || nextLastNameError) {
+      return;
+    }
+
     dispatch({ type: "profileDetailsStarted" });
     try {
       const updateParams: { firstName?: string; lastName?: string } = {};
@@ -156,6 +171,14 @@ export function useGroupInvitationAccept() {
 
       const updateResult: ClerkSignUpResult = await signUp.update(updateParams);
       if (updateResult.error) {
+        // first_name / last_name のエラーは各入力項目の下に出す（全体Alertには載せない）。
+        const fieldErrors = extractProfileFieldErrors(updateResult.error);
+        if (fieldErrors.firstName !== undefined || fieldErrors.lastName !== undefined) {
+          if (fieldErrors.firstName !== undefined) setFirstNameError(fieldErrors.firstName);
+          if (fieldErrors.lastName !== undefined) setLastNameError(fieldErrors.lastName);
+          dispatch({ type: "processingFinished" });
+          return;
+        }
         throw updateResult.error;
       }
 
@@ -181,6 +204,7 @@ export function useGroupInvitationAccept() {
       if (cancelled) return;
       dispatch({ type: "invitationContextReset" });
       if (!isAuthenticated || !token || clerkTicket) return;
+      dispatch({ type: "previewStarted" });
       try {
         const details = await previewInvitation({ token });
         if (!cancelled) dispatch({ type: "previewLoaded", preview: { token, details } });
@@ -218,6 +242,7 @@ export function useGroupInvitationAccept() {
     } catch {
       hasAccepted.current = false;
       dispatch({ type: "acceptFailed" });
+      dispatch({ type: "previewStarted" });
       try {
         const details = await previewInvitation({ token });
         dispatch({ type: "previewLoaded", preview: { token, details } });
@@ -236,18 +261,27 @@ export function useGroupInvitationAccept() {
   return {
     error: state.error,
     invitation,
+    isPreviewLoading: state.isPreviewLoading,
     needsGroupSwitch,
     switchActiveGroup: state.switchActiveGroup,
     setSwitchActiveGroup,
     handleAcceptInvitation,
     firstName,
+    firstNameError,
     isCompletingInvitation: state.isCompletingInvitation,
     lastName,
+    lastNameError,
     missingProfileFields: state.missingProfileFields,
     needsProfileDetails: state.needsProfileDetails,
     needsAccountSwitch,
-    setFirstName,
-    setLastName,
+    setFirstName: (value: string) => {
+      setFirstName(value);
+      setFirstNameError("");
+    },
+    setLastName: (value: string) => {
+      setLastName(value);
+      setLastNameError("");
+    },
     handleProfileDetailsSubmit,
     handleAccountSwitch,
     token,

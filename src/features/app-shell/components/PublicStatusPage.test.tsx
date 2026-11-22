@@ -19,7 +19,7 @@ describe("PublicStatusPage", () => {
         label="404 Not Found"
         primaryAction={{ label: "ホームへ戻る", href: "/" }}
         secondaryActions={[
-          { label: "プライバシー", href: "/privacy" },
+          { label: "プライバシーポリシー", href: "/privacy" },
           { label: "利用規約", href: "/terms" },
         ]}
         title="ページが見つかりません"
@@ -35,7 +35,10 @@ describe("PublicStatusPage", () => {
     expect(screen.getByRole("heading", { name: "ページが見つかりません" })).toBeInTheDocument();
     expect(screen.getByText("説明文です。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "ホームへ戻る" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "プライバシー" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: "プライバシーポリシー" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
     expect(screen.getByRole("link", { name: "利用規約" })).toHaveAttribute("href", "/terms");
     expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
     expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute(

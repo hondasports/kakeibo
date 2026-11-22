@@ -16,11 +16,13 @@ import {
   normalizeSystemAdminReason,
 } from "../../../../lib/domain/systemAdmin/reason";
 import { formatDateTimeForDisplay } from "../../../utils/date";
+import { SystemAdminEnvironmentNotice } from "./SystemAdminEnvironmentNotice";
 
 type Props = {
   open: boolean;
   group: { id: string; name: string };
   invitation: { id: string; email: string; createdAt: number } | null;
+  environment: string;
   confirming: boolean;
   error?: string;
   onCancel: () => void;
@@ -31,6 +33,7 @@ export function SystemAdminInvitationRevokeDialog({
   open,
   group,
   invitation,
+  environment,
   confirming,
   error,
   onCancel,
@@ -51,11 +54,12 @@ export function SystemAdminInvitationRevokeDialog({
 
   return (
     <Dialog fullWidth maxWidth="sm" onClose={confirming ? undefined : onCancel} open={open}>
-      <DialogTitle>pending招待を取り消す</DialogTitle>
+      <DialogTitle>保留中の招待を取り消す</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
+          <SystemAdminEnvironmentNotice environment={environment} />
           <Typography>
-            対象group: {group.name}（{group.id}）
+            対象グループ: {group.name}（{group.id}）
           </Typography>
           <Typography>
             招待先: {invitation?.email ?? "不明"}

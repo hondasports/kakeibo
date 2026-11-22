@@ -6,6 +6,7 @@ import { UserDomainError } from "../../lib/domain/users/rules";
 import { createUserStore } from "../../lib/convex/users/convexUserStore";
 import {
   acceptReceiptImageExternalApiConsent as acceptReceiptImageExternalApiConsentUsecase,
+  updateMonthlyIncome as updateMonthlyIncomeUsecase,
   updateWeeklyDays as updateWeeklyDaysUsecase,
   upsertUser as upsertUserUsecase,
 } from "../../lib/usecase/users";
@@ -87,4 +88,31 @@ export const updateWeeklyDays = mutation({
     weeklyEndDay: v.number(),
   },
   handler: updateWeeklyDaysHandler,
+});
+
+/** updateMonthlyIncome mutation の handler ロジック（テスト用に export） */
+export async function updateMonthlyIncomeHandler(
+  ctx: MutationCtx,
+  args: { monthlyIncome?: number },
+) {
+  const userId = await requireAuthenticatedUserId(ctx);
+
+  try {
+    await updateMonthlyIncomeUsecase(
+      createUserStore(ctx),
+      userId,
+      { monthlyIncome: args.monthlyIncome },
+      Date.now(),
+    );
+  } catch (error) {
+    convexError(error);
+  }
+}
+
+/** 月収入を設定する。monthlyIncome を省略すると未設定に戻す。 */
+export const updateMonthlyIncome = mutation({
+  args: {
+    monthlyIncome: v.optional(v.number()),
+  },
+  handler: updateMonthlyIncomeHandler,
 });

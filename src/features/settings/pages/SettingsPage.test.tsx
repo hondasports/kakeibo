@@ -18,6 +18,10 @@ vi.mock("../components/WeekDaySettingsPanel", () => ({
   WeekDaySettingsPanel: () => <h2>週の設定</h2>,
 }));
 
+vi.mock("../components/MonthlyIncomeSettingsPanel", () => ({
+  MonthlyIncomeSettingsPanel: () => <h2>月収入</h2>,
+}));
+
 vi.mock("../components/NotificationSettingsPanel", () => ({
   NotificationSettingsPanel: () => <h2>通知設定</h2>,
 }));
@@ -56,6 +60,7 @@ describe("SettingsPage", () => {
       "グループ",
       "カテゴリ",
       "週の設定",
+      "月収入",
       "通知設定",
       "LINE連携",
       "データの書き出し",

@@ -1,4 +1,4 @@
-import { IconButton, Stack, Tooltip } from "@mui/material";
+import { Box, IconButton, Stack, Tooltip } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import { designTokens } from "../../../designTokens";
 
@@ -30,16 +30,30 @@ export function CategoryColorSwatches({ value, onChange, disabled = false }: Pro
                 onClick={() => onChange(option.value)}
                 size="small"
                 sx={{
+                  // SPはテーマの44pxタップ対象が効く。見た目の丸は内側の28pxで維持する
                   width: 28,
                   height: 28,
-                  bgcolor: option.value,
-                  border: "2px solid",
-                  borderColor: selected ? "text.primary" : "transparent",
-                  "&:hover": { bgcolor: option.value, opacity: 0.85 },
-                  "&.Mui-disabled": { bgcolor: option.value, opacity: 0.4 },
+                  p: 0,
+                  opacity: 1,
+                  "&:hover": { opacity: 0.85 },
+                  "&.Mui-disabled": { opacity: 0.4 },
                 }}
               >
-                {selected ? <CheckIcon fontSize="small" htmlColor="#FFFFFF" /> : null}
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    bgcolor: option.value,
+                    border: "2px solid",
+                    borderColor: selected ? "text.primary" : "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {selected ? <CheckIcon fontSize="small" htmlColor="#FFFFFF" /> : null}
+                </Box>
               </IconButton>
             </span>
           </Tooltip>

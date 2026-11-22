@@ -43,6 +43,8 @@ export type GroupInvitationAcceptState = {
   needsProfileDetails: boolean;
   /** いずれかの非同期処理が進行中。操作可否の導出に使う。 */
   isCompletingInvitation: boolean;
+  /** 招待内容の preview 取得中。取得完了・失敗・context リセットで解除する。 */
+  isPreviewLoading: boolean;
 };
 
 export const initialGroupInvitationAcceptState: GroupInvitationAcceptState = {
@@ -52,11 +54,13 @@ export const initialGroupInvitationAcceptState: GroupInvitationAcceptState = {
   missingProfileFields: [],
   needsProfileDetails: false,
   isCompletingInvitation: false,
+  isPreviewLoading: false,
 };
 
 /** Clerk 認証フェーズと招待確認・受諾フェーズの両方から届く出来事。 */
 type GroupInvitationAcceptEvent =
   | { type: "invitationContextReset" }
+  | { type: "previewStarted" }
   | { type: "previewLoaded"; preview: GroupInvitationPreviewResult }
   | { type: "previewFailed" }
   | { type: "switchConsentChanged"; checked: boolean }
@@ -82,11 +86,23 @@ export function groupInvitationAcceptReducer(
 ): GroupInvitationAcceptState {
   switch (event.type) {
     case "invitationContextReset":
-      return { ...state, preview: null, switchActiveGroup: false, error: "" };
+      return {
+        ...state,
+        preview: null,
+        switchActiveGroup: false,
+        error: "",
+        isPreviewLoading: false,
+      };
+    case "previewStarted":
+      return { ...state, isPreviewLoading: true };
     case "previewLoaded":
-      return { ...state, preview: event.preview };
+      return { ...state, preview: event.preview, isPreviewLoading: false };
     case "previewFailed":
-      return { ...state, error: GROUP_INVITATION_ACCEPT_ERRORS.previewFailed };
+      return {
+        ...state,
+        error: GROUP_INVITATION_ACCEPT_ERRORS.previewFailed,
+        isPreviewLoading: false,
+      };
     case "switchConsentChanged":
       return { ...state, switchActiveGroup: event.checked };
     case "acceptStarted":

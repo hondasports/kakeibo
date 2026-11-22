@@ -13,6 +13,7 @@ import {
   SystemAdminPageFrame,
 } from "./SystemAdminPageFrame";
 import { LoadingDetail } from "../components/LoadingDetail";
+import { displayLabel, groupStatusLabels } from "../lib/displayLabels";
 
 export function SystemAdminGroupDetailPage() {
   const { groupId } = useParams();
@@ -51,12 +52,14 @@ export function SystemAdminGroupDetailPage() {
     requestRecovery,
     cancelRecovery,
     executeRecovery,
+    load,
   } = useSystemAdminGroupDetail(groupId);
 
   if (error) {
     return (
       <SystemAdminPageFrame title="グループ詳細">
-        <SystemAdminErrorState />
+        <SystemAdminErrorState onRetry={() => void load()} />
+        <SystemAdminBackLink to="/admin/groups">グループ検索へ戻る</SystemAdminBackLink>
       </SystemAdminPageFrame>
     );
   }
@@ -124,7 +127,8 @@ export function SystemAdminGroupDetailPage() {
       ) : null}
       {stale ? (
         <Alert severity="warning">
-          このグループは状態が「{detail.status}」のため変更できません。
+          このグループは状態が「{displayLabel(groupStatusLabels, detail.status)}
+          」のため変更できません。
         </Alert>
       ) : null}
       {ownerless ? (
@@ -151,7 +155,7 @@ export function SystemAdminGroupDetailPage() {
           {detail.name}
         </Typography>
         <Typography>groupId: {detail.id}</Typography>
-        <Typography>状態: {detail.status}</Typography>
+        <Typography>状態: {displayLabel(groupStatusLabels, detail.status)}</Typography>
       </Paper>
       <GroupMembersSection
         detail={detail}
@@ -161,6 +165,7 @@ export function SystemAdminGroupDetailPage() {
         roleSource={roleSource}
         roleTarget={roleTarget}
         stale={stale}
+        onCancelRoleOperation={cancelRoleOperation}
         onRequestRemove={requestRemove}
         onRequestRoleChange={requestRoleChange}
         onSelectRoleSource={selectRoleSource}
@@ -176,6 +181,7 @@ export function SystemAdminGroupDetailPage() {
       </Alert>
       <SystemAdminInvitationRevokeDialog
         confirming={invitationSaving}
+        environment={detail.environment}
         error={invitationError}
         group={sourceGroup}
         invitation={invitationTarget}
@@ -213,6 +219,7 @@ export function SystemAdminGroupDetailPage() {
         target={roleDialogTarget}
       />
       <GroupOwnerlessRecoveryDialog
+        environment={detail.environment}
         error={recoveryError}
         group={sourceGroup}
         onCancel={cancelRecovery}
