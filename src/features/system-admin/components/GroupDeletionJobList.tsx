@@ -68,9 +68,13 @@ export function GroupDeletionJobList({ list, onSelectJob, onLoadMore }: GroupDel
           </Stack>
         </Stack>
       ))}
-      <Button disabled={list.isDone} onClick={onLoadMore}>
-        次のページ
-      </Button>
+      {list.isDone ? (
+        <Typography color="text.secondary" variant="body2">
+          {list.page.length}件を表示（最後）
+        </Typography>
+      ) : (
+        <Button onClick={onLoadMore}>次のページ</Button>
+      )}
     </Stack>
   );
 }

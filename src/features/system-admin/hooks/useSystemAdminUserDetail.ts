@@ -150,19 +150,20 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
         targetGroupId: dialog.targetGroup?.id as Id<"groups"> | undefined,
         reason,
       });
-      const operationLabel: Record<MembershipOperation, string> = {
-        add: "追加",
-        remove: "解除",
-        transfer: "移動",
-        set_active: "active設定",
-        clear_active: "active解除",
-      };
+      const userName = detail.displayName || detail.userId;
       const groupName = dialog.targetGroup?.name ?? dialog.sourceGroup?.name ?? "グループ";
+      const sourceName = dialog.sourceGroup?.name ?? "グループ";
+      const targetName = dialog.targetGroup?.name ?? "グループ";
+      const messageByOperation: Record<MembershipOperation, string> = {
+        add: `「${userName}」を「${groupName}」に追加しました`,
+        remove: `「${userName}」を「${groupName}」から解除しました`,
+        transfer: `「${userName}」を「${sourceName}」から「${targetName}」へ移動しました`,
+        set_active: `「${userName}」のactiveグループを「${groupName}」に設定しました`,
+        clear_active: `「${userName}」のactiveグループを解除しました`,
+      };
       setDialog(null);
       setSelectedSource(undefined);
-      setSuccess(
-        `「${groupName}」を${operationLabel[dialog.operation]}しました（監査ログに記録済み）`,
-      );
+      setSuccess(`${messageByOperation[dialog.operation]}（監査ログに記録済み）`);
       await load();
     } catch (cause) {
       setOperationError(cause instanceof Error ? cause.message : "操作に失敗しました");

@@ -5,6 +5,7 @@ import type { MembershipDialogGroup } from "./SystemAdminMembershipChangeDialog"
 import type { GroupCandidate, UserDetail } from "../hooks/useSystemAdminUserDetail";
 import { displayLabel, groupRoleLabels, groupStatusLabels } from "../lib/displayLabels";
 import { formatDateTimeForDisplay } from "../../../utils/date";
+import { DETAIL_LIST_LIMIT } from "../../../../lib/domain/systemAdmin/searchQuery";
 
 type UserMembershipsSectionProps = {
   detail: UserDetail;
@@ -130,8 +131,8 @@ export function UserMembershipsSection({
         )}
         {detail.membershipsTruncated ? (
           <Alert severity="warning">
-            所属グループは上限20件まで表示しています（{detail.memberships.length}件を表示）。
-            対象が見つからないときはユーザーの条件を絞ってください。
+            所属グループは上限{DETAIL_LIST_LIMIT}件まで表示しています（{detail.memberships.length}
+            件を表示）。 対象が見つからないときはユーザーの条件を絞ってください。
           </Alert>
         ) : null}
         <TextField

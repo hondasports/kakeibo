@@ -57,7 +57,9 @@ export function formatAction(action: SystemAdminAuditAction) {
 
 function parseDateBoundary(value: string, endOfDay: boolean) {
   if (!value) return undefined;
-  const date = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}`);
+  // 日付境界は JST 固定（repository 規約「日付はJST前提」に管理画面も揃える。
+  // JST は +09:00 固定で DST なし）。
+  const date = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}+09:00`);
   const timestamp = date.getTime();
   return Number.isFinite(timestamp) ? timestamp : undefined;
 }
@@ -72,9 +74,9 @@ type AppliedFilters = {
   toDate: string;
 };
 
-// ConvexのドキュメントID形式（32桁の英小文字・数字）。形式外の文字列は v.id() が拒否するため、
-// クエリへ渡す前に画面側で弾く。
-const CONVEX_ID_PATTERN = /^[a-z0-9]{32}$/;
+// ConvexのドキュメントIDは Crockford base32（小文字）で 31〜37文字。
+// 画面側は「明らかに違う入力を止める」目的で、最終判定はサーバーの v.id() に任せる。
+const CONVEX_ID_PATTERN = /^[0-9a-hjkmnp-tv-z]{31,37}$/;
 export const isInvalidConvexIdInput = (value: string) =>
   value.trim() !== "" && !CONVEX_ID_PATTERN.test(value.trim());
 
