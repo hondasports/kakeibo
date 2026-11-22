@@ -76,7 +76,7 @@ export const theme = createTheme({
             boxShadow: "none",
           },
           // SPのタップ対象は44px以上に揃える。境界は900px（AppLayoutの isPC=up("md") の補集合。
-          // breakpoints.not("md") は1200px以上にも適用されるため、up("md") の否定を明示する）
+          // MUIの not(md) は1200px以上にも適用されるため、up("md") の否定を明示する）
           "@media not all and (min-width: 900px)": {
             minHeight: designTokens.size.buttonMinHeightSp,
           },
