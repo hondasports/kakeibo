@@ -154,9 +154,11 @@ test.describe("通知設定（Issue #893）", () => {
         // 操作種別と対象スナップショットで今回記録されるはずの行に絞る
         await page.getByRole("combobox", { name: "操作" }).click();
         await page.getByRole("option", { name: "通知設定変更" }).click();
+        // 条件は「絞り込む」押下で確定する（ドラフトはクエリに反映されない）
+        await page.getByRole("button", { name: "絞り込む" }).click();
         const lineLogRow = page
           .getByRole("button")
-          .filter({ hasText: "target: AIレビュー依頼（LINE）" })
+          .filter({ hasText: "対象: AIレビュー依頼（LINE）" })
           .first();
         await expect(lineLogRow).toBeVisible({ timeout: 15_000 });
         // 一覧は新しい順のため、先頭行の記録時刻が操作開始以降なら今回の変更由来と断定できる
@@ -179,7 +181,7 @@ test.describe("通知設定（Issue #893）", () => {
         await lineLogRow.click();
         const detailDialog = page.getByRole("dialog", { name: "監査ログ詳細" });
         await expect(detailDialog).toBeVisible();
-        await expect(detailDialog.getByText(/target: AIレビュー依頼（LINE）/)).toBeVisible();
+        await expect(detailDialog.getByText(/対象: AIレビュー依頼（LINE）/)).toBeVisible();
         await expect(detailDialog.getByText(`通知設定: ${lineTransition}`)).toBeVisible();
       } finally {
         await page.goto("/admin/notifications");

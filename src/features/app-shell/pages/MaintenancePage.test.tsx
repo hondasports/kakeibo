@@ -1,9 +1,13 @@
 import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
 import { MaintenancePage } from "./MaintenancePage";
 
 describe("MaintenancePage", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("メンテナンス文言と復帰導線を表示する", () => {
     renderWithProviders(<MaintenancePage />);
 
@@ -16,7 +20,22 @@ describe("MaintenancePage", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "プライバシー" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: "プライバシーポリシー" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
     expect(screen.getByRole("link", { name: "利用規約" })).toHaveAttribute("href", "/terms");
+  });
+
+  it("環境変数で期間・理由・復旧見込みを渡すと表示する", () => {
+    vi.stubEnv("VITE_APP_MAINTENANCE_PERIOD", "2026年11月24日 02:00〜06:00（予定）");
+    vi.stubEnv("VITE_APP_MAINTENANCE_REASON", "データベース更新のため");
+    vi.stubEnv("VITE_APP_MAINTENANCE_ETA", "2026年11月24日 06:00");
+
+    renderWithProviders(<MaintenancePage />);
+
+    expect(screen.getByText(/期間: 2026年11月24日 02:00〜06:00/)).toBeInTheDocument();
+    expect(screen.getByText(/理由: データベース更新のため/)).toBeInTheDocument();
+    expect(screen.getByText(/復旧見込み: 2026年11月24日 06:00/)).toBeInTheDocument();
   });
 });

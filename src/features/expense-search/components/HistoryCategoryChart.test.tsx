@@ -1,3 +1,5 @@
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
 import { HistoryCategoryChart } from "./HistoryCategoryChart";
@@ -42,5 +44,42 @@ describe("HistoryCategoryChart", () => {
 
     expect(ticks).toEqual(["0万円", "0.4万円", "0.8万円", "1.2万円", "1.6万円"]);
     expect(margin.right).toBeGreaterThan(12);
+  });
+  it("カテゴリ行はボタンでキーボードから絞り込め、「その他」はボタンにしない", async () => {
+    const user = userEvent.setup();
+    const onCategorySelect = vi.fn();
+
+    renderWithProviders(
+      <HistoryCategoryChart
+        categories={[
+          {
+            categoryId: "food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            totalAmountYen: 16_000,
+            count: 2,
+          },
+          {
+            categoryId: "__other__",
+            categoryName: "その他",
+            categoryColor: "#9ca3af",
+            totalAmountYen: 4_000,
+            count: 3,
+          },
+        ]}
+        onCategorySelect={onCategorySelect}
+      />,
+    );
+
+    const foodButton = screen.getByRole("button", { name: /カテゴリ「食費」で絞り込む/ });
+    await user.tab();
+    expect(foodButton).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(onCategorySelect).toHaveBeenCalledWith("food");
+
+    expect(
+      screen.queryByRole("button", { name: /カテゴリ「その他」で絞り込む/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("その他")).toBeInTheDocument();
   });
 });

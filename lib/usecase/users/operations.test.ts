@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { NewUserFields, UserPatch, UserRecord, UserStore } from "../../domain/users/store";
-import { acceptReceiptImageExternalApiConsent, updateWeeklyDays, upsertUser } from "./operations";
+import {
+  acceptReceiptImageExternalApiConsent,
+  updateMonthlyIncome,
+  updateWeeklyDays,
+  upsertUser,
+} from "./operations";
 import { getReceiptImageConsent, getUserProfile } from "./queries";
 import { getWeeklyStartDayForUser } from "./weeklySettings";
 
@@ -106,6 +111,37 @@ describe("updateWeeklyDays", () => {
     await expect(
       updateWeeklyDays(store, "u1", { weeklyStartDay: 0, weeklyEndDay: 7 }, 0),
     ).rejects.toThrow("週の終了曜日は0〜6の整数で入力してください");
+  });
+});
+
+describe("updateMonthlyIncome", () => {
+  it("整数の月収入を保存する", async () => {
+    const { store, calls } = makeStore(makeUser({ id: "ex1" }));
+    await updateMonthlyIncome(store, "u1", { monthlyIncome: 300_000 }, 100);
+    expect(calls.patches).toEqual([
+      { id: "ex1", patch: { monthlyIncome: 300_000, updatedAt: 100 } },
+    ]);
+  });
+
+  it("undefined で未設定に戻す", async () => {
+    const { store, calls } = makeStore(makeUser({ id: "ex1", monthlyIncome: 200_000 }));
+    await updateMonthlyIncome(store, "u1", {}, 100);
+    expect(calls.patches).toEqual([
+      { id: "ex1", patch: { monthlyIncome: undefined, updatedAt: 100 } },
+    ]);
+  });
+
+  it("負数・小数・上限超過はエラー", async () => {
+    const { store } = makeStore(makeUser());
+    await expect(updateMonthlyIncome(store, "u1", { monthlyIncome: -1 }, 0)).rejects.toThrow(
+      "月収入は0以上999999999以下の整数（円）で入力してください",
+    );
+    await expect(updateMonthlyIncome(store, "u1", { monthlyIncome: 1.5 }, 0)).rejects.toThrow(
+      "月収入は0以上999999999以下の整数（円）で入力してください",
+    );
+    await expect(
+      updateMonthlyIncome(store, "u1", { monthlyIncome: 1_000_000_000 }, 0),
+    ).rejects.toThrow("月収入は0以上999999999以下の整数（円）で入力してください");
   });
 });
 

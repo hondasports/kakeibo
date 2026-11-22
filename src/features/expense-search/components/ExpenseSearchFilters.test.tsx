@@ -3,6 +3,15 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithDatePickers } from "../../../test/render";
+
+const { useMediaQueryMock } = vi.hoisted(() => ({
+  useMediaQueryMock: vi.fn((_query?: unknown) => false),
+}));
+
+vi.mock("@mui/material", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@mui/material")>();
+  return { ...mod, useMediaQuery: (query: unknown) => useMediaQueryMock(query) };
+});
 import { EMPTY_EXPENSE_SEARCH_FORM } from "../lib/searchParams";
 import { ExpenseSearchFilters } from "./ExpenseSearchFilters";
 
@@ -58,6 +67,62 @@ describe("ExpenseSearchFilters", () => {
     await user.click(screen.getByRole("button", { name: "すべてクリア" }));
     expect(onClear).toHaveBeenCalled();
   }, 15_000);
+
+  it("期間を指定しているとき「期間を指定しない」は選択中に見えない", () => {
+    renderWithDatePickers(
+      <ExpenseSearchFilters
+        categories={[]}
+        state={{ ...EMPTY_EXPENSE_SEARCH_FORM, startDate: "2026-08-03", endDate: "2026-08-17" }}
+        onChange={() => undefined}
+        onClear={() => undefined}
+        onSubmit={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "期間を指定しない" }).className).toContain(
+      "MuiButton-outlined",
+    );
+  });
+
+  it("期間未指定のとき「期間を指定しない」は選択中に見える", () => {
+    renderWithDatePickers(
+      <ExpenseSearchFilters
+        categories={[]}
+        state={EMPTY_EXPENSE_SEARCH_FORM}
+        onChange={() => undefined}
+        onClear={() => undefined}
+        onSubmit={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "期間を指定しない" }).className).toContain(
+      "MuiButton-contained",
+    );
+  });
+
+  it("SPでは閉じていても未適用の表示が見え、開閉はaria-expandedで伝わる", async () => {
+    useMediaQueryMock.mockReturnValue(true);
+    const user = userEvent.setup();
+    renderWithDatePickers(
+      <ExpenseSearchFilters
+        categories={[]}
+        state={EMPTY_EXPENSE_SEARCH_FORM}
+        hasUnappliedChanges
+        onChange={() => undefined}
+        onClear={() => undefined}
+        onSubmit={() => undefined}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: "絞り込み条件を開く" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("変更はまだ適用されていません")).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(screen.getByRole("button", { name: "絞り込み条件を閉じる" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    useMediaQueryMock.mockReturnValue(false);
+  });
 
   it("不正な日付は空扱いし、選択した日付はクリアできる", async () => {
     const user = userEvent.setup();

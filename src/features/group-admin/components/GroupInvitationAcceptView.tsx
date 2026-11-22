@@ -16,14 +16,17 @@ import { firstNameFieldNames, lastNameFieldNames } from "../lib/groupInvitationC
 
 type GroupInvitationAcceptViewProps = {
   invitation: GroupInvitationPreview | null;
+  isPreviewLoading: boolean;
   needsGroupSwitch: boolean;
   switchActiveGroup: boolean;
   onSwitchActiveGroupChange: (value: boolean) => void;
   onAcceptInvitation: () => void;
   error: string;
   firstName: string;
+  firstNameError: string;
   isCompletingInvitation: boolean;
   lastName: string;
+  lastNameError: string;
   missingProfileFields: string[];
   needsProfileDetails: boolean;
   needsAccountSwitch: boolean;
@@ -35,14 +38,17 @@ type GroupInvitationAcceptViewProps = {
 
 export function GroupInvitationAcceptView({
   invitation,
+  isPreviewLoading,
   needsGroupSwitch,
   switchActiveGroup,
   onSwitchActiveGroupChange,
   onAcceptInvitation,
   error,
   firstName,
+  firstNameError,
   isCompletingInvitation,
   lastName,
+  lastNameError,
   missingProfileFields,
   needsProfileDetails,
   needsAccountSwitch,
@@ -74,6 +80,15 @@ export function GroupInvitationAcceptView({
           </Box>
           <Box id="clerk-captcha" sx={{ minHeight: 1 }} />
 
+          {!needsAccountSwitch && !needsProfileDetails && !invitation && isPreviewLoading ? (
+            <Stack spacing={1} sx={{ alignItems: "center" }}>
+              <CircularProgress aria-label="招待内容を確認中" size={28} />
+              <Typography color="text.secondary" variant="body2">
+                招待内容を確認しています。
+              </Typography>
+            </Stack>
+          ) : null}
+
           {needsAccountSwitch ? (
             <Button
               disabled={isCompletingInvitation}
@@ -89,6 +104,12 @@ export function GroupInvitationAcceptView({
             <Stack spacing={2} sx={{ width: "100%" }}>
               <Typography component="h2" variant="h6">
                 {invitation.groupName}
+              </Typography>
+              <Typography color="text.secondary" variant="body2">
+                {invitation.invitedByName
+                  ? `${invitation.invitedByName}さんからの招待`
+                  : "グループからの招待"}
+                {invitation.recipientEmail ? `（宛先: ${invitation.recipientEmail}）` : ""}
               </Typography>
               <Typography variant="body2">
                 {invitation.isExistingMember
@@ -118,7 +139,9 @@ export function GroupInvitationAcceptView({
                 size="large"
                 variant="contained"
               >
-                招待を受け入れて参加する
+                {invitation.isExistingMember
+                  ? "このグループを表示する"
+                  : "招待を受け入れて参加する"}
               </Button>
             </Stack>
           ) : null}
@@ -129,7 +152,9 @@ export function GroupInvitationAcceptView({
                 <TextField
                   autoComplete="given-name"
                   disabled={isCompletingInvitation}
+                  error={firstNameError !== ""}
                   fullWidth
+                  helperText={firstNameError || undefined}
                   label="名"
                   onChange={(event) => onFirstNameChange(event.target.value)}
                   required={missingProfileFields.some((field) => firstNameFieldNames.has(field))}
@@ -138,7 +163,9 @@ export function GroupInvitationAcceptView({
                 <TextField
                   autoComplete="family-name"
                   disabled={isCompletingInvitation}
+                  error={lastNameError !== ""}
                   fullWidth
+                  helperText={lastNameError || undefined}
                   label="姓"
                   onChange={(event) => onLastNameChange(event.target.value)}
                   required={missingProfileFields.some((field) => lastNameFieldNames.has(field))}

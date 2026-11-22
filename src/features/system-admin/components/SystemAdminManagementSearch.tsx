@@ -1,4 +1,5 @@
 import {
+  Alert,
   Button,
   CircularProgress,
   FormControl,
@@ -21,6 +22,7 @@ type SystemAdminManagementSearchProps = {
   hasSearched: boolean;
   searchError: boolean;
   candidates: UserSearchItem[];
+  candidatesTruncated: boolean;
   onSearchTypeChange: (type: UserSearchType) => void;
   onSearchQueryChange: (query: string) => void;
   onSearch: () => void;
@@ -36,6 +38,7 @@ export function SystemAdminManagementSearch({
   hasSearched,
   searchError,
   candidates,
+  candidatesTruncated,
   onSearchTypeChange,
   onSearchQueryChange,
   onSearch,
@@ -87,6 +90,11 @@ export function SystemAdminManagementSearch({
         </Stack>
       </Paper>
       {searchError ? <SystemAdminErrorState onRetry={onRetry} /> : null}
+      {candidatesTruncated ? (
+        <Alert severity="info" variant="outlined">
+          10件まで表示しています。対象が見つからない場合は検索条件を絞ってください。
+        </Alert>
+      ) : null}
       {candidates.length > 0 ? (
         <Stack aria-label="管理者付与候補" spacing={1}>
           {candidates.map((candidate) => (

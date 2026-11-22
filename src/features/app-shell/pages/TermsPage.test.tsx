@@ -21,6 +21,21 @@ describe("TermsPage", () => {
     expect(screen.getByText(/制定日:/)).toBeInTheDocument();
   });
 
+  it("目次から各節へのアンカーリンクを辿れる", () => {
+    renderPage();
+
+    const toc = screen.getByRole("navigation", { name: "目次" });
+    const link = within(toc).getByRole("link", { name: "AI解析・自動分類機能" });
+    expect(link).toHaveAttribute("href", "#AI解析・自動分類機能");
+    expect(document.getElementById("AI解析・自動分類機能")).not.toBeNull();
+  });
+
+  it("未改定の間は最終改定日を表示しない", () => {
+    renderPage();
+
+    expect(screen.queryByText(/最終改定日/)).not.toBeInTheDocument();
+  });
+
   it("運営者情報とサービス内容を明記する", () => {
     renderPage();
 

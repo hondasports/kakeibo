@@ -7,6 +7,7 @@ import {
   buildUserInsertFields,
   buildUserUpsertPatch,
   UserDomainError,
+  validateMonthlyIncome,
   type UserIdentityInput,
 } from "../../domain/users/rules";
 import { getWeekEndDay, validateWeekDay } from "../../domain/week/weekDates";
@@ -61,6 +62,29 @@ export async function updateWeeklyDays(
   await store.patch(user.id, {
     weeklyStartDay: args.weeklyStartDay,
     weeklyEndDay: getWeekEndDay(args.weeklyStartDay),
+    updatedAt: now,
+  });
+}
+
+/**
+ * 月収入設定。個人設定であり、共有グループの収支集計には混ぜない。
+ * undefined を渡すと未設定に戻す。
+ */
+export async function updateMonthlyIncome(
+  store: UserStore,
+  userId: string,
+  args: { monthlyIncome?: number },
+  now: number,
+): Promise<void> {
+  const income = args.monthlyIncome;
+  if (!validateMonthlyIncome(income).success) {
+    throw new UserDomainError("月収入は0以上999999999以下の整数（円）で入力してください");
+  }
+
+  const user = assertUserFound(await store.findByUserId(userId));
+
+  await store.patch(user.id, {
+    monthlyIncome: income,
     updatedAt: now,
   });
 }
