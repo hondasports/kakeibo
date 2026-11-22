@@ -7,6 +7,7 @@ export const listExportEntries = query({
     startDate: v.string(),
     endDate: v.string(),
     entryType: v.optional(v.union(v.literal("expense"), v.literal("income"))),
+    expectedGroupId: v.optional(v.id("groups")),
   },
   returns: v.object({
     rows: v.array(
@@ -20,6 +21,7 @@ export const listExportEntries = query({
       }),
     ),
     truncated: v.boolean(),
+    groupId: v.id("groups"),
   }),
   handler: exportEntriesHandler,
 });

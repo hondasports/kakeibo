@@ -1,4 +1,5 @@
 import { api } from "../../../../convex/_generated/api";
+import type { Id } from "../../../../convex/_generated/dataModel";
 import { useConvex } from "convex/react";
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
@@ -64,12 +65,17 @@ export function ExportPage() {
     try {
       const rows: ExportCsvRow[] = [];
       const chunks = splitDateRangeIntoMonths(startDate, endDate);
+      // 1回目の結果の groupId を2回目以降に渡し、書き出し中の
+      // グループ切替で別グループの行が混ざらないようにする。
+      let expectedGroupId: Id<"groups"> | undefined;
       for (const chunk of chunks) {
         const result = await convex.query(api.dataExport.listExportEntries, {
           startDate: chunk.startDate,
           endDate: chunk.endDate,
           entryType: entryType === "all" ? undefined : entryType,
+          expectedGroupId,
         });
+        expectedGroupId ??= result.groupId;
         if (result.truncated) {
           throw new Error(
             `${chunk.startDate.slice(0, 7)} の明細が1か月あたりの上限を超えています。期間を短くして再度お試しください`,
