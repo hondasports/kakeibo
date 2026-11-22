@@ -16,6 +16,7 @@ import { getCurrentWeekStartDate } from "../../week";
 import { formatJapaneseDate } from "../../../utils/date";
 import { MonthlySpendingCalendar } from "../components/MonthlySpendingCalendar";
 import { MonthNavigator } from "../components/MonthNavigator";
+import { MonthlyInsightCard } from "../components/MonthlyInsightCard";
 import { MonthlyMetricsPanel } from "../../summary-shared/components/MonthlyMetricsPanel";
 import { formatYearLabel } from "../../../../lib/domain/common/year";
 import { addMonths, getCurrentMonth, isFutureMonth, normalizeMonth } from "../lib/monthNavigation";
@@ -318,6 +319,8 @@ export function MonthlySummaryPage() {
           onNextMonth={() => navigateToMonth(addMonths(month, 1))}
           onPreviousMonth={() => navigateToMonth(addMonths(month, -1))}
         />
+
+        <MonthlyInsightCard month={month} />
 
         <Button
           component={Link}

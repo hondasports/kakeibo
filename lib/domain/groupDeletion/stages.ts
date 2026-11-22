@@ -20,6 +20,7 @@ export const GROUP_DELETION_PURGE_STAGES = [
   "expenseEntries",
   "receipts",
   "sourceDocuments",
+  "monthlyInsights",
   "weekSessions",
   "categories",
   "groupInvitations",

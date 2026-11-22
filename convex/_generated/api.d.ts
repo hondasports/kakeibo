@@ -83,6 +83,7 @@ import type * as lineWebhook_internal from "../lineWebhook/internal.js";
 import type * as lineWebhook_model from "../lineWebhook/model.js";
 import type * as lineWebhook_summary from "../lineWebhook/summary.js";
 import type * as lineWebhook_webhook from "../lineWebhook/webhook.js";
+import type * as monthlyInsights_index from "../monthlyInsights/index.js";
 import type * as notificationSettings from "../notificationSettings.js";
 import type * as notifications_cleanup from "../notifications/cleanup.js";
 import type * as notifications_internal from "../notifications/internal.js";
@@ -200,6 +201,7 @@ declare const fullApi: ApiFromModules<{
   "lineWebhook/model": typeof lineWebhook_model;
   "lineWebhook/summary": typeof lineWebhook_summary;
   "lineWebhook/webhook": typeof lineWebhook_webhook;
+  "monthlyInsights/index": typeof monthlyInsights_index;
   notificationSettings: typeof notificationSettings;
   "notifications/cleanup": typeof notifications_cleanup;
   "notifications/internal": typeof notifications_internal;

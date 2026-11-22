@@ -755,4 +755,12 @@ export default defineSchema({
     .index("by_request_id", ["requestId"])
     .index("by_request_id_and_status", ["requestId", "status"])
     .index("by_group_deletion_job_id", ["groupDeletionJobId"]),
+  // 月次インサイト: グループ×月のAI傾向コメント（集計値のみを外部送信して生成）
+  monthlyInsights: defineTable({
+    groupId: v.id("groups"),
+    month: v.string(), // "YYYY-MM"
+    commentText: v.string(),
+    source: v.union(v.literal("ai"), v.literal("fallback")),
+    generatedAt: v.number(),
+  }).index("by_group_id_and_month", ["groupId", "month"]),
 });

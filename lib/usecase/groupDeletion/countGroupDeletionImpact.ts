@@ -24,6 +24,7 @@ const STAGE_BY_METRIC = {
   analysisJobs: "receiptAnalysisImageJobs",
   weekSessions: "weekSessions",
   managementAuditLogs: "managementAuditLogs",
+  monthlyInsights: "monthlyInsights",
 } as const satisfies Record<string, PurgeStage>;
 
 export async function countGroupDeletionImpact(
@@ -45,6 +46,7 @@ export async function countGroupDeletionImpact(
   const analysisJobs = await count(STAGE_BY_METRIC.analysisJobs);
   const weekSessions = await count(STAGE_BY_METRIC.weekSessions);
   const managementAuditLogs = await count(STAGE_BY_METRIC.managementAuditLogs);
+  const monthlyInsights = await count(STAGE_BY_METRIC.monthlyInsights);
 
   return {
     members: members.result,
@@ -60,5 +62,6 @@ export async function countGroupDeletionImpact(
     analysisJobs: analysisJobs.result,
     weekSessions: weekSessions.result,
     managementAuditLogs: managementAuditLogs.result,
+    monthlyInsights: monthlyInsights.result,
   };
 }

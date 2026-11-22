@@ -15,6 +15,7 @@ vi.mock("../../../../lib/domain/common/month", async (importOriginal) => {
 });
 
 vi.mock("convex/react", () => ({
+  useAction: () => vi.fn(),
   useMutation: () => useMutationMock(),
   useQuery: (...args: unknown[]) => useQueryMock(...args),
   useQuery_experimental: (...args: unknown[]) => useQueryExperimentalMock(...args),

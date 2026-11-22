@@ -37,6 +37,8 @@ export type GroupDeletionJobCounts = {
   managementAuditLogs: number;
   groupMembers: number;
   groups: number;
+  /** 月次インサイト。フィールド追加前に作成されたジョブは未設定のため optional。 */
+  monthlyInsights?: number;
 };
 
 /** groupDeletionJobs ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */
