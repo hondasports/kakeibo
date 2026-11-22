@@ -29,6 +29,8 @@ function SystemAdminAuditLogPageContent() {
     setActor,
     target,
     setTarget,
+    groupId,
+    setGroupId,
     fromDate,
     setFromDate,
     toDate,
@@ -36,34 +38,11 @@ function SystemAdminAuditLogPageContent() {
     setCursor,
     selected,
     setSelected,
+    applyFilters,
     clearFilters,
     hasFilter,
+    dateRangeInvalid,
   } = useSystemAdminAuditLog();
-
-  const handleActionChange = (value: typeof action) => {
-    setAction(value);
-    setCursor(null);
-  };
-
-  const handleActorChange = (value: string) => {
-    setActor(value);
-    setCursor(null);
-  };
-
-  const handleTargetChange = (value: string) => {
-    setTarget(value);
-    setCursor(null);
-  };
-
-  const handleFromDateChange = (value: string) => {
-    setFromDate(value);
-    setCursor(null);
-  };
-
-  const handleToDateChange = (value: string) => {
-    setToDate(value);
-    setCursor(null);
-  };
 
   const handleClear = () => {
     clearFilters();
@@ -77,16 +56,20 @@ function SystemAdminAuditLogPageContent() {
       <AuditLogFilters
         action={action}
         actor={actor}
+        dateRangeInvalid={dateRangeInvalid}
         fromDate={fromDate}
+        groupId={groupId}
         hasFilter={hasFilter}
         target={target}
         toDate={toDate}
-        onActionChange={handleActionChange}
-        onActorChange={handleActorChange}
+        onActionChange={setAction}
+        onActorChange={setActor}
+        onApply={applyFilters}
         onClear={handleClear}
-        onFromDateChange={handleFromDateChange}
-        onTargetChange={handleTargetChange}
-        onToDateChange={handleToDateChange}
+        onFromDateChange={setFromDate}
+        onGroupIdChange={setGroupId}
+        onTargetChange={setTarget}
+        onToDateChange={setToDate}
       />
       <AuditLogList
         formatAction={formatAction}

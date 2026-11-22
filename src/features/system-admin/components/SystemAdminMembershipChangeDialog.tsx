@@ -17,6 +17,8 @@ import {
 } from "../../../../lib/domain/systemAdmin/reason";
 import type { GroupRole } from "../../../../lib/domain/groups/role";
 import type { MembershipOperation } from "../../../../lib/domain/systemAdmin/membershipOperation";
+import { SystemAdminEnvironmentNotice } from "./SystemAdminEnvironmentNotice";
+import { displayLabel, groupRoleLabels } from "../lib/displayLabels";
 
 export type SystemAdminRoleOperation = MembershipOperation | "role_change" | "owner_transfer";
 
@@ -106,6 +108,7 @@ export function SystemAdminMembershipChangeDialog({
       <DialogTitle id={titleId}>{actionLabel}を確認</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
+          <SystemAdminEnvironmentNotice environment={environment} />
           <Typography id={descriptionId} variant="body2">
             {subject}（user document: {target?.id ?? "不明"}）に対して「{actionLabel}
             」を実行します。
@@ -126,13 +129,13 @@ export function SystemAdminMembershipChangeDialog({
               ? `対象: ${targetGroup.name}（${targetGroup.id}）`
               : null}
             {operation === "role_change"
-              ? `対象グループ: ${sourceGroup?.name ?? "-"}（${sourceGroup?.id ?? "-"}） / role: ${currentRole ?? "-"} → ${newRole ?? "-"}`
+              ? `対象グループ: ${sourceGroup?.name ?? "-"}（${sourceGroup?.id ?? "-"}） / role: ${currentRole ? displayLabel(groupRoleLabels, currentRole) : "-"} → ${newRole ? displayLabel(groupRoleLabels, newRole) : "-"}`
               : null}
             {operation === "owner_transfer" && sourceUser
               ? `付替え元: ${sourceUser.displayName}（${sourceUser.id}） → 付替え先: ${subject}`
               : null}
             <br />
-            環境: {environment}。所属だけを変更し、家計データは移動しません。
+            所属だけを変更し、家計データは移動しません。
           </Typography>
           <TextField
             autoFocus

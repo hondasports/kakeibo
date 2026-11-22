@@ -92,6 +92,8 @@ type SystemAdminAuditLogFilter = {
   action?: SystemAdminAuditAction;
   actorUserId?: string;
   targetUserId?: string;
+  /** 移動元または移動先にこのグループが関係する操作だけに絞る（sourceGroupId / targetGroupId の OR）。 */
+  groupId?: string;
 };
 
 export interface SystemAdminAuditLogReader {

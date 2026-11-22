@@ -16,6 +16,8 @@ import {
   normalizeSystemAdminReason,
 } from "../../../../lib/domain/systemAdmin/reason";
 import type { SystemAdminListItem, UserSearchItem } from "../types";
+import { SystemAdminEnvironmentNotice } from "./SystemAdminEnvironmentNotice";
+import { Alert } from "@mui/material";
 
 export type SystemAdminAction = "grant" | "regrant" | "revoke";
 
@@ -80,12 +82,20 @@ export function SystemAdminActionDialog({
       <DialogTitle id={titleId}>{label}を確認</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
+          <SystemAdminEnvironmentNotice environment={environment} />
           <Typography id={descriptionId} variant="body2">
             {target?.displayName ?? "対象ユーザー"}（
             {target ? ("targetUserId" in target ? target.targetUserId : target.userId) : "不明"}
-            ）に対して「{label}
-            」を実行します。 環境: {environment}。この操作は監査ログに記録されます。
+            ）に対して「{label}」を実行します。この操作は監査ログに記録されます。
           </Typography>
+          <Typography variant="body2">
+            実行後の状態: {action === "revoke" ? "有効 → 剥奪済み" : "剥奪済みまたは未登録 → 有効"}
+          </Typography>
+          {action === "revoke" ? (
+            <Alert severity="warning" variant="outlined">
+              剥奪した管理者を復旧するには、別の有効な管理者の操作が必要です。
+            </Alert>
+          ) : null}
           <TextField
             autoFocus
             disabled={confirming}

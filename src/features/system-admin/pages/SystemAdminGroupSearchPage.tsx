@@ -1,5 +1,5 @@
 import { api } from "../../../../convex/_generated/api";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAction } from "convex/react";
 import { Link as RouterLink } from "react-router-dom";
 import {
@@ -21,6 +21,7 @@ import {
   SystemAdminPageFrame,
 } from "./SystemAdminPageFrame";
 import type { GroupSearchItem, PageResult } from "../types";
+import { displayLabel, groupStatusLabels } from "../lib/displayLabels";
 import type { GroupSearchType } from "../../../../lib/domain/systemAdmin/searchQuery";
 
 export function SystemAdminGroupSearchPage() {
@@ -29,10 +30,16 @@ export function SystemAdminGroupSearchPage() {
   const [queryType, setQueryType] = useState<GroupSearchType>("name");
   const [result, setResult] = useState<PageResult<GroupSearchItem> | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
+  const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
+  const lastRequest = useRef<{ cursor: string | null } | null>(null);
 
-  const runSearch = async (nextCursor: string | null) => {
+  const runSearch = async (
+    nextCursor: string | null,
+    nav?: { push?: string | null; pop?: boolean },
+  ) => {
+    lastRequest.current = { cursor: nextCursor };
     const normalizedQuery = query.trim();
     setIsLoading(true);
     setError(false);
@@ -44,12 +51,27 @@ export function SystemAdminGroupSearchPage() {
       });
       setResult(response as PageResult<GroupSearchItem>);
       setCursor(nextCursor);
+      if (nav?.pop) setCursorHistory((history) => history.slice(0, -1));
+      else if (nav && "push" in nav) setCursorHistory((history) => [...history, nav.push ?? null]);
     } catch {
       setError(true);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const startNewSearch = () => {
+    setCursorHistory([]);
+    void runSearch(null);
+  };
+  const goToPrevPage = () => {
+    void runSearch(cursorHistory[cursorHistory.length - 1] ?? null, { pop: true });
+  };
+  const retryFailedRequest = () => {
+    void runSearch(lastRequest.current?.cursor ?? cursor);
+  };
+  const resultStart = cursorHistory.length * 20 + 1;
+  const resultEnd = result ? resultStart + result.page.length - 1 : 0;
 
   return (
     <SystemAdminPageFrame
@@ -60,7 +82,7 @@ export function SystemAdminGroupSearchPage() {
         component="form"
         onSubmit={(event) => {
           event.preventDefault();
-          void runSearch(null);
+          startNewSearch();
         }}
         sx={{ p: 2 }}
         variant="outlined"
@@ -96,10 +118,19 @@ export function SystemAdminGroupSearchPage() {
           </Button>
         </Stack>
       </Paper>
-      {error ? <SystemAdminErrorState onRetry={() => void runSearch(cursor)} /> : null}
+      {error ? <SystemAdminErrorState onRetry={retryFailedRequest} /> : null}
       {result ? (
         result.page.length > 0 ? (
           <Stack aria-live="polite" spacing={1}>
+            <Typography color="text.secondary" variant="body2">
+              {resultStart}〜{resultEnd}件目を表示
+              {result.isDone ? "" : "（続きがあります）"}
+            </Typography>
+            {isLoading ? (
+              <Typography color="text.secondary" variant="body2">
+                読み込んでいます…
+              </Typography>
+            ) : null}
             {result.page.map((group) => (
               <Paper key={group.id} sx={{ p: 2 }} variant="outlined">
                 <Typography component="h3" variant="h6">
@@ -109,7 +140,7 @@ export function SystemAdminGroupSearchPage() {
                   groupId: {group.id}
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
-                  状態: {group.status}
+                  状態: {displayLabel(groupStatusLabels, group.status)}
                 </Typography>
                 <Button
                   component={RouterLink}
@@ -121,11 +152,22 @@ export function SystemAdminGroupSearchPage() {
                 </Button>
               </Paper>
             ))}
-            {!result.isDone ? (
-              <Button disabled={isLoading} onClick={() => void runSearch(result.continueCursor)}>
-                次のページ
-              </Button>
-            ) : null}
+            <Stack direction="row" spacing={1}>
+              {cursorHistory.length > 0 ? (
+                <Button disabled={isLoading} onClick={goToPrevPage} variant="outlined">
+                  前のページ
+                </Button>
+              ) : null}
+              {!result.isDone ? (
+                <Button
+                  disabled={isLoading}
+                  onClick={() => void runSearch(result.continueCursor, { push: cursor })}
+                  variant="outlined"
+                >
+                  次のページ
+                </Button>
+              ) : null}
+            </Stack>
           </Stack>
         ) : (
           <SystemAdminEmptyState message="一致するグループはありません。検索条件を確認してください。" />

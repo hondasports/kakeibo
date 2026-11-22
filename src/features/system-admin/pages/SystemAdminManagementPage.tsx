@@ -43,6 +43,7 @@ function SystemAdminManagementPageContent() {
     searchQuery,
     setSearchQuery,
     candidates,
+    candidatesTruncated,
     hasSearched,
     searching,
     searchError,
@@ -70,6 +71,7 @@ function SystemAdminManagementPageContent() {
     >
       <SystemAdminManagementSearch
         candidates={candidates}
+        candidatesTruncated={candidatesTruncated}
         hasSearched={hasSearched}
         isSelf={isSelf}
         searchError={searchError}

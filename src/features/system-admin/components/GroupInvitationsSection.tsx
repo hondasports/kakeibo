@@ -1,6 +1,7 @@
 import { Alert, Button, List, ListItem, Paper, Stack, Typography } from "@mui/material";
 import type { GroupDetail, GroupDetailInvitation } from "../hooks/useSystemAdminGroupDetail";
 import { formatDateTimeForDisplay } from "../../../utils/date";
+import { displayLabel, invitationStatusLabels } from "../lib/displayLabels";
 
 type GroupInvitationsSectionProps = {
   invitations: GroupDetail["invitations"];
@@ -30,7 +31,7 @@ export function GroupInvitationsSection({
                 sx={{ alignItems: { xs: "flex-start", sm: "center" } }}
               >
                 <Typography sx={{ flex: 1 }}>
-                  {invitation.email} / {invitation.status} /{" "}
+                  {invitation.email} / {displayLabel(invitationStatusLabels, invitation.status)} /{" "}
                   {formatDateTimeForDisplay(invitation.createdAt)}
                 </Typography>
                 {invitation.status === "pending" ? (
@@ -41,7 +42,7 @@ export function GroupInvitationsSection({
                     size="small"
                     variant="outlined"
                   >
-                    pending招待を取り消す
+                    保留中の招待を取り消す
                   </Button>
                 ) : null}
               </Stack>
@@ -54,7 +55,9 @@ export function GroupInvitationsSection({
         </Typography>
       )}
       {invitationsTruncated ? (
-        <Alert severity="warning">招待情報は上限件数まで表示しています。</Alert>
+        <Alert severity="warning">
+          招待情報は上限20件まで表示しています（{invitations.length}件を表示）。
+        </Alert>
       ) : null}
     </Paper>
   );

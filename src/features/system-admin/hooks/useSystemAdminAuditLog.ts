@@ -2,6 +2,8 @@ import { api } from "../../../../convex/_generated/api";
 import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
+
+// 日付フィルタはこのブラウザのタイムゾーンの 0:00〜23:59:59.999 を境にする（両端を含む）。
 import type { SystemAdminAuditAction, SystemAdminAuditItem } from "../types";
 
 const actionLabels: Record<SystemAdminAuditAction, string> = {
@@ -45,37 +47,80 @@ function parseDateBoundary(value: string, endOfDay: boolean) {
   return Number.isFinite(timestamp) ? timestamp : undefined;
 }
 
+type AppliedFilters = {
+  action: SystemAdminAuditAction | "";
+  actor: string;
+  target: string;
+  groupId: string;
+  fromDate: string;
+  toDate: string;
+};
+
+const emptyFilters: AppliedFilters = {
+  action: "",
+  actor: "",
+  target: "",
+  groupId: "",
+  fromDate: "",
+  toDate: "",
+};
+
 export function useSystemAdminAuditLog() {
   const [cursor, setCursor] = useState<string | null>(null);
+  // 入力中のドラフト。クエリには「絞り込む」を押した時点の内容だけを渡す（打鍵ごとの再取得を防ぐ）。
   const [action, setAction] = useState<SystemAdminAuditAction | "">("");
   const [actor, setActor] = useState("");
   const [target, setTarget] = useState("");
+  const [groupId, setGroupId] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [applied, setApplied] = useState<AppliedFilters>(emptyFilters);
   const [selected, setSelected] = useState<SystemAdminAuditItem | null>(null);
 
-  const from = useMemo(() => parseDateBoundary(fromDate, false), [fromDate]);
-  const to = useMemo(() => parseDateBoundary(toDate, true), [toDate]);
+  const from = useMemo(() => parseDateBoundary(applied.fromDate, false), [applied.fromDate]);
+  const to = useMemo(() => parseDateBoundary(applied.toDate, true), [applied.toDate]);
+  // 開始 > 終了 の間はクエリを止める（項目エラーとして画面に出す）。
+  const dateRangeInvalid = Boolean(fromDate && toDate && fromDate > toDate);
 
-  const logs = useQuery(api.systemAdmins.listSystemAdminAuditLogs, {
-    paginationOpts: { numItems: 20, cursor },
-    action: action || undefined,
-    actorUserId: actor.trim() ? (actor.trim() as Id<"users">) : undefined,
-    targetUserId: target.trim() ? (target.trim() as Id<"users">) : undefined,
-    from,
-    to,
-  });
+  const logs = useQuery(
+    api.systemAdmins.listSystemAdminAuditLogs,
+    dateRangeInvalid
+      ? "skip"
+      : {
+          paginationOpts: { numItems: 20, cursor },
+          action: applied.action || undefined,
+          actorUserId: applied.actor.trim() ? (applied.actor.trim() as Id<"users">) : undefined,
+          targetUserId: applied.target.trim() ? (applied.target.trim() as Id<"users">) : undefined,
+          groupId: applied.groupId.trim() ? (applied.groupId.trim() as Id<"groups">) : undefined,
+          from,
+          to,
+        },
+  );
+
+  const applyFilters = () => {
+    setApplied({ action, actor, target, groupId, fromDate, toDate });
+    setCursor(null);
+  };
 
   const clearFilters = () => {
     setAction("");
     setActor("");
     setTarget("");
+    setGroupId("");
     setFromDate("");
     setToDate("");
+    setApplied(emptyFilters);
     setCursor(null);
   };
 
-  const hasFilter = Boolean(action || actor.trim() || target.trim() || fromDate || toDate);
+  const hasFilter = Boolean(
+    applied.action ||
+    applied.actor.trim() ||
+    applied.target.trim() ||
+    applied.groupId.trim() ||
+    applied.fromDate ||
+    applied.toDate,
+  );
 
   return {
     logs,
@@ -85,6 +130,8 @@ export function useSystemAdminAuditLog() {
     setActor,
     target,
     setTarget,
+    groupId,
+    setGroupId,
     fromDate,
     setFromDate,
     toDate,
@@ -93,7 +140,9 @@ export function useSystemAdminAuditLog() {
     setCursor,
     selected,
     setSelected,
+    applyFilters,
     clearFilters,
     hasFilter,
+    dateRangeInvalid,
   };
 }
