@@ -19,6 +19,7 @@ export const GROUP_DELETION_PURGE_STAGES = [
   "receiptAnalysisBatches",
   "expenseEntries",
   "receipts",
+  "entryFavorites",
   "sourceDocuments",
   "weekSessions",
   "categories",

@@ -16,6 +16,7 @@ export function ReceiptListCard({
   maxVisibleGroups = 5,
   receipts,
   onDeleteReceipt,
+  onCopyReceipt,
   onEditReceipt,
   selectionEnabled = false,
   selectedCount = 0,
@@ -43,6 +44,7 @@ export function ReceiptListCard({
   preserveOrder?: boolean;
   receipts: ReceiptItem[];
   onDeleteReceipt?: (receipt: ReceiptItem) => void;
+  onCopyReceipt?: (receipt: ReceiptItem) => void;
   onEditReceipt?: (receipt: ReceiptItem) => void;
   selectionEnabled?: boolean;
   selectedCount?: number;
@@ -60,7 +62,9 @@ export function ReceiptListCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
-  const hasRowActions = Boolean(onEditReceipt || onDeleteReceipt || weekSummaryPath);
+  const hasRowActions = Boolean(
+    onEditReceipt || onDeleteReceipt || onCopyReceipt || weekSummaryPath,
+  );
   const receiptGroups = groupReceiptItems(receipts);
   const orderedReceiptGroups = preserveOrder
     ? receiptGroups
@@ -201,6 +205,7 @@ export function ReceiptListCard({
                     key={group.id}
                     dateFormat={dateFormat}
                     group={group}
+                    onCopy={onCopyReceipt}
                     onDelete={onDeleteReceipt}
                     onEdit={onEditReceipt}
                     isSelected={isSelected}

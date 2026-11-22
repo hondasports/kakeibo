@@ -25,6 +25,15 @@ vi.mock("../../../../convex/_generated/api", () => ({
         listByStatusPaginated: "aiExpenseDrafts.queries.listByStatusPaginated",
       },
     },
+    entryFavorites: {
+      mutations: {
+        saveEntryFavorite: "entryFavorites.mutations.saveEntryFavorite",
+        deleteEntryFavorite: "entryFavorites.mutations.deleteEntryFavorite",
+      },
+      queries: {
+        listEntryFavorites: "entryFavorites.queries.listEntryFavorites",
+      },
+    },
     users: {
       mutations: {
         acceptReceiptImageExternalApiConsent:

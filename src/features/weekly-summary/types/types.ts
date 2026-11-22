@@ -16,6 +16,7 @@ export type WeeklySummaryPanelProps = {
   fourWeeksStatus?: "pending" | "success" | "error";
   onTrendRetry?: () => void;
   currentWeekStartDate?: string;
+  onCopyReceipt?: (receipt: ReceiptItem) => void;
   onDeleteReceipt?: (receipt: ReceiptItem) => void;
   onEditReceipt?: (receipt: ReceiptItem) => void;
   selectionEnabled?: boolean;

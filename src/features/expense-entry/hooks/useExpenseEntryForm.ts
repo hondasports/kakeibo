@@ -1,4 +1,5 @@
 import type { Id } from "../../../../convex/_generated/dataModel";
+import type { ExpenseEntryPrefill } from "../types/prefill";
 import { useExpenseEntryMode } from "./useExpenseEntryMode";
 import { useExpenseEntrySubmit } from "./useExpenseEntrySubmit";
 
@@ -8,10 +9,15 @@ type UseExpenseEntryFormArgs = {
   weekStartDate: string;
   weekEndDate: string;
   categories: Array<{ _id: Id<"categories">; name: string; color: string }>;
+  initialPrefill?: ExpenseEntryPrefill;
 };
 
-export function useExpenseEntryForm({ weekStartDate, categories }: UseExpenseEntryFormArgs) {
-  const mode = useExpenseEntryMode({ weekStartDate, categories });
+export function useExpenseEntryForm({
+  weekStartDate,
+  categories,
+  initialPrefill,
+}: UseExpenseEntryFormArgs) {
+  const mode = useExpenseEntryMode({ weekStartDate, categories, initialPrefill });
 
   const submit = useExpenseEntrySubmit({
     date: mode.date,
@@ -52,6 +58,7 @@ export function useExpenseEntryForm({ weekStartDate, categories }: UseExpenseEnt
     setSourceAmount: mode.setSourceAmount,
     setMemo: mode.setMemo,
     setDate: mode.setDate,
+    applyEntryPrefill: mode.applyEntryPrefill,
     handleEnterMultiMode: mode.handleEnterMultiMode,
     handleAddItem: mode.handleAddItem,
     handleRemoveItem: mode.handleRemoveItem,
