@@ -16,7 +16,10 @@ vi.mock("convex/react", () => ({
 }));
 
 vi.mock("../../../../convex/_generated/api", () => ({
-  api: apiMockWith({ "users.queries.getUserProfile": "get-user-profile" }),
+  api: apiMockWith({
+    "users.queries.getUserProfile": "get-user-profile",
+    "categories.queries.listForSettings": "categories-list-for-settings",
+  }),
 }));
 
 function LocationProbe() {
@@ -53,6 +56,12 @@ describe("ExpenseSearchPage", () => {
     useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
       if (_api === "get-user-profile") {
         return { weeklyStartDay: 3 };
+      }
+      if (_api === "categories-list-for-settings") {
+        return [
+          { _id: "cat-food", name: "食費", isActive: true },
+          { _id: "cat-old", name: "旧カテゴリ", isActive: false },
+        ];
       }
       if (args === undefined) {
         return [{ _id: "cat-food", name: "食費" }];
@@ -120,7 +129,7 @@ describe("ExpenseSearchPage", () => {
     );
 
     expect(screen.getByRole("navigation", { name: "履歴メニュー" })).toBeInTheDocument();
-    expect(screen.getByText("金額の下限は上限以下にしてください")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("金額の下限は上限以下にしてください");
     expect(screen.queryByText("条件に合う履歴はありません")).not.toBeInTheDocument();
   });
 
@@ -190,10 +199,14 @@ describe("ExpenseSearchPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "支出一覧（1件）" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "支出一覧（1件中 1件を表示）" }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "さらに読み込む" }));
 
-    expect(screen.getByRole("heading", { name: "支出一覧（1件）" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "支出一覧（1件中 1件を表示）" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("追加の履歴を読み込めませんでした。表示済みの履歴はそのまま残しています。"),
     ).toBeInTheDocument();
@@ -428,6 +441,219 @@ describe("ExpenseSearchPage", () => {
     await user.click(screen.getByRole("button", { name: /未分類/ }));
     expect(
       screen.getByText("/search?type=expense&categoryId=__uncategorized__"),
+    ).toBeInTheDocument();
+  });
+
+  it("無効化済みカテゴリの条件はチップで状態が分かる", () => {
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?categoryId=cat-old"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("カテゴリ: 旧カテゴリ（無効化済み）")).toBeInTheDocument();
+  });
+
+  it("無効化済みカテゴリの設定一覧を読み込んでいる間は「読み込み中」と出す", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (_api === "categories-list-for-settings") {
+        return undefined;
+      }
+      if (args === undefined) {
+        return [{ _id: "cat-food", name: "食費" }];
+      }
+      if (args === "skip") {
+        return undefined;
+      }
+      return emptySearchResult;
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?categoryId=cat-old"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("カテゴリ: 読み込み中")).toBeInTheDocument();
+  });
+
+  it("下限が上限を超える条件は絞り込めず、項目の近くに理由が出る", async () => {
+    const user = userEvent.setup();
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+        <LocationProbe />
+        <Routes>
+          <Route path="/search" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText("金額の下限"), "200");
+    await user.type(screen.getByLabelText("金額の上限"), "100");
+    await user.click(screen.getByRole("button", { name: "絞り込む" }));
+
+    expect(screen.getByText("金額の下限は上限以下にしてください")).toBeInTheDocument();
+    expect(screen.getByText("/search")).toBeInTheDocument();
+  });
+
+  it("編集中の下書きはチップ削除で消えず、未適用の変更が分かる", async () => {
+    const user = userEvent.setup();
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?q=%E5%BA%97&min=1000"]}>
+        <ExpenseSearchPage />
+        <LocationProbe />
+        <Routes>
+          <Route path="/search" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText("金額の上限"), "5000");
+    expect(
+      screen.getByText("変更はまだ適用されていません。「絞り込む」を押すと反映されます"),
+    ).toBeInTheDocument();
+
+    const keywordChip = screen.getByText("キーワード: 店").closest(".MuiChip-root") as HTMLElement;
+    await user.click(keywordChip.querySelector(".MuiChip-deleteIcon") as Element);
+
+    expect(screen.getByText("/search?min=1000")).toBeInTheDocument();
+    expect(screen.getByLabelText("金額の上限")).toHaveValue("5000");
+    expect(
+      screen.getByText("変更はまだ適用されていません。「絞り込む」を押すと反映されます"),
+    ).toBeInTheDocument();
+  });
+
+  it("適用済みの条件が無効なら理由を画面に表示する", () => {
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?min=2000&max=100"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("金額の下限は上限以下にしてください");
+  });
+
+  it("0件の空状態から条件をすべてクリアできる", async () => {
+    const user = userEvent.setup();
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?q=%E5%BA%97"]}>
+        <ExpenseSearchPage />
+        <LocationProbe />
+        <Routes>
+          <Route path="/search" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("条件に合う履歴はありません")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "条件をすべてクリア" }));
+
+    expect(screen.getByText("/search")).toBeInTheDocument();
+  });
+
+  it("集計の対象期間を常時表示し、読み込み途中では表示済み件数も出す", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (_api === "categories-list-for-settings") {
+        return [{ _id: "cat-food", name: "食費", isActive: true }];
+      }
+      if (args === undefined) {
+        return [];
+      }
+      if (args === "skip") {
+        return undefined;
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-1",
+            date: "2026-08-01",
+            type: "expense" as const,
+            shopName: "店",
+            amountYen: 1200,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        isDone: false,
+        totalCount: 5,
+        expenseCount: 5,
+        totalExpenseYen: 1200,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("対象期間: 全期間")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "支出一覧（5件中 1件を表示）" }),
+    ).toBeInTheDocument();
+  });
+
+  it("明細が複数あるレシートはグループ単位で表示済み件数を数える", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-1",
+            date: "2026-08-01",
+            type: "expense" as const,
+            shopName: "店",
+            amountYen: 600,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            receiptGroupId: "receipt-1",
+            recordType: "expenseEntry" as const,
+          },
+          {
+            _id: "expense-2",
+            date: "2026-08-01",
+            type: "expense" as const,
+            shopName: "店",
+            amountYen: 600,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            receiptGroupId: "receipt-1",
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        isDone: false,
+        totalCount: 1,
+        expenseCount: 1,
+        totalExpenseYen: 1200,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "支出一覧（1件中 1件を表示）" }),
     ).toBeInTheDocument();
   });
 
