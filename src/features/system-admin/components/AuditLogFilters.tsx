@@ -1,6 +1,7 @@
 import {
   Button,
   FormControl,
+  FormHelperText,
   InputLabel,
   MenuItem,
   Paper,
@@ -150,6 +151,9 @@ export function AuditLogFilters({
                 </MenuItem>
               ))}
             </Select>
+            <FormHelperText>
+              「直接操作の対象」はグループ自体への操作（閲覧・削除再開・role変更など）だけです。所属の追加・移動・解除は「操作元」「操作先」で絞り込んでください
+            </FormHelperText>
           </FormControl>
         </Stack>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
