@@ -16,14 +16,21 @@ export function createLineExpenseDraftStore(ctx: MutationCtx): LineExpenseDraftS
         groupId: args.groupId as Id<"groups">,
         createdByUserId: args.createdByUserId,
         sourceType: "line_text",
-        status: "ready",
+        // カテゴリ未解決の下書きを ready にすると登録バリデーション
+        // (missing_category) を確実に通らず一括登録も止めるため、
+        // ユーザーにカテゴリ選択を促す needs_review で作成する。
+        status: args.categoryId ? "ready" : "needs_review",
         documentType: "unknown",
         shopName: args.title,
         date: args.date,
         amountYen: args.amountYen,
         categoryId: args.categoryId as Id<"categories"> | undefined,
-        confidence: { amountYen: 1, shopName: 1, date: 1 },
-        reviewReasons: ["user_confirmation_required"],
+        confidence: args.categoryId
+          ? { amountYen: 1, shopName: 1, date: 1, categoryId: 1 }
+          : { amountYen: 1, shopName: 1, date: 1 },
+        reviewReasons: args.categoryId
+          ? ["user_confirmation_required"]
+          : ["missing_required_field", "user_confirmation_required"],
         createdAt: args.now,
         updatedAt: args.now,
       });

@@ -150,7 +150,13 @@ async function maybeCreateExpenseDraft(
   now: number,
 ): Promise<void> {
   const command = parseLineSummaryCommand(commandText);
-  if (command.type !== "week_summary" && command.type !== "category_lookup") {
+  // help 分類（日本語を含まない入力等）も支出入力の可能性があるため対象にする。
+  // 「使い方」等の実コマンドは parseLineExpenseInput が金額不在で弾く。
+  if (
+    command.type !== "week_summary" &&
+    command.type !== "category_lookup" &&
+    command.type !== "help"
+  ) {
     return;
   }
   const expenseInput = parseLineExpenseInput(commandText);
