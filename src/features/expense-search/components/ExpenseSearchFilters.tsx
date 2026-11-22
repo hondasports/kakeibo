@@ -14,7 +14,10 @@ import {
   getHistoryDateRangeForPreset,
   type HistoryDatePreset,
 } from "../../../../lib/domain/expenseSearch/datePresets";
-import type { HistoryEntryType } from "../../../../lib/domain/expenseSearch/filter";
+import {
+  UNCATEGORIZED_CATEGORY_ID,
+  type HistoryEntryType,
+} from "../../../../lib/domain/expenseSearch/filter";
 import type { ExpenseSearchFormState } from "../lib/searchParams";
 import { extractAmountDigits } from "../../../utils/currency";
 
@@ -130,6 +133,7 @@ export function ExpenseSearchFilters({
         <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
           <TextField
             fullWidth
+            helperText={'空白区切りでAND、先頭「-」で除外、「"..."」でそのまま検索'}
             label="キーワード"
             name="shopQuery"
             placeholder="店名・内容・メモ"
@@ -149,6 +153,7 @@ export function ExpenseSearchFilters({
             onChange={(event) => onChange({ ...state, categoryId: event.target.value })}
           >
             <MenuItem value="">指定なし</MenuItem>
+            <MenuItem value={UNCATEGORIZED_CATEGORY_ID}>未分類</MenuItem>
             {categories.map((category) => (
               <MenuItem key={category._id} value={category._id}>
                 {category.name}

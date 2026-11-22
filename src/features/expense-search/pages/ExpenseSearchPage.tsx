@@ -4,9 +4,10 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { Alert, Box, Button, Stack, Typography } from "@mui/material";
 import { getCurrentMonth } from "../../../../lib/domain/common/month";
+import { UNCATEGORIZED_CATEGORY_ID } from "../../../../lib/domain/expenseSearch/filter";
 import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
 import { SuzumemoLoadingState } from "../../ui";
-import { getCurrentWeekStartDate } from "../../week";
+import { getCurrentWeekStartDate, normalizeWeekStartDate } from "../../week";
 import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
 import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
 import { AppliedSearchFilters } from "../components/AppliedSearchFilters";
@@ -52,7 +53,30 @@ export function ExpenseSearchPage() {
   }
 
   const currentSearchPath = `${location.pathname}${location.search}`;
-  const categoryName = categories.find((category) => category._id === applied.categoryId)?.name;
+  const categoryName =
+    applied.categoryId === UNCATEGORIZED_CATEGORY_ID
+      ? "未分類"
+      : categories.find((category) => category._id === applied.categoryId)?.name;
+
+  // 期間が複数月にまたがるときは開始日側の月・週を代表として使う。
+  const representativeDate =
+    applied.startDate.length > 0
+      ? applied.startDate
+      : applied.endDate.length > 0
+        ? applied.endDate
+        : undefined;
+  const linkedWeekStart =
+    representativeDate !== undefined
+      ? normalizeWeekStartDate(representativeDate, userProfile?.weeklyStartDay)
+      : null;
+  const monthlyPath =
+    representativeDate !== undefined
+      ? `/months/${representativeDate.slice(0, 7)}`
+      : `/months/${getCurrentMonth()}`;
+  const weeklyPath =
+    linkedWeekStart !== null && linkedWeekStart !== undefined
+      ? `/weeks/${linkedWeekStart}`
+      : `/weeks/${getCurrentWeekStartDate(userProfile?.weeklyStartDay)}`;
   const expenseItems = loadedItems.filter((item) => item.type === "expense").map(toReceiptItem);
   const incomeItems = loadedItems.filter((item) => item.type === "income").map(toIncomeItem);
 
@@ -81,9 +105,9 @@ export function ExpenseSearchPage() {
     <Box className="app-main">
       <Stack spacing={3}>
         <HistoryNavigation
-          monthlyPath={`/months/${getCurrentMonth()}`}
+          monthlyPath={monthlyPath}
           searchPath={currentSearchPath}
-          weeklyPath={`/weeks/${getCurrentWeekStartDate(userProfile?.weeklyStartDay)}`}
+          weeklyPath={weeklyPath}
         />
         <Typography component="h1" variant="h4">
           履歴検索

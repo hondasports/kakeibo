@@ -9,6 +9,7 @@ import {
   groupHistoryEntries,
   paginateHistoryGroups,
   parseExpenseSearchFilters,
+  UNCATEGORIZED_CATEGORY_ID,
   type HistoryEntryType,
   type SearchableHistoryGroup,
 } from "../../domain/expenseSearch/filter";
@@ -69,7 +70,10 @@ export async function searchExpenses(
     throw new ExpenseSearchDomainError(parsed.error);
   }
 
-  if (parsed.filters.categoryId !== undefined) {
+  if (
+    parsed.filters.categoryId !== undefined &&
+    parsed.filters.categoryId !== UNCATEGORIZED_CATEGORY_ID
+  ) {
     const categoryGroupId = await store.getCategoryGroupId(parsed.filters.categoryId);
     if (categoryGroupId !== groupId) {
       return emptySearchResult();

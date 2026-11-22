@@ -54,8 +54,77 @@ type ParsedExpenseSearchFilters =
 
 const SHOP_QUERY_MAX_LENGTH = 80;
 
+// 「カテゴリ未分類」絞り込みを表す特別な categoryId 値。
+// 実際のカテゴリIDと衝突しない文字列を使う。
+export const UNCATEGORIZED_CATEGORY_ID = "__uncategorized__";
+
 function normalizeSearchText(value: string | undefined): string {
   return (value ?? "").normalize("NFKC").trim().toLocaleLowerCase("ja");
+}
+
+export type SearchQueryTerm = {
+  raw: string;
+  exclude: boolean;
+};
+
+/**
+ * キーワード欄を検索語へ分解する。
+ * 空白区切りはAND、先頭「-」は除外、「"..."」で囲むと空白や「-」を含む
+ * 文字列をそのまま検索できる。
+ */
+export function parseSearchQueryTerms(query: string): SearchQueryTerm[] {
+  const terms: SearchQueryTerm[] = [];
+  let current = "";
+  let inQuote = false;
+  let tokenStartedWithQuote = false;
+
+  const flush = () => {
+    const raw = current;
+    current = "";
+    const startedWithQuote = tokenStartedWithQuote;
+    tokenStartedWithQuote = false;
+    if (raw.length === 0) {
+      return;
+    }
+    // 「-」始まりは除外指定。引用で始まるトークンは中身をそのまま含める。
+    const exclude = !startedWithQuote && raw.startsWith("-") && raw.length > 1;
+    terms.push({ raw: exclude ? raw.slice(1) : raw, exclude });
+  };
+
+  for (const char of query) {
+    if (char === '"') {
+      if (current.length === 0 && !inQuote) {
+        tokenStartedWithQuote = true;
+      }
+      inQuote = !inQuote;
+      continue;
+    }
+    if (!inQuote && /\s/.test(char)) {
+      flush();
+      continue;
+    }
+    current += char;
+  }
+  flush();
+
+  return terms.filter((term) => term.raw.length > 0);
+}
+
+function matchesAnyHaystack(haystacks: Array<string | undefined>, term: string): boolean {
+  const normalizedTerm = normalizeSearchText(term);
+  return haystacks.some((value) => normalizeSearchText(value).includes(normalizedTerm));
+}
+
+function matchesSearchTerms(
+  haystacks: Array<string | undefined>,
+  terms: SearchQueryTerm[],
+): boolean {
+  const includeTerms = terms.filter((term) => !term.exclude);
+  const excludeTerms = terms.filter((term) => term.exclude);
+  return (
+    includeTerms.every((term) => matchesAnyHaystack(haystacks, term.raw)) &&
+    !excludeTerms.some((term) => matchesAnyHaystack(haystacks, term.raw))
+  );
 }
 
 export function groupSpendingEntries(entries: SpendingEntry[]): SearchableReceiptGroup[] {
@@ -110,8 +179,8 @@ export function groupHistoryEntries(
 }
 
 function matchesExpenseQuery(group: SearchableReceiptGroup, query: string): boolean {
-  const normalizedQuery = normalizeSearchText(query);
-  if (normalizedQuery.length === 0) {
+  const terms = parseSearchQueryTerms(query);
+  if (terms.length === 0) {
     return true;
   }
 
@@ -125,21 +194,19 @@ function matchesExpenseQuery(group: SearchableReceiptGroup, query: string): bool
     ]),
   ];
 
-  return haystacks.some((value) => normalizeSearchText(value).includes(normalizedQuery));
+  return matchesSearchTerms(haystacks, terms);
 }
 
 function matchesIncomeQuery(
   group: Extract<SearchableHistoryGroup, { type: "income" }>,
   query: string,
 ): boolean {
-  const normalizedQuery = normalizeSearchText(query);
-  if (normalizedQuery.length === 0) {
+  const terms = parseSearchQueryTerms(query);
+  if (terms.length === 0) {
     return true;
   }
 
-  return [group.bankName, group.income.memo].some((value) =>
-    normalizeSearchText(value).includes(normalizedQuery),
-  );
+  return matchesSearchTerms([group.bankName, group.income.memo], terms);
 }
 
 function matchesSearchQuery(group: SearchableHistoryGroup, query: string): boolean {
@@ -161,12 +228,17 @@ export function filterHistoryGroups(
       return false;
     }
 
-    if (
-      filters.categoryId !== undefined &&
-      (group.type === "income" ||
-        !group.items.some((item) => item.categoryId === filters.categoryId))
-    ) {
-      return false;
+    if (filters.categoryId !== undefined) {
+      if (group.type === "income") {
+        return false;
+      }
+      const matchesCategory =
+        filters.categoryId === UNCATEGORIZED_CATEGORY_ID
+          ? group.items.some((item) => item.categoryId.length === 0)
+          : group.items.some((item) => item.categoryId === filters.categoryId);
+      if (!matchesCategory) {
+        return false;
+      }
     }
 
     if (filters.minAmountYen !== undefined && group.amountYen < filters.minAmountYen) {

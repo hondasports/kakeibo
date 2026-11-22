@@ -21,7 +21,7 @@ export type { ExpenseSearchReceipt, ExpenseSearchResult };
 type ExpenseSearchArgs = {
   entryType?: HistoryEntryType;
   shopQuery?: string;
-  categoryId?: Id<"categories">;
+  categoryId?: Id<"categories"> | "__uncategorized__";
   minAmountYen?: number;
   maxAmountYen?: number;
   startDate?: string;

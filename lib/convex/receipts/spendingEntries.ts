@@ -147,6 +147,34 @@ export function mapExpenseEntriesToReceiptLinkages(
   }));
 }
 
+// 履歴検索ではカテゴリ未設定の記録を「未分類」として表示対象に含めるため、
+// missing_category で落とさず空の categoryId として載せる。
+export function mapExpenseEntriesToSearchLinkages(
+  entries: Doc<"expenseEntries">[],
+): ReceiptLinkage[] {
+  return entries.map((entry) => {
+    const result = mapExpenseEntryToSpendingEntryDomain(entry);
+    const spending: SpendingEntry = result.success
+      ? result.entry
+      : {
+          _id: entry._id,
+          date: entry.date,
+          type: entry.entryType,
+          shopName: entry.title,
+          amountYen: entry.amount,
+          categoryId: "",
+          memo: entry.memo,
+          recordType: "expenseEntry",
+          aiExpenseDraftId: entry.aiExpenseDraftId,
+        };
+    return {
+      entry: spending,
+      sourceDocumentId: entry.sourceDocumentId,
+      aiExpenseDraftId: entry.aiExpenseDraftId,
+    };
+  });
+}
+
 async function fetchExpenseEntriesByDateRange(
   ctx: QueryCtx,
   groupId: Id<"groups">,

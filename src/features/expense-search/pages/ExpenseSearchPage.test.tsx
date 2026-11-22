@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExpenseSearchResult } from "../../../../lib/convex/expenseSearch/searchExpenses";
 import { apiMockWith } from "../../../test/apiMock";
 import { renderWithDatePickers } from "../../../test/render";
-import { getCurrentWeekStartDate } from "../../week";
+import { getCurrentWeekStartDate, normalizeWeekStartDate } from "../../week";
 import { ExpenseSearchPage } from "./ExpenseSearchPage";
 
 const useQueryMock = vi.fn();
@@ -92,6 +92,24 @@ describe("ExpenseSearchPage", () => {
     expect(screen.getByRole("button", { name: "終了日を選択" })).toBeInTheDocument();
     expect(document.querySelector('input[type="date"]')).toBeNull();
     expect(screen.getByText("条件に合う履歴はありません")).toBeInTheDocument();
+  });
+
+  it("検索期間に連動して週次・月次サマリーへリンクする", () => {
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?from=2026-05-10&to=2026-05-31"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    const historyNavigation = screen.getByRole("navigation", { name: "履歴メニュー" });
+    expect(within(historyNavigation).getByRole("link", { name: "月次サマリー" })).toHaveAttribute(
+      "href",
+      "/months/2026-05",
+    );
+    expect(within(historyNavigation).getByRole("link", { name: "週次サマリー" })).toHaveAttribute(
+      "href",
+      `/weeks/${normalizeWeekStartDate("2026-05-10", 3)}`,
+    );
   });
 
   it("不正な金額範囲ならエラーを出して検索しない", () => {
