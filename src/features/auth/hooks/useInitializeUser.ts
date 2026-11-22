@@ -14,6 +14,8 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
  *   クライアントから userId を渡さない。
  * - デフォルトカテゴリはグループ所属後に seed する。
  * - エラーは console.error に記録し、UI をブロックしない。
+ *   upsertUser の失敗は initializationError で通知し、
+ *   retryInitialization で再試行できる。
  */
 export function useInitializeUser() {
   const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
@@ -25,6 +27,8 @@ export function useInitializeUser() {
   const hasInitialized = useRef(false);
   const seededGroupIds = useRef(new Set<string>());
   const [isInitializing, setIsInitializing] = useState(false);
+  const [initializationError, setInitializationError] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     if (!isAuthenticated || hasInitialized.current) {
@@ -42,9 +46,16 @@ export function useInitializeUser() {
       .catch((err: unknown) => {
         hasInitialized.current = false; // リトライ許可
         setIsInitializing(false);
+        setInitializationError(true);
         console.error("[useInitializeUser] initialization failed:", err);
       });
-  }, [isAuthenticated, upsertUser]);
+  }, [isAuthenticated, upsertUser, retryTick]);
+
+  const retryInitialization = () => {
+    if (isInitializing || hasInitialized.current) return;
+    setInitializationError(false);
+    setRetryTick((tick) => tick + 1);
+  };
 
   useEffect(() => {
     if (!isAuthenticated || group === undefined || group === null) {
@@ -61,5 +72,5 @@ export function useInitializeUser() {
     });
   }, [group, isAuthenticated, seedDefaultCategories]);
 
-  return { isInitializing };
+  return { isInitializing, initializationError, retryInitialization };
 }

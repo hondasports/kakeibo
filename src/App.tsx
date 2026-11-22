@@ -1,6 +1,6 @@
 import { useSignOutState } from "./features/auth/hooks/signOutState";
-import { useState } from "react";
-import { AuthenticateWithRedirectCallback, useAuth } from "@clerk/react";
+import { useEffect, useState } from "react";
+import { AuthenticateWithRedirectCallback, useAuth, useClerk } from "@clerk/react";
 import { useSignIn } from "@clerk/react/legacy";
 import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
 import { RouterProvider } from "react-router-dom";
@@ -50,7 +50,16 @@ function App() {
   return <AuthenticatedApp />;
 }
 
+const OAUTH_CALLBACK_STALL_MS = 20000;
+
 function AuthCallbackScreen() {
+  const [isStalled, setIsStalled] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setIsStalled(true), OAUTH_CALLBACK_STALL_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   return (
     <Box className="auth-screen">
       <Paper className="auth-panel paper-panel" elevation={0}>
@@ -67,6 +76,16 @@ function AuthCallbackScreen() {
               認証が完了したらSuzumemoに戻ります。
             </Typography>
           </Box>
+          {isStalled ? (
+            <Alert severity="info" variant="outlined">
+              ログイン処理に時間がかかっています。この画面が進まない場合は、ログイン画面からもう一度お試しください。
+            </Alert>
+          ) : null}
+          {isStalled ? (
+            <Button component="a" href="/" variant="outlined">
+              ログイン画面に戻る
+            </Button>
+          ) : null}
           <AuthenticateWithRedirectCallback
             signInFallbackRedirectUrl="/"
             signUpFallbackRedirectUrl="/"
@@ -81,7 +100,7 @@ function AuthenticatedApp() {
   const { isLoaded, isSignedIn } = useAuth();
   const { isLoading: isConvexAuthLoading, isAuthenticated: isConvexAuthenticated } =
     useConvexAuth();
-  useInitializeUser();
+  const { initializationError, retryInitialization } = useInitializeUser();
 
   if (!isLoaded) {
     return (
@@ -108,15 +127,21 @@ function AuthenticatedApp() {
   }
 
   if (!isConvexAuthenticated) {
+    return <ConvexAuthFailureScreen />;
+  }
+
+  if (initializationError) {
     return (
       <Box className="auth-screen">
         <Paper className="auth-panel paper-panel" elevation={0}>
           <Stack spacing={2.5} sx={{ alignItems: "center", textAlign: "center" }}>
             <AuthBrand />
             <Alert severity="error" variant="outlined">
-              Clerkログインは完了していますが、Convexで認証できませんでした。
-              ClerkのConvex連携とCLERK_JWT_ISSUER_DOMAINを確認してください。
+              アカウントの初期化に失敗しました。通信状況を確認して、もう一度お試しください。
             </Alert>
+            <Button onClick={retryInitialization} variant="contained">
+              もう一度試す
+            </Button>
           </Stack>
         </Paper>
       </Box>
@@ -124,6 +149,47 @@ function AuthenticatedApp() {
   }
 
   return <RouterProvider router={router} />;
+}
+
+function ConvexAuthFailureScreen() {
+  const clerk = useClerk();
+  const [isSigningOutForRetry, setIsSigningOutForRetry] = useState(false);
+
+  const handleSignOutForRetry = async () => {
+    setIsSigningOutForRetry(true);
+    try {
+      await clerk.signOut({ redirectUrl: "/" });
+    } catch (caughtError) {
+      console.error("signOut for retry failed:", caughtError);
+      window.location.assign("/");
+    }
+  };
+
+  return (
+    <Box className="auth-screen">
+      <Paper className="auth-panel paper-panel" elevation={0}>
+        <Stack spacing={2.5} sx={{ alignItems: "center", textAlign: "center" }}>
+          <AuthBrand />
+          <Alert severity="error" variant="outlined">
+            ログインは完了しましたが、データ同期の準備に失敗しました。
+            時間をおいてもう一度お試しいただくか、一度ログアウトしてログインし直してください。
+          </Alert>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Button onClick={() => window.location.reload()} variant="contained">
+              再読み込み
+            </Button>
+            <Button
+              disabled={isSigningOutForRetry}
+              onClick={handleSignOutForRetry}
+              variant="outlined"
+            >
+              {isSigningOutForRetry ? "ログアウトしています" : "ログアウトしてログインし直す"}
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+    </Box>
+  );
 }
 
 function AuthBrand() {
@@ -156,7 +222,8 @@ function SignedOutScreen() {
       setError(
         getClerkErrorMessage(
           caughtError,
-          "Googleログインを開始できませんでした。Clerk DashboardのGoogle OAuth設定を確認してください。",
+          "Googleログインを開始できませんでした。通信状況を確認して、もう一度お試しください。",
+          { userFacingOnly: true },
         ),
       );
       setIsRedirecting(false);
@@ -170,6 +237,15 @@ function SignedOutScreen() {
           <AuthBrand />
 
           <Typography color="text.secondary">小さな支出と日々のメモを、軽く残せます。</Typography>
+
+          <Box>
+            <Typography color="text.secondary" variant="body2">
+              はじめての方も、同じボタンからGoogleアカウントで登録へ進めます。
+            </Typography>
+            <Typography color="text.secondary" variant="body2">
+              ログインまたは登録を進めると、利用規約とプライバシーポリシーに同意したものとみなします。
+            </Typography>
+          </Box>
 
           {error ? (
             <Alert severity="error" variant="outlined">
