@@ -72,3 +72,40 @@ describe("サマリー返信のリンク確認", () => {
     expect(deps.summaryData.getWeekSpendingEntries).toHaveBeenCalledWith("group-a", "2026-08-10");
   });
 });
+
+describe("テキスト支出入力の返信分岐", () => {
+  const categories = [
+    { id: "cat-food", name: "食費" },
+    { id: "cat-daily", name: "日用品" },
+  ];
+
+  function depsWithCategories(links: LineAccountLinkRecord[]) {
+    const deps = createDeps(links);
+    deps.summaryData.listActiveCategories = vi.fn().mockResolvedValue(categories);
+    return deps;
+  }
+
+  it.each(["食費 1,200円", "日用品 300", "コンビニ 500", "Amazon 500"] as const)(
+    "「%s」はカテゴリ名＋金額でも下書き作成の返信を返す",
+    async (messageText) => {
+      const deps = depsWithCategories([originalLink]);
+      const result = await buildSummaryReply(deps, { ...args, messageText });
+      expect(result.replyKind).toBe("expense_draft");
+      expect(result.replyText).toContain("下書きを作成したよ");
+    },
+  );
+
+  it.each([
+    ["食費", "category_lookup"],
+    ["使い方", "help"],
+    ["レシート", "receipt_guide"],
+  ] as const)(
+    "下書きを作らない入力「%s」は下書き作成済みとは返さない（%s）",
+    async (messageText, replyKind) => {
+      const deps = depsWithCategories([originalLink]);
+      const result = await buildSummaryReply(deps, { ...args, messageText });
+      expect(result.replyKind).toBe(replyKind);
+      expect(result.replyText).not.toContain("下書きを作成したよ");
+    },
+  );
+});

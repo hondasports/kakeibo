@@ -139,7 +139,7 @@ export async function claimEvents(
 }
 
 /**
- * サマリーコマンドとしても解釈できない「内容＋金額」だけ下書き化する。
+ * 「内容＋金額」のテキストを下書き化する（カテゴリ名＋金額も含む）。
  * グループ解決・削除済みチェックは buildSummaryReply と同じ手順に揃える。
  */
 async function maybeCreateExpenseDraft(
@@ -171,14 +171,9 @@ async function maybeCreateExpenseDraft(
     groupResolution.groupId,
     MAX_CATEGORIES_PER_GROUP,
   );
-  // 「食費 500」で command.name が実在カテゴリに解決できる場合、返信側は
-  // カテゴリ集計を返すので下書きは作らない（返信との一貫性を保つ）。
-  if (
-    command.type === "category_lookup" &&
-    resolveCategoryLookup(command.name, categories) !== undefined
-  ) {
-    return;
-  }
+  // 「食費 1,200円」のようなカテゴリ名＋金額も支出入力を優先する。
+  // カテゴリは金額を取り除いた title だけで解決し、金額を含まない入力は
+  // そもそも parseLineExpenseInput が弾くため従来どおり category_lookup に流れる。
   const category = resolveCategoryLookup(expenseInput.title, categories);
   await deps.expenseDrafts.createFromLineText({
     groupId: groupResolution.groupId,

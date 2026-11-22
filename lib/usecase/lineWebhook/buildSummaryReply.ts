@@ -138,15 +138,18 @@ export async function buildSummaryReply(
     return reply("week_trend", formatWeekTrendReply({ weeks }));
   }
   if (command.type === "category_lookup") {
+    // 「食費 1,200円」のような金額を含む入力は支出入力を優先する。
+    // category_lookup として返信するのは金額を含まない入力に限る
+    // （claim 側も金額つき入力は下書きを作る）。
+    if (expenseInput !== null) {
+      return reply("expense_draft", formatExpenseDraftReply(expenseInput));
+    }
     const categories = await deps.summaryData.listActiveCategories(
       groupId,
       MAX_CATEGORIES_PER_GROUP,
     );
     const category = resolveCategoryLookup(command.name, categories);
     if (category === undefined) {
-      if (expenseInput !== null) {
-        return reply("expense_draft", formatExpenseDraftReply(expenseInput));
-      }
       return reply("help", LINE_HELP_MESSAGE);
     }
     const matched = weekSummary.byCategory.find((entry) => entry.categoryId === category.id);
