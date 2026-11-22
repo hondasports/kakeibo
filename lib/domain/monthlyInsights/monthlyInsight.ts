@@ -4,6 +4,8 @@
  */
 
 export type MonthlyInsightCategoryPoint = {
+  /** 同名カテゴリが複数ある場合の比較用。無い集計では名前で比較する */
+  categoryId?: string;
   categoryName: string;
   amountYen: number;
   count: number;
@@ -28,11 +30,33 @@ export function getPreviousMonth(month: string): string {
   return m === 1 ? `${year - 1}-12` : `${year}-${String(m - 1).padStart(2, "0")}`;
 }
 
-const YEN_PATTERN = /([0-9][0-9,]*)円/g;
+const FULL_WIDTH_DIGITS = "０１２３４５６７８９";
+const YEN_PATTERN = /([0-9０-９][0-9０-９,.]*)(万|億)?円/g;
 
-/** 生成文中の「◯◯円」金額を抽出する。 */
+function toHalfWidth(value: string): string {
+  return [...value]
+    .map((ch) => {
+      const index = FULL_WIDTH_DIGITS.indexOf(ch);
+      return index >= 0 ? String(index) : ch;
+    })
+    .join("");
+}
+
+/** 生成文中の「◯◯円」「◯万円」金額を円単位で抽出する（全角数字も対象）。 */
 export function extractYenAmounts(text: string): number[] {
-  return [...text.matchAll(YEN_PATTERN)].map((m) => Number(m[1].replace(/,/g, "")));
+  return [...text.matchAll(YEN_PATTERN)].map((m) => {
+    const base = Number(toHalfWidth(m[1]).replace(/,/g, ""));
+    const multiplier = m[2] === "万" ? 10_000 : m[2] === "億" ? 100_000_000 : 1;
+    return base * multiplier;
+  });
+}
+
+/** カテゴリIDが両方あるときはIDで、無い場合は名前で同一カテゴリを判定する。 */
+function sameCategory(a: MonthlyInsightCategoryPoint, b: MonthlyInsightCategoryPoint): boolean {
+  if (a.categoryId !== undefined && b.categoryId !== undefined) {
+    return a.categoryId === b.categoryId;
+  }
+  return a.categoryName === b.categoryName;
 }
 
 function collectAllowedAmounts(input: MonthlyInsightInput): Set<number> {
@@ -48,12 +72,11 @@ function collectAllowedAmounts(input: MonthlyInsightInput): Set<number> {
     // 差額も許容する（比較元2値から直接計算できる数値のみ）
     amounts.add(input.current.totalAmountYen - input.previous.totalAmountYen);
     amounts.add(input.previous.totalAmountYen - input.current.totalAmountYen);
-    const prevByName = new Map(input.previous.byCategory.map((c) => [c.categoryName, c.amountYen]));
     for (const c of input.current.byCategory) {
-      const prev = prevByName.get(c.categoryName);
+      const prev = input.previous.byCategory.find((p) => sameCategory(p, c));
       if (prev !== undefined) {
-        amounts.add(c.amountYen - prev);
-        amounts.add(prev - c.amountYen);
+        amounts.add(c.amountYen - prev.amountYen);
+        amounts.add(prev.amountYen - c.amountYen);
       }
     }
   }
@@ -131,7 +154,7 @@ export function buildFallbackInsight(input: MonthlyInsightInput): string {
       parts.push(`支出合計は前月と比べて${formatYen(Math.abs(diff))}円${direction}しています。`);
     }
     if (top) {
-      const prevTop = input.previous.byCategory.find((c) => c.categoryName === top.categoryName);
+      const prevTop = input.previous.byCategory.find((c) => sameCategory(c, top));
       if (prevTop) {
         const catDiff = top.amountYen - prevTop.amountYen;
         if (catDiff !== 0) {

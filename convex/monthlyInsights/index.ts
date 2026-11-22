@@ -1,5 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { action, internalMutation, query } from "../_generated/server";
+import type { ActionCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { api } from "../_generated/api";
 import { requireGroupMembership } from "../groups/membership";
@@ -28,7 +30,12 @@ type MonthSummary = {
   totalAmountYen: number;
   totalIncomeYen: number;
   count: number;
-  byCategory: Array<{ categoryName: string; totalAmountYen: number; count: number }>;
+  byCategory: Array<{
+    categoryId: string;
+    categoryName: string;
+    totalAmountYen: number;
+    count: number;
+  }>;
 };
 
 function toMonthPoint(summary: MonthSummary): MonthlyInsightMonthPoint {
@@ -37,6 +44,7 @@ function toMonthPoint(summary: MonthSummary): MonthlyInsightMonthPoint {
     totalIncomeYen: summary.totalIncomeYen,
     count: summary.count,
     byCategory: summary.byCategory.map((c) => ({
+      categoryId: c.categoryId,
       categoryName: c.categoryName,
       amountYen: c.totalAmountYen,
       count: c.count,
@@ -70,6 +78,11 @@ export const generateMonthlyInsight = action({
       previous,
     };
 
+    // 集計クエリは呼び出しのたびに「現在の利用グループ」を解決する。
+    // 生成途中の切替・除名で別グループの集計が混ざったり保存先がずれたりしないよう、
+    // 外部API呼び出し前と保存直前に利用中グループを再検証する。
+    await assertSameActiveGroup(ctx, group._id);
+
     const deps = createMonthlyInsightGeneratorDeps();
     const { appEnv, openAiApiKey } = deps.readEnvironment();
     let commentText: string;
@@ -94,6 +107,7 @@ export const generateMonthlyInsight = action({
       source = "fallback";
     }
 
+    await assertSameActiveGroup(ctx, group._id);
     await ctx.runMutation(internal.monthlyInsights.index.saveMonthlyInsight, {
       groupId: group._id,
       month: args.month,
@@ -103,6 +117,13 @@ export const generateMonthlyInsight = action({
     return { commentText, source };
   },
 });
+
+async function assertSameActiveGroup(ctx: ActionCtx, expectedGroupId: Id<"groups">): Promise<void> {
+  const again = await ctx.runQuery(api.groups.queries.getMyGroup, {});
+  if (again === null || again._id !== expectedGroupId) {
+    throw new ConvexError("利用中のグループが変更されたため生成を中止しました");
+  }
+}
 
 export const saveMonthlyInsight = internalMutation({
   args: {

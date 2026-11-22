@@ -90,3 +90,49 @@ describe("buildFallbackInsight", () => {
     expect(insightNumbersAreConsistent(text, { ...INPUT, previous: null })).toBe(true);
   });
 });
+
+describe("extractYenAmounts", () => {
+  it("全角数字・万・億の金額も円で抽出する", () => {
+    expect(extractYenAmounts("９万円と1,200円と1億円")).toEqual([90000, 1200, 100000000]);
+  });
+});
+
+describe("insightNumbersAreConsistent: 単位表記の拒否", () => {
+  it("入力に無い「9万円」は不一致として拒否する", () => {
+    const input = {
+      month: "2026-11",
+      current: { totalAmountYen: 5000, totalIncomeYen: 0, count: 2, byCategory: [] },
+      previous: null,
+    };
+    expect(insightNumbersAreConsistent("支出は9万円でした", input)).toBe(false);
+  });
+});
+
+describe("buildFallbackInsight: 同名カテゴリ", () => {
+  it("categoryIdで前月比較し、同名の別カテゴリは使わない", () => {
+    const input = {
+      month: "2026-11",
+      current: {
+        totalAmountYen: 5000,
+        totalIncomeYen: 0,
+        count: 2,
+        byCategory: [
+          { categoryId: "a", categoryName: "食費", amountYen: 3000, count: 1 },
+          { categoryId: "b", categoryName: "食費", amountYen: 2000, count: 1 },
+        ],
+      },
+      previous: {
+        totalAmountYen: 4000,
+        totalIncomeYen: 0,
+        count: 1,
+        byCategory: [
+          { categoryId: "b", categoryName: "食費", amountYen: 2500, count: 1 },
+          { categoryId: "a", categoryName: "食費", amountYen: 1500, count: 1 },
+        ],
+      },
+    };
+    // top は categoryId=a（3000円）→ 前月の a=1500 と比較し +1500円増
+    const text = buildFallbackInsight(input);
+    expect(text).toContain("食費は前月と比べて1,500円増");
+  });
+});
