@@ -735,4 +735,56 @@ describe("ExpenseSearchPage", () => {
     await user.click(screen.getByRole("button", { name: "絞り込む" }));
     expect(screen.getByText("/search?sort=amountDesc")).toBeInTheDocument();
   });
+
+  it("日付が古い順ではサーバーの並びをそのまま表示する（再ソートしない）", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return {
+        ...emptySearchResult,
+        // 古い順で返される前提のページ（先頭が最も古い）。
+        page: [
+          {
+            _id: "expense-old",
+            date: "2026-08-01",
+            type: "expense" as const,
+            shopName: "古い店",
+            amountYen: 500,
+            recordType: "expenseEntry" as const,
+          },
+          {
+            _id: "expense-new",
+            date: "2026-08-02",
+            type: "expense" as const,
+            shopName: "新しい店",
+            amountYen: 900,
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        totalCount: 2,
+        expenseCount: 2,
+        totalExpenseYen: 1400,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?sort=dateAsc"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    const rows = within(expenseTable)
+      .getAllByRole("row")
+      .map((row) => row.textContent ?? "");
+    const oldIndex = rows.findIndex((text) => text.includes("古い店"));
+    const newIndex = rows.findIndex((text) => text.includes("新しい店"));
+    expect(oldIndex).toBeGreaterThanOrEqual(0);
+    expect(newIndex).toBeGreaterThanOrEqual(0);
+    expect(oldIndex).toBeLessThan(newIndex);
+  });
 });

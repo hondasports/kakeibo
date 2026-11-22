@@ -154,7 +154,8 @@ describe("searchExpenses", () => {
       endDate: "2026-01-31",
     });
     expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
-    expect(loadHistoryEntries).toHaveBeenNthCalledWith(1, "g1", "2026-01-01", "2026-01-31");
+    expect(loadHistoryEntries).toHaveBeenNthCalledWith(1, "g1", "2026-01-01", "2026-01-31", "desc");
+    // 前期間は集計用なので取得順は常に desc（直近期間側から上限まで）。
     expect(loadHistoryEntries).toHaveBeenNthCalledWith(2, "g1", "2025-12-01", "2025-12-31");
     expect(result.comparison).not.toBeNull();
   });
@@ -222,4 +223,23 @@ describe("searchExpenses", () => {
     const incomeItem = result.page.find((item) => item.type === "income");
     expect(incomeItem).toMatchObject({ _id: "i1", bankName: "銀行", amountYen: 200000 });
   });
+
+  it.each([
+    ["dateAsc", "asc"],
+    ["dateDesc", "desc"],
+    ["amountDesc", "desc"],
+  ] as const)(
+    "sortOrder=%s のとき取得順 %s で読み込む（打ち切り時は表示順の先頭側が残る）",
+    async (sortOrder, expectedOrder) => {
+      const { store, loadHistoryEntries } = createStore();
+      await searchExpenses(store, "group-1", { ...baseArgs, sortOrder });
+      expect(loadHistoryEntries).toHaveBeenNthCalledWith(
+        1,
+        "group-1",
+        undefined,
+        undefined,
+        expectedOrder,
+      );
+    },
+  );
 });

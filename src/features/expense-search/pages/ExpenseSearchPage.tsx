@@ -362,7 +362,9 @@ export function ExpenseSearchPage() {
             ) : null}
             {displayResult.truncated ? (
               <Alert severity="warning" variant="outlined">
-                件数が多いため、先頭の一部だけを集計しています。期間やキーワードで絞り込んでください。
+                {applied.sortOrder === "amountDesc"
+                  ? "件数が多いため、新しい10,000件の中での金額順です。期間を絞ると全件から並べます。"
+                  : "件数が多いため、先頭の一部だけを集計しています。期間やキーワードで絞り込んでください。"}
               </Alert>
             ) : null}
             {displayResult.comparisonTruncated ? (

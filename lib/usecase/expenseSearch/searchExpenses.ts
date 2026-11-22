@@ -36,6 +36,7 @@ export type ExpenseSearchStore = {
     groupId: string,
     startDate: string | undefined,
     endDate: string | undefined,
+    order?: "asc" | "desc",
   ) => Promise<SearchHistorySource>;
   buildCategoryInfoMap: (
     groupId: string,
@@ -84,10 +85,13 @@ export async function searchExpenses(
     }
   }
 
+  // dateAsc は古い側から取る（打ち切られても表示順の先頭側が残る）。
+  // dateDesc/amountDesc は新しい側から取る（amountDesc は範囲内での金額順になる旨UIで案内する）。
   const source = await store.loadHistoryEntries(
     groupId,
     parsed.filters.startDate,
     parsed.filters.endDate,
+    parsed.filters.sortOrder === "dateAsc" ? "asc" : "desc",
   );
   const groups = filterHistoryGroups(
     groupHistoryEntries(source.entries, source.incomes),

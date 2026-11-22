@@ -30,8 +30,9 @@ type SearchDocsResult<T> = {
 async function fetchExpenseEntriesForSearch(
   ctx: QueryCtx,
   groupId: Id<"groups">,
-  startDate?: string,
-  endDate?: string,
+  startDate: string | undefined,
+  endDate: string | undefined,
+  order: "asc" | "desc",
 ): Promise<SearchDocsResult<Doc<"expenseEntries">>> {
   const query = ctx.db
     .query("expenseEntries")
@@ -47,7 +48,9 @@ async function fetchExpenseEntriesForSearch(
       }
       return q.eq("groupId", groupId);
     })
-    .order("desc");
+    // 打ち切り時に残る範囲を表示順の先頭側に合わせる（dateAsc は古い側を取る）。
+    // amountDesc は日付順で取った範囲内での金額順になる（UIで案内する）。
+    .order(order);
 
   const docs = await query.take(SEARCH_MAX_RECORDS + 1);
   return {
@@ -59,8 +62,9 @@ async function fetchExpenseEntriesForSearch(
 async function fetchReceiptsForSearch(
   ctx: QueryCtx,
   groupId: Id<"groups">,
-  startDate?: string,
-  endDate?: string,
+  startDate: string | undefined,
+  endDate: string | undefined,
+  order: "asc" | "desc",
 ): Promise<SearchDocsResult<Doc<"receipts">>> {
   const query = ctx.db
     .query("receipts")
@@ -76,7 +80,7 @@ async function fetchReceiptsForSearch(
       }
       return q.eq("groupId", groupId);
     })
-    .order("desc");
+    .order(order);
 
   const docs = await query.take(SEARCH_MAX_RECORDS + 1);
   return {
@@ -94,12 +98,13 @@ type SearchHistoryEntries = {
 export async function loadHistoryEntriesForSearch(
   ctx: QueryCtx,
   groupId: Id<"groups">,
-  startDate?: string,
-  endDate?: string,
+  startDate: string | undefined,
+  endDate: string | undefined,
+  order: "asc" | "desc" = "desc",
 ): Promise<SearchHistoryEntries> {
   const [newEntryResult, receiptResult] = await Promise.all([
-    fetchExpenseEntriesForSearch(ctx, groupId, startDate, endDate),
-    fetchReceiptsForSearch(ctx, groupId, startDate, endDate),
+    fetchExpenseEntriesForSearch(ctx, groupId, startDate, endDate, order),
+    fetchReceiptsForSearch(ctx, groupId, startDate, endDate, order),
   ]);
   const newEntries = newEntryResult.docs;
   const receipts = receiptResult.docs;
