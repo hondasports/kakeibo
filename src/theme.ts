@@ -67,7 +67,7 @@ export const theme = createTheme({
     },
     MuiButton: {
       styleOverrides: {
-        root: ({ theme }) => ({
+        root: () => ({
           minHeight: designTokens.size.buttonMinHeight,
           borderRadius: designTokens.radius.md,
           boxShadow: "none",
@@ -75,9 +75,9 @@ export const theme = createTheme({
           "&:hover": {
             boxShadow: "none",
           },
-          // SPのタップ対象は44px以上に揃える（AppLayoutの isPC=up("md") と同じ境界。
-          // down("md") は899.95px止まりで900px手前に隙間ができるため not("md") にする）
-          [theme.breakpoints.not("md")]: {
+          // SPのタップ対象は44px以上に揃える。境界は900px（AppLayoutの isPC=up("md") の補集合。
+          // breakpoints.not("md") は1200px以上にも適用されるため、up("md") の否定を明示する）
+          "@media not all and (min-width: 900px)": {
             minHeight: designTokens.size.buttonMinHeightSp,
           },
         }),
@@ -85,8 +85,8 @@ export const theme = createTheme({
     },
     MuiIconButton: {
       styleOverrides: {
-        root: ({ theme }) => ({
-          [theme.breakpoints.not("md")]: {
+        root: () => ({
+          "@media not all and (min-width: 900px)": {
             minHeight: designTokens.size.buttonMinHeightSp,
           },
         }),
@@ -157,10 +157,10 @@ export const theme = createTheme({
     },
     MuiTab: {
       styleOverrides: {
-        root: ({ theme }) => ({
+        root: () => ({
           minHeight: designTokens.size.buttonMinHeight,
           paddingInline: designTokens.space.md,
-          [theme.breakpoints.not("md")]: {
+          "@media not all and (min-width: 900px)": {
             minHeight: designTokens.size.buttonMinHeightSp,
           },
         }),
