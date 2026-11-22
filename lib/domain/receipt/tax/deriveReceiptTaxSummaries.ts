@@ -9,9 +9,11 @@ import {
   hasPrintedTaxSummaryEvidence,
   isTaxRateDeclarationLine,
 } from "./summaryEvidence";
+import { isSplitFromSameLine } from "./combinedSummaryLines";
 
 const TAX_EVIDENCE_CONFLICT = "contradictory_receipt_tax_evidence";
 const TAX_EVIDENCE_MISSING = "unresolved_receipt_tax_evidence";
+const EXTERNAL_TAX_LABEL = /外(?:消費)?税|\(外\)(?:消費)?税|税抜|税別/;
 
 function isAggregateTaxLine(rawText: string): boolean {
   const text = rawText.normalize("NFKC").replace(/\s+/g, "");
@@ -232,7 +234,7 @@ export function deriveReceiptTaxSummaries(args: {
         taxLines.some((line) => {
           if (rate === 0) return false;
           const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
-          return basis === "tax_included" && /外税|税抜|税別/.test(text);
+          return basis === "tax_included" && EXTERNAL_TAX_LABEL.test(text);
         }) ||
         targetLines.some((line) => {
           const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
@@ -268,7 +270,7 @@ export function deriveReceiptTaxSummaries(args: {
           if (
             basis === "tax_included" &&
             line.amountYen === excluded &&
-            taxLines.some((taxLine) => taxLine.sourceLineIndex === line.sourceLineIndex)
+            taxLines.some((taxLine) => isSplitFromSameLine(taxLine, line))
           )
             return false;
           return line.amountYen !== target;
@@ -356,7 +358,7 @@ export function deriveReceiptTaxSummaries(args: {
     if (!isAggregateTaxLine(line.rawText)) return false;
     const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
     const basisConflict =
-      /外(?:消費)?税|\(外\)(?:消費)?税|税抜|税別/.test(text) &&
+      EXTERNAL_TAX_LABEL.test(text) &&
       derived.some((summary) => summary.taxRatePercent !== 0 && summary.taxMode === "included");
     return (
       basisConflict ||

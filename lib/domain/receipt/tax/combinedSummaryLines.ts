@@ -51,13 +51,27 @@ function splitCombinedLine(line: ReceiptRawObservationLine): ReceiptRawObservati
   return labels.map((label, index) => {
     const amountText = text.slice(printed[index].start, printed[index].end);
     const rawLabel = index > 0 && rate && !label.includes("%") ? `${rate}${label}` : label;
-    return {
+    const split = {
       ...line,
       rawText: `${rawLabel} ${amountText}`,
       amountText,
       amountYen: printed[index].yen,
     };
+    splitSources.set(split, line);
+    return split;
   });
+}
+
+// sourceLineIndex はOCRが別々の行に同じ番号を付けうるので、分割元の観測そのもので組を判定する。
+const splitSources = new WeakMap<ReceiptRawObservationLine, ReceiptRawObservationLine>();
+
+/** 2行が同じ1つの印字行から分けた対象額と税額の組かどうか。 */
+export function isSplitFromSameLine(
+  a: ReceiptRawObservationLine,
+  b: ReceiptRawObservationLine,
+): boolean {
+  const source = splitSources.get(a);
+  return source !== undefined && source === splitSources.get(b);
 }
 
 export function splitCombinedSummaryLines(

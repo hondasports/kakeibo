@@ -330,6 +330,8 @@ describe("括弧つきの1行に税抜の対象額と税額が並ぶ内税レシ
     ["印字された税額が税率の計算と合わない", "(8%対象 ¥519 消費税 ¥40)", "¥519 / ¥40", 519],
     ["対象額が税込合計から税額を引いた額と合わない", "(8%対象 ¥520 消費税 ¥41)", "¥520 / ¥41", 520],
     ["amountYen が行内のどの金額とも違う", "(8%対象 ¥519 消費税 ¥41)", "¥519 / ¥41", 560],
+    ["税額が外消費税と印字されている", "(8%対象 ¥519 外消費税 ¥41)", "¥519 / ¥41", 519],
+    ["税額が(外)消費税と印字されている", "(8%対象 ¥519 (外)消費税 ¥41)", "¥519 / ¥41", 519],
   ])("%s行は配分せずに止める", (_, rateLine, rateAmountText, rateAmountYen) => {
     const result = reinterpretDraftTax(
       parenthesizedIncludedTaxReceipt({ rateLine, rateAmountText, rateAmountYen }),
@@ -344,6 +346,17 @@ describe("括弧つきの1行に税抜の対象額と税額が並ぶ内税レシ
         rateAmountText: "¥519",
       }),
     );
+    expect(result.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+  });
+
+  it("別々に印字された対象額と税額は、行番号が同じでも組として扱わない", () => {
+    const input = parenthesizedIncludedTaxReceipt();
+    input.rawObservationLines = input.rawObservationLines.flatMap((entry) =>
+      entry.sourceLineIndex === 6
+        ? [line(6, "8%対象 ¥519", 519, ["tax"]), line(6, "8%消費税 ¥41", 41, ["tax"])]
+        : [entry],
+    );
+    const result = reinterpretDraftTax(input);
     expect(result.itemFields.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
   });
 });
