@@ -89,7 +89,12 @@ export function SystemAdminActionDialog({
             ）に対して「{label}」を実行します。この操作は監査ログに記録されます。
           </Typography>
           <Typography variant="body2">
-            実行後の状態: {action === "revoke" ? "有効 → 剥奪済み" : "剥奪済みまたは未登録 → 有効"}
+            実行後の状態:{" "}
+            {action === "revoke"
+              ? "有効 → 剥奪済み"
+              : action === "regrant"
+                ? "剥奪済み → 有効"
+                : "未登録または無効 → 有効"}
           </Typography>
           {action === "revoke" ? (
             <Alert severity="warning" variant="outlined">

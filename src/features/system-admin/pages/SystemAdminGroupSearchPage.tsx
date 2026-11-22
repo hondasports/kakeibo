@@ -65,6 +65,8 @@ export function SystemAdminGroupSearchPage() {
       appliedParams.current = effectiveParams;
       if (nav?.pop) setCursorHistory((history) => history.slice(0, -1));
       else if (nav && "push" in nav) setCursorHistory((history) => [...history, nav.push ?? null]);
+      // 新規検索の成功時に履歴をリセットする（失敗時に巻き戻さないよう要求前ではなく成功時に行う）
+      else setCursorHistory([]);
     } catch {
       setError(true);
     } finally {
@@ -73,7 +75,6 @@ export function SystemAdminGroupSearchPage() {
   };
 
   const startNewSearch = () => {
-    setCursorHistory([]);
     void runSearch(null, undefined, { queryType, query: query.trim() });
   };
   const goToPrevPage = () => {

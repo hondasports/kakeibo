@@ -180,7 +180,8 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
     setSuccess,
     groupQuery,
     setGroupQuery,
-    candidates: groupQuery.trim().length === 0 ? [] : candidates,
+    // 検索中・失敗時は前の検索語の候補を出さない（現在のクエリに対する結果のみ表示）
+    candidates: candidateSearch === "done" ? candidates : [],
     candidatesTruncated: groupQuery.trim().length !== 0 && candidatesTruncated,
     candidateSearch,
     retryCandidateSearch: () => setCandidateRetryTick((tick) => tick + 1),

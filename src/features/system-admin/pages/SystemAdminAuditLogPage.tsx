@@ -43,6 +43,7 @@ function SystemAdminAuditLogPageContent() {
     applyFilters,
     clearFilters,
     hasFilter,
+    hasCondition,
     applied,
     dateRangeInvalid,
     actorInvalid,
@@ -68,7 +69,7 @@ function SystemAdminAuditLogPageContent() {
         groupIdInvalid={groupIdInvalid}
         groupId={groupId}
         groupRelation={groupRelation}
-        hasFilter={hasFilter}
+        hasFilter={hasCondition}
         target={target}
         targetInvalid={targetInvalid}
         toDate={toDate}

@@ -167,7 +167,9 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
       });
       setRoleTarget(null);
       setSuccess(
-        `「${roleTarget.displayName ?? "ユーザー"}」のroleを${displayLabel(groupRoleLabels, roleNewRole ?? "member")}に変更しました（監査ログに記録済み）`,
+        roleOperation === "owner_transfer"
+          ? `「${roleSource?.displayName ?? "ユーザー"}」から「${roleTarget.displayName ?? "ユーザー"}」へownerを付け替えました（監査ログに記録済み）`
+          : `「${roleTarget.displayName ?? "ユーザー"}」のroleを${displayLabel(groupRoleLabels, roleNewRole ?? "member")}に変更しました（監査ログに記録済み）`,
       );
       await load();
     } catch (cause) {

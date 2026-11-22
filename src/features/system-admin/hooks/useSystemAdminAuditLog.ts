@@ -162,6 +162,20 @@ export function useSystemAdminAuditLog() {
     applied.toDate,
   );
 
+  // 「条件をクリア」の表示判定。確定済みだけでなく入力中のドラフトも含める
+  // （絞り込む前に入力を消したい場合もクリアできる）。
+  const hasCondition =
+    hasFilter ||
+    Boolean(
+      action ||
+      actor.trim() ||
+      target.trim() ||
+      groupId.trim() ||
+      groupRelation !== "direct" ||
+      fromDate ||
+      toDate,
+    );
+
   return {
     logs,
     action,
@@ -186,6 +200,7 @@ export function useSystemAdminAuditLog() {
     applyFilters,
     clearFilters,
     hasFilter,
+    hasCondition,
     dateRangeInvalid,
     actorInvalid,
     targetInvalid,
