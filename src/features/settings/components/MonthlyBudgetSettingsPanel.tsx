@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { formatYen } from "../../../../lib/domain/common/currency";
+import { validateMonthlyBudgetYen } from "../../../../lib/domain/groups/monthlyBudget";
 
 /** 月予算の設定（グループオーナーのみ変更可・全メンバーに進捗表示される）。 */
 export function MonthlyBudgetSettingsPanel() {
@@ -31,9 +32,7 @@ export function MonthlyBudgetSettingsPanel() {
   }
 
   const parsed = input.trim() === "" ? null : Number(input);
-  const inputError =
-    input.trim() !== "" &&
-    (parsed === null || !Number.isInteger(parsed) || parsed < 0 || parsed > 999_999_999);
+  const inputError = !validateMonthlyBudgetYen(parsed).success;
   const dirty = parsed !== (myGroup?.monthlyBudgetYen ?? null);
   const isOwner = myGroup?.role === "owner";
 
