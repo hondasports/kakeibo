@@ -37,6 +37,8 @@ export function SystemAdminUserSearchPage() {
     queryType: UserSearchType;
     query: string;
   } | null>(null);
+  // 表示中の結果を作った検索条件。失敗した検索では更新しない（再試行とページ送りを分けるため）。
+  const appliedParams = useRef<{ queryType: UserSearchType; query: string } | null>(null);
 
   const runSearch = async (
     nextCursor: string | null,
@@ -46,8 +48,8 @@ export function SystemAdminUserSearchPage() {
     // ページ送り・リトライは確定した検索条件を使う（入力中のドラフトは混ぜない）。
     const effectiveParams =
       params ??
-      (lastRequest.current
-        ? { queryType: lastRequest.current.queryType, query: lastRequest.current.query }
+      (appliedParams.current
+        ? { ...appliedParams.current }
         : { queryType, query: query.trim() });
     lastRequest.current = { cursor: nextCursor, ...effectiveParams };
     setIsLoading(true);
@@ -60,6 +62,7 @@ export function SystemAdminUserSearchPage() {
       });
       setResult(response as PageResult<UserSearchItem>);
       setCursor(nextCursor);
+      appliedParams.current = effectiveParams;
       if (nav?.pop) setCursorHistory((history) => history.slice(0, -1));
       else if (nav && "push" in nav) setCursorHistory((history) => [...history, nav.push ?? null]);
     } catch {
@@ -77,7 +80,13 @@ export function SystemAdminUserSearchPage() {
     void runSearch(cursorHistory[cursorHistory.length - 1] ?? null, { pop: true });
   };
   const retryFailedRequest = () => {
-    void runSearch(lastRequest.current?.cursor ?? cursor);
+    void runSearch(
+      lastRequest.current?.cursor ?? cursor,
+      undefined,
+      lastRequest.current
+        ? { queryType: lastRequest.current.queryType, query: lastRequest.current.query }
+        : undefined,
+    );
   };
   const resultStart = cursorHistory.length * 20 + 1;
   const resultEnd = result ? resultStart + result.page.length - 1 : 0;
