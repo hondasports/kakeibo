@@ -1,7 +1,8 @@
 import { Button, Chip, Paper, Stack, Typography } from "@mui/material";
+import { auditResultLabels, displayLabel } from "../lib/displayLabels";
 import { SystemAdminEmptyState } from "../pages/SystemAdminPageFrame";
 import type { SystemAdminAuditItem } from "../types";
-import { formatDateTimeWithSecondsForDisplay } from "../../../utils/date";
+import { formatDateTimeWithSecondsInJapanTime } from "../../../utils/date";
 
 type AuditLogListProps = {
   logs: { page: unknown[]; isDone: boolean; continueCursor: string } | undefined;
@@ -63,35 +64,44 @@ export function AuditLogList({
                   {formatAction(item.action)}
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
-                  {formatDateTimeWithSecondsForDisplay(item.createdAt)}
+                  {formatDateTimeWithSecondsInJapanTime(item.createdAt)}
                 </Typography>
                 <Typography
                   color="text.secondary"
                   sx={{ overflowWrap: "anywhere" }}
                   variant="body2"
                 >
-                  actor: {item.actorDisplayName ?? item.actorUserId ?? item.actorType}
+                  操作者: {item.actorDisplayName ?? item.actorUserId ?? item.actorType}
                 </Typography>
                 <Typography
                   color="text.secondary"
                   sx={{ overflowWrap: "anywhere" }}
                   variant="body2"
                 >
-                  target: {item.targetDisplayName ?? item.targetUserId ?? item.targetId ?? "-"}
+                  対象: {item.targetDisplayName ?? item.targetUserId ?? item.targetId ?? "-"}
                 </Typography>
               </Stack>
-              <Chip
-                color={item.result === "success" ? "success" : "error"}
-                label={item.result}
-                size="small"
-              />
+              <Stack spacing={0.5} sx={{ alignItems: "flex-end" }}>
+                <Chip
+                  color={item.result === "success" ? "success" : "error"}
+                  label={displayLabel(auditResultLabels, item.result)}
+                  size="small"
+                />
+                <Typography color="primary" variant="body2">
+                  詳細を見る
+                </Typography>
+              </Stack>
             </Stack>
           </Paper>
         );
       })}
-      <Button disabled={logs.isDone} onClick={() => onLoadMore(logs.continueCursor)}>
-        次のページ
-      </Button>
+      {logs.isDone ? (
+        <Typography color="text.secondary" variant="body2">
+          最後のページです
+        </Typography>
+      ) : (
+        <Button onClick={() => onLoadMore(logs.continueCursor)}>次のページ</Button>
+      )}
     </Stack>
   );
 }

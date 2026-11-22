@@ -20,7 +20,11 @@ describe("NotFoundPage", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "ホームへ戻る" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "プライバシー" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: "更新履歴" })).toHaveAttribute("href", "/updates");
+    expect(screen.getByRole("link", { name: "プライバシーポリシー" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
     expect(screen.getByRole("link", { name: "利用規約" })).toHaveAttribute("href", "/terms");
     expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
   });

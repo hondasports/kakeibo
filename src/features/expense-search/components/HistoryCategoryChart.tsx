@@ -1,5 +1,5 @@
 import { BarChart } from "@mui/x-charts/BarChart";
-import { Box, Paper, Stack, Typography, useMediaQuery } from "@mui/material";
+import { Box, Button, Paper, Stack, Typography, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
   buildHistoryCategoryBreakdown,
@@ -101,28 +101,51 @@ export function HistoryCategoryChart({
         )}
         {hasData ? (
           <Stack aria-label="カテゴリ別支出の詳細" spacing={0.5} sx={{ mt: 1 }}>
-            {topCategories.map((category) => (
-              <Stack
-                direction="row"
-                key={category.categoryId}
-                spacing={1}
-                sx={{ alignItems: "center", justifyContent: "space-between" }}
-              >
-                <Typography variant="body2">{category.categoryName}</Typography>
-                <Typography color="text.secondary" variant="body2">
-                  {formatYen(category.totalAmountYen)}（
-                  {totalAmountYen > 0
-                    ? Math.round((category.totalAmountYen / totalAmountYen) * 100)
-                    : 0}
-                  %）
-                </Typography>
-              </Stack>
-            ))}
+            {topCategories.map((category) => {
+              const selectable =
+                onCategorySelect !== undefined && category.categoryId !== HISTORY_OTHER_CATEGORY_ID;
+              const amountText = `${formatYen(category.totalAmountYen)}（${
+                totalAmountYen > 0
+                  ? Math.round((category.totalAmountYen / totalAmountYen) * 100)
+                  : 0
+              }%）`;
+
+              return selectable ? (
+                <Button
+                  aria-label={`カテゴリ「${category.categoryName}」で絞り込む。${amountText}`}
+                  key={category.categoryId}
+                  onClick={() => onCategorySelect(category.categoryId)}
+                  sx={{ justifyContent: "space-between", minHeight: 44, textTransform: "none" }}
+                  variant="text"
+                >
+                  <Typography variant="body2">{category.categoryName}</Typography>
+                  <Typography color="text.secondary" variant="body2">
+                    {amountText}
+                  </Typography>
+                </Button>
+              ) : (
+                <Stack
+                  direction="row"
+                  key={category.categoryId}
+                  spacing={1}
+                  sx={{
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    minHeight: 44,
+                  }}
+                >
+                  <Typography variant="body2">{category.categoryName}</Typography>
+                  <Typography color="text.secondary" variant="body2">
+                    {amountText}
+                  </Typography>
+                </Stack>
+              );
+            })}
           </Stack>
         ) : null}
         {hasData && onCategorySelect ? (
           <Typography color="text.secondary" variant="caption">
-            棒をクリックすると、そのカテゴリで絞り込めます
+            棒または一覧の行をクリックすると、そのカテゴリで絞り込めます
             {hasOtherCategory ? "（その他を除く）" : ""}
           </Typography>
         ) : null}

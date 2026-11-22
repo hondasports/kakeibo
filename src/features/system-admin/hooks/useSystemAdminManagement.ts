@@ -17,6 +17,7 @@ export function useSystemAdminManagement() {
   const [hasSearched, setHasSearched] = useState(false);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  const [candidatesTruncated, setCandidatesTruncated] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<SystemAdminListItem | UserSearchItem | null>(
     null,
   );
@@ -52,6 +53,7 @@ export function useSystemAdminManagement() {
         paginationOpts: { numItems: 10, cursor: null },
       });
       setCandidates(result.page as UserSearchItem[]);
+      setCandidatesTruncated(result.isDone === false);
     } catch {
       setSearchError(true);
       setCandidates([]);
@@ -81,7 +83,7 @@ export function useSystemAdminManagement() {
       setPendingAction(null);
       setSelectedTarget(null);
       setSnackbar(
-        `${selectedTarget.displayName} を${pendingAction === "revoke" ? "剥奪" : pendingAction === "regrant" ? "再付与" : "付与"}しました`,
+        `${selectedTarget.displayName} を${pendingAction === "revoke" ? "剥奪" : pendingAction === "regrant" ? "再付与" : "付与"}しました（監査ログに記録済み）`,
       );
       setCandidates([]);
     } catch (error) {
@@ -106,6 +108,7 @@ export function useSystemAdminManagement() {
     searchQuery,
     setSearchQuery,
     candidates,
+    candidatesTruncated,
     hasSearched,
     searching,
     searchError,

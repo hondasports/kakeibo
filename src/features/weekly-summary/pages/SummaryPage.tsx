@@ -11,8 +11,8 @@ import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation"
 import { SummarySectionErrorBoundary } from "../../summary-shared/components/SummarySectionErrorBoundary";
 import { WeeklySummaryPanel } from "../components/WeeklySummaryPanel";
 import { receiptItemToEntryPrefill } from "../../summary-shared/lib/receiptToEntryPrefill";
-import { ExpenseBulkCategoryDialog } from "../components/ExpenseBulkCategoryDialog";
-import { ExpenseBulkDeleteDialog } from "../components/ExpenseBulkDeleteDialog";
+import { ExpenseBulkCategoryDialog } from "../../summary-shared/components/ExpenseBulkCategoryDialog";
+import { ExpenseBulkDeleteDialog } from "../../summary-shared/components/ExpenseBulkDeleteDialog";
 import { ExpenseEntryDeleteDialog } from "../../summary-shared/components/ExpenseEntryDeleteDialog";
 import { ExpenseEntryEditDialog } from "../../summary-shared/components/ExpenseEntryEditDialog";
 import type { CategoryPreview } from "../../summary-shared/components/ReceiptRow";

@@ -18,9 +18,14 @@ export function ProductUpdateList({ productUpdates }: ProductUpdateListProps) {
     );
   }
 
+  // 掲載日(publishedAt)の降順はここで保証する（生成済みJSONの配列順には依存しない）
+  const sortedUpdates = [...productUpdates].sort((a, b) =>
+    b.publishedAt.localeCompare(a.publishedAt),
+  );
+
   return (
     <Stack divider={<Divider />} spacing={3}>
-      {productUpdates.map((update) => (
+      {sortedUpdates.map((update) => (
         <ProductUpdateItem key={update.id} update={update} />
       ))}
     </Stack>

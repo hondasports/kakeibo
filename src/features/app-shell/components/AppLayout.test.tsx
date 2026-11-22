@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
@@ -70,8 +70,11 @@ describe("AppLayout サイドバー開閉", () => {
 
       await user.click(screen.getByRole("button", { name: "サイドバーを閉じる" }));
 
-      // ナビラベルがDOMから取り除かれる
-      expect(screen.queryByText("ホーム")).not.toBeInTheDocument();
+      // サイドメニューのナビラベルがDOMから取り除かれる（ヘッダーの画面名は残る）
+      const drawer = screen.getByLabelText("サイドメニュー");
+      expect(within(drawer).queryByText("ホーム")).not.toBeInTheDocument();
+      // ドロワーを畳むとヘッダーにブランドと画面名が出る
+      expect(screen.getByText("ホーム")).toBeInTheDocument();
       // アイコンがChevronRight（開く）に切り替わる
       expect(screen.getByRole("button", { name: "サイドバーを開く" })).toBeInTheDocument();
     });
@@ -129,6 +132,24 @@ describe("AppLayout サイドバー開閉", () => {
       renderWithProviders(<AppLayout />);
 
       expect(screen.getByLabelText("履歴を検索")).toBeInTheDocument();
+    });
+
+    it("ヘッダーにブランドと現在の画面名を表示する", () => {
+      const { container } = renderWithProviders(<AppLayout />);
+      const header = container.querySelector("header");
+
+      expect(header).not.toBeNull();
+      expect(header!.querySelector('img[src="/suzumemo-app-icon.svg"]')).toBeInTheDocument();
+      expect(within(header as HTMLElement).getByText("ホーム")).toBeInTheDocument();
+    });
+
+    it("ヘッダーの画面名はSPでも折り返さない", () => {
+      const { container } = renderWithProviders(<AppLayout />);
+      const header = container.querySelector("header");
+      const title = within(header as HTMLElement).getByText("ホーム");
+
+      // 日本語は1文字ずつ折り返せるため、折り返し禁止を明示する（縦並び防止）
+      expect(title).toHaveStyle("white-space: nowrap");
     });
   });
 });

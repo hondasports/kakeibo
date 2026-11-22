@@ -29,6 +29,10 @@ function SystemAdminAuditLogPageContent() {
     setActor,
     target,
     setTarget,
+    groupId,
+    setGroupId,
+    groupRelation,
+    setGroupRelation,
     fromDate,
     setFromDate,
     toDate,
@@ -36,34 +40,16 @@ function SystemAdminAuditLogPageContent() {
     setCursor,
     selected,
     setSelected,
+    applyFilters,
     clearFilters,
     hasFilter,
+    hasCondition,
+    applied,
+    dateRangeInvalid,
+    actorInvalid,
+    targetInvalid,
+    groupIdInvalid,
   } = useSystemAdminAuditLog();
-
-  const handleActionChange = (value: typeof action) => {
-    setAction(value);
-    setCursor(null);
-  };
-
-  const handleActorChange = (value: string) => {
-    setActor(value);
-    setCursor(null);
-  };
-
-  const handleTargetChange = (value: string) => {
-    setTarget(value);
-    setCursor(null);
-  };
-
-  const handleFromDateChange = (value: string) => {
-    setFromDate(value);
-    setCursor(null);
-  };
-
-  const handleToDateChange = (value: string) => {
-    setToDate(value);
-    setCursor(null);
-  };
 
   const handleClear = () => {
     clearFilters();
@@ -77,24 +63,39 @@ function SystemAdminAuditLogPageContent() {
       <AuditLogFilters
         action={action}
         actor={actor}
+        actorInvalid={actorInvalid}
+        dateRangeInvalid={dateRangeInvalid}
         fromDate={fromDate}
-        hasFilter={hasFilter}
+        groupIdInvalid={groupIdInvalid}
+        groupId={groupId}
+        groupRelation={groupRelation}
+        hasFilter={hasCondition}
         target={target}
+        targetInvalid={targetInvalid}
         toDate={toDate}
-        onActionChange={handleActionChange}
-        onActorChange={handleActorChange}
+        onActionChange={setAction}
+        onActorChange={setActor}
+        onApply={applyFilters}
         onClear={handleClear}
-        onFromDateChange={handleFromDateChange}
-        onTargetChange={handleTargetChange}
-        onToDateChange={handleToDateChange}
+        onFromDateChange={setFromDate}
+        onGroupIdChange={setGroupId}
+        onGroupRelationChange={setGroupRelation}
+        onTargetChange={setTarget}
+        onToDateChange={setToDate}
       />
-      <AuditLogList
-        formatAction={formatAction}
-        hasFilter={hasFilter}
-        logs={logs}
-        onLoadMore={(cursor) => setCursor(cursor)}
-        onSelect={(item) => setSelected(item)}
-      />
+      <SystemAdminErrorBoundary
+        key={JSON.stringify(applied)}
+        label="AuditLogList"
+        renderError={(retry) => <SystemAdminErrorState onRetry={retry} />}
+      >
+        <AuditLogList
+          formatAction={formatAction}
+          hasFilter={hasFilter}
+          logs={logs}
+          onLoadMore={(cursor) => setCursor(cursor)}
+          onSelect={(item) => setSelected(item)}
+        />
+      </SystemAdminErrorBoundary>
       <AuditLogDetailDialog
         formatAction={formatAction}
         onClose={() => setSelected(null)}

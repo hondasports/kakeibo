@@ -34,7 +34,7 @@ test.describe("system admin conditionless search", () => {
       await page.getByRole("button", { name: "検索" }).click();
       const newestGroup = page.getByRole("heading", { name: `${prefix}-group-23` });
       await expect(newestGroup).toBeVisible();
-      await expect(newestGroup.locator("..").getByText("状態: archived")).toBeVisible();
+      await expect(newestGroup.locator("..").getByText("状態: アーカイブ済み")).toBeVisible();
       await expect(page.getByRole("button", { name: "次のページ" })).toBeVisible();
 
       await page.goto("/admin/system-admins");

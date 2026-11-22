@@ -21,6 +21,15 @@ describe("PrivacyPolicyPage", () => {
     expect(screen.getByText(/制定日:/)).toBeInTheDocument();
   });
 
+  it("目次から各節へのアンカーリンクを辿れる", () => {
+    renderPage();
+
+    const toc = screen.getByRole("navigation", { name: "目次" });
+    const link = within(toc).getByRole("link", { name: "お問い合わせ先" });
+    expect(link).toHaveAttribute("href", "#お問い合わせ先");
+    expect(document.getElementById("お問い合わせ先")).not.toBeNull();
+  });
+
   it("運営者情報を表示する", () => {
     renderPage();
 

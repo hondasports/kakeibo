@@ -1,5 +1,7 @@
 import { Alert, List, ListItem, Paper, Typography } from "@mui/material";
 import type { UserDetail } from "../hooks/useSystemAdminUserDetail";
+import { displayLabel, invitationStatusLabels } from "../lib/displayLabels";
+import { DETAIL_LIST_LIMIT } from "../../../../lib/domain/systemAdmin/searchQuery";
 
 type UserInvitationsSectionProps = {
   invitations: UserDetail["invitations"];
@@ -19,7 +21,8 @@ export function UserInvitationsSection({
         <List>
           {invitations.map((invitation) => (
             <ListItem key={invitation.groupId}>
-              {invitation.groupName}（{invitation.groupId}） / {invitation.status}
+              {invitation.groupName}（{invitation.groupId}） /{" "}
+              {displayLabel(invitationStatusLabels, invitation.status)}
             </ListItem>
           ))}
         </List>
@@ -29,7 +32,9 @@ export function UserInvitationsSection({
         </Typography>
       )}
       {invitationsTruncated ? (
-        <Alert severity="warning">招待情報は上限件数まで表示しています。</Alert>
+        <Alert severity="warning">
+          招待情報は上限{DETAIL_LIST_LIMIT}件まで表示しています（{invitations.length}件を表示）。
+        </Alert>
       ) : null}
     </Paper>
   );

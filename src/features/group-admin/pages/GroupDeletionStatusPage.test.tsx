@@ -87,16 +87,18 @@ describe("GroupDeletionStatusPage", () => {
       return undefined;
     });
     renderPage();
-    await userEvent.setup().click(screen.getByRole("button", { name: "続ける" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "グループ選択へ進む" }));
     expect(navigateMock).toHaveBeenCalledWith("/group/select");
   });
 
-  it("jobなしと権限なしを区別しない", () => {
+  it("jobなしと権限なしを区別せず、通常導線へのボタンを置く", async () => {
     useQueryMock.mockReturnValue(null);
     renderPage();
     expect(
       screen.getByRole("heading", { name: "グループ削除の要求が見つかりません" }),
     ).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "新しいグループを作成する" }));
+    expect(navigateMock).toHaveBeenCalledWith("/group/setup");
   });
 
   it("通信errorを再読み込み可能な状態として表示する", () => {
