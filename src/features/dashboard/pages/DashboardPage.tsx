@@ -112,6 +112,8 @@ function DashboardSummarySection({
         isLoading={isLoading}
         prevWeekTotalAmountYen={prevWeekTotalAmountYen}
       />
+
+      <DashboardMonthlySummaryLink month={currentMonth} />
     </>
   );
 }

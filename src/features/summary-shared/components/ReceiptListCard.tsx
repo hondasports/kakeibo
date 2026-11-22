@@ -16,6 +16,7 @@ export function ReceiptListCard({
   maxVisibleGroups = 5,
   receipts,
   onDeleteReceipt,
+  onCopyReceipt,
   onEditReceipt,
   selectionEnabled = false,
   selectedCount = 0,
@@ -29,6 +30,8 @@ export function ReceiptListCard({
   onClearSelection,
   onBulkChangeCategory,
   onBulkDelete,
+  weekSummaryPath,
+  preserveOrder,
 }: {
   count: number;
   dateFormat?: ReceiptDateFormat;
@@ -37,8 +40,11 @@ export function ReceiptListCard({
   isLoading: boolean;
   listAriaLabel?: string;
   maxVisibleGroups?: number;
+  /** true のとき入力順をそのまま表示する。検索結果のようにサーバー側で並び順が決まっている場合に使う */
+  preserveOrder?: boolean;
   receipts: ReceiptItem[];
   onDeleteReceipt?: (receipt: ReceiptItem) => void;
+  onCopyReceipt?: (receipt: ReceiptItem) => void;
   onEditReceipt?: (receipt: ReceiptItem) => void;
   selectionEnabled?: boolean;
   selectedCount?: number;
@@ -52,14 +58,20 @@ export function ReceiptListCard({
   onClearSelection?: () => void;
   onBulkChangeCategory?: () => void;
   onBulkDelete?: () => void;
+  weekSummaryPath?: (date: string) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
-  const hasRowActions = Boolean(onEditReceipt || onDeleteReceipt);
-  const orderedReceiptGroups = groupReceiptItems(receipts)
-    .map((group, index) => ({ group, index }))
-    .sort((a, b) => b.group.date.localeCompare(a.group.date) || b.index - a.index)
-    .map(({ group }) => group);
+  const hasRowActions = Boolean(
+    onEditReceipt || onDeleteReceipt || onCopyReceipt || weekSummaryPath,
+  );
+  const receiptGroups = groupReceiptItems(receipts);
+  const orderedReceiptGroups = preserveOrder
+    ? receiptGroups
+    : receiptGroups
+        .map((group, index) => ({ group, index }))
+        .sort((a, b) => b.group.date.localeCompare(a.group.date) || b.index - a.index)
+        .map(({ group }) => group);
   const visibleReceiptGroups =
     expanded || maxVisibleGroups === Number.POSITIVE_INFINITY
       ? orderedReceiptGroups
@@ -193,12 +205,14 @@ export function ReceiptListCard({
                     key={group.id}
                     dateFormat={dateFormat}
                     group={group}
+                    onCopy={onCopyReceipt}
                     onDelete={onDeleteReceipt}
                     onEdit={onEditReceipt}
                     isSelected={isSelected}
                     previewCategory={previewCategory}
                     selectionEnabled={selectionEnabled}
                     onToggleSelection={onToggleSelection}
+                    weekSummaryPath={weekSummaryPath}
                   />
                 ))}
               </>

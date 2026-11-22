@@ -29,6 +29,7 @@ export type GroupDeletionJobCounts = {
   receiptAnalysisBatches: number;
   expenseEntries: number;
   receipts: number;
+  entryFavorites: number;
   sourceDocuments: number;
   storageFiles: number;
   weekSessions: number;
@@ -39,6 +40,9 @@ export type GroupDeletionJobCounts = {
   groups: number;
   /** 月次インサイト。フィールド追加前に作成されたジョブは未設定のため optional。 */
   monthlyInsights?: number;
+
+  /** 定期定義。フィールド追加前に作成されたジョブは未設定のため optional。 */
+  recurringEntryRules?: number;
 };
 
 /** groupDeletionJobs ドキュメントのフィールド（書き込み用。id は採番前のため含まない）。 */

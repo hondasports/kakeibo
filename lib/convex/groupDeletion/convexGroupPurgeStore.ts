@@ -23,8 +23,11 @@ const STAGE_INDEX: Record<PurgeStage, string> = {
   receiptAnalysisBatches: "by_group_id_and_created_at",
   expenseEntries: "by_group_id_and_date",
   receipts: "by_group_id_and_date",
+  entryFavorites: "by_group_id",
   sourceDocuments: "by_group_id_and_date",
   monthlyInsights: "by_group_id_and_month",
+
+  recurringEntryRules: "by_group_id",
   weekSessions: "by_group_id_and_week_start_date",
   categories: "by_group_id_and_sort_order",
   groupInvitations: "by_group_id",

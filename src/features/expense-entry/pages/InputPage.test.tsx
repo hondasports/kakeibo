@@ -42,6 +42,10 @@ vi.mock("../../week", () => ({
   ),
 }));
 
+vi.mock("../components/RecurringDueSection", () => ({
+  RecurringDueSection: () => null,
+}));
+
 vi.mock("../components/ExpenseEntryForm", () => ({
   ExpenseEntryForm: () => <div data-testid="expense-entry-form" />,
 }));

@@ -13,6 +13,7 @@ import { SystemAdminEmptyState } from "../pages/SystemAdminPageFrame";
 import type { SystemAdminListItem } from "../types";
 import type { useSystemAdminManagement, StatusFilter } from "../hooks/useSystemAdminManagement";
 import { formatDateTimeForDisplay } from "../../../utils/date";
+import { displayLabel, systemAdminStatusLabels } from "../lib/displayLabels";
 
 type AdminList = NonNullable<ReturnType<typeof useSystemAdminManagement>["list"]>;
 
@@ -51,8 +52,8 @@ export function SystemAdminManagementAdminList({
             value={statusFilter}
             onChange={(event) => onStatusFilterChange(event.target.value as StatusFilter)}
           >
-            <MenuItem value="active">active</MenuItem>
-            <MenuItem value="revoked">revoked</MenuItem>
+            <MenuItem value="active">有効</MenuItem>
+            <MenuItem value="revoked">剥奪済み</MenuItem>
           </Select>
         </FormControl>
       </Stack>
@@ -81,7 +82,7 @@ export function SystemAdminManagementAdminList({
                   <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                     <Chip
                       color={admin.status === "active" ? "success" : "default"}
-                      label={admin.status}
+                      label={displayLabel(systemAdminStatusLabels, admin.status)}
                       size="small"
                     />
                     {admin.status === "active" ? (
@@ -112,7 +113,7 @@ export function SystemAdminManagementAdminList({
                 ) : null}
                 {!self && admin.status === "active" && !hasAnotherActiveAdmin ? (
                   <Typography color="text.secondary" variant="caption">
-                    最後のactive管理者のため剥奪できません。
+                    最後の有効な管理者のため剥奪できません。
                   </Typography>
                 ) : null}
               </Paper>
@@ -127,7 +128,7 @@ export function SystemAdminManagementAdminList({
   );
 }
 
-const statusLabel: Record<StatusFilter, string> = { active: "active", revoked: "revoked" };
+const statusLabel: Record<StatusFilter, string> = { active: "有効", revoked: "剥奪済み" };
 
 function BoxText({ item }: { item: SystemAdminListItem }) {
   return (

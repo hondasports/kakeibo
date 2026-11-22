@@ -85,6 +85,10 @@ type SystemAdminAuditLogFields = {
 
 export type SystemAdminAuditLogRecord = SystemAdminAuditLogFields & { id: string };
 
+/** 対象グループとの関係。source=移動元 / target=移動先 / direct=直接操作の対象（targetKind=group の targetId）。 */
+export const SYSTEM_ADMIN_AUDIT_GROUP_RELATIONS = ["source", "target", "direct"] as const;
+export type SystemAdminAuditGroupRelation = (typeof SYSTEM_ADMIN_AUDIT_GROUP_RELATIONS)[number];
+
 /** 監査ログ一覧のフィルタ。指定された組み合わせに応じてインフラ側が index を選択する。 */
 type SystemAdminAuditLogFilter = {
   from: number;
@@ -92,6 +96,9 @@ type SystemAdminAuditLogFilter = {
   action?: SystemAdminAuditAction;
   actorUserId?: string;
   targetUserId?: string;
+  /** このグループが関係する操作だけに絞る。groupRelation で関係の種類を選ぶ（index で読むため1種のみ）。 */
+  groupId?: string;
+  groupRelation?: SystemAdminAuditGroupRelation;
 };
 
 export interface SystemAdminAuditLogReader {

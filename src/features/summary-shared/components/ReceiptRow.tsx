@@ -1,5 +1,8 @@
 import EditIcon from "@mui/icons-material/Edit";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import { Link } from "react-router-dom";
 import { Box, Button, Checkbox, Chip, Stack, Typography } from "@mui/material";
 import { formatDateForDisplay } from "../../week";
 import { formatDateWithYearForDisplay } from "../../../utils/date";
@@ -16,6 +19,7 @@ export type CategoryPreview = {
 export function ReceiptRow({
   receipt,
   dateFormat = "monthDay",
+  onCopy,
   onDelete,
   onEdit,
   showCategory = true,
@@ -25,9 +29,11 @@ export function ReceiptRow({
   selected = false,
   previewCategory = null,
   onToggleSelection,
+  weekSummaryPath,
 }: {
   receipt: ReceiptItem;
   dateFormat?: ReceiptDateFormat;
+  onCopy?: (receipt: ReceiptItem) => void;
   onDelete?: (receipt: ReceiptItem) => void;
   onEdit?: (receipt: ReceiptItem) => void;
   showCategory?: boolean;
@@ -37,6 +43,8 @@ export function ReceiptRow({
   selected?: boolean;
   previewCategory?: CategoryPreview | null;
   onToggleSelection?: (receipt: ReceiptItem, checked: boolean) => void;
+  /** 指定すると、その記録が属する週次サマリーへの導線を行に表示する */
+  weekSummaryPath?: (date: string) => string;
 }) {
   const displayName =
     receipt.type === "income" ? (receipt.bankName ?? "不明") : (receipt.shopName ?? "不明");
@@ -146,8 +154,22 @@ export function ReceiptRow({
         </Box>
       )}
       <Box className="receipt-row-actions" role="cell">
-        {(onEdit || onDelete) && (
+        {(onEdit || onDelete || onCopy || (!isDetail && weekSummaryPath)) && (
           <Stack direction="row" spacing={0.5}>
+            {!isDetail && weekSummaryPath && (
+              <Button
+                aria-label={`${actionLabelSuffix}が属する週のサマリーを見る`}
+                component={Link}
+                size="small"
+                startIcon={<CalendarMonthIcon fontSize="small" />}
+                sx={{ minHeight: 44 }}
+                to={weekSummaryPath(receipt.date)}
+                type="button"
+                variant="text"
+              >
+                <span className="receipt-row-action-label">この週を見る</span>
+              </Button>
+            )}
             {onEdit && (
               <Button
                 aria-label={`${actionLabelSuffix}を編集`}
@@ -159,6 +181,19 @@ export function ReceiptRow({
                 variant="text"
               >
                 <span className="receipt-row-action-label">編集</span>
+              </Button>
+            )}
+            {onCopy && (
+              <Button
+                aria-label={`${actionLabelSuffix}の内容で新規入力`}
+                onClick={() => onCopy(receipt)}
+                size="small"
+                startIcon={<ContentCopyIcon fontSize="small" />}
+                sx={{ minHeight: 44 }}
+                type="button"
+                variant="text"
+              >
+                <span className="receipt-row-action-label">複写</span>
               </Button>
             )}
             {onDelete && (

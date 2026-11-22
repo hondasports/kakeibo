@@ -54,7 +54,7 @@ describe("SystemAdminGroupDeletionPage", () => {
     const user = userEvent.setup();
     render(<SystemAdminGroupDeletionPage />);
     await user.click(screen.getByRole("combobox", { name: "状態" }));
-    await user.click(screen.getByRole("option", { name: "requested" }));
+    await user.click(screen.getByRole("option", { name: "受付済み" }));
     expect(useQueryMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ status: "requested" }),

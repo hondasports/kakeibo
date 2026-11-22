@@ -9,7 +9,7 @@ import {
   type ExpenseSearchReceipt,
   type ExpenseSearchResult,
 } from "../../domain/expenseSearch/searchResult";
-import type { HistoryEntryType } from "../../domain/expenseSearch/filter";
+import type { HistoryEntryType, HistorySortOrder } from "../../domain/expenseSearch/filter";
 import {
   searchExpenses,
   type ExpenseSearchStore,
@@ -20,8 +20,9 @@ export type { ExpenseSearchReceipt, ExpenseSearchResult };
 
 type ExpenseSearchArgs = {
   entryType?: HistoryEntryType;
+  sortOrder?: HistorySortOrder;
   shopQuery?: string;
-  categoryId?: Id<"categories">;
+  categoryId?: Id<"categories"> | "__uncategorized__";
   minAmountYen?: number;
   maxAmountYen?: number;
   startDate?: string;
@@ -33,8 +34,15 @@ function createExpenseSearchStore(ctx: QueryCtx): ExpenseSearchStore {
   return {
     getCategoryGroupId: async (categoryId) =>
       (await ctx.db.get(categoryId as Id<"categories">))?.groupId,
-    loadHistoryEntries: (groupId, startDate, endDate) =>
-      loadHistoryEntriesForSearch(ctx, groupId as Id<"groups">, startDate, endDate),
+    loadHistoryEntries: (groupId, startDate, endDate, order, maxRecords) =>
+      loadHistoryEntriesForSearch(
+        ctx,
+        groupId as Id<"groups">,
+        startDate,
+        endDate,
+        order,
+        maxRecords,
+      ),
     buildCategoryInfoMap: (groupId, categoryIds) =>
       buildCategoryInfoMap(ctx, groupId as Id<"groups">, categoryIds),
   };

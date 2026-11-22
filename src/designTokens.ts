@@ -70,10 +70,18 @@ export const designTokens = {
   radius: {
     sm: "4px",
     md: "8px",
+    /** ブランドロゴの枠（パネルより小さく丸める） */
+    brandMark: "12px",
+    lg: "16px",
     pill: "999px",
+  },
+  shadow: {
+    panel: "0 12px 40px rgba(61, 44, 34, 0.08)",
   },
   size: {
     buttonMinHeight: "40px",
+    // SPでは台帳の40pxより指先の44pxを優先する（MuiButton/MuiTab/MuiIconButton が使用）
+    buttonMinHeightSp: "44px",
     inputMinHeight: "36px",
     bottomNavHeight: "56px",
   },
@@ -168,7 +176,9 @@ export const rootCssVariables: Record<CssVariableName, string> = {
   "--space-xl": designTokens.space.xl,
   "--radius-sm": designTokens.radius.sm,
   "--radius-md": designTokens.radius.md,
+  "--radius-lg": designTokens.radius.lg,
   "--radius-pill": designTokens.radius.pill,
+  "--shadow-panel": designTokens.shadow.panel,
   "--size-button-min-height": designTokens.size.buttonMinHeight,
   "--size-input-min-height": designTokens.size.inputMinHeight,
   "--size-bottom-nav-height": designTokens.size.bottomNavHeight,

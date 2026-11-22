@@ -14,7 +14,8 @@ export function NotFoundPage() {
       label="404 Not Found"
       primaryAction={{ label: "ホームへ戻る", href: "/" }}
       secondaryActions={[
-        { label: "プライバシー", href: "/privacy" },
+        { label: "更新履歴", href: "/updates" },
+        { label: "プライバシーポリシー", href: "/privacy" },
         { label: "利用規約", href: "/terms" },
       ]}
       title="ページが見つかりません"

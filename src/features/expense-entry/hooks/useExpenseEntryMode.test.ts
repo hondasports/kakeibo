@@ -251,3 +251,50 @@ describe("useExpenseEntryMode 複数項目モードとの行き来", () => {
     expect(result.current.memo).toBe("立替分");
   });
 });
+
+describe("initialPrefill / applyEntryPrefill", () => {
+  const prefill = {
+    title: "スーパー",
+    amountYen: 3000,
+    categoryId: "cat-daily" as Id<"categories">,
+    memo: "週末まとめ買い",
+  };
+
+  it("initialPrefill で店名・金額・カテゴリ・メモが初期化される", () => {
+    const { result } = renderHook(() =>
+      useExpenseEntryMode({ weekStartDate: "2026-11-16", categories, initialPrefill: prefill }),
+    );
+    expect(result.current.shopName).toBe("スーパー");
+    expect(result.current.sourceAmount).toBe("3000");
+    expect(result.current.items[0]?.categoryId).toBe("cat-daily");
+    expect(result.current.memo).toBe("週末まとめ買い");
+  });
+
+  it("applyEntryPrefill で入力済みフォームを上書きし単一モードに戻す", () => {
+    const { result } = renderHook(() =>
+      useExpenseEntryMode({ weekStartDate: "2026-11-16", categories }),
+    );
+    act(() => {
+      result.current.setShopName("別の店");
+      result.current.setSourceAmount("999");
+    });
+    act(() => {
+      result.current.applyEntryPrefill(prefill);
+    });
+    expect(result.current.shopName).toBe("スーパー");
+    expect(result.current.sourceAmount).toBe("3000");
+    expect(result.current.items[0]?.categoryId).toBe("cat-daily");
+    expect(result.current.isMultiMode).toBe(false);
+  });
+
+  it("prefill のカテゴリが一覧に無ければ先頭カテゴリにフォールバックする", () => {
+    const { result } = renderHook(() =>
+      useExpenseEntryMode({
+        weekStartDate: "2026-11-16",
+        categories,
+        initialPrefill: { ...prefill, categoryId: "cat-unknown" as Id<"categories"> },
+      }),
+    );
+    expect(result.current.items[0]?.categoryId).toBe("cat-food");
+  });
+});

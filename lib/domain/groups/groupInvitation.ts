@@ -72,4 +72,8 @@ export type GroupInvitationPreview = {
   activeGroupId: string | null;
   activeGroupName: string | null;
   isExistingMember: boolean;
+  /** 招待者の表示名。宛先メールとの照合を通った呼び出し元にのみ返す */
+  invitedByName: string | null;
+  /** 招待の宛先メールアドレス。宛先メールとの照合を通った呼び出し元にのみ返す */
+  recipientEmail: string;
 };

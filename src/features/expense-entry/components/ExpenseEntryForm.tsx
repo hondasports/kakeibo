@@ -2,6 +2,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import type { EntryKind } from "../../../../lib/domain/common/entryKind";
 import { useState } from "react";
 import { Box, Paper, Stack, Tab, Tabs } from "@mui/material";
+import type { ExpenseEntryPrefill } from "../types/prefill";
 import { useExpenseEntryForm } from "../hooks/useExpenseEntryForm";
 import { useIncomeEntry } from "../hooks/useIncomeEntry";
 import { ExpenseEntryWorkbench } from "./ExpenseEntryWorkbench";
@@ -11,18 +12,20 @@ interface ExpenseEntryFormProps {
   weekStartDate: string;
   weekEndDate: string;
   categories: Array<{ _id: Id<"categories">; name: string; color: string }>;
+  initialPrefill?: ExpenseEntryPrefill;
 }
 
 export function ExpenseEntryForm({
   weekStartDate,
   weekEndDate,
   categories,
+  initialPrefill,
 }: ExpenseEntryFormProps) {
   const [entryType, setEntryType] = useState<EntryKind>("expense");
   // 支出はカテゴリ必須、収入はカテゴリ不要。カテゴリ0件では支出タブを無効化して収入だけ使えるようにする
   const expenseUnavailable = categories.length === 0;
   const activeEntryType = expenseUnavailable ? "income" : entryType;
-  const expense = useExpenseEntryForm({ weekStartDate, weekEndDate, categories });
+  const expense = useExpenseEntryForm({ weekStartDate, weekEndDate, categories, initialPrefill });
   const income = useIncomeEntry(expense.date);
 
   return (

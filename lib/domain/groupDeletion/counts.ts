@@ -13,6 +13,7 @@ export function zeroDeletedCounts(): GroupDeletionJobCounts {
     receiptAnalysisBatches: 0,
     expenseEntries: 0,
     receipts: 0,
+    entryFavorites: 0,
     sourceDocuments: 0,
     storageFiles: 0,
     weekSessions: 0,
@@ -22,6 +23,8 @@ export function zeroDeletedCounts(): GroupDeletionJobCounts {
     groupMembers: 0,
     groups: 0,
     monthlyInsights: 0,
+
+    recurringEntryRules: 0,
   };
 }
 

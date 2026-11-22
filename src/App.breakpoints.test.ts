@@ -41,6 +41,12 @@ describe("App.css のレスポンシブ境界", () => {
     expect(productionFiles.length).toBeGreaterThan(0);
     expect(offenders).toEqual([]);
   });
+
+  it('theme.ts のSP向け上書きは "@media not all and (min-width: 900px)" を使う（breakpoints.not("md") は1200px以上にも適用されてPCで44pxになるため）', () => {
+    const source = readFileSync(resolve(process.cwd(), "src/theme.ts"), "utf8");
+    expect(source).not.toMatch(/breakpoints\.not\(\s*["']md["']\s*\)/);
+    expect(source).toContain("@media not all and (min-width: 900px)");
+  });
 });
 
 describe("週次サマリーのカテゴリ別表の列幅（PC・2列カード内に収める）", () => {

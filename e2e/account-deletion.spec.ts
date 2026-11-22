@@ -38,6 +38,9 @@ test("@smoke @group-access 唯一ownerは退会をブロックされ、owner譲�
     const button = page.getByRole("button", { name: "アカウントを削除する" });
     await expect(button).toBeDisabled();
     await page.getByRole("textbox", { name: "確認用入力" }).fill("削除");
+    const accountEmail = process.env.E2E_CLERK_USER_EMAIL;
+    if (!accountEmail) throw new Error("E2E_CLERK_USER_EMAIL is not set");
+    await page.getByRole("textbox", { name: "メールアドレス入力" }).fill(accountEmail);
     await expect(button).toBeEnabled();
   } finally {
     // seedユーザーの削除認可には本人の所属が必要なため、本人は最後に片付ける。

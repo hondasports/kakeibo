@@ -4,6 +4,7 @@ import { useAction, useMutation } from "convex/react";
 import { normalizeSystemAdminReason } from "../../../../lib/domain/systemAdmin/reason";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { GroupRole } from "../../../../lib/domain/groups/role";
+import { displayLabel, groupRoleLabels } from "../lib/displayLabels";
 
 export type GroupDetail = {
   name: string;
@@ -119,7 +120,9 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
         reason,
       });
       setDialogMember(null);
-      setSuccess("所属を解除しました。家計データは変更していません。");
+      setSuccess(
+        `「${dialogMember.displayName ?? "ユーザー"}」を「${detail.name}」から外しました（監査ログに記録済み。家計データは変更していません）`,
+      );
       await load();
     } catch (cause) {
       setOperationError(cause instanceof Error ? cause.message : "操作に失敗しました");
@@ -163,7 +166,11 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
         reason,
       });
       setRoleTarget(null);
-      setSuccess("role変更を完了しました。監査ログと通知outboxに記録しました。");
+      setSuccess(
+        roleOperation === "owner_transfer"
+          ? `「${roleSource?.displayName ?? "ユーザー"}」から「${roleTarget.displayName ?? "ユーザー"}」へownerを付け替えました（監査ログに記録済み）`
+          : `「${roleTarget.displayName ?? "ユーザー"}」のroleを${displayLabel(groupRoleLabels, roleNewRole ?? "member")}に変更しました（監査ログに記録済み）`,
+      );
       await load();
     } catch (cause) {
       setRoleError(cause instanceof Error ? cause.message : "role変更に失敗しました");
@@ -193,7 +200,9 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
         reason,
       });
       setInvitationTarget(null);
-      setSuccess("pending招待を取り消しました。ユーザーや家計データは変更していません。");
+      setSuccess(
+        `「${invitationTarget.email}」への招待を取り消しました（監査ログに記録済み。ユーザーや家計データは変更していません）`,
+      );
       await load();
     } catch (cause) {
       setInvitationError(
@@ -229,7 +238,9 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
       });
       setRecoveryTarget(null);
       setRecoveryReason("");
-      setSuccess("owner不在グループを復旧しました。監査ログと通知outboxに記録しました。");
+      setSuccess(
+        `「${recoveryTarget.displayName ?? "ユーザー"}」をownerへ復旧しました（監査ログに記録済み）`,
+      );
       await load();
     } catch (cause) {
       setRecoveryError(cause instanceof Error ? cause.message : "復旧に失敗しました");
@@ -241,6 +252,7 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
   return {
     detail,
     error,
+    load,
     success,
     setSuccess,
     dialogMember,

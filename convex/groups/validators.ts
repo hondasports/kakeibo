@@ -40,4 +40,6 @@ export const groupDeletionPreviewValidator = v.object({
   weekSessions: groupDeletionPreviewCountValidator,
   managementAuditLogs: groupDeletionPreviewCountValidator,
   monthlyInsights: groupDeletionPreviewCountValidator,
+
+  recurringRules: groupDeletionPreviewCountValidator,
 });

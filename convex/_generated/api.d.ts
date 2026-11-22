@@ -22,6 +22,7 @@ import type * as categories_normalize from "../categories/normalize.js";
 import type * as categories_queries from "../categories/queries.js";
 import type * as categories_testHelpers from "../categories/testHelpers.js";
 import type * as crons from "../crons.js";
+import type * as dataExport from "../dataExport.js";
 import type * as e2eHttp_e2eAuth from "../e2eHttp/e2eAuth.js";
 import type * as e2eHttp_e2eCleanup from "../e2eHttp/e2eCleanup.js";
 import type * as e2eHttp_e2eSeedDraft from "../e2eHttp/e2eSeedDraft.js";
@@ -39,6 +40,8 @@ import type * as email_webhooks_resendWebhook from "../email/webhooks/resendWebh
 import type * as expenseEntries_internal from "../expenseEntries/internal.js";
 import type * as expenseEntries_mutations from "../expenseEntries/mutations.js";
 import type * as expenseEntries_testHelpers from "../expenseEntries/testHelpers.js";
+import type * as entryFavorites_mutations from "../entryFavorites/mutations.js";
+import type * as entryFavorites_queries from "../entryFavorites/queries.js";
 import type * as expenseSearch from "../expenseSearch.js";
 import type * as groups_adminGuards from "../groups/adminGuards.js";
 import type * as groups_auditLogs from "../groups/auditLogs.js";
@@ -99,6 +102,7 @@ import type * as receiptAnalysisJobs_testHelpers from "../receiptAnalysisJobs/te
 import type * as receiptImageExtraction_extraction from "../receiptImageExtraction/extraction.js";
 import type * as receiptImageExtraction_testHelpers from "../receiptImageExtraction/testHelpers.js";
 import type * as receipts_crud from "../receipts/crud.js";
+import type * as recurringRules_index from "../recurringRules/index.js";
 import type * as receipts_summaries from "../receipts/summaries.js";
 import type * as receipts_testHelpers from "../receipts/testHelpers.js";
 import type * as systemAdminGroupDeletion from "../systemAdminGroupDeletion.js";
@@ -140,6 +144,7 @@ declare const fullApi: ApiFromModules<{
   "categories/queries": typeof categories_queries;
   "categories/testHelpers": typeof categories_testHelpers;
   crons: typeof crons;
+  dataExport: typeof dataExport;
   "e2eHttp/e2eAuth": typeof e2eHttp_e2eAuth;
   "e2eHttp/e2eCleanup": typeof e2eHttp_e2eCleanup;
   "e2eHttp/e2eSeedDraft": typeof e2eHttp_e2eSeedDraft;
@@ -157,6 +162,8 @@ declare const fullApi: ApiFromModules<{
   "expenseEntries/internal": typeof expenseEntries_internal;
   "expenseEntries/mutations": typeof expenseEntries_mutations;
   "expenseEntries/testHelpers": typeof expenseEntries_testHelpers;
+  "entryFavorites/mutations": typeof entryFavorites_mutations;
+  "entryFavorites/queries": typeof entryFavorites_queries;
   expenseSearch: typeof expenseSearch;
   "groups/adminGuards": typeof groups_adminGuards;
   "groups/auditLogs": typeof groups_auditLogs;
@@ -217,6 +224,7 @@ declare const fullApi: ApiFromModules<{
   "receiptImageExtraction/extraction": typeof receiptImageExtraction_extraction;
   "receiptImageExtraction/testHelpers": typeof receiptImageExtraction_testHelpers;
   "receipts/crud": typeof receipts_crud;
+  "recurringRules/index": typeof recurringRules_index;
   "receipts/summaries": typeof receipts_summaries;
   "receipts/testHelpers": typeof receipts_testHelpers;
   systemAdminGroupDeletion: typeof systemAdminGroupDeletion;

@@ -53,6 +53,62 @@ describe("SystemAdminUserSearchPage", () => {
     });
   });
 
+  it("次のページの取得に失敗しても再試行で同じページを取得し、前のページに戻れる", async () => {
+    const user = userEvent.setup();
+    const firstPageUser = {
+      id: "user-document-1",
+      userId: "target-user",
+      displayName: "対象ユーザー",
+      email: "target@example.test",
+      activeGroupId: null,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const secondPageUser = {
+      ...firstPageUser,
+      id: "user-document-21",
+      displayName: "21番目のユーザー",
+    };
+    actionMock
+      .mockResolvedValueOnce({
+        environment: "preview",
+        page: [firstPageUser],
+        isDone: false,
+        continueCursor: "cursor-page-2",
+      })
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce({
+        environment: "preview",
+        page: [secondPageUser],
+        isDone: true,
+        continueCursor: "",
+      });
+    render(
+      <MemoryRouter>
+        <SystemAdminUserSearchPage />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "検索" }));
+    expect(await screen.findByText("対象ユーザー")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "次のページ" }));
+    expect(await screen.findByText(/管理情報を読み込めませんでした/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "再試行" }));
+    expect(await screen.findByText("21番目のユーザー")).toBeInTheDocument();
+    expect(screen.getByText("21〜21件目を表示（最後のページです）")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "前のページ" })).toBeInTheDocument();
+    // 失敗したリクエストと同じカーソル・同じ条件で再発行される。
+    for (const callIndex of [2, 3]) {
+      expect(actionMock).toHaveBeenNthCalledWith(callIndex, {
+        queryType: "displayName",
+        query: "",
+        paginationOpts: { numItems: 20, cursor: "cursor-page-2" },
+      });
+    }
+  });
+
   it("検索条件が未入力でも条件なし検索を実行する", async () => {
     const user = userEvent.setup();
     render(

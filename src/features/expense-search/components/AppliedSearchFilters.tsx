@@ -4,11 +4,11 @@ import { formatYen } from "../../../../lib/domain/common/currency";
 
 export function AppliedSearchFilters({
   state,
-  categoryName,
+  categoryLabel,
   onChange,
 }: {
   state: ExpenseSearchFormState;
-  categoryName?: string;
+  categoryLabel?: string;
   onChange: (state: ExpenseSearchFormState) => void;
 }) {
   const chips: Array<{ key: string; label: string; remove: () => void }> = [];
@@ -29,7 +29,7 @@ export function AppliedSearchFilters({
   if (state.categoryId) {
     chips.push({
       key: "categoryId",
-      label: `カテゴリ: ${categoryName ?? "指定"}`,
+      label: `カテゴリ: ${categoryLabel ?? "指定"}`,
       remove: () => onChange({ ...state, categoryId: "" }),
     });
   }

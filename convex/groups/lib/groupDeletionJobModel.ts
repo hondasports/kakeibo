@@ -24,6 +24,8 @@ export const groupDeletionCountsValidator = v.object({
   receiptAnalysisBatches: v.number(),
   expenseEntries: v.number(),
   receipts: v.number(),
+  // 追加ステージ。追加前に記録されたジョブはキー自体を持たないため optional。
+  entryFavorites: v.optional(v.number()),
   sourceDocuments: v.number(),
   storageFiles: v.number(),
   weekSessions: v.number(),
@@ -33,6 +35,8 @@ export const groupDeletionCountsValidator = v.object({
   groupMembers: v.number(),
   groups: v.number(),
   monthlyInsights: v.optional(v.number()),
+
+  recurringEntryRules: v.optional(v.number()),
 });
 
 export type { GroupDeletionJobStatus as GroupDeletionStatus } from "../../../lib/domain/groupDeletion/groupDeletionJob";

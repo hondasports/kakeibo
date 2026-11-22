@@ -163,6 +163,8 @@ beforeEach(() => {
         weekSessions: { count: 4, accuracy: "exact" },
         managementAuditLogs: { count: 5, accuracy: "exact" },
         monthlyInsights: { count: 0, accuracy: "exact" },
+
+        recurringRules: { count: 0, accuracy: "exact" },
       };
     }
     if (typeof reference === "string" && reference.includes("groups.queries.getMyGroup")) {

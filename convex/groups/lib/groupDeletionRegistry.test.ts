@@ -29,8 +29,11 @@ describe("group deletion registry", () => {
       "receiptAnalysisBatches",
       "expenseEntries",
       "receipts",
+      "entryFavorites",
       "sourceDocuments",
       "monthlyInsights",
+
+      "recurringEntryRules",
       "weekSessions",
       "categories",
       "groupInvitations",

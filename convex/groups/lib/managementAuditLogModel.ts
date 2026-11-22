@@ -30,6 +30,7 @@ export const MANAGEMENT_AUDIT_ACTION_LABELS: Record<ManagementAuditAction, strin
   system_admin_delegated: "システム管理者による操作代行",
   spending_bulk_category_changed: "支出明細のカテゴリを一括変更",
   spending_bulk_deleted: "支出明細を一括削除",
+  group_monthly_budget_changed: "月予算を変更",
 };
 
 export const managementAuditLogListItemValidator = v.object({

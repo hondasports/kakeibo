@@ -25,6 +25,8 @@ const STAGE_BY_METRIC = {
   weekSessions: "weekSessions",
   managementAuditLogs: "managementAuditLogs",
   monthlyInsights: "monthlyInsights",
+
+  recurringRules: "recurringEntryRules",
 } as const satisfies Record<string, PurgeStage>;
 
 export async function countGroupDeletionImpact(
@@ -48,6 +50,8 @@ export async function countGroupDeletionImpact(
   const managementAuditLogs = await count(STAGE_BY_METRIC.managementAuditLogs);
   const monthlyInsights = await count(STAGE_BY_METRIC.monthlyInsights);
 
+  const recurringRules = await count(STAGE_BY_METRIC.recurringRules);
+
   return {
     members: members.result,
     invitations: invitations.result,
@@ -63,5 +67,7 @@ export async function countGroupDeletionImpact(
     weekSessions: weekSessions.result,
     managementAuditLogs: managementAuditLogs.result,
     monthlyInsights: monthlyInsights.result,
+
+    recurringRules: recurringRules.result,
   };
 }
