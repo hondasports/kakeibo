@@ -1,12 +1,16 @@
 import { Alert, Button, List, ListItem, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Link } from "react-router-dom";
 import type { MembershipOperation } from "../../../../lib/domain/systemAdmin/membershipOperation";
 import type { MembershipDialogGroup } from "./SystemAdminMembershipChangeDialog";
 import type { GroupCandidate, UserDetail } from "../hooks/useSystemAdminUserDetail";
+import { displayLabel, groupRoleLabels, groupStatusLabels } from "../lib/displayLabels";
+import { formatDateTimeForDisplay } from "../../../utils/date";
 
 type UserMembershipsSectionProps = {
   detail: UserDetail;
   groupQuery: string;
   candidates: GroupCandidate[];
+  candidateSearch: "idle" | "loading" | "done" | "error";
   selectedSource?: MembershipDialogGroup;
   onGroupQueryChange: (query: string) => void;
   onSelectSource: (source: MembershipDialogGroup) => void;
@@ -15,27 +19,44 @@ type UserMembershipsSectionProps = {
     sourceGroup?: MembershipDialogGroup,
     targetGroup?: MembershipDialogGroup,
   ) => void;
+  onRetryCandidateSearch: () => void;
 };
 
 export function UserMembershipsSection({
   detail,
   groupQuery,
   candidates,
+  candidateSearch,
   selectedSource,
   onGroupQueryChange,
   onSelectSource,
   onRequestOperation,
+  onRetryCandidateSearch,
 }: UserMembershipsSectionProps) {
   return (
     <Paper sx={{ p: 2 }} variant="outlined">
       <Typography component="h3" variant="h6">
         所属グループ
       </Typography>
+      {selectedSource ? (
+        <Alert
+          severity="info"
+          sx={{ mt: 1 }}
+          action={
+            <Button color="inherit" onClick={() => onSelectSource(selectedSource)} size="small">
+              解除
+            </Button>
+          }
+        >
+          移動元: {selectedSource.name}
+        </Alert>
+      ) : null}
       <Stack spacing={1} sx={{ mt: 1 }}>
         {detail.memberships.length ? (
           <List disablePadding>
             {detail.memberships.map((membership) => {
               const source = { id: membership.groupId, name: membership.groupName };
+              const isOwner = membership.role === "owner";
               return (
                 <ListItem
                   data-testid={`system-admin-membership-${membership.groupId}`}
@@ -52,14 +73,25 @@ export function UserMembershipsSection({
                     }}
                   >
                     <Typography sx={{ flex: 1, minWidth: 220 }}>
-                      {membership.groupName}（{membership.groupId}） / {membership.role}
+                      {membership.groupName}（{membership.groupId}） /{" "}
+                      {displayLabel(groupRoleLabels, membership.role)}
                     </Typography>
                     <Button
-                      disabled={membership.role === "owner"}
+                      component={Link}
+                      size="small"
+                      to={`/admin/groups/${membership.groupId}`}
+                      variant="text"
+                    >
+                      グループ詳細
+                    </Button>
+                    <Button
+                      disabled={isOwner}
                       onClick={() => onRequestOperation("remove", source)}
                       size="small"
                       title={
-                        membership.role === "owner" ? "ownerの解除は#477で行います" : undefined
+                        isOwner
+                          ? "ownerの解除はグループ詳細からmemberへ変更してから行えます"
+                          : undefined
                       }
                       variant="outlined"
                     >
@@ -73,20 +105,18 @@ export function UserMembershipsSection({
                       activeに設定
                     </Button>
                     <Button
-                      disabled={membership.role === "owner"}
+                      disabled={isOwner}
                       onClick={() => onSelectSource(source)}
                       size="small"
-                      title={
-                        membership.role === "owner" ? "ownerの付替えは#477で行います" : undefined
-                      }
+                      title={isOwner ? "ownerの付替えはグループ詳細から行えます" : undefined}
                       variant={selectedSource?.id === source.id ? "contained" : "text"}
                     >
                       移動元に選択
                     </Button>
                   </Stack>
-                  {membership.role === "owner" ? (
+                  {isOwner ? (
                     <Typography color="text.secondary" variant="caption">
-                      ownerの解除・付替えは#477で行います。
+                      ownerの権限変更・付替えはグループ詳細から行えます。
                     </Typography>
                   ) : null}
                 </ListItem>
@@ -97,13 +127,39 @@ export function UserMembershipsSection({
           <Typography color="text.secondary">所属グループはありません。</Typography>
         )}
         {detail.membershipsTruncated ? (
-          <Alert severity="warning">所属グループは上限件数まで表示しています。</Alert>
+          <Alert severity="warning">
+            所属グループは上限20件まで表示しています（{detail.memberships.length}件を表示）。
+            対象が見つからないときはユーザーの条件を絞ってください。
+          </Alert>
         ) : null}
         <TextField
           label="追加・移動先グループを検索"
           onChange={(event) => onGroupQueryChange(event.target.value)}
           value={groupQuery}
         />
+        {candidateSearch === "loading" ? (
+          <Typography color="text.secondary" variant="body2">
+            グループ候補を検索しています…
+          </Typography>
+        ) : null}
+        {candidateSearch === "error" ? (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" onClick={onRetryCandidateSearch} size="small">
+                再試行
+              </Button>
+            }
+            variant="outlined"
+          >
+            グループ候補を取得できませんでした。
+          </Alert>
+        ) : null}
+        {candidateSearch === "done" && candidates.length === 0 ? (
+          <Typography color="text.secondary" variant="body2">
+            この条件で見つかる追加先・移動先の候補はありません。検索条件を変えてみてください。
+          </Typography>
+        ) : null}
         {candidates.map((candidate) => {
           const target = { id: candidate.id, name: candidate.name, status: candidate.status };
           return (
@@ -113,6 +169,10 @@ export function UserMembershipsSection({
             >
               <Typography sx={{ flex: 1 }}>
                 {candidate.name}（{candidate.id}）
+              </Typography>
+              <Typography color="text.secondary" variant="caption">
+                {displayLabel(groupStatusLabels, candidate.status)} / 登録{" "}
+                {formatDateTimeForDisplay(candidate.createdAt)}
               </Typography>
               <Button
                 onClick={() =>

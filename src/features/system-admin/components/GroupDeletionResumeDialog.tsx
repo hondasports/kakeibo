@@ -14,10 +14,12 @@ import {
   MAX_REASON_LENGTH,
   normalizeSystemAdminReason,
 } from "../../../../lib/domain/systemAdmin/reason";
+import { SystemAdminEnvironmentNotice } from "./SystemAdminEnvironmentNotice";
 
 type GroupDeletionResumeDialogProps = {
   open: boolean;
   targetGroupNameSnapshot: string | undefined;
+  environment: string;
   reason: string;
   saving: boolean;
   error: string;
@@ -29,6 +31,7 @@ type GroupDeletionResumeDialogProps = {
 export function GroupDeletionResumeDialog({
   open,
   targetGroupNameSnapshot,
+  environment,
   reason,
   saving,
   error,
@@ -46,6 +49,7 @@ export function GroupDeletionResumeDialog({
       <DialogTitle>削除処理を再開</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
+          <SystemAdminEnvironmentNotice environment={environment} />
           <Typography>対象: {targetGroupNameSnapshot ?? "-"}</Typography>
           <Typography color="text.secondary" variant="body2">
             失敗したstageから再開します。削除開始・取消・復元は行いません。

@@ -1,4 +1,5 @@
 import { Button, Chip, Stack, Typography } from "@mui/material";
+import { deletionJobStatusLabels, displayLabel } from "../lib/displayLabels";
 import { SystemAdminEmptyState } from "../pages/SystemAdminPageFrame";
 import type { useSystemAdminGroupDeletion } from "../hooks/useSystemAdminGroupDeletion";
 
@@ -34,15 +35,15 @@ export function GroupDeletionJobList({ list, onSelectJob, onLoadMore }: GroupDel
                 groupId: {job.targetGroupIdSnapshot}
               </Typography>
               <Typography color="text.secondary" variant="body2">
-                source: {job.source} / stage: {job.stage}
+                実行元: {job.source} / 段階: {job.stage}
               </Typography>
               <Typography color="text.secondary" variant="body2">
-                attempt: {job.attemptCount}/{job.maxAttempts} / 更新:{" "}
+                試行: {job.attemptCount}/{job.maxAttempts} / 更新:{" "}
                 {new Intl.DateTimeFormat("ja-JP").format(job.updatedAt)}
               </Typography>
               {job.lastErrorCategory ? (
                 <Typography color="error" variant="body2">
-                  error: {job.lastErrorCategory}
+                  エラー種別: {job.lastErrorCategory}
                 </Typography>
               ) : null}
             </Stack>
@@ -55,7 +56,7 @@ export function GroupDeletionJobList({ list, onSelectJob, onLoadMore }: GroupDel
                       ? "default"
                       : "warning"
                 }
-                label={job.status}
+                label={displayLabel(deletionJobStatusLabels, job.status)}
                 size="small"
               />
               {job.status === "failed" ? (

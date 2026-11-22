@@ -9,11 +9,11 @@ type StatusFilter = GroupDeletionJobStatus | "";
 
 const statusLabels: Record<StatusFilter, string> = {
   "": "すべて",
-  requested: "requested",
-  running: "running",
-  retry_wait: "retry_wait",
-  failed: "failed",
-  completed: "completed",
+  requested: "受付済み",
+  running: "実行中",
+  retry_wait: "再試行待ち",
+  failed: "失敗",
+  completed: "完了",
 };
 
 export function useSystemAdminGroupDeletion() {
@@ -48,7 +48,9 @@ export function useSystemAdminGroupDeletion() {
     try {
       await resume({ jobId: selected.jobId, reason: reasonResult.reason });
       closeDialog();
-      setSuccess("削除ジョブの再開を受け付けました。監査ログに記録しました。");
+      setSuccess(
+        `「${selected.targetGroupNameSnapshot}」の削除ジョブの再開を受け付けました（監査ログに記録済み）`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "再開に失敗しました");
     } finally {

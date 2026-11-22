@@ -120,6 +120,7 @@ export async function listSystemAdminAuditLogs(
     action?: SystemAdminAuditAction;
     actorUserId?: string;
     targetUserId?: string;
+    groupId?: string;
   },
 ) {
   await requireSystemAdminActor(deps, args.tokenIdentifier);
@@ -130,6 +131,7 @@ export async function listSystemAdminAuditLogs(
       action: args.action,
       actorUserId: args.actorUserId,
       targetUserId: args.targetUserId,
+      groupId: args.groupId,
     },
     args.paginationOpts,
   );

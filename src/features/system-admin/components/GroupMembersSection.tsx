@@ -2,6 +2,7 @@ import { Alert, Button, List, ListItem, Paper, Stack, Typography } from "@mui/ma
 import { Link } from "react-router-dom";
 import type { GroupDetail, GroupDetailMember } from "../hooks/useSystemAdminGroupDetail";
 import type { GroupRole } from "../../../../lib/domain/groups/role";
+import { displayLabel, groupRoleLabels } from "../lib/displayLabels";
 
 type GroupMembersSectionProps = {
   detail: GroupDetail;
@@ -18,6 +19,7 @@ type GroupMembersSectionProps = {
     newRole?: GroupRole,
   ) => void;
   onSelectRoleSource: (member: GroupDetailMember) => void;
+  onCancelRoleOperation: () => void;
 };
 
 export function GroupMembersSection({
@@ -31,6 +33,7 @@ export function GroupMembersSection({
   onRequestRemove,
   onRequestRoleChange,
   onSelectRoleSource,
+  onCancelRoleOperation,
 }: GroupMembersSectionProps) {
   return (
     <Paper sx={{ p: 2 }} variant="outlined">
@@ -52,7 +55,7 @@ export function GroupMembersSection({
               >
                 <Typography sx={{ flex: 1, minWidth: 220 }}>
                   {member.displayName ?? "ユーザー"}（{member.email ?? "email未登録"}） /{" "}
-                  {member.role}
+                  {displayLabel(groupRoleLabels, member.role)}
                 </Typography>
                 {member.userDocumentId ? (
                   <Button
@@ -68,7 +71,11 @@ export function GroupMembersSection({
                   disabled={stale || member.role === "owner" || !member.userDocumentId}
                   onClick={() => onRequestRemove(member)}
                   size="small"
-                  title={member.role === "owner" ? "ownerの解除は#477で行います" : undefined}
+                  title={
+                    member.role === "owner"
+                      ? "ownerはmemberへ変更してから解除できます（ownerが0人になる操作はできません）"
+                      : undefined
+                  }
                   variant="outlined"
                 >
                   グループから外す
@@ -119,7 +126,7 @@ export function GroupMembersSection({
               </Stack>
               {member.role === "owner" ? (
                 <Typography color="text.secondary" variant="caption">
-                  ownerの解除・付替えは#477で行います。
+                  ownerの解除・付替えは、ownerが0人にならない条件でのみこの画面から行えます。
                 </Typography>
               ) : null}
             </ListItem>
@@ -131,10 +138,20 @@ export function GroupMembersSection({
         </Typography>
       )}
       {detail.membersTruncated ? (
-        <Alert severity="warning">メンバーは上限件数まで表示しています。</Alert>
+        <Alert severity="warning">
+          メンバーは上限20件まで表示しています（{detail.members.length}件を表示）。
+        </Alert>
       ) : null}
       {roleOperation === "owner_transfer" && roleTarget && !roleSource ? (
-        <Alert severity="info" sx={{ mt: 1 }}>
+        <Alert
+          severity="info"
+          sx={{ mt: 1 }}
+          action={
+            <Button color="inherit" disabled={stale} onClick={onCancelRoleOperation} size="small">
+              取消
+            </Button>
+          }
+        >
           owner付替え先に「{roleTarget.displayName ?? "ユーザー"}
           」を選択しました。付替え元にするownerを選択してください。
         </Alert>
