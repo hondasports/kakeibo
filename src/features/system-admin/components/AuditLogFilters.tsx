@@ -9,14 +9,15 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import type { SystemAdminAuditAction } from "../types";
-import { actionOptions } from "../hooks/useSystemAdminAuditLog";
+import type { SystemAdminAuditAction, SystemAdminAuditGroupRelation } from "../types";
+import { actionOptions, groupRelationOptions } from "../hooks/useSystemAdminAuditLog";
 
 type AuditLogFiltersProps = {
   action: SystemAdminAuditAction | "";
   actor: string;
   target: string;
   groupId: string;
+  groupRelation: SystemAdminAuditGroupRelation;
   fromDate: string;
   toDate: string;
   hasFilter: boolean;
@@ -28,6 +29,7 @@ type AuditLogFiltersProps = {
   onActorChange: (actor: string) => void;
   onTargetChange: (target: string) => void;
   onGroupIdChange: (groupId: string) => void;
+  onGroupRelationChange: (relation: SystemAdminAuditGroupRelation) => void;
   onFromDateChange: (date: string) => void;
   onToDateChange: (date: string) => void;
   onApply: () => void;
@@ -39,6 +41,7 @@ export function AuditLogFilters({
   actor,
   target,
   groupId,
+  groupRelation,
   fromDate,
   toDate,
   hasFilter,
@@ -50,6 +53,7 @@ export function AuditLogFilters({
   onActorChange,
   onTargetChange,
   onGroupIdChange,
+  onGroupRelationChange,
   onFromDateChange,
   onToDateChange,
   onApply,
@@ -122,12 +126,31 @@ export function AuditLogFilters({
             helperText={
               groupIdInvalid
                 ? "IDの形式が正しくありません"
-                : "移動元・移動先・直接操作の対象に含まれる操作を絞り込みます"
+                : "このグループが関係する操作を絞り込みます"
             }
             label="対象グループの groupId"
             onChange={(event) => onGroupIdChange(event.target.value)}
             value={groupId}
           />
+          <FormControl disabled={!groupId.trim()} sx={{ minWidth: 160 }}>
+            <InputLabel id="system-admin-audit-group-relation-label">
+              対象グループとの関係
+            </InputLabel>
+            <Select
+              label="対象グループとの関係"
+              labelId="system-admin-audit-group-relation-label"
+              value={groupRelation}
+              onChange={(event) =>
+                onGroupRelationChange(event.target.value as SystemAdminAuditGroupRelation)
+              }
+            >
+              {groupRelationOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Stack>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
           <Button

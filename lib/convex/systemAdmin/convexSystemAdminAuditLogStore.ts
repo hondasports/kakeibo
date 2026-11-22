@@ -100,18 +100,68 @@ export function createSystemAdminAuditLogReader(
                             q.gte("createdAt", from).lte("createdAt", to),
                           )
                           .order("desc");
-      const page = await (
-        groupId
-          ? ordered.filter((q) =>
-              q.or(
-                q.eq(q.field("sourceGroupId"), groupId as Id<"groups">),
-                q.eq(q.field("targetGroupId"), groupId as Id<"groups">),
-                // 閲覧・削除再開・owner不在復旧など直接操作は対象グループを targetId に記録する。
-                q.eq(q.field("targetId"), groupId),
-              ),
-            )
-          : ordered
-      ).paginate(opts);
+      let page: Awaited<ReturnType<typeof ordered.paginate>>;
+      if (!groupId) {
+        page = await ordered.paginate(opts);
+      } else {
+        // groupId は関係の種類ごとに index で読む。sourceGroupId / targetGroupId /
+        // targetKind=group の targetId の OR は index では表せず、監査ログ全体を
+        // 読む .filter() は増え続けるテーブルで読み取り上限に当たるため使わない。
+        // 残りの条件（action/actor/targetUserId）はそのグループの行に限定して絞る。
+        const relation = filter.groupRelation ?? "direct";
+        const scoped =
+          relation === "source"
+            ? await ctx.db
+                .query("systemAdminAuditLogs")
+                .withIndex("by_source_group_id_and_created_at", (q) =>
+                  q
+                    .eq("sourceGroupId", groupId as Id<"groups">)
+                    .gte("createdAt", from)
+                    .lte("createdAt", to),
+                )
+                .order("desc")
+            : relation === "target"
+              ? await ctx.db
+                  .query("systemAdminAuditLogs")
+                  .withIndex("by_target_group_id_and_created_at", (q) =>
+                    q
+                      .eq("targetGroupId", groupId as Id<"groups">)
+                      .gte("createdAt", from)
+                      .lte("createdAt", to),
+                  )
+                  .order("desc")
+              : await ctx.db
+                  .query("systemAdminAuditLogs")
+                  .withIndex("by_target_kind_and_target_id_and_created_at", (q) =>
+                    q
+                      .eq("targetKind", "group")
+                      .eq("targetId", groupId)
+                      .gte("createdAt", from)
+                      .lte("createdAt", to),
+                  )
+                  .order("desc");
+        page =
+          action || actorUserId || targetUserId
+            ? await scoped
+                .filter((q) =>
+                  q.and(
+                    ...[
+                      action ? q.eq(q.field("action"), action) : undefined,
+                      actorUserId
+                        ? q.eq(q.field("actorUserId"), actorUserId as Id<"users">)
+                        : undefined,
+                      targetUserId
+                        ? q.eq(q.field("targetUserId"), targetUserId as Id<"users">)
+                        : undefined,
+                    ].filter(
+                      (condition): condition is NonNullable<typeof condition> =>
+                        condition !== undefined,
+                    ),
+                  ),
+                )
+                .paginate(opts)
+            : await scoped.paginate(opts);
+      }
       return { ...page, page: page.page.map(auditDocToRecord) };
     },
   };

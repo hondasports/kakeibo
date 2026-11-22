@@ -168,6 +168,9 @@ export const listSystemAdminAuditLogs = query({
     actorUserId: v.optional(v.id("users")),
     targetUserId: v.optional(v.id("users")),
     groupId: v.optional(v.id("groups")),
+    groupRelation: v.optional(
+      v.union(v.literal("source"), v.literal("target"), v.literal("direct")),
+    ),
   },
   returns: listAuditLogsResultValidator,
   handler: async (ctx, args) => {
@@ -182,6 +185,7 @@ export const listSystemAdminAuditLogs = query({
       actorUserId: args.actorUserId,
       targetUserId: args.targetUserId,
       groupId: args.groupId,
+      groupRelation: args.groupRelation,
     })) as Infer<typeof listAuditLogsResultValidator>;
   },
 });

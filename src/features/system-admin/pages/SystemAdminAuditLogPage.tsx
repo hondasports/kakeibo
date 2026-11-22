@@ -31,6 +31,8 @@ function SystemAdminAuditLogPageContent() {
     setTarget,
     groupId,
     setGroupId,
+    groupRelation,
+    setGroupRelation,
     fromDate,
     setFromDate,
     toDate,
@@ -64,6 +66,7 @@ function SystemAdminAuditLogPageContent() {
         fromDate={fromDate}
         groupIdInvalid={groupIdInvalid}
         groupId={groupId}
+        groupRelation={groupRelation}
         hasFilter={hasFilter}
         target={target}
         targetInvalid={targetInvalid}
@@ -74,6 +77,7 @@ function SystemAdminAuditLogPageContent() {
         onClear={handleClear}
         onFromDateChange={setFromDate}
         onGroupIdChange={setGroupId}
+        onGroupRelationChange={setGroupRelation}
         onTargetChange={setTarget}
         onToDateChange={setToDate}
       />

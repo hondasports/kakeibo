@@ -11,7 +11,10 @@ import {
 import type { PaginationOpts } from "../../domain/pagination";
 import type { SystemAdminNotificationAction } from "../../domain/systemAdmin/notificationStore";
 import type { SystemAdminStatus } from "../../domain/systemAdmin/systemAdminStore";
-import type { SystemAdminAuditAction } from "../../domain/systemAdmin/auditLog";
+import type {
+  SystemAdminAuditAction,
+  SystemAdminAuditGroupRelation,
+} from "../../domain/systemAdmin/auditLog";
 import type { AppEnvironment } from "../../domain/systemAdmin/environment";
 import type { SystemAdminMutationDeps, SystemAdminQueryDeps } from "./deps";
 import { requireSystemAdminActor } from "./actor";
@@ -121,6 +124,7 @@ export async function listSystemAdminAuditLogs(
     actorUserId?: string;
     targetUserId?: string;
     groupId?: string;
+    groupRelation?: SystemAdminAuditGroupRelation;
   },
 ) {
   await requireSystemAdminActor(deps, args.tokenIdentifier);
@@ -132,6 +136,7 @@ export async function listSystemAdminAuditLogs(
       actorUserId: args.actorUserId,
       targetUserId: args.targetUserId,
       groupId: args.groupId,
+      groupRelation: args.groupRelation,
     },
     args.paginationOpts,
   );

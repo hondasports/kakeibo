@@ -34,6 +34,7 @@ export function SystemAdminUserSearchPage() {
   const [error, setError] = useState(false);
   const lastRequest = useRef<{
     cursor: string | null;
+    nav?: { push?: string | null; pop?: boolean };
     queryType: UserSearchType;
     query: string;
   } | null>(null);
@@ -49,7 +50,7 @@ export function SystemAdminUserSearchPage() {
     const effectiveParams =
       params ??
       (appliedParams.current ? { ...appliedParams.current } : { queryType, query: query.trim() });
-    lastRequest.current = { cursor: nextCursor, ...effectiveParams };
+    lastRequest.current = { cursor: nextCursor, nav, ...effectiveParams };
     setIsLoading(true);
     setError(false);
     try {
@@ -80,7 +81,7 @@ export function SystemAdminUserSearchPage() {
   const retryFailedRequest = () => {
     void runSearch(
       lastRequest.current?.cursor ?? cursor,
-      undefined,
+      lastRequest.current?.nav,
       lastRequest.current
         ? { queryType: lastRequest.current.queryType, query: lastRequest.current.query }
         : undefined,
