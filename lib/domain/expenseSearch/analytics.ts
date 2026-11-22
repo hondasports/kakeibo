@@ -94,6 +94,9 @@ function categoryInfo(
   categoryId: string,
   categoryInfoMap: Map<string, HistoryCategoryInfo>,
 ): HistoryCategoryInfo {
+  if (categoryId.length === 0) {
+    return { name: "未分類", color: "#AAB7C4" };
+  }
   return categoryInfoMap.get(categoryId) ?? { name: "不明", color: "#AAB7C4" };
 }
 

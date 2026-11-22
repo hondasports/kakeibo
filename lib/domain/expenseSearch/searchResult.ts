@@ -65,7 +65,9 @@ export function collectCategoryIds(groups: SearchableHistoryGroup[]): string[] {
   return Array.from(
     new Set(
       groups.flatMap((group) =>
-        group.type === "income" ? [] : group.items.map((item) => item.categoryId),
+        group.type === "income"
+          ? []
+          : group.items.map((item) => item.categoryId).filter((id) => id.length > 0),
       ),
     ),
   );
@@ -99,7 +101,7 @@ export function mapHistoryGroupToItems(
       shopName: item.shopName,
       amountYen: item.amountYen,
       categoryId: item.categoryId,
-      categoryName: info?.name ?? "不明",
+      categoryName: item.categoryId.length === 0 ? "未分類" : (info?.name ?? "不明"),
       categoryColor: info?.color ?? "#AAB7C4",
       memo: item.memo,
       recordType: item.recordType,

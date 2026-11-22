@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExpenseSearchResult } from "../../../../lib/convex/expenseSearch/searchExpenses";
 import { apiMockWith } from "../../../test/apiMock";
 import { renderWithDatePickers } from "../../../test/render";
-import { getCurrentWeekStartDate } from "../../week";
+import { getCurrentWeekStartDate, normalizeWeekStartDate } from "../../week";
 import { ExpenseSearchPage } from "./ExpenseSearchPage";
 
 const useQueryMock = vi.fn();
@@ -101,6 +101,24 @@ describe("ExpenseSearchPage", () => {
     expect(screen.getByRole("button", { name: "終了日を選択" })).toBeInTheDocument();
     expect(document.querySelector('input[type="date"]')).toBeNull();
     expect(screen.getByText("条件に合う履歴はありません")).toBeInTheDocument();
+  });
+
+  it("検索期間に連動して週次・月次サマリーへリンクする", () => {
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?from=2026-05-10&to=2026-05-31"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    const historyNavigation = screen.getByRole("navigation", { name: "履歴メニュー" });
+    expect(within(historyNavigation).getByRole("link", { name: "月次サマリー" })).toHaveAttribute(
+      "href",
+      "/months/2026-05",
+    );
+    expect(within(historyNavigation).getByRole("link", { name: "週次サマリー" })).toHaveAttribute(
+      "href",
+      `/weeks/${normalizeWeekStartDate("2026-05-10", 3)}`,
+    );
   });
 
   it("不正な金額範囲ならエラーを出して検索しない", () => {
@@ -351,6 +369,78 @@ describe("ExpenseSearchPage", () => {
       screen.getByText(
         "件数が多いため、先頭の一部だけを集計しています。期間やキーワードで絞り込んでください。",
       ),
+    ).toBeInTheDocument();
+  });
+
+  it("未分類の集計項目を選ぶと未分類フィルタで絞り込む", async () => {
+    const user = userEvent.setup();
+    const result: ExpenseSearchResult = {
+      ...emptySearchResult,
+      totalCount: 1,
+      expenseCount: 1,
+      totalExpenseYen: 1200,
+      comparison: {
+        currentStartDate: "2026-08-01",
+        currentEndDate: "2026-08-31",
+        previousStartDate: "2026-07-01",
+        previousEndDate: "2026-07-31",
+        current: {
+          count: 1,
+          expenseCount: 1,
+          incomeCount: 0,
+          totalExpenseYen: 1200,
+          totalIncomeYen: 0,
+          netAmountYen: -1200,
+          byCategory: [],
+        },
+        previous: {
+          count: 1,
+          expenseCount: 1,
+          incomeCount: 0,
+          totalExpenseYen: 800,
+          totalIncomeYen: 0,
+          netAmountYen: -800,
+          byCategory: [],
+        },
+        diffExpenseYen: 400,
+        diffIncomeYen: 0,
+        diffNetYen: -400,
+        categoryChanges: [
+          {
+            categoryId: "",
+            categoryName: "未分類",
+            categoryColor: "#AAB7C4",
+            currentAmountYen: 1200,
+            previousAmountYen: 800,
+            diffAmountYen: 400,
+            diffRatePercent: 50,
+          },
+        ],
+        hasPreviousData: true,
+      },
+    };
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return result;
+    });
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+        <LocationProbe />
+        <Routes>
+          <Route path="/search" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /未分類/ }));
+    expect(
+      screen.getByText("/search?type=expense&categoryId=__uncategorized__"),
     ).toBeInTheDocument();
   });
 

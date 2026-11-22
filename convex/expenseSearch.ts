@@ -7,6 +7,7 @@ import {
   historyTrendGranularityValidator,
 } from "../lib/convex/expenseSearch/validators";
 import { entryKindValidator, recordTypeValidator } from "../lib/convex/receipts/validators";
+import { UNCATEGORIZED_CATEGORY_ID } from "../lib/domain/expenseSearch/filter";
 import { categorySummaryValidator } from "./lib/validators";
 
 const expenseSearchReceiptValidator = v.object({
@@ -68,7 +69,7 @@ export const searchExpenses = query({
   args: {
     entryType: v.optional(historyEntryTypeValidator),
     shopQuery: v.optional(v.string()),
-    categoryId: v.optional(v.id("categories")),
+    categoryId: v.optional(v.union(v.id("categories"), v.literal(UNCATEGORIZED_CATEGORY_ID))),
     minAmountYen: v.optional(v.number()),
     maxAmountYen: v.optional(v.number()),
     startDate: v.optional(v.string()),

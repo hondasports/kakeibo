@@ -19,7 +19,10 @@ import {
   getHistoryDateRangeForPreset,
   type HistoryDatePreset,
 } from "../../../../lib/domain/expenseSearch/datePresets";
-import type { HistoryEntryType } from "../../../../lib/domain/expenseSearch/filter";
+import {
+  UNCATEGORIZED_CATEGORY_ID,
+  type HistoryEntryType,
+} from "../../../../lib/domain/expenseSearch/filter";
 import type { ExpenseSearchFieldErrors, ExpenseSearchFormState } from "../lib/searchParams";
 import { extractAmountDigits } from "../../../utils/currency";
 
@@ -35,7 +38,7 @@ const pickerPaperSx = {
   },
 } as const;
 
-const KEYWORD_FIELD_HELP = "店名・品名・銀行名・メモを部分一致で探します";
+const KEYWORD_FIELD_HELP = '空白区切りでAND、先頭「-」で除外、「"..."」でそのまま検索';
 
 const datePresetOptions: Array<{ label: string; value: Exclude<HistoryDatePreset, "custom"> }> = [
   { label: "今週", value: "thisWeek" },
@@ -168,6 +171,7 @@ export function ExpenseSearchFilters({
             onChange={(event) => onChange({ ...state, categoryId: event.target.value })}
           >
             <MenuItem value="">指定なし</MenuItem>
+            <MenuItem value={UNCATEGORIZED_CATEGORY_ID}>未分類</MenuItem>
             {categories.map((category) => (
               <MenuItem key={category._id} value={category._id}>
                 {category.name}

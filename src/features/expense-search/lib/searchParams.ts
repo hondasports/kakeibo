@@ -187,7 +187,7 @@ export function toExpenseSearchQueryArgs(state: ExpenseSearchFormState) {
       entryType: parsed.filters.entryType,
       shopQuery: parsed.filters.shopQuery,
       categoryId: parsed.filters.categoryId
-        ? (parsed.filters.categoryId as Id<"categories">)
+        ? (parsed.filters.categoryId as Id<"categories"> | "__uncategorized__")
         : undefined,
       minAmountYen: parsed.filters.minAmountYen,
       maxAmountYen: parsed.filters.maxAmountYen,

@@ -8,7 +8,7 @@ import {
 import {
   addLegacyReceiptGroups,
   enrichSpendingEntriesWithReceiptGroups,
-  mapExpenseEntriesToReceiptLinkages,
+  mapExpenseEntriesToSearchLinkages,
   mapIncomeExpenseEntryToListEntry,
   mapReceiptToIncomeListEntry,
   mapReceiptToSpendingEntry,
@@ -114,7 +114,7 @@ export async function loadHistoryEntriesForSearch(
   const enrichedEntries = await enrichSpendingEntriesWithReceiptGroups(
     ctx,
     groupId,
-    mapExpenseEntriesToReceiptLinkages(newKinds.expenses),
+    mapExpenseEntriesToSearchLinkages(newKinds.expenses),
   );
   const entries = mergeSearchEntrySources(
     enrichedEntries,
