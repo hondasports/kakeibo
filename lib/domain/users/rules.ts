@@ -65,6 +65,25 @@ export function buildUserUpsertPatch(
   };
 }
 
+/** 月収入の上限（円）。入力契約の正本。 */
+export const MAX_MONTHLY_INCOME_YEN = 999_999_999;
+
+/**
+ * 月収入の数値検証。未設定（undefined）は許容し、設定する場合は
+ * 0以上 MAX_MONTHLY_INCOME_YEN 以下の整数のみを認める。
+ */
+export function validateMonthlyIncome(
+  income: number | undefined,
+): { success: true } | { success: false } {
+  if (income === undefined) {
+    return { success: true };
+  }
+  if (!Number.isInteger(income) || income < 0 || income > MAX_MONTHLY_INCOME_YEN) {
+    return { success: false };
+  }
+  return { success: true };
+}
+
 /** 内部 upsert（Clerk webhook 等）の displayName 解決。 */
 export function resolveProfileDisplayName(displayName: string, email?: string): string {
   return displayName.trim() || email || "ユーザー";

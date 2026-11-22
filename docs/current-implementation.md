@@ -310,7 +310,7 @@ E2E専用HTTPエンドポイントはデプロイ時の環境変数に依存せ�
 
 - `/export` 画面
 - CSV生成・ダウンロードUI
-- 月収入設定UI（schema互換の `monthlyIncome` は残る）
+- 月収入の集計への反映（設定UIは実装済みだが `monthlyIncome` は保存のみで集計には未使用。表示は必要になった時点で別Issue）
 - `sourceDocuments` を中心にした一般利用向け公開CRUDフロー
 - LINEからの支出・収入登録、更新、削除
 - オフラインファースト/PWAの完成フロー
