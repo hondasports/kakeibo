@@ -163,6 +163,9 @@ publishable keyから得たissuerとユーザーIDを組み合わせて`E2E_CLER
 | 変数名 | 用途 | Local | DEV/PR Preview | PREVIEW RC | PROD | Secret扱い | 設定場所 |
 | ------------------------------ | --------------------------------------------------------------------- | ----- | -------------- | ---------- | ---- | ---------- | ---------------- |
 | `VITE_APP_MAINTENANCE_MODE` | メンテナンスモード切替。`"true"` で全ページをメンテナンス表示に切替（`/privacy`・`/terms`・`/maintenance` は除外。`src/features/app-shell/lib/maintenanceMode.ts`） | 任意 | 任意 | 任意 | 任意 | ❌ | .env.local / Vercel Env |
+| `VITE_APP_MAINTENANCE_PERIOD` | メンテナンス画面に表示する実施期間（計画メンテナンス用。未設定なら表示しない） | 任意 | 任意 | 任意 | 任意 | ❌ | .env.local / Vercel Env |
+| `VITE_APP_MAINTENANCE_REASON` | メンテナンス画面に表示する実施理由（同上） | 任意 | 任意 | 任意 | 任意 | ❌ | .env.local / Vercel Env |
+| `VITE_APP_MAINTENANCE_ETA` | メンテナンス画面に表示する復旧見込み（同上） | 任意 | 任意 | 任意 | 任意 | ❌ | .env.local / Vercel Env |
 | `VITE_ENABLE_E2E_ROUTES` | 本番相当ビルドで `/__e2e__/*` ルートを有効化（`"1"` のみ有効。`src/routing/e2eRoutes.tsx`） | 不要（`import.meta.env.DEV` で常時有効） | ❌ | `production-release.yml` がビルド時に `=1` を export | ❌ | ❌ | workflow のみ（手動設定しない） |
 
 `VITE_ENABLE_E2E_ROUTES` は CI 専用の内部変数で、`.env.example` にはコメントのみ記載し
