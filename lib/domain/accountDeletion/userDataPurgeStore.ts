@@ -16,6 +16,8 @@ export const ACCOUNT_DELETION_USER_PURGE_TABLES = [
   "lineLinkRequests",
   "lineLinkAuditLogs",
   "lineAccountLinks",
+  // お気に入りは userId 単位の個人データのため退会時に削除する（グループ削除でも別途purge）。
+  "entryFavorites",
 ] as const;
 
 export type AccountDeletionUserPurgeTable = (typeof ACCOUNT_DELETION_USER_PURGE_TABLES)[number];

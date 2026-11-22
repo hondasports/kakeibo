@@ -1,6 +1,7 @@
+import { useEffect } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
-import { Link as RouterLink, useLocation } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { Alert, Box, Button, Stack, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { ExpenseEntryForm } from "../components/ExpenseEntryForm";
@@ -12,7 +13,16 @@ import { SuzumemoLoadingState } from "../../ui";
 export function InputPage() {
   const theme = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const initialPrefill = (location.state as { prefill?: ExpenseEntryPrefill } | null)?.prefill;
+  // 複写内容は1回だけ適用する。state を消さないと週移動などでフォームが
+  // 再マウントされた際に同じ内容が再適用される。
+  useEffect(() => {
+    if (initialPrefill !== undefined) {
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const {
     weekStartDate,
