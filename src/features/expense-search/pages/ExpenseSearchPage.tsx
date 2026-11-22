@@ -97,12 +97,18 @@ export function ExpenseSearchPage() {
   const hasUnappliedChanges = Object.keys(diffExpenseSearchFormState(applied, draft)).length > 0;
 
   const currentSearchPath = `${location.pathname}${location.search}`;
-  const appliedCategory = allCategories.find((category) => category._id === applied.categoryId);
+  // まず有効カテゴリ（listActive）で解決し、無効化済みかの判定だけ listForSettings に頼る。
+  // どちらの結果も来ていない間は「読み込み中」として「指定」と区別する。
+  const activeCategory = categories.find((category) => category._id === applied.categoryId);
+  const appliedCategory =
+    activeCategory ?? allCategories.find((category) => category._id === applied.categoryId);
   const categoryLabel = appliedCategory
-    ? appliedCategory.isActive
-      ? appliedCategory.name
-      : `${appliedCategory.name}（無効化済み）`
-    : undefined;
+    ? appliedCategory.isActive === false
+      ? `${appliedCategory.name}（無効化済み）`
+      : appliedCategory.name
+    : applied.categoryId && allCategoriesQuery === undefined
+      ? "読み込み中"
+      : undefined;
   const expenseItems = loadedItems.filter((item) => item.type === "expense").map(toReceiptItem);
   const incomeItems = loadedItems.filter((item) => item.type === "income").map(toIncomeItem);
 
