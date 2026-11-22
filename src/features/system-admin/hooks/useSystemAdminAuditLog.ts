@@ -40,13 +40,15 @@ export const actionOptions: Array<{ value: SystemAdminAuditAction | ""; label: s
   })),
 ];
 
+// sourceGroupId / targetGroupId は所属移動だけでなく、role変更・招待取消・
+// 所属追加など「そのグループが操作の起点・宛先として記録された」全操作に入る。
 export const groupRelationOptions: Array<{
   value: SystemAdminAuditGroupRelation;
   label: string;
 }> = [
   { value: "direct", label: "直接操作の対象" },
-  { value: "source", label: "移動元" },
-  { value: "target", label: "移動先" },
+  { value: "source", label: "操作元（移動元・role変更・招待取消など）" },
+  { value: "target", label: "操作先（所属追加・移動先など）" },
 ];
 
 export function formatAction(action: SystemAdminAuditAction) {
