@@ -307,21 +307,24 @@ describe("searchExpenses", () => {
         );
         expect(loadHistoryEntries).toHaveBeenCalledTimes(3);
       } else {
+        // dateDesc/amountDesc も集計用に新しい側を件数を絞って読み直す
+        // （一覧・集計用の再読・前期間の3回）。
         expect(loadHistoryEntries).toHaveBeenNthCalledWith(
-          1,
+          2,
           "g1",
           "2026-01-01",
           "2026-01-31",
           "desc",
+          AGGREGATE_RESCAN_MAX_RECORDS,
         );
         expect(loadHistoryEntries).toHaveBeenNthCalledWith(
-          2,
+          3,
           "g1",
           "2025-12-01",
           "2025-12-31",
           "desc",
         );
-        expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
+        expect(loadHistoryEntries).toHaveBeenCalledTimes(3);
       }
     },
   );

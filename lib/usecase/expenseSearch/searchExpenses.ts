@@ -105,34 +105,23 @@ export async function searchExpenses(
     parsed.filters,
   );
 
-  // 集計は並び順に依存しない。常に日付が新しい側の範囲を対象にし、
-  // 打ち切り時の集計対象は全ソートで同一の最新 AGGREGATE_RESCAN_MAX_RECORDS
-  // 件に揃える。同じ範囲を2度読めば1クエリの走査上限を超えるため、
-  // dateAsc だけ新しい側を件数を絞って読み直し、desc/amountDesc は
-  // 取得済みの新しい側の先頭から同じ件数だけ使う。
+  // 集計は並び順に依存しない。打ち切り時は全ソートで同一の最新
+  // AGGREGATE_RESCAN_MAX_RECORDS 件を対象にするため、一覧用とは別に
+  // 新しい側を件数を絞って読み直す（読み直し件数は1クエリの走査上限に
+  // 一覧分と合わせて収まる範囲に設定してある）。
   let aggregateGroups = groups;
   if (source.truncated) {
-    if (parsed.filters.sortOrder === "dateAsc") {
-      const aggregateSource = await store.loadHistoryEntries(
-        groupId,
-        parsed.filters.startDate,
-        parsed.filters.endDate,
-        "desc",
-        AGGREGATE_RESCAN_MAX_RECORDS,
-      );
-      aggregateGroups = filterHistoryGroups(
-        groupHistoryEntries(aggregateSource.entries, aggregateSource.incomes),
-        parsed.filters,
-      );
-    } else {
-      aggregateGroups = filterHistoryGroups(
-        groupHistoryEntries(
-          source.entries.slice(0, AGGREGATE_RESCAN_MAX_RECORDS),
-          source.incomes.slice(0, AGGREGATE_RESCAN_MAX_RECORDS),
-        ),
-        parsed.filters,
-      );
-    }
+    const aggregateSource = await store.loadHistoryEntries(
+      groupId,
+      parsed.filters.startDate,
+      parsed.filters.endDate,
+      "desc",
+      AGGREGATE_RESCAN_MAX_RECORDS,
+    );
+    aggregateGroups = filterHistoryGroups(
+      groupHistoryEntries(aggregateSource.entries, aggregateSource.incomes),
+      parsed.filters,
+    );
   }
 
   // 前期間比較は初回ページでだけ計算する。ページ追加時は現在期間の集計を
