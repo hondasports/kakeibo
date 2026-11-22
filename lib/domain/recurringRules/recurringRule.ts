@@ -1,5 +1,5 @@
 import { addDays, getMonthEndDate } from "../common/date";
-import { isValidIsoDateString } from "../week/weekDates";
+import { calculateWeekStartDate, isValidIsoDateString } from "../week/weekDates";
 import {
   validateExpenseAmount,
   validateExpenseMemo,
@@ -28,8 +28,10 @@ export const MAX_REGISTERED_DATES = 90;
 
 export type RecurringRule = RecurringRuleInput & {
   active: boolean;
-  /** 登録済みの発生日（YYYY-MM-DD）の履歴。条件変更で発生日が移動しても
-      過去の発生日を再登録しないよう、直近の全発生日を保持する */
+  /** 登録済みの発生日（YYYY-MM-DD）の履歴。直近の全発生日を保持する。
+      二重登録の判定は発生日そのものではなく期間キー（monthlyはYYYY-MM、
+      weeklyは発生日を含む週の開始日）で行うため、条件変更で発生日が
+      移動しても同じ期間には1回しか登録できない */
   registeredForDates?: string[];
 };
 
@@ -116,11 +118,39 @@ export function latestOccurrenceDate(
   return `${prevMonthStart.slice(0, 8)}${String(prevDay).padStart(2, "0")}`;
 }
 
+/**
+ * 二重登録の判定に使う期間キー。
+ * monthly は "YYYY-MM"、weekly は発生日を含む週の開始日（月曜始まり）。
+ * 発生日そのものではなく期間で比較するため、繰り返し条件の変更
+ * （25日→1日、月曜→金曜など）で同じ期間に2件登録できない。
+ */
+export function recurringRegistrationKey(
+  input: Pick<RecurringRuleInput, "frequency">,
+  occurrenceDate: string,
+): string {
+  if (input.frequency === "monthly") {
+    return occurrenceDate.slice(0, 7);
+  }
+  return calculateWeekStartDate(occurrenceDate);
+}
+
+/**
+ * occurrence の期間がすでに登録済みか。
+ * 保存されている発生日も現在の頻度で期間キーへ変換して比較する
+ * （weekly→monthly への変更後も同じ期間は再登録されない）。
+ */
+export function isOccurrenceRegistered(rule: RecurringRule, occurrence: string): boolean {
+  const key = recurringRegistrationKey(rule, occurrence);
+  return (rule.registeredForDates ?? []).some(
+    (date) => recurringRegistrationKey(rule, date) === key,
+  );
+}
+
 /** 登録が必要な状態（発生日が到来していて未登録）か。 */
 export function isRuleDue(rule: RecurringRule, today: string): boolean {
   if (!rule.active || !isValidIsoDateString(today)) {
     return false;
   }
   const occurrence = latestOccurrenceDate(rule, today);
-  return !(rule.registeredForDates ?? []).includes(occurrence);
+  return !isOccurrenceRegistered(rule, occurrence);
 }

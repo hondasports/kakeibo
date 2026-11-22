@@ -4,6 +4,7 @@ import type { CategoryRepository } from "../../domain/categories/categoryReposit
 import type { ExpenseEntryRepository } from "../../domain/expenseEntries/expenseEntryRepository";
 import type { SourceDocumentRepository } from "../../domain/sourceDocuments/sourceDocumentRepository";
 import {
+  isOccurrenceRegistered,
   isRuleDue,
   latestOccurrenceDate,
   MAX_REGISTERED_DATES,
@@ -125,8 +126,9 @@ export type RegisterFromRuleResult =
 
 /**
  * 定期定義から実績を登録する。直近の発生日（JST基準・当日含む）で
- * 1件作成し、同じ発生日の二重登録は registeredForDates で弾く
- * （条件変更で発生日が移動しても過去の発生日は再登録しない）。
+ * 1件作成する。二重登録は発生日ではなく期間キー（monthlyは月、
+ * weeklyは週）で判定するため、条件変更で発生日が移動しても
+ * 同じ期間には1回しか登録できない。
  */
 export async function registerFromRecurringRule(
   ctx: UsecaseGroupContext,
@@ -139,7 +141,7 @@ export async function registerFromRecurringRule(
   }
   const today = getTodayDateStringInJapan();
   const occurrence = latestOccurrenceDate(rule, today);
-  if ((rule.registeredForDates ?? []).includes(occurrence)) {
+  if (isOccurrenceRegistered(rule, occurrence)) {
     return { registered: false, reason: "already_registered" };
   }
   if (rule.kind === "income") {

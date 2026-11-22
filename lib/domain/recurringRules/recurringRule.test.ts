@@ -125,4 +125,26 @@ describe("isRuleDue", () => {
   it("停止中は登録不要", () => {
     expect(isRuleDue({ ...rule, active: false }, "2026-11-22")).toBe(false);
   });
+
+  it("発生日の日付を変えても、同じ月には再登録できない", () => {
+    // 11/25 に登録済み → 条件を毎月1日に変えても、11/1 は同じ "2026-11" のため登録不要。
+    const moved = { ...rule, dayOfMonth: 1, registeredForDates: ["2026-11-25"] };
+    expect(isRuleDue(moved, "2026-11-30")).toBe(false);
+    // 翌月（12/1）になれば別期間なので due になる。
+    expect(isRuleDue(moved, "2026-12-01")).toBe(true);
+  });
+
+  it("曜日を変えても、同じ週には再登録できない", () => {
+    // 月曜日付けで 11/16（月）に登録済み → 金曜に変えても 11/20（金）は同じ週。
+    const weekly = {
+      ...rule,
+      frequency: "weekly" as const,
+      dayOfMonth: undefined,
+      dayOfWeek: 5,
+      registeredForDates: ["2026-11-16"],
+    };
+    expect(isRuleDue(weekly, "2026-11-20")).toBe(false);
+    // 翌週の発生日（11/27）は別期間なので due になる。
+    expect(isRuleDue(weekly, "2026-11-28")).toBe(true);
+  });
 });
