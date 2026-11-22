@@ -35,6 +35,9 @@ function createDeps(links: LineAccountLinkRecord[]): BuildSummaryReplyDeps {
       buildCategoryInfoMap: vi.fn().mockResolvedValue(new Map()),
       listActiveCategories: vi.fn().mockResolvedValue([]),
     },
+    expenseDrafts: {
+      lineTextDraftCreatedAtsSince: vi.fn().mockResolvedValue([]),
+    },
   };
 }
 
@@ -94,6 +97,30 @@ describe("テキスト支出入力の返信分岐", () => {
       expect(result.replyText).toContain("下書きを作成したよ");
     },
   );
+
+  it("当日の下書きが30件で今回の入力が作っていない場合は上限の返信を返す", async () => {
+    const deps = depsWithCategories([originalLink]);
+    deps.expenseDrafts.lineTextDraftCreatedAtsSince = vi
+      .fn()
+      .mockResolvedValue(Array.from({ length: 30 }, (_, i) => args.nowMs - 1000 * (i + 1)));
+    const result = await buildSummaryReply(deps, { ...args, messageText: "コンビニ 500" });
+    expect(result.replyKind).toBe("expense_draft_limit");
+    expect(result.replyText).toContain("今日はこれ以上LINEから下書きを作れません");
+    expect(result.replyText).not.toContain("下書きを作成したよ");
+  });
+
+  it("30件目を今回の入力で作った場合は作成済みの返信を返す", async () => {
+    const deps = depsWithCategories([originalLink]);
+    deps.expenseDrafts.lineTextDraftCreatedAtsSince = vi
+      .fn()
+      .mockResolvedValue([
+        args.nowMs,
+        ...Array.from({ length: 29 }, (_, i) => args.nowMs - 1000 * (i + 1)),
+      ]);
+    const result = await buildSummaryReply(deps, { ...args, messageText: "コンビニ 500" });
+    expect(result.replyKind).toBe("expense_draft");
+    expect(result.replyText).toContain("下書きを作成したよ");
+  });
 
   it.each([
     ["食費", "category_lookup"],

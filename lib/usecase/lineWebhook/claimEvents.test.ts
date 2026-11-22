@@ -41,6 +41,7 @@ function createDeps(
       | { status: "no_group" }
       | { status: "unresolved" };
     group?: { id: string; status?: string } | null;
+    expenseDraftCreatedAts?: number[];
   } = {},
 ) {
   const {
@@ -48,6 +49,7 @@ function createDeps(
     findByWebhookEventId = async () => null,
     groupResolution = { status: "resolved", groupId: "group-a" },
     group = { id: "group-a", status: "active" },
+    expenseDraftCreatedAts = [],
   } = overrides;
   const deps: ClaimEventsDeps = {
     webhookEvents: {
@@ -77,7 +79,10 @@ function createDeps(
       buildCategoryInfoMap: vi.fn(async () => new Map()),
       listActiveCategories: vi.fn(async () => categories),
     },
-    expenseDrafts: { createFromLineText: vi.fn(async () => undefined) },
+    expenseDrafts: {
+      createFromLineText: vi.fn(async () => undefined),
+      lineTextDraftCreatedAtsSince: vi.fn(async () => expenseDraftCreatedAts),
+    },
   };
   return deps;
 }
@@ -145,6 +150,22 @@ describe("LINEテキストの支出下書き作成", () => {
     const result = await claimEvents(deps, [textEvent()]);
     expect(result.duplicateCount).toBe(1);
     expect(deps.expenseDrafts.createFromLineText).not.toHaveBeenCalled();
+  });
+
+  it("当日（JST）30件目まで作り、31件目は作らない", async () => {
+    const deps = createDeps({
+      expenseDraftCreatedAts: Array.from({ length: 30 }, (_, i) => NOW - 1000 * (i + 1)),
+    });
+    await claimEvents(deps, [textEvent()]);
+    expect(deps.expenseDrafts.createFromLineText).not.toHaveBeenCalled();
+  });
+
+  it("当日（JST）29件までなら30件目を作る", async () => {
+    const deps = createDeps({
+      expenseDraftCreatedAts: Array.from({ length: 29 }, (_, i) => NOW - 1000 * (i + 1)),
+    });
+    await claimEvents(deps, [textEvent()]);
+    expect(deps.expenseDrafts.createFromLineText).toHaveBeenCalledTimes(1);
   });
 
   it("同じバッチ内の重複 webhookEventId も1件だけ", async () => {

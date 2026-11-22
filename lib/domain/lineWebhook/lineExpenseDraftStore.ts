@@ -12,6 +12,17 @@ export type LineExpenseDraftInsert = {
   now: number;
 };
 
-export type LineExpenseDraftStore = {
+/** LINEテキスト下書きの1人あたりの日次上限（JSTの暦日で数える）。 */
+export const LINE_TEXT_DRAFT_DAILY_LIMIT = 30;
+
+export type LineExpenseDraftReader = {
+  /**
+   * sinceMs 以降に同じユーザーが作成した line_text 下書きの createdAt
+   * （新しい順・最大 LINE_TEXT_DRAFT_DAILY_LIMIT + 1 件）。日次上限の判定用。
+   */
+  lineTextDraftCreatedAtsSince(createdByUserId: string, sinceMs: number): Promise<number[]>;
+};
+
+export type LineExpenseDraftStore = LineExpenseDraftReader & {
   createFromLineText(args: LineExpenseDraftInsert): Promise<void>;
 };

@@ -1,5 +1,13 @@
 export const JAPAN_TIME_ZONE = "Asia/Tokyo";
 
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** JST で当日0:00に相当するUTC時刻（ms）。日ごとの件数制限に使う。 */
+export function startOfDayInJapanMs(now: number): number {
+  return Math.floor((now + JST_OFFSET_MS) / DAY_MS) * DAY_MS - JST_OFFSET_MS;
+}
+
 export function getTodayDateStringInJapan(now: Date | number = new Date()): string {
   const date = typeof now === "number" ? new Date(now) : now;
   const parts = new Intl.DateTimeFormat("ja-JP", {

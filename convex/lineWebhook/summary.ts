@@ -20,6 +20,7 @@ const lineReplyKindValidator = v.union(
   v.literal("category_lookup"),
   v.literal("receipt_guide"),
   v.literal("expense_draft"),
+  v.literal("expense_draft_limit"),
 );
 
 const summaryReplyValidator = v.object({

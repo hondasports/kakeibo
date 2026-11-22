@@ -4,13 +4,17 @@ import { resolveActiveLink } from "../../domain/lineLink/activeLink";
  * コマンド解析→グループ解決→週次集計→応答文生成の分岐順序はベースと同一。
  */
 import { MAX_CATEGORIES_PER_GROUP } from "../../domain/categories/defaults";
-import { getTodayDateStringInJapan } from "../../domain/common/date";
+import { getTodayDateStringInJapan, startOfDayInJapanMs } from "../../domain/common/date";
 import { isGroupDeleted } from "../../domain/groups/lifecycle";
 import type { GroupReadRepository } from "../../domain/groups/groupRepository";
 import type { UserSettingsRepository } from "../../domain/users/userSettingsRepository";
 import type { LineActiveGroupResolver } from "../../domain/lineWebhook/activeGroupResolver";
 import type { LineAccountLinkReader } from "../../domain/lineLink/accountLinkStore";
 import type { LineSummaryDataReader } from "../../domain/lineWebhook/summaryDataReader";
+import {
+  LINE_TEXT_DRAFT_DAILY_LIMIT,
+  type LineExpenseDraftReader,
+} from "../../domain/lineWebhook/lineExpenseDraftStore";
 import type { SummaryReplyJobArgs } from "../../domain/lineWebhook/scheduler";
 import { LINE_UNLINKED_GUIDANCE_MESSAGE } from "../../domain/lineWebhook/reply";
 import { parseLineSummaryCommand, resolveCategoryLookup } from "../../domain/lineSummary/commands";
@@ -20,6 +24,7 @@ import {
   LINE_HELP_MESSAGE,
   LINE_NO_GROUP_MESSAGE,
   LINE_RECEIPT_GUIDE_MESSAGE,
+  LINE_TEXT_DRAFT_DAILY_LIMIT_MESSAGE,
   LINE_UNRESOLVED_GROUP_MESSAGE,
   formatCategoryReply,
   formatExpenseDraftReply,
@@ -41,7 +46,31 @@ export type BuildSummaryReplyDeps = {
   groups: GroupReadRepository;
   userSettings: UserSettingsRepository;
   summaryData: LineSummaryDataReader;
+  expenseDrafts: LineExpenseDraftReader;
 };
+
+/**
+ * テキスト支出入力の返信を決める。
+ * claim 側の日次上限（JST・LINE_TEXT_DRAFT_DAILY_LIMIT）で作成を弾かれた
+ * 入力には「作れない」旨を返す。作成済みかどうかは「このイベント時刻以降の
+ * line_text 下書きがあるか」で判定する（eventTimestamp 欠落時は claim 時刻
+ * が nowMs に入るため、作成直後の下書きは必ず一致する）。
+ */
+async function resolveExpenseDraftReply(
+  deps: BuildSummaryReplyDeps,
+  args: Omit<SummaryReplyJobArgs, "replyToken">,
+  expenseInput: NonNullable<ReturnType<typeof parseLineExpenseInput>>,
+) {
+  const createdAts = await deps.expenseDrafts.lineTextDraftCreatedAtsSince(
+    args.userId,
+    startOfDayInJapanMs(args.nowMs),
+  );
+  const createdNow = createdAts.some((at) => at >= args.nowMs);
+  if (createdAts.length >= LINE_TEXT_DRAFT_DAILY_LIMIT && !createdNow) {
+    return reply("expense_draft_limit", LINE_TEXT_DRAFT_DAILY_LIMIT_MESSAGE);
+  }
+  return reply("expense_draft", formatExpenseDraftReply(expenseInput));
+}
 
 async function loadWeekSummary(
   deps: BuildSummaryReplyDeps,
@@ -142,7 +171,7 @@ export async function buildSummaryReply(
     // category_lookup として返信するのは金額を含まない入力に限る
     // （claim 側も金額つき入力は下書きを作る）。
     if (expenseInput !== null) {
-      return reply("expense_draft", formatExpenseDraftReply(expenseInput));
+      return await resolveExpenseDraftReply(deps, args, expenseInput);
     }
     const categories = await deps.summaryData.listActiveCategories(
       groupId,
@@ -163,7 +192,7 @@ export async function buildSummaryReply(
   // 上のブロックで既に処理済み。receipt_guide のような
   // 他分類では下書きが作られないため、作成済みと返信してはいけない。
   if (expenseInput !== null && (command.type === "week_summary" || command.type === "help")) {
-    return reply("expense_draft", formatExpenseDraftReply(expenseInput));
+    return await resolveExpenseDraftReply(deps, args, expenseInput);
   }
   if (command.type === "help") {
     return reply("help", LINE_HELP_MESSAGE);

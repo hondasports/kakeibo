@@ -7,7 +7,10 @@ import { createGroupReadRepository } from "../groups/convexGroupRepository";
 import { createUserSettingsRepository } from "../users/userSettingsRepository";
 import { createLineAccountLinkReader } from "../lineLink/convexLineAccountLinkStore";
 import { createLineActiveGroupResolver } from "./convexLineActiveGroupResolver";
-import { createLineExpenseDraftStore } from "./convexLineExpenseDraftStore";
+import {
+  createLineExpenseDraftReader,
+  createLineExpenseDraftStore,
+} from "./convexLineExpenseDraftStore";
 import { createLineImageJobReader, createLineImageJobStore } from "./convexLineImageJobStore";
 import { createLineSummaryDataReader } from "./convexLineSummaryDataReader";
 import {
@@ -48,6 +51,7 @@ export function createLineWebhookQueryDeps(ctx: QueryCtx) {
     userSettings: createUserSettingsRepository(ctx),
     summaryData: createLineSummaryDataReader(ctx),
     webhookEvents: createLineWebhookEventReader(ctx),
+    expenseDrafts: createLineExpenseDraftReader(ctx),
   };
 }
 

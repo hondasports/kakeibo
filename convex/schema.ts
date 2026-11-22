@@ -563,6 +563,11 @@ export default defineSchema({
   })
     .index("by_group_id_and_status_and_created_at", ["groupId", "status", "createdAt"])
     .index("by_group_id_and_created_by_user_id", ["groupId", "createdByUserId"])
+    .index("by_created_by_user_id_and_source_type_and_created_at", [
+      "createdByUserId",
+      "sourceType",
+      "createdAt",
+    ])
     .index("by_group_id_and_created_at", ["groupId", "createdAt"])
     .index("by_group_id_and_registered_receipt_id", ["groupId", "registeredReceiptId"])
     .index("by_group_id_and_status_and_registered_at", ["groupId", "status", "registeredAt"]),

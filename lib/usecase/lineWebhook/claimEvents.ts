@@ -10,12 +10,15 @@ import {
 } from "../../domain/lineSummary/commands";
 import { parseLineExpenseInput } from "../../domain/lineExpenseInput/lineExpenseInput";
 import { MAX_CATEGORIES_PER_GROUP } from "../../domain/categories/defaults";
-import { getTodayDateStringInJapan } from "../../domain/common/date";
+import { getTodayDateStringInJapan, startOfDayInJapanMs } from "../../domain/common/date";
 import { isGroupDeleted } from "../../domain/groups/lifecycle";
 import type { LineActiveGroupResolver } from "../../domain/lineWebhook/activeGroupResolver";
 import type { GroupReadRepository } from "../../domain/groups/groupRepository";
 import type { LineSummaryDataReader } from "../../domain/lineWebhook/summaryDataReader";
-import type { LineExpenseDraftStore } from "../../domain/lineWebhook/lineExpenseDraftStore";
+import {
+  LINE_TEXT_DRAFT_DAILY_LIMIT,
+  type LineExpenseDraftStore,
+} from "../../domain/lineWebhook/lineExpenseDraftStore";
 import {
   buildLinkedWebhookEventFields,
   buildPendingImageJobFields,
@@ -175,6 +178,14 @@ async function maybeCreateExpenseDraft(
   // カテゴリは金額を取り除いた title だけで解決し、金額を含まない入力は
   // そもそも parseLineExpenseInput が弾くため従来どおり category_lookup に流れる。
   const category = resolveCategoryLookup(expenseInput.title, categories);
+  // 連投対策: 1人あたり1日（JST）LINE_TEXT_DRAFT_DAILY_LIMIT 件まで。
+  // 超過時は下書きを作らない（返信側は buildSummaryReply が同じ件数を
+  // 数えて「作れない」旨を返す）。
+  const createdAts = await deps.expenseDrafts.lineTextDraftCreatedAtsSince(
+    activeUserId,
+    startOfDayInJapanMs(now),
+  );
+  if (createdAts.length >= LINE_TEXT_DRAFT_DAILY_LIMIT) return;
   await deps.expenseDrafts.createFromLineText({
     groupId: groupResolution.groupId,
     createdByUserId: activeUserId,
