@@ -30,9 +30,7 @@ test.describe("system admin membership operation", () => {
       await targetRow.getByRole("button", { name: "このグループへ移動" }).click();
       await page.getByLabel("操作理由").fill("E2E transfer確認");
       await page.getByRole("button", { name: "実行する" }).click();
-      await expect(
-        page.getByText("操作を完了しました。監査ログと通知outboxに記録しました。"),
-      ).toBeVisible();
+      await expect(page.getByText(/移動しました（監査ログに記録済み）/)).toBeVisible();
       const targetMembership = page.getByTestId(`system-admin-membership-${fixture.groupB}`);
       await expect(targetMembership).toContainText(`${prefix}-B`);
       await expect(targetMembership).toContainText(fixture.groupB);

@@ -154,6 +154,8 @@ test.describe("通知設定（Issue #893）", () => {
         // 操作種別と対象スナップショットで今回記録されるはずの行に絞る
         await page.getByRole("combobox", { name: "操作" }).click();
         await page.getByRole("option", { name: "通知設定変更" }).click();
+        // 条件は「絞り込む」押下で確定する（ドラフトはクエリに反映されない）
+        await page.getByRole("button", { name: "絞り込む" }).click();
         const lineLogRow = page
           .getByRole("button")
           .filter({ hasText: "target: AIレビュー依頼（LINE）" })
