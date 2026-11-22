@@ -48,9 +48,7 @@ export function SystemAdminUserSearchPage() {
     // ページ送り・リトライは確定した検索条件を使う（入力中のドラフトは混ぜない）。
     const effectiveParams =
       params ??
-      (appliedParams.current
-        ? { ...appliedParams.current }
-        : { queryType, query: query.trim() });
+      (appliedParams.current ? { ...appliedParams.current } : { queryType, query: query.trim() });
     lastRequest.current = { cursor: nextCursor, ...effectiveParams };
     setIsLoading(true);
     setError(false);
