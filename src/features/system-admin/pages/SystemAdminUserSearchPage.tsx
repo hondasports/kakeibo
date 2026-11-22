@@ -142,7 +142,7 @@ export function SystemAdminUserSearchPage() {
           <Stack aria-live="polite" spacing={1}>
             <Typography color="text.secondary" variant="body2">
               {resultStart}〜{resultEnd}件目を表示
-              {result.isDone ? "" : "（続きがあります）"}
+              {result.isDone ? "（最後のページです）" : "（続きがあります）"}
             </Typography>
             {isLoading ? (
               <Typography color="text.secondary" variant="body2">
