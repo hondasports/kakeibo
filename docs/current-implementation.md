@@ -313,8 +313,6 @@ E2E専用HTTPエンドポイントはデプロイ時の環境変数に依存せ�
 
 コード確認時点で、次は実装済み機能として扱わない。
 
-- `/export` 画面
-- CSV生成・ダウンロードUI
 - 月収入設定UI（schema互換の `monthlyIncome` は残る）
 - `sourceDocuments` を中心にした一般利用向け公開CRUDフロー
 - LINEからの支出・収入登録、更新、削除
