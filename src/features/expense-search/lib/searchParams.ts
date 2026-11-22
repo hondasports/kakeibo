@@ -1,4 +1,9 @@
 import {
+  getAmountRangeError,
+  getAmountYenError,
+  getDateRangeError,
+  getIsoDateError,
+  getShopQueryError,
   parseExpenseSearchFilters,
   type HistoryEntryType,
 } from "../../../../lib/domain/expenseSearch/filter";
@@ -84,6 +89,90 @@ export function parseExpenseSearchFormState(state: ExpenseSearchFormState) {
     startDate: state.startDate || undefined,
     endDate: state.endDate || undefined,
   });
+}
+
+export function diffExpenseSearchFormState(
+  before: ExpenseSearchFormState,
+  after: ExpenseSearchFormState,
+): Partial<ExpenseSearchFormState> {
+  const diff: Partial<ExpenseSearchFormState> = {};
+  for (const key of Object.keys(before) as Array<keyof ExpenseSearchFormState>) {
+    if (before[key] !== after[key]) {
+      (diff as Record<keyof ExpenseSearchFormState, unknown>)[key] = after[key];
+    }
+  }
+  return diff;
+}
+
+export type ExpenseSearchFieldErrors = Partial<
+  Record<"shopQuery" | "minAmountYen" | "maxAmountYen" | "startDate" | "endDate", string>
+>;
+
+export type ExpenseSearchFormValidation = {
+  ok: boolean;
+  fieldErrors: ExpenseSearchFieldErrors;
+  formError: string | null;
+};
+
+// 判定・文言は lib/domain/expenseSearch/filter.ts が正本。
+// parse は先頭の1件だけ返すため、項目ごとの近接表示にはこちらで各フィールドへ割り当てる。
+export function validateExpenseSearchForm(
+  state: ExpenseSearchFormState,
+): ExpenseSearchFormValidation {
+  const fieldErrors: ExpenseSearchFieldErrors = {};
+
+  const shopQueryError = getShopQueryError(state.shopQuery.trim());
+  if (shopQueryError !== null) {
+    fieldErrors.shopQuery = shopQueryError;
+  }
+
+  const minAmountYen = parseOptionalInteger(state.minAmountYen);
+  const maxAmountYen = parseOptionalInteger(state.maxAmountYen);
+  if (minAmountYen !== undefined) {
+    const error = getAmountYenError(minAmountYen);
+    if (error !== null) {
+      fieldErrors.minAmountYen = error;
+    }
+  }
+  if (maxAmountYen !== undefined) {
+    const error = getAmountYenError(maxAmountYen);
+    if (error !== null) {
+      fieldErrors.maxAmountYen = error;
+    }
+  }
+  if (fieldErrors.minAmountYen === undefined && fieldErrors.maxAmountYen === undefined) {
+    const rangeError = getAmountRangeError(minAmountYen, maxAmountYen);
+    if (rangeError !== null) {
+      fieldErrors.minAmountYen = rangeError;
+    }
+  }
+
+  const startDate = state.startDate.length > 0 ? state.startDate : undefined;
+  const endDate = state.endDate.length > 0 ? state.endDate : undefined;
+  if (startDate !== undefined) {
+    const error = getIsoDateError(startDate);
+    if (error !== null) {
+      fieldErrors.startDate = error;
+    }
+  }
+  if (endDate !== undefined) {
+    const error = getIsoDateError(endDate);
+    if (error !== null) {
+      fieldErrors.endDate = error;
+    }
+  }
+  if (fieldErrors.startDate === undefined && fieldErrors.endDate === undefined) {
+    const rangeError = getDateRangeError(startDate, endDate);
+    if (rangeError !== null) {
+      fieldErrors.startDate = rangeError;
+    }
+  }
+
+  const ok = Object.keys(fieldErrors).length === 0;
+  // フィールドに割り当てられないエラー（将来追加される検証など）だけフォーム全体のエラーとして残す。
+  const parsed = parseExpenseSearchFormState(state);
+  const formError = !ok || parsed.ok ? null : parsed.error;
+  return { ok, fieldErrors, formError };
 }
 
 export function toExpenseSearchQueryArgs(state: ExpenseSearchFormState) {

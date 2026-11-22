@@ -18,12 +18,44 @@ import { HistoryMetricsPanel } from "../components/HistoryMetricsPanel";
 import { HistoryTrendChart } from "../components/HistoryTrendChart";
 import { useExpenseSearchResults } from "../hooks/useExpenseSearchResults";
 import { toIncomeItem, toReceiptItem } from "../lib/expenseSearchItems";
+import { formatDateForDisplay } from "../../../utils/date";
 import {
+  diffExpenseSearchFormState,
   EMPTY_EXPENSE_SEARCH_FORM,
   expenseSearchPath,
   readExpenseSearchFormState,
+  validateExpenseSearchForm,
   type ExpenseSearchFormState,
 } from "../lib/searchParams";
+
+function formatSearchPeriodLabel(state: ExpenseSearchFormState): string {
+  const start = state.startDate ? formatDateForDisplay(state.startDate) : null;
+  const end = state.endDate ? formatDateForDisplay(state.endDate) : null;
+  if (start !== null && end !== null) {
+    return `${start}〜${end}`;
+  }
+  if (start !== null) {
+    return `${start}以降`;
+  }
+  if (end !== null) {
+    return `${end}まで`;
+  }
+  return "全期間";
+}
+
+function hasAnyFilter(state: ExpenseSearchFormState): boolean {
+  return (
+    state.entryType !== "all" ||
+    [
+      state.shopQuery,
+      state.categoryId,
+      state.minAmountYen,
+      state.maxAmountYen,
+      state.startDate,
+      state.endDate,
+    ].some((value) => value.length > 0)
+  );
+}
 
 export function ExpenseSearchPage() {
   const location = useLocation();
@@ -36,27 +68,45 @@ export function ExpenseSearchPage() {
   const userProfile = useQuery(api.users.queries.getUserProfile);
   const categoriesQuery = useQuery(api.categories.queries.listActive);
   const categories = Array.isArray(categoriesQuery) ? categoriesQuery : [];
+  // チップ表示用に無効化済みを含むカテゴリを引く。未指定のときは発行しない。
+  const allCategoriesQuery = useQuery(
+    api.categories.queries.listForSettings,
+    applied.categoryId ? {} : "skip",
+  );
+  const allCategories = Array.isArray(allCategoriesQuery) ? allCategoriesQuery : [];
   const {
     loadedItems,
     displayResult,
     searchError,
     isLoadingMore,
     isAdditionalSearchError,
-    parsedError,
     retrySearch,
     loadMore,
   } = useExpenseSearchResults(applied, appliedKey);
 
+  // チップ削除・グラフクリックなど適用側の変化は差分だけdraftへ反映し、
+  // フォームで編集中の未適用の値は消さない。
   if (draftKey !== appliedKey) {
+    const previousApplied = readExpenseSearchFormState(new URLSearchParams(draftKey));
+    const delta = diffExpenseSearchFormState(previousApplied, applied);
+    setDraft((current) => ({ ...current, ...delta }));
     setDraftKey(appliedKey);
-    setDraft(applied);
   }
 
+  const draftValidation = validateExpenseSearchForm(draft);
+  const appliedValidation = validateExpenseSearchForm(applied);
+  const hasUnappliedChanges = Object.keys(diffExpenseSearchFormState(applied, draft)).length > 0;
+
   const currentSearchPath = `${location.pathname}${location.search}`;
-  const categoryName =
+  const appliedCategory = allCategories.find((category) => category._id === applied.categoryId);
+  const categoryLabel =
     applied.categoryId === UNCATEGORIZED_CATEGORY_ID
       ? "未分類"
-      : categories.find((category) => category._id === applied.categoryId)?.name;
+      : appliedCategory
+        ? appliedCategory.isActive
+          ? appliedCategory.name
+          : `${appliedCategory.name}（無効化済み）`
+        : undefined;
 
   // 期間が複数月にまたがるときは開始日側の月・週を代表として使う。
   const representativeDate =
@@ -77,6 +127,7 @@ export function ExpenseSearchPage() {
     linkedWeekStart !== null && linkedWeekStart !== undefined
       ? `/weeks/${linkedWeekStart}`
       : `/weeks/${getCurrentWeekStartDate(userProfile?.weeklyStartDay)}`;
+
   const expenseItems = loadedItems.filter((item) => item.type === "expense").map(toReceiptItem);
   const incomeItems = loadedItems.filter((item) => item.type === "income").map(toIncomeItem);
 
@@ -88,8 +139,19 @@ export function ExpenseSearchPage() {
     setDraft(next);
   };
 
+  const handleSubmit = () => {
+    if (!draftValidation.ok) {
+      return;
+    }
+    handleApply(draft);
+  };
+
+  const handleClearAll = () => {
+    setDraft(EMPTY_EXPENSE_SEARCH_FORM);
+    handleApply(EMPTY_EXPENSE_SEARCH_FORM);
+  };
+
   const handleAppliedFilterChange = (next: ExpenseSearchFormState) => {
-    setDraft(next);
     handleApply(next);
   };
 
@@ -100,6 +162,13 @@ export function ExpenseSearchPage() {
   const handleCategorySelect = (categoryId: string) => {
     handleApply({ ...applied, categoryId, entryType: "expense" });
   };
+
+  const expenseListHeading =
+    displayResult !== null && displayResult.truncated
+      ? `支出一覧（集計対象の一部 ${displayResult.expenseCount}件中 ${expenseItems.length}件を表示）`
+      : displayResult !== null && !displayResult.isDone
+        ? `支出一覧（${displayResult.expenseCount}件中 ${expenseItems.length}件を表示）`
+        : `支出一覧（${expenseItems.length}件）`;
 
   return (
     <Box className="app-main">
@@ -114,24 +183,27 @@ export function ExpenseSearchPage() {
         </Typography>
         <ExpenseSearchFilters
           categories={categories}
+          errors={draftValidation.fieldErrors}
+          hasUnappliedChanges={hasUnappliedChanges}
           state={draft}
           weekStartDay={userProfile?.weeklyStartDay}
           onChange={handleFilterChange}
-          onClear={() => {
-            setDraft(EMPTY_EXPENSE_SEARCH_FORM);
-            handleApply(EMPTY_EXPENSE_SEARCH_FORM);
-          }}
-          onSubmit={() => handleApply(draft)}
+          onClear={handleClearAll}
+          onSubmit={handleSubmit}
         />
         <AppliedSearchFilters
-          categoryName={categoryName}
+          categoryLabel={categoryLabel}
           state={applied}
           onChange={handleAppliedFilterChange}
         />
 
-        {parsedError !== null ? (
+        {appliedValidation.formError !== null ? (
           <Alert severity="error" variant="outlined">
-            {parsedError}
+            {appliedValidation.formError}
+          </Alert>
+        ) : !appliedValidation.ok ? (
+          <Alert severity="error" variant="outlined">
+            {Array.from(new Set(Object.values(appliedValidation.fieldErrors))).join("、")}
           </Alert>
         ) : displayResult === null && searchError !== null ? (
           <Alert
@@ -182,9 +254,11 @@ export function ExpenseSearchPage() {
               expenseCount={displayResult.expenseCount}
               incomeCount={displayResult.incomeCount}
               netAmountYen={displayResult.netAmountYen}
+              periodLabel={formatSearchPeriodLabel(applied)}
               totalCount={displayResult.totalCount}
               totalExpenseYen={displayResult.totalExpenseYen}
               totalIncomeYen={displayResult.totalIncomeYen}
+              truncated={displayResult.truncated}
             />
             <HistoryTrendChart
               points={displayResult.trend}
@@ -199,9 +273,16 @@ export function ExpenseSearchPage() {
               onCategorySelect={handleCategorySelect}
             />
             {expenseItems.length === 0 && incomeItems.length === 0 ? (
-              <Typography color="text.secondary" variant="body2">
-                条件に合う履歴はありません
-              </Typography>
+              <Stack spacing={1} sx={{ alignItems: "flex-start" }}>
+                <Typography color="text.secondary" variant="body2">
+                  条件に合う履歴はありません
+                </Typography>
+                {hasAnyFilter(applied) ? (
+                  <Button onClick={handleClearAll} sx={{ minHeight: 44 }} variant="outlined">
+                    条件をすべてクリア
+                  </Button>
+                ) : null}
+              </Stack>
             ) : (
               <>
                 {applied.entryType !== "income" && expenseItems.length > 0 ? (
@@ -209,7 +290,7 @@ export function ExpenseSearchPage() {
                     count={expenseItems.length}
                     dateFormat="yearMonthDay"
                     emptyMessage="条件に合う支出はありません"
-                    heading={`支出一覧（${displayResult.expenseCount}件）`}
+                    heading={expenseListHeading}
                     isLoading={false}
                     listAriaLabel="支出の検索結果"
                     maxVisibleGroups={Number.POSITIVE_INFINITY}
