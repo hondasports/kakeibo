@@ -17,7 +17,11 @@ import { ExpenseEntryDeleteDialog } from "../../summary-shared/components/Expens
 import { ExpenseEntryEditDialog } from "../../summary-shared/components/ExpenseEntryEditDialog";
 import type { CategoryPreview } from "../../summary-shared/components/ReceiptRow";
 import { useSpendingBulkSelection } from "../../summary-shared/hooks/useSpendingBulkSelection";
-import { incomeItemToReceiptItem, type ReceiptItem } from "../../summary-shared/types/types";
+import {
+  groupReceiptItems,
+  incomeItemToReceiptItem,
+  type ReceiptItem,
+} from "../../summary-shared/types/types";
 import { AppliedSearchFilters } from "../components/AppliedSearchFilters";
 import { ExpenseSearchFilters } from "../components/ExpenseSearchFilters";
 import { HistoryCategoryChart } from "../components/HistoryCategoryChart";
@@ -274,12 +278,17 @@ export function ExpenseSearchPage() {
     });
   };
 
+  // expenseCountはレシート単位の件数なので、表示側も明細ではなくレシートの件数で合わせる
+  const displayedExpenseGroupCount = useMemo(
+    () => groupReceiptItems(expenseItems).length,
+    [expenseItems],
+  );
   const expenseListHeading =
     displayResult !== null && displayResult.truncated
-      ? `支出一覧（集計対象の一部 ${displayResult.expenseCount}件中 ${expenseItems.length}件を表示）`
+      ? `支出一覧（集計対象の一部 ${displayResult.expenseCount}件中 ${displayedExpenseGroupCount}件を表示）`
       : displayResult !== null && !displayResult.isDone
-        ? `支出一覧（${displayResult.expenseCount}件中 ${expenseItems.length}件を表示）`
-        : `支出一覧（${expenseItems.length}件）`;
+        ? `支出一覧（${displayResult.expenseCount}件中 ${displayedExpenseGroupCount}件を表示）`
+        : `支出一覧（${displayedExpenseGroupCount}件）`;
 
   return (
     <Box className="app-main">

@@ -25,6 +25,8 @@ export function toReceiptItem(item: ExpenseSearchReceipt): ReceiptItem {
     receiptGroupId: item.receiptGroupId,
     receiptShopName: item.receiptShopName,
     receiptTotalAmountYen: item.receiptTotalAmountYen,
+    aiExpenseDraftId: item.aiExpenseDraftId,
+    registrationMode: item.registrationMode,
   };
 }
 

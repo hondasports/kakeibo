@@ -6,6 +6,7 @@ import {
   historyEntryTypeValidator,
   historyTrendGranularityValidator,
 } from "../lib/convex/expenseSearch/validators";
+import { aiExpenseRegistrationModeValidator } from "./aiExpenseDrafts/validators";
 import { entryKindValidator, recordTypeValidator } from "../lib/convex/receipts/validators";
 import { UNCATEGORIZED_CATEGORY_ID } from "../lib/domain/expenseSearch/filter";
 import { categorySummaryValidator } from "./lib/validators";
@@ -26,6 +27,8 @@ const expenseSearchReceiptValidator = v.object({
   receiptGroupId: v.optional(v.string()),
   receiptShopName: v.optional(v.string()),
   receiptTotalAmountYen: v.optional(v.number()),
+  aiExpenseDraftId: v.optional(v.string()),
+  registrationMode: v.optional(aiExpenseRegistrationModeValidator),
 });
 
 const historyAggregateValidator = v.object({

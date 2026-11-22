@@ -1,3 +1,4 @@
+import type { AiExpenseRegistrationMode } from "../aiExpenseDrafts/receiptDataContract";
 import type { EntryKind } from "../common/entryKind";
 import type { RecordType } from "../common/recordKind";
 import type { HistoryAggregate, HistoryComparison, HistoryTrendPoint } from "./analytics";
@@ -21,6 +22,8 @@ export type ExpenseSearchReceipt = {
   receiptGroupId?: string;
   receiptShopName?: string;
   receiptTotalAmountYen?: number;
+  aiExpenseDraftId?: string;
+  registrationMode?: AiExpenseRegistrationMode;
 };
 
 export type ExpenseSearchResult = {
@@ -109,6 +112,8 @@ export function mapHistoryGroupToItems(
       receiptGroupId: item.receiptGroupId,
       receiptShopName: item.receiptShopName,
       receiptTotalAmountYen: item.receiptTotalAmountYen,
+      aiExpenseDraftId: item.aiExpenseDraftId,
+      registrationMode: item.registrationMode,
     };
   });
 }
