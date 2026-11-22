@@ -14,6 +14,7 @@ export function IncomeListCard({
   listAriaLabel = "週次サマリーの収入一覧",
   onDeleteIncome,
   onEditIncome,
+  weekSummaryPath,
 }: {
   count: number;
   dateFormat?: ReceiptDateFormat;
@@ -23,10 +24,11 @@ export function IncomeListCard({
   listAriaLabel?: string;
   onDeleteIncome?: (income: IncomeItem) => void;
   onEditIncome?: (income: IncomeItem) => void;
+  weekSummaryPath?: (date: string) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
-  const hasRowActions = Boolean(onEditIncome || onDeleteIncome);
+  const hasRowActions = Boolean(onEditIncome || onDeleteIncome || weekSummaryPath);
   const orderedIncomes = incomes
     .map((income, index) => ({ income, index }))
     .sort((a, b) => b.income.date.localeCompare(a.income.date) || b.index - a.index)
@@ -77,6 +79,7 @@ export function IncomeListCard({
                       showCategory={false}
                       onDelete={onDeleteIncome ? () => onDeleteIncome(income) : undefined}
                       onEdit={onEditIncome ? () => onEditIncome(income) : undefined}
+                      weekSummaryPath={weekSummaryPath}
                     />
                   );
                 })}

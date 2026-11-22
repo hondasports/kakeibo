@@ -29,6 +29,7 @@ export function ReceiptListCard({
   onClearSelection,
   onBulkChangeCategory,
   onBulkDelete,
+  weekSummaryPath,
 }: {
   count: number;
   dateFormat?: ReceiptDateFormat;
@@ -52,10 +53,11 @@ export function ReceiptListCard({
   onClearSelection?: () => void;
   onBulkChangeCategory?: () => void;
   onBulkDelete?: () => void;
+  weekSummaryPath?: (date: string) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
-  const hasRowActions = Boolean(onEditReceipt || onDeleteReceipt);
+  const hasRowActions = Boolean(onEditReceipt || onDeleteReceipt || weekSummaryPath);
   const orderedReceiptGroups = groupReceiptItems(receipts)
     .map((group, index) => ({ group, index }))
     .sort((a, b) => b.group.date.localeCompare(a.group.date) || b.index - a.index)
@@ -199,6 +201,7 @@ export function ReceiptListCard({
                     previewCategory={previewCategory}
                     selectionEnabled={selectionEnabled}
                     onToggleSelection={onToggleSelection}
+                    weekSummaryPath={weekSummaryPath}
                   />
                 ))}
               </>

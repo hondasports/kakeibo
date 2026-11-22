@@ -1,4 +1,6 @@
-import { Box, Chip, Stack, Typography } from "@mui/material";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import { Link } from "react-router-dom";
+import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { formatDateForDisplay } from "../../week";
 import { formatDateWithYearForDisplay } from "../../../utils/date";
 import { ReceiptRow, type CategoryPreview } from "./ReceiptRow";
@@ -14,6 +16,7 @@ export function ReceiptGroupRow({
   previewCategory = null,
   isSelected,
   onToggleSelection,
+  weekSummaryPath,
 }: {
   group: ReceiptGroup;
   dateFormat?: ReceiptDateFormat;
@@ -23,6 +26,7 @@ export function ReceiptGroupRow({
   previewCategory?: CategoryPreview | null;
   isSelected?: (receipt: ReceiptItem) => boolean;
   onToggleSelection?: (receipt: ReceiptItem, checked: boolean) => void;
+  weekSummaryPath?: (date: string) => string;
 }) {
   const formatDate =
     dateFormat === "yearMonthDay" ? formatDateWithYearForDisplay : formatDateForDisplay;
@@ -45,6 +49,7 @@ export function ReceiptGroupRow({
         selected={isSelected?.(singleItem) ?? false}
         selectionEnabled={selectionEnabled}
         onToggleSelection={onToggleSelection}
+        weekSummaryPath={weekSummaryPath}
       />
     );
   }
@@ -81,7 +86,22 @@ export function ReceiptGroupRow({
         <Typography className="receipt-row-amount" role="cell" sx={{ fontWeight: 700 }}>
           {formatYen(group.amountYen)}
         </Typography>
-        <Box className="receipt-row-actions" role="cell" />
+        <Box className="receipt-row-actions" role="cell">
+          {weekSummaryPath && (
+            <Button
+              aria-label={`${group.shopName}（${formatDate(group.date)}）が属する週のサマリーを見る`}
+              component={Link}
+              size="small"
+              startIcon={<CalendarMonthIcon fontSize="small" />}
+              sx={{ minHeight: 44 }}
+              to={weekSummaryPath(group.date)}
+              type="button"
+              variant="text"
+            >
+              <span className="receipt-row-action-label">この週を見る</span>
+            </Button>
+          )}
+        </Box>
       </Box>
 
       <Box className="receipt-group-details">
@@ -98,6 +118,7 @@ export function ReceiptGroupRow({
             selected={isSelected?.(item) ?? false}
             selectionEnabled={selectionEnabled}
             onToggleSelection={onToggleSelection}
+            weekSummaryPath={weekSummaryPath}
           />
         ))}
       </Box>

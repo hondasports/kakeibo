@@ -38,8 +38,8 @@ const pickerPaperSx = {
   },
 } as const;
 
-const KEYWORD_FIELD_HELP = '空白区切りでAND、先頭「-」で除外、「"..."」でそのまま検索';
-
+const KEYWORD_FIELD_HELP =
+  '店名・品名・銀行名・メモを部分一致で探します。空白区切りでAND、先頭「-」で除外、「"..."」でそのまま検索';
 const datePresetOptions: Array<{ label: string; value: Exclude<HistoryDatePreset, "custom"> }> = [
   { label: "今週", value: "thisWeek" },
   { label: "今月", value: "thisMonth" },

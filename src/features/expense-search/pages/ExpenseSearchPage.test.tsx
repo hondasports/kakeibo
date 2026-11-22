@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,9 +10,11 @@ import { ExpenseSearchPage } from "./ExpenseSearchPage";
 
 const useQueryMock = vi.fn();
 const useQueriesMock = vi.fn();
+const useMutationMock = vi.fn((_endpoint: unknown) => vi.fn());
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
   useQueries: (queries: Record<string, { args: unknown }>) => useQueriesMock(queries),
+  useMutation: (endpoint: unknown) => useMutationMock(endpoint),
 }));
 
 vi.mock("../../../../convex/_generated/api", () => ({
@@ -212,6 +214,77 @@ describe("ExpenseSearchPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("追加読み込み後に削除すると、読み込み済み分を破棄して先頭ページから取り直す", async () => {
+    const user = userEvent.setup();
+    const searchCalls: unknown[] = [];
+    useQueryMock.mockImplementation((api: unknown, args: unknown) => {
+      if (api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (api === "categories-list-for-settings" || args === undefined) {
+        return [];
+      }
+      searchCalls.push(args);
+      const cursor = (args as { paginationOpts?: { cursor?: string | null } }).paginationOpts
+        ?.cursor;
+      return cursor === "cursor-1"
+        ? {
+            ...emptySearchResult,
+            isDone: true,
+            page: [
+              {
+                _id: "expense-2",
+                date: "2026-08-01",
+                type: "expense" as const,
+                shopName: "2ページ目の店",
+                amountYen: 500,
+                recordType: "expenseEntry" as const,
+              },
+            ],
+          }
+        : {
+            ...emptySearchResult,
+            continueCursor: "cursor-1",
+            isDone: false,
+            page: [
+              {
+                _id: "expense-1",
+                date: "2026-08-02",
+                type: "expense" as const,
+                shopName: "対象の店",
+                amountYen: 900,
+                recordType: "expenseEntry" as const,
+              },
+            ],
+          };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "さらに読み込む" }));
+    expect(await screen.findByText("2ページ目の店")).toBeInTheDocument();
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    await user.click(
+      within(expenseTable).getByRole("button", { name: "対象の店（2026/8/2）を削除" }),
+    );
+    await user.click(screen.getByRole("button", { name: "削除する" }));
+
+    // 新しい検索要約キー（searchRequestIdが進む）で先頭ページ（cursor: null）を取り直す。
+    await screen.findByText("対象の店");
+    const cursors = searchCalls.map(
+      (args) => (args as { paginationOpts?: { cursor?: string | null } }).paginationOpts?.cursor,
+    );
+    expect(cursors).toContain("cursor-1");
+    expect(cursors[cursors.length - 1]).toBeNull();
+    // 2ページ目の読み込み済み分は破棄され、先頭ページの内容だけが残る。
+    expect(screen.queryByText("2ページ目の店")).not.toBeInTheDocument();
+  });
+
   it("履歴検索の支出と収入の一覧は、年をまたぐ結果をそれぞれ年つきで日付を出す", () => {
     useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
       if (_api === "get-user-profile") {
@@ -261,6 +334,121 @@ describe("ExpenseSearchPage", () => {
     expect(within(expenseTable).getByText("2023/6/1")).toBeInTheDocument();
     const incomeTable = screen.getByRole("table", { name: "収入の検索結果" });
     expect(within(incomeTable).getByText("2021/3/15")).toBeInTheDocument();
+  });
+
+  it("結果行から編集・削除・その週のサマリーへ進める", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-1",
+            date: "2026-08-02",
+            type: "expense" as const,
+            shopName: "対象の店",
+            amountYen: 900,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry" as const,
+          },
+          {
+            _id: "income-1",
+            date: "2026-08-05",
+            type: "income" as const,
+            bankName: "対象の銀行",
+            amountYen: 5000,
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        totalCount: 2,
+        expenseCount: 1,
+        incomeCount: 1,
+        totalExpenseYen: 900,
+        totalIncomeYen: 5000,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    expect(
+      within(expenseTable).getByRole("button", { name: "対象の店（2026/8/2）を編集" }),
+    ).toBeInTheDocument();
+    expect(
+      within(expenseTable).getByRole("button", { name: "対象の店（2026/8/2）を削除" }),
+    ).toBeInTheDocument();
+    expect(
+      within(expenseTable).getByRole("link", {
+        name: "対象の店（2026/8/2）が属する週のサマリーを見る",
+      }),
+    ).toHaveAttribute("href", `/weeks/${normalizeWeekStartDate("2026-08-02", 3)}`);
+
+    const incomeTable = screen.getByRole("table", { name: "収入の検索結果" });
+    expect(
+      within(incomeTable).getByRole("button", { name: "対象の銀行（2026/8/5）を編集" }),
+    ).toBeInTheDocument();
+    expect(
+      within(incomeTable).getByRole("link", {
+        name: "対象の銀行（2026/8/5）が属する週のサマリーを見る",
+      }),
+    ).toHaveAttribute("href", `/weeks/${normalizeWeekStartDate("2026-08-05", 3)}`);
+  });
+
+  it("支出行を選択して一括操作を呼び出せる", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-1",
+            date: "2026-08-02",
+            type: "expense" as const,
+            shopName: "対象の店",
+            amountYen: 900,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        totalCount: 1,
+        expenseCount: 1,
+        totalExpenseYen: 900,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    await user.click(
+      within(expenseTable).getByRole("checkbox", { name: "対象の店（2026/8/2）を選択" }),
+    );
+
+    expect(screen.getByText("明細1件を選択中")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "カテゴリを変更" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "削除" })).toBeInTheDocument();
   });
 
   it("追加読み込み後も初回の前期間比較を保持する", async () => {
@@ -369,6 +557,139 @@ describe("ExpenseSearchPage", () => {
       screen.getByText(
         "件数が多いため、先頭の一部だけを集計しています。期間やキーワードで絞り込んでください。",
       ),
+    ).toBeInTheDocument();
+  });
+
+  it("無効化済みカテゴリの条件はチップで状態が分かる", () => {
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?categoryId=cat-old"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("カテゴリ: 旧カテゴリ（無効化済み）")).toBeInTheDocument();
+  });
+
+  it("下限が上限を超える条件は絞り込めず、項目の近くに理由が出る", async () => {
+    const user = userEvent.setup();
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+        <LocationProbe />
+        <Routes>
+          <Route path="/search" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText("金額の下限"), "200");
+    await user.type(screen.getByLabelText("金額の上限"), "100");
+    await user.click(screen.getByRole("button", { name: "絞り込む" }));
+
+    expect(screen.getByText("金額の下限は上限以下にしてください")).toBeInTheDocument();
+    expect(screen.getByText("/search")).toBeInTheDocument();
+  });
+
+  it("編集中の下書きはチップ削除で消えず、未適用の変更が分かる", async () => {
+    const user = userEvent.setup();
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?q=%E5%BA%97&min=1000"]}>
+        <ExpenseSearchPage />
+        <LocationProbe />
+        <Routes>
+          <Route path="/search" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText("金額の上限"), "5000");
+    expect(
+      screen.getByText("変更はまだ適用されていません。「絞り込む」を押すと反映されます"),
+    ).toBeInTheDocument();
+
+    const keywordChip = screen.getByText("キーワード: 店").closest(".MuiChip-root") as HTMLElement;
+    await user.click(keywordChip.querySelector(".MuiChip-deleteIcon") as Element);
+
+    expect(screen.getByText("/search?min=1000")).toBeInTheDocument();
+    expect(screen.getByLabelText("金額の上限")).toHaveValue("5000");
+    expect(
+      screen.getByText("変更はまだ適用されていません。「絞り込む」を押すと反映されます"),
+    ).toBeInTheDocument();
+  });
+
+  it("適用済みの条件が無効なら理由を画面に表示する", () => {
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?min=2000&max=100"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("金額の下限は上限以下にしてください");
+  });
+
+  it("0件の空状態から条件をすべてクリアできる", async () => {
+    const user = userEvent.setup();
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?q=%E5%BA%97"]}>
+        <ExpenseSearchPage />
+        <LocationProbe />
+        <Routes>
+          <Route path="/search" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("条件に合う履歴はありません")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "条件をすべてクリア" }));
+
+    expect(screen.getByText("/search")).toBeInTheDocument();
+  });
+
+  it("集計の対象期間を常時表示し、読み込み途中では表示済み件数も出す", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (_api === "categories-list-for-settings") {
+        return [{ _id: "cat-food", name: "食費", isActive: true }];
+      }
+      if (args === undefined) {
+        return [];
+      }
+      if (args === "skip") {
+        return undefined;
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-1",
+            date: "2026-08-01",
+            type: "expense" as const,
+            shopName: "店",
+            amountYen: 1200,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        isDone: false,
+        totalCount: 5,
+        expenseCount: 5,
+        totalExpenseYen: 1200,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("対象期間: 全期間")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "支出一覧（5件中 1件を表示）" }),
     ).toBeInTheDocument();
   });
 
@@ -676,5 +997,261 @@ describe("ExpenseSearchPage", () => {
 
     await user.click(screen.getByRole("button", { name: "すべてクリア" }));
     expect(screen.getByText("/search")).toBeInTheDocument();
+  });
+
+  it("編集保存後は先頭ページから取り直し、集計・比較も更新する", async () => {
+    const user = userEvent.setup();
+    const searchCalls: unknown[] = [];
+    // 再取得は searchRequestId ごとのクエリキー（historySearch:N）で区別する
+    useQueriesMock.mockImplementation((queries: Record<string, { args: unknown }>) => {
+      const [key, query] = Object.entries(queries)[0] ?? [];
+      if (!key || !query) return {};
+      const requestId = key.split(":")[1];
+      return {
+        [key]: useQueryMock("history-search", {
+          ...(query.args as Record<string, unknown>),
+          __requestId: requestId,
+        }),
+      };
+    });
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (_api === "categories-list-for-settings" || args === undefined) {
+        return [{ _id: "cat-food", name: "食費" }];
+      }
+      searchCalls.push(args);
+      const { __requestId, ...queryArgs } = args as {
+        __requestId?: string;
+        paginationOpts?: { cursor?: string | null };
+      };
+      if (__requestId === "0") {
+        return {
+          ...emptySearchResult,
+          page: [
+            {
+              _id: "expense-1",
+              date: "2026-08-02",
+              type: "expense" as const,
+              shopName: "対象の店",
+              amountYen: 900,
+              categoryId: "cat-food",
+              categoryName: "食費",
+              categoryColor: "#f97316",
+              recordType: "expenseEntry" as const,
+            },
+          ],
+          totalCount: 1,
+          expenseCount: 1,
+          totalExpenseYen: 900,
+          comparison: null,
+        };
+      }
+      if (queryArgs.paginationOpts?.cursor !== null) return emptySearchResult;
+      // 編集保存後の再取得: 集計値と前期間比較が変わっている
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-1",
+            date: "2026-08-02",
+            type: "expense" as const,
+            shopName: "編集後の店",
+            amountYen: 1234,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        totalCount: 1,
+        expenseCount: 1,
+        totalExpenseYen: 1234,
+        comparison: {
+          currentStartDate: "2026-08-01",
+          currentEndDate: "2026-08-31",
+          previousStartDate: "2026-07-01",
+          previousEndDate: "2026-07-31",
+          current: {
+            count: 1,
+            expenseCount: 1,
+            incomeCount: 0,
+            totalExpenseYen: 1234,
+            totalIncomeYen: 0,
+            netAmountYen: -1234,
+            byCategory: [],
+          },
+          previous: {
+            count: 1,
+            expenseCount: 1,
+            incomeCount: 0,
+            totalExpenseYen: 800,
+            totalIncomeYen: 0,
+            netAmountYen: -800,
+            byCategory: [],
+          },
+          diffExpenseYen: 434,
+          diffIncomeYen: 0,
+          diffNetYen: -434,
+          categoryChanges: [],
+          hasPreviousData: true,
+        },
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("対象の店")).toBeInTheDocument();
+    expect(screen.queryByTestId("history-comparison")).not.toBeInTheDocument();
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    await user.click(
+      within(expenseTable).getByRole("button", { name: "対象の店（2026/8/2）を編集" }),
+    );
+    await user.click(await screen.findByRole("button", { name: "保存" }));
+
+    // 先頭ページ（cursor: null）を取り直して集計と比較を反映する
+    await screen.findByText("編集後の店");
+    // 行の金額と集計パネルの両方が 1,234円 になる
+    expect(screen.getAllByText("1,234円").length).toBeGreaterThan(0);
+    const cursors = searchCalls.map(
+      (args) => (args as { paginationOpts?: { cursor?: string | null } }).paginationOpts?.cursor,
+    );
+    expect(cursors[cursors.length - 1]).toBeNull();
+    expect(await screen.findByTestId("history-comparison")).toBeInTheDocument();
+  });
+
+  it("一括操作は選択した明細ID・レシートIDでmutationを呼び、適用条件が変わると選択を解除する", async () => {
+    const user = userEvent.setup();
+    // useMutation は毎レンダー呼ばれ、他フック（編集ダイアログ状態）にも
+    // useMutation があるので call-site では固定できない。返した mock fn を
+    // すべて捕捉して、実際に呼ばれた引数で検証する。
+    const mutationFns: ReturnType<typeof vi.fn>[] = [];
+    useMutationMock.mockImplementation(() => {
+      const fn = vi.fn().mockResolvedValue({ updatedCount: 2, deletedCount: 2 });
+      mutationFns.push(fn);
+      return fn;
+    });
+    const calledArgs = () => mutationFns.flatMap((fn) => fn.mock.calls).map((call) => call[0]);
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (_api === "categories-list-for-settings") {
+        return [{ _id: "cat-food", name: "食費", isActive: true }];
+      }
+      if (args === undefined) {
+        // listActive（一括変更のカテゴリ候補）
+        return [{ _id: "cat-food", name: "食費" }];
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-1",
+            date: "2026-08-02",
+            type: "expense" as const,
+            shopName: "明細の店",
+            amountYen: 900,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry" as const,
+          },
+          {
+            _id: "receipt-1",
+            date: "2026-08-03",
+            type: "expense" as const,
+            shopName: "レシートの店",
+            amountYen: 800,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "receipt" as const,
+          },
+        ],
+        totalCount: 2,
+        expenseCount: 2,
+        totalExpenseYen: 1700,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    await user.click(
+      within(expenseTable).getByRole("checkbox", { name: "明細の店（2026/8/2）を選択" }),
+    );
+    await user.click(
+      within(expenseTable).getByRole("checkbox", { name: "レシートの店（2026/8/3）を選択" }),
+    );
+    expect(screen.getByText("明細2件を選択中")).toBeInTheDocument();
+
+    // 一括カテゴリ変更: 明細・レシートのIDを混ぜて渡す
+    await user.click(screen.getByRole("button", { name: "カテゴリを変更" }));
+    const bulkDialog = await screen.findByRole("dialog");
+    await user.click(within(bulkDialog).getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "食費" }));
+    await user.click(screen.getByRole("button", { name: "変更する" }));
+    await screen.findByText("明細2件のカテゴリを変更しました。");
+    // bulkUpdateSpendingCategories に明細・レシート両方のIDとカテゴリを渡す
+    expect(calledArgs()).toContainEqual({
+      expenseEntryIds: ["expense-1"],
+      receiptIds: ["receipt-1"],
+      categoryId: "cat-food",
+    });
+
+    // 一括削除も同じIDの組を渡す（結果が再描画されるのでテーブルを取り直す）
+    const expenseTableAfterApply = await screen.findByRole("table", { name: "支出の検索結果" });
+    await user.click(
+      within(expenseTableAfterApply).getByRole("checkbox", {
+        name: "明細の店（2026/8/2）を選択",
+      }),
+    );
+    await user.click(
+      within(expenseTableAfterApply).getByRole("checkbox", {
+        name: "レシートの店（2026/8/3）を選択",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "削除" }));
+    await user.click(await screen.findByRole("button", { name: "削除する" }));
+    await screen.findByText("明細2件を削除しました。");
+    // bulkDeleteSpendingRecords に同じIDの組を渡す（categoryIdなし）
+    expect(
+      calledArgs().filter(
+        (args) =>
+          args !== null &&
+          typeof args === "object" &&
+          "expenseEntryIds" in args &&
+          "receiptIds" in args &&
+          !("categoryId" in args),
+      ),
+    ).toContainEqual({
+      expenseEntryIds: ["expense-1"],
+      receiptIds: ["receipt-1"],
+    });
+
+    // 適用条件（appliedKey）が変わると選択は解除される
+    const expenseTableAfterDelete = await screen.findByRole("table", {
+      name: "支出の検索結果",
+    });
+    await user.click(
+      within(expenseTableAfterDelete).getByRole("checkbox", {
+        name: "明細の店（2026/8/2）を選択",
+      }),
+    );
+    expect(screen.getByText("明細1件を選択中")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("キーワード"), "北浜");
+    await user.click(screen.getByRole("button", { name: "絞り込む" }));
+    await waitFor(() => expect(screen.queryByText(/明細\d+件を選択中/)).not.toBeInTheDocument());
   });
 });

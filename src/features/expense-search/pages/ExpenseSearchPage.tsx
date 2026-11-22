@@ -1,8 +1,9 @@
 import { api } from "../../../../convex/_generated/api";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery } from "convex/react";
-import { Alert, Box, Button, Stack, Typography } from "@mui/material";
+import { useMutation, useQuery } from "convex/react";
+import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material";
+import type { Id } from "../../../../convex/_generated/dataModel";
 import { getCurrentMonth } from "../../../../lib/domain/common/month";
 import { UNCATEGORIZED_CATEGORY_ID } from "../../../../lib/domain/expenseSearch/filter";
 import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
@@ -10,6 +11,17 @@ import { SuzumemoLoadingState } from "../../ui";
 import { getCurrentWeekStartDate, normalizeWeekStartDate } from "../../week";
 import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
 import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
+import { ExpenseBulkCategoryDialog } from "../../summary-shared/components/ExpenseBulkCategoryDialog";
+import { ExpenseBulkDeleteDialog } from "../../summary-shared/components/ExpenseBulkDeleteDialog";
+import { ExpenseEntryDeleteDialog } from "../../summary-shared/components/ExpenseEntryDeleteDialog";
+import { ExpenseEntryEditDialog } from "../../summary-shared/components/ExpenseEntryEditDialog";
+import type { CategoryPreview } from "../../summary-shared/components/ReceiptRow";
+import { useSpendingBulkSelection } from "../../summary-shared/hooks/useSpendingBulkSelection";
+import {
+  groupReceiptItems,
+  incomeItemToReceiptItem,
+  type ReceiptItem,
+} from "../../summary-shared/types/types";
 import { AppliedSearchFilters } from "../components/AppliedSearchFilters";
 import { ExpenseSearchFilters } from "../components/ExpenseSearchFilters";
 import { HistoryCategoryChart } from "../components/HistoryCategoryChart";
@@ -18,7 +30,6 @@ import { HistoryMetricsPanel } from "../components/HistoryMetricsPanel";
 import { HistoryTrendChart } from "../components/HistoryTrendChart";
 import { useExpenseSearchResults } from "../hooks/useExpenseSearchResults";
 import { toIncomeItem, toReceiptItem } from "../lib/expenseSearchItems";
-import { groupReceiptItems } from "../../summary-shared/types/types";
 import { formatDateForDisplay } from "../../../utils/date";
 import {
   diffExpenseSearchFormState,
@@ -83,7 +94,27 @@ export function ExpenseSearchPage() {
     isAdditionalSearchError,
     retrySearch,
     loadMore,
+    refreshResults,
   } = useExpenseSearchResults(applied, appliedKey);
+
+  const [editingReceipt, setEditingReceipt] = useState<ReceiptItem | null>(null);
+  const [deletingReceipt, setDeletingReceipt] = useState<ReceiptItem | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
+  const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [previewCategory, setPreviewCategory] = useState<CategoryPreview | null>(null);
+
+  const deleteExpenseEntry = useMutation(api.expenseEntries.mutations.deleteExpenseEntry);
+  const deleteReceipt = useMutation(api.receipts.crud.deleteReceipt);
+  const bulkUpdateSpendingCategories = useMutation(
+    api.expenseEntries.mutations.bulkUpdateSpendingCategories,
+  );
+  const bulkDeleteSpendingRecords = useMutation(
+    api.expenseEntries.mutations.bulkDeleteSpendingRecords,
+  );
 
   // チップ削除・グラフクリックなど適用側の変化は差分だけdraftへ反映し、
   // フォームで編集中の未適用の値は消さない。
@@ -134,8 +165,87 @@ export function ExpenseSearchPage() {
     linkedWeekStart !== null && linkedWeekStart !== undefined
       ? `/weeks/${linkedWeekStart}`
       : `/weeks/${getCurrentWeekStartDate(userProfile?.weeklyStartDay)}`;
-  const expenseItems = loadedItems.filter((item) => item.type === "expense").map(toReceiptItem);
-  const incomeItems = loadedItems.filter((item) => item.type === "income").map(toIncomeItem);
+
+  const expenseItems = useMemo(
+    () => loadedItems.filter((item) => item.type === "expense").map(toReceiptItem),
+    [loadedItems],
+  );
+  const incomeItems = useMemo(
+    () => loadedItems.filter((item) => item.type === "income").map(toIncomeItem),
+    [loadedItems],
+  );
+
+  const weeklyStartDay = userProfile?.weeklyStartDay ?? 1;
+  // 適用条件が変わると表示対象が変わるため、選択状態は適用条件単位で持つ。
+  const bulkSelection = useSpendingBulkSelection(expenseItems, appliedKey);
+  const weekSummaryPath = (date: string) =>
+    `/weeks/${normalizeWeekStartDate(date, weeklyStartDay) ?? date}`;
+
+  const handleConfirmDelete = async () => {
+    if (!deletingReceipt) {
+      return;
+    }
+    setDeleteSaving(true);
+    setDeleteError("");
+    try {
+      if (deletingReceipt.recordType === "expenseEntry") {
+        await deleteExpenseEntry({
+          expenseEntryId: deletingReceipt._id as Id<"expenseEntries">,
+        });
+      } else {
+        await deleteReceipt({
+          receiptId: deletingReceipt._id as Id<"receipts">,
+        });
+      }
+      setDeletingReceipt(null);
+      setSaveMessage("記録を削除しました。");
+      refreshResults();
+    } catch {
+      setDeleteError("削除に失敗しました。時間をおいて再度お試しください。");
+    } finally {
+      setDeleteSaving(false);
+    }
+  };
+
+  const handleBulkChangeCategory = async (categoryId: string) => {
+    setBulkSaving(true);
+    setDeleteError("");
+    try {
+      const result = await bulkUpdateSpendingCategories({
+        expenseEntryIds: bulkSelection.selectedIds.expenseEntryIds as Id<"expenseEntries">[],
+        receiptIds: bulkSelection.selectedIds.receiptIds as Id<"receipts">[],
+        categoryId: categoryId as Id<"categories">,
+      });
+      setBulkCategoryOpen(false);
+      setPreviewCategory(null);
+      bulkSelection.clearSelection();
+      setSaveMessage(`明細${result.updatedCount}件のカテゴリを変更しました。`);
+      refreshResults();
+    } catch {
+      setDeleteError("カテゴリの一括変更に失敗しました。時間をおいて再度お試しください。");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkSaving(true);
+    setDeleteError("");
+    try {
+      const result = await bulkDeleteSpendingRecords({
+        expenseEntryIds: bulkSelection.selectedIds.expenseEntryIds as Id<"expenseEntries">[],
+        receiptIds: bulkSelection.selectedIds.receiptIds as Id<"receipts">[],
+      });
+      setBulkDeleteOpen(false);
+      bulkSelection.clearSelection();
+      setSaveMessage(`明細${result.deletedCount}件を削除しました。`);
+      refreshResults();
+    } catch {
+      setDeleteError("一括削除に失敗しました。時間をおいて再度お試しください。");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
 
   const handleApply = (next: ExpenseSearchFormState = draft) => {
     navigate(expenseSearchPath(next));
@@ -301,6 +411,11 @@ export function ExpenseSearchPage() {
               </Stack>
             ) : (
               <>
+                {deletingReceipt === null && deleteError ? (
+                  <Alert severity="error" variant="outlined" onClose={() => setDeleteError("")}>
+                    {deleteError}
+                  </Alert>
+                ) : null}
                 {applied.entryType !== "income" && expenseItems.length > 0 ? (
                   <ReceiptListCard
                     count={expenseItems.length}
@@ -311,6 +426,24 @@ export function ExpenseSearchPage() {
                     listAriaLabel="支出の検索結果"
                     maxVisibleGroups={Number.POSITIVE_INFINITY}
                     receipts={expenseItems}
+                    onDeleteReceipt={(receipt) => {
+                      setDeleteError("");
+                      setDeletingReceipt(receipt);
+                    }}
+                    onEditReceipt={setEditingReceipt}
+                    isSelected={bulkSelection.isSelected}
+                    limitMessage={bulkSelection.limitMessage}
+                    previewCategory={previewCategory}
+                    saving={bulkSaving}
+                    selectedCount={bulkSelection.selectedCount}
+                    selectionEnabled
+                    onBulkChangeCategory={() => setBulkCategoryOpen(true)}
+                    onBulkDelete={() => setBulkDeleteOpen(true)}
+                    onClearSelection={bulkSelection.clearSelection}
+                    onDeselectVisible={bulkSelection.deselectVisible}
+                    onSelectVisible={bulkSelection.selectVisible}
+                    onToggleSelection={bulkSaving ? undefined : bulkSelection.toggleReceipt}
+                    weekSummaryPath={weekSummaryPath}
                   />
                 ) : null}
                 {applied.entryType !== "expense" && incomeItems.length > 0 ? (
@@ -321,6 +454,12 @@ export function ExpenseSearchPage() {
                     incomes={incomeItems}
                     isLoading={false}
                     listAriaLabel="収入の検索結果"
+                    onDeleteIncome={(income) => {
+                      setDeleteError("");
+                      setDeletingReceipt(incomeItemToReceiptItem(income));
+                    }}
+                    onEditIncome={(income) => setEditingReceipt(incomeItemToReceiptItem(income))}
+                    weekSummaryPath={weekSummaryPath}
                   />
                 ) : null}
               </>
@@ -344,6 +483,59 @@ export function ExpenseSearchPage() {
             ) : null}
           </>
         )}
+
+        <ExpenseEntryEditDialog
+          categories={categories}
+          open={editingReceipt !== null}
+          receipt={editingReceipt}
+          onClose={() => setEditingReceipt(null)}
+          onSaved={() => {
+            setSaveMessage("変更を保存しました。");
+            refreshResults();
+          }}
+        />
+
+        <ExpenseEntryDeleteDialog
+          error={deleteError || undefined}
+          impactMessage="削除すると元に戻せません。各サマリーの集計からも外れます。"
+          open={deletingReceipt !== null}
+          saving={deleteSaving}
+          onCancel={() => {
+            setDeletingReceipt(null);
+            setDeleteError("");
+          }}
+          onConfirm={() => void handleConfirmDelete()}
+        />
+
+        <ExpenseBulkCategoryDialog
+          categories={categories}
+          open={bulkCategoryOpen}
+          saving={bulkSaving}
+          selectedReceipts={bulkSelection.selectedReceipts}
+          onCancel={() => {
+            setBulkCategoryOpen(false);
+            setPreviewCategory(null);
+          }}
+          onConfirm={(categoryId) => void handleBulkChangeCategory(categoryId)}
+          onPreviewCategory={setPreviewCategory}
+        />
+
+        <ExpenseBulkDeleteDialog
+          open={bulkDeleteOpen}
+          saving={bulkSaving}
+          selectedCount={bulkSelection.selectedCount}
+          impactMessage="削除すると元に戻せません。各サマリーの集計からも外れます。"
+          onCancel={() => setBulkDeleteOpen(false)}
+          onConfirm={() => void handleBulkDelete()}
+        />
+
+        <Snackbar
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          autoHideDuration={3000}
+          message={saveMessage}
+          onClose={() => setSaveMessage("")}
+          open={saveMessage.length > 0}
+        />
       </Stack>
     </Box>
   );
