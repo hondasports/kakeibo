@@ -20,6 +20,7 @@ export function InputPage() {
   const [initialPrefill] = useState(
     () => (location.state as { prefill?: ExpenseEntryPrefill } | null)?.prefill,
   );
+  const [prefillApplied, setPrefillApplied] = useState(false);
   useEffect(() => {
     if (initialPrefill !== undefined) {
       navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
@@ -43,6 +44,14 @@ export function InputPage() {
   const weekSummary = useQuery(api.receipts.summaries.getWeekSummary, {
     weekStartDate,
   });
+
+  // フォームが一度マウントしたら複写内容を消費済みにする。
+  // 週移動でフォームが再マウントされても保存済みの内容を再適用しないため。
+  useEffect(() => {
+    if (initialPrefill !== undefined && categories !== undefined && weekSession !== null) {
+      setPrefillApplied(true);
+    }
+  }, [initialPrefill, categories, weekSession]);
 
   if (isLoading && !weekSession) {
     return (
@@ -115,7 +124,7 @@ export function InputPage() {
               </Alert>
             )}
             <ExpenseEntryForm
-              initialPrefill={initialPrefill}
+              initialPrefill={prefillApplied ? undefined : initialPrefill}
               weekStartDate={weekStartDate}
               weekEndDate={weekEndDate}
               categories={categories}
