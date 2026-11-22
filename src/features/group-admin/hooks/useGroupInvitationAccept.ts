@@ -7,6 +7,7 @@ import { useAction, useConvexAuth } from "convex/react";
 import {
   buildInvitationFallbackUrl,
   CLERK_STATUS_SIGN_IN,
+  extractProfileFieldErrors,
   firstNameFieldNames,
   lastNameFieldNames,
   type ClerkSignIn,
@@ -170,6 +171,14 @@ export function useGroupInvitationAccept() {
 
       const updateResult: ClerkSignUpResult = await signUp.update(updateParams);
       if (updateResult.error) {
+        // first_name / last_name のエラーは各入力項目の下に出す（全体Alertには載せない）。
+        const fieldErrors = extractProfileFieldErrors(updateResult.error);
+        if (fieldErrors.firstName !== undefined || fieldErrors.lastName !== undefined) {
+          if (fieldErrors.firstName !== undefined) setFirstNameError(fieldErrors.firstName);
+          if (fieldErrors.lastName !== undefined) setLastNameError(fieldErrors.lastName);
+          dispatch({ type: "processingFinished" });
+          return;
+        }
         throw updateResult.error;
       }
 

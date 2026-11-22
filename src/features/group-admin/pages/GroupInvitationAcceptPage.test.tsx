@@ -572,6 +572,44 @@ describe("GroupInvitationAcceptPage", () => {
     expect(signUpUpdateMock).not.toHaveBeenCalled();
   });
 
+  it("サーバーが判定したfirst_name/last_nameのエラーは各入力項目の下に表示する", async () => {
+    useSignUpMock.mockReturnValue({
+      signUp: {
+        finalize: signUpFinalizeMock,
+        missingFields: ["first_name", "last_name"],
+        sso: signUpSsoMock,
+        status: "missing_requirements",
+        ticket: signUpTicketMock,
+        update: signUpUpdateMock,
+      },
+    });
+    signUpTicketMock.mockResolvedValue({
+      error: null,
+      missingFields: ["first_name", "last_name"],
+    });
+    signUpUpdateMock.mockResolvedValue({
+      error: {
+        errors: [
+          { longMessage: "名が長すぎます", meta: { paramName: "first_name" } },
+          { message: "姓の形式が不正です", meta: { paramName: "last_name" } },
+        ],
+      },
+      missingFields: ["first_name", "last_name"],
+    });
+
+    renderPage();
+
+    await screen.findByRole("heading", { name: "招待を完了する" });
+    fireEvent.change(screen.getByLabelText(/名/), { target: { value: "Taro" } });
+    fireEvent.change(screen.getByLabelText(/姓/), { target: { value: "Yamada" } });
+    fireEvent.submit(screen.getByRole("button", { name: "招待を完了する" }).closest("form")!);
+
+    expect(await screen.findByText("名が長すぎます")).toBeInTheDocument();
+    expect(await screen.findByText("姓の形式が不正です")).toBeInTheDocument();
+    // 項目に対応しないエラーだけが全体Alertに出る。
+    expect(screen.queryByText(/プロフィールを更新できませんでした/)).not.toBeInTheDocument();
+  });
+
   it("アカウント切り替えに失敗したら説明を表示し、再操作で続行できる", async () => {
     const failure = new Error("sign out failed");
     const signOutMock = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(undefined);

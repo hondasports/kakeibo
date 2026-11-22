@@ -102,3 +102,45 @@ export function isExistingAccountInvitationError(error: unknown) {
 export function buildInvitationFallbackUrl(token: string | null) {
   return buildInvitationFallbackUrlDomain(token);
 }
+
+/**
+ * signUp.update のエラーから first_name / last_name 各フィールド向けの
+ * メッセージを取り出す。paramName が一致しない項目は返さない（全体Alert側に委ねる）。
+ */
+export function extractProfileFieldErrors(error: unknown) {
+  const result: { firstName?: string; lastName?: string } = {};
+  if (!error || typeof error !== "object") {
+    return result;
+  }
+  const errors = (error as { errors?: unknown }).errors;
+  if (!Array.isArray(errors)) {
+    return result;
+  }
+  for (const item of errors) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const clerkError = item as {
+      longMessage?: unknown;
+      message?: unknown;
+      meta?: { paramName?: unknown };
+    };
+    const paramName =
+      typeof clerkError.meta?.paramName === "string" ? clerkError.meta.paramName : "";
+    const message =
+      typeof clerkError.longMessage === "string" && clerkError.longMessage !== ""
+        ? clerkError.longMessage
+        : typeof clerkError.message === "string" && clerkError.message !== ""
+          ? clerkError.message
+          : undefined;
+    if (message === undefined) {
+      continue;
+    }
+    if (firstNameFieldNames.has(paramName)) {
+      result.firstName = message;
+    } else if (lastNameFieldNames.has(paramName)) {
+      result.lastName = message;
+    }
+  }
+  return result;
+}
