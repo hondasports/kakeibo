@@ -10,6 +10,11 @@ describe("parseLineExpenseInput", () => {
     expect(parseLineExpenseInput("100均 500")).toEqual({ title: "100均", amountYen: 500 });
     expect(parseLineExpenseInput("Amazon 500")).toEqual({ title: "Amazon", amountYen: 500 });
   });
+  it("全角カンマを含む金額を桁区切りとして解析する", () => {
+    expect(parseLineExpenseInput("食費 １，２００円")).toEqual({ title: "食費", amountYen: 1200 });
+    expect(parseLineExpenseInput("食費 1，200円")).toEqual({ title: "食費", amountYen: 1200 });
+    expect(parseLineExpenseInput("食費 １２，３４５")).toEqual({ title: "食費", amountYen: 12345 });
+  });
   it("金額のみ・内容のみ・コマンド語は受理しない", () => {
     expect(parseLineExpenseInput("500")).toBeNull();
     expect(parseLineExpenseInput("コンビニ")).toBeNull();

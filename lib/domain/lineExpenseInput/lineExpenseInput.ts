@@ -51,7 +51,9 @@ function toHalfWidthDigits(value: string): string {
 
 /** メッセージを支出入力として解析する。解釈できなければ null。 */
 export function parseLineExpenseInput(messageText: string): LineExpenseInput | null {
-  const text = messageText.trim();
+  // 全角数字・全角カンマは半角にそろえてから照合する
+  // （「１，２００円」が「１」と「２００円」に分かれないように）。
+  const text = toHalfWidthDigits(messageText.trim()).replace(/，/g, ",");
   if (text.length === 0) return null;
 
   // 「内容 金額」が基本形。金額は空白・端で区切られた独立した数字列のみ

@@ -184,8 +184,8 @@ async function maybeCreateExpenseDraft(
   // そもそも parseLineExpenseInput が弾くため従来どおり category_lookup に流れる。
   const category = resolveCategoryLookup(expenseInput.title, categories);
   // 連投対策: 1人あたり1日（JST）LINE_TEXT_DRAFT_DAILY_LIMIT 件まで。
-  // 超過時は下書きを作らない（返信側は buildSummaryReply が同じ件数を
-  // 数えて「作れない」旨を返す）。
+  // 超過時は下書きを作らず "limit" を返し、返信 job の expenseDraftStatus が
+  // 上限用の返信文に切り替わる。
   const createdAts = await deps.expenseDrafts.lineTextDraftCreatedAtsSince(
     activeUserId,
     startOfDayInJapanMs(now),
