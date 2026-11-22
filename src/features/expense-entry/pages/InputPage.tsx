@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
 import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
@@ -14,9 +14,12 @@ export function InputPage() {
   const theme = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
-  const initialPrefill = (location.state as { prefill?: ExpenseEntryPrefill } | null)?.prefill;
-  // 複写内容は1回だけ適用する。state を消さないと週移動などでフォームが
-  // 再マウントされた際に同じ内容が再適用される。
+  // 複写内容は1回だけ適用する。フォームが非同期データの到着後に
+  // マウントされても失われないよう初回レンダー時点で捕捉し、
+  // location.state は消して週移動等の再マウントでの再適用を防ぐ。
+  const [initialPrefill] = useState(
+    () => (location.state as { prefill?: ExpenseEntryPrefill } | null)?.prefill,
+  );
   useEffect(() => {
     if (initialPrefill !== undefined) {
       navigate(`${location.pathname}${location.search}`, { replace: true, state: null });

@@ -466,7 +466,9 @@ export default defineSchema({
     memo: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_user_id_and_group_id", ["userId", "groupId"]),
+  })
+    .index("by_user_id_and_group_id", ["userId", "groupId"])
+    .index("by_group_id", ["groupId"]),
 
   receipts: defineTable({
     groupId: v.id("groups"),
