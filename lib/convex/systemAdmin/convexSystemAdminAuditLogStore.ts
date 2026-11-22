@@ -106,6 +106,8 @@ export function createSystemAdminAuditLogReader(
               q.or(
                 q.eq(q.field("sourceGroupId"), groupId as Id<"groups">),
                 q.eq(q.field("targetGroupId"), groupId as Id<"groups">),
+                // 閲覧・削除再開・owner不在復旧など直接操作は対象グループを targetId に記録する。
+                q.eq(q.field("targetId"), groupId),
               ),
             )
           : ordered
