@@ -9,6 +9,7 @@ type MyGroupInfo = {
   groupId: string;
   name: string;
   clerkOrganizationId: string | null;
+  monthlyBudgetYen: number | null;
   role: GroupRole;
   createdAt: number;
 };
@@ -24,6 +25,7 @@ export async function getMyGroup(
     groupId: group.id,
     name: group.name,
     clerkOrganizationId: group.clerkOrganizationId ?? null,
+    monthlyBudgetYen: group.monthlyBudgetYen ?? null,
     role: args.role,
     createdAt: group.createdAt,
   };

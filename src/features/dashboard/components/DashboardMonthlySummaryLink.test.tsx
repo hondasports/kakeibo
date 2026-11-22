@@ -1,8 +1,12 @@
 import { screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
 import { DashboardMonthlySummaryLink } from "./DashboardMonthlySummaryLink";
+
+vi.mock("convex/react", () => ({
+  useQuery: () => undefined,
+}));
 
 describe("DashboardMonthlySummaryLink", () => {
   it("指定した月次サマリーへのリンクを表示する", () => {
