@@ -82,7 +82,7 @@ export function MonthlyIncomeSettingsPanel() {
           月収入
         </Typography>
         <Typography color="text.secondary" variant="body2">
-          給与などの固定収入を登録します。個人設定であり、共有グループの収支集計には含まれません。
+          給与などの固定収入を登録します。現在、この値は集計には使われません。
         </Typography>
       </Box>
 
