@@ -91,7 +91,8 @@ describe("AccountDeletionPage", () => {
     expect(navigate).toHaveBeenCalledWith("/settings");
   });
 
-  it("GROUP_MEMBERSHIP_INVARIANT のときサポート案内を表示する", () => {
+  it("GROUP_MEMBERSHIP_INVARIANT のときサポート案内を表示し、設定へ戻れる", async () => {
+    const user = userEvent.setup();
     useQueryMock.mockReturnValue(
       previewWith({ canDelete: false, errorCode: "GROUP_MEMBERSHIP_INVARIANT" }),
     );
@@ -102,8 +103,10 @@ describe("AccountDeletionPage", () => {
     expect(
       screen.getByText(/サポート（hondasports@gmail.com）へお問い合わせください/),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "設定に戻る" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "アカウントを削除する" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "設定に戻る" }));
+    expect(navigate).toHaveBeenCalledWith("/settings");
   });
 
   it("離脱・削除対象グループの一覧を表示し、確認文言「削除」の入力後にだけ退会を開始できる", async () => {

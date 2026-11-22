@@ -240,7 +240,7 @@ function SignedOutScreen() {
 
           <Box>
             <Typography color="text.secondary" variant="body2">
-              はじめての方も、同じボタンからGoogleアカウントで登録へ進めます。
+              招待を受けた方は、同じボタンからGoogleアカウントで登録へ進めます（招待制です）。
             </Typography>
             <Typography color="text.secondary" variant="body2">
               ログインまたは登録を進めると、利用規約とプライバシーポリシーに同意したものとみなします。

@@ -142,5 +142,14 @@ describe("AppLayout サイドバー開閉", () => {
       expect(header!.querySelector('img[src="/suzumemo-app-icon.svg"]')).toBeInTheDocument();
       expect(within(header as HTMLElement).getByText("ホーム")).toBeInTheDocument();
     });
+
+    it("ヘッダーの画面名はSPでも折り返さない", () => {
+      const { container } = renderWithProviders(<AppLayout />);
+      const header = container.querySelector("header");
+      const title = within(header as HTMLElement).getByText("ホーム");
+
+      // 日本語は1文字ずつ折り返せるため、折り返し禁止を明示する（縦並び防止）
+      expect(title).toHaveStyle("white-space: nowrap");
+    });
   });
 });

@@ -42,6 +42,8 @@ export function useInitializeUser() {
       .then(() => {
         hasInitialized.current = true;
         setIsInitializing(false);
+        // 前回失敗でエラー画面が出ていても、自動再実行の成功で解除する
+        setInitializationError(false);
       })
       .catch((err: unknown) => {
         hasInitialized.current = false; // リトライ許可
