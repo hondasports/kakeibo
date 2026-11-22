@@ -106,6 +106,10 @@ export type SearchQueryTerm = {
  * 空白区切りはAND、先頭「-」は除外、「"..."」で囲むと空白や「-」を含む
  * 文字列をそのまま検索できる。
  */
+// スマートフォンの日本語入力では全角の「－」や「“”」・「＂」が入りうるため、
+// 解析の前に NFKC で半角へ寄せ、波線の引用符も引用として扱う。
+const QUOTE_CHARS = new Set(['"', "\u201c", "\u201d"]);
+
 export function parseSearchQueryTerms(query: string): SearchQueryTerm[] {
   const terms: SearchQueryTerm[] = [];
   let current = "";
@@ -125,8 +129,8 @@ export function parseSearchQueryTerms(query: string): SearchQueryTerm[] {
     terms.push({ raw: exclude ? raw.slice(1) : raw, exclude });
   };
 
-  for (const char of query) {
-    if (char === '"') {
+  for (const char of query.normalize("NFKC")) {
+    if (QUOTE_CHARS.has(char)) {
       if (current.length === 0 && !inQuote) {
         tokenStartedWithQuote = true;
       }

@@ -130,15 +130,21 @@ export function ExpenseSearchPage() {
   const hasUnappliedChanges = Object.keys(diffExpenseSearchFormState(applied, draft)).length > 0;
 
   const currentSearchPath = `${location.pathname}${location.search}`;
-  const appliedCategory = allCategories.find((category) => category._id === applied.categoryId);
+  // まず有効カテゴリ（listActive）で解決し、無効化済みかの判定だけ listForSettings に頼る。
+  // どちらの結果も来ていない間は「読み込み中」として「指定」と区別する。
+  const activeCategory = categories.find((category) => category._id === applied.categoryId);
+  const appliedCategory =
+    activeCategory ?? allCategories.find((category) => category._id === applied.categoryId);
   const categoryLabel =
     applied.categoryId === UNCATEGORIZED_CATEGORY_ID
       ? "未分類"
       : appliedCategory
-        ? appliedCategory.isActive
-          ? appliedCategory.name
-          : `${appliedCategory.name}（無効化済み）`
-        : undefined;
+        ? appliedCategory.isActive === false
+          ? `${appliedCategory.name}（無効化済み）`
+          : appliedCategory.name
+        : applied.categoryId && allCategoriesQuery === undefined
+          ? "読み込み中"
+          : undefined;
 
   // 期間が複数月にまたがるときは開始日側の月・週を代表として使う。
   const representativeDate =
