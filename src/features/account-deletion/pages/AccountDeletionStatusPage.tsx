@@ -22,6 +22,8 @@ function BackToSettingsButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+// 退会要求が進行中の間は GroupRouteGuard が全画面を退会状況へ戻すため、
+// 「設定に戻る」導線は「要求が見つかりません」画面にだけ出す。
 function AccountDeletionStatusPageContent() {
   const { isLoading: isConvexAuthLoading, isAuthenticated } = useConvexAuth();
   const status = useQuery(
@@ -153,7 +155,6 @@ function AccountDeletionStatusPageContent() {
               ) : null}
             </>
           )}
-          <BackToSettingsButton onClick={backToSettings} />
         </Stack>
       </Paper>
     </Box>
