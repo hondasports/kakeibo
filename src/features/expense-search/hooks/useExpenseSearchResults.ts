@@ -136,5 +136,16 @@ export function useExpenseSearchResults(applied: ExpenseSearchFormState, applied
     parsedError: parsed.ok ? null : parsed.error,
     retrySearch: () => setSearchRequestId((current) => current + 1),
     loadMore: () => setPaginationCursor(displayResult?.continueCursor ?? null),
+    // 編集・削除・一括操作の後に読み込み済み分を破棄して先頭ページから取り直す。
+    // 追加読み込み後は初回ページしかsubscribeしていないため、マージでは更新できない。
+    refreshResults: () => {
+      setHasLoadedPage(false);
+      setLoadedItems([]);
+      setLoadedCursor(null);
+      setPaginationCursor(null);
+      setLastSearchResult(null);
+      setInitialSearchResult(null);
+      setSearchRequestId((current) => current + 1);
+    },
   };
 }

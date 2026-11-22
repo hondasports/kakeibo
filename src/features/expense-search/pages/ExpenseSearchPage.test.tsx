@@ -10,9 +10,11 @@ import { ExpenseSearchPage } from "./ExpenseSearchPage";
 
 const useQueryMock = vi.fn();
 const useQueriesMock = vi.fn();
+const useMutationMock = vi.fn((_endpoint: unknown) => vi.fn());
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
   useQueries: (queries: Record<string, { args: unknown }>) => useQueriesMock(queries),
+  useMutation: (endpoint: unknown) => useMutationMock(endpoint),
 }));
 
 vi.mock("../../../../convex/_generated/api", () => ({
@@ -261,6 +263,121 @@ describe("ExpenseSearchPage", () => {
     expect(within(expenseTable).getByText("2023/6/1")).toBeInTheDocument();
     const incomeTable = screen.getByRole("table", { name: "収入の検索結果" });
     expect(within(incomeTable).getByText("2021/3/15")).toBeInTheDocument();
+  });
+
+  it("結果行から編集・削除・その週のサマリーへ進める", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-1",
+            date: "2026-08-02",
+            type: "expense" as const,
+            shopName: "対象の店",
+            amountYen: 900,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry" as const,
+          },
+          {
+            _id: "income-1",
+            date: "2026-08-05",
+            type: "income" as const,
+            bankName: "対象の銀行",
+            amountYen: 5000,
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        totalCount: 2,
+        expenseCount: 1,
+        incomeCount: 1,
+        totalExpenseYen: 900,
+        totalIncomeYen: 5000,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    expect(
+      within(expenseTable).getByRole("button", { name: "対象の店（2026/8/2）を編集" }),
+    ).toBeInTheDocument();
+    expect(
+      within(expenseTable).getByRole("button", { name: "対象の店（2026/8/2）を削除" }),
+    ).toBeInTheDocument();
+    expect(
+      within(expenseTable).getByRole("link", {
+        name: "対象の店（2026/8/2）が属する週のサマリーを見る",
+      }),
+    ).toHaveAttribute("href", `/weeks/${normalizeWeekStartDate("2026-08-02", 3)}`);
+
+    const incomeTable = screen.getByRole("table", { name: "収入の検索結果" });
+    expect(
+      within(incomeTable).getByRole("button", { name: "対象の銀行（2026/8/5）を編集" }),
+    ).toBeInTheDocument();
+    expect(
+      within(incomeTable).getByRole("link", {
+        name: "対象の銀行（2026/8/5）が属する週のサマリーを見る",
+      }),
+    ).toHaveAttribute("href", `/weeks/${normalizeWeekStartDate("2026-08-05", 3)}`);
+  });
+
+  it("支出行を選択して一括操作を呼び出せる", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-1",
+            date: "2026-08-02",
+            type: "expense" as const,
+            shopName: "対象の店",
+            amountYen: 900,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        totalCount: 1,
+        expenseCount: 1,
+        totalExpenseYen: 900,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    await user.click(
+      within(expenseTable).getByRole("checkbox", { name: "対象の店（2026/8/2）を選択" }),
+    );
+
+    expect(screen.getByText("明細1件を選択中")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "カテゴリを変更" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "削除" })).toBeInTheDocument();
   });
 
   it("追加読み込み後も初回の前期間比較を保持する", async () => {
