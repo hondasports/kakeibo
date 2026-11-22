@@ -16,7 +16,7 @@ export function createLineExpenseDraftReader(ctx: QueryCtx | MutationCtx): LineE
         .withIndex("by_created_by_user_id_and_source_type_and_created_at", (q) =>
           q.eq("createdByUserId", createdByUserId).eq("sourceType", "line_text"),
         )
-        .filter((q) => q.gte(q.field("createdAt"), sinceMs))
+        .range((q) => q.gte(q.field("createdAt"), sinceMs))
         .order("desc")
         .take(LINE_TEXT_DRAFT_DAILY_LIMIT + 1);
       return rows.map((row) => row.createdAt);

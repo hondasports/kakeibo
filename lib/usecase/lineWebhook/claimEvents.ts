@@ -193,6 +193,9 @@ async function maybeCreateExpenseDraft(
     amountYen: expenseInput.amountYen,
     categoryId: category?.id,
     date: getTodayDateStringInJapan(eventAtMs),
-    now,
+    // createdAt はイベント時刻で打つ。返信側が「このイベント時刻以降の
+    // 下書き」で作成可否を判定するため、claim 時刻で打つと同時刻に連投
+    // された別イベントの下書きを自分の分と誤認する。
+    now: eventAtMs,
   });
 }
