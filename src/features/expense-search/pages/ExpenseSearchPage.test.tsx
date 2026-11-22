@@ -505,6 +505,78 @@ describe("ExpenseSearchPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("未分類の集計項目を選ぶと未分類フィルタで絞り込む", async () => {
+    const user = userEvent.setup();
+    const result: ExpenseSearchResult = {
+      ...emptySearchResult,
+      totalCount: 1,
+      expenseCount: 1,
+      totalExpenseYen: 1200,
+      comparison: {
+        currentStartDate: "2026-08-01",
+        currentEndDate: "2026-08-31",
+        previousStartDate: "2026-07-01",
+        previousEndDate: "2026-07-31",
+        current: {
+          count: 1,
+          expenseCount: 1,
+          incomeCount: 0,
+          totalExpenseYen: 1200,
+          totalIncomeYen: 0,
+          netAmountYen: -1200,
+          byCategory: [],
+        },
+        previous: {
+          count: 1,
+          expenseCount: 1,
+          incomeCount: 0,
+          totalExpenseYen: 800,
+          totalIncomeYen: 0,
+          netAmountYen: -800,
+          byCategory: [],
+        },
+        diffExpenseYen: 400,
+        diffIncomeYen: 0,
+        diffNetYen: -400,
+        categoryChanges: [
+          {
+            categoryId: "",
+            categoryName: "未分類",
+            categoryColor: "#AAB7C4",
+            currentAmountYen: 1200,
+            previousAmountYen: 800,
+            diffAmountYen: 400,
+            diffRatePercent: 50,
+          },
+        ],
+        hasPreviousData: true,
+      },
+    };
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return result;
+    });
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+        <LocationProbe />
+        <Routes>
+          <Route path="/search" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /未分類/ }));
+    expect(
+      screen.getByText("/search?type=expense&categoryId=__uncategorized__"),
+    ).toBeInTheDocument();
+  });
+
   it("条件を絞り込むとURLへ反映し、クリアで戻せる", async () => {
     const user = userEvent.setup();
     renderWithDatePickers(
