@@ -112,9 +112,10 @@ ClerkProvider
 
 ### 認証状態のチェック順序（`App.tsx`）
 
-`/sso-callback` はClerkの認証コールバックとして直接処理する。公開パスと未定義URLは認証前に
-`RouterProvider` へ渡し、公開ページや404を表示する。家計・設定・管理画面などの認証対象パスは
-`AuthenticatedApp` で以下を順に確認する。
+`/sso-callback` はClerkの認証コールバックとして直接処理する。公開パスと、認証対象パス以外の
+未定義URLは認証前に `RouterProvider` へ渡し、公開ページや404を表示する。家計・設定・管理画面などの
+認証対象パス（配下の未定義URLを含む。判定は `src/features/app-shell/lib/publicPaths.ts` の
+`isAuthenticatedAppPath`）は `AuthenticatedApp` で以下を順に確認する。
 
 1. `useAuth().isLoaded` が `false` → ローディング表示
 2. `useAuth().isSignedIn` が `false` → サインイン画面（`SignedOutScreen`）
