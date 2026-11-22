@@ -24,7 +24,7 @@ license: Apache-2.0
    | 外部操作 | 外部write・webhook・通知の重複や部分失敗のときの挙動を決めた |
    | 復旧範囲 | 失敗したときに戻す手段（revert・再実行・データ修正）と、その範囲を書いた |
 
-4. **Verification Strategyへ反映する。** 「caller・観点 → 確認方法」を1行ずつ書き、`skills/implementation` の対応表に入れる。2つ以上のfeature・domainにまたがる変更は高リスクとして扱い、caller側の確認も検証計画に含める。Risk点数ではなく、必要な確認とその理由を残す。
+4. **Verification Strategyへ反映する。** 「caller・観点 → 確認方法」を1行ずつ書き、`skills/requirements` のVerification Strategyと `skills/implementation` の対応表に入れる。2つ以上のfeature・domainにまたがる変更は高リスクとして扱い、caller側の確認も検証計画に含める。Risk点数ではなく、必要な確認とその理由を残す。
 
 ## indexionで当たりを付ける
 

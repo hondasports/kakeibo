@@ -5,7 +5,7 @@
 ## Core contract
 
 - repositoryを編集する前に `node scripts/check-task-worktree.mjs --require-clean` で専用worktree・非保護branch・clean baselineを確認する。FAILしたら `skills/workspace-preflight` に従う。
-- Issueが曖昧ならrepository・既存仕様・テストを調べ、Goal / Acceptance Criteria / Non-goals / Assumptions / Verification Strategyを補う。調査で解ける疑問はユーザーへ戻さない。
+- Issueが曖昧ならrepository・既存仕様・テストを調べ、Goal / Acceptance Criteria / Non-goals / Assumptions / Verification Strategyを補い、Issueへ書き戻す（`skills/requirements`）。調査で解ける疑問はユーザーへ戻さない。
 - 既存patternに沿う可逆・低影響な判断はAgentが決めてAssumptionに記録する。Product / UX / Security / Data semanticsを実質的に変える未確定事項だけユーザーへ確認する。
 - 実装・targeted test・debug・修正・再検証は同じRunで反復する。止めてよい条件は「開発ループ」の3で、無情報の再試行はしない。
 - 原因・状態・設定の主張は、この作業中にコマンドやファイルで確かめたものだけを事実として書き、根拠を添える。確かめていないものは推定と書き、推定を前提に修正・push・Issue/PRへの記載をしない。
@@ -35,6 +35,7 @@
 | 該当したら読む（path・操作） | skill |
 | --- | --- |
 | preflightがFAILした、task worktreeを作る・片付ける | `skills/workspace-preflight` |
+| Issue・依頼から実装に入る（完了地点が `local_verified` 以上。最初の編集前）、レビューで照合する受入条件が見つからない | `skills/requirements` |
 | アプリの振る舞いを変える `src/**`・`lib/**`・`convex/**` の変更（最初の編集前とコミット前） | `skills/implementation` |
 | UI/UXの設計・実装・レビュー（画面レイアウト・コンポーネント・状態表示・文言） | `skills/ui-design` |
 | 振る舞いの変更に伴うテスト設計、テストの追加・修正・削除・統合・見直し、テストの選定・実行範囲の変更（タグ・`playwright.config.ts`・`vite.config.ts` のtest設定等）。最初の編集前 | `skills/test-design` |
