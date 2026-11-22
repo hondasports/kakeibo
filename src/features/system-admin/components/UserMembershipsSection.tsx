@@ -10,6 +10,7 @@ type UserMembershipsSectionProps = {
   detail: UserDetail;
   groupQuery: string;
   candidates: GroupCandidate[];
+  candidatesTruncated: boolean;
   candidateSearch: "idle" | "loading" | "done" | "error";
   selectedSource?: MembershipDialogGroup;
   onGroupQueryChange: (query: string) => void;
@@ -26,6 +27,7 @@ export function UserMembershipsSection({
   detail,
   groupQuery,
   candidates,
+  candidatesTruncated,
   candidateSearch,
   selectedSource,
   onGroupQueryChange,
@@ -157,7 +159,9 @@ export function UserMembershipsSection({
         ) : null}
         {candidateSearch === "done" && candidates.length === 0 ? (
           <Typography color="text.secondary" variant="body2">
-            この条件で見つかる追加先・移動先の候補はありません。検索条件を変えてみてください。
+            {candidatesTruncated
+              ? "先頭20件に追加先・移動先の候補はありません。検索条件を絞ってください。"
+              : "この条件で見つかる追加先・移動先の候補はありません。検索条件を変えてみてください。"}
           </Typography>
         ) : null}
         {candidates.map((candidate) => {

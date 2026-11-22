@@ -36,6 +36,8 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
   const [error, setError] = useState(false);
   const [groupQuery, setGroupQuery] = useState("");
   const [candidates, setCandidates] = useState<GroupCandidate[]>([]);
+  // 先頭20件で打ち切られたか。0件メッセージの文言に使う（true=先頭に無いだけの可能性）。
+  const [candidatesTruncated, setCandidatesTruncated] = useState(false);
   const [candidateOutcome, setCandidateOutcome] = useState<
     { query: string; tick: number; state: "done" | "error" } | undefined
   >();
@@ -96,6 +98,7 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
       .then((response) => {
         if (!cancelled) {
           setCandidates(response.page.filter((group) => group.status === "active"));
+          setCandidatesTruncated(response.isDone === false);
           setCandidateOutcome({ query: groupQuery, tick: candidateRetryTick, state: "done" });
         }
       })
@@ -177,6 +180,7 @@ export function useSystemAdminUserDetail(userId: string | undefined) {
     groupQuery,
     setGroupQuery,
     candidates: groupQuery.trim().length === 0 ? [] : candidates,
+    candidatesTruncated: groupQuery.trim().length !== 0 && candidatesTruncated,
     candidateSearch,
     retryCandidateSearch: () => setCandidateRetryTick((tick) => tick + 1),
     selectedSource,

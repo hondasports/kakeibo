@@ -23,6 +23,7 @@ export function SystemAdminUserDetailPage() {
     groupQuery,
     setGroupQuery,
     candidates,
+    candidatesTruncated,
     candidateSearch,
     retryCandidateSearch,
     selectedSource,
@@ -73,6 +74,7 @@ export function SystemAdminUserDetailPage() {
       <UserProfileCard detail={detail} onClearActive={() => requestOperation("clear_active")} />
       <UserMembershipsSection
         candidates={candidates}
+        candidatesTruncated={candidatesTruncated}
         candidateSearch={candidateSearch}
         detail={detail}
         groupQuery={groupQuery}

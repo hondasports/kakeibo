@@ -4,7 +4,11 @@ import { useQuery } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
 // 日付フィルタはこのブラウザのタイムゾーンの 0:00〜23:59:59.999 を境にする（両端を含む）。
-import type { SystemAdminAuditAction, SystemAdminAuditItem } from "../types";
+import type {
+  SystemAdminAuditAction,
+  SystemAdminAuditGroupRelation,
+  SystemAdminAuditItem,
+} from "../types";
 
 const actionLabels: Record<SystemAdminAuditAction, string> = {
   system_admin_granted: "付与",
@@ -36,6 +40,15 @@ export const actionOptions: Array<{ value: SystemAdminAuditAction | ""; label: s
   })),
 ];
 
+export const groupRelationOptions: Array<{
+  value: SystemAdminAuditGroupRelation;
+  label: string;
+}> = [
+  { value: "direct", label: "直接操作の対象" },
+  { value: "source", label: "移動元" },
+  { value: "target", label: "移動先" },
+];
+
 export function formatAction(action: SystemAdminAuditAction) {
   return actionLabels[action] ?? action;
 }
@@ -52,6 +65,7 @@ type AppliedFilters = {
   actor: string;
   target: string;
   groupId: string;
+  groupRelation: SystemAdminAuditGroupRelation;
   fromDate: string;
   toDate: string;
 };
@@ -67,6 +81,7 @@ const emptyFilters: AppliedFilters = {
   actor: "",
   target: "",
   groupId: "",
+  groupRelation: "direct",
   fromDate: "",
   toDate: "",
 };
@@ -78,6 +93,7 @@ export function useSystemAdminAuditLog() {
   const [actor, setActor] = useState("");
   const [target, setTarget] = useState("");
   const [groupId, setGroupId] = useState("");
+  const [groupRelation, setGroupRelation] = useState<SystemAdminAuditGroupRelation>("direct");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [applied, setApplied] = useState<AppliedFilters>(emptyFilters);
@@ -108,6 +124,7 @@ export function useSystemAdminAuditLog() {
           actorUserId: applied.actor.trim() ? (applied.actor.trim() as Id<"users">) : undefined,
           targetUserId: applied.target.trim() ? (applied.target.trim() as Id<"users">) : undefined,
           groupId: applied.groupId.trim() ? (applied.groupId.trim() as Id<"groups">) : undefined,
+          groupRelation: applied.groupId.trim() ? applied.groupRelation : undefined,
           from,
           to,
         },
@@ -116,7 +133,7 @@ export function useSystemAdminAuditLog() {
   const applyFilters = () => {
     // 不正なドラフト（逆転した期間・形式外のID）は確定しない。
     if (dateRangeInvalid || actorInvalid || targetInvalid || groupIdInvalid) return;
-    setApplied({ action, actor, target, groupId, fromDate, toDate });
+    setApplied({ action, actor, target, groupId, groupRelation, fromDate, toDate });
     setCursor(null);
   };
 
@@ -125,6 +142,7 @@ export function useSystemAdminAuditLog() {
     setActor("");
     setTarget("");
     setGroupId("");
+    setGroupRelation("direct");
     setFromDate("");
     setToDate("");
     setApplied(emptyFilters);
@@ -150,6 +168,8 @@ export function useSystemAdminAuditLog() {
     setTarget,
     groupId,
     setGroupId,
+    groupRelation,
+    setGroupRelation,
     fromDate,
     setFromDate,
     toDate,
