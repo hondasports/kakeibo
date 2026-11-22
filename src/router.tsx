@@ -134,6 +134,13 @@ const appRoutes: RouteObject[] = [
     element: <SettingsPage />,
   },
   {
+    path: "/export",
+    lazy: async () => {
+      const { ExportPage } = await import("./features/export/pages/ExportPage");
+      return { Component: ExportPage };
+    },
+  },
+  {
     path: "/settings/line/callback",
     element: <LineLinkCallbackPage />,
   },
