@@ -133,6 +133,21 @@ describe("replaceCategorySymbols", () => {
     );
     expect(text).toBe("支出の中心は食費の40,000円です。日用品は10,000円でした。");
   });
+  it("実名に記号と同じ文字列が含まれても二重置換しない", () => {
+    const input: MonthlyInsightInput = {
+      ...INPUT,
+      current: {
+        ...INPUT.current,
+        byCategory: [
+          { categoryName: "カテゴリB", amountYen: 40000, count: 20 },
+          { categoryName: "日用品", amountYen: 10000, count: 5 },
+        ],
+      },
+    };
+    expect(replaceCategorySymbols("カテゴリAの40,000円、カテゴリBの10,000円。", input)).toBe(
+      "カテゴリBの40,000円、日用品の10,000円。",
+    );
+  });
   it("前月にしか無いカテゴリにも記号を割り当てる", () => {
     const input: MonthlyInsightInput = {
       ...INPUT,

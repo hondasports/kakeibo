@@ -141,11 +141,19 @@ function symbolFor(
  * 記号は外部APIへ送ったプロンプトのものと対応している。
  */
 export function replaceCategorySymbols(text: string, input: MonthlyInsightInput): string {
-  let result = text;
-  for (const { point, symbol } of categorySymbolsForInput(input)) {
-    result = result.split(symbol).join(point.categoryName);
-  }
-  return result;
+  const entries = categorySymbolsForInput(input);
+  if (entries.length === 0) return text;
+  // 置換は元テキストを一括走査する。実名に記号と同じ文字列（例:「カテゴリB」
+  // というカテゴリ）が含まれても、戻した名前を再置換しない。
+  const pattern = new RegExp(
+    entries
+      .map((e) => e.symbol)
+      .sort((a, b) => b.length - a.length)
+      .join("|"),
+    "g",
+  );
+  const nameBySymbol = new Map(entries.map((e) => [e.symbol, e.point.categoryName]));
+  return text.replace(pattern, (matched) => nameBySymbol.get(matched) ?? matched);
 }
 
 /**
