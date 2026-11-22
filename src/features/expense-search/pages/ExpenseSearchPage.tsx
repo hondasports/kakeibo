@@ -518,6 +518,7 @@ export function ExpenseSearchPage() {
           open={bulkDeleteOpen}
           saving={bulkSaving}
           selectedCount={bulkSelection.selectedCount}
+          impactMessage="削除すると元に戻せません。各サマリーの集計からも外れます。"
           onCancel={() => setBulkDeleteOpen(false)}
           onConfirm={() => void handleBulkDelete()}
         />
