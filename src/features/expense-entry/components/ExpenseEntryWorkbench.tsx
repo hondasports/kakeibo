@@ -1,5 +1,8 @@
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { Alert, Box, Snackbar, Stack } from "@mui/material";
+import { api } from "../../../../convex/_generated/api";
+import { useMutation } from "convex/react";
+import { useState } from "react";
+import { Alert, Box, Button, Snackbar, Stack } from "@mui/material";
 import {
   AiExpenseQueuePanelProvider,
   QueuePanelActive,
@@ -8,6 +11,7 @@ import {
   QueuePanelRegistered,
 } from "../../ai-expense-queue";
 import { ConfirmDifferenceDialog } from "./ConfirmDifferenceDialog";
+import { EntryFavoritesDialog } from "./EntryFavoritesDialog";
 import { ExitMultiModeDialog } from "./ExitMultiModeDialog";
 import { ExpenseFormActions } from "./ExpenseFormActions";
 import { ExpenseFormHeading } from "./ExpenseFormHeading";
@@ -59,10 +63,32 @@ export function ExpenseEntryWorkbench({
   handleSubmit,
   handleConfirmSave,
   handleCancelConfirm,
+  applyEntryPrefill,
   handleSnackbarClose,
 }: ExpenseEntryWorkbenchProps) {
   const sourceAmountNum = parseInt(sourceAmount || "0", 10) || 0;
   const isOverExceeded = difference !== null && difference < 0;
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [favoriteMessage, setFavoriteMessage] = useState("");
+  const saveEntryFavorite = useMutation(api.entryFavorites.mutations.saveEntryFavorite);
+
+  const currentCategoryId = items[0]?.categoryId ?? "";
+  const canSaveFavorite =
+    !isMultiMode && shopName.trim() !== "" && sourceAmountNum > 0 && currentCategoryId !== "";
+
+  const handleSaveFavorite = async () => {
+    try {
+      await saveEntryFavorite({
+        title: shopName,
+        categoryId: currentCategoryId as Id<"categories">,
+        amountYen: sourceAmountNum,
+        memo: memo || undefined,
+      });
+      setFavoriteMessage("お気に入りに保存しました");
+    } catch {
+      setFavoriteMessage("お気に入りの保存に失敗しました");
+    }
+  };
 
   return (
     <AiExpenseQueuePanelProvider categories={categories}>
@@ -129,6 +155,35 @@ export function ExpenseEntryWorkbench({
               <ExpenseMemoField memo={memo} memoError={memoError} onMemoChange={setMemo} />
             )}
 
+            {!isMultiMode && (
+              <Stack direction="row" spacing={1}>
+                <Button
+                  onClick={() => setFavoritesOpen(true)}
+                  size="small"
+                  sx={{ minHeight: 44 }}
+                  type="button"
+                  variant="outlined"
+                >
+                  お気に入りから入力
+                </Button>
+                <Button
+                  disabled={!canSaveFavorite}
+                  onClick={() => void handleSaveFavorite()}
+                  size="small"
+                  sx={{ minHeight: 44 }}
+                  type="button"
+                  variant="text"
+                >
+                  お気に入りに保存
+                </Button>
+              </Stack>
+            )}
+            {favoriteMessage && (
+              <Alert onClose={() => setFavoriteMessage("")} severity="info" variant="outlined">
+                {favoriteMessage}
+              </Alert>
+            )}
+
             <ExpenseFormActions
               isMultiMode={isMultiMode}
               isOverExceeded={isOverExceeded}
@@ -147,6 +202,16 @@ export function ExpenseEntryWorkbench({
         onConfirm={handleConfirmSave}
         open={showConfirmDialog}
         pendingDifference={pendingDifference}
+      />
+
+      <EntryFavoritesDialog
+        categoryNames={new Map(categories.map((category) => [category._id, category.name]))}
+        open={favoritesOpen}
+        onApply={(prefill) => {
+          applyEntryPrefill(prefill);
+          setFavoritesOpen(false);
+        }}
+        onClose={() => setFavoritesOpen(false)}
       />
 
       <ExitMultiModeDialog

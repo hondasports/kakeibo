@@ -10,6 +10,7 @@ import { WeekNavigator } from "../../week";
 import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
 import { SummarySectionErrorBoundary } from "../../summary-shared/components/SummarySectionErrorBoundary";
 import { WeeklySummaryPanel } from "../components/WeeklySummaryPanel";
+import { receiptItemToEntryPrefill } from "../../summary-shared/lib/receiptToEntryPrefill";
 import { ExpenseBulkCategoryDialog } from "../components/ExpenseBulkCategoryDialog";
 import { ExpenseBulkDeleteDialog } from "../components/ExpenseBulkDeleteDialog";
 import { ExpenseEntryDeleteDialog } from "../../summary-shared/components/ExpenseEntryDeleteDialog";
@@ -40,6 +41,7 @@ function WeeklySummarySection({
   weekStartDate,
   onRetry,
 }: WeeklySummarySectionProps) {
+  const navigate = useNavigate();
   const [editingReceipt, setEditingReceipt] = useState<ReceiptItem | null>(null);
   const [deletingReceipt, setDeletingReceipt] = useState<ReceiptItem | null>(null);
   const [deleteSaving, setDeleteSaving] = useState(false);
@@ -204,6 +206,11 @@ function WeeklySummarySection({
         weeklyExpenseTrend={weeklyExpenseTrend}
         fourWeeksStatus={fourWeeksResult.status}
         onTrendRetry={onRetry}
+        onCopyReceipt={(receipt) =>
+          navigate("/weeks/current/input", {
+            state: { prefill: receiptItemToEntryPrefill(receipt) },
+          })
+        }
         onDeleteReceipt={setDeletingReceipt}
         onEditReceipt={setEditingReceipt}
         isSelected={bulkSelection.isSelected}

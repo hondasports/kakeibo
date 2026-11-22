@@ -9,6 +9,7 @@ import { SuzumemoLoadingState } from "../../ui";
 import { getCurrentWeekStartDate } from "../../week";
 import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
 import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
+import { receiptItemToEntryPrefill } from "../../summary-shared/lib/receiptToEntryPrefill";
 import { AppliedSearchFilters } from "../components/AppliedSearchFilters";
 import { ExpenseSearchFilters } from "../components/ExpenseSearchFilters";
 import { HistoryCategoryChart } from "../components/HistoryCategoryChart";
@@ -189,6 +190,11 @@ export function ExpenseSearchPage() {
                     isLoading={false}
                     listAriaLabel="支出の検索結果"
                     maxVisibleGroups={Number.POSITIVE_INFINITY}
+                    onCopyReceipt={(receipt) =>
+                      navigate("/weeks/current/input", {
+                        state: { prefill: receiptItemToEntryPrefill(receipt) },
+                      })
+                    }
                     receipts={expenseItems}
                   />
                 ) : null}

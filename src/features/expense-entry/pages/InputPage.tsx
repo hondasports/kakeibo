@@ -1,15 +1,18 @@
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useLocation } from "react-router-dom";
 import { Alert, Box, Button, Stack, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { ExpenseEntryForm } from "../components/ExpenseEntryForm";
+import type { ExpenseEntryPrefill } from "../types/prefill";
 import { WEEK_SESSION_LOAD_ERROR_MESSAGE, WeekNavigator, WeekStatusPanel } from "../../week";
 import { useInputPageWeek } from "../hooks/useInputPageWeek";
 import { SuzumemoLoadingState } from "../../ui";
 
 export function InputPage() {
   const theme = useTheme();
+  const location = useLocation();
+  const initialPrefill = (location.state as { prefill?: ExpenseEntryPrefill } | null)?.prefill;
   const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const {
     weekStartDate,
@@ -99,6 +102,7 @@ export function InputPage() {
               </Alert>
             )}
             <ExpenseEntryForm
+              initialPrefill={initialPrefill}
               weekStartDate={weekStartDate}
               weekEndDate={weekEndDate}
               categories={categories}

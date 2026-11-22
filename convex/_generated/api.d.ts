@@ -39,6 +39,8 @@ import type * as email_webhooks_resendWebhook from "../email/webhooks/resendWebh
 import type * as expenseEntries_internal from "../expenseEntries/internal.js";
 import type * as expenseEntries_mutations from "../expenseEntries/mutations.js";
 import type * as expenseEntries_testHelpers from "../expenseEntries/testHelpers.js";
+import type * as entryFavorites_mutations from "../entryFavorites/mutations.js";
+import type * as entryFavorites_queries from "../entryFavorites/queries.js";
 import type * as expenseSearch from "../expenseSearch.js";
 import type * as groups_adminGuards from "../groups/adminGuards.js";
 import type * as groups_auditLogs from "../groups/auditLogs.js";
@@ -156,6 +158,8 @@ declare const fullApi: ApiFromModules<{
   "expenseEntries/internal": typeof expenseEntries_internal;
   "expenseEntries/mutations": typeof expenseEntries_mutations;
   "expenseEntries/testHelpers": typeof expenseEntries_testHelpers;
+  "entryFavorites/mutations": typeof entryFavorites_mutations;
+  "entryFavorites/queries": typeof entryFavorites_queries;
   expenseSearch: typeof expenseSearch;
   "groups/adminGuards": typeof groups_adminGuards;
   "groups/auditLogs": typeof groups_auditLogs;
