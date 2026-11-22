@@ -56,6 +56,12 @@ type AppliedFilters = {
   toDate: string;
 };
 
+// ConvexのドキュメントID形式（32桁の英小文字・数字）。形式外の文字列は v.id() が拒否するため、
+// クエリへ渡す前に画面側で弾く。
+const CONVEX_ID_PATTERN = /^[a-z0-9]{32}$/;
+export const isInvalidConvexIdInput = (value: string) =>
+  value.trim() !== "" && !CONVEX_ID_PATTERN.test(value.trim());
+
 const emptyFilters: AppliedFilters = {
   action: "",
   actor: "",
@@ -79,12 +85,22 @@ export function useSystemAdminAuditLog() {
 
   const from = useMemo(() => parseDateBoundary(applied.fromDate, false), [applied.fromDate]);
   const to = useMemo(() => parseDateBoundary(applied.toDate, true), [applied.toDate]);
-  // 開始 > 終了 の間はクエリを止める（項目エラーとして画面に出す）。
+  // 入力中のドラフトのエラー。開始 > 終了 の間は項目エラーを出し、クエリは確定前の条件のまま。
   const dateRangeInvalid = Boolean(fromDate && toDate && fromDate > toDate);
+  const actorInvalid = isInvalidConvexIdInput(actor);
+  const targetInvalid = isInvalidConvexIdInput(target);
+  const groupIdInvalid = isInvalidConvexIdInput(groupId);
+  // 確定済みの条件が不正ならクエリを止める（applyは不正値を確定しないが保険として残す）。
+  const appliedRangeInvalid = Boolean(from !== undefined && to !== undefined && from > to);
+  const appliedIdsInvalid =
+    isInvalidConvexIdInput(applied.actor) ||
+    isInvalidConvexIdInput(applied.target) ||
+    isInvalidConvexIdInput(applied.groupId);
+  const querySkipped = appliedRangeInvalid || appliedIdsInvalid;
 
   const logs = useQuery(
     api.systemAdmins.listSystemAdminAuditLogs,
-    dateRangeInvalid
+    querySkipped
       ? "skip"
       : {
           paginationOpts: { numItems: 20, cursor },
@@ -98,6 +114,8 @@ export function useSystemAdminAuditLog() {
   );
 
   const applyFilters = () => {
+    // 不正なドラフト（逆転した期間・形式外のID）は確定しない。
+    if (dateRangeInvalid || actorInvalid || targetInvalid || groupIdInvalid) return;
     setApplied({ action, actor, target, groupId, fromDate, toDate });
     setCursor(null);
   };
@@ -144,5 +162,8 @@ export function useSystemAdminAuditLog() {
     clearFilters,
     hasFilter,
     dateRangeInvalid,
+    actorInvalid,
+    targetInvalid,
+    groupIdInvalid,
   };
 }

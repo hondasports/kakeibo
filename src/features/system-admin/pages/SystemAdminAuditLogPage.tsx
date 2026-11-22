@@ -42,6 +42,9 @@ function SystemAdminAuditLogPageContent() {
     clearFilters,
     hasFilter,
     dateRangeInvalid,
+    actorInvalid,
+    targetInvalid,
+    groupIdInvalid,
   } = useSystemAdminAuditLog();
 
   const handleClear = () => {
@@ -56,11 +59,14 @@ function SystemAdminAuditLogPageContent() {
       <AuditLogFilters
         action={action}
         actor={actor}
+        actorInvalid={actorInvalid}
         dateRangeInvalid={dateRangeInvalid}
         fromDate={fromDate}
+        groupIdInvalid={groupIdInvalid}
         groupId={groupId}
         hasFilter={hasFilter}
         target={target}
+        targetInvalid={targetInvalid}
         toDate={toDate}
         onActionChange={setAction}
         onActorChange={setActor}
