@@ -97,9 +97,7 @@ const COUNT_PATTERN = /([0-9０-９][0-9０-９,]*)\s*件/g;
 
 /** 生成文中の「◯件」を件数として抽出する（全角数字も対象）。 */
 export function extractCounts(text: string): number[] {
-  return [...text.matchAll(COUNT_PATTERN)].map((m) =>
-    Number(toHalfWidth(m[1]).replace(/,/g, "")),
-  );
+  return [...text.matchAll(COUNT_PATTERN)].map((m) => Number(toHalfWidth(m[1]).replace(/,/g, "")));
 }
 
 function collectAllowedCounts(input: MonthlyInsightInput): Set<number> {

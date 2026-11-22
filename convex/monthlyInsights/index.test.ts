@@ -145,9 +145,7 @@ describe("reserveMonthlyInsightGeneration", () => {
 
 describe("releaseMonthlyInsightGeneration", () => {
   const release = (t: ReturnType<typeof convexTest>, groupId: Id<"groups">, month = "2026-11") =>
-    t.run((ctx) =>
-      releaseMonthlyInsightGenerationHandler(ctx as MutationCtx, { groupId, month }),
-    );
+    t.run((ctx) => releaseMonthlyInsightGenerationHandler(ctx as MutationCtx, { groupId, month }));
 
   it("保存済みレコードの予約を解放し、generationCount を戻す", async () => {
     const t = convexTest(schema, convexTestModules);

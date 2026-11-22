@@ -28,9 +28,7 @@ describe("MonthlyInsightCard", () => {
 
     expect(screen.getByText("AI月次インサイト")).toBeInTheDocument();
     expect(screen.getByText("この月の傾向コメントはまだ生成されていません。")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "コメントを生成" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "コメントを生成" })).toBeEnabled();
     // 送信するのは集計値のみだと押下前に分かる
     expect(
       screen.getByText(/金額と件数の集計値だけを外部のAIサービスに送ります/),
