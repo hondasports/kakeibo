@@ -25,6 +25,7 @@ export type GroupDeletionImpactCounts = {
   analysisJobs: GroupDeletionPreviewCount;
   weekSessions: GroupDeletionPreviewCount;
   managementAuditLogs: GroupDeletionPreviewCount;
+  recurringRules: GroupDeletionPreviewCount;
 };
 
 export interface GroupDeletionWorkflowService {

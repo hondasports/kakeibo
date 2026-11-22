@@ -1,5 +1,10 @@
 import { addDays, getMonthEndDate } from "../common/date";
 import { isValidIsoDateString } from "../week/weekDates";
+import {
+  validateExpenseAmount,
+  validateExpenseMemo,
+  validateExpenseTitle,
+} from "../expenseEntries/expenseEntryItem";
 
 export const RECURRING_FREQUENCIES = ["weekly", "monthly"] as const;
 export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number];
@@ -18,20 +23,41 @@ export type RecurringRuleInput = {
   dayOfMonth?: number;
 };
 
+/** 二重登録防止のために保持する登録済み発生日の最大件数。 */
+export const MAX_REGISTERED_DATES = 90;
+
 export type RecurringRule = RecurringRuleInput & {
   active: boolean;
-  /** 最後に登録した発生日（YYYY-MM-DD）。同じ発生日の二重登録を防ぐ */
-  lastRegisteredFor?: string;
+  /** 登録済みの発生日（YYYY-MM-DD）の履歴。条件変更で発生日が移動しても
+      過去の発生日を再登録しないよう、直近の全発生日を保持する */
+  registeredForDates?: string[];
 };
 
 export type RecurringRuleValidation = { success: true } | { success: false; message: string };
 
 export function validateRecurringRuleInput(input: RecurringRuleInput): RecurringRuleValidation {
-  if (!input.title.trim()) {
-    return { success: false, message: "項目名を入力してください" };
+  // 登録時に実績エントリへ転記するため、実績側の制約（タイトル100字・メモ500字・
+  // 金額上限）と同じ条件で検証する。ここで受け入れないと「保存できるが登録できない」定義になる。
+  const titleResult = validateExpenseTitle(input.title);
+  if (!titleResult.success) {
+    return {
+      success: false,
+      message:
+        titleResult.error === "empty"
+          ? "項目名を入力してください"
+          : "項目名は100文字以内で入力してください",
+    };
   }
-  if (!Number.isInteger(input.amountYen) || input.amountYen <= 0) {
-    return { success: false, message: "金額は1円以上の整数で入力してください" };
+  const amountResult = validateExpenseAmount(input.amountYen);
+  if (!amountResult.success) {
+    return {
+      success: false,
+      message: "金額は1円以上9,999,999円以下の整数で入力してください",
+    };
+  }
+  const memoResult = validateExpenseMemo(input.memo);
+  if (!memoResult.success) {
+    return { success: false, message: "メモは500文字以内で入力してください" };
   }
   if (input.kind === "expense" && !input.categoryId) {
     return { success: false, message: "支出の定期定義にはカテゴリが必要です" };
@@ -96,5 +122,5 @@ export function isRuleDue(rule: RecurringRule, today: string): boolean {
     return false;
   }
   const occurrence = latestOccurrenceDate(rule, today);
-  return rule.lastRegisteredFor !== occurrence;
+  return !(rule.registeredForDates ?? []).includes(occurrence);
 }

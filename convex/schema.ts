@@ -471,7 +471,7 @@ export default defineSchema({
     dayOfMonth: v.optional(v.number()),
     active: v.boolean(),
     // 最後に登録した発生日（YYYY-MM-DD）。同じ発生日の二重登録を防ぐ。
-    lastRegisteredFor: v.optional(v.string()),
+    registeredForDates: v.optional(v.array(v.string())),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_group_id", ["groupId"]),

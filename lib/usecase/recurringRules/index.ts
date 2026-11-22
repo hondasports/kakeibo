@@ -6,6 +6,7 @@ import type { SourceDocumentRepository } from "../../domain/sourceDocuments/sour
 import {
   isRuleDue,
   latestOccurrenceDate,
+  MAX_REGISTERED_DATES,
   validateRecurringRuleInput,
   type RecurringRuleInput,
 } from "../../domain/recurringRules/recurringRule";
@@ -47,6 +48,19 @@ async function requireGroupRule(
   return rule;
 }
 
+/** 省略可能フィールドの正規化。収入ではカテゴリ・店名・メモを持たないため消去し、
+    空文字は未指定（フィールド削除）に揃える。 */
+function normalizedRuleFields(input: RecurringRuleInput): RecurringRuleInput {
+  const trimmedShopName = input.shopName?.trim();
+  const trimmedMemo = input.memo?.trim();
+  return {
+    ...input,
+    categoryId: input.kind === "expense" ? input.categoryId : undefined,
+    shopName: input.kind === "expense" && trimmedShopName ? trimmedShopName : undefined,
+    memo: input.kind === "expense" && trimmedMemo ? trimmedMemo : undefined,
+  };
+}
+
 export async function createRecurringRule(
   ctx: UsecaseGroupContext,
   deps: Deps & { categories: CategoryRepository },
@@ -61,7 +75,7 @@ export async function createRecurringRule(
   }
   const now = Date.now();
   return await deps.recurringRules.insert({
-    ...args,
+    ...normalizedRuleFields(args),
     title: args.title.trim(),
     groupId: ctx.groupId,
     createdByUserId: ctx.userId,
@@ -85,9 +99,14 @@ export async function updateRecurringRule(
   if (patch.kind === "expense" && patch.categoryId !== undefined) {
     await assertUsableCategory(deps.categories, patch.categoryId, ctx.groupId);
   }
-  // 繰り返し条件が変わると発生日も変わるため、登録済みマーカーは保持する
-  // （過去の発生日を遡って再登録はしない）。
-  await deps.recurringRules.update(ruleId, { ...patch, updatedAt: Date.now() });
+  // 繰り返し条件が変わると発生日も変わるが、過去の発生日を遡って再登録しないため
+  // 登録済み発生日の履歴は保持する。
+  // 省略可能フィールドは常にキーを出して「未指定＝消去」に揃える
+  // （キー自体が無いと db.patch が既存値を残してしまう）。
+  await deps.recurringRules.update(ruleId, {
+    ...normalizedRuleFields(patch),
+    updatedAt: Date.now(),
+  });
 }
 
 export async function setRecurringRuleActive(
@@ -106,7 +125,8 @@ export type RegisterFromRuleResult =
 
 /**
  * 定期定義から実績を登録する。直近の発生日（JST基準・当日含む）で
- * 1件作成し、同じ発生日の二重登録は lastRegisteredFor で弾く。
+ * 1件作成し、同じ発生日の二重登録は registeredForDates で弾く
+ * （条件変更で発生日が移動しても過去の発生日は再登録しない）。
  */
 export async function registerFromRecurringRule(
   ctx: UsecaseGroupContext,
@@ -119,10 +139,11 @@ export async function registerFromRecurringRule(
   }
   const today = getTodayDateStringInJapan();
   const occurrence = latestOccurrenceDate(rule, today);
-  if (rule.lastRegisteredFor === occurrence) {
+  if ((rule.registeredForDates ?? []).includes(occurrence)) {
     return { registered: false, reason: "already_registered" };
   }
   if (rule.kind === "income") {
+    // 収入エントリは title が「内容・メモ」兼用で memo フィールドを持たない
     await createIncomeEntry(
       ctx,
       { expenseEntries: deps.expenseEntries },
@@ -154,8 +175,11 @@ export async function registerFromRecurringRule(
       },
     );
   }
+  const registeredForDates = [...(rule.registeredForDates ?? []), occurrence].slice(
+    -MAX_REGISTERED_DATES,
+  );
   await deps.recurringRules.update(ruleId, {
-    lastRegisteredFor: occurrence,
+    registeredForDates,
     updatedAt: Date.now(),
   });
   return { registered: true, date: occurrence };

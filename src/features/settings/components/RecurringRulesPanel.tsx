@@ -239,11 +239,13 @@ export function RecurringRulesPanel() {
                 value={form.shopName}
               />
             ) : null}
-            <TextField
-              label="メモ（任意）"
-              onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
-              value={form.memo}
-            />
+            {form.kind === "expense" ? (
+              <TextField
+                label="メモ（任意）"
+                onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
+                value={form.memo}
+              />
+            ) : null}
             <ToggleButtonGroup
               exclusive
               onChange={(_e, value: "weekly" | "monthly" | null) => {

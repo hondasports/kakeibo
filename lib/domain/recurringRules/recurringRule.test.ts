@@ -64,6 +64,31 @@ describe("latestOccurrenceDate", () => {
   });
 });
 
+describe("validateRecurringRuleInput の実績側制約", () => {
+  const base = {
+    kind: "expense" as const,
+    title: "家賃",
+    amountYen: 80_000,
+    categoryId: "cat-1",
+    frequency: "monthly" as const,
+    dayOfMonth: 22,
+  };
+
+  it("タイトル100文字超は実績作成が失敗するため拒否する", () => {
+    expect(validateRecurringRuleInput({ ...base, title: "あ".repeat(101) }).success).toBe(false);
+    expect(validateRecurringRuleInput({ ...base, title: "あ".repeat(100) }).success).toBe(true);
+  });
+
+  it("メモ500文字超は拒否する", () => {
+    expect(validateRecurringRuleInput({ ...base, memo: "あ".repeat(501) }).success).toBe(false);
+  });
+
+  it("金額9,999,999円超は拒否する", () => {
+    expect(validateRecurringRuleInput({ ...base, amountYen: 10_000_000 }).success).toBe(false);
+    expect(validateRecurringRuleInput({ ...base, amountYen: 9_999_999 }).success).toBe(true);
+  });
+});
+
 describe("isRuleDue", () => {
   const rule = {
     kind: "expense" as const,
@@ -84,7 +109,16 @@ describe("isRuleDue", () => {
     expect(isRuleDue({ ...rule, dayOfMonth: 25 }, "2026-11-22")).toBe(true);
     // その発生日を登録済みなら due でない。
     expect(
-      isRuleDue({ ...rule, dayOfMonth: 25, lastRegisteredFor: "2026-10-25" }, "2026-11-22"),
+      isRuleDue({ ...rule, dayOfMonth: 25, registeredForDates: ["2026-10-25"] }, "2026-11-22"),
+    ).toBe(false);
+  });
+
+  it("条件変更で発生日が移っても登録済みの発生日は再登録しない", () => {
+    // 10/25 に登録済み → 条件を 22日に戻しても直近発生日 11/22 が未登録なら due。
+    expect(isRuleDue({ ...rule, registeredForDates: ["2026-10-25"] }, "2026-11-22")).toBe(true);
+    // 11/22 も登録済みなら due でない。
+    expect(
+      isRuleDue({ ...rule, registeredForDates: ["2026-10-25", "2026-11-22"] }, "2026-11-22"),
     ).toBe(false);
   });
 

@@ -23,7 +23,7 @@ function toRecord(doc: Doc<"recurringEntryRules">): RecurringRuleRecord {
     dayOfWeek: doc.dayOfWeek,
     dayOfMonth: doc.dayOfMonth,
     active: doc.active,
-    lastRegisteredFor: doc.lastRegisteredFor,
+    registeredForDates: doc.registeredForDates,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
@@ -56,7 +56,7 @@ export function createRecurringRuleRepository(ctx: Ctx): RecurringRuleRepository
         dayOfWeek: rule.dayOfWeek,
         dayOfMonth: rule.dayOfMonth,
         active: rule.active,
-        lastRegisteredFor: rule.lastRegisteredFor,
+        registeredForDates: rule.registeredForDates,
         createdAt: rule.createdAt,
         updatedAt: rule.updatedAt,
       }),
