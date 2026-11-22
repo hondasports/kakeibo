@@ -111,7 +111,7 @@ describe("ExpenseSearchPage", () => {
     );
 
     expect(screen.getByRole("navigation", { name: "履歴メニュー" })).toBeInTheDocument();
-    expect(screen.getByText("金額の下限は上限以下にしてください")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("金額の下限は上限以下にしてください");
     expect(screen.queryByText("条件に合う履歴はありません")).not.toBeInTheDocument();
   });
 
@@ -409,6 +409,16 @@ describe("ExpenseSearchPage", () => {
     expect(
       screen.getByText("変更はまだ適用されていません。「絞り込む」を押すと反映されます"),
     ).toBeInTheDocument();
+  });
+
+  it("適用済みの条件が無効なら理由を画面に表示する", () => {
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?min=2000&max=100"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("金額の下限は上限以下にしてください");
   });
 
   it("0件の空状態から条件をすべてクリアできる", async () => {
