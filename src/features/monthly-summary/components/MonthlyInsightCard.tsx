@@ -41,7 +41,7 @@ export function MonthlyInsightCard({ month }: { month: string }) {
           <Typography component="h2" variant="h6">
             AI月次インサイト
           </Typography>
-          {insight ? (
+          {insight && insight.commentText !== "" ? (
             <Typography sx={{ whiteSpace: "pre-wrap" }} variant="body2">
               {insight.commentText}
             </Typography>

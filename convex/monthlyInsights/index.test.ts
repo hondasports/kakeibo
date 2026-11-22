@@ -38,6 +38,8 @@ describe("reserveMonthlyInsightGeneration", () => {
     );
     expect(row?.generationCount).toBe(1);
     expect(row?.generatingUntil).toBeGreaterThan(Date.now());
+    // 保存前の予約は24hキャッシュの対象外にする（失敗後に再試行できるように）
+    expect(row?.generatedAt).toBe(0);
   });
 
   it("予約中の並列呼び出しは in_progress を返し、生成に進むのは1件だけになる", async () => {

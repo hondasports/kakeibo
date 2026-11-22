@@ -212,13 +212,14 @@ export async function reserveMonthlyInsightGenerationHandler(
     });
     return "reserved";
   }
-  // 初回の生成。保存前の予約レコードとして作成し、保存時に本文へ差し替える
+  // 初回の生成。保存前の予約レコードとして作成し、保存時に本文へ差し替える。
+  // generatedAt=0: 保存前に失敗しても24hキャッシュで空コメントを返さず再試行できる
   await ctx.db.insert("monthlyInsights", {
     groupId: args.groupId,
     month: args.month,
     commentText: "",
     source: "fallback",
-    generatedAt: now,
+    generatedAt: 0,
     generationCount: 1,
     generatingUntil: now + INSIGHT_RESERVATION_TTL_MS,
   });
