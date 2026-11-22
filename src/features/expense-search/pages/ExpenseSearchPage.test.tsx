@@ -513,6 +513,60 @@ describe("ExpenseSearchPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("明細が複数あるレシートはグループ単位で表示済み件数を数える", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return {
+        ...emptySearchResult,
+        page: [
+          {
+            _id: "expense-1",
+            date: "2026-08-01",
+            type: "expense" as const,
+            shopName: "店",
+            amountYen: 600,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            receiptGroupId: "receipt-1",
+            recordType: "expenseEntry" as const,
+          },
+          {
+            _id: "expense-2",
+            date: "2026-08-01",
+            type: "expense" as const,
+            shopName: "店",
+            amountYen: 600,
+            categoryId: "cat-food",
+            categoryName: "食費",
+            categoryColor: "#f97316",
+            receiptGroupId: "receipt-1",
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        isDone: false,
+        totalCount: 1,
+        expenseCount: 1,
+        totalExpenseYen: 1200,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "支出一覧（1件中 1件を表示）" }),
+    ).toBeInTheDocument();
+  });
+
   it("条件を絞り込むとURLへ反映し、クリアで戻せる", async () => {
     const user = userEvent.setup();
     renderWithDatePickers(

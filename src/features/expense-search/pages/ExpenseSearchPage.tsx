@@ -1,5 +1,5 @@
 import { api } from "../../../../convex/_generated/api";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { Alert, Box, Button, Stack, Typography } from "@mui/material";
@@ -17,6 +17,7 @@ import { HistoryMetricsPanel } from "../components/HistoryMetricsPanel";
 import { HistoryTrendChart } from "../components/HistoryTrendChart";
 import { useExpenseSearchResults } from "../hooks/useExpenseSearchResults";
 import { toIncomeItem, toReceiptItem } from "../lib/expenseSearchItems";
+import { groupReceiptItems } from "../../summary-shared/types/types";
 import { formatDateForDisplay } from "../../../utils/date";
 import {
   diffExpenseSearchFormState,
@@ -144,12 +145,17 @@ export function ExpenseSearchPage() {
     handleApply({ ...applied, categoryId, entryType: "expense" });
   };
 
+  // expenseCountはレシート単位の件数なので、表示側も明細ではなくレシートの件数で合わせる
+  const displayedExpenseGroupCount = useMemo(
+    () => groupReceiptItems(expenseItems).length,
+    [expenseItems],
+  );
   const expenseListHeading =
     displayResult !== null && displayResult.truncated
-      ? `支出一覧（集計対象の一部 ${displayResult.expenseCount}件中 ${expenseItems.length}件を表示）`
+      ? `支出一覧（集計対象の一部 ${displayResult.expenseCount}件中 ${displayedExpenseGroupCount}件を表示）`
       : displayResult !== null && !displayResult.isDone
-        ? `支出一覧（${displayResult.expenseCount}件中 ${expenseItems.length}件を表示）`
-        : `支出一覧（${expenseItems.length}件）`;
+        ? `支出一覧（${displayResult.expenseCount}件中 ${displayedExpenseGroupCount}件を表示）`
+        : `支出一覧（${displayedExpenseGroupCount}件）`;
 
   return (
     <Box className="app-main">
