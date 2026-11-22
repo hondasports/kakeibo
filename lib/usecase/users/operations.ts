@@ -64,3 +64,30 @@ export async function updateWeeklyDays(
     updatedAt: now,
   });
 }
+
+const MAX_MONTHLY_INCOME_YEN = 999_999_999;
+
+/**
+ * 月収入設定。個人設定であり、共有グループの収支集計には混ぜない。
+ * undefined を渡すと未設定に戻す。
+ */
+export async function updateMonthlyIncome(
+  store: UserStore,
+  userId: string,
+  args: { monthlyIncome?: number },
+  now: number,
+): Promise<void> {
+  const income = args.monthlyIncome;
+  if (income !== undefined) {
+    if (!Number.isInteger(income) || income < 0 || income > MAX_MONTHLY_INCOME_YEN) {
+      throw new UserDomainError("月収入は0以上999999999以下の整数（円）で入力してください");
+    }
+  }
+
+  const user = assertUserFound(await store.findByUserId(userId));
+
+  await store.patch(user.id, {
+    monthlyIncome: income,
+    updatedAt: now,
+  });
+}
