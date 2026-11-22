@@ -1,4 +1,5 @@
 import { act, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "./test/render";
 import App from "./App";
@@ -13,6 +14,7 @@ const {
   useQueryMock,
   useSignInMock,
   useUserMock,
+  useInitializeUserMock,
 } = vi.hoisted(() => ({
   useActionMock: vi.fn(),
   useAuthMock: vi.fn(),
@@ -22,6 +24,7 @@ const {
   useQueryMock: vi.fn(),
   useSignInMock: vi.fn(),
   useUserMock: vi.fn(),
+  useInitializeUserMock: vi.fn(),
 }));
 
 vi.mock("@clerk/react", () => ({
@@ -34,6 +37,11 @@ vi.mock("@clerk/react", () => ({
 vi.mock("@clerk/react/legacy", () => ({
   useSignIn: useSignInMock,
 }));
+
+vi.mock("./features/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./features/auth")>();
+  return { ...actual, useInitializeUser: useInitializeUserMock };
+});
 
 vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router-dom")>();
@@ -73,6 +81,11 @@ describe("App authentication states", () => {
       signOut: vi.fn(),
     });
     useUserMock.mockReturnValue({ user: null });
+    useInitializeUserMock.mockReturnValue({
+      isInitializing: false,
+      initializationError: false,
+      retryInitialization: vi.fn(),
+    });
   });
 
   it("ログアウト開始時はrouterと初期化queryを外す", () => {
@@ -151,10 +164,13 @@ describe("App authentication states", () => {
     // When: アプリを表示する
     renderWithProviders(<App />);
 
-    // Then: Convex連携の設定エラーが表示される
+    // Then: データ同期失敗の案内と再試行導線が表示される（開発者向け文言は出さない）
+    expect(screen.getByText(/データ同期の準備に失敗しました/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
     expect(
-      screen.getByText(/Clerkログインは完了していますが、Convexで認証できませんでした。/),
+      screen.getByRole("button", { name: "ログアウトしてログインし直す" }),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/CLERK_JWT_ISSUER_DOMAIN/)).not.toBeInTheDocument();
   });
 
   it("OAuth callback pathではClerkのリダイレクト完了画面を表示する", () => {
@@ -168,6 +184,51 @@ describe("App authentication states", () => {
     expect(screen.getByRole("heading", { name: "Googleログインを処理中" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Googleログイン処理中" })).toBeInTheDocument();
     expect(screen.getByText("OAuth callback mock")).toBeInTheDocument();
+  });
+
+  it("Convex未認証画面ではログアウトしてログインし直せる", async () => {
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    useClerkMock.mockReturnValue({ signOut });
+    useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: true });
+    useConvexAuthMock.mockReturnValue({ isLoading: false, isAuthenticated: false });
+
+    renderWithProviders(<App />);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "ログアウトしてログインし直す" }));
+    expect(signOut).toHaveBeenCalledWith({ redirectUrl: "/" });
+  });
+
+  it("アカウント初期化に失敗したらエラーと再試行導線を表示する", async () => {
+    const retryInitialization = vi.fn();
+    useInitializeUserMock.mockReturnValue({
+      isInitializing: false,
+      initializationError: true,
+      retryInitialization,
+    });
+    useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: true });
+    useConvexAuthMock.mockReturnValue({ isLoading: false, isAuthenticated: true });
+
+    renderWithProviders(<App />);
+
+    expect(screen.getByText(/アカウントの初期化に失敗しました/)).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "もう一度試す" }));
+    expect(retryInitialization).toHaveBeenCalled();
+  });
+
+  it("OAuth callbackの処理が長引くとログイン画面へ戻る導線を表示する", () => {
+    vi.useFakeTimers();
+    window.history.pushState({}, "", "/sso-callback");
+
+    renderWithProviders(<App />);
+    act(() => {
+      vi.advanceTimersByTime(20000);
+    });
+
+    expect(screen.getByText(/ログイン処理に時間がかかっています/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "ログイン画面に戻る" })).toHaveAttribute("href", "/");
+    vi.useRealTimers();
   });
 
   it("招待受け入れpathでは未ログインでもルーターを表示する", () => {

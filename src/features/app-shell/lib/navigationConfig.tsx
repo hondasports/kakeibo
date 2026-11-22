@@ -1,4 +1,4 @@
-import CategoryIcon from "@mui/icons-material/Category";
+import SettingsIcon from "@mui/icons-material/Settings";
 import HomeIcon from "@mui/icons-material/Home";
 import EditIcon from "@mui/icons-material/Edit";
 import HistoryIcon from "@mui/icons-material/History";
@@ -22,7 +22,7 @@ export function createNavItems(weeklyStartDay?: number): NavItem[] {
     { label: "入力", path: "/weeks/current/input", icon: <EditIcon /> },
     { label: "履歴", path: `/weeks/${currentWeekStartDate}`, icon: <HistoryIcon /> },
     { label: "使い方", path: "/guide", icon: <HelpOutlinedIcon /> },
-    { label: "設定", path: "/settings", icon: <CategoryIcon /> },
+    { label: "設定", path: "/settings", icon: <SettingsIcon /> },
   ];
 }
 
@@ -38,7 +38,13 @@ export function isNavItemSelected(pathname: string, path: string) {
     return (
       (pathname.startsWith("/weeks/") && pathname !== "/weeks/current/input") ||
       pathname.startsWith("/months/") ||
+      pathname.startsWith("/years/") ||
       pathname === "/search"
+    );
+  }
+  if (path === "/settings") {
+    return (
+      pathname === "/settings" || pathname.startsWith("/settings/") || pathname === "/categories"
     );
   }
   return pathname === path;

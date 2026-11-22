@@ -5,15 +5,20 @@ import { renderWithProviders } from "../../../test/render";
 import { apiMockWith } from "../../../test/apiMock";
 import { AccountDeletionPage } from "./AccountDeletionPage";
 
-const { useMutationMock, useNavigateMock, useQueryMock } = vi.hoisted(() => ({
+const { useMutationMock, useNavigateMock, useQueryMock, useUserMock } = vi.hoisted(() => ({
   useMutationMock: vi.fn(),
   useNavigateMock: vi.fn(),
   useQueryMock: vi.fn(),
+  useUserMock: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
   useMutation: useMutationMock,
   useQuery: useQueryMock,
+}));
+
+vi.mock("@clerk/react", () => ({
+  useUser: useUserMock,
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -51,6 +56,7 @@ describe("AccountDeletionPage", () => {
       reference === "request-account-deletion" ? requestDeletion : setActiveGroup,
     );
     useNavigateMock.mockReturnValue(navigate);
+    useUserMock.mockReturnValue({ user: null });
   });
 
   it("preview読み込み中はローディングを表示する", () => {
@@ -93,7 +99,10 @@ describe("AccountDeletionPage", () => {
     renderWithProviders(<AccountDeletionPage />);
 
     expect(screen.getByRole("heading", { name: "アカウントを削除できません" })).toBeInTheDocument();
-    expect(screen.getByText(/サポートへお問い合わせください/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/サポート（hondasports@gmail.com）へお問い合わせください/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "設定に戻る" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "アカウントを削除する" })).not.toBeInTheDocument();
   });
 
@@ -138,5 +147,43 @@ describe("AccountDeletionPage", () => {
 
     expect(await screen.findByText(/アカウント削除を開始できませんでした/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "アカウントを削除する" })).toBeEnabled();
+  });
+
+  it("メールアドレスが分かるときは「削除」とメールアドレスの両方の入力後にだけ退会を開始できる", async () => {
+    const user = userEvent.setup();
+    useUserMock.mockReturnValue({
+      user: { primaryEmailAddress: { emailAddress: "me@example.com" } },
+    });
+    useQueryMock.mockReturnValue(previewWith({}));
+
+    renderWithProviders(<AccountDeletionPage />);
+
+    const emailInput = screen.getByRole("textbox", { name: "メールアドレス入力" });
+    expect(screen.getByText(/me@example.com/)).toBeInTheDocument();
+    const deleteButton = screen.getByRole("button", { name: "アカウントを削除する" });
+
+    await user.type(screen.getByRole("textbox", { name: "確認用入力" }), "削除");
+    expect(deleteButton).toBeDisabled();
+
+    await user.type(emailInput, "other@example.com");
+    expect(deleteButton).toBeDisabled();
+
+    await user.clear(emailInput);
+    await user.type(emailInput, "Me@Example.com ");
+    expect(deleteButton).toBeEnabled();
+
+    await user.click(deleteButton);
+    expect(requestDeletion).toHaveBeenCalledWith({ confirmationText: "削除" });
+    expect(navigate).toHaveBeenCalledWith("/settings/account/delete/status", { replace: true });
+  });
+
+  it("確認画面から設定へ戻れる", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockReturnValue(previewWith({}));
+
+    renderWithProviders(<AccountDeletionPage />);
+
+    await user.click(screen.getByRole("button", { name: "設定に戻る" }));
+    expect(navigate).toHaveBeenCalledWith("/settings");
   });
 });
