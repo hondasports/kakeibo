@@ -118,7 +118,7 @@ export function GuidePage() {
           </Typography>
           <GuideSteps>
             <ListItem disableGutters>期間やキーワード、カテゴリを選んで検索します。</ListItem>
-            <ListItem disableGutters>結果の行から、登録内容の確認や修正を行えます。</ListItem>
+            <ListItem disableGutters>条件に合った明細の一覧と合計を確認できます。</ListItem>
           </GuideSteps>
           <Button component={RouterLink} to="/search" variant="outlined" sx={{ mt: 1 }}>
             検索を開く
