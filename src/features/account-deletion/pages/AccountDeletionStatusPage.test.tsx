@@ -80,7 +80,8 @@ describe("AccountDeletionStatusPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/ページを閉じても処理は続きます/)).toBeInTheDocument();
     expect(screen.getByText(/メールアドレスへお知らせします/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "設定に戻る" })).toBeInTheDocument();
+    // 処理中は GroupRouteGuard が全画面をこのページへ戻すため、設定への導線は出さない
+    expect(screen.queryByRole("button", { name: "設定に戻る" })).not.toBeInTheDocument();
   });
 
   it("identity_deleted では残り処理の案内を表示する", () => {
