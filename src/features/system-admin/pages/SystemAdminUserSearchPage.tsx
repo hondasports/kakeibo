@@ -32,20 +32,30 @@ export function SystemAdminUserSearchPage() {
   const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
-  const lastRequest = useRef<{ cursor: string | null } | null>(null);
+  const lastRequest = useRef<{
+    cursor: string | null;
+    queryType: UserSearchType;
+    query: string;
+  } | null>(null);
 
   const runSearch = async (
     nextCursor: string | null,
     nav?: { push?: string | null; pop?: boolean },
+    params?: { queryType: UserSearchType; query: string },
   ) => {
-    lastRequest.current = { cursor: nextCursor };
-    const normalizedQuery = query.trim();
+    // ページ送り・リトライは確定した検索条件を使う（入力中のドラフトは混ぜない）。
+    const effectiveParams =
+      params ??
+      (lastRequest.current
+        ? { queryType: lastRequest.current.queryType, query: lastRequest.current.query }
+        : { queryType, query: query.trim() });
+    lastRequest.current = { cursor: nextCursor, ...effectiveParams };
     setIsLoading(true);
     setError(false);
     try {
       const response = await searchUsers({
-        queryType,
-        query: normalizedQuery,
+        queryType: effectiveParams.queryType,
+        query: effectiveParams.query,
         paginationOpts: { numItems: 20, cursor: nextCursor },
       });
       setResult(response as PageResult<UserSearchItem>);
@@ -61,7 +71,7 @@ export function SystemAdminUserSearchPage() {
 
   const startNewSearch = () => {
     setCursorHistory([]);
-    void runSearch(null);
+    void runSearch(null, undefined, { queryType, query: query.trim() });
   };
   const goToPrevPage = () => {
     void runSearch(cursorHistory[cursorHistory.length - 1] ?? null, { pop: true });
