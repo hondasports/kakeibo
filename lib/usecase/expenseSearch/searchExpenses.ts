@@ -5,12 +5,14 @@ import {
   summarizeHistoryGroups,
 } from "../../domain/expenseSearch/analytics";
 import {
+  DEFAULT_HISTORY_SORT_ORDER,
   filterHistoryGroups,
   groupHistoryEntries,
   paginateHistoryGroups,
   parseExpenseSearchFilters,
   UNCATEGORIZED_CATEGORY_ID,
   type HistoryEntryType,
+  type HistorySortOrder,
   type SearchableHistoryGroup,
 } from "../../domain/expenseSearch/filter";
 import {
@@ -34,6 +36,8 @@ export type ExpenseSearchStore = {
     groupId: string,
     startDate: string | undefined,
     endDate: string | undefined,
+    order?: "asc" | "desc",
+    maxRecords?: number,
   ) => Promise<SearchHistorySource>;
   buildCategoryInfoMap: (
     groupId: string,
@@ -43,6 +47,7 @@ export type ExpenseSearchStore = {
 
 type SearchExpensesInput = {
   entryType?: HistoryEntryType;
+  sortOrder?: HistorySortOrder;
   shopQuery?: string;
   categoryId?: string;
   minAmountYen?: number;
@@ -59,6 +64,7 @@ export async function searchExpenses(
 ): Promise<ExpenseSearchResult> {
   const parsed = parseExpenseSearchFilters({
     entryType: args.entryType,
+    sortOrder: args.sortOrder,
     shopQuery: args.shopQuery,
     categoryId: args.categoryId,
     minAmountYen: args.minAmountYen,
@@ -80,15 +86,36 @@ export async function searchExpenses(
     }
   }
 
+  // dateAsc は古い側から取る（打ち切られても表示順の先頭側が残る）。
+  // dateDesc/amountDesc は新しい側から取る（amountDesc は範囲内での金額順になる旨UIで案内する）。
   const source = await store.loadHistoryEntries(
     groupId,
     parsed.filters.startDate,
     parsed.filters.endDate,
+    parsed.filters.sortOrder === "dateAsc" ? "asc" : "desc",
   );
   const groups = filterHistoryGroups(
     groupHistoryEntries(source.entries, source.incomes),
     parsed.filters,
   );
+
+  // 集計は並び順に依存しない。dateDesc・amountDesc では一覧用に読んだ
+  // groups をそのまま集計に使う（打ち切り時も一覧と同じ範囲＝preview と同じ）。
+  // dateAsc で一覧が打ち切られたときだけ、集計は dateDesc と同じ範囲になるよう
+  // 新しい側から一覧と同じ上限（store既定の SEARCH_MAX_RECORDS）で読み直す。
+  let aggregateGroups = groups;
+  if (source.truncated && parsed.filters.sortOrder === "dateAsc") {
+    const aggregateSource = await store.loadHistoryEntries(
+      groupId,
+      parsed.filters.startDate,
+      parsed.filters.endDate,
+      "desc",
+    );
+    aggregateGroups = filterHistoryGroups(
+      groupHistoryEntries(aggregateSource.entries, aggregateSource.incomes),
+      parsed.filters,
+    );
+  }
 
   // 前期間比較は初回ページでだけ計算する。ページ追加時は現在期間の集計を
   // 更新しつつ、初回レスポンスの比較をUI側で保持することで、同じ比較を
@@ -100,10 +127,13 @@ export async function searchExpenses(
   let previousGroups: SearchableHistoryGroup[] = [];
   let previousTruncated = false;
   if (previousPeriod !== null) {
+    // 前期間比較は preview と同じ上限（store既定の SEARCH_MAX_RECORDS）で
+    // 新しい側を読む。
     const previousSource = await store.loadHistoryEntries(
       groupId,
       previousPeriod.startDate,
       previousPeriod.endDate,
+      "desc",
     );
     previousTruncated = previousSource.truncated;
     previousGroups = filterHistoryGroups(
@@ -117,11 +147,19 @@ export async function searchExpenses(
   }
 
   const categoryIds = Array.from(
-    new Set([...collectCategoryIds(groups), ...collectCategoryIds(previousGroups)]),
+    new Set([
+      ...collectCategoryIds(groups),
+      ...collectCategoryIds(aggregateGroups),
+      ...collectCategoryIds(previousGroups),
+    ]),
   );
   const categoryInfoMap = await store.buildCategoryInfoMap(groupId, categoryIds);
-  const aggregate = summarizeHistoryGroups(groups, categoryInfoMap);
-  const paged = paginateHistoryGroups(groups, args.paginationOpts);
+  const aggregate = summarizeHistoryGroups(aggregateGroups, categoryInfoMap);
+  const paged = paginateHistoryGroups(
+    groups,
+    args.paginationOpts,
+    parsed.filters.sortOrder ?? DEFAULT_HISTORY_SORT_ORDER,
+  );
   const page = paged.page.flatMap((group) => mapHistoryGroupToItems(group, categoryInfoMap));
   const comparison =
     previousPeriod === null
@@ -140,7 +178,7 @@ export async function searchExpenses(
     isDone: paged.isDone,
     truncated: source.truncated,
     comparisonTruncated: previousTruncated,
-    matchedGroupCount: groups.length,
+    matchedGroupCount: aggregateGroups.length,
     totalCount: aggregate.count,
     expenseCount: aggregate.expenseCount,
     incomeCount: aggregate.incomeCount,
@@ -148,7 +186,7 @@ export async function searchExpenses(
     totalIncomeYen: aggregate.totalIncomeYen,
     netAmountYen: aggregate.netAmountYen,
     byCategory: aggregate.byCategory,
-    trend: buildHistoryTrend(groups, parsed.filters),
+    trend: buildHistoryTrend(aggregateGroups, parsed.filters),
     comparison,
   };
 }

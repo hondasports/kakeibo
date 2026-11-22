@@ -4,6 +4,7 @@ import { query } from "./_generated/server";
 import { searchExpensesHandler } from "../lib/convex/expenseSearch/searchExpenses";
 import {
   historyEntryTypeValidator,
+  historySortOrderValidator,
   historyTrendGranularityValidator,
 } from "../lib/convex/expenseSearch/validators";
 import { aiExpenseRegistrationModeValidator } from "./aiExpenseDrafts/validators";
@@ -71,6 +72,7 @@ const historyComparisonValidator = v.union(
 export const searchExpenses = query({
   args: {
     entryType: v.optional(historyEntryTypeValidator),
+    sortOrder: v.optional(historySortOrderValidator),
     shopQuery: v.optional(v.string()),
     categoryId: v.optional(v.union(v.id("categories"), v.literal(UNCATEGORIZED_CATEGORY_ID))),
     minAmountYen: v.optional(v.number()),

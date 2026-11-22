@@ -7,6 +7,12 @@ export const HISTORY_ENTRY_TYPES = ["all", ...ENTRY_KINDS] as const;
 
 export type HistoryEntryType = (typeof HISTORY_ENTRY_TYPES)[number];
 
+export const HISTORY_SORT_ORDERS = ["dateDesc", "dateAsc", "amountDesc"] as const;
+
+export type HistorySortOrder = (typeof HISTORY_SORT_ORDERS)[number];
+
+export const DEFAULT_HISTORY_SORT_ORDER: HistorySortOrder = "dateDesc";
+
 type SearchableReceiptGroup = {
   id: string;
   date: string;
@@ -30,6 +36,9 @@ export type SearchableHistoryGroup =
 
 export type ExpenseSearchFilters = {
   entryType: HistoryEntryType;
+  // filterHistoryGroupsは並び順を使わない。paginateHistoryGroupsへ渡すため
+  // parse結果に載せるだけで、絞り込み条件としては任意。
+  sortOrder?: HistorySortOrder;
   shopQuery?: string;
   categoryId?: string;
   minAmountYen?: number;
@@ -40,6 +49,7 @@ export type ExpenseSearchFilters = {
 
 type ExpenseSearchFilterInput = {
   entryType?: string;
+  sortOrder?: string;
   shopQuery?: string;
   categoryId?: string;
   minAmountYen?: number;
@@ -299,36 +309,83 @@ export function filterHistoryGroups(
   });
 }
 
-function compareHistoryGroups(left: SearchableHistoryGroup, right: SearchableHistoryGroup): number {
-  const dateOrder = right.date.localeCompare(left.date);
-  if (dateOrder !== 0) {
-    return dateOrder;
+// 並び順ごとのキーセット順序。同値時のタイブレークは
+// dateDesc: 日付降順→ID降順、dateAsc: 日付昇順→ID昇順、
+// amountDesc: 金額降順→日付降順→ID降順。いずれもIDまで含む全順序。
+type HistoryGroupSortKey = {
+  id: string;
+  date: string;
+  amountYen: number;
+};
+
+function compareBySortKey(
+  left: HistoryGroupSortKey,
+  right: HistoryGroupSortKey,
+  sortOrder: HistorySortOrder,
+): number {
+  switch (sortOrder) {
+    case "dateAsc": {
+      const dateOrder = left.date.localeCompare(right.date);
+      return dateOrder !== 0 ? dateOrder : left.id.localeCompare(right.id);
+    }
+    case "amountDesc": {
+      const amountOrder = right.amountYen - left.amountYen;
+      if (amountOrder !== 0) {
+        return amountOrder;
+      }
+      const dateOrder = right.date.localeCompare(left.date);
+      return dateOrder !== 0 ? dateOrder : right.id.localeCompare(left.id);
+    }
+    case "dateDesc": {
+      const dateOrder = right.date.localeCompare(left.date);
+      return dateOrder !== 0 ? dateOrder : right.id.localeCompare(left.id);
+    }
   }
-  return right.id.localeCompare(left.id);
 }
 
 type SearchCursor = {
-  version: 1;
+  version: 2;
+  sortOrder: HistorySortOrder;
   date: string;
+  amountYen: number;
   id: string;
 };
 
-function encodeSearchCursor(group: SearchableHistoryGroup): string {
-  const cursor: SearchCursor = { version: 1, date: group.date, id: group.id };
-  return `v1.${encodeURIComponent(JSON.stringify(cursor))}`;
+function encodeSearchCursor(group: SearchableHistoryGroup, sortOrder: HistorySortOrder): string {
+  const cursor: SearchCursor = {
+    version: 2,
+    sortOrder,
+    date: group.date,
+    amountYen: group.amountYen,
+    id: group.id,
+  };
+  return `v2.${encodeURIComponent(JSON.stringify(cursor))}`;
 }
 
-function decodeSearchCursor(cursor: string): SearchCursor | null {
-  if (!cursor.startsWith("v1.")) {
+function decodeSearchCursor(cursor: string, sortOrder: HistorySortOrder): SearchCursor | null {
+  if (!cursor.startsWith("v2.")) {
     return null;
   }
 
   try {
     const parsed = JSON.parse(decodeURIComponent(cursor.slice(3))) as Partial<SearchCursor>;
-    if (parsed.version !== 1 || typeof parsed.date !== "string" || typeof parsed.id !== "string") {
+    // 並び順が変わった古いカーソルは別の順序を指すため無効にし、先頭から取り直す。
+    if (
+      parsed.version !== 2 ||
+      parsed.sortOrder !== sortOrder ||
+      typeof parsed.date !== "string" ||
+      typeof parsed.amountYen !== "number" ||
+      typeof parsed.id !== "string"
+    ) {
       return null;
     }
-    return { version: 1, date: parsed.date, id: parsed.id };
+    return {
+      version: 2,
+      sortOrder,
+      date: parsed.date,
+      amountYen: parsed.amountYen,
+      id: parsed.id,
+    };
   } catch {
     return null;
   }
@@ -337,25 +394,24 @@ function decodeSearchCursor(cursor: string): SearchCursor | null {
 export function paginateHistoryGroups(
   groups: SearchableHistoryGroup[],
   paginationOpts: { numItems: number; cursor: string | null },
+  sortOrder: HistorySortOrder = DEFAULT_HISTORY_SORT_ORDER,
 ): {
   page: SearchableHistoryGroup[];
   continueCursor: string;
   isDone: boolean;
 } {
-  const ordered = [...groups].sort(compareHistoryGroups);
+  const ordered = [...groups].sort((left, right) => compareBySortKey(left, right, sortOrder));
   const requestedSize = Number.isFinite(paginationOpts.numItems)
     ? Math.floor(paginationOpts.numItems)
     : 1;
   const pageSize = Math.min(Math.max(requestedSize, 1), 100);
   let startIndex = 0;
 
-  const keysetCursor = paginationOpts.cursor ? decodeSearchCursor(paginationOpts.cursor) : null;
+  const keysetCursor = paginationOpts.cursor
+    ? decodeSearchCursor(paginationOpts.cursor, sortOrder)
+    : null;
   if (keysetCursor !== null) {
-    startIndex = ordered.findIndex(
-      (group) =>
-        group.date < keysetCursor.date ||
-        (group.date === keysetCursor.date && group.id < keysetCursor.id),
-    );
+    startIndex = ordered.findIndex((group) => compareBySortKey(group, keysetCursor, sortOrder) > 0);
     if (startIndex < 0) {
       startIndex = ordered.length;
     }
@@ -369,8 +425,8 @@ export function paginateHistoryGroups(
     page,
     continueCursor:
       page.length > 0
-        ? encodeSearchCursor(page[page.length - 1]!)
-        : (paginationOpts.cursor ?? "v1.empty"),
+        ? encodeSearchCursor(page[page.length - 1]!, sortOrder)
+        : (paginationOpts.cursor ?? "v2.empty"),
     isDone,
   };
 }
@@ -389,15 +445,36 @@ function parseEntryType(value: string | undefined): HistoryEntryType | null {
   return null;
 }
 
+function parseSortOrder(value: string | undefined): HistorySortOrder | null {
+  if (value === undefined) {
+    return DEFAULT_HISTORY_SORT_ORDER;
+  }
+  return (HISTORY_SORT_ORDERS as readonly string[]).includes(value)
+    ? (value as HistorySortOrder)
+    : null;
+}
+
 export function parseExpenseSearchFilters(
   input: ExpenseSearchFilterInput,
 ): ParsedExpenseSearchFilters {
-  const filters: ExpenseSearchFilters = { entryType: "all" };
+  const filters: ExpenseSearchFilters = {
+    entryType: "all",
+    sortOrder: DEFAULT_HISTORY_SORT_ORDER,
+  };
   const entryType = parseEntryType(input.entryType);
   if (entryType === null) {
     return { ok: false, error: "種別はすべて・支出・収入のいずれかで指定してください" };
   }
   filters.entryType = entryType;
+
+  const sortOrder = parseSortOrder(input.sortOrder);
+  if (sortOrder === null) {
+    return {
+      ok: false,
+      error: "並び順は日付が新しい順・日付が古い順・金額が大きい順のいずれかで指定してください",
+    };
+  }
+  filters.sortOrder = sortOrder;
 
   const shopQuery = input.shopQuery?.trim();
   if (shopQuery) {

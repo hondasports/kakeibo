@@ -368,7 +368,11 @@ export function ExpenseSearchPage() {
             ) : null}
             {displayResult.truncated ? (
               <Alert severity="warning" variant="outlined">
-                件数が多いため、先頭の一部だけを集計しています。期間やキーワードで絞り込んでください。
+                {applied.sortOrder === "amountDesc"
+                  ? "件数が多いため、新しい10,000件の中での金額順です。集計も同じ範囲が対象です。期間を絞ると全件から並べます。"
+                  : applied.sortOrder === "dateAsc"
+                    ? "件数が多いため、一覧は古い10,000件、集計は新しい10,000件が対象です。期間を絞ると全件から並べます。"
+                    : "件数が多いため、一覧・集計とも新しい10,000件が対象です。期間やキーワードで絞り込んでください。"}
               </Alert>
             ) : null}
             {displayResult.comparisonTruncated ? (
@@ -425,6 +429,7 @@ export function ExpenseSearchPage() {
                     isLoading={false}
                     listAriaLabel="支出の検索結果"
                     maxVisibleGroups={Number.POSITIVE_INFINITY}
+                    preserveOrder
                     receipts={expenseItems}
                     onDeleteReceipt={(receipt) => {
                       setDeleteError("");
@@ -454,6 +459,7 @@ export function ExpenseSearchPage() {
                     incomes={incomeItems}
                     isLoading={false}
                     listAriaLabel="収入の検索結果"
+                    preserveOrder
                     onDeleteIncome={(income) => {
                       setDeleteError("");
                       setDeletingReceipt(incomeItemToReceiptItem(income));

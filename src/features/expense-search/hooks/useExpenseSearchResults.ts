@@ -28,6 +28,7 @@ export function useExpenseSearchResults(applied: ExpenseSearchFormState, applied
   const activeCursor = loadedKey === appliedKey ? paginationCursor : null;
   const searchQueryKey = `historySearch:${searchRequestId}`;
   const searchEntryType = queryArgs.ok ? queryArgs.args.entryType : undefined;
+  const searchSortOrder = queryArgs.ok ? queryArgs.args.sortOrder : undefined;
   const searchShopQuery = queryArgs.ok ? queryArgs.args.shopQuery : undefined;
   const searchCategoryId = queryArgs.ok ? queryArgs.args.categoryId : undefined;
   const searchMinAmountYen = queryArgs.ok ? queryArgs.args.minAmountYen : undefined;
@@ -41,6 +42,7 @@ export function useExpenseSearchResults(applied: ExpenseSearchFormState, applied
     return {
       paginationOpts: { numItems: PAGE_SIZE, cursor: activeCursor },
       ...(searchEntryType !== undefined ? { entryType: searchEntryType } : {}),
+      ...(searchSortOrder !== undefined ? { sortOrder: searchSortOrder } : {}),
       ...(searchShopQuery !== undefined ? { shopQuery: searchShopQuery } : {}),
       ...(searchCategoryId !== undefined ? { categoryId: searchCategoryId } : {}),
       ...(searchMinAmountYen !== undefined ? { minAmountYen: searchMinAmountYen } : {}),
@@ -57,6 +59,7 @@ export function useExpenseSearchResults(applied: ExpenseSearchFormState, applied
     searchMaxAmountYen,
     searchMinAmountYen,
     searchShopQuery,
+    searchSortOrder,
     searchStartDate,
   ]);
   const searchQueries = useMemo(

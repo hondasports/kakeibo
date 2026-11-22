@@ -22,6 +22,7 @@ import {
 import {
   UNCATEGORIZED_CATEGORY_ID,
   type HistoryEntryType,
+  type HistorySortOrder,
 } from "../../../../lib/domain/expenseSearch/filter";
 import type { ExpenseSearchFieldErrors, ExpenseSearchFormState } from "../lib/searchParams";
 import { extractAmountDigits } from "../../../utils/currency";
@@ -141,6 +142,32 @@ export function ExpenseSearchFilters({
             </ToggleButton>
             <ToggleButton sx={{ minHeight: 44 }} value="income">
               収入
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
+
+        <Stack spacing={1}>
+          <Typography component="h2" variant="subtitle1">
+            並び順
+          </Typography>
+          <ToggleButtonGroup
+            aria-label="並び順"
+            exclusive
+            onChange={(_event, value: HistorySortOrder | null) => {
+              if (value !== null) {
+                onChange({ ...state, sortOrder: value });
+              }
+            }}
+            value={state.sortOrder}
+          >
+            <ToggleButton sx={{ minHeight: 44 }} value="dateDesc">
+              日付が新しい順
+            </ToggleButton>
+            <ToggleButton sx={{ minHeight: 44 }} value="dateAsc">
+              日付が古い順
+            </ToggleButton>
+            <ToggleButton sx={{ minHeight: 44 }} value="amountDesc">
+              金額が大きい順
             </ToggleButton>
           </ToggleButtonGroup>
         </Stack>

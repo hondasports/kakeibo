@@ -300,6 +300,80 @@ describe("paginateHistoryGroups", () => {
     expect(paged.page.map((group) => group.shopName)).toEqual(["B店", "A店"]);
   });
 
+  it("日付の古い順でもカーソルから重複なく続きを返す", () => {
+    const groups = groupSpendingEntries([
+      entry({ _id: "old", date: "2026-01-01", receiptGroupId: "g-old", receiptShopName: "旧" }),
+      entry({ _id: "new", date: "2026-08-01", receiptGroupId: "g-new", receiptShopName: "新" }),
+      entry({ _id: "mid", date: "2026-04-01", receiptGroupId: "g-mid", receiptShopName: "中" }),
+    ]);
+
+    const first = paginateHistoryGroups(groups, { numItems: 2, cursor: null }, "dateAsc");
+    expect(first.page.map((group) => group.shopName)).toEqual(["旧", "中"]);
+
+    const second = paginateHistoryGroups(
+      groups,
+      { numItems: 2, cursor: first.continueCursor },
+      "dateAsc",
+    );
+    expect(second.page.map((group) => group.shopName)).toEqual(["新"]);
+    expect(second.isDone).toBe(true);
+  });
+
+  it("金額の大きい順でページングし、同額は日付の新しい順にする", () => {
+    const groups = groupSpendingEntries([
+      entry({
+        _id: "cheap",
+        date: "2026-08-01",
+        receiptGroupId: "g-cheap",
+        receiptShopName: "小",
+        amountYen: 100,
+        receiptTotalAmountYen: 100,
+      }),
+      entry({
+        _id: "tie-old",
+        date: "2026-01-01",
+        receiptGroupId: "g-tie-old",
+        receiptShopName: "同額旧",
+        amountYen: 500,
+        receiptTotalAmountYen: 500,
+      }),
+      entry({
+        _id: "tie-new",
+        date: "2026-05-01",
+        receiptGroupId: "g-tie-new",
+        receiptShopName: "同額新",
+        amountYen: 500,
+        receiptTotalAmountYen: 500,
+      }),
+    ]);
+
+    const first = paginateHistoryGroups(groups, { numItems: 2, cursor: null }, "amountDesc");
+    expect(first.page.map((group) => group.shopName)).toEqual(["同額新", "同額旧"]);
+
+    const second = paginateHistoryGroups(
+      groups,
+      { numItems: 2, cursor: first.continueCursor },
+      "amountDesc",
+    );
+    expect(second.page.map((group) => group.shopName)).toEqual(["小"]);
+    expect(second.isDone).toBe(true);
+  });
+
+  it("別の並び順で発行されたcursorは使わず先頭から始める", () => {
+    const groups = groupSpendingEntries([
+      entry({ _id: "old", date: "2026-01-01", receiptGroupId: "g-old", receiptShopName: "旧" }),
+      entry({ _id: "new", date: "2026-08-01", receiptGroupId: "g-new", receiptShopName: "新" }),
+    ]);
+
+    const descPage = paginateHistoryGroups(groups, { numItems: 1, cursor: null }, "dateDesc");
+    const ascPage = paginateHistoryGroups(
+      groups,
+      { numItems: 1, cursor: descPage.continueCursor },
+      "dateAsc",
+    );
+    expect(ascPage.page.map((group) => group.shopName)).toEqual(["旧"]);
+  });
+
   it("v1形式でない数値のcursorはオフセットとして読まず先頭から始める", () => {
     const groups = groupSpendingEntries([
       entry({ _id: "old", date: "2026-01-01", receiptGroupId: "g-old", receiptShopName: "旧" }),
@@ -343,6 +417,7 @@ describe("parseExpenseSearchFilters", () => {
       ok: true,
       filters: {
         entryType: "all",
+        sortOrder: "dateDesc",
         shopQuery: "北浜",
         minAmountYen: 100,
         maxAmountYen: 200,
@@ -362,7 +437,7 @@ describe("parseExpenseSearchFilters", () => {
   it("下限と上限が等しい金額を受け付ける", () => {
     expect(parseExpenseSearchFilters({ minAmountYen: 900, maxAmountYen: 900 })).toEqual({
       ok: true,
-      filters: { entryType: "all", minAmountYen: 900, maxAmountYen: 900 },
+      filters: { entryType: "all", sortOrder: "dateDesc", minAmountYen: 900, maxAmountYen: 900 },
     });
   });
 
@@ -405,6 +480,24 @@ describe("parseExpenseSearchFilters", () => {
     expect(parseExpenseSearchFilters({ maxAmountYen: 1.5 })).toEqual({
       ok: false,
       error: "金額は0以上の整数で指定してください",
+    });
+  });
+
+  it("並び順を受け付け、未指定なら日付が新しい順にする", () => {
+    expect(parseExpenseSearchFilters({ sortOrder: "amountDesc" })).toEqual({
+      ok: true,
+      filters: { entryType: "all", sortOrder: "amountDesc" },
+    });
+    expect(parseExpenseSearchFilters({})).toEqual({
+      ok: true,
+      filters: { entryType: "all", sortOrder: "dateDesc" },
+    });
+  });
+
+  it("不正な並び順を拒否する", () => {
+    expect(parseExpenseSearchFilters({ sortOrder: "newest" })).toEqual({
+      ok: false,
+      error: "並び順は日付が新しい順・日付が古い順・金額が大きい順のいずれかで指定してください",
     });
   });
 });

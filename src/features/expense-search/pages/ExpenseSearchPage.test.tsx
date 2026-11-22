@@ -555,7 +555,7 @@ describe("ExpenseSearchPage", () => {
 
     expect(
       screen.getByText(
-        "件数が多いため、先頭の一部だけを集計しています。期間やキーワードで絞り込んでください。",
+        "件数が多いため、一覧・集計とも新しい10,000件が対象です。期間やキーワードで絞り込んでください。",
       ),
     ).toBeInTheDocument();
   });
@@ -997,6 +997,79 @@ describe("ExpenseSearchPage", () => {
 
     await user.click(screen.getByRole("button", { name: "すべてクリア" }));
     expect(screen.getByText("/search")).toBeInTheDocument();
+  });
+
+  it("並び順を選ぶとURLへ反映し、初期表示は日付が新しい順になる", async () => {
+    const user = userEvent.setup();
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+        <LocationProbe />
+        <Routes>
+          <Route path="/search" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "日付が新しい順", pressed: true }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "金額が大きい順" }));
+    await user.click(screen.getByRole("button", { name: "絞り込む" }));
+    expect(screen.getByText("/search?sort=amountDesc")).toBeInTheDocument();
+  });
+
+  it("日付が古い順ではサーバーの並びをそのまま表示する（再ソートしない）", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (args === undefined) {
+        return [];
+      }
+      return {
+        ...emptySearchResult,
+        // 古い順で返される前提のページ（先頭が最も古い）。
+        page: [
+          {
+            _id: "expense-old",
+            date: "2026-08-01",
+            type: "expense" as const,
+            shopName: "古い店",
+            amountYen: 500,
+            recordType: "expenseEntry" as const,
+          },
+          {
+            _id: "expense-new",
+            date: "2026-08-02",
+            type: "expense" as const,
+            shopName: "新しい店",
+            amountYen: 900,
+            recordType: "expenseEntry" as const,
+          },
+        ],
+        totalCount: 2,
+        expenseCount: 2,
+        totalExpenseYen: 1400,
+      };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?sort=dateAsc"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    const rows = within(expenseTable)
+      .getAllByRole("row")
+      .map((row) => row.textContent ?? "");
+    const oldIndex = rows.findIndex((text) => text.includes("古い店"));
+    const newIndex = rows.findIndex((text) => text.includes("新しい店"));
+    expect(oldIndex).toBeGreaterThanOrEqual(0);
+    expect(newIndex).toBeGreaterThanOrEqual(0);
+    expect(oldIndex).toBeLessThan(newIndex);
   });
 
   it("編集保存後は先頭ページから取り直し、集計・比較も更新する", async () => {
