@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -795,7 +795,10 @@ describe("ExpenseSearchPage", () => {
       if (!key || !query) return {};
       const requestId = key.split(":")[1];
       return {
-        [key]: useQueryMock("history-search", { ...query.args, __requestId: requestId }),
+        [key]: useQueryMock("history-search", {
+          ...(query.args as Record<string, unknown>),
+          __requestId: requestId,
+        }),
       };
     });
     useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
