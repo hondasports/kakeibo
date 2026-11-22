@@ -5,12 +5,14 @@ import {
   summarizeHistoryGroups,
 } from "../../domain/expenseSearch/analytics";
 import {
+  DEFAULT_HISTORY_SORT_ORDER,
   filterHistoryGroups,
   groupHistoryEntries,
   paginateHistoryGroups,
   parseExpenseSearchFilters,
   UNCATEGORIZED_CATEGORY_ID,
   type HistoryEntryType,
+  type HistorySortOrder,
   type SearchableHistoryGroup,
 } from "../../domain/expenseSearch/filter";
 import {
@@ -43,6 +45,7 @@ export type ExpenseSearchStore = {
 
 type SearchExpensesInput = {
   entryType?: HistoryEntryType;
+  sortOrder?: HistorySortOrder;
   shopQuery?: string;
   categoryId?: string;
   minAmountYen?: number;
@@ -59,6 +62,7 @@ export async function searchExpenses(
 ): Promise<ExpenseSearchResult> {
   const parsed = parseExpenseSearchFilters({
     entryType: args.entryType,
+    sortOrder: args.sortOrder,
     shopQuery: args.shopQuery,
     categoryId: args.categoryId,
     minAmountYen: args.minAmountYen,
@@ -121,7 +125,11 @@ export async function searchExpenses(
   );
   const categoryInfoMap = await store.buildCategoryInfoMap(groupId, categoryIds);
   const aggregate = summarizeHistoryGroups(groups, categoryInfoMap);
-  const paged = paginateHistoryGroups(groups, args.paginationOpts);
+  const paged = paginateHistoryGroups(
+    groups,
+    args.paginationOpts,
+    parsed.filters.sortOrder ?? DEFAULT_HISTORY_SORT_ORDER,
+  );
   const page = paged.page.flatMap((group) => mapHistoryGroupToItems(group, categoryInfoMap));
   const comparison =
     previousPeriod === null

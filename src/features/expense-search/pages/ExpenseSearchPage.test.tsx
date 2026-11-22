@@ -714,4 +714,25 @@ describe("ExpenseSearchPage", () => {
     await user.click(screen.getByRole("button", { name: "すべてクリア" }));
     expect(screen.getByText("/search")).toBeInTheDocument();
   });
+
+  it("並び順を選ぶとURLへ反映し、初期表示は日付が新しい順になる", async () => {
+    const user = userEvent.setup();
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+        <LocationProbe />
+        <Routes>
+          <Route path="/search" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "日付が新しい順", pressed: true }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "金額が大きい順" }));
+    await user.click(screen.getByRole("button", { name: "絞り込む" }));
+    expect(screen.getByText("/search?sort=amountDesc")).toBeInTheDocument();
+  });
 });

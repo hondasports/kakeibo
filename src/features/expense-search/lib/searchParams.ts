@@ -1,16 +1,20 @@
 import {
+  DEFAULT_HISTORY_SORT_ORDER,
   getAmountRangeError,
   getAmountYenError,
   getDateRangeError,
   getIsoDateError,
   getShopQueryError,
+  HISTORY_SORT_ORDERS,
   parseExpenseSearchFilters,
   type HistoryEntryType,
+  type HistorySortOrder,
 } from "../../../../lib/domain/expenseSearch/filter";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
 export type ExpenseSearchFormState = {
   entryType: HistoryEntryType;
+  sortOrder: HistorySortOrder;
   shopQuery: string;
   categoryId: string;
   minAmountYen: string;
@@ -21,6 +25,7 @@ export type ExpenseSearchFormState = {
 
 export const EMPTY_EXPENSE_SEARCH_FORM: ExpenseSearchFormState = {
   entryType: "all",
+  sortOrder: DEFAULT_HISTORY_SORT_ORDER,
   shopQuery: "",
   categoryId: "",
   minAmountYen: "",
@@ -44,8 +49,12 @@ export function readExpenseSearchFormState(searchParams: URLSearchParams): Expen
   const entryType = searchParams.get("type");
   const normalizedEntryType: HistoryEntryType =
     entryType === "expense" || entryType === "income" || entryType === "all" ? entryType : "all";
+  const sortOrderParam = searchParams.get("sort");
   return {
     entryType: normalizedEntryType,
+    sortOrder: (HISTORY_SORT_ORDERS as readonly string[]).includes(sortOrderParam ?? "")
+      ? (sortOrderParam as HistorySortOrder)
+      : DEFAULT_HISTORY_SORT_ORDER,
     shopQuery: searchParams.get("q") ?? "",
     categoryId: normalizedEntryType === "income" ? "" : (searchParams.get("categoryId") ?? ""),
     minAmountYen: searchParams.get("min") ?? "",
@@ -58,6 +67,7 @@ export function readExpenseSearchFormState(searchParams: URLSearchParams): Expen
 export function expenseSearchFormToSearchParams(state: ExpenseSearchFormState): URLSearchParams {
   const params = new URLSearchParams();
   if (state.entryType !== "all") params.set("type", state.entryType);
+  if (state.sortOrder !== DEFAULT_HISTORY_SORT_ORDER) params.set("sort", state.sortOrder);
   if (state.shopQuery.trim()) params.set("q", state.shopQuery.trim());
   if (state.categoryId && state.entryType !== "income") params.set("categoryId", state.categoryId);
   if (state.minAmountYen.trim()) params.set("min", state.minAmountYen.trim());
@@ -82,6 +92,7 @@ export function parseExpenseSearchFormState(state: ExpenseSearchFormState) {
 
   return parseExpenseSearchFilters({
     entryType: state.entryType,
+    sortOrder: state.sortOrder,
     shopQuery: state.shopQuery,
     categoryId: state.categoryId || undefined,
     minAmountYen,
@@ -185,6 +196,7 @@ export function toExpenseSearchQueryArgs(state: ExpenseSearchFormState) {
     ok: true as const,
     args: {
       entryType: parsed.filters.entryType,
+      sortOrder: parsed.filters.sortOrder,
       shopQuery: parsed.filters.shopQuery,
       categoryId: parsed.filters.categoryId
         ? (parsed.filters.categoryId as Id<"categories"> | "__uncategorized__")

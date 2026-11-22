@@ -9,7 +9,7 @@ import {
   type ExpenseSearchReceipt,
   type ExpenseSearchResult,
 } from "../../domain/expenseSearch/searchResult";
-import type { HistoryEntryType } from "../../domain/expenseSearch/filter";
+import type { HistoryEntryType, HistorySortOrder } from "../../domain/expenseSearch/filter";
 import {
   searchExpenses,
   type ExpenseSearchStore,
@@ -20,6 +20,7 @@ export type { ExpenseSearchReceipt, ExpenseSearchResult };
 
 type ExpenseSearchArgs = {
   entryType?: HistoryEntryType;
+  sortOrder?: HistorySortOrder;
   shopQuery?: string;
   categoryId?: Id<"categories"> | "__uncategorized__";
   minAmountYen?: number;

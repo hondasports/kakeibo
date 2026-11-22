@@ -16,6 +16,7 @@ describe("expense search params", () => {
     );
     expect(readExpenseSearchFormState(params)).toEqual({
       entryType: "all",
+      sortOrder: "dateDesc",
       shopQuery: "北浜",
       categoryId: "cat-1",
       minAmountYen: "100",
@@ -29,6 +30,7 @@ describe("expense search params", () => {
     expect(
       expenseSearchPath({
         entryType: "all",
+        sortOrder: "dateDesc",
         shopQuery: "  ",
         categoryId: "",
         minAmountYen: "",
@@ -43,6 +45,7 @@ describe("expense search params", () => {
     expect(
       expenseSearchPath({
         entryType: "expense",
+        sortOrder: "amountDesc",
         shopQuery: "北浜",
         categoryId: "cat-1",
         minAmountYen: "100",
@@ -51,7 +54,7 @@ describe("expense search params", () => {
         endDate: "2026-07-31",
       }),
     ).toBe(
-      "/search?type=expense&q=%E5%8C%97%E6%B5%9C&categoryId=cat-1&min=100&max=2000&from=2026-07-01&to=2026-07-31",
+      "/search?type=expense&sort=amountDesc&q=%E5%8C%97%E6%B5%9C&categoryId=cat-1&min=100&max=2000&from=2026-07-01&to=2026-07-31",
     );
   });
 
@@ -72,6 +75,7 @@ describe("expense search params", () => {
     expect(
       parseExpenseSearchFormState({
         entryType: "all",
+        sortOrder: "dateDesc",
         shopQuery: "",
         categoryId: "",
         minAmountYen: "200",
@@ -180,6 +184,7 @@ describe("expense search params", () => {
     expect(
       toExpenseSearchQueryArgs({
         entryType: "all",
+        sortOrder: "dateAsc",
         shopQuery: " 北浜 ",
         categoryId: "cat-1",
         minAmountYen: "100",
@@ -191,6 +196,7 @@ describe("expense search params", () => {
       ok: true,
       args: {
         entryType: "all",
+        sortOrder: "dateAsc",
         shopQuery: "北浜",
         categoryId: "cat-1",
         minAmountYen: 100,
