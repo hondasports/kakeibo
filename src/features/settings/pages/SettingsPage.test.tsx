@@ -37,7 +37,7 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("heading", { name: "設定", level: 1 })).toBeInTheDocument();
   });
 
-  it("単一の設定台帳に説明と4セクションを順番どおり表示する", () => {
+  it("単一の設定台帳に説明と8セクションを順番どおり表示する", () => {
     renderWithProviders(
       <MemoryRouter>
         <SettingsPage />
@@ -49,7 +49,7 @@ describe("SettingsPage", () => {
     ).toBeInTheDocument();
 
     const ledger = screen.getByTestId("settings-ledger");
-    expect(ledger.querySelectorAll(":scope > .settings-ledger-section")).toHaveLength(7);
+    expect(ledger.querySelectorAll(":scope > .settings-ledger-section")).toHaveLength(8);
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
     ).toEqual([
@@ -58,6 +58,7 @@ describe("SettingsPage", () => {
       "週の設定",
       "通知設定",
       "LINE連携",
+      "データの書き出し",
       "アカウント",
       "危険な操作",
     ]);

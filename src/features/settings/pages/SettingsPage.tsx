@@ -52,6 +52,18 @@ export function SettingsPage() {
               </SettingsSectionErrorBoundary>
             </Box>
             <Divider />
+            <Box className="settings-ledger-section">
+              <Typography component="h2" variant="h5">
+                データの書き出し
+              </Typography>
+              <Typography color="text.secondary" sx={{ mt: 0.75 }} variant="body2">
+                支出・収入をCSVで書き出します。バックアップや他サービスへの移行に使えます。
+              </Typography>
+              <Button component={RouterLink} sx={{ mt: 1.5 }} to="/export" variant="outlined">
+                書き出し画面へ
+              </Button>
+            </Box>
+            <Divider />
             <Box className="settings-ledger-section settings-ledger-section--danger">
               <Typography component="h2" variant="h5">
                 アカウント
