@@ -84,11 +84,19 @@ function collectAllowedAmounts(input: MonthlyInsightInput): Set<number> {
   return amounts;
 }
 
+// 要因・理由を断定する語。生成文に含まれたら採用しない
+const CAUSAL_PATTERN = /(ため|せい|原因|要因)/;
+// 前月データが無いのに増減・前月比を述べる語。previous が無いとき拒否する
+const COMPARISON_PATTERN = /(前月|増|減|%|％)/;
+
 /**
  * 生成文の全ての円金額が入力集計値（またはその差額）と一致するか。
- * 比較元に無い数値を述べるコメントは採用しない。
+ * 比較元に無い数値を述べるコメント、要因を断定するコメント、
+ * 前月データが無いのに増減・前月比に触れるコメントは採用しない。
  */
 export function insightNumbersAreConsistent(text: string, input: MonthlyInsightInput): boolean {
+  if (CAUSAL_PATTERN.test(text)) return false;
+  if (input.previous === null && COMPARISON_PATTERN.test(text)) return false;
   const allowed = collectAllowedAmounts(input);
   return extractYenAmounts(text).every((n) => allowed.has(n));
 }

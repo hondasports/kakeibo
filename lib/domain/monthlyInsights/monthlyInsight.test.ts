@@ -60,6 +60,27 @@ describe("insightNumbersAreConsistent", () => {
     const noPrev = { ...INPUT, previous: null };
     expect(insightNumbersAreConsistent("前月は70,000円でした。", noPrev)).toBe(false);
   });
+  it("前月データが無いとき増減・前月比・割合に触れる文は不一致", () => {
+    const noPrev = { ...INPUT, previous: null };
+    for (const text of [
+      "支出は前月より増えています。",
+      "食費が減少しました。",
+      "支出が30%増です。",
+      "食費の割合が増えました。",
+    ]) {
+      expect(insightNumbersAreConsistent(text, noPrev)).toBe(false);
+    }
+  });
+  it("要因・理由を断定する文は前月の有無に関わらず不一致", () => {
+    for (const text of [
+      "食費が増えたため支出が膨らみました。",
+      "外食のせいで食費が増加しました。",
+      "原因は日用品の買い増しです。",
+      "要因は交際費の増加です。",
+    ]) {
+      expect(insightNumbersAreConsistent(text, INPUT)).toBe(false);
+    }
+  });
 });
 
 describe("buildMonthlyInsightPrompt", () => {
