@@ -155,8 +155,8 @@ describe("searchExpenses", () => {
     });
     expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
     expect(loadHistoryEntries).toHaveBeenNthCalledWith(1, "g1", "2026-01-01", "2026-01-31", "desc");
-    // 前期間は集計用なので取得順は常に desc（直近期間側から上限まで）。
-    expect(loadHistoryEntries).toHaveBeenNthCalledWith(2, "g1", "2025-12-01", "2025-12-31");
+    // 前期間も一覧と同じ取得側で読む（打ち切り時に一覧・集計・比較が同じ範囲になるよう揃える）。
+    expect(loadHistoryEntries).toHaveBeenNthCalledWith(2, "g1", "2025-12-01", "2025-12-31", "desc");
     expect(result.comparison).not.toBeNull();
   });
 

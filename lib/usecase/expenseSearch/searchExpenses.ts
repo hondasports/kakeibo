@@ -108,10 +108,13 @@ export async function searchExpenses(
   let previousGroups: SearchableHistoryGroup[] = [];
   let previousTruncated = false;
   if (previousPeriod !== null) {
+    // 集計・前期間比較も一覧と同じ取得側にそろえる（打ち切り時に
+    // 一覧と集計が別の範囲を指す不整合を防ぐ。仕様は docs/current-implementation.md §4.4）
     const previousSource = await store.loadHistoryEntries(
       groupId,
       previousPeriod.startDate,
       previousPeriod.endDate,
+      parsed.filters.sortOrder === "dateAsc" ? "asc" : "desc",
     );
     previousTruncated = previousSource.truncated;
     previousGroups = filterHistoryGroups(

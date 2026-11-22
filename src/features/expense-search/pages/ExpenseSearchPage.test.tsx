@@ -484,7 +484,7 @@ describe("ExpenseSearchPage", () => {
 
     expect(
       screen.getByText(
-        "件数が多いため、先頭の一部だけを集計しています。期間やキーワードで絞り込んでください。",
+        "件数が多いため、新しい10,000件を対象に集計・表示しています。期間やキーワードで絞り込んでください。",
       ),
     ).toBeInTheDocument();
   });

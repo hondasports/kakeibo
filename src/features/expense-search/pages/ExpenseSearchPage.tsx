@@ -363,8 +363,10 @@ export function ExpenseSearchPage() {
             {displayResult.truncated ? (
               <Alert severity="warning" variant="outlined">
                 {applied.sortOrder === "amountDesc"
-                  ? "件数が多いため、新しい10,000件の中での金額順です。期間を絞ると全件から並べます。"
-                  : "件数が多いため、先頭の一部だけを集計しています。期間やキーワードで絞り込んでください。"}
+                  ? "件数が多いため、新しい10,000件の中での金額順です。集計もこの範囲が対象です。期間を絞ると全件から並べます。"
+                  : applied.sortOrder === "dateAsc"
+                    ? "件数が多いため、古い10,000件を対象に集計・表示しています。並び順や期間を変えると対象範囲も変わります。"
+                    : "件数が多いため、新しい10,000件を対象に集計・表示しています。期間やキーワードで絞り込んでください。"}
               </Alert>
             ) : null}
             {displayResult.comparisonTruncated ? (
