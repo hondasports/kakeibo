@@ -21,6 +21,7 @@ export const GROUP_DELETION_PURGE_STAGES = [
   "receipts",
   "entryFavorites",
   "sourceDocuments",
+  "recurringEntryRules",
   "weekSessions",
   "categories",
   "groupInvitations",

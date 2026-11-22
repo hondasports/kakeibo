@@ -31,6 +31,7 @@ describe("group deletion registry", () => {
       "receipts",
       "entryFavorites",
       "sourceDocuments",
+      "recurringEntryRules",
       "weekSessions",
       "categories",
       "groupInvitations",

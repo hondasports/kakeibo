@@ -22,6 +22,7 @@ export function zeroDeletedCounts(): GroupDeletionJobCounts {
     managementAuditLogs: 0,
     groupMembers: 0,
     groups: 0,
+    recurringEntryRules: 0,
   };
 }
 
@@ -33,7 +34,7 @@ export function accumulateDeletedCounts(
 ): GroupDeletionJobCounts {
   return {
     ...counts,
-    [stage]: counts[stage] + progress.deleted,
+    [stage]: (counts[stage] ?? 0) + progress.deleted,
     storageFiles: counts.storageFiles + progress.storageFiles,
   };
 }

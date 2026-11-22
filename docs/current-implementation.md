@@ -206,6 +206,14 @@
 
 集計コードは移行期間の二重計上を避けるため、期間・種別ごとに `expenseEntries` と互換 `receipts` の取得元を選ぶ。週収入・月収入・履歴検索の違いは `docs/technical-design.md` 12.2節を参照する。
 
+### 5.4 `recurringEntryRules`
+
+家賃・光熱費など毎週・毎月くり返す支出・収入の定期定義。グループ単位で共有され、設定画面で登録・編集・停止（`active=false`）できる。
+
+主なフィールド: `kind`（expense/income）、`title`、`amountYen`、`categoryId`（支出必須）、`shopName`、`memo`、`frequency`（weekly/monthly）、`dayOfWeek`/`dayOfMonth`、`active`、`registeredForDates`（登録済みの発生日の履歴。最新90件まで保持）。
+
+入力画面には期日が到来した定義が一覧され、「登録」1タップで直近の発生日（JST基準・当日含む）の支出・収入として記録される。登録できるのは直近の1回分だけで、それより前の発生日は自動では登録しない（しばらくアプリを開かなかった場合に飛ばされた分は手動で記録する）。二重登録は `registeredForDates` の期間キー（monthlyは `YYYY-MM`、weeklyは発生日を含む週の開始日）で判定するため、繰り返し条件を変更しても同じ期間には1回しか登録できない。期日を使わないテンプレ呼び出しはお気に入り（#1522）が担当し、期日にサーバー側で自動生成する方式は現行に無い。
+
 ## 6. AIレシート入力
 
 現行コードでは次の構成を持つ。

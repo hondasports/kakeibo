@@ -23,6 +23,7 @@ describe("stages", () => {
       "receipts",
       "entryFavorites",
       "sourceDocuments",
+      "recurringEntryRules",
       "weekSessions",
       "categories",
       "groupInvitations",
