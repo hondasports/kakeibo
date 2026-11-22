@@ -186,6 +186,7 @@ export default defineSchema({
     name: v.string(),
     clerkOrganizationId: v.optional(v.string()),
     defaultCategoriesSeedVersion: v.optional(v.number()),
+    monthlyBudgetYen: v.optional(v.number()),
     status: v.optional(v.union(...GROUP_LIFECYCLE_STATUSES.map((value) => v.literal(value)))),
     deletedAt: v.optional(v.number()),
     archivedAt: v.optional(v.number()),

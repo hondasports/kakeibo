@@ -47,6 +47,7 @@ function MonthlySummarySection({ month, onRetry }: { month: string; onRetry: () 
   const deleteExpenseEntry = useMutation(api.expenseEntries.mutations.deleteExpenseEntry);
   const deleteReceipt = useMutation(api.receipts.crud.deleteReceipt);
   const monthlySummary = useQuery(api.receipts.summaries.getMonthSummaryWithCategories, { month });
+  const myGroup = useQuery(api.groups.queries.getMyGroup);
   const categoriesResult = useQuery_experimental({
     query: api.categories.queries.listActive,
     args: {},
@@ -154,6 +155,7 @@ function MonthlySummarySection({ month, onRetry }: { month: string; onRetry: () 
 
       <MonthlyMetricsPanel
         isLoading={isSummaryLoading}
+        monthlyBudgetYen={myGroup?.monthlyBudgetYen ?? undefined}
         netAmountYen={summary.netAmountYen}
         scopeLabel={selectedDate ? "集計範囲：月全体" : undefined}
         totalAmountYen={summary.totalAmountYen}

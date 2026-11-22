@@ -1,5 +1,6 @@
-import { Box, Paper, Skeleton, Stack, Typography } from "@mui/material";
+import { Box, LinearProgress, Paper, Skeleton, Stack, Typography } from "@mui/material";
 import { formatSignedYen, formatYen } from "../../../../lib/domain/common/currency";
+import { monthlyBudgetProgress } from "../../../../lib/domain/groups/monthlyBudget";
 
 function Metric({
   label,
@@ -37,12 +38,14 @@ function Metric({
 
 export function MonthlyMetricsPanel({
   isLoading,
+  monthlyBudgetYen,
   netAmountYen,
   scopeLabel,
   totalAmountYen,
   totalIncomeYen,
 }: {
   isLoading: boolean;
+  monthlyBudgetYen?: number;
   netAmountYen: number;
   scopeLabel?: string;
   totalAmountYen: number;
@@ -92,7 +95,39 @@ export function MonthlyMetricsPanel({
             />
           </Box>
         )}
+        {!isLoading && monthlyBudgetYen !== undefined && (
+          <MonthlyBudgetStrip budgetYen={monthlyBudgetYen} spentYen={totalAmountYen} />
+        )}
       </Box>
     </Paper>
+  );
+}
+
+/** 月予算に対する消化率と残額。予算未設定の月は表示しない。 */
+function MonthlyBudgetStrip({ budgetYen, spentYen }: { budgetYen: number; spentYen: number }) {
+  const { remainingYen, usedPercent } = monthlyBudgetProgress(budgetYen, spentYen);
+  const over = remainingYen < 0;
+  return (
+    <Stack aria-label="月予算" spacing={0.75} sx={{ mt: 2 }}>
+      <Stack direction="row" spacing={1} sx={{ justifyContent: "space-between" }}>
+        <Typography color="text.secondary" variant="body2">
+          月予算 {formatYen(budgetYen)} のうち {usedPercent}% 使用
+        </Typography>
+        <Typography
+          color={over ? "error.main" : "text.secondary"}
+          sx={{ fontWeight: over ? 700 : 400 }}
+          variant="body2"
+        >
+          {over ? `${formatYen(-remainingYen)} 超過` : `残り ${formatYen(remainingYen)}`}
+        </Typography>
+      </Stack>
+      <LinearProgress
+        aria-label="予算消化率"
+        color={over ? "error" : usedPercent >= 80 ? "warning" : "primary"}
+        sx={{ borderRadius: 999, height: 6 }}
+        value={Math.min(usedPercent, 100)}
+        variant="determinate"
+      />
+    </Stack>
   );
 }

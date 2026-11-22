@@ -27,6 +27,7 @@ export async function getMyGroupHandler(ctx: QueryCtx) {
     _id: result.groupId as Id<"groups">,
     name: result.name,
     clerkOrganizationId: result.clerkOrganizationId,
+    monthlyBudgetYen: result.monthlyBudgetYen,
     role: result.role,
     createdAt: result.createdAt,
   };
