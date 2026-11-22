@@ -75,8 +75,9 @@ export const theme = createTheme({
           "&:hover": {
             boxShadow: "none",
           },
-          // SPのタップ対象は44px以上に揃える（App.cssの後勝ち詳細度ではなくテーマで指定）
-          [theme.breakpoints.down("md")]: {
+          // SPのタップ対象は44px以上に揃える（AppLayoutの isPC=up("md") と同じ境界。
+          // down("md") は899.95px止まりで900px手前に隙間ができるため not("md") にする）
+          [theme.breakpoints.not("md")]: {
             minHeight: designTokens.size.buttonMinHeightSp,
           },
         }),
@@ -85,7 +86,7 @@ export const theme = createTheme({
     MuiIconButton: {
       styleOverrides: {
         root: ({ theme }) => ({
-          [theme.breakpoints.down("md")]: {
+          [theme.breakpoints.not("md")]: {
             minHeight: designTokens.size.buttonMinHeightSp,
           },
         }),
@@ -159,7 +160,7 @@ export const theme = createTheme({
         root: ({ theme }) => ({
           minHeight: designTokens.size.buttonMinHeight,
           paddingInline: designTokens.space.md,
-          [theme.breakpoints.down("md")]: {
+          [theme.breakpoints.not("md")]: {
             minHeight: designTokens.size.buttonMinHeightSp,
           },
         }),
