@@ -11,6 +11,7 @@ import { SuzumemoLoadingState } from "../../ui";
 import { getCurrentWeekStartDate, normalizeWeekStartDate } from "../../week";
 import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
 import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
+import { receiptItemToEntryPrefill } from "../../summary-shared/lib/receiptToEntryPrefill";
 import { ExpenseBulkCategoryDialog } from "../../summary-shared/components/ExpenseBulkCategoryDialog";
 import { ExpenseBulkDeleteDialog } from "../../summary-shared/components/ExpenseBulkDeleteDialog";
 import { ExpenseEntryDeleteDialog } from "../../summary-shared/components/ExpenseEntryDeleteDialog";
@@ -429,6 +430,11 @@ export function ExpenseSearchPage() {
                     isLoading={false}
                     listAriaLabel="支出の検索結果"
                     maxVisibleGroups={Number.POSITIVE_INFINITY}
+                    onCopyReceipt={(receipt) =>
+                      navigate("/weeks/current/input", {
+                        state: { prefill: receiptItemToEntryPrefill(receipt) },
+                      })
+                    }
                     preserveOrder
                     receipts={expenseItems}
                     onDeleteReceipt={(receipt) => {

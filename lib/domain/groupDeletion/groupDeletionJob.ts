@@ -29,6 +29,7 @@ export type GroupDeletionJobCounts = {
   receiptAnalysisBatches: number;
   expenseEntries: number;
   receipts: number;
+  entryFavorites: number;
   sourceDocuments: number;
   storageFiles: number;
   weekSessions: number;

@@ -3,6 +3,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { getTodayDateStringInJapan } from "../../../../lib/domain/common/date";
 import { getWeekEndDate } from "../../week";
 import type { ExpenseItemEntryErrors } from "../validation/expenseItems";
+import type { ExpenseEntryPrefill } from "../types/prefill";
 
 export type ExpenseItemState = {
   categoryId: Id<"categories"> | "";
@@ -16,6 +17,7 @@ type EntryCategory = { _id: Id<"categories">; name: string; color: string };
 type UseExpenseEntryModeArgs = {
   weekStartDate: string;
   categories: EntryCategory[];
+  initialPrefill?: ExpenseEntryPrefill;
 };
 
 /**
@@ -42,20 +44,35 @@ function resolveEntryCategoryId(
   return categories[0]?._id ?? "";
 }
 
-export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEntryModeArgs) {
-  const [shopName, setShopNameState] = useState("");
-  const [sourceAmount, setSourceAmountState] = useState("");
+export function useExpenseEntryMode({
+  weekStartDate,
+  categories,
+  initialPrefill,
+}: UseExpenseEntryModeArgs) {
+  const [shopName, setShopNameState] = useState(initialPrefill?.title ?? "");
+  const [sourceAmount, setSourceAmountState] = useState(
+    initialPrefill ? String(initialPrefill.amountYen) : "",
+  );
   const [date, setDate] = useState(() => resolveEntryDefaultDate(weekStartDate));
   const [isMultiMode, setIsMultiMode] = useState(false);
   const [items, setItems] = useState<ExpenseItemState[]>([
-    { categoryId: categories[0]?._id ?? "", amountYen: "", title: "", memo: "" },
+    {
+      categoryId: resolveEntryCategoryId(
+        initialPrefill?.categoryId as Id<"categories"> | "" | undefined,
+        categories,
+      ),
+      amountYen: "",
+      title: "",
+      memo: "",
+    },
   ]);
+
   const [shopNameError, setShopNameError] = useState("");
   const [sourceAmountError, setSourceAmountError] = useState("");
   const [itemErrors, setItemErrors] = useState<ExpenseItemEntryErrors[]>([{}]);
   // 支出全体のメモは明細（items）とは別のフォーム状態として持つ。
   // 明細行の増減で値が失われないようにするため（#1346）。
-  const [memo, setMemoState] = useState("");
+  const [memo, setMemoState] = useState(initialPrefill?.memo ?? "");
   const [memoError, setMemoError] = useState("");
 
   // BUG#1: weekStartDate が変わったら date をリセット（WeekNavigator 週移動時のstale防止）
@@ -113,6 +130,26 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
       },
     ]);
     setItemErrors([{}]);
+  };
+
+  // 履歴の複写・お気に入りを単一モードのフォームへ適用する
+  const applyEntryPrefill = (prefill: ExpenseEntryPrefill) => {
+    setShopNameState(prefill.title);
+    setShopNameError("");
+    setSourceAmountState(String(prefill.amountYen));
+    setSourceAmountError("");
+    setMemoState(prefill.memo ?? "");
+    setMemoError("");
+    setItems([
+      {
+        categoryId: resolveEntryCategoryId(prefill.categoryId as Id<"categories">, categories),
+        amountYen: "",
+        title: "",
+        memo: "",
+      },
+    ]);
+    setItemErrors([{}]);
+    setIsMultiMode(false);
   };
 
   const handleAddItem = () => {
@@ -222,6 +259,7 @@ export function useExpenseEntryMode({ weekStartDate, categories }: UseExpenseEnt
     setShopNameError,
     setSourceAmountError,
     setItemErrors,
+    applyEntryPrefill,
     handleEnterMultiMode,
     handleAddItem,
     handleRemoveItem,

@@ -31,6 +31,7 @@ export function WeeklySummaryPanel({
   fourWeeksStatus,
   onTrendRetry,
   onDeleteReceipt,
+  onCopyReceipt,
   onEditReceipt,
   weekStartDate,
   selectionEnabled = false,
@@ -96,6 +97,7 @@ export function WeeklySummaryPanel({
         isLoading={isLoading}
         receipts={receipts}
         onDeleteReceipt={onDeleteReceipt}
+        onCopyReceipt={onCopyReceipt}
         onEditReceipt={onEditReceipt}
         isSelected={isSelected}
         limitMessage={limitMessage}

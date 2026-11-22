@@ -479,6 +479,20 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_group_id", ["groupId"]),
 
+  // 入力画面で再利用する「お気に入りの支出項目」。個人単位×所属グループで保持する。
+  entryFavorites: defineTable({
+    userId: v.string(),
+    groupId: v.id("groups"),
+    title: v.string(),
+    categoryId: v.id("categories"),
+    amountYen: v.number(),
+    memo: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_id_and_group_id", ["userId", "groupId"])
+    .index("by_group_id", ["groupId"]),
+
   receipts: defineTable({
     groupId: v.id("groups"),
     // 既存データとの後方互換性を保ちつつ、E2E cleanupの削除範囲を限定する。

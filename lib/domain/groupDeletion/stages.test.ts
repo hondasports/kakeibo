@@ -21,6 +21,7 @@ describe("stages", () => {
       "receiptAnalysisBatches",
       "expenseEntries",
       "receipts",
+      "entryFavorites",
       "sourceDocuments",
       "recurringEntryRules",
       "weekSessions",

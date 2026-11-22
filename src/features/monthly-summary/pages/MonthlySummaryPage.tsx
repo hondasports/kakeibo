@@ -10,6 +10,7 @@ import { CategoryBreakdownCard } from "../../summary-shared/components/CategoryB
 import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
 import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
 import { incomeItemToReceiptItem, type ReceiptItem } from "../../summary-shared/types/types";
+import { receiptItemToEntryPrefill } from "../../summary-shared/lib/receiptToEntryPrefill";
 import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
 import { SummarySectionErrorBoundary } from "../../summary-shared/components/SummarySectionErrorBoundary";
 import { getCurrentWeekStartDate } from "../../week";
@@ -208,6 +209,11 @@ function MonthlySummarySection({
         }
         isLoading={isSummaryLoading}
         listAriaLabel={dateLabel ? `${dateLabel}の支出一覧` : "月次サマリーの支出一覧"}
+        onCopyReceipt={(receipt) =>
+          navigate("/weeks/current/input", {
+            state: { prefill: receiptItemToEntryPrefill(receipt) },
+          })
+        }
         onDeleteReceipt={setDeletingReceipt}
         onEditReceipt={setEditingReceipt}
         receipts={visibleReceipts}
