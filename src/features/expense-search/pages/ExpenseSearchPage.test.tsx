@@ -364,6 +364,32 @@ describe("ExpenseSearchPage", () => {
     expect(screen.getByText("カテゴリ: 旧カテゴリ（無効化済み）")).toBeInTheDocument();
   });
 
+  it("無効化済みカテゴリの設定一覧を読み込んでいる間は「読み込み中」と出す", () => {
+    useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
+      if (_api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (_api === "categories-list-for-settings") {
+        return undefined;
+      }
+      if (args === undefined) {
+        return [{ _id: "cat-food", name: "食費" }];
+      }
+      if (args === "skip") {
+        return undefined;
+      }
+      return emptySearchResult;
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search?categoryId=cat-old"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("カテゴリ: 読み込み中")).toBeInTheDocument();
+  });
+
   it("下限が上限を超える条件は絞り込めず、項目の近くに理由が出る", async () => {
     const user = userEvent.setup();
     renderWithDatePickers(
