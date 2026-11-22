@@ -123,7 +123,7 @@ export function ConfirmDeleteGroupDialog({
                 {formatImpactLine("週次セッション", preview.weekSessions)}
               </Typography>
               <Typography color="text.secondary" variant="body2">
-                {formatImpactLine("管理操作の監査ログ", preview.managementAuditLogs)}
+                {formatImpactLine("管理操作の監査ログ", preview.managementAuditLogs)} /{" "}
                 {formatImpactLine("AI月次インサイト", preview.monthlyInsights)}
               </Typography>
             </Stack>

@@ -1,5 +1,5 @@
 import { useAction, useQuery } from "convex/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { Alert, Button, Card, CardContent, Stack, Typography } from "@mui/material";
 import { INSIGHT_MAX_REGENERATIONS } from "../../../../lib/domain/monthlyInsights/monthlyInsight";
@@ -13,6 +13,15 @@ export function MonthlyInsightCard({ month }: { month: string }) {
   const generate = useAction(api.monthlyInsights.index.generateMonthlyInsight);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  // 予約の失効時刻が過ぎたら再評価する（レンダー時点の Date.now() 固定を防ぐ）
+  const generatingUntil = insight?.generatingUntil;
+  useEffect(() => {
+    if (generatingUntil === undefined || generatingUntil <= Date.now()) return;
+    const timer = setTimeout(() => setNow(Date.now()), generatingUntil - Date.now() + 50);
+    return () => clearTimeout(timer);
+  }, [generatingUntil]);
 
   const onGenerate = async () => {
     setGenerating(true);
@@ -31,8 +40,7 @@ export function MonthlyInsightCard({ month }: { month: string }) {
   // 再生成の回数 = 累計の生成回数 - 初回の1回（上限は再生成のみに掛かる）
   const regenerationsUsed = insight === null ? 0 : Math.max(0, (insight.generationCount ?? 1) - 1);
   const generationLimitReached = regenerationsUsed >= INSIGHT_MAX_REGENERATIONS;
-  const generationInProgress =
-    insight?.generatingUntil !== undefined && insight.generatingUntil > Date.now();
+  const generationInProgress = generatingUntil !== undefined && generatingUntil > now;
 
   return (
     <Card variant="outlined">
@@ -65,7 +73,7 @@ export function MonthlyInsightCard({ month }: { month: string }) {
           >
             {generating || generationInProgress
               ? "生成しています…"
-              : insight
+              : insight && insight.commentText !== ""
                 ? "コメントを再生成"
                 : "コメントを生成"}
           </Button>

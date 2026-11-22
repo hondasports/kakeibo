@@ -191,6 +191,23 @@ describe("insightNumbersAreConsistent: 単位表記の拒否", () => {
     };
     expect(insightNumbersAreConsistent("支出は9万円でした", input)).toBe(false);
   });
+
+  it.each([
+    "支出は前月比80%増です",
+    "支出は前月比80％増です",
+    "食費は3万7千円でした",
+    "食費は5千円でした",
+    "支出は九万円でした",
+    "支出は前月の3倍です",
+    "記録は99件でした",
+  ])("検証できない数値表現を含む文は不一致として拒否する: %s", (text) => {
+    expect(insightNumbersAreConsistent(text, INPUT)).toBe(false);
+  });
+
+  it("件数が集計値（またはその差分）と一致する文は採用する", () => {
+    expect(insightNumbersAreConsistent("支出は80,000円、42件でした。", INPUT)).toBe(true);
+    expect(insightNumbersAreConsistent("記録は前月より2件増えました。", INPUT)).toBe(true);
+  });
 });
 
 describe("buildFallbackInsight: 同名カテゴリ", () => {

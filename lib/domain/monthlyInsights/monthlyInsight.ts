@@ -88,6 +88,42 @@ function collectAllowedAmounts(input: MonthlyInsightInput): Set<number> {
 const CAUSAL_PATTERN = /(ため|せい|原因|要因)/;
 // 前月データが無いのに増減・前月比を述べる語。previous が無いとき拒否する
 const COMPARISON_PATTERN = /(前月|増|減|%|％)/;
+// サーバーが照合できるのは集計値（金額・件数）だけ。割合・倍率・漢数字・
+// 「◯千円」のような桁読み表現は検証できないため、含む生成文は採用しない。
+const UNVERIFIABLE_NOTATION_PATTERN =
+  /%|％|倍|[0-9０-９][0-9０-９,.]*千|千[円億]|[一二三四五六七八九〇零十][一二三四五六七八九〇零十百千万億]*[万億]?円/;
+// 件数は入力集計値と照合できるので抽出して検証する
+const COUNT_PATTERN = /([0-9０-９][0-9０-９,]*)\s*件/g;
+
+/** 生成文中の「◯件」を件数として抽出する（全角数字も対象）。 */
+export function extractCounts(text: string): number[] {
+  return [...text.matchAll(COUNT_PATTERN)].map((m) =>
+    Number(toHalfWidth(m[1]).replace(/,/g, "")),
+  );
+}
+
+function collectAllowedCounts(input: MonthlyInsightInput): Set<number> {
+  const counts = new Set<number>();
+  const add = (p: MonthlyInsightMonthPoint) => {
+    counts.add(p.count);
+    for (const c of p.byCategory) counts.add(c.count);
+  };
+  add(input.current);
+  if (input.previous) {
+    add(input.previous);
+    // 件数の差分も許容する（金額と同じく比較元2値から計算できる数値のみ）
+    counts.add(input.current.count - input.previous.count);
+    counts.add(input.previous.count - input.current.count);
+    for (const c of input.current.byCategory) {
+      const prev = input.previous.byCategory.find((p) => sameCategory(p, c));
+      if (prev !== undefined) {
+        counts.add(c.count - prev.count);
+        counts.add(prev.count - c.count);
+      }
+    }
+  }
+  return counts;
+}
 
 /**
  * 生成文の全ての円金額が入力集計値（またはその差額）と一致するか。
@@ -97,8 +133,13 @@ const COMPARISON_PATTERN = /(前月|増|減|%|％)/;
 export function insightNumbersAreConsistent(text: string, input: MonthlyInsightInput): boolean {
   if (CAUSAL_PATTERN.test(text)) return false;
   if (input.previous === null && COMPARISON_PATTERN.test(text)) return false;
+  if (UNVERIFIABLE_NOTATION_PATTERN.test(text)) return false;
   const allowed = collectAllowedAmounts(input);
-  return extractYenAmounts(text).every((n) => allowed.has(n));
+  const allowedCounts = collectAllowedCounts(input);
+  return (
+    extractYenAmounts(text).every((n) => allowed.has(n)) &&
+    extractCounts(text).every((n) => allowedCounts.has(n))
+  );
 }
 
 function describeCategory(displayName: string, p: MonthlyInsightCategoryPoint): string {
@@ -167,6 +208,7 @@ export function buildMonthlyInsightPrompt(input: MonthlyInsightInput): string {
     "以下の集計値だけを根拠に、150字程度の日本語コメントを1つ書いてください。",
     "ルール:",
     "- 提示された数値（または当月と前月の差額）以外の金額を書かない",
+    "- 金額は「◯円」「◯万円」の算用数字だけで書き、割合（%）・倍率・漢数字・「◯千円」の表現は使わない",
     "- 明細・店名・商品名を推測して書かない（入力に含まれないため断定できない）",
     "- 増減の要因を断定しない（「◯◯が増えた」まで。理由は書かない）",
     "- 前月データが無い場合は増減・前月比に一切触れない",

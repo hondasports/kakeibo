@@ -118,62 +118,84 @@ export const generateMonthlyInsight = action({
         generationInProgress: true,
       };
     }
-    const current = await ctx.runQuery(api.receipts.summaries.getMonthSummaryWithCategories, {
-      month: args.month,
-    });
-    let previous: MonthlyInsightMonthPoint | null = null;
-    try {
-      const prevSummary = await ctx.runQuery(api.receipts.summaries.getMonthSummaryWithCategories, {
-        month: getPreviousMonth(args.month),
+    if (reservation === "cached") {
+      // 予約側が24hキャッシュを検出した場合（予約後に別経路で保存済みになった競合）
+      const fresh = await ctx.runQuery(api.monthlyInsights.index.getMonthlyInsight, {
+        month: args.month,
       });
-      if (prevSummary.count > 0) previous = toMonthPoint(prevSummary);
-    } catch {
-      previous = null;
+      return {
+        commentText: fresh?.commentText ?? "",
+        source: fresh?.source ?? "fallback",
+        cached: true,
+      };
     }
-    const input: MonthlyInsightInput = {
-      month: args.month,
-      current: toMonthPoint(current),
-      previous,
-    };
-
-    // 集計クエリは呼び出しのたびに「現在の利用グループ」を解決する。
-    // 生成途中の切替・除名で別グループの集計が混ざったり保存先がずれたりしないよう、
-    // 外部API呼び出し前と保存直前に利用中グループを再検証する。
-    await assertSameActiveGroup(ctx, group._id);
-
-    const deps = createMonthlyInsightGeneratorDeps();
-    const { appEnv, openAiApiKey } = deps.readEnvironment();
-    let commentText: string;
-    let source: "ai" | "fallback";
-    if (appEnv === "production" && openAiApiKey) {
+    try {
+      const current = await ctx.runQuery(api.receipts.summaries.getMonthSummaryWithCategories, {
+        month: args.month,
+      });
+      let previous: MonthlyInsightMonthPoint | null = null;
       try {
-        const generated = await deps.callOpenAI(openAiApiKey, buildMonthlyInsightPrompt(input));
-        if (insightNumbersAreConsistent(generated, input)) {
-          // プロンプトではカテゴリ記号で送っているので実名に戻す
-          commentText = replaceCategorySymbols(generated, input);
-          source = "ai";
-        } else {
-          // 入力集計値と一致しない金額を含む生成文は採用しない
+        const prevSummary = await ctx.runQuery(
+          api.receipts.summaries.getMonthSummaryWithCategories,
+          { month: getPreviousMonth(args.month) },
+        );
+        if (prevSummary.count > 0) previous = toMonthPoint(prevSummary);
+      } catch {
+        previous = null;
+      }
+      const input: MonthlyInsightInput = {
+        month: args.month,
+        current: toMonthPoint(current),
+        previous,
+      };
+
+      // 集計クエリは呼び出しのたびに「現在の利用グループ」を解決する。
+      // 生成途中の切替・除名で別グループの集計が混ざったり保存先がずれたりしないよう、
+      // 外部API呼び出し前と保存直前に利用中グループを再検証する。
+      await assertSameActiveGroup(ctx, group._id);
+
+      const deps = createMonthlyInsightGeneratorDeps();
+      const { appEnv, openAiApiKey } = deps.readEnvironment();
+      let commentText: string;
+      let source: "ai" | "fallback";
+      if (appEnv === "production" && openAiApiKey) {
+        try {
+          const generated = await deps.callOpenAI(openAiApiKey, buildMonthlyInsightPrompt(input));
+          if (insightNumbersAreConsistent(generated, input)) {
+            // プロンプトではカテゴリ記号で送っているので実名に戻す
+            commentText = replaceCategorySymbols(generated, input);
+            source = "ai";
+          } else {
+            // 入力集計値と一致しない金額を含む生成文は採用しない
+            commentText = buildFallbackInsight(input);
+            source = "fallback";
+          }
+        } catch {
           commentText = buildFallbackInsight(input);
           source = "fallback";
         }
-      } catch {
+      } else {
         commentText = buildFallbackInsight(input);
         source = "fallback";
       }
-    } else {
-      commentText = buildFallbackInsight(input);
-      source = "fallback";
-    }
 
-    await assertSameActiveGroup(ctx, group._id);
-    await ctx.runMutation(internal.monthlyInsights.index.saveMonthlyInsight, {
-      groupId: group._id,
-      month: args.month,
-      commentText,
-      source,
-    });
-    return { commentText, source, cached: false };
+      await assertSameActiveGroup(ctx, group._id);
+      await ctx.runMutation(internal.monthlyInsights.index.saveMonthlyInsight, {
+        groupId: group._id,
+        month: args.month,
+        commentText,
+        source,
+      });
+      return { commentText, source, cached: false };
+    } catch (err) {
+      // 予約だけ消費して生成に進めなかった場合は枠を解放する
+      // （グループ切替・集計取得・保存の失敗など）。上限到達には数えさせない。
+      await ctx.runMutation(internal.monthlyInsights.index.releaseMonthlyInsightGeneration, {
+        groupId: group._id,
+        month: args.month,
+      });
+      throw err;
+    }
   },
 });
 
@@ -189,7 +211,7 @@ async function assertSameActiveGroup(ctx: ActionCtx, expectedGroupId: Id<"groups
 export async function reserveMonthlyInsightGenerationHandler(
   ctx: MutationCtx,
   args: { groupId: Id<"groups">; month: string },
-): Promise<"reserved" | "in_progress" | "limit"> {
+): Promise<"reserved" | "in_progress" | "limit" | "cached"> {
   const now = Date.now();
   const existing = await ctx.db
     .query("monthlyInsights")
@@ -200,6 +222,10 @@ export async function reserveMonthlyInsightGenerationHandler(
   if (existing !== null) {
     if (existing.generatingUntil !== undefined && existing.generatingUntil > now) {
       return "in_progress";
+    }
+    // 予約後に別経路で保存済み（24h以内）になったケース。予約を消費せず保存済みを返す
+    if (existing.generatedAt > 0 && now - existing.generatedAt < INSIGHT_CACHE_TTL_MS) {
+      return "cached";
     }
     // 再生成の回数 = 累計の生成回数 - 初回の1回
     const regenerations = Math.max(0, (existing.generationCount ?? 1) - 1);
@@ -228,8 +254,41 @@ export async function reserveMonthlyInsightGenerationHandler(
 
 export const reserveMonthlyInsightGeneration = internalMutation({
   args: { groupId: v.id("groups"), month: v.string() },
-  returns: v.union(v.literal("reserved"), v.literal("in_progress"), v.literal("limit")),
+  returns: v.union(
+    v.literal("reserved"),
+    v.literal("in_progress"),
+    v.literal("limit"),
+    v.literal("cached"),
+  ),
   handler: reserveMonthlyInsightGenerationHandler,
+});
+
+// 予約だけ取得して生成に進めなかった場合の解放。generationCount を戻し、
+// 空の予約レコードは削除する（保存済みの実レコードは数を戻すだけ）。
+export async function releaseMonthlyInsightGenerationHandler(
+  ctx: MutationCtx,
+  args: { groupId: Id<"groups">; month: string },
+): Promise<void> {
+  const existing = await ctx.db
+    .query("monthlyInsights")
+    .withIndex("by_group_id_and_month", (q) =>
+      q.eq("groupId", args.groupId).eq("month", args.month),
+    )
+    .unique();
+  if (existing === null || existing.generatingUntil === undefined) return;
+  if ((existing.generationCount ?? 1) <= 1 && existing.commentText === "") {
+    await ctx.db.delete(existing._id);
+    return;
+  }
+  await ctx.db.patch(existing._id, {
+    generationCount: Math.max(0, (existing.generationCount ?? 1) - 1),
+    generatingUntil: undefined,
+  });
+}
+
+export const releaseMonthlyInsightGeneration = internalMutation({
+  args: { groupId: v.id("groups"), month: v.string() },
+  handler: releaseMonthlyInsightGenerationHandler,
 });
 
 export const saveMonthlyInsight = internalMutation({

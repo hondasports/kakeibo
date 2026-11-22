@@ -1,5 +1,8 @@
 import type { MonthlyInsightInput } from "../../domain/monthlyInsights/monthlyInsight";
-import { buildMonthlyInsightPrompt } from "../../domain/monthlyInsights/monthlyInsight";
+import {
+  buildMonthlyInsightPrompt,
+  INSIGHT_RESERVATION_TTL_MS,
+} from "../../domain/monthlyInsights/monthlyInsight";
 
 export type MonthlyInsightGeneratorDeps = {
   readEnvironment: () => { appEnv: string | undefined; openAiApiKey: string | undefined };
@@ -31,6 +34,9 @@ async function callOpenAIForInsight(apiKey: string, prompt: string): Promise<str
       model: "gpt-4o-mini",
       input: prompt,
     }),
+    // 生成予約（generatingUntil）のTTL内で終わらせる。超えると別呼出しが
+    // 生成へ進み、OpenAI を二重呼びする可能性がある
+    signal: AbortSignal.timeout(INSIGHT_RESERVATION_TTL_MS - 5_000),
   });
   if (!response.ok) {
     throw new Error(`OpenAI API がエラーを返しました（HTTP ${response.status}）`);
