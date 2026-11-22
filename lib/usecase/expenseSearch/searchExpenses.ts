@@ -30,15 +30,6 @@ export type SearchHistorySource = {
   truncated: boolean;
 };
 
-// dateAsc で一覧が打ち切られた場合の集計用再読み込みの1テーブル上限。
-// 一覧用の取得（各テーブル SEARCH_MAX_RECORDS+1 件まで走査）と合わせても
-// Convex の1クエリあたりのドキュメント走査上限（32,000件）を超えないよう絞る
-// （最悪 20,002 + 10,001 = 30,003 件の走査）。
-// 1クエリのドキュメント走査上限（約32,000件）を、一覧（2テーブル×10,001件）、
-// 集計用の再読（同×3,001件）、前期間（同×2,001件）で分け合う配分にする。
-export const AGGREGATE_RESCAN_MAX_RECORDS = 3_000;
-export const PREVIOUS_PERIOD_MAX_RECORDS = 2_000;
-
 export type ExpenseSearchStore = {
   getCategoryGroupId: (categoryId: string) => Promise<string | undefined>;
   loadHistoryEntries: (
@@ -108,18 +99,17 @@ export async function searchExpenses(
     parsed.filters,
   );
 
-  // 集計は並び順に依存しない。打ち切り時は全ソートで同一の最新
-  // AGGREGATE_RESCAN_MAX_RECORDS 件を対象にするため、一覧用とは別に
-  // 新しい側を件数を絞って読み直す（読み直し件数は1クエリの走査上限に
-  // 一覧分と合わせて収まる範囲に設定してある）。
+  // 集計は並び順に依存しない。dateDesc・amountDesc では一覧用に読んだ
+  // groups をそのまま集計に使う（打ち切り時も一覧と同じ範囲＝preview と同じ）。
+  // dateAsc で一覧が打ち切られたときだけ、集計は dateDesc と同じ範囲になるよう
+  // 新しい側から一覧と同じ上限（store既定の SEARCH_MAX_RECORDS）で読み直す。
   let aggregateGroups = groups;
-  if (source.truncated) {
+  if (source.truncated && parsed.filters.sortOrder === "dateAsc") {
     const aggregateSource = await store.loadHistoryEntries(
       groupId,
       parsed.filters.startDate,
       parsed.filters.endDate,
       "desc",
-      AGGREGATE_RESCAN_MAX_RECORDS,
     );
     aggregateGroups = filterHistoryGroups(
       groupHistoryEntries(aggregateSource.entries, aggregateSource.incomes),
@@ -137,13 +127,13 @@ export async function searchExpenses(
   let previousGroups: SearchableHistoryGroup[] = [];
   let previousTruncated = false;
   if (previousPeriod !== null) {
-    // 前期間比較も集計と同じく並び順に依存せず、常に新しい側の範囲を読む。
+    // 前期間比較は preview と同じ上限（store既定の SEARCH_MAX_RECORDS）で
+    // 新しい側を読む。
     const previousSource = await store.loadHistoryEntries(
       groupId,
       previousPeriod.startDate,
       previousPeriod.endDate,
       "desc",
-      PREVIOUS_PERIOD_MAX_RECORDS,
     );
     previousTruncated = previousSource.truncated;
     previousGroups = filterHistoryGroups(

@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ExpenseSearchDomainError } from "../../domain/expenseSearch/searchResult";
 import {
-  AGGREGATE_RESCAN_MAX_RECORDS,
-  PREVIOUS_PERIOD_MAX_RECORDS,
   searchExpenses,
   type ExpenseSearchStore,
   type SearchHistorySource,
@@ -157,15 +155,9 @@ describe("searchExpenses", () => {
     });
     expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
     expect(loadHistoryEntries).toHaveBeenNthCalledWith(1, "g1", "2026-01-01", "2026-01-31", "desc");
-    // 前期間比較も集計と同様に並び順に依存せず、常に新しい側の範囲を読む。
-    expect(loadHistoryEntries).toHaveBeenNthCalledWith(
-      2,
-      "g1",
-      "2025-12-01",
-      "2025-12-31",
-      "desc",
-      PREVIOUS_PERIOD_MAX_RECORDS,
-    );
+    // 前期間比較は preview と同じ上限（store既定の SEARCH_MAX_RECORDS）で
+    // 新しい側を読む（maxRecords 未指定）。
+    expect(loadHistoryEntries).toHaveBeenNthCalledWith(2, "g1", "2025-12-01", "2025-12-31", "desc");
     expect(result.comparison).not.toBeNull();
   });
 
@@ -296,7 +288,7 @@ describe("searchExpenses", () => {
       expect(result.matchedGroupCount).toBe(1);
       // 前期間読込みと合わせて新しい側は必ず読まれている。
       if (sortOrder === "dateAsc") {
-        // dateAsc では一覧（asc）・集計用の再読（desc・走査上限つき）・
+        // dateAsc では一覧（asc）・集計用の再読（desc・一覧と同じ上限）・
         // 前期間（desc）の3回読む。
         expect(loadHistoryEntries).toHaveBeenNthCalledWith(
           2,
@@ -304,7 +296,6 @@ describe("searchExpenses", () => {
           "2026-01-01",
           "2026-01-31",
           "desc",
-          AGGREGATE_RESCAN_MAX_RECORDS,
         );
         expect(loadHistoryEntries).toHaveBeenNthCalledWith(
           3,
@@ -312,29 +303,19 @@ describe("searchExpenses", () => {
           "2025-12-01",
           "2025-12-31",
           "desc",
-          PREVIOUS_PERIOD_MAX_RECORDS,
         );
         expect(loadHistoryEntries).toHaveBeenCalledTimes(3);
       } else {
-        // dateDesc/amountDesc も集計用に新しい側を件数を絞って読み直す
-        // （一覧・集計用の再読・前期間の3回）。
+        // dateDesc/amountDesc は読み直しをせず、一覧用に読んだ groups を
+        // そのまま集計に使う（一覧・前期間の2回だけ）。
         expect(loadHistoryEntries).toHaveBeenNthCalledWith(
           2,
-          "g1",
-          "2026-01-01",
-          "2026-01-31",
-          "desc",
-          AGGREGATE_RESCAN_MAX_RECORDS,
-        );
-        expect(loadHistoryEntries).toHaveBeenNthCalledWith(
-          3,
           "g1",
           "2025-12-01",
           "2025-12-31",
           "desc",
-          PREVIOUS_PERIOD_MAX_RECORDS,
         );
-        expect(loadHistoryEntries).toHaveBeenCalledTimes(3);
+        expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
       }
     },
   );
