@@ -165,6 +165,14 @@ async function maybeCreateExpenseDraft(
     groupResolution.groupId,
     MAX_CATEGORIES_PER_GROUP,
   );
+  // 「食費 500」で command.name が実在カテゴリに解決できる場合、返信側は
+  // カテゴリ集計を返すので下書きは作らない（返信との一貫性を保つ）。
+  if (
+    command.type === "category_lookup" &&
+    resolveCategoryLookup(command.name, categories) !== undefined
+  ) {
+    return;
+  }
   const category = resolveCategoryLookup(expenseInput.title, categories);
   await deps.expenseDrafts.createFromLineText({
     groupId: groupResolution.groupId,
