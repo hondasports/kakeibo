@@ -405,6 +405,11 @@ export function ExpenseSearchPage() {
               </Stack>
             ) : (
               <>
+                {deletingReceipt === null && deleteError ? (
+                  <Alert severity="error" variant="outlined" onClose={() => setDeleteError("")}>
+                    {deleteError}
+                  </Alert>
+                ) : null}
                 {applied.entryType !== "income" && expenseItems.length > 0 ? (
                   <ReceiptListCard
                     count={expenseItems.length}
@@ -415,7 +420,10 @@ export function ExpenseSearchPage() {
                     listAriaLabel="支出の検索結果"
                     maxVisibleGroups={Number.POSITIVE_INFINITY}
                     receipts={expenseItems}
-                    onDeleteReceipt={setDeletingReceipt}
+                    onDeleteReceipt={(receipt) => {
+                      setDeleteError("");
+                      setDeletingReceipt(receipt);
+                    }}
                     onEditReceipt={setEditingReceipt}
                     isSelected={bulkSelection.isSelected}
                     limitMessage={bulkSelection.limitMessage}
@@ -440,7 +448,10 @@ export function ExpenseSearchPage() {
                     incomes={incomeItems}
                     isLoading={false}
                     listAriaLabel="収入の検索結果"
-                    onDeleteIncome={(income) => setDeletingReceipt(incomeItemToReceiptItem(income))}
+                    onDeleteIncome={(income) => {
+                      setDeleteError("");
+                      setDeletingReceipt(incomeItemToReceiptItem(income));
+                    }}
                     onEditIncome={(income) => setEditingReceipt(incomeItemToReceiptItem(income))}
                     weekSummaryPath={weekSummaryPath}
                   />
@@ -467,12 +478,6 @@ export function ExpenseSearchPage() {
           </>
         )}
 
-        {deleteError ? (
-          <Alert severity="error" variant="outlined" onClose={() => setDeleteError("")}>
-            {deleteError}
-          </Alert>
-        ) : null}
-
         <ExpenseEntryEditDialog
           categories={categories}
           open={editingReceipt !== null}
@@ -485,9 +490,14 @@ export function ExpenseSearchPage() {
         />
 
         <ExpenseEntryDeleteDialog
+          error={deleteError || undefined}
+          impactMessage="削除すると元に戻せません。各サマリーの集計からも外れます。"
           open={deletingReceipt !== null}
           saving={deleteSaving}
-          onCancel={() => setDeletingReceipt(null)}
+          onCancel={() => {
+            setDeletingReceipt(null);
+            setDeleteError("");
+          }}
           onConfirm={() => void handleConfirmDelete()}
         />
 

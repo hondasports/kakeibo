@@ -214,6 +214,77 @@ describe("ExpenseSearchPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("追加読み込み後に削除すると、読み込み済み分を破棄して先頭ページから取り直す", async () => {
+    const user = userEvent.setup();
+    const searchCalls: unknown[] = [];
+    useQueryMock.mockImplementation((api: unknown, args: unknown) => {
+      if (api === "get-user-profile") {
+        return { weeklyStartDay: 3 };
+      }
+      if (api === "categories-list-for-settings" || args === undefined) {
+        return [];
+      }
+      searchCalls.push(args);
+      const cursor = (args as { paginationOpts?: { cursor?: string | null } }).paginationOpts
+        ?.cursor;
+      return cursor === "cursor-1"
+        ? {
+            ...emptySearchResult,
+            isDone: true,
+            page: [
+              {
+                _id: "expense-2",
+                date: "2026-08-01",
+                type: "expense" as const,
+                shopName: "2ページ目の店",
+                amountYen: 500,
+                recordType: "expenseEntry" as const,
+              },
+            ],
+          }
+        : {
+            ...emptySearchResult,
+            continueCursor: "cursor-1",
+            isDone: false,
+            page: [
+              {
+                _id: "expense-1",
+                date: "2026-08-02",
+                type: "expense" as const,
+                shopName: "対象の店",
+                amountYen: 900,
+                recordType: "expenseEntry" as const,
+              },
+            ],
+          };
+    });
+
+    renderWithDatePickers(
+      <MemoryRouter initialEntries={["/search"]}>
+        <ExpenseSearchPage />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "さらに読み込む" }));
+    expect(await screen.findByText("2ページ目の店")).toBeInTheDocument();
+
+    const expenseTable = screen.getByRole("table", { name: "支出の検索結果" });
+    await user.click(
+      within(expenseTable).getByRole("button", { name: "対象の店（2026/8/2）を削除" }),
+    );
+    await user.click(screen.getByRole("button", { name: "削除する" }));
+
+    // 新しい検索要約キー（searchRequestIdが進む）で先頭ページ（cursor: null）を取り直す。
+    await screen.findByText("対象の店");
+    const cursors = searchCalls.map(
+      (args) => (args as { paginationOpts?: { cursor?: string | null } }).paginationOpts?.cursor,
+    );
+    expect(cursors).toContain("cursor-1");
+    expect(cursors[cursors.length - 1]).toBeNull();
+    // 2ページ目の読み込み済み分は破棄され、先頭ページの内容だけが残る。
+    expect(screen.queryByText("2ページ目の店")).not.toBeInTheDocument();
+  });
+
   it("履歴検索の支出と収入の一覧は、年をまたぐ結果をそれぞれ年つきで日付を出す", () => {
     useQueryMock.mockImplementation((_api: unknown, args: unknown) => {
       if (_api === "get-user-profile") {
