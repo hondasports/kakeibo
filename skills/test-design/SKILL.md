@@ -6,7 +6,7 @@ license: Apache-2.0
 
 # テスト設計
 
-実装前に、受入条件・不変条件と、壊れたときの影響を整理する。変更が表示だけに見えても、金額・データ・認可・主要操作などへの影響からリスクを判断する。想定する具体的な故障に対し、既存テストが実際に確認する値・条件・経路を調べ、必要な検証を選ぶ。テストを書く順序とred→greenは `skills/implementation`、E2E specの作法は `skills/e2e-spec-authoring` に従う。設計や見直しの判断例が必要なら [references/examples.md](references/examples.md) を読む。
+実装前に、`skills/requirements` で確定した受入条件について、不変条件と壊れたときの影響を整理する。変更が表示だけに見えても、金額・データ・認可・主要操作などへの影響からリスクを判断する。想定する具体的な故障に対し、既存テストが実際に確認する値・条件・経路を調べ、必要な検証を選ぶ。テストを書く順序とred→greenは `skills/implementation`、E2E specの作法は `skills/e2e-spec-authoring` に従う。設計や見直しの判断例が必要なら [references/examples.md](references/examples.md) を読む。
 
 ## 層を選ぶ
 
