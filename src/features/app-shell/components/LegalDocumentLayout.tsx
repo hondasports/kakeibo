@@ -39,8 +39,12 @@ export function LegalDocumentLayout({
   useEffect(() => {
     const hash = window.location.hash.slice(1);
     if (!hash) return;
-    const target = document.getElementById(decodeURIComponent(hash));
-    target?.scrollIntoView();
+    try {
+      const target = document.getElementById(decodeURIComponent(hash));
+      target?.scrollIntoView();
+    } catch {
+      // 不完全なパーセントエンコードのフラグメントでは何もしない
+    }
   }, []);
 
   const revisedDateLabel =
