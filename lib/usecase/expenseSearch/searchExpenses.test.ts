@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ExpenseSearchDomainError } from "../../domain/expenseSearch/searchResult";
 import {
+  AGGREGATE_RESCAN_MAX_RECORDS,
   searchExpenses,
   type ExpenseSearchStore,
   type SearchHistorySource,
@@ -286,11 +287,40 @@ describe("searchExpenses", () => {
       expect(result.expenseCount).toBe(1);
       expect(result.matchedGroupCount).toBe(1);
       // 前期間読込みと合わせて新しい側は必ず読まれている。
-      expect(loadHistoryEntries).toHaveBeenCalledWith("g1", "2026-01-01", "2026-01-31", "desc");
       if (sortOrder === "dateAsc") {
-        // 古い側を一覧に読んだ分だけ余分に1回読む。
+        // dateAsc では一覧（asc）・集計用の再読（desc・走査上限つき）・
+        // 前期間（desc）の3回読む。
+        expect(loadHistoryEntries).toHaveBeenNthCalledWith(
+          2,
+          "g1",
+          "2026-01-01",
+          "2026-01-31",
+          "desc",
+          AGGREGATE_RESCAN_MAX_RECORDS,
+        );
+        expect(loadHistoryEntries).toHaveBeenNthCalledWith(
+          3,
+          "g1",
+          "2025-12-01",
+          "2025-12-31",
+          "desc",
+        );
         expect(loadHistoryEntries).toHaveBeenCalledTimes(3);
       } else {
+        expect(loadHistoryEntries).toHaveBeenNthCalledWith(
+          1,
+          "g1",
+          "2026-01-01",
+          "2026-01-31",
+          "desc",
+        );
+        expect(loadHistoryEntries).toHaveBeenNthCalledWith(
+          2,
+          "g1",
+          "2025-12-01",
+          "2025-12-31",
+          "desc",
+        );
         expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
       }
     },

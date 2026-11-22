@@ -33,6 +33,7 @@ async function fetchExpenseEntriesForSearch(
   startDate: string | undefined,
   endDate: string | undefined,
   order: "asc" | "desc",
+  maxRecords: number,
 ): Promise<SearchDocsResult<Doc<"expenseEntries">>> {
   const query = ctx.db
     .query("expenseEntries")
@@ -52,10 +53,10 @@ async function fetchExpenseEntriesForSearch(
     // amountDesc は日付順で取った範囲内での金額順になる（UIで案内する）。
     .order(order);
 
-  const docs = await query.take(SEARCH_MAX_RECORDS + 1);
+  const docs = await query.take(maxRecords + 1);
   return {
-    docs: docs.slice(0, SEARCH_MAX_RECORDS),
-    truncated: docs.length > SEARCH_MAX_RECORDS,
+    docs: docs.slice(0, maxRecords),
+    truncated: docs.length > maxRecords,
   };
 }
 
@@ -65,6 +66,7 @@ async function fetchReceiptsForSearch(
   startDate: string | undefined,
   endDate: string | undefined,
   order: "asc" | "desc",
+  maxRecords: number,
 ): Promise<SearchDocsResult<Doc<"receipts">>> {
   const query = ctx.db
     .query("receipts")
@@ -82,10 +84,10 @@ async function fetchReceiptsForSearch(
     })
     .order(order);
 
-  const docs = await query.take(SEARCH_MAX_RECORDS + 1);
+  const docs = await query.take(maxRecords + 1);
   return {
-    docs: docs.slice(0, SEARCH_MAX_RECORDS),
-    truncated: docs.length > SEARCH_MAX_RECORDS,
+    docs: docs.slice(0, maxRecords),
+    truncated: docs.length > maxRecords,
   };
 }
 
@@ -101,10 +103,11 @@ export async function loadHistoryEntriesForSearch(
   startDate: string | undefined,
   endDate: string | undefined,
   order: "asc" | "desc" = "desc",
+  maxRecords: number = SEARCH_MAX_RECORDS,
 ): Promise<SearchHistoryEntries> {
   const [newEntryResult, receiptResult] = await Promise.all([
-    fetchExpenseEntriesForSearch(ctx, groupId, startDate, endDate, order),
-    fetchReceiptsForSearch(ctx, groupId, startDate, endDate, order),
+    fetchExpenseEntriesForSearch(ctx, groupId, startDate, endDate, order, maxRecords),
+    fetchReceiptsForSearch(ctx, groupId, startDate, endDate, order, maxRecords),
   ]);
   const newEntries = newEntryResult.docs;
   const receipts = receiptResult.docs;

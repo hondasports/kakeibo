@@ -30,6 +30,12 @@ export type SearchHistorySource = {
   truncated: boolean;
 };
 
+// dateAsc で一覧が打ち切られた場合の集計用再読み込みの1テーブル上限。
+// 一覧用の取得（各テーブル SEARCH_MAX_RECORDS+1 件まで走査）と合わせても
+// Convex の1クエリあたりのドキュメント走査上限（32,000件）を超えないよう絞る
+// （最悪 20,002 + 10,001 = 30,003 件の走査）。
+export const AGGREGATE_RESCAN_MAX_RECORDS = 5_000;
+
 export type ExpenseSearchStore = {
   getCategoryGroupId: (categoryId: string) => Promise<string | undefined>;
   loadHistoryEntries: (
@@ -37,6 +43,7 @@ export type ExpenseSearchStore = {
     startDate: string | undefined,
     endDate: string | undefined,
     order?: "asc" | "desc",
+    maxRecords?: number,
   ) => Promise<SearchHistorySource>;
   buildCategoryInfoMap: (
     groupId: string,
@@ -101,6 +108,8 @@ export async function searchExpenses(
   // 集計は並び順に依存しない。常に日付が新しい側の範囲を対象にする。
   // dateAsc で打ち切られた場合、一覧用の古い側データは集計範囲と異なる
   // ため新しい側を読み直す（未打ち切りなら全件読めており再読は不要）。
+  // 再読は1クエリのドキュメント走査上限を一覧用の取得と共有するため、
+  // 1テーブルあたりの取り込み件数を AGGREGATE_RESCAN_MAX_RECORDS に絞る。
   let aggregateGroups = groups;
   if (source.truncated && parsed.filters.sortOrder === "dateAsc") {
     const aggregateSource = await store.loadHistoryEntries(
@@ -108,6 +117,7 @@ export async function searchExpenses(
       parsed.filters.startDate,
       parsed.filters.endDate,
       "desc",
+      AGGREGATE_RESCAN_MAX_RECORDS,
     );
     aggregateGroups = filterHistoryGroups(
       groupHistoryEntries(aggregateSource.entries, aggregateSource.incomes),

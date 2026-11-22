@@ -34,8 +34,15 @@ function createExpenseSearchStore(ctx: QueryCtx): ExpenseSearchStore {
   return {
     getCategoryGroupId: async (categoryId) =>
       (await ctx.db.get(categoryId as Id<"categories">))?.groupId,
-    loadHistoryEntries: (groupId, startDate, endDate, order) =>
-      loadHistoryEntriesForSearch(ctx, groupId as Id<"groups">, startDate, endDate, order),
+    loadHistoryEntries: (groupId, startDate, endDate, order, maxRecords) =>
+      loadHistoryEntriesForSearch(
+        ctx,
+        groupId as Id<"groups">,
+        startDate,
+        endDate,
+        order,
+        maxRecords,
+      ),
     buildCategoryInfoMap: (groupId, categoryIds) =>
       buildCategoryInfoMap(ctx, groupId as Id<"groups">, categoryIds),
   };
