@@ -27,6 +27,8 @@ export function MonthlyInsightCard({ month }: { month: string }) {
 
   if (insight === undefined) return null;
 
+  const generationLimitReached = insight !== null && (insight.generationCount ?? 1) >= 3;
+
   return (
     <Card variant="outlined">
       <CardContent>
@@ -44,8 +46,13 @@ export function MonthlyInsightCard({ month }: { month: string }) {
             </Typography>
           )}
           {error ? <Alert severity="error">{error}</Alert> : null}
+          {generationLimitReached ? (
+            <Alert severity="info">
+              再生成の上限（月3回）に達したため、保存済みのコメントを表示しています。
+            </Alert>
+          ) : null}
           <Button
-            disabled={generating}
+            disabled={generating || generationLimitReached}
             onClick={onGenerate}
             sx={{ alignSelf: "flex-start" }}
             variant="outlined"
@@ -53,10 +60,12 @@ export function MonthlyInsightCard({ month }: { month: string }) {
             {generating ? "生成しています…" : insight ? "コメントを再生成" : "コメントを生成"}
           </Button>
           <Typography color="text.secondary" variant="caption">
-            カテゴリ別の集計値のみを外部サービスに送信してAIが生成します。明細・店名・個人情報は送信しません。
-            {insight
-              ? ` 再生成は残り${Math.max(0, 3 - (insight.generationCount ?? 1))}回までです（上限到達後・生成から24時間以内は保存済みを表示します）。`
-              : " 生成は月ごとに3回までです。"}
+            金額と件数の集計値だけを外部のAIサービスに送ります。カテゴリ名・明細・店名は送りません。
+            {insight && !generationLimitReached
+              ? ` 再生成は残り${Math.max(0, 3 - (insight.generationCount ?? 1))}回までです（生成から24時間以内は保存済みを表示します）。`
+              : !generationLimitReached
+                ? " 生成は月ごとに3回までです。"
+                : ""}
           </Typography>
         </Stack>
       </CardContent>

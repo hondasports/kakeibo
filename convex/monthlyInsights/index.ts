@@ -16,6 +16,7 @@ import {
   INSIGHT_CACHE_TTL_MS,
   INSIGHT_MAX_GENERATIONS,
   insightNumbersAreConsistent,
+  replaceCategorySymbols,
   isValidMonthString,
   type MonthlyInsightInput,
   type MonthlyInsightMonthPoint,
@@ -130,7 +131,8 @@ export const generateMonthlyInsight = action({
       try {
         const generated = await deps.callOpenAI(openAiApiKey, buildMonthlyInsightPrompt(input));
         if (insightNumbersAreConsistent(generated, input)) {
-          commentText = generated;
+          // プロンプトではカテゴリ記号で送っているので実名に戻す
+          commentText = replaceCategorySymbols(generated, input);
           source = "ai";
         } else {
           // 入力集計値と一致しない金額を含む生成文は採用しない

@@ -9,6 +9,7 @@ import {
   extractYenAmounts,
   getPreviousMonth,
   insightNumbersAreConsistent,
+  replaceCategorySymbols,
   type MonthlyInsightInput,
 } from "./monthlyInsight";
 
@@ -108,9 +109,12 @@ describe("insightNumbersAreConsistent", () => {
 });
 
 describe("buildMonthlyInsightPrompt", () => {
-  it("カテゴリ集計と制約を含み、前月ありなら前月値を含む", () => {
+  it("カテゴリは記号に置き換え、実名を送らない", () => {
     const prompt = buildMonthlyInsightPrompt(INPUT);
-    expect(prompt).toContain("食費: 40000円（20件）");
+    expect(prompt).toContain("カテゴリA: 40000円（20件）");
+    expect(prompt).toContain("カテゴリB: 10000円（5件）");
+    expect(prompt).not.toContain("食費");
+    expect(prompt).not.toContain("日用品");
     expect(prompt).toContain("前月: 支出合計 70000円");
     expect(prompt).toContain("要因を断定しない");
   });
@@ -118,6 +122,26 @@ describe("buildMonthlyInsightPrompt", () => {
     const prompt = buildMonthlyInsightPrompt({ ...INPUT, previous: null });
     expect(prompt).toContain("前月データ: なし");
     expect(prompt).not.toContain("前月: 支出合計");
+  });
+});
+
+describe("replaceCategorySymbols", () => {
+  it("生成文内の記号を実名に戻す", () => {
+    const text = replaceCategorySymbols(
+      "支出の中心はカテゴリAの40,000円です。カテゴリBは10,000円でした。",
+      INPUT,
+    );
+    expect(text).toBe("支出の中心は食費の40,000円です。日用品は10,000円でした。");
+  });
+  it("前月にしか無いカテゴリにも記号を割り当てる", () => {
+    const input: MonthlyInsightInput = {
+      ...INPUT,
+      current: {
+        ...INPUT.current,
+        byCategory: [{ categoryName: "食費", amountYen: 40000, count: 20 }],
+      },
+    };
+    expect(replaceCategorySymbols("カテゴリBが増えました。", input)).toBe("日用品が増えました。");
   });
 });
 

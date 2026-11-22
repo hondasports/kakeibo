@@ -101,12 +101,59 @@ export function insightNumbersAreConsistent(text: string, input: MonthlyInsightI
   return extractYenAmounts(text).every((n) => allowed.has(n));
 }
 
-function describeCategory(p: MonthlyInsightCategoryPoint): string {
-  return `${p.categoryName}: ${p.amountYen}円（${p.count}件）`;
+function describeCategory(displayName: string, p: MonthlyInsightCategoryPoint): string {
+  return `${displayName}: ${p.amountYen}円（${p.count}件）`;
 }
 
-/** OpenAI へ送るプロンプト。集計値のみを含め、要因断定・創作を禁止する。 */
+/** カテゴリ記号の生成。26件までは カテゴリA〜Z、以降は カテゴリ27〜 */
+function categorySymbolForIndex(index: number): string {
+  return index < 26 ? `カテゴリ${String.fromCharCode(65 + index)}` : `カテゴリ${index + 1}`;
+}
+
+/**
+ * 入力の各カテゴリに外部送信向けの記号（カテゴリA・B…）を割り当てる。
+ * 当月・前月で同一カテゴリには同じ記号を割る（categoryId か名前で同一判定）。
+ */
+export function categorySymbolsForInput(
+  input: MonthlyInsightInput,
+): { point: MonthlyInsightCategoryPoint; symbol: string }[] {
+  const result: { point: MonthlyInsightCategoryPoint; symbol: string }[] = [];
+  const assign = (points: MonthlyInsightMonthPoint) => {
+    for (const c of points.byCategory) {
+      if (result.some((r) => sameCategory(r.point, c))) continue;
+      result.push({ point: c, symbol: categorySymbolForIndex(result.length) });
+    }
+  };
+  assign(input.current);
+  if (input.previous) assign(input.previous);
+  return result;
+}
+
+function symbolFor(
+  entries: { point: MonthlyInsightCategoryPoint; symbol: string }[],
+  p: MonthlyInsightCategoryPoint,
+): string {
+  return entries.find((r) => sameCategory(r.point, p))?.symbol ?? "カテゴリ不明";
+}
+
+/**
+ * 生成文内のカテゴリ記号を実名に戻す（サーバー側でのみ実行）。
+ * 記号は外部APIへ送ったプロンプトのものと対応している。
+ */
+export function replaceCategorySymbols(text: string, input: MonthlyInsightInput): string {
+  let result = text;
+  for (const { point, symbol } of categorySymbolsForInput(input)) {
+    result = result.split(symbol).join(point.categoryName);
+  }
+  return result;
+}
+
+/**
+ * OpenAI へ送るプロンプト。金額・件数の集計値とカテゴリ記号のみを含め、
+ * カテゴリ名・明細・店名は送らない。要因断定・創作を禁止する。
+ */
 export function buildMonthlyInsightPrompt(input: MonthlyInsightInput): string {
+  const symbols = categorySymbolsForInput(input);
   const lines: string[] = [
     "あなたは家計簿アプリの月次振り返りコメントを書くアシスタントです。",
     "以下の集計値だけを根拠に、150字程度の日本語コメントを1つ書いてください。",
@@ -115,19 +162,20 @@ export function buildMonthlyInsightPrompt(input: MonthlyInsightInput): string {
     "- 明細・店名・商品名を推測して書かない（入力に含まれないため断定できない）",
     "- 増減の要因を断定しない（「◯◯が増えた」まで。理由は書かない）",
     "- 前月データが無い場合は増減・前月比に一切触れない",
+    "- カテゴリには「カテゴリA」のような記号で言及し、その記号をそのまま使う",
     "- 家計への共感を添える簡潔な文体にする",
     "",
     `対象月: ${input.month}`,
     `当月: 支出合計 ${input.current.totalAmountYen}円（${input.current.count}件）・収入合計 ${input.current.totalIncomeYen}円`,
     "当月カテゴリ別支出:",
-    ...input.current.byCategory.map((c) => `- ${describeCategory(c)}`),
+    ...input.current.byCategory.map((c) => `- ${describeCategory(symbolFor(symbols, c), c)}`),
   ];
   if (input.previous) {
     lines.push(
       "",
       `前月: 支出合計 ${input.previous.totalAmountYen}円（${input.previous.count}件）・収入合計 ${input.previous.totalIncomeYen}円`,
       "前月カテゴリ別支出:",
-      ...input.previous.byCategory.map((c) => `- ${describeCategory(c)}`),
+      ...input.previous.byCategory.map((c) => `- ${describeCategory(symbolFor(symbols, c), c)}`),
     );
   } else {
     lines.push("", "前月データ: なし（増減には触れない）");
