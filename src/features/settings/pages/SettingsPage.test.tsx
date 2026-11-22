@@ -18,10 +18,13 @@ vi.mock("../components/WeekDaySettingsPanel", () => ({
   WeekDaySettingsPanel: () => <h2>週の設定</h2>,
 }));
 
+vi.mock("../components/MonthlyBudgetSettingsPanel", () => ({
+  MonthlyBudgetSettingsPanel: () => <h2>月予算</h2>,
+}));
+
 vi.mock("../components/MonthlyIncomeSettingsPanel", () => ({
   MonthlyIncomeSettingsPanel: () => <h2>月収入</h2>,
 }));
-
 vi.mock("../components/NotificationSettingsPanel", () => ({
   NotificationSettingsPanel: () => <h2>通知設定</h2>,
 }));
@@ -41,7 +44,7 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("heading", { name: "設定", level: 1 })).toBeInTheDocument();
   });
 
-  it("単一の設定台帳に説明と8セクションを順番どおり表示する", () => {
+  it("単一の設定台帳に説明と9セクションを順番どおり表示する", () => {
     renderWithProviders(
       <MemoryRouter>
         <SettingsPage />
@@ -53,16 +56,18 @@ describe("SettingsPage", () => {
     ).toBeInTheDocument();
 
     const ledger = screen.getByTestId("settings-ledger");
-    expect(ledger.querySelectorAll(":scope > .settings-ledger-section")).toHaveLength(8);
+    expect(ledger.querySelectorAll(":scope > .settings-ledger-section")).toHaveLength(9);
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
     ).toEqual([
       "グループ",
       "カテゴリ",
       "週の設定",
+      "月予算",
       "月収入",
       "通知設定",
       "LINE連携",
+      "データの書き出し",
       "アカウント",
       "危険な操作",
     ]);

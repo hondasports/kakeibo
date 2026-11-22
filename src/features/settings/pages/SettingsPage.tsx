@@ -5,6 +5,7 @@ import { GroupDangerZone, GroupSettingsPanel, GroupSettingsProvider } from "../.
 import { WeekDaySettingsPanel } from "../components/WeekDaySettingsPanel";
 import { MonthlyIncomeSettingsPanel } from "../components/MonthlyIncomeSettingsPanel";
 import { LineLinkSettingsPanel } from "../components/LineLinkSettingsPanel";
+import { MonthlyBudgetSettingsPanel } from "../components/MonthlyBudgetSettingsPanel";
 import { NotificationSettingsPanel } from "../components/NotificationSettingsPanel";
 import { SettingsSectionErrorBoundary } from "../components/SettingsSectionErrorBoundary";
 
@@ -43,6 +44,12 @@ export function SettingsPage() {
             <Divider />
             <Box className="settings-ledger-section">
               <SettingsSectionErrorBoundary>
+                <MonthlyBudgetSettingsPanel />
+              </SettingsSectionErrorBoundary>
+            </Box>
+            <Divider />
+            <Box className="settings-ledger-section">
+              <SettingsSectionErrorBoundary>
                 <MonthlyIncomeSettingsPanel />
               </SettingsSectionErrorBoundary>
             </Box>
@@ -57,6 +64,18 @@ export function SettingsPage() {
               <SettingsSectionErrorBoundary>
                 <LineLinkSettingsPanel />
               </SettingsSectionErrorBoundary>
+            </Box>
+            <Divider />
+            <Box className="settings-ledger-section">
+              <Typography component="h2" variant="h5">
+                データの書き出し
+              </Typography>
+              <Typography color="text.secondary" sx={{ mt: 0.75 }} variant="body2">
+                支出・収入をCSVで書き出します。バックアップや他サービスへの移行に使えます。
+              </Typography>
+              <Button component={RouterLink} sx={{ mt: 1.5 }} to="/export" variant="outlined">
+                書き出し画面へ
+              </Button>
             </Box>
             <Divider />
             <Box className="settings-ledger-section settings-ledger-section--danger">

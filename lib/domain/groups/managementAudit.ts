@@ -15,6 +15,7 @@ export const MANAGEMENT_AUDIT_ACTIONS = [
   "system_admin_delegated",
   "spending_bulk_category_changed",
   "spending_bulk_deleted",
+  "group_monthly_budget_changed",
 ] as const;
 
 export type ManagementAuditAction = (typeof MANAGEMENT_AUDIT_ACTIONS)[number];
