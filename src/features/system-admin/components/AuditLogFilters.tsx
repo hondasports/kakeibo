@@ -21,6 +21,9 @@ type AuditLogFiltersProps = {
   toDate: string;
   hasFilter: boolean;
   dateRangeInvalid: boolean;
+  actorInvalid: boolean;
+  targetInvalid: boolean;
+  groupIdInvalid: boolean;
   onActionChange: (action: SystemAdminAuditAction | "") => void;
   onActorChange: (actor: string) => void;
   onTargetChange: (target: string) => void;
@@ -40,6 +43,9 @@ export function AuditLogFilters({
   toDate,
   hasFilter,
   dateRangeInvalid,
+  actorInvalid,
+  targetInvalid,
+  groupIdInvalid,
   onActionChange,
   onActorChange,
   onTargetChange,
@@ -90,26 +96,45 @@ export function AuditLogFilters({
             </Select>
           </FormControl>
           <TextField
-            helperText="操作を行ったユーザーの userId（完全一致）"
+            error={actorInvalid}
+            helperText={
+              actorInvalid
+                ? "IDの形式が正しくありません"
+                : "操作を行ったユーザーの userId（完全一致）"
+            }
             label="操作者の userId"
             onChange={(event) => onActorChange(event.target.value)}
             value={actor}
           />
           <TextField
-            helperText="操作対象のユーザーの userId（完全一致）"
+            error={targetInvalid}
+            helperText={
+              targetInvalid
+                ? "IDの形式が正しくありません"
+                : "操作対象のユーザーの userId（完全一致）"
+            }
             label="対象の userId"
             onChange={(event) => onTargetChange(event.target.value)}
             value={target}
           />
           <TextField
-            helperText="移動元・移動先のどちらかに含まれる操作を絞り込みます"
+            error={groupIdInvalid}
+            helperText={
+              groupIdInvalid
+                ? "IDの形式が正しくありません"
+                : "移動元・移動先・直接操作の対象に含まれる操作を絞り込みます"
+            }
             label="対象グループの groupId"
             onChange={(event) => onGroupIdChange(event.target.value)}
             value={groupId}
           />
         </Stack>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <Button onClick={onApply} variant="contained">
+          <Button
+            disabled={dateRangeInvalid || actorInvalid || targetInvalid || groupIdInvalid}
+            onClick={onApply}
+            variant="contained"
+          >
             絞り込む
           </Button>
           {hasFilter ? <Button onClick={onClear}>条件をクリア</Button> : null}
