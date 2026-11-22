@@ -1,6 +1,7 @@
 import { MemoryRouter } from "react-router-dom";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { getCurrentMonth } from "../../../../lib/domain/common/month";
 import { GuidePage } from "./GuidePage";
 
 function renderGuide() {
@@ -49,6 +50,10 @@ describe("GuidePage", () => {
       "/weeks/current/input",
     );
     expect(screen.getByRole("link", { name: "検索を開く" })).toHaveAttribute("href", "/search");
+    expect(screen.getByRole("link", { name: "今月のサマリーを開く" })).toHaveAttribute(
+      "href",
+      `/months/${getCurrentMonth()}`,
+    );
     expect(screen.getByRole("link", { name: "設定を開く" })).toHaveAttribute("href", "/settings");
     expect(screen.getByRole("link", { name: "ホームへ戻る" })).toHaveAttribute("href", "/");
   });

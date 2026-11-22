@@ -1,6 +1,7 @@
 import HelpOutlinedIcon from "@mui/icons-material/HelpOutlined";
 import { Box, Button, Container, List, ListItem, Paper, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
+import { getCurrentMonth } from "../../../../lib/domain/common/month";
 
 type GuideSectionProps = {
   title: string;
@@ -110,6 +111,14 @@ export function GuidePage() {
               カレンダーやカテゴリ別の金額から、使いすぎに気づいた項目を振り返ります。
             </ListItem>
           </GuideSteps>
+          <Button
+            component={RouterLink}
+            to={`/months/${getCurrentMonth()}`}
+            variant="outlined"
+            sx={{ mt: 1 }}
+          >
+            今月のサマリーを開く
+          </Button>
         </GuideSection>
 
         <GuideSection title="履歴を検索する">

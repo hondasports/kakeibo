@@ -70,6 +70,8 @@ export const designTokens = {
   radius: {
     sm: "4px",
     md: "8px",
+    /** ブランドロゴの枠（パネルより小さく丸める） */
+    brandMark: "12px",
     lg: "16px",
     pill: "999px",
   },
