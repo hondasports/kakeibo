@@ -32,7 +32,9 @@ export const sendSummaryReply = internalAction({
     lineUserId: v.optional(v.string()),
     messageText: v.string(),
     nowMs: v.number(),
-    expenseDraftStatus: v.optional(v.union(v.literal("created"), v.literal("limit"))),
+    expenseDraftStatus: v.optional(
+      v.union(v.literal("created"), v.literal("limit"), v.literal("none")),
+    ),
     attempt: v.optional(v.number()),
   },
   returns: v.null(),

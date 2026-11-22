@@ -92,11 +92,45 @@ describe("テキスト支出入力の返信分岐", () => {
     "「%s」はカテゴリ名＋金額でも下書き作成の返信を返す",
     async (messageText) => {
       const deps = depsWithCategories([originalLink]);
-      const result = await buildSummaryReply(deps, { ...args, messageText });
+      // claim が下書きを作ったjob（expenseDraftStatus=created）を再現する
+      const result = await buildSummaryReply(deps, {
+        ...args,
+        messageText,
+        expenseDraftStatus: "created",
+      });
       expect(result.replyKind).toBe("expense_draft");
       expect(result.replyText).toContain("下書きを作成したよ");
     },
   );
+
+  it.each([
+    ["created", "expense_draft", true],
+    ["limit", "expense_draft_limit", false],
+    ["none", "category_lookup", false],
+  ] as const)(
+    "expenseDraftStatus=%s のとき返信は %s",
+    async (expenseDraftStatus, replyKind, containsCreated) => {
+      const deps = depsWithCategories([originalLink]);
+      const result = await buildSummaryReply(deps, {
+        ...args,
+        messageText: "食費 1,200円",
+        expenseDraftStatus,
+      });
+      expect(result.replyKind).toBe(replyKind);
+      expect(result.replyText.includes("下書きを作成したよ")).toBe(containsCreated);
+    },
+  );
+
+  it("expenseDraftStatus=none で金額のみの入力は下書き作成済みと返さない", async () => {
+    const deps = depsWithCategories([originalLink]);
+    const result = await buildSummaryReply(deps, {
+      ...args,
+      messageText: "コンビニ 500",
+      expenseDraftStatus: "none",
+    });
+    expect(result.replyKind).not.toBe("expense_draft");
+    expect(result.replyText).not.toContain("下書きを作成したよ");
+  });
 
   it("当日の下書きが30件で今回の入力が作っていない場合は上限の返信を返す", async () => {
     const deps = depsWithCategories([originalLink]);

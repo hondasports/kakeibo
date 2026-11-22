@@ -60,7 +60,7 @@ async function resolveExpenseDraftReply(
   deps: BuildSummaryReplyDeps,
   args: Omit<SummaryReplyJobArgs, "replyToken">,
   expenseInput: NonNullable<ReturnType<typeof parseLineExpenseInput>>,
-) {
+): Promise<{ replyText: string; replyKind: LineReplyKind } | null> {
   // claim がjob引数で渡した作成結果をそのまま使う（時刻推測はしない）。
   if (args.expenseDraftStatus === "limit") {
     return reply("expense_draft_limit", LINE_TEXT_DRAFT_DAILY_LIMIT_MESSAGE);
@@ -68,6 +68,9 @@ async function resolveExpenseDraftReply(
   if (args.expenseDraftStatus === "created") {
     return reply("expense_draft", formatExpenseDraftReply(expenseInput));
   }
+  // "none" = claim 時点で支出入力だが下書きを作れなかった。作成済みとは
+  // 返さず、呼び出し元の通常分岐（週次集計・使い方等）へ戻す。
+  if (args.expenseDraftStatus === "none") return null;
   // 引数を持たない在庫job向けのフォールバック: 「このイベント時刻以降の
   // line_text 下書きがあるか」で判定する（createdAt は claim 時刻）。
   const createdAts = await deps.expenseDrafts.lineTextDraftCreatedAtsSince(
@@ -75,10 +78,11 @@ async function resolveExpenseDraftReply(
     startOfDayInJapanMs(args.nowMs),
   );
   const createdNow = createdAts.some((at) => at >= args.nowMs);
-  if (createdAts.length >= LINE_TEXT_DRAFT_DAILY_LIMIT && !createdNow) {
+  if (createdNow) return reply("expense_draft", formatExpenseDraftReply(expenseInput));
+  if (createdAts.length >= LINE_TEXT_DRAFT_DAILY_LIMIT) {
     return reply("expense_draft_limit", LINE_TEXT_DRAFT_DAILY_LIMIT_MESSAGE);
   }
-  return reply("expense_draft", formatExpenseDraftReply(expenseInput));
+  return null;
 }
 
 async function loadWeekSummary(
@@ -180,7 +184,8 @@ export async function buildSummaryReply(
     // category_lookup として返信するのは金額を含まない入力に限る
     // （claim 側も金額つき入力は下書きを作る）。
     if (expenseInput !== null) {
-      return await resolveExpenseDraftReply(deps, args, expenseInput);
+      const expenseDraftReply = await resolveExpenseDraftReply(deps, args, expenseInput);
+      if (expenseDraftReply !== null) return expenseDraftReply;
     }
     const categories = await deps.summaryData.listActiveCategories(
       groupId,
@@ -201,7 +206,8 @@ export async function buildSummaryReply(
   // 上のブロックで既に処理済み。receipt_guide のような
   // 他分類では下書きが作られないため、作成済みと返信してはいけない。
   if (expenseInput !== null && (command.type === "week_summary" || command.type === "help")) {
-    return await resolveExpenseDraftReply(deps, args, expenseInput);
+    const expenseDraftReply = await resolveExpenseDraftReply(deps, args, expenseInput);
+    if (expenseDraftReply !== null) return expenseDraftReply;
   }
   if (command.type === "help") {
     return reply("help", LINE_HELP_MESSAGE);

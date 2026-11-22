@@ -154,7 +154,7 @@ async function maybeCreateExpenseDraft(
   activeUserId: string,
   eventAtMs: number,
   now: number,
-): Promise<"created" | "limit" | null> {
+): Promise<"created" | "limit" | "none" | null> {
   const command = parseLineSummaryCommand(commandText);
   // help 分類（日本語を含まない入力等）も支出入力の可能性があるため対象にする。
   // 「使い方」等の実コマンドは parseLineExpenseInput が金額不在で弾く。
@@ -168,10 +168,12 @@ async function maybeCreateExpenseDraft(
   const expenseInput = parseLineExpenseInput(commandText);
   if (expenseInput === null) return null;
 
+  // 支出入力なのに作れない（グループ未解決・削除済み）ことも返信側へ
+  // 伝えるため null ではなく "none" を返す。
   const groupResolution = await deps.activeGroup.resolve(activeUserId);
-  if (groupResolution.status !== "resolved") return null;
+  if (groupResolution.status !== "resolved") return "none";
   const group = await deps.groups.get(groupResolution.groupId);
-  if (group === null || isGroupDeleted(group)) return null;
+  if (group === null || isGroupDeleted(group)) return "none";
 
   const categories = await deps.summaryData.listActiveCategories(
     groupResolution.groupId,

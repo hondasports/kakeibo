@@ -42,7 +42,9 @@ export const buildReply = internalQuery({
     lineUserId: v.string(),
     messageText: v.string(),
     nowMs: v.number(),
-    expenseDraftStatus: v.optional(v.union(v.literal("created"), v.literal("limit"))),
+    expenseDraftStatus: v.optional(
+      v.union(v.literal("created"), v.literal("limit"), v.literal("none")),
+    ),
   },
   returns: summaryReplyValidator,
   handler: buildSummaryReplyHandler,
