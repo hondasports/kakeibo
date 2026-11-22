@@ -8,7 +8,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { SystemAdminAuditItem } from "../types";
-import { formatDateTimeWithSecondsForDisplay } from "../../../utils/date";
+import { formatDateTimeWithSecondsInJapanTime } from "../../../utils/date";
 import {
   auditResultLabels,
   displayLabel,
@@ -35,7 +35,9 @@ export function AuditLogDetailDialog({
           <Stack spacing={1}>
             <Typography>操作: {formatAction(selected.action)}</Typography>
             <Typography>結果: {displayLabel(auditResultLabels, selected.result)}</Typography>
-            <Typography>日時: {formatDateTimeWithSecondsForDisplay(selected.createdAt)}</Typography>
+            <Typography>
+              日時: {formatDateTimeWithSecondsInJapanTime(selected.createdAt)}
+            </Typography>
             <Typography sx={{ overflowWrap: "anywhere" }}>
               操作者: {selected.actorDisplayName ?? selected.actorUserId ?? selected.actorType}
             </Typography>

@@ -167,7 +167,7 @@ export function AuditLogFilters({
           {hasFilter ? <Button onClick={onClear}>条件をクリア</Button> : null}
         </Stack>
         <Typography color="text.secondary" variant="caption">
-          開始日・終了日はこのブラウザのタイムゾーンの 0:00〜23:59 で判定し、両端を含みます。
+          開始日・終了日はJSTの 0:00〜23:59 で判定し、両端を含みます。
           条件の変更は「絞り込む」を押した時点で反映されます。
         </Typography>
       </Stack>

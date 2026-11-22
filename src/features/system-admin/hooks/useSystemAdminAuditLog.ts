@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
-// 日付フィルタはこのブラウザのタイムゾーンの 0:00〜23:59:59.999 を境にする（両端を含む）。
+// 日付フィルタはJSTの 0:00〜23:59:59.999 を境にする（両端を含む）。
 import type {
   SystemAdminAuditAction,
   SystemAdminAuditGroupRelation,
