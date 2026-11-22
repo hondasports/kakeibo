@@ -155,7 +155,14 @@ export async function buildSummaryReply(
 
   // 既定の週サマリーへ落とす前に「内容＋金額」の支出入力か判定する。
   // 下書き自体は claim 時の mutation で作成済み（作成できた場合のみこの応答に辿り着く）。
-  if (expenseInput !== null) {
+  // expense_draft 分岐は claim 側 maybeCreateExpenseDraft の対象コマンド
+  // （week_summary・category_lookup・help）に限定する。category_lookup は
+  // 上のブロックで既に処理済み。receipt_guide のような
+  // 他分類では下書きが作られないため、作成済みと返信してはいけない。
+  if (
+    expenseInput !== null &&
+    (command.type === "week_summary" || command.type === "help")
+  ) {
     return reply("expense_draft", formatExpenseDraftReply(expenseInput));
   }
   if (command.type === "help") {
