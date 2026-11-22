@@ -60,7 +60,8 @@ export function AppLayout() {
               />
               <Typography
                 component="span"
-                sx={{ fontSize: "0.95rem", fontWeight: 800 }}
+                noWrap
+                sx={{ fontSize: "0.95rem", fontWeight: 800, flexShrink: 0 }}
                 variant="subtitle1"
               >
                 {headerTitle}

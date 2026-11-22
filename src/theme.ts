@@ -87,6 +87,8 @@ export const theme = createTheme({
       styleOverrides: {
         root: () => ({
           "@media not all and (min-width: 900px)": {
+            // 縦だけ大きい楕円にならないよう、幅も44pxに揃える
+            minWidth: designTokens.size.buttonMinHeightSp,
             minHeight: designTokens.size.buttonMinHeightSp,
           },
         }),

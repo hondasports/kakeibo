@@ -143,6 +143,37 @@ describe("App authentication states", () => {
     );
   });
 
+  it("サインイン画面では招待制の利用条件を案内する", () => {
+    useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: false });
+    useConvexAuthMock.mockReturnValue({ isLoading: false, isAuthenticated: false });
+    renderWithProviders(<App />);
+    expect(
+      screen.getByText(
+        "招待を受けた方は、同じボタンからGoogleアカウントで登録へ進めます（招待制です）。",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("Googleログインの開始に失敗したらユーザー向けの文言を表示する", async () => {
+    // 本番想定（DEV=false）ではClerkの生エラーを見せず案内文を出す
+    vi.stubEnv("DEV", false);
+    useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: false });
+    useConvexAuthMock.mockReturnValue({ isLoading: false, isAuthenticated: false });
+    useSignInMock.mockReturnValue({
+      isLoaded: true,
+      signIn: { authenticateWithRedirect: vi.fn().mockRejectedValue(new Error("network")) },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<App />);
+    await user.click(screen.getByRole("button", { name: "Googleでログイン" }));
+    expect(
+      await screen.findByText(
+        "Googleログインを開始できませんでした。通信状況を確認して、もう一度お試しください。",
+      ),
+    ).toBeInTheDocument();
+    vi.unstubAllEnvs();
+  });
+
   it("Clerkログイン後にConvex認証が読み込み中なら同期認証確認画面を表示する", () => {
     // Given: Clerkログイン済みでConvex認証が処理中
     useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: true });
