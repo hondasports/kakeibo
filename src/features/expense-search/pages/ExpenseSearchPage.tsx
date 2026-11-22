@@ -176,7 +176,11 @@ export function ExpenseSearchPage() {
           <Alert severity="error" variant="outlined">
             {appliedValidation.formError}
           </Alert>
-        ) : !appliedValidation.ok ? null : displayResult === null && searchError !== null ? (
+        ) : !appliedValidation.ok ? (
+          <Alert severity="error" variant="outlined">
+            {Array.from(new Set(Object.values(appliedValidation.fieldErrors))).join("、")}
+          </Alert>
+        ) : displayResult === null && searchError !== null ? (
           <Alert
             action={
               <Button color="inherit" onClick={retrySearch} size="small">
