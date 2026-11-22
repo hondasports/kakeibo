@@ -98,6 +98,23 @@ export async function searchExpenses(
     parsed.filters,
   );
 
+  // 集計は並び順に依存しない。常に日付が新しい側の範囲を対象にする。
+  // dateAsc で打ち切られた場合、一覧用の古い側データは集計範囲と異なる
+  // ため新しい側を読み直す（未打ち切りなら全件読めており再読は不要）。
+  let aggregateGroups = groups;
+  if (source.truncated && parsed.filters.sortOrder === "dateAsc") {
+    const aggregateSource = await store.loadHistoryEntries(
+      groupId,
+      parsed.filters.startDate,
+      parsed.filters.endDate,
+      "desc",
+    );
+    aggregateGroups = filterHistoryGroups(
+      groupHistoryEntries(aggregateSource.entries, aggregateSource.incomes),
+      parsed.filters,
+    );
+  }
+
   // 前期間比較は初回ページでだけ計算する。ページ追加時は現在期間の集計を
   // 更新しつつ、初回レスポンスの比較をUI側で保持することで、同じ比較を
   // 毎ページ読み直すコストと上限超過リスクを避ける。
@@ -108,13 +125,12 @@ export async function searchExpenses(
   let previousGroups: SearchableHistoryGroup[] = [];
   let previousTruncated = false;
   if (previousPeriod !== null) {
-    // 集計・前期間比較も一覧と同じ取得側にそろえる（打ち切り時に
-    // 一覧と集計が別の範囲を指す不整合を防ぐ。仕様は docs/current-implementation.md §4.4）
+    // 前期間比較も集計と同じく並び順に依存せず、常に新しい側の範囲を読む。
     const previousSource = await store.loadHistoryEntries(
       groupId,
       previousPeriod.startDate,
       previousPeriod.endDate,
-      parsed.filters.sortOrder === "dateAsc" ? "asc" : "desc",
+      "desc",
     );
     previousTruncated = previousSource.truncated;
     previousGroups = filterHistoryGroups(
@@ -128,10 +144,14 @@ export async function searchExpenses(
   }
 
   const categoryIds = Array.from(
-    new Set([...collectCategoryIds(groups), ...collectCategoryIds(previousGroups)]),
+    new Set([
+      ...collectCategoryIds(groups),
+      ...collectCategoryIds(aggregateGroups),
+      ...collectCategoryIds(previousGroups),
+    ]),
   );
   const categoryInfoMap = await store.buildCategoryInfoMap(groupId, categoryIds);
-  const aggregate = summarizeHistoryGroups(groups, categoryInfoMap);
+  const aggregate = summarizeHistoryGroups(aggregateGroups, categoryInfoMap);
   const paged = paginateHistoryGroups(
     groups,
     args.paginationOpts,
@@ -155,7 +175,7 @@ export async function searchExpenses(
     isDone: paged.isDone,
     truncated: source.truncated,
     comparisonTruncated: previousTruncated,
-    matchedGroupCount: groups.length,
+    matchedGroupCount: aggregateGroups.length,
     totalCount: aggregate.count,
     expenseCount: aggregate.expenseCount,
     incomeCount: aggregate.incomeCount,
@@ -163,7 +183,7 @@ export async function searchExpenses(
     totalIncomeYen: aggregate.totalIncomeYen,
     netAmountYen: aggregate.netAmountYen,
     byCategory: aggregate.byCategory,
-    trend: buildHistoryTrend(groups, parsed.filters),
+    trend: buildHistoryTrend(aggregateGroups, parsed.filters),
     comparison,
   };
 }

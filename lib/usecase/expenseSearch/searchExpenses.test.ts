@@ -155,7 +155,7 @@ describe("searchExpenses", () => {
     });
     expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
     expect(loadHistoryEntries).toHaveBeenNthCalledWith(1, "g1", "2026-01-01", "2026-01-31", "desc");
-    // 前期間も一覧と同じ取得側で読む（打ち切り時に一覧・集計・比較が同じ範囲になるよう揃える）。
+    // 前期間比較も集計と同様に並び順に依存せず、常に新しい側の範囲を読む。
     expect(loadHistoryEntries).toHaveBeenNthCalledWith(2, "g1", "2025-12-01", "2025-12-31", "desc");
     expect(result.comparison).not.toBeNull();
   });
@@ -240,6 +240,59 @@ describe("searchExpenses", () => {
         undefined,
         expectedOrder,
       );
+    },
+  );
+
+  it.each(["dateAsc", "dateDesc", "amountDesc"] as const)(
+    "打ち切り時でも sortOrder=%s で集計値は同じ（集計は並び順に依存しない）",
+    async (sortOrder) => {
+      const entries = [
+        {
+          _id: "e1",
+          date: "2026-01-10",
+          amountYen: 800,
+          categoryId: "cat-a",
+          recordType: "expenseEntry",
+        },
+        {
+          _id: "e2",
+          date: "2026-01-20",
+          amountYen: 400,
+          categoryId: "cat-a",
+          recordType: "expenseEntry",
+        },
+      ];
+      const loadHistoryEntries = vi.fn(
+        async (
+          _g: string,
+          _s: string | undefined,
+          _e: string | undefined,
+          order?: "asc" | "desc",
+        ) => ({
+          entries: order === "desc" ? [entries[1]!] : [entries[0]!],
+          incomes: [],
+          truncated: true,
+        }),
+      );
+      const { store } = createStore({ loadHistoryEntries });
+      const result = await searchExpenses(store, "g1", {
+        ...baseArgs,
+        sortOrder,
+        startDate: "2026-01-01",
+        endDate: "2026-01-31",
+      });
+      // 集計は常に新しい側（e2=400）を対象にする。
+      expect(result.totalExpenseYen).toBe(400);
+      expect(result.expenseCount).toBe(1);
+      expect(result.matchedGroupCount).toBe(1);
+      // 前期間読込みと合わせて新しい側は必ず読まれている。
+      expect(loadHistoryEntries).toHaveBeenCalledWith("g1", "2026-01-01", "2026-01-31", "desc");
+      if (sortOrder === "dateAsc") {
+        // 古い側を一覧に読んだ分だけ余分に1回読む。
+        expect(loadHistoryEntries).toHaveBeenCalledTimes(3);
+      } else {
+        expect(loadHistoryEntries).toHaveBeenCalledTimes(2);
+      }
     },
   );
 });
