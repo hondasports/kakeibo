@@ -98,7 +98,12 @@ export function ExpenseSearchPage() {
   };
 
   const handleCategorySelect = (categoryId: string) => {
-    handleApply({ ...applied, categoryId, entryType: "expense" });
+    handleApply({
+      ...applied,
+      // 集計側は未分類を空文字で返すため、フィルタ用のセンチネル値へ写像する
+      categoryId: categoryId === "" ? UNCATEGORIZED_CATEGORY_ID : categoryId,
+      entryType: "expense",
+    });
   };
 
   return (
