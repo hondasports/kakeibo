@@ -47,7 +47,8 @@ export function extractYenAmounts(text: string): number[] {
   return [...text.matchAll(YEN_PATTERN)].map((m) => {
     const base = Number(toHalfWidth(m[1]).replace(/,/g, ""));
     const multiplier = m[2] === "万" ? 10_000 : m[2] === "億" ? 100_000_000 : 1;
-    return base * multiplier;
+    // 「1.13万円」= 11299.999… の浮動小数点誤差を円整数へ丸める
+    return Math.round(base * multiplier);
   });
 }
 

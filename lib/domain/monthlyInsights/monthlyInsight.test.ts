@@ -94,6 +94,7 @@ describe("buildFallbackInsight", () => {
 describe("extractYenAmounts", () => {
   it("全角数字・万・億の金額も円で抽出する", () => {
     expect(extractYenAmounts("９万円と1,200円と1億円")).toEqual([90000, 1200, 100000000]);
+    expect(extractYenAmounts("1.13万円")).toEqual([11300]);
   });
 });
 
