@@ -97,7 +97,7 @@ export function AuditLogList({
       })}
       {logs.isDone ? (
         <Typography color="text.secondary" variant="body2">
-          {logs.page.length}件を表示（最後）
+          最後のページです
         </Typography>
       ) : (
         <Button onClick={() => onLoadMore(logs.continueCursor)}>次のページ</Button>

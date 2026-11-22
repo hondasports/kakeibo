@@ -70,7 +70,7 @@ export function GroupDeletionJobList({ list, onSelectJob, onLoadMore }: GroupDel
       ))}
       {list.isDone ? (
         <Typography color="text.secondary" variant="body2">
-          {list.page.length}件を表示（最後）
+          最後のページです
         </Typography>
       ) : (
         <Button onClick={onLoadMore}>次のページ</Button>
