@@ -32,7 +32,15 @@ function scrollToDetailHeading(heading: HTMLElement) {
   heading.focus({ preventScroll: true });
 }
 
-function MonthlySummarySection({ month, onRetry }: { month: string; onRetry: () => void }) {
+function MonthlySummarySection({
+  isCurrentMonth,
+  month,
+  onRetry,
+}: {
+  isCurrentMonth: boolean;
+  month: string;
+  onRetry: () => void;
+}) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   // 利用者が日付を選んだ直後だけ true にする。?date= 付きの初回表示や戻る/進むではスクロールしない
@@ -158,7 +166,7 @@ function MonthlySummarySection({ month, onRetry }: { month: string; onRetry: () 
         monthlyBudgetYen={myGroup?.monthlyBudgetYen ?? undefined}
         netAmountYen={summary.netAmountYen}
         scopeLabel={selectedDate ? "集計範囲：月全体" : undefined}
-        showBudget={month === currentMonth}
+        showBudget={isCurrentMonth}
         totalAmountYen={summary.totalAmountYen}
         totalIncomeYen={summary.totalIncomeYen}
       />
@@ -333,6 +341,7 @@ export function MonthlySummaryPage() {
 
         <SummarySectionErrorBoundary message="月次サマリーを読み込めませんでした。">
           <MonthlySummarySection
+            isCurrentMonth={month === currentMonth}
             key={sectionRetryKey}
             month={month}
             onRetry={() => setSectionRetryKey((key) => key + 1)}
