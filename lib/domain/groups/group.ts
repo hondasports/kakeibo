@@ -8,6 +8,7 @@ import type { GroupLifecycleStatus } from "./lifecycle";
 export type GroupFields = {
   name: string;
   clerkOrganizationId?: string;
+  monthlyBudgetYen?: number;
   status?: GroupLifecycleStatus;
   deletedAt?: number;
   createdAt: number;

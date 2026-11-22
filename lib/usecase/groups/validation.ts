@@ -4,6 +4,10 @@
  */
 import { ConvexError } from "convex/values";
 import { MAX_GROUP_NAME_LENGTH, validateGroupName } from "../../domain/groups/groupName";
+import {
+  MAX_MONTHLY_BUDGET_YEN,
+  validateMonthlyBudgetYen,
+} from "../../domain/groups/monthlyBudget";
 import { assertGroupNotDeleted } from "../../domain/groups/lifecycle";
 import type { GroupWithLifecycleStatus } from "../../domain/groups/lifecycle";
 import { MAX_EMAIL_LENGTH, validateInvitationEmail } from "../../domain/groups/email";
@@ -32,6 +36,17 @@ export function normalizeEmailOrThrow(email: string): string {
     throw new ConvexError("メールアドレスの形式が正しくありません");
   }
   return result.email;
+}
+
+/** null は予算解除。返値の undefined が patch によるフィールド削除を表す。 */
+export function normalizeMonthlyBudgetYenOrThrow(amountYen: number | null): number | undefined {
+  const result = validateMonthlyBudgetYen(amountYen);
+  if (!result.success) {
+    throw new ConvexError(
+      `月予算は0〜${MAX_MONTHLY_BUDGET_YEN.toLocaleString("ja-JP")}円の整数で入力してください`,
+    );
+  }
+  return result.amountYen;
 }
 
 export function assertGroupNotDeletedOrThrow(group: GroupWithLifecycleStatus): void {

@@ -5,6 +5,7 @@ import { GroupDangerZone, GroupSettingsPanel, GroupSettingsProvider } from "../.
 import { WeekDaySettingsPanel } from "../components/WeekDaySettingsPanel";
 import { MonthlyIncomeSettingsPanel } from "../components/MonthlyIncomeSettingsPanel";
 import { LineLinkSettingsPanel } from "../components/LineLinkSettingsPanel";
+import { MonthlyBudgetSettingsPanel } from "../components/MonthlyBudgetSettingsPanel";
 import { NotificationSettingsPanel } from "../components/NotificationSettingsPanel";
 import { SettingsSectionErrorBoundary } from "../components/SettingsSectionErrorBoundary";
 
@@ -38,6 +39,12 @@ export function SettingsPage() {
             <Box className="settings-ledger-section">
               <SettingsSectionErrorBoundary>
                 <WeekDaySettingsPanel />
+              </SettingsSectionErrorBoundary>
+            </Box>
+            <Divider />
+            <Box className="settings-ledger-section">
+              <SettingsSectionErrorBoundary>
+                <MonthlyBudgetSettingsPanel />
               </SettingsSectionErrorBoundary>
             </Box>
             <Divider />

@@ -55,4 +55,34 @@ describe("MonthlyMetricsPanel", () => {
     expect(container.querySelectorAll('[data-testid="monthly-metric-skeleton"]')).toHaveLength(3);
     expect(screen.queryByLabelText("支出")).not.toBeInTheDocument();
   });
+
+  it("showBudget のとき予算の消化率と残額を表示する", () => {
+    renderWithProviders(
+      <MonthlyMetricsPanel
+        isLoading={false}
+        monthlyBudgetYen={300000}
+        netAmountYen={-100000}
+        showBudget
+        totalAmountYen={400000}
+        totalIncomeYen={300000}
+      />,
+    );
+
+    expect(screen.getByLabelText("月予算")).toBeInTheDocument();
+    expect(screen.getByText(/100,000円 超過/)).toBeInTheDocument();
+  });
+
+  it("showBudget でない（過去月表示）は予算を表示しない", () => {
+    renderWithProviders(
+      <MonthlyMetricsPanel
+        isLoading={false}
+        monthlyBudgetYen={300000}
+        netAmountYen={-100000}
+        totalAmountYen={400000}
+        totalIncomeYen={300000}
+      />,
+    );
+
+    expect(screen.queryByLabelText("月予算")).not.toBeInTheDocument();
+  });
 });

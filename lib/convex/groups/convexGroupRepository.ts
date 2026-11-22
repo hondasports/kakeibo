@@ -11,6 +11,7 @@ export function groupDocToFields(doc: Doc<"groups">): GroupRecord {
     id: doc._id,
     name: doc.name,
     clerkOrganizationId: doc.clerkOrganizationId,
+    monthlyBudgetYen: doc.monthlyBudgetYen,
     status: doc.status,
     deletedAt: doc.deletedAt,
     createdAt: doc.createdAt,
