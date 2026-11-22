@@ -97,7 +97,7 @@ describe("SystemAdminUserSearchPage", () => {
 
     await user.click(screen.getByRole("button", { name: "再試行" }));
     expect(await screen.findByText("21番目のユーザー")).toBeInTheDocument();
-    expect(screen.getByText("21〜21件目を表示")).toBeInTheDocument();
+    expect(screen.getByText("21〜21件目を表示（最後のページです）")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "前のページ" })).toBeInTheDocument();
     // 失敗したリクエストと同じカーソル・同じ条件で再発行される。
     for (const callIndex of [2, 3]) {
