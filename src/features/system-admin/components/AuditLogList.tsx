@@ -95,9 +95,13 @@ export function AuditLogList({
           </Paper>
         );
       })}
-      <Button disabled={logs.isDone} onClick={() => onLoadMore(logs.continueCursor)}>
-        次のページ
-      </Button>
+      {logs.isDone ? (
+        <Typography color="text.secondary" variant="body2">
+          {logs.page.length}件を表示（最後）
+        </Typography>
+      ) : (
+        <Button onClick={() => onLoadMore(logs.continueCursor)}>次のページ</Button>
+      )}
     </Stack>
   );
 }

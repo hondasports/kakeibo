@@ -2,6 +2,7 @@ import { Alert, Button, List, ListItem, Paper, Stack, Typography } from "@mui/ma
 import type { GroupDetail, GroupDetailInvitation } from "../hooks/useSystemAdminGroupDetail";
 import { formatDateTimeForDisplay } from "../../../utils/date";
 import { displayLabel, invitationStatusLabels } from "../lib/displayLabels";
+import { DETAIL_LIST_LIMIT } from "../../../../lib/domain/systemAdmin/searchQuery";
 
 type GroupInvitationsSectionProps = {
   invitations: GroupDetail["invitations"];
@@ -56,7 +57,7 @@ export function GroupInvitationsSection({
       )}
       {invitationsTruncated ? (
         <Alert severity="warning">
-          招待情報は上限20件まで表示しています（{invitations.length}件を表示）。
+          招待情報は上限{DETAIL_LIST_LIMIT}件まで表示しています（{invitations.length}件を表示）。
         </Alert>
       ) : null}
     </Paper>

@@ -4,6 +4,7 @@ import { useAction, useMutation } from "convex/react";
 import { normalizeSystemAdminReason } from "../../../../lib/domain/systemAdmin/reason";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { GroupRole } from "../../../../lib/domain/groups/role";
+import { displayLabel, groupRoleLabels } from "../lib/displayLabels";
 
 export type GroupDetail = {
   name: string;
@@ -166,7 +167,7 @@ export function useSystemAdminGroupDetail(groupId: string | undefined) {
       });
       setRoleTarget(null);
       setSuccess(
-        `「${roleTarget.displayName ?? "ユーザー"}」のroleを${roleNewRole === "owner" ? "owner" : "member"}に変更しました（監査ログに記録済み）`,
+        `「${roleTarget.displayName ?? "ユーザー"}」のroleを${displayLabel(groupRoleLabels, roleNewRole ?? "member")}に変更しました（監査ログに記録済み）`,
       );
       await load();
     } catch (cause) {

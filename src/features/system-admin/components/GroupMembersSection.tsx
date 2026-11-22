@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { GroupDetail, GroupDetailMember } from "../hooks/useSystemAdminGroupDetail";
 import type { GroupRole } from "../../../../lib/domain/groups/role";
 import { displayLabel, groupRoleLabels } from "../lib/displayLabels";
+import { DETAIL_LIST_LIMIT } from "../../../../lib/domain/systemAdmin/searchQuery";
 
 type GroupMembersSectionProps = {
   detail: GroupDetail;
@@ -139,7 +140,7 @@ export function GroupMembersSection({
       )}
       {detail.membersTruncated ? (
         <Alert severity="warning">
-          メンバーは上限20件まで表示しています（{detail.members.length}件を表示）。
+          メンバーは上限{DETAIL_LIST_LIMIT}件まで表示しています（{detail.members.length}件を表示）。
         </Alert>
       ) : null}
       {roleOperation === "owner_transfer" && roleTarget && !roleSource ? (

@@ -190,6 +190,10 @@ export function SystemAdminGroupSearchPage() {
         ) : (
           <SystemAdminEmptyState message="一致するグループはありません。検索条件を確認してください。" />
         )
+      ) : isLoading ? (
+        <Typography aria-live="polite" color="text.secondary" role="status" variant="body2">
+          検索しています…
+        </Typography>
       ) : null}
       <Alert severity="info" variant="outlined">
         表示されるのはグループ名、groupId、状態などの管理情報だけです。

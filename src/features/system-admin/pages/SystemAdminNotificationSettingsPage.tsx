@@ -104,7 +104,10 @@ export function SystemAdminNotificationSettingsPage() {
         ? ""
         : getNormalizeReasonErrorMessage(reasonResult.error);
   const canSave =
-    normalizedReason.length > 0 && reasonResult.success && !(mandatoryDisable && !confirmed);
+    context !== undefined &&
+    normalizedReason.length > 0 &&
+    reasonResult.success &&
+    !(mandatoryDisable && !confirmed);
 
   return (
     <SystemAdminPageFrame
@@ -182,7 +185,7 @@ export function SystemAdminNotificationSettingsPage() {
         <DialogContent>
           {pending ? (
             <Stack spacing={2} sx={{ mt: 1 }}>
-              <SystemAdminEnvironmentNotice environment={context?.environment ?? "development"} />
+              <SystemAdminEnvironmentNotice environment={context?.environment ?? "確認中"} />
               <Typography>
                 {NOTIFICATION_TYPE_LABELS[pending.type]}（
                 {NOTIFICATION_CHANNEL_LABELS[pending.channel]}）を

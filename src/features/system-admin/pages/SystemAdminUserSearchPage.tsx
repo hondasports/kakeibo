@@ -190,6 +190,10 @@ export function SystemAdminUserSearchPage() {
         ) : (
           <SystemAdminEmptyState message="一致するユーザーはありません。検索条件を確認してください。" />
         )
+      ) : isLoading ? (
+        <Typography aria-live="polite" color="text.secondary" role="status" variant="body2">
+          検索しています…
+        </Typography>
       ) : null}
       <Alert severity="info" variant="outlined">
         表示されるのは表示名、メールアドレス、userId、所属グループ識別子などの管理情報だけです。
