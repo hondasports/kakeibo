@@ -11,7 +11,19 @@ const QUOTED_PATTERN = /'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"|`((?:[^`\\]|\\.)
 const JSX_TEXT_PATTERN = />([^<>{}]+)</g;
 const COMMENT_LINE_PATTERN = /^\s*(?:\/\/|\/\*|\*)/;
 const BARE_TEXT_FORBIDDEN_PATTERN = /[{}=;<>'"`]/;
-const TEST_PATH_PATTERN = /(?:\.test\.|\.spec\.|(?:^|\/)__tests__\/)/;
+const TEST_PATH_PATTERN =
+  /(?:\.test\.|\.spec\.|(?:^|\/)__tests__\/|(?:^|\/)src\/test\/|TestMocks\.|Fixtures\.|(?:^|\/)testHelpers\.)/;
+const TEST_PATHSPEC_EXCLUDES = [
+  ":(exclude,glob)**/*.test.*",
+  ":(exclude,glob)**/*.spec.*",
+  ":(exclude,glob)**/__tests__/**",
+  ":(exclude,glob)src/test/**",
+  ":(exclude,glob)**/*TestMocks.*",
+  ":(exclude,glob)**/*Fixtures.*",
+  ":(exclude,glob)**/testHelpers.*",
+];
+const E2E_TITLE_PATTERN = /^\s*(?:await\s+)?test(?:\.\w+)*\(\s*["'`]/;
+
 const MAX_BUFFER = 256 * 1024 * 1024;
 
 export function isTestSourcePath(filePath) {
@@ -33,8 +45,8 @@ export function parseRemovedSourceLines(diffText) {
   let countable = false;
   for (const line of diffText.split("\n")) {
     if (line.startsWith("diff --git ")) {
-      const match = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
-      const filePath = match?.[2] ?? "";
+      const match = /^diff --git (?:"a\/.+?"|a\/.+?) (?:"b\/(.+)"|b\/(.+))$/.exec(line);
+      const filePath = match?.[1] ?? match?.[2] ?? "";
       countable = filePath.startsWith("src/") && !isTestSourcePath(filePath);
     } else if (countable && line.startsWith("-") && !line.startsWith("---")) {
       removed.push(line.slice(1));
@@ -61,6 +73,11 @@ export function extractCopyStrings(line) {
   return [...new Set(found.map((text) => text.trim()).filter(isCopyCandidate))];
 }
 
+/** コメント行とテストのタイトル行は文言が表示されるかに関与しないため照合しない。 */
+function isIgnoredE2eLine(text) {
+  return COMMENT_LINE_PATTERN.test(text) || E2E_TITLE_PATTERN.test(text);
+}
+
 /**
  * 削除された文言のうちHEADのsrcに無く、e2eに残っているものを返す。
  * e2eLines: [{ file, line, text }]
@@ -70,7 +87,11 @@ export function findCopyDrift({ removedStrings, headSrcText, e2eLines }) {
   const drift = [];
   for (const copy of gone) {
     for (const entry of e2eLines) {
-      if (entry.text.includes(copy) && !entry.text.includes(ALLOW_MARKER)) {
+      if (
+        entry.text.includes(copy) &&
+        !entry.text.includes(ALLOW_MARKER) &&
+        !isIgnoredE2eLine(entry.text)
+      ) {
         drift.push({ file: entry.file, line: entry.line, copy });
       }
     }
@@ -79,7 +100,10 @@ export function findCopyDrift({ removedStrings, headSrcText, e2eLines }) {
 }
 
 function git(args) {
-  return execFileSync("git", args, { encoding: "utf8", maxBuffer: MAX_BUFFER });
+  return execFileSync("git", ["-c", "core.quotePath=false", ...args], {
+    encoding: "utf8",
+    maxBuffer: MAX_BUFFER,
+  });
 }
 
 function gitGrepAll(head, pathspecs) {
@@ -108,15 +132,9 @@ export function checkCopyDrift({ base, head }) {
   if (removedStrings.length === 0) {
     return [];
   }
-  const srcLines = stripRef(
-    gitGrepAll(head, [
-      "src",
-      ":(exclude,glob)**/*.test.*",
-      ":(exclude,glob)**/*.spec.*",
-      ":(exclude,glob)**/__tests__/**",
-    ]),
-    head,
-  ).map((entry) => entry.replace(/^[^:]+:\d+:/, ""));
+  const srcLines = stripRef(gitGrepAll(head, ["src", ...TEST_PATHSPEC_EXCLUDES]), head).map(
+    (entry) => entry.replace(/^[^:]+:\d+:/, ""),
+  );
   const e2eLines = stripRef(gitGrepAll(head, ["e2e"]), head).flatMap((entry) => {
     const match = /^(.+?):(\d+):(.*)$/.exec(entry);
     return match ? [{ file: match[1], line: Number(match[2]), text: match[3] }] : [];
