@@ -206,6 +206,8 @@ jobs:
       # 最新attemptのjob一覧を読む。片方だけ再実行しても needs.e2e.result は
       # matrix全体で1つのため、jobごとのconclusionで照合する。
       actions: read
+      # job単位で指定すると未指定の権限はnoneになるため、checkout用に明示する。
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
