@@ -100,7 +100,9 @@ test.describe("グループアクセス", () => {
     await cleanupGroupMembershipsByUser(currentUserId);
 
     await waitForGroupSetupRedirect(page);
-    await expect(page.getByRole("heading", { name: "家族グループを作成" })).toBeVisible({
+    await expect(
+      page.getByRole("heading", { level: 1, name: "グループを作成", exact: true }),
+    ).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByRole("button", { name: "グループを作成" })).toBeEnabled({
@@ -185,9 +187,9 @@ test.describe("グループアクセス", () => {
         await page.goto(invitationPath);
         await expect(page.getByRole("heading", { name: "招待先の家計" })).toBeVisible();
         await expect(page.getByText(/「切替前の家計」から招待先に切り替わります/)).toBeVisible();
-        await expect(page.getByRole("button", { name: "招待を受け入れて参加する" })).toBeDisabled();
+        await expect(page.getByRole("button", { name: "このグループを表示する" })).toBeDisabled();
         await page.reload();
-        await expect(page.getByRole("button", { name: "招待を受け入れて参加する" })).toBeDisabled();
+        await expect(page.getByRole("button", { name: "このグループを表示する" })).toBeDisabled();
 
         await page.goto("/settings");
         await expandGroupManagement(page);
@@ -195,7 +197,7 @@ test.describe("グループアクセス", () => {
 
         await page.goto(invitationPath);
         await page.getByRole("checkbox", { name: "表示するグループの切り替えに同意する" }).check();
-        await page.getByRole("button", { name: "招待を受け入れて参加する" }).click();
+        await page.getByRole("button", { name: "このグループを表示する" }).click();
         await expect(page).toHaveURL("/");
         await page.goto("/settings");
         await expandGroupManagement(page);
@@ -418,11 +420,15 @@ test.describe("グループアクセス", () => {
     await expect(
       page.getByRole("heading", { name: "グループの完全削除が完了しました" }),
     ).toBeVisible({ timeout: 60_000 });
-    await page.getByRole("button", { name: "続ける" }).click();
+    await page
+      .getByRole("button", { name: /^(グループ選択へ進む|新しいグループを作成する)$/ })
+      .click();
 
     await expect(page).toHaveURL(/\/group\/(setup|select)/, { timeout: 15_000 });
     if (page.url().includes("/group/setup")) {
-      await expect(page.getByRole("heading", { name: "家族グループを作成" })).toBeVisible({
+      await expect(
+        page.getByRole("heading", { level: 1, name: "グループを作成", exact: true }),
+      ).toBeVisible({
         timeout: 15_000,
       });
     } else {
