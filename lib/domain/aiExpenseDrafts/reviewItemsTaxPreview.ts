@@ -116,6 +116,7 @@ export function buildReviewTaxPreview(
   const sourceSummaries = toExtractedTaxSummaries(args.taxSummaries ?? []);
   const { itemFields, interpretation, receiptTotalConflict } = reinterpretDraftTax({
     useCalculatedRegistrationAmounts: true,
+    itemLinks: items,
     amountYen: paidTotalYen,
     receiptTotalSource: resolveReceiptTotalSource({
       amountYen: paidTotalYen,
