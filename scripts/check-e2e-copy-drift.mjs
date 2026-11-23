@@ -12,14 +12,14 @@ const JSX_TEXT_PATTERN = />([^<>{}]+)</g;
 const COMMENT_LINE_PATTERN = /^\s*(?:\/\/|\/\*|\*)/;
 const BARE_TEXT_FORBIDDEN_PATTERN = /[{}=;<>'"`]/;
 const TEST_PATH_PATTERN =
-  /(?:\.test\.|\.spec\.|(?:^|\/)__tests__\/|(?:^|\/)src\/test\/|TestMocks\.|Fixtures\.|(?:^|\/)testHelpers\.)/;
+  /(?:\.test\.|\.spec\.|(?:^|\/)__tests__\/|(?:^|\/)src\/test\/|TestMocks\.|(?:^|\/)testFixtures\.|(?:^|\/)testHelpers\.)/;
 const TEST_PATHSPEC_EXCLUDES = [
   ":(exclude,glob)**/*.test.*",
   ":(exclude,glob)**/*.spec.*",
   ":(exclude,glob)**/__tests__/**",
   ":(exclude,glob)src/test/**",
   ":(exclude,glob)**/*TestMocks.*",
-  ":(exclude,glob)**/*Fixtures.*",
+  ":(exclude,glob)**/testFixtures.*",
   ":(exclude,glob)**/testHelpers.*",
 ];
 const E2E_TITLE_PATTERN = /^\s*(?:await\s+)?test(?:\.\w+)*\(\s*["'`]/;
