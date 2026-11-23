@@ -27,24 +27,44 @@ test.describe("設定台帳（Issue #375）", () => {
     const weekSection = ledger.locator(".settings-ledger-section", {
       has: page.getByRole("heading", { name: "週の設定", level: 2 }),
     });
+    const saveButton = weekSection.getByRole("button", { name: "変更を保存" });
+    const savedToast = page.getByText("週の設定を保存しました");
+    const saveAndWait = async () => {
+      await expect(saveButton).toBeEnabled();
+      await saveButton.click();
+      await expect(savedToast).toBeVisible({ timeout: 15_000 });
+    };
 
     // 値が未変更だと保存ボタンは無効なので、現在値と違う曜日を選ぶ
     const startDaySelect = weekSection.getByRole("combobox", { name: "週の始まり" });
-    const currentLabel = (await startDaySelect.innerText()).trim();
-    await startDaySelect.click();
-    const options = page.getByRole("listbox").getByRole("option");
-    const optionCount = await options.count();
-    for (let i = 0; i < optionCount; i += 1) {
-      const option = options.nth(i);
-      if ((await option.innerText()).trim() !== currentLabel) {
-        await option.click();
-        break;
+    const originalLabel = (await startDaySelect.innerText()).trim();
+    let changed = false;
+    try {
+      await startDaySelect.click();
+      const options = page.getByRole("listbox").getByRole("option");
+      const optionCount = await options.count();
+      for (let i = 0; i < optionCount; i += 1) {
+        const option = options.nth(i);
+        if ((await option.innerText()).trim() !== originalLabel) {
+          await option.click();
+          changed = true;
+          break;
+        }
+      }
+      await saveAndWait();
+    } finally {
+      // 週開始曜日はE2Eユーザー全体の共有設定なので、変更した値は元に戻す。
+      // 復元時は1回目の保存トーストと見分けるため、消えるのを待ってから保存する。
+      if (changed) {
+        await expect(savedToast).toBeHidden({ timeout: 10_000 });
+        await startDaySelect.click();
+        await page
+          .getByRole("listbox")
+          .getByRole("option", { name: originalLabel, exact: true })
+          .click();
+        await saveAndWait();
       }
     }
-
-    await expect(weekSection.getByRole("button", { name: "変更を保存" })).toBeEnabled();
-    await weekSection.getByRole("button", { name: "変更を保存" }).click();
-    await expect(page.getByText("週の設定を保存しました")).toBeVisible({ timeout: 15_000 });
   });
 
   test("@smoke /categories 互換ルートでも同じ設定台帳を表示する", async ({ page }) => {
