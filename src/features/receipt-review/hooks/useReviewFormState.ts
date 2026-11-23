@@ -81,6 +81,12 @@ export function useReviewFormState({
     setIsCategorySplit(false);
   };
 
+  const recalculateReviewItems = (items: ReviewItemValues[]) =>
+    applyReviewItemsTaxPreview(items, {
+      ...buildReviewTaxEvidence(selectedReviewDraft),
+      paidTotalYen: Number(reviewForm.amountYen),
+    });
+
   const handleReviewFieldChange = (field: keyof ReviewFormValues, value: string) => {
     setReviewForm((current) => ({ ...current, [field]: value }));
     if (field === "amountYen") {
@@ -206,8 +212,6 @@ export function useReviewFormState({
             ? { ...invalidateItemTaxRateConfirmation(item), confirmedTaxRatePercent: undefined }
             : item;
         });
-      } else if (field !== "amountYen") {
-        return updated;
       }
 
       const editedItem = updated.find((item) => item.id === itemId);
@@ -215,11 +219,7 @@ export function useReviewFormState({
         return updated;
       }
 
-      const paidTotalYen = Number(reviewForm.amountYen);
-      return applyReviewItemsTaxPreview(updated, {
-        ...buildReviewTaxEvidence(selectedReviewDraft),
-        paidTotalYen: Number.isFinite(paidTotalYen) ? paidTotalYen : undefined,
-      });
+      return recalculateReviewItems(updated);
     });
   };
 
@@ -242,10 +242,7 @@ export function useReviewFormState({
         current.filter((item) => item.id !== itemId),
         itemId,
       );
-      return applyReviewItemsTaxPreview(remaining, {
-        ...buildReviewTaxEvidence(selectedReviewDraft),
-        paidTotalYen: Number(reviewForm.amountYen),
-      });
+      return recalculateReviewItems(remaining);
     });
   };
 
@@ -261,7 +258,9 @@ export function useReviewFormState({
   };
 
   const handleDiscountTargetChange = (discountItemId: string, targetItemId: string) => {
-    setReviewItems((current) => assignDiscountTarget(current, discountItemId, targetItemId));
+    setReviewItems((current) =>
+      recalculateReviewItems(assignDiscountTarget(current, discountItemId, targetItemId)),
+    );
   };
 
   return {
