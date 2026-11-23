@@ -65,11 +65,17 @@ function hasUnresolvedDiscountTarget(
   const products = items.filter((item) => !isDiscountLine(item.itemName, item.lineType));
   const productsById = new Map(products.map((item) => [item.id, item]));
   const productCategories = new Set(products.map((item) => item.categoryId));
+  const productRates = new Set(products.map((item) => item.taxRatePercent));
   return items.some((item, index) => {
     if (!isDiscountLine(item.itemName, item.lineType) || Number(item.amountYen) >= 0) return false;
     const targetId = originalItems[index].discountTargetItemId;
     if (targetId === undefined) {
-      return requiresProductTarget || !item.categoryId || !productCategories.has(item.categoryId);
+      return (
+        requiresProductTarget ||
+        !item.categoryId ||
+        !productCategories.has(item.categoryId) ||
+        (item.taxRatePercent != null && !productRates.has(item.taxRatePercent))
+      );
     }
     const target = productsById.get(targetId);
     return (

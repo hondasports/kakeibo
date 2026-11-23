@@ -147,6 +147,52 @@ describe("印字税内訳に依存しない登録額", () => {
     expect(() => buildDraftRegistrationItems(saved, savedItems)).toThrow(/未確定/);
   });
 
+  it.each([
+    [100, -11, "tax_excluded", "tax_included"],
+    [110, -10, "tax_included", "tax_excluded"],
+  ] as const)(
+    "価格区分が異なる商品%d円と割引%d円は合計99円で登録できる",
+    (product, discount, productBasis, discountBasis) => {
+      const { draft, items } = receipt([product, discount], 99, productBasis, [10, 10]);
+      items[1] = {
+        ...items[1],
+        itemName: "割引",
+        lineType: "discount",
+        amountBasis: discountBasis,
+        discountTargetItemId: items[0].id,
+      };
+      const { plan, saved, savedItems } = save(draft, items);
+      expect(plan.listSummary.amountAndTaxResolved).toBe(true);
+      expect(savedItems.map((item) => item.allocatedTaxYen)).toEqual([10, -1]);
+      expect(savedItems.map((item) => item.normalizedAmountYen)).toEqual([110, -11]);
+      expect(buildDraftRegistrationItems(saved, savedItems)).toMatchObject([{ amountYen: 99 }]);
+    },
+  );
+
+  it("支払額が読み取れていれば、別の合計行の金額が空でも登録できる", () => {
+    const { draft, items } = receipt([108], 108, "tax_included", [8]);
+    draft.rawObservation.lines.push({
+      ...observationLine("合計", 0, 1),
+      amountYen: null,
+      amountText: null,
+      lineRoleCandidates: ["total"],
+    });
+    expect(planDraftTaxInterpretation(draft, items, {}, 1).listSummary.amountAndTaxResolved).toBe(
+      true,
+    );
+  });
+
+  it("内税の有効な切り捨て額は配分用の四捨五入額と異なっても一致と扱う", () => {
+    const { draft, items } = receipt([105], 105, "tax_included", [8]);
+    draft.rawObservation.lines.push(observationLine("内消費税8% 7円", 7, 1));
+    const preview = buildReviewTaxPreview(mapDraftItemsToReviewItems(judgmentItems(items)), {
+      ...buildReviewTaxEvidence(draft),
+      paidTotalYen: 105,
+    });
+    expect(preview.items[0]).toMatchObject({ allocatedTaxYen: 8, normalizedAmountYen: 105 });
+    expect(preview.taxSummaries[0]).toMatchObject({ taxYen: 7, warnings: [], status: "verified" });
+  });
+
   it.each(["お支払合計", "税込合計"])(
     "明細と保存支払額が一致しても、%sが異なる場合は確認を求める",
     (label) => {

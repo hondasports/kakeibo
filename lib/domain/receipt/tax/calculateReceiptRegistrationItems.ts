@@ -55,18 +55,25 @@ export function calculateReceiptRegistrationItems(
 
   const result = [...items];
   for (const { rate, external, printedTotal, indexes } of buckets.values()) {
+    const sign = printedTotal < 0 ? -1 : 1;
+    const absoluteTotal = Math.abs(printedTotal);
     const tax = external
-      ? (externalTax.get(rate) ?? 0)
-      : Math.round((printedTotal * rate) / (100 + rate));
+      ? sign * (externalTax.get(rate) ?? 0)
+      : Math.round((absoluteTotal * rate) / (100 + rate));
     const amounts = indexes.map((index) => items[index].printedAmountYen);
-    const allocation = allocateTax(tax, printedTotal, amounts);
+    const allocation = allocateTax(
+      tax,
+      absoluteTotal,
+      amounts.map((amount) => sign * amount),
+    );
     if (!allocation) return undefined;
     for (const [index, itemIndex] of indexes.entries()) {
-      const amountYen = amounts[index] + (external ? allocation[index] : 0);
+      const allocatedTaxYen = allocation[index] === 0 ? 0 : sign * allocation[index];
+      const amountYen = amounts[index] + (external ? allocatedTaxYen : 0);
       if (Math.abs(amountYen) > EXPENSE_ENTRY_AMOUNT_MAX) return undefined;
       result[itemIndex] = {
         ...items[itemIndex],
-        allocatedTaxYen: allocation[index],
+        allocatedTaxYen,
         normalizedAmountYen: amountYen,
         taxAllocationStatus: "allocated",
       };

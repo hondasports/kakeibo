@@ -335,13 +335,19 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
         (candidate) =>
           candidate.source === "explicit_label" && candidate.amountYen !== input.amountYen,
       ) === true);
-  const allocatedTaxByRate = new Map<TaxRatePercent, number>();
-  if (registrationItems) {
-    for (const item of registrationItems) {
-      const rate = item.taxRatePercent;
-      if (rate !== null) {
-        allocatedTaxByRate.set(rate, (allocatedTaxByRate.get(rate) ?? 0) + item.allocatedTaxYen);
-      }
+  const includedRates = new Set(
+    registrationItems
+      ?.filter((item) => item.amountBasis === "tax_included")
+      .map((item) => item.taxRatePercent),
+  );
+  const allocatedExternalTaxByRate = new Map<TaxRatePercent, number>();
+  for (const item of registrationItems ?? []) {
+    const rate = item.taxRatePercent;
+    if (rate !== null && !includedRates.has(rate)) {
+      allocatedExternalTaxByRate.set(
+        rate,
+        (allocatedExternalTaxByRate.get(rate) ?? 0) + item.allocatedTaxYen,
+      );
     }
   }
   const hasTaxReadingCorrection = taxSummaries.some((summary) =>
@@ -351,7 +357,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     ...interpretation,
     taxSummaries: interpretation.taxSummaries.map((summary) => {
       const rate = summary.taxRatePercent;
-      const allocatedTax = allocatedTaxByRate.get(rate);
+      const allocatedTax = allocatedExternalTaxByRate.get(rate);
       if (
         allocatedTax !== undefined &&
         printedTaxesByRate.get(rate)?.some((tax) => tax !== allocatedTax)
