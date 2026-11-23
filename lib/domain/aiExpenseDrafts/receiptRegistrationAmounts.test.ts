@@ -169,6 +169,26 @@ describe("印字税内訳に依存しない登録額", () => {
     },
   );
 
+  it("税抜額がほぼ相殺されても、それぞれのカテゴリへ税率に沿った税込額を登録する", () => {
+    const { draft, items } = receipt([99, 330, -100], 328, "tax_excluded", [10, 10, 10]);
+    const extracted = { ...draft, receiptDataContractVersion: RECEIPT_DATA_CONTRACT_VERSION };
+    items[1] = { ...items[1], amountBasis: "tax_included", categoryId: "other" };
+    items[2] = {
+      ...items[2],
+      itemName: "割引",
+      lineType: "discount",
+      categoryId: "other",
+      discountTargetItemId: items[1].id,
+    };
+    const { plan, saved, savedItems } = save(extracted, items);
+    expect(plan.listSummary.amountAndTaxResolved).toBe(true);
+    expect(savedItems.map((item) => item.allocatedTaxYen)).toEqual([9, 30, -10]);
+    expect(buildDraftRegistrationItems(saved, savedItems)).toMatchObject([
+      { amountYen: 108, categoryId: "food" },
+      { amountYen: 220, categoryId: "other" },
+    ]);
+  });
+
   it("支払額が読み取れていれば、別の合計行の金額が空でも登録できる", () => {
     const { draft, items } = receipt([108], 108, "tax_included", [8]);
     draft.rawObservation.lines.push({
