@@ -104,6 +104,7 @@ import type * as receipts_crud from "../receipts/crud.js";
 import type * as recurringRules_index from "../recurringRules/index.js";
 import type * as receipts_summaries from "../receipts/summaries.js";
 import type * as receipts_testHelpers from "../receipts/testHelpers.js";
+import type * as savedExpenseSearches_internal from "../savedExpenseSearches/internal.js";
 import type * as savedExpenseSearches_mutations from "../savedExpenseSearches/mutations.js";
 import type * as savedExpenseSearches_queries from "../savedExpenseSearches/queries.js";
 import type * as systemAdminGroupDeletion from "../systemAdminGroupDeletion.js";
@@ -227,6 +228,7 @@ declare const fullApi: ApiFromModules<{
   "recurringRules/index": typeof recurringRules_index;
   "receipts/summaries": typeof receipts_summaries;
   "receipts/testHelpers": typeof receipts_testHelpers;
+  "savedExpenseSearches/internal": typeof savedExpenseSearches_internal;
   "savedExpenseSearches/mutations": typeof savedExpenseSearches_mutations;
   "savedExpenseSearches/queries": typeof savedExpenseSearches_queries;
   systemAdminGroupDeletion: typeof systemAdminGroupDeletion;

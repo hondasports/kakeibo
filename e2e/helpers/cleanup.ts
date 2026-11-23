@@ -210,6 +210,14 @@ export async function cleanupNotificationData(options?: CleanupOptions): Promise
   });
 }
 
+/** 履歴検索の保存した検索・最近の検索をテストユーザー単位で削除する。 */
+export async function cleanupSavedExpenseSearches(options?: CleanupOptions): Promise<void> {
+  await callCleanupEndpoint({
+    ...(await resolveCleanupIdentity(options)),
+    clearSavedExpenseSearches: true,
+  });
+}
+
 /**
  * テストユーザーのグループ所属を削除する。
  */
@@ -323,6 +331,7 @@ async function callCleanupEndpoint(body: {
   clearGroupInvitations?: boolean;
   clearLineLink?: boolean;
   clearNotificationData?: boolean;
+  clearSavedExpenseSearches?: boolean;
   setGroupMemberRole?: GroupRole;
 }): Promise<void> {
   const siteUrl = process.env.VITE_CONVEX_SITE_URL;
