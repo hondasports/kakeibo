@@ -14,6 +14,7 @@ export function zeroDeletedCounts(): GroupDeletionJobCounts {
     expenseEntries: 0,
     receipts: 0,
     entryFavorites: 0,
+    savedExpenseSearches: 0,
     sourceDocuments: 0,
     storageFiles: 0,
     weekSessions: 0,

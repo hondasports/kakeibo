@@ -281,6 +281,40 @@ describe("e2eCleanupHandler", () => {
       )?.[1],
     ).toEqual({ userId: E2E_USER_ID, groupId: GROUP_ID });
   });
+
+  it("clearSavedExpenseSearches は E2E ユーザーの保存・最近の検索を全件消すまで繰り返す", async () => {
+    const runMutation = vi
+      .fn()
+      .mockResolvedValueOnce({ deletedCount: 0 }) // 既定で走るレシート削除
+      .mockResolvedValueOnce({ deletedCount: 100, hasMore: true })
+      .mockResolvedValueOnce({ deletedCount: 3, hasMore: false });
+    const response = await e2eCleanupHandler(
+      createActionCtx({ runMutation }),
+      request({ userId: E2E_USER_ID, clearSavedExpenseSearches: true }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(responseJson(response)).resolves.toMatchObject({
+      savedExpenseSearches: { deletedCount: 103 },
+    });
+    const clearCalls = runMutation.mock.calls.filter(
+      ([ref]) => getFunctionName(ref) === "savedExpenseSearches/internal:clearE2eDataForUser",
+    );
+    expect(clearCalls).toHaveLength(2);
+    for (const [, args] of clearCalls) {
+      expect(args).toEqual({ userId: E2E_USER_ID });
+    }
+  });
+
+  it("clearSavedExpenseSearches が真偽値以外なら400を返す", async () => {
+    const runMutation = vi.fn();
+    const response = await e2eCleanupHandler(
+      createActionCtx({ runMutation }),
+      request({ userId: E2E_USER_ID, clearSavedExpenseSearches: "yes" }),
+    );
+    expect(response.status).toBe(400);
+    expect(runMutation).not.toHaveBeenCalled();
+  });
 });
 
 describe("e2e seed handlers", () => {

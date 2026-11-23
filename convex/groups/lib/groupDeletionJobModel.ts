@@ -35,6 +35,7 @@ export const groupDeletionCountsValidator = v.object({
   groupMembers: v.number(),
   groups: v.number(),
   recurringEntryRules: v.optional(v.number()),
+  savedExpenseSearches: v.optional(v.number()),
 });
 
 export type { GroupDeletionJobStatus as GroupDeletionStatus } from "../../../lib/domain/groupDeletion/groupDeletionJob";

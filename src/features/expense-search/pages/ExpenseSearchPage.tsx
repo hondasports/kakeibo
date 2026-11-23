@@ -25,16 +25,19 @@ import {
 } from "../../summary-shared/types/types";
 import { AppliedSearchFilters } from "../components/AppliedSearchFilters";
 import { ExpenseSearchFilters } from "../components/ExpenseSearchFilters";
+import { SavedExpenseSearches } from "../components/SavedExpenseSearches";
 import { HistoryCategoryChart } from "../components/HistoryCategoryChart";
 import { HistoryComparisonCard } from "../components/HistoryComparisonCard";
 import { HistoryMetricsPanel } from "../components/HistoryMetricsPanel";
 import { HistoryTrendChart } from "../components/HistoryTrendChart";
 import { useExpenseSearchResults } from "../hooks/useExpenseSearchResults";
 import { toIncomeItem, toReceiptItem } from "../lib/expenseSearchItems";
+import { hasSearchCondition } from "../lib/searchFilterLabels";
 import { formatDateForDisplay } from "../../../utils/date";
 import {
   diffExpenseSearchFormState,
   EMPTY_EXPENSE_SEARCH_FORM,
+  expenseSearchFormToSearchParams,
   expenseSearchPath,
   readExpenseSearchFormState,
   validateExpenseSearchForm,
@@ -110,6 +113,9 @@ export function ExpenseSearchPage() {
 
   const deleteExpenseEntry = useMutation(api.expenseEntries.mutations.deleteExpenseEntry);
   const deleteReceipt = useMutation(api.receipts.crud.deleteReceipt);
+  const recordRecentSearch = useMutation(
+    api.savedExpenseSearches.mutations.recordRecentExpenseSearch,
+  );
   const bulkUpdateSpendingCategories = useMutation(
     api.expenseEntries.mutations.bulkUpdateSpendingCategories,
   );
@@ -261,6 +267,31 @@ export function ExpenseSearchPage() {
       return;
     }
     handleApply(draft);
+    if (hasSearchCondition(draft)) {
+      void recordRecent(expenseSearchFormToSearchParams(draft).toString());
+    }
+  };
+
+  // 保存・最近の検索は未適用の入力を残さずフォーム全体を置き換える。
+  // 同じ条件の再選択はURLが変わらないため、結果を取り直す。
+  const handleApplySavedQuery = (query: string) => {
+    setDraft(readExpenseSearchFormState(new URLSearchParams(query)));
+    const nextKey = new URLSearchParams(query).toString();
+    setDraftKey(nextKey);
+    if (nextKey === appliedKey) {
+      refreshResults();
+      return;
+    }
+    navigate(`/search?${query}`);
+  };
+
+  // 最近の検索の記録は補助機能のため、失敗しても検索は妨げない。
+  const recordRecent = async (query: string) => {
+    try {
+      await recordRecentSearch({ query });
+    } catch {
+      // 記録できなくても検索結果の表示には影響しない
+    }
   };
 
   const handleClearAll = () => {
@@ -322,6 +353,11 @@ export function ExpenseSearchPage() {
           categoryLabel={categoryLabel}
           state={applied}
           onChange={handleAppliedFilterChange}
+        />
+        <SavedExpenseSearches
+          applied={applied}
+          isValid={appliedValidation.ok}
+          onApply={handleApplySavedQuery}
         />
 
         {appliedValidation.formError !== null ? (
