@@ -20,14 +20,9 @@ import {
   type ReceiptRawObservationLine,
 } from "../observations";
 import { ITEM_IDENTITY_CHANGED, getItemTaxConfirmedFields } from "./itemTaxConfirmation";
-import { deriveReceiptTaxSummaries } from "./deriveReceiptTaxSummaries";
+import { analyzeReceiptTaxSummaries, deriveReceiptTaxSummaries } from "./deriveReceiptTaxSummaries";
 import { normalizeTaxSummary } from "./taxSummaryConsistency";
-import {
-  independentSummaryLines,
-  taxSummaryEvidenceLines,
-  taxSummaryLineKind,
-} from "./summaryEvidence";
-import { EXPLICIT_PAYMENT_TOTAL_LABEL, isReceiptTotalLabel } from "../lineClassification";
+import { taxSummaryEvidenceLines } from "./summaryEvidence";
 import { calculateReceiptRegistrationItems } from "./calculateReceiptRegistrationItems";
 import { splitCombinedSummaryLines } from "./combinedSummaryLines";
 
@@ -243,20 +238,21 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
   // 「不明」の選択は自動補完を止めるために記録するが、税額の確定には使わない。
   const itemTaxWasConfirmed = (index: number): boolean =>
     confirmedFields[index].length === 2 && items[index].amountBasis !== "unknown";
-  const taxSummaries = deriveReceiptTaxSummaries({
-    paidTotalConfirmed: input.receiptTotalSource === "user_confirmed",
-    amountYen: input.amountYen,
-    items,
-    allowEstimates: items.every(
-      (item, index) =>
-        item.amountBasis !== "unknown" &&
-        item.taxRatePercent !== null &&
-        itemTaxWasConfirmed(index),
-    ),
-    correctedSummaries: input.correctedTaxSummaries,
-    lines: rawObservationLines,
-    classifications: input.receiptLineClassifications,
-  });
+  const { taxSummaries, printedPaymentTotalConflict, printedTaxesByRate } =
+    analyzeReceiptTaxSummaries({
+      paidTotalConfirmed: input.receiptTotalSource === "user_confirmed",
+      amountYen: input.amountYen,
+      items,
+      allowEstimates: items.every(
+        (item, index) =>
+          item.amountBasis !== "unknown" &&
+          item.taxRatePercent !== null &&
+          itemTaxWasConfirmed(index),
+      ),
+      correctedSummaries: input.correctedTaxSummaries,
+      lines: rawObservationLines,
+      classifications: input.receiptLineClassifications,
+    });
 
   const interpretation = interpretReceiptTax({
     amountYen: input.amountYen,
@@ -334,28 +330,37 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
   const receiptTotalConflict =
     input.useCalculatedRegistrationAmounts === true &&
     input.receiptTotalSource !== "user_confirmed" &&
-    (input.receiptTotalSupportingCandidates?.some(
-      (candidate) =>
-        candidate.source === "explicit_label" && candidate.amountYen !== input.amountYen,
-    ) === true ||
-      independentSummaryLines(rawObservationLines, input.receiptLineClassifications).some(
-        (line) => {
-          const label = line.rawText.normalize("NFKC").replace(/\s+/g, "");
-          return (
-            Number.isSafeInteger(line.amountYen) &&
-            line.amountYen !== input.amountYen &&
-            isReceiptTotalLabel(line.rawText, line.amountText) &&
-            taxSummaryLineKind(line.rawText) === undefined &&
-            (EXPLICIT_PAYMENT_TOTAL_LABEL.test(label) || !label.includes("税"))
-          );
-        },
-      ));
+    (printedPaymentTotalConflict ||
+      input.receiptTotalSupportingCandidates?.some(
+        (candidate) =>
+          candidate.source === "explicit_label" && candidate.amountYen !== input.amountYen,
+      ) === true);
+  const allocatedTaxByRate = new Map<TaxRatePercent, number>();
+  if (registrationItems) {
+    for (const item of registrationItems) {
+      const rate = item.taxRatePercent;
+      if (rate !== null) {
+        allocatedTaxByRate.set(rate, (allocatedTaxByRate.get(rate) ?? 0) + item.allocatedTaxYen);
+      }
+    }
+  }
   const hasTaxReadingCorrection = taxSummaries.some((summary) =>
     summary.userEditedFields?.includes("taxYen"),
   );
   const resolvedInterpretation = {
     ...interpretation,
     taxSummaries: interpretation.taxSummaries.map((summary) => {
+      const rate = summary.taxRatePercent;
+      const allocatedTax = allocatedTaxByRate.get(rate);
+      if (
+        allocatedTax !== undefined &&
+        printedTaxesByRate.get(rate)?.some((tax) => tax !== allocatedTax)
+      ) {
+        return {
+          ...summary,
+          warnings: [...new Set([...summary.warnings, "contradictory_receipt_tax_evidence"])],
+        };
+      }
       const matching = normalizedSources.filter(
         (entry) => entry.taxRatePercent === summary.taxRatePercent,
       );

@@ -18,6 +18,7 @@ type DraftForRegistration = Pick<
   AiExpenseDraftFields,
   | "rawObservation"
   | "receiptInterpretation"
+  | "receiptDataContractVersion"
   | "receiptUserOverride"
   | "registrationMode"
   | "receiptTotalResolution"

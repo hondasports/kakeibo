@@ -26,7 +26,7 @@ function isAggregateTaxLine(rawText: string): boolean {
   );
 }
 
-export function deriveReceiptTaxSummaries(args: {
+type DeriveReceiptTaxSummariesArgs = {
   amountYen: number;
   items: ExtractedReceiptItem[];
   lines?: ReceiptRawObservationLine[];
@@ -34,13 +34,25 @@ export function deriveReceiptTaxSummaries(args: {
   correctedSummaries?: ExtractedTaxSummary[];
   allowEstimates?: boolean;
   paidTotalConfirmed?: boolean;
-}): ExtractedTaxSummary[] {
+};
+
+export function deriveReceiptTaxSummaries(
+  args: DeriveReceiptTaxSummariesArgs,
+): ExtractedTaxSummary[] {
+  return analyzeReceiptTaxSummaries(args).taxSummaries;
+}
+
+export function analyzeReceiptTaxSummaries(args: DeriveReceiptTaxSummariesArgs) {
   const { items } = args;
   if (
     items.length === 0 ||
     items.some((item) => item.taxRatePercent === null || item.amountBasis === "unknown")
   ) {
-    return [];
+    return {
+      taxSummaries: [],
+      printedPaymentTotalConflict: false,
+      printedTaxesByRate: new Map<TaxRatePercent, number[]>(),
+    };
   }
   const rates = [...new Set(items.map((item) => item.taxRatePercent!))];
   const lines = independentSummaryLines(args.lines, args.classifications).filter((line) => {
@@ -352,7 +364,7 @@ export function deriveReceiptTaxSummaries(args: {
   });
   const estimatedTotalConflict =
     derived.reduce((sum, summary) => sum + summary.taxIncludedAmountYen!, 0) !== args.amountYen;
-  return derived.map((summary) =>
+  const taxSummaries = derived.map((summary) =>
     combinedTargetConflict ||
     subtotalConflict ||
     (ambiguousEstimatedTax && estimatedRates.has(summary.taxRatePercent)) ||
@@ -361,4 +373,9 @@ export function deriveReceiptTaxSummaries(args: {
       ? { ...summary, warnings: [...new Set([...summary.warnings, TAX_EVIDENCE_CONFLICT])] }
       : summary,
   );
+  return {
+    taxSummaries,
+    printedPaymentTotalConflict: totalConflict,
+    printedTaxesByRate: new Map(buckets.map(({ rate, taxes }) => [rate, taxes])),
+  };
 }
