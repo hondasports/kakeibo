@@ -229,4 +229,39 @@ describe("E2E cleanup ownership scope", () => {
     );
     expect(remaining.jobs.map((row) => row._id)).not.toContain(ids.jobA);
   });
+
+  it("clearE2eDataForUser は対象ユーザーの保存・最近の検索だけを消し、他ユーザーの分は残す", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await t.run((ctx) =>
+      ctx.db.insert("groups", { name: "g", status: "active", createdAt: 1, updatedAt: 1 }),
+    );
+    await t.run(async (ctx) => {
+      for (const [userId, kind] of [
+        ["e2e-user", "saved"],
+        ["e2e-user", "recent"],
+        ["other-user", "saved"],
+        ["other-user", "recent"],
+      ] as const) {
+        await ctx.db.insert("savedExpenseSearches", {
+          userId,
+          groupId,
+          kind,
+          query: "q=a",
+          createdAt: 1,
+          updatedAt: 1,
+        });
+      }
+    });
+
+    const result = await t.mutation(internal.savedExpenseSearches.internal.clearE2eDataForUser, {
+      userId: "e2e-user",
+    });
+
+    expect(result).toEqual({ deletedCount: 2, hasMore: false });
+    const remaining = await t.run((ctx) => ctx.db.query("savedExpenseSearches").collect());
+    expect(remaining.map((row) => `${row.userId}:${row.kind}`).sort()).toEqual([
+      "other-user:recent",
+      "other-user:saved",
+    ]);
+  });
 });

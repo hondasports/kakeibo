@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { gotoAuthenticated } from "./helpers/auth";
-import { cleanupE2eExpenseEntries } from "./helpers/cleanup";
+import { cleanupE2eExpenseEntries, cleanupSavedExpenseSearches } from "./helpers/cleanup";
 import { saveExpense } from "./helpers/expenseEntry";
 import { expectNoContentOverflow } from "./helpers/viewport";
 
@@ -102,19 +102,8 @@ test.describe("履歴検索（Issue #537 / #637〜#643）", () => {
         timeout: 15_000,
       });
     } finally {
-      // 保存済みの上限（20件）を圧迫しないよう、このテストで作った保存条件を消す
-      await page.goto("/search");
-      // 一覧の読込完了を待つ（このシナリオでは最近の検索が必ず記録されている）
-      await expect(page.getByRole("list", { name: "最近の検索" })).toBeVisible({
-        timeout: 10_000,
-      });
-      const deleteButton = page.getByRole("button", {
-        name: `${savedName}を保存した検索から削除`,
-      });
-      for (let remaining = await deleteButton.count(); remaining > 0; remaining -= 1) {
-        await deleteButton.first().click();
-        await expect(deleteButton).toHaveCount(remaining - 1, { timeout: 10_000 });
-      }
+      // 保存した検索・最近の検索は他specに残さない（保存に失敗していても安全）
+      await cleanupSavedExpenseSearches({ page });
     }
   });
 });
