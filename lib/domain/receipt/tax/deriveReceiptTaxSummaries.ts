@@ -154,7 +154,7 @@ export function analyzeReceiptTaxSummaries(args: DeriveReceiptTaxSummariesArgs) 
     const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
     return text.includes("税") && !EXPLICIT_PAYMENT_TOTAL_LABEL.test(text);
   };
-  const totalConflict = lines.some(
+  const conflictingTotalLines = lines.filter(
     (line) =>
       isUnclassifiedTotalLabel(line) &&
       line.amountYen !== args.amountYen &&
@@ -165,6 +165,7 @@ export function analyzeReceiptTaxSummaries(args: DeriveReceiptTaxSummariesArgs) 
         isTaxConfusableTotalLabel(line)
       ),
   );
+  const totalConflict = conflictingTotalLines.length > 0;
   const estimatedExternal = buckets.filter(
     (bucket) =>
       bucket.rate !== 0 &&
@@ -375,7 +376,9 @@ export function analyzeReceiptTaxSummaries(args: DeriveReceiptTaxSummariesArgs) 
   );
   return {
     taxSummaries,
-    printedPaymentTotalConflict: totalConflict,
+    printedPaymentTotalConflict: conflictingTotalLines.some((line) =>
+      Number.isSafeInteger(line.amountYen),
+    ),
     printedTaxesByRate: new Map(buckets.map(({ rate, taxes }) => [rate, taxes])),
   };
 }

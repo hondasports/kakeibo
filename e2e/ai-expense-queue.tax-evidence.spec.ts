@@ -1,6 +1,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { getCurrentClerkTokenIdentifier, gotoAuthenticated } from "./helpers/auth";
-import { cleanupAiExpenseQueue, cleanupTestReceipts } from "./helpers/cleanup";
+import {
+  cleanupAiExpenseQueue,
+  cleanupE2eExpenseEntries,
+  cleanupTestReceipts,
+} from "./helpers/cleanup";
 import { seedTaxReviewDraftByUser } from "./helpers/seed";
 import { expandDetailsIfClosed } from "./helpers/receiptQueue";
 
@@ -107,7 +111,7 @@ test("@smoke Issue #1548 印字税内訳に矛盾があっても、支払額と�
     await ready.getByRole("button", { name: "登録する", exact: true }).click();
     await expect(queue.getByRole("region", { name: "登録済み" })).toContainText("4,810円");
   } finally {
-    await cleanupTestReceipts();
+    await cleanupE2eExpenseEntries();
     await cleanupAiExpenseQueue();
   }
 });
