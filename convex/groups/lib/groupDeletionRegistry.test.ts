@@ -30,6 +30,7 @@ describe("group deletion registry", () => {
       "expenseEntries",
       "receipts",
       "entryFavorites",
+      "savedExpenseSearches",
       "sourceDocuments",
       "recurringEntryRules",
       "weekSessions",

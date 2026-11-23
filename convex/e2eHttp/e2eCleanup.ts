@@ -26,6 +26,7 @@ type E2eCleanupBody = {
   clearGroupInvitations?: boolean;
   clearLineLink?: boolean;
   clearNotificationData?: boolean;
+  clearSavedExpenseSearches?: boolean;
   setGroupMemberRole?: GroupRole;
   seedGroupMember?: { displayName: string; email: string };
 };
@@ -43,6 +44,7 @@ const BOOLEAN_FIELDS = [
   "clearGroupInvitations",
   "clearLineLink",
   "clearNotificationData",
+  "clearSavedExpenseSearches",
 ] as const;
 
 function badRequest(message: string) {
@@ -100,6 +102,7 @@ function isSeededMembershipCleanupOnly(body: E2eCleanupBody) {
     body.clearGroupInvitations !== true &&
     body.clearLineLink !== true &&
     body.clearNotificationData !== true &&
+    body.clearSavedExpenseSearches !== true &&
     body.setGroupMemberRole === undefined &&
     body.seedGroupMember === undefined
   );
@@ -349,6 +352,21 @@ export const e2eCleanupHandler = httpAction(async (ctx, req) => {
     notificationData = { deletedCount };
   }
 
+  let savedExpenseSearches: { deletedCount: number } | null = null;
+  if (body.clearSavedExpenseSearches && resolvedUserId) {
+    let deletedCount = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const result = await ctx.runMutation(
+        internal.savedExpenseSearches.internal.clearE2eDataForUser,
+        { userId: resolvedUserId },
+      );
+      deletedCount += result.deletedCount;
+      hasMore = result.hasMore;
+    }
+    savedExpenseSearches = { deletedCount };
+  }
+
   let expenseEntries: { deletedCount: number } | null = null;
   if (resolvedGroupId && body.clearE2eExpenseEntries) {
     expenseEntries = await ctx.runMutation(
@@ -420,6 +438,7 @@ export const e2eCleanupHandler = httpAction(async (ctx, req) => {
       monthlyIncome,
       lineLink,
       notificationData,
+      savedExpenseSearches,
       expenseEntries,
       groupMemberships,
       groupMemberRole,

@@ -21,6 +21,8 @@ vi.mock("../../../../convex/_generated/api", () => ({
   api: apiMockWith({
     "users.queries.getUserProfile": "get-user-profile",
     "categories.queries.listForSettings": "categories-list-for-settings",
+    "savedExpenseSearches.mutations.recordRecentExpenseSearch": "record-recent",
+    "savedExpenseSearches.queries.listSavedExpenseSearches": "list-saved",
   }),
 }));
 
@@ -1326,5 +1328,147 @@ describe("ExpenseSearchPage", () => {
     await user.type(screen.getByLabelText("キーワード"), "北浜");
     await user.click(screen.getByRole("button", { name: "絞り込む" }));
     await waitFor(() => expect(screen.queryByText(/明細\d+件を選択中/)).not.toBeInTheDocument());
+  });
+
+  describe("保存した検索・最近の検索", () => {
+    const recordRecentMock = vi.fn();
+
+    beforeEach(() => {
+      recordRecentMock.mockReset();
+      recordRecentMock.mockResolvedValue("recent-id");
+      useMutationMock.mockImplementation((endpoint: unknown) =>
+        endpoint === "record-recent" ? recordRecentMock : vi.fn(),
+      );
+    });
+
+    function renderAt(path: string) {
+      return renderWithDatePickers(
+        <MemoryRouter initialEntries={[path]}>
+          <ExpenseSearchPage />
+          <LocationProbe />
+          <Routes>
+            <Route path="/search" element={<div />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    }
+
+    it("適用中の条件が無いときは保存ボタンが無効", () => {
+      renderAt("/search");
+      expect(screen.getByRole("button", { name: "この条件を保存" })).toBeDisabled();
+    });
+
+    it("条件が適用されていれば保存ボタンが有効になる", () => {
+      renderAt("/search?q=%E5%8C%97%E6%B5%9C");
+      expect(screen.getByRole("button", { name: "この条件を保存" })).toBeEnabled();
+    });
+
+    it("「絞り込む」で条件1つ以上の検索を適用すると最近の検索へ正規化したqueryを記録する", async () => {
+      const user = userEvent.setup();
+      renderAt("/search");
+
+      await user.type(screen.getByLabelText("キーワード"), "北浜");
+      await user.type(screen.getByLabelText("金額の下限"), "9000");
+      await user.click(screen.getByRole("button", { name: "絞り込む" }));
+
+      expect(screen.getByText("/search?q=%E5%8C%97%E6%B5%9C&min=9000")).toBeInTheDocument();
+      expect(recordRecentMock).toHaveBeenCalledTimes(1);
+      expect(recordRecentMock).toHaveBeenCalledWith({ query: "q=%E5%8C%97%E6%B5%9C&min=9000" });
+    });
+
+    it("条件が1つも無い検索や並び順だけの適用は記録しない", async () => {
+      const user = userEvent.setup();
+      renderAt("/search");
+
+      await user.click(screen.getByRole("button", { name: "絞り込む" }));
+      await user.click(screen.getByRole("button", { name: "金額が大きい順" }));
+      await user.click(screen.getByRole("button", { name: "絞り込む" }));
+
+      expect(screen.getByText("/search?sort=amountDesc")).toBeInTheDocument();
+      expect(recordRecentMock).not.toHaveBeenCalled();
+    });
+
+    it("チップ削除・すべてクリアでは記録しない", async () => {
+      const user = userEvent.setup();
+      renderAt("/search?q=%E5%BA%97&min=1000");
+
+      const keywordChip = screen
+        .getByText("キーワード: 店")
+        .closest(".MuiChip-root") as HTMLElement;
+      await user.click(keywordChip.querySelector(".MuiChip-deleteIcon") as Element);
+      expect(screen.getByText("/search?min=1000")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "すべてクリア" }));
+      expect(screen.getByText("/search")).toBeInTheDocument();
+      expect(recordRecentMock).not.toHaveBeenCalled();
+    });
+
+    it("記録に失敗しても検索は進む", async () => {
+      const user = userEvent.setup();
+      recordRecentMock.mockRejectedValue(new Error("down"));
+      renderAt("/search");
+
+      await user.type(screen.getByLabelText("キーワード"), "北浜");
+      await user.click(screen.getByRole("button", { name: "絞り込む" }));
+
+      expect(screen.getByText("/search?q=%E5%8C%97%E6%B5%9C")).toBeInTheDocument();
+      expect(recordRecentMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("不正な条件は適用も記録もしない", async () => {
+      const user = userEvent.setup();
+      renderAt("/search");
+
+      await user.type(screen.getByLabelText("金額の下限"), "9000");
+      await user.type(screen.getByLabelText("金額の上限"), "100");
+      await user.click(screen.getByRole("button", { name: "絞り込む" }));
+
+      expect(recordRecentMock).not.toHaveBeenCalled();
+    });
+    it("保存した検索を選ぶと、未適用の入力を残さずフォーム全体を保存条件に置き換える", async () => {
+      const user = userEvent.setup();
+      const baseImpl = useQueryMock.getMockImplementation();
+      useQueryMock.mockImplementation((endpoint: unknown, args: unknown) =>
+        endpoint === "list-saved"
+          ? {
+              saved: [{ id: "s1", name: "高額", query: "min=9000", createdAt: 1, updatedAt: 1 }],
+              recent: [],
+            }
+          : baseImpl?.(endpoint, args),
+      );
+      renderAt("/search?q=%E5%BA%97");
+
+      await user.type(screen.getByLabelText("金額の上限"), "5000");
+      await user.click(screen.getByRole("button", { name: /^高額(?!を)/ }));
+
+      expect(screen.getByText("/search?min=9000")).toBeInTheDocument();
+      expect(screen.getByLabelText("キーワード")).toHaveValue("");
+      expect(screen.getByLabelText("金額の上限")).toHaveValue("");
+      expect(screen.getByLabelText("金額の下限")).toHaveValue("9000");
+    });
+
+    it("現在と同じ条件を選び直すと遷移せず結果を取り直す", async () => {
+      const user = userEvent.setup();
+      const baseImpl = useQueryMock.getMockImplementation();
+      useQueryMock.mockImplementation((endpoint: unknown, args: unknown) =>
+        endpoint === "list-saved"
+          ? { saved: [], recent: [{ id: "r1", query: "min=9000", createdAt: 1, updatedAt: 1 }] }
+          : baseImpl?.(endpoint, args),
+      );
+      renderAt("/search?min=9000");
+      const requestedKeys = () =>
+        useQueriesMock.mock.calls.flatMap(([queries]) => Object.keys(queries));
+      expect(requestedKeys()).not.toContain("historySearch:1");
+
+      await user.click(
+        within(screen.getByRole("list", { name: "最近の検索" })).getByRole("button", {
+          name: /9,000円以上/,
+        }),
+      );
+
+      expect(screen.getByText("/search?min=9000")).toBeInTheDocument();
+      // refreshResults で検索リクエストが振り直される
+      expect(requestedKeys()).toContain("historySearch:1");
+    });
   });
 });
