@@ -22,6 +22,8 @@ const TEST_PATHSPEC_EXCLUDES = [
   ":(exclude,glob)**/testFixtures.*",
   ":(exclude,glob)**/testHelpers.*",
 ];
+/** 文言が head にまだ残っているかを探す範囲。画面の文言は lib・convex の定義（既定カテゴリ等）からも出る。 */
+export const REMAINING_COPY_PATHSPECS = ["src", "lib", "convex", ...TEST_PATHSPEC_EXCLUDES];
 const E2E_TITLE_PATTERN = /^\s*(?:await\s+)?test(?:\.\w+)*\(\s*["'`]/;
 
 const MAX_BUFFER = 256 * 1024 * 1024;
@@ -132,8 +134,8 @@ export function checkCopyDrift({ base, head }) {
   if (removedStrings.length === 0) {
     return [];
   }
-  const srcLines = stripRef(gitGrepAll(head, ["src", ...TEST_PATHSPEC_EXCLUDES]), head).map(
-    (entry) => entry.replace(/^[^:]+:\d+:/, ""),
+  const srcLines = stripRef(gitGrepAll(head, REMAINING_COPY_PATHSPECS), head).map((entry) =>
+    entry.replace(/^[^:]+:\d+:/, ""),
   );
   const e2eLines = stripRef(gitGrepAll(head, ["e2e"]), head).flatMap((entry) => {
     const match = /^(.+?):(\d+):(.*)$/.exec(entry);

@@ -5,7 +5,17 @@ import {
   findCopyDrift,
   isTestSourcePath,
   parseRemovedSourceLines,
+  REMAINING_COPY_PATHSPECS,
 } from "./check-e2e-copy-drift.mjs";
+
+describe("remaining copy search scope", () => {
+  // 既定カテゴリ（lib/domain/categories/defaults.ts）等、画面の文言は lib・convex からも出る。
+  // src だけを探すと、E2E用データから同じ語を外しただけで無関係なE2Eを誤検知する。
+  it("searches src, lib and convex for copy that still exists, excluding test helpers", () => {
+    expect(REMAINING_COPY_PATHSPECS.slice(0, 3)).toEqual(["src", "lib", "convex"]);
+    expect(REMAINING_COPY_PATHSPECS).toContain(":(exclude,glob)**/*.test.*");
+  });
+});
 
 const DIFF = [
   "diff --git a/src/pages/Group.tsx b/src/pages/Group.tsx",
