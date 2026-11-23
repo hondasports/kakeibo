@@ -1270,6 +1270,13 @@
     display: none;
   }
 
+  /* 履歴検索で親行に週サマリー導線があるときは、明細行と同じく全幅の操作行として出す */
+  .receipt-group-header .receipt-row-actions:not(:empty) {
+    display: block;
+    grid-column: 1 / -1;
+    padding-top: var(--space-xs);
+  }
+
   .receipt-row--detail .receipt-row-name {
     padding-left: var(--space-md);
   }

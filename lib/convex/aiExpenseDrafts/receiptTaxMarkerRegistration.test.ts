@@ -10,7 +10,7 @@ const identity = { tokenIdentifier: userId, subject: userId, issuer: "https://is
 
 describe("軽減税率注記の保存と登録", () => {
   it.each([false, true])(
-    "保存後の再取得と登録で印字税額の矛盾を保護する（矛盾=%s）",
+    "印字税額の矛盾は保存後に確認でき、支払額と一致する税込額を登録する（矛盾=%s）",
     async (conflict) => {
       const t = convexTest(schema, convexTestModules);
       const { draftId, categoryId } = await t.run(async ({ db }) => {
@@ -120,37 +120,29 @@ describe("軽減税率注記の保存と登録", () => {
       });
       const retrieved = await client.query(api.aiExpenseDrafts.queries.getWithItems, { draftId });
       expect(retrieved).toBeTruthy();
-      if (conflict) {
-        expect(retrieved?.items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(
-          true,
-        );
-        await expect(
-          client.mutation(api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries, {
-            draftIds: [draftId],
-          }),
-        ).rejects.toThrow();
-      } else {
-        expect(retrieved?.draft.taxSummaries).toMatchObject([
-          { taxRatePercent: 8, taxableAmountYen: 246, taxYen: 19, status: "verified" },
-        ]);
-        expect(
-          retrieved?.items
-            .map((item) => item.normalizedAmountYen)
-            .sort((a, b) => (a ?? 0) - (b ?? 0)),
-        ).toEqual([116, 149]);
-        expect(retrieved?.items.every((item) => item.taxAllocationStatus === "allocated")).toBe(
-          true,
-        );
-        const result = await client.mutation(
-          api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries,
-          { draftIds: [draftId] },
-        );
-        expect(result.registeredDraftIds).toEqual([draftId]);
-        const entries = await t.run(async ({ db }) =>
-          Promise.all(result.createdExpenseEntryIds.map((id) => db.get(id))),
-        );
-        expect(entries.reduce((sum, item) => sum + (item?.amount ?? 0), 0)).toBe(265);
-      }
+      expect(retrieved?.draft.taxSummaries).toMatchObject([
+        {
+          taxRatePercent: 8,
+          taxableAmountYen: 246,
+          taxYen: conflict ? 20 : 19,
+          status: conflict ? "contradictory" : "verified",
+        },
+      ]);
+      expect(
+        retrieved?.items
+          .map((item) => item.normalizedAmountYen)
+          .sort((a, b) => (a ?? 0) - (b ?? 0)),
+      ).toEqual([116, 149]);
+      expect(retrieved?.items.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+      const result = await client.mutation(
+        api.aiExpenseDrafts.mutations.registerReadyDraftsAsExpenseEntries,
+        { draftIds: [draftId] },
+      );
+      expect(result.registeredDraftIds).toEqual([draftId]);
+      const entries = await t.run(async ({ db }) =>
+        Promise.all(result.createdExpenseEntryIds.map((id) => db.get(id))),
+      );
+      expect(entries.reduce((sum, item) => sum + (item?.amount ?? 0), 0)).toBe(265);
     },
   );
 });

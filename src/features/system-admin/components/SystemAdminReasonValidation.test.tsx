@@ -15,6 +15,7 @@ function Controlled({ kind }: { kind: "deletion" | "recovery" }) {
   const [reason, setReason] = useState("");
   return kind === "deletion" ? (
     <GroupDeletionResumeDialog
+      environment="preview"
       open
       targetGroupNameSnapshot="group"
       reason={reason}
@@ -26,6 +27,7 @@ function Controlled({ kind }: { kind: "deletion" | "recovery" }) {
     />
   ) : (
     <GroupOwnerlessRecoveryDialog
+      environment="preview"
       open
       group={{ id: "g", name: "group" }}
       target={{
@@ -65,6 +67,7 @@ describe("管理操作の理由の境界", () => {
       else if (kind === "invitation")
         render(
           <SystemAdminInvitationRevokeDialog
+            environment="preview"
             open
             group={{ id: "g", name: "group" }}
             invitation={{ id: "i", email: "a@example.test", createdAt: 0 }}

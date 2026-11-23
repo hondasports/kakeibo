@@ -10,6 +10,8 @@ import {
   isTaxRateDeclarationLine,
 } from "./summaryEvidence";
 
+import { findTaxRoundingCombinations } from "./normalizeAmounts";
+
 const TAX_EVIDENCE_CONFLICT = "contradictory_receipt_tax_evidence";
 const TAX_EVIDENCE_MISSING = "unresolved_receipt_tax_evidence";
 
@@ -24,7 +26,7 @@ function isAggregateTaxLine(rawText: string): boolean {
   );
 }
 
-export function deriveReceiptTaxSummaries(args: {
+type DeriveReceiptTaxSummariesArgs = {
   amountYen: number;
   items: ExtractedReceiptItem[];
   lines?: ReceiptRawObservationLine[];
@@ -32,13 +34,25 @@ export function deriveReceiptTaxSummaries(args: {
   correctedSummaries?: ExtractedTaxSummary[];
   allowEstimates?: boolean;
   paidTotalConfirmed?: boolean;
-}): ExtractedTaxSummary[] {
+};
+
+export function deriveReceiptTaxSummaries(
+  args: DeriveReceiptTaxSummariesArgs,
+): ExtractedTaxSummary[] {
+  return analyzeReceiptTaxSummaries(args).taxSummaries;
+}
+
+export function analyzeReceiptTaxSummaries(args: DeriveReceiptTaxSummariesArgs) {
   const { items } = args;
   if (
     items.length === 0 ||
     items.some((item) => item.taxRatePercent === null || item.amountBasis === "unknown")
   ) {
-    return [];
+    return {
+      taxSummaries: [],
+      printedPaymentTotalConflict: false,
+      printedTaxesByRate: new Map<TaxRatePercent, number[]>(),
+    };
   }
   const rates = [...new Set(items.map((item) => item.taxRatePercent!))];
   const lines = independentSummaryLines(args.lines, args.classifications).filter((line) => {
@@ -140,7 +154,7 @@ export function deriveReceiptTaxSummaries(args: {
     const text = line.rawText.normalize("NFKC").replace(/\s+/g, "");
     return text.includes("税") && !EXPLICIT_PAYMENT_TOTAL_LABEL.test(text);
   };
-  const totalConflict = lines.some(
+  const conflictingTotalLines = lines.filter(
     (line) =>
       isUnclassifiedTotalLabel(line) &&
       line.amountYen !== args.amountYen &&
@@ -151,6 +165,7 @@ export function deriveReceiptTaxSummaries(args: {
         isTaxConfusableTotalLabel(line)
       ),
   );
+  const totalConflict = conflictingTotalLines.length > 0;
   const estimatedExternal = buckets.filter(
     (bucket) =>
       bucket.rate !== 0 &&
@@ -163,18 +178,9 @@ export function deriveReceiptTaxSummaries(args: {
     .reduce((sum, bucket) => sum + (bucket.correctedTax ?? bucket.taxes[0] ?? 0), 0);
   const requiredTax =
     args.amountYen - items.reduce((sum, item) => sum + item.printedAmountYen, 0) - fixedTax;
-  const combinations = estimatedExternal.reduce<number[][]>(
-    (current, bucket) =>
-      current.flatMap((values) =>
-        [...new Set([Math.floor(bucket.exactTax), Math.ceil(bucket.exactTax)])].map((tax) => [
-          ...values,
-          tax,
-        ]),
-      ),
-    [[]],
-  );
-  const matches = combinations.filter(
-    (values) => values.reduce((sum, tax) => sum + tax, 0) === requiredTax,
+  const matches = findTaxRoundingCombinations(
+    estimatedExternal.map(({ exactTax }) => exactTax),
+    requiredTax,
   );
   const resolvedExternal = new Map<TaxRatePercent, number>(
     matches.length === 1
@@ -359,7 +365,7 @@ export function deriveReceiptTaxSummaries(args: {
   });
   const estimatedTotalConflict =
     derived.reduce((sum, summary) => sum + summary.taxIncludedAmountYen!, 0) !== args.amountYen;
-  return derived.map((summary) =>
+  const taxSummaries = derived.map((summary) =>
     combinedTargetConflict ||
     subtotalConflict ||
     (ambiguousEstimatedTax && estimatedRates.has(summary.taxRatePercent)) ||
@@ -368,4 +374,11 @@ export function deriveReceiptTaxSummaries(args: {
       ? { ...summary, warnings: [...new Set([...summary.warnings, TAX_EVIDENCE_CONFLICT])] }
       : summary,
   );
+  return {
+    taxSummaries,
+    printedPaymentTotalConflict: conflictingTotalLines.some((line) =>
+      Number.isSafeInteger(line.amountYen),
+    ),
+    printedTaxesByRate: new Map(buckets.map(({ rate, taxes }) => [rate, taxes])),
+  };
 }

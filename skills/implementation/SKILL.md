@@ -59,7 +59,7 @@ preflightの後、**最初の編集の前**に読む。コミット前にもう�
 - 変更後は、型・lint・直接影響するunitを必ず流し直す。コマンドの成否は**終了コード**で確認し、出力の一部だけで判断しない。
 - browser層の受入条件は `skills/test-design` に従い確認方法を選ぶ。ローカルで証明が要る場面は `docs/development-process.md` の「Verification」に従う（マージ判定はCI）。ローカルで対象specを確かめるときは `pnpm run e2e:isolated -- <spec>` を使う。pathだけを理由にローカル全E2Eを要求しない。
 - repo全体の回帰はCIを正本とし、同じ全件をローカルで理由なく重複しない（`docs/development-process.md` の Verification）。
-- UI文言や表示の変更は、その文言を前提にしている既存のunit・E2Eを検索し、期待を更新する。
+- UI文言や表示の変更は、その文言を前提にしている既存のunit・E2Eを検索し、期待を更新する。E2Eへの旧文言の残存は `node scripts/check-e2e-copy-drift.mjs` で検出できる（作業ツリーではなく `HEAD` を検査するため、文言変更をcommitしてから実行する。CIのLintでも実行）。
 
 ## コミット前: 差分から対応表を作り直す
 

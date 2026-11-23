@@ -1,15 +1,33 @@
+import { useEffect, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { Alert, Box, Button, Stack, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { ExpenseEntryForm } from "../components/ExpenseEntryForm";
+import { RecurringDueSection } from "../components/RecurringDueSection";
+import type { ExpenseEntryPrefill } from "../types/prefill";
 import { WEEK_SESSION_LOAD_ERROR_MESSAGE, WeekNavigator, WeekStatusPanel } from "../../week";
 import { useInputPageWeek } from "../hooks/useInputPageWeek";
 import { SuzumemoLoadingState } from "../../ui";
 
 export function InputPage() {
   const theme = useTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
+  // 複写内容は1回だけ適用する。フォームが非同期データの到着後に
+  // マウントされても失われないよう初回レンダー時点で捕捉し、
+  // location.state は消して週移動等の再マウントでの再適用を防ぐ。
+  const [initialPrefill] = useState(
+    () => (location.state as { prefill?: ExpenseEntryPrefill } | null)?.prefill,
+  );
+  const [prefillApplied, setPrefillApplied] = useState(false);
+  useEffect(() => {
+    if (initialPrefill !== undefined) {
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const isCompact = !useMediaQuery(theme.breakpoints.up("md"));
   const {
     weekStartDate,
@@ -27,6 +45,14 @@ export function InputPage() {
   const weekSummary = useQuery(api.receipts.summaries.getWeekSummary, {
     weekStartDate,
   });
+
+  // フォームが一度マウントしたら複写内容を消費済みにする。
+  // 週移動でフォームが再マウントされても保存済みの内容を再適用しないため。
+  useEffect(() => {
+    if (initialPrefill !== undefined && categories !== undefined && weekSession !== null) {
+      setPrefillApplied(true);
+    }
+  }, [initialPrefill, categories, weekSession]);
 
   if (isLoading && !weekSession) {
     return (
@@ -98,7 +124,9 @@ export function InputPage() {
                 カテゴリがまだ登録されていません。支出を記録するには、設定でカテゴリを追加してください。
               </Alert>
             )}
+            <RecurringDueSection />
             <ExpenseEntryForm
+              initialPrefill={prefillApplied ? undefined : initialPrefill}
               weekStartDate={weekStartDate}
               weekEndDate={weekEndDate}
               categories={categories}

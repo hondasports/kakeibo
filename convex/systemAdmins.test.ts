@@ -381,3 +381,154 @@ describe("system admin authorization lifecycle", () => {
     ).resolves.toHaveLength(0);
   });
 });
+
+describe("listSystemAdminAuditLogs: groupRelation", () => {
+  // groupId の関係の種類ごとに専用 index で絞り込む。acceptance: #1507
+  it("direct/source/target の関係ごとに別グループの行を混ぜずに絞り込む", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const users = await seedUsers(t, ["owner", "actor"]);
+    await addAdmin(t, users.owner);
+    const owner = t.withIdentity(identity("owner"));
+    const [groupA, groupB] = await t.run(async (ctx) => {
+      const a = await ctx.db.insert("groups", {
+        name: "グループA",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const b = await ctx.db.insert("groups", {
+        name: "グループB",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      return [a, b];
+    });
+    await t.run(async (ctx) => {
+      const base = {
+        actorType: "system_admin" as const,
+        actorUserId: users.actor,
+        targetKind: "user" as const,
+        result: "success" as const,
+      };
+      // 対象がグループAそのもの（direct）
+      await ctx.db.insert("systemAdminAuditLogs", {
+        ...base,
+        action: "system_admin_group_deletion_resumed",
+        targetKind: "group",
+        targetId: groupA,
+        reason: "direct-A",
+        createdAt: 10,
+      });
+      // 移動元がグループA（source）
+      await ctx.db.insert("systemAdminAuditLogs", {
+        ...base,
+        action: "system_admin_membership_transferred",
+        targetUserId: users.actor,
+        sourceGroupId: groupA,
+        targetGroupId: groupB,
+        reason: "source-A",
+        createdAt: 20,
+      });
+      // 移動先がグループA（target）
+      await ctx.db.insert("systemAdminAuditLogs", {
+        ...base,
+        action: "system_admin_membership_transferred",
+        targetUserId: users.actor,
+        sourceGroupId: groupB,
+        targetGroupId: groupA,
+        reason: "target-A",
+        createdAt: 30,
+      });
+      // どの関係でもグループAに紐付かない行
+      await ctx.db.insert("systemAdminAuditLogs", {
+        ...base,
+        action: "system_admin_group_deletion_resumed",
+        targetKind: "group",
+        targetId: groupB,
+        reason: "unrelated-B",
+        createdAt: 40,
+      });
+    });
+
+    const list = (groupRelation?: "direct" | "source" | "target", action?: string) =>
+      owner.query(api.systemAdmins.listSystemAdminAuditLogs, {
+        paginationOpts: { numItems: 10, cursor: null },
+        groupId: groupA,
+        groupRelation,
+        action: action as never,
+      });
+
+    const direct = await list("direct");
+    expect(direct.page.map((log) => log.reason)).toEqual(["direct-A"]);
+
+    const source = await list("source");
+    expect(source.page.map((log) => log.reason)).toEqual(["source-A"]);
+
+    const target = await list("target");
+    expect(target.page.map((log) => log.reason)).toEqual(["target-A"]);
+
+    // groupRelation 未指定は direct と同じ
+    const defaulted = await list(undefined);
+    expect(defaulted.page.map((log) => log.reason)).toEqual(["direct-A"]);
+  });
+
+  it("groupId と action・actor・targetUserId を組み合わせて絞り込む", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const users = await seedUsers(t, ["owner", "actorA", "actorB", "targetUser"]);
+    await addAdmin(t, users.owner);
+    const owner = t.withIdentity(identity("owner"));
+    const groupA = await t.run(async (ctx) =>
+      ctx.db.insert("groups", {
+        name: "グループA",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+    await t.run(async (ctx) => {
+      const base = {
+        actorType: "system_admin" as const,
+        targetKind: "user" as const,
+        result: "success" as const,
+      };
+      await ctx.db.insert("systemAdminAuditLogs", {
+        ...base,
+        action: "system_admin_membership_transferred",
+        actorUserId: users.actorA,
+        targetUserId: users.targetUser,
+        sourceGroupId: groupA,
+        reason: "actorA-target",
+        createdAt: 10,
+      });
+      await ctx.db.insert("systemAdminAuditLogs", {
+        ...base,
+        action: "system_admin_membership_transferred",
+        actorUserId: users.actorB,
+        targetUserId: users.targetUser,
+        sourceGroupId: groupA,
+        reason: "actorB-target",
+        createdAt: 20,
+      });
+      await ctx.db.insert("systemAdminAuditLogs", {
+        ...base,
+        action: "system_admin_group_role_changed",
+        actorUserId: users.actorA,
+        targetUserId: users.actorB,
+        sourceGroupId: groupA,
+        reason: "actorA-other-action",
+        createdAt: 30,
+      });
+    });
+
+    const scoped = await owner.query(api.systemAdmins.listSystemAdminAuditLogs, {
+      paginationOpts: { numItems: 10, cursor: null },
+      groupId: groupA,
+      groupRelation: "source",
+      action: "system_admin_membership_transferred",
+      actorUserId: users.actorA,
+      targetUserId: users.targetUser,
+    });
+    expect(scoped.page.map((log) => log.reason)).toEqual(["actorA-target"]);
+  });
+});

@@ -96,7 +96,7 @@ export async function getCurrentClerkTokenIdentifier(page: Page): Promise<string
 async function ensureE2eGroup(page: Page) {
   await page.goto("/");
 
-  const setupHeading = page.getByRole("heading", { name: "家族グループを作成" });
+  const setupHeading = page.getByRole("heading", { level: 1, name: "グループを作成", exact: true });
   const dashboardHeading = page.getByRole("heading", {
     level: 1,
     name: "今週のダッシュボード",

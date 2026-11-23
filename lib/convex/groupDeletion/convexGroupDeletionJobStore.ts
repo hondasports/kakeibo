@@ -26,7 +26,7 @@ export function groupDeletionJobDocToRecord(doc: Doc<"groupDeletionJobs">): Grou
     snapshotCursor: doc.snapshotCursor,
     failureNotificationHandledAt: doc.failureNotificationHandledAt,
     failureNotificationAttemptCount: doc.failureNotificationAttemptCount,
-    deletedCounts: doc.deletedCounts,
+    deletedCounts: { entryFavorites: 0, ...doc.deletedCounts },
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
     completedAt: doc.completedAt,

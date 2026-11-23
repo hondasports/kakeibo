@@ -10,6 +10,7 @@ import { CategoryBreakdownCard } from "../../summary-shared/components/CategoryB
 import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
 import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
 import { incomeItemToReceiptItem, type ReceiptItem } from "../../summary-shared/types/types";
+import { receiptItemToEntryPrefill } from "../../summary-shared/lib/receiptToEntryPrefill";
 import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
 import { SummarySectionErrorBoundary } from "../../summary-shared/components/SummarySectionErrorBoundary";
 import { getCurrentWeekStartDate } from "../../week";
@@ -32,7 +33,15 @@ function scrollToDetailHeading(heading: HTMLElement) {
   heading.focus({ preventScroll: true });
 }
 
-function MonthlySummarySection({ month, onRetry }: { month: string; onRetry: () => void }) {
+function MonthlySummarySection({
+  isCurrentMonth,
+  month,
+  onRetry,
+}: {
+  isCurrentMonth: boolean;
+  month: string;
+  onRetry: () => void;
+}) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   // 利用者が日付を選んだ直後だけ true にする。?date= 付きの初回表示や戻る/進むではスクロールしない
@@ -47,6 +56,7 @@ function MonthlySummarySection({ month, onRetry }: { month: string; onRetry: () 
   const deleteExpenseEntry = useMutation(api.expenseEntries.mutations.deleteExpenseEntry);
   const deleteReceipt = useMutation(api.receipts.crud.deleteReceipt);
   const monthlySummary = useQuery(api.receipts.summaries.getMonthSummaryWithCategories, { month });
+  const myGroup = useQuery(api.groups.queries.getMyGroup);
   const categoriesResult = useQuery_experimental({
     query: api.categories.queries.listActive,
     args: {},
@@ -154,8 +164,10 @@ function MonthlySummarySection({ month, onRetry }: { month: string; onRetry: () 
 
       <MonthlyMetricsPanel
         isLoading={isSummaryLoading}
+        monthlyBudgetYen={myGroup?.monthlyBudgetYen ?? undefined}
         netAmountYen={summary.netAmountYen}
         scopeLabel={selectedDate ? "集計範囲：月全体" : undefined}
+        showBudget={isCurrentMonth}
         totalAmountYen={summary.totalAmountYen}
         totalIncomeYen={summary.totalIncomeYen}
       />
@@ -197,6 +209,11 @@ function MonthlySummarySection({ month, onRetry }: { month: string; onRetry: () 
         }
         isLoading={isSummaryLoading}
         listAriaLabel={dateLabel ? `${dateLabel}の支出一覧` : "月次サマリーの支出一覧"}
+        onCopyReceipt={(receipt) =>
+          navigate("/weeks/current/input", {
+            state: { prefill: receiptItemToEntryPrefill(receipt) },
+          })
+        }
         onDeleteReceipt={setDeletingReceipt}
         onEditReceipt={setEditingReceipt}
         receipts={visibleReceipts}
@@ -330,6 +347,7 @@ export function MonthlySummaryPage() {
 
         <SummarySectionErrorBoundary message="月次サマリーを読み込めませんでした。">
           <MonthlySummarySection
+            isCurrentMonth={month === currentMonth}
             key={sectionRetryKey}
             month={month}
             onRetry={() => setSectionRetryKey((key) => key + 1)}

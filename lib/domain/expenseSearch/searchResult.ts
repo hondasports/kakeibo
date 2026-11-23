@@ -1,3 +1,4 @@
+import type { AiExpenseRegistrationMode } from "../aiExpenseDrafts/receiptDataContract";
 import type { EntryKind } from "../common/entryKind";
 import type { RecordType } from "../common/recordKind";
 import type { HistoryAggregate, HistoryComparison, HistoryTrendPoint } from "./analytics";
@@ -21,6 +22,8 @@ export type ExpenseSearchReceipt = {
   receiptGroupId?: string;
   receiptShopName?: string;
   receiptTotalAmountYen?: number;
+  aiExpenseDraftId?: string;
+  registrationMode?: AiExpenseRegistrationMode;
 };
 
 export type ExpenseSearchResult = {
@@ -65,7 +68,9 @@ export function collectCategoryIds(groups: SearchableHistoryGroup[]): string[] {
   return Array.from(
     new Set(
       groups.flatMap((group) =>
-        group.type === "income" ? [] : group.items.map((item) => item.categoryId),
+        group.type === "income"
+          ? []
+          : group.items.map((item) => item.categoryId).filter((id) => id.length > 0),
       ),
     ),
   );
@@ -99,7 +104,7 @@ export function mapHistoryGroupToItems(
       shopName: item.shopName,
       amountYen: item.amountYen,
       categoryId: item.categoryId,
-      categoryName: info?.name ?? "不明",
+      categoryName: item.categoryId.length === 0 ? "未分類" : (info?.name ?? "不明"),
       categoryColor: info?.color ?? "#AAB7C4",
       memo: item.memo,
       recordType: item.recordType,
@@ -107,6 +112,8 @@ export function mapHistoryGroupToItems(
       receiptGroupId: item.receiptGroupId,
       receiptShopName: item.receiptShopName,
       receiptTotalAmountYen: item.receiptTotalAmountYen,
+      aiExpenseDraftId: item.aiExpenseDraftId,
+      registrationMode: item.registrationMode,
     };
   });
 }

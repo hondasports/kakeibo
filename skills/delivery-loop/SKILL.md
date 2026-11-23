@@ -72,10 +72,10 @@ license: Apache-2.0
 
 `preview`・`main` は完了地点が `merged` のときだけ。直前に最新HEADで全条件を取り直す。GitHubがマージを許しても条件の確認は必要。
 
-- **必須checkの揃い方**。base `main` は次の一覧を `gh pr checks <番号> --json name,state` の最新HEADと照合する。`--required` は報告済みcheckだけを絞るので、未登録の必須checkを拾えない。
-  - Ruleset: `gh api repos/{owner}/{repo}/rules/branches/main --jq '.[]|select(.type=="required_status_checks")|.parameters.required_status_checks[].context'`
-  - Branch protectionがあれば加算: `gh api repos/{owner}/{repo}/branches/main --jq '.protection.required_status_checks.contexts[]'`
-  - base `preview` はrulesetの必須checkがないため、最新HEADに `ci.yml`・`e2e.yml`・`pr-update-spec.yml` のrunが揃うことを確認。
+- **必須checkの揃い方**。base（`main`・`preview`）の次の一覧を `gh pr checks <番号> --json name,state` の最新HEADと照合する。`--required` は報告済みcheckだけを絞るので、未登録の必須checkを拾えない。
+  - Ruleset: `gh api repos/{owner}/{repo}/rules/branches/<base> --jq '.[]|select(.type=="required_status_checks")|.parameters.required_status_checks[].context'`
+  - Branch protectionがあれば加算: `gh api repos/{owner}/{repo}/branches/<base> --jq '.protection.required_status_checks.contexts[]'`
+  - base `preview` は必須checkに加えて、最新HEADに `pr-update-spec.yml` のrunが揃うことも確認。
 - **結果**。全check success。workflow条件のskipは可、failure・cancelled・pendingは不可。未対応finding・未解決threadは各0、conflictなし。
 - **方式と事後**。方式はユーザー指定、なければ同じbaseの直近マージ済みPRと同じ。PRのmerged状態とマージ先の新SHAを確認し、`preview` なら `preview-deploy.yml` の結果も報告。
 

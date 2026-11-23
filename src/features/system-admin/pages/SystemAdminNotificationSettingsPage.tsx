@@ -34,8 +34,10 @@ import {
   getNormalizeReasonErrorMessage,
   normalizeSystemAdminReason,
 } from "../../../../lib/domain/systemAdmin/reason";
+import { MAX_REASON_LENGTH } from "../../../../lib/domain/systemAdmin/reason";
 import type { TransactionalEmailType } from "../../../../lib/email/model";
 import { SystemAdminPageFrame } from "./SystemAdminPageFrame";
+import { SystemAdminEnvironmentNotice } from "../components/SystemAdminEnvironmentNotice";
 
 type PendingChange = {
   type: TransactionalEmailType;
@@ -46,6 +48,7 @@ type PendingChange = {
 
 export function SystemAdminNotificationSettingsPage() {
   const settings = useQuery(api.notificationSettings.getNotificationSettings);
+  const context = useQuery(api.systemAdmins.getMySystemAdminContext);
   const updateSetting = useMutation(api.notificationSettings.updateNotificationSetting);
   const [pending, setPending] = useState<PendingChange | null>(null);
   const [reason, setReason] = useState("");
@@ -92,6 +95,19 @@ export function SystemAdminNotificationSettingsPage() {
   };
 
   const mandatoryDisable = pending !== null && pending.mandatory && !pending.enabled;
+  const normalizedReason = reason.trim();
+  const reasonResult = normalizeSystemAdminReason(normalizedReason);
+  const reasonFieldError =
+    normalizedReason.length === 0
+      ? ""
+      : reasonResult.success
+        ? ""
+        : getNormalizeReasonErrorMessage(reasonResult.error);
+  const canSave =
+    context !== undefined &&
+    normalizedReason.length > 0 &&
+    reasonResult.success &&
+    !(mandatoryDisable && !confirmed);
 
   return (
     <SystemAdminPageFrame
@@ -169,16 +185,19 @@ export function SystemAdminNotificationSettingsPage() {
         <DialogContent>
           {pending ? (
             <Stack spacing={2} sx={{ mt: 1 }}>
+              <SystemAdminEnvironmentNotice environment={context?.environment ?? "確認中"} />
               <Typography>
                 {NOTIFICATION_TYPE_LABELS[pending.type]}（
                 {NOTIFICATION_CHANNEL_LABELS[pending.channel]}）を
                 {pending.enabled ? "ON" : "OFF"}にします。
               </Typography>
-              {mandatoryDisable ? (
-                <Alert severity="warning" variant="outlined">
-                  このメールは必須通知です。OFFにするとユーザーに送信されなくなります。
+              {pending.enabled ? null : (
+                <Alert severity={pending.mandatory ? "warning" : "info"} variant="outlined">
+                  {pending.mandatory
+                    ? "このメールは必須通知です。OFFにするとユーザーに送信されなくなります。"
+                    : "OFFにすると対象ユーザーへこの通知が届かなくなります。"}
                 </Alert>
-              ) : null}
+              )}
               {dialogError ? (
                 <Alert severity="error" variant="outlined">
                   {dialogError}
@@ -187,14 +206,22 @@ export function SystemAdminNotificationSettingsPage() {
               <TextField
                 autoFocus
                 disabled={saving}
+                error={Boolean(reasonFieldError)}
                 fullWidth
-                slotProps={{ htmlInput: { maxLength: 500 } }}
+                helperText={reasonFieldError || "監査目的の理由を入力してください"}
                 label="変更理由（必須）"
                 multiline
                 onChange={(event) => setReason(event.target.value)}
                 required
                 value={reason}
               />
+              <Typography
+                aria-live="polite"
+                color={normalizedReason.length > MAX_REASON_LENGTH ? "error" : "text.secondary"}
+                variant="caption"
+              >
+                {normalizedReason.length}/{MAX_REASON_LENGTH}文字
+              </Typography>
               {mandatoryDisable ? (
                 <FormControlLabel
                   control={
@@ -215,7 +242,7 @@ export function SystemAdminNotificationSettingsPage() {
             キャンセル
           </Button>
           <Button
-            disabled={saving || reason.trim().length === 0 || (mandatoryDisable && !confirmed)}
+            disabled={saving || !canSave}
             onClick={() => void handleSave()}
             variant="contained"
           >

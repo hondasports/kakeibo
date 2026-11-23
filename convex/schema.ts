@@ -186,6 +186,7 @@ export default defineSchema({
     name: v.string(),
     clerkOrganizationId: v.optional(v.string()),
     defaultCategoriesSeedVersion: v.optional(v.number()),
+    monthlyBudgetYen: v.optional(v.number()),
     status: v.optional(v.union(...GROUP_LIFECYCLE_STATUSES.map((value) => v.literal(value)))),
     deletedAt: v.optional(v.number()),
     archivedAt: v.optional(v.number()),
@@ -317,7 +318,9 @@ export default defineSchema({
       "targetUserId",
       "createdAt",
     ])
-    .index("by_target_kind_and_target_id_and_created_at", ["targetKind", "targetId", "createdAt"]),
+    .index("by_target_kind_and_target_id_and_created_at", ["targetKind", "targetId", "createdAt"])
+    .index("by_source_group_id_and_created_at", ["sourceGroupId", "createdAt"])
+    .index("by_target_group_id_and_created_at", ["targetGroupId", "createdAt"]),
 
   systemAdminNotifications: defineTable({
     action: systemAdminNotificationActionValidator,
@@ -455,6 +458,53 @@ export default defineSchema({
     .index("by_group_id_and_category_id_and_date", ["groupId", "categoryId", "date"])
     .index("by_group_id_and_source_document_id", ["groupId", "sourceDocumentId"])
     .index("by_group_id_and_ai_expense_draft_id", ["groupId", "aiExpenseDraftId"]),
+
+  recurringEntryRules: defineTable({
+    groupId: v.id("groups"),
+    createdByUserId: v.optional(v.string()),
+    kind: entryKindValidator,
+    title: v.string(),
+    amountYen: v.number(),
+    // 支出の場合に必須。収入はカテゴリを持たないため optional。
+    categoryId: v.optional(v.id("categories")),
+    shopName: v.optional(v.string()),
+    memo: v.optional(v.string()),
+    frequency: v.union(v.literal("weekly"), v.literal("monthly")),
+    dayOfWeek: v.optional(v.number()),
+    dayOfMonth: v.optional(v.number()),
+    active: v.boolean(),
+    // 最後に登録した発生日（YYYY-MM-DD）。同じ発生日の二重登録を防ぐ。
+    registeredForDates: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_group_id", ["groupId"]),
+
+  // 入力画面で再利用する「お気に入りの支出項目」。個人単位×所属グループで保持する。
+  entryFavorites: defineTable({
+    userId: v.string(),
+    groupId: v.id("groups"),
+    title: v.string(),
+    categoryId: v.id("categories"),
+    amountYen: v.number(),
+    memo: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_id_and_group_id", ["userId", "groupId"])
+    .index("by_group_id", ["groupId"]),
+
+  // 履歴検索の「保存した検索（saved）」と「最近の検索（recent）」。個人単位×所属グループで保持する。
+  savedExpenseSearches: defineTable({
+    userId: v.string(),
+    groupId: v.id("groups"),
+    kind: v.union(v.literal("saved"), v.literal("recent")),
+    name: v.optional(v.string()),
+    query: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_id_and_group_id_and_kind", ["userId", "groupId", "kind"])
+    .index("by_group_id", ["groupId"]),
 
   receipts: defineTable({
     groupId: v.id("groups"),
