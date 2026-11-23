@@ -134,11 +134,19 @@ describe("round 2: helper test files and quoted paths", () => {
       "src/components/GroupSettingsPanelTestMocks.tsx",
       "src/test/apiMock.ts",
       "src/lib/testFixtures.ts",
-      "src/lib/groupFixtures.ts",
       "src/lib/testHelpers.ts",
     ]) {
       expect(isTestSourcePath(filePath), filePath).toBe(true);
     }
+  });
+
+  it("keeps E2E screen fixtures as sources because their values are rendered and asserted by E2E", () => {
+    expect(isTestSourcePath("src/routing/e2eFixtures.ts")).toBe(false);
+    const diff = diffFor(
+      "diff --git a/src/routing/e2eFixtures.ts b/src/routing/e2eFixtures.ts",
+      '  shopName: "ジャパン 明石稲美店",',
+    );
+    expect(parseRemovedSourceLines(diff)).toEqual(['  shopName: "ジャパン 明石稲美店",']);
   });
 
   it("does not extract removed lines of test helper files", () => {
