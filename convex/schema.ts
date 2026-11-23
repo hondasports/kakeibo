@@ -493,6 +493,19 @@ export default defineSchema({
     .index("by_user_id_and_group_id", ["userId", "groupId"])
     .index("by_group_id", ["groupId"]),
 
+  // 履歴検索の「保存した検索（saved）」と「最近の検索（recent）」。個人単位×所属グループで保持する。
+  savedExpenseSearches: defineTable({
+    userId: v.string(),
+    groupId: v.id("groups"),
+    kind: v.union(v.literal("saved"), v.literal("recent")),
+    name: v.optional(v.string()),
+    query: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_id_and_group_id_and_kind", ["userId", "groupId", "kind"])
+    .index("by_group_id", ["groupId"]),
+
   receipts: defineTable({
     groupId: v.id("groups"),
     // 既存データとの後方互換性を保ちつつ、E2E cleanupの削除範囲を限定する。
