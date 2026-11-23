@@ -32,7 +32,7 @@ export default defineConfig({
   },
   /* flaky テストの自動リトライは local/CI ともに 1 回に統一（#958） */
   retries: 1,
-  /* CIだけ: 失敗の連鎖でjob timeoutまで走り続けず、failureとして早く確定させる（#1550） */
+  /* GitHub Actions（GITHUB_ACTIONS=true）だけ: 失敗の連鎖でjob timeoutまで走り続けず、failureとして早く確定させる（#1550） */
   ...resolveE2ECiLimits(),
   /* 単一のClerkテストユーザーを使うため、認証・cleanup競合を避けて常に直列実行する */
   workers: 1,
