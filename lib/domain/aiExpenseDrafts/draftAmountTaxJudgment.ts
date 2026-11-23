@@ -60,6 +60,7 @@ export function analyzeRegistrationAmounts(
 function hasUnresolvedDiscountTarget(
   items: ReviewItemValues[],
   originalItems: ReviewItemValues[],
+  requiresProductTarget: boolean,
 ): boolean {
   const products = items.filter((item) => !isDiscountLine(item.itemName, item.lineType));
   const productsById = new Map(products.map((item) => [item.id, item]));
@@ -68,10 +69,14 @@ function hasUnresolvedDiscountTarget(
     if (!isDiscountLine(item.itemName, item.lineType) || Number(item.amountYen) >= 0) return false;
     const targetId = originalItems[index].discountTargetItemId;
     if (targetId === undefined) {
-      return !item.categoryId || !productCategories.has(item.categoryId);
+      return requiresProductTarget || !item.categoryId || !productCategories.has(item.categoryId);
     }
     const target = productsById.get(targetId);
-    return !target || item.taxRatePercent !== target.taxRatePercent;
+    return (
+      !target ||
+      item.taxRatePercent !== target.taxRatePercent ||
+      (requiresProductTarget && item.categoryId !== target.categoryId)
+    );
   });
 }
 
@@ -175,7 +180,12 @@ export function judgeDraftAmountAndTax(
   if (
     taxProblem ||
     storedTaxMismatch ||
-    (!amountError && hasUnresolvedDiscountTarget(preview.items, originalItems))
+    (!amountError &&
+      hasUnresolvedDiscountTarget(
+        preview.items,
+        originalItems,
+        draft.receiptDataContractVersion !== undefined,
+      ))
   ) {
     reasons.push("user_confirmation_required");
   }

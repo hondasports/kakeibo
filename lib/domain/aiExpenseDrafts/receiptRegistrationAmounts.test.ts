@@ -6,6 +6,7 @@ import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
 import { judgeDraftAmountAndTax } from "./draftAmountTaxJudgment";
 import { buildDraftRegistrationItems } from "./registrationItems";
+import { RECEIPT_DATA_CONTRACT_VERSION } from "./receiptDataContract";
 import { judgeReviewFormAmountAndTax } from "./reviewFormJudgment";
 import { getReviewGuidance } from "./reviewGuidance";
 import { buildReviewTaxEvidence, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
@@ -111,7 +112,24 @@ describe("印字税内訳に依存しない登録額", () => {
 
   it("税抜の端数配分が一意なら、税内訳が食い違っても支払額に合わせる", () => {
     const { draft, items } = receipt([104, 102], 224, "tax_excluded", [8, 10]);
-    draft.rawObservation.lines.push(observationLine("8%消費税 9円", 9, 1));
+    draft.rawObservation.lines.push(
+      observationLine("8%消費税 9円", 9, 1),
+      observationLine("10%消費税 10円", 10, 2),
+    );
+    const preview = buildReviewTaxPreview(mapDraftItemsToReviewItems(judgmentItems(items)), {
+      ...buildReviewTaxEvidence(draft),
+      paidTotalYen: 224,
+    });
+    expect(preview.taxSummaries[0]).toMatchObject({
+      taxYen: 9,
+      warnings: expect.arrayContaining(["contradictory_receipt_tax_evidence"]),
+    });
+    expect(
+      getReviewGuidance(mapDraftToReviewForm(draft), preview.items, {
+        ...draft,
+        taxSummaries: preview.taxSummaries,
+      }),
+    ).toContainEqual(expect.objectContaining({ taxSummaryIndex: 0, required: false }));
     const { plan, saved, savedItems } = save(draft, items);
     expect(plan.listSummary.amountAndTaxResolved).toBe(true);
     expect(savedItems.map((item) => item.normalizedAmountYen)).toEqual([112, 112]);
@@ -129,24 +147,28 @@ describe("印字税内訳に依存しない登録額", () => {
     expect(() => buildDraftRegistrationItems(saved, savedItems)).toThrow(/未確定/);
   });
 
-  it("明細と保存支払額が一致していても、別の支払合計の読み取りがあれば確認を求める", () => {
-    const { draft, items } = receipt([183, 183, 194], 560, "tax_included", [8, 8, 8]);
-    draft.rawObservation.lines[0] = {
-      ...observationLine("お支払合計 561円", 561, 0),
-      lineRoleCandidates: ["total"],
-    };
-    expect(judgeDraftAmountAndTax({ ...draft, items: judgmentItems(items) }).status).toBe(
-      "unresolved",
-    );
-  });
+  it.each(["お支払合計", "税込合計"])(
+    "明細と保存支払額が一致しても、%sが異なる場合は確認を求める",
+    (label) => {
+      const { draft, items } = receipt([183, 183, 194], 560, "tax_included", [8, 8, 8]);
+      draft.rawObservation.lines[0] = {
+        ...observationLine(`${label} 561円`, 561, 0),
+        lineRoleCandidates: ["total"],
+      };
+      expect(judgeDraftAmountAndTax({ ...draft, items: judgmentItems(items) }).status).toBe(
+        "unresolved",
+      );
+    },
+  );
 
-  it("税込の支払額が一致していても、商品に付け先のない割引は登録を止める", () => {
+  it("新規解析の下書きでは同カテゴリの商品が複数あっても割引先を保存するまで登録を止める", () => {
     const { draft, items } = receipt([170, 100, -10], 260, "tax_included", [8, 10, 8]);
-    items[1].categoryId = "other";
-    items[2] = { ...items[2], itemName: "割引", lineType: "discount", categoryId: undefined };
-    expect(judgeDraftAmountAndTax({ ...draft, items: judgmentItems(items) }).status).toBe(
-      "unresolved",
-    );
-    expect(() => buildDraftRegistrationItems(draft, items)).toThrow();
+    const extracted = { ...draft, receiptDataContractVersion: RECEIPT_DATA_CONTRACT_VERSION };
+    items[2] = { ...items[2], itemName: "割引", lineType: "discount" };
+    const plan = planDraftTaxInterpretation(extracted, items, {}, 1);
+    expect(plan.draftPatch.status).toBe("needs_review");
+    expect(() => buildDraftRegistrationItems(extracted, items)).toThrow(/未確定/);
+    items[2].discountTargetItemId = items[0].id;
+    expect(save(extracted, items).plan.draftPatch.status).toBe("ready");
   });
 });

@@ -72,7 +72,14 @@ export function getReviewGuidance(
         reasons.push(
           `商品合計 ${formatYen(row.currentYen ?? 0)} ／ レシートの${summary.taxRatePercent}%対象 ${formatYen(summary.taxableAmountYen)}。商品の税込／税抜・税率を確認してください`,
         );
-      if (row?.blockerCode === "basis-conflict" && row.reason) reasons.push(row.reason);
+      if (
+        (row?.blockerCode === "basis-conflict" ||
+          (isVerifiedTaxSummaryStatus(summary.status) &&
+            row?.blockerCode === "unverified-tax-summary")) &&
+        row.reason
+      ) {
+        reasons.push(row.reason);
+      }
       const unresolvedStatus =
         summary.status !== undefined && !isVerifiedTaxSummaryStatus(summary.status);
       if (!unresolvedStatus && reasons.length === 0) return;
