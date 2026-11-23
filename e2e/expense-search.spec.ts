@@ -73,7 +73,7 @@ test.describe("履歴検索（Issue #537 / #637〜#643）", () => {
 
     await page.goto("/search");
     await page.getByLabel("キーワード").fill("保存検索用");
-    await page.getByRole("button", { name: "絞り込む" }).click();
+    await page.getByRole("button", { name: "絞り込む", exact: true }).click();
     await expect(page).toHaveURL(/\/search\?q=/, { timeout: 10_000 });
     await expect(page.getByText("保存検索用スーパー東町").first()).toBeVisible({ timeout: 15_000 });
 
