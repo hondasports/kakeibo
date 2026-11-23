@@ -22,6 +22,7 @@ vi.mock("../../../../convex/_generated/api", () => ({
     "users.queries.getUserProfile": "get-user-profile",
     "categories.queries.listForSettings": "categories-list-for-settings",
     "savedExpenseSearches.mutations.recordRecentExpenseSearch": "record-recent",
+    "savedExpenseSearches.queries.listSavedExpenseSearches": "list-saved",
   }),
 }));
 
@@ -1423,6 +1424,51 @@ describe("ExpenseSearchPage", () => {
       await user.click(screen.getByRole("button", { name: "絞り込む" }));
 
       expect(recordRecentMock).not.toHaveBeenCalled();
+    });
+    it("保存した検索を選ぶと、未適用の入力を残さずフォーム全体を保存条件に置き換える", async () => {
+      const user = userEvent.setup();
+      const baseImpl = useQueryMock.getMockImplementation();
+      useQueryMock.mockImplementation((endpoint: unknown, args: unknown) =>
+        endpoint === "list-saved"
+          ? {
+              saved: [{ id: "s1", name: "高額", query: "min=9000", createdAt: 1, updatedAt: 1 }],
+              recent: [],
+            }
+          : baseImpl?.(endpoint, args),
+      );
+      renderAt("/search?q=%E5%BA%97");
+
+      await user.type(screen.getByLabelText("金額の上限"), "5000");
+      await user.click(screen.getByRole("button", { name: /^高額(?!を)/ }));
+
+      expect(screen.getByText("/search?min=9000")).toBeInTheDocument();
+      expect(screen.getByLabelText("キーワード")).toHaveValue("");
+      expect(screen.getByLabelText("金額の上限")).toHaveValue("");
+      expect(screen.getByLabelText("金額の下限")).toHaveValue("9000");
+    });
+
+    it("現在と同じ条件を選び直すと遷移せず結果を取り直す", async () => {
+      const user = userEvent.setup();
+      const baseImpl = useQueryMock.getMockImplementation();
+      useQueryMock.mockImplementation((endpoint: unknown, args: unknown) =>
+        endpoint === "list-saved"
+          ? { saved: [], recent: [{ id: "r1", query: "min=9000", createdAt: 1, updatedAt: 1 }] }
+          : baseImpl?.(endpoint, args),
+      );
+      renderAt("/search?min=9000");
+      const requestedKeys = () =>
+        useQueriesMock.mock.calls.flatMap(([queries]) => Object.keys(queries));
+      expect(requestedKeys()).not.toContain("historySearch:1");
+
+      await user.click(
+        within(screen.getByRole("list", { name: "最近の検索" })).getByRole("button", {
+          name: /9,000円以上/,
+        }),
+      );
+
+      expect(screen.getByText("/search?min=9000")).toBeInTheDocument();
+      // refreshResults で検索リクエストが振り直される
+      expect(requestedKeys()).toContain("historySearch:1");
     });
   });
 });

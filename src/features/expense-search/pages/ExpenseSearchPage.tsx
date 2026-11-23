@@ -272,6 +272,19 @@ export function ExpenseSearchPage() {
     }
   };
 
+  // 保存・最近の検索は未適用の入力を残さずフォーム全体を置き換える。
+  // 同じ条件の再選択はURLが変わらないため、結果を取り直す。
+  const handleApplySavedQuery = (query: string) => {
+    setDraft(readExpenseSearchFormState(new URLSearchParams(query)));
+    const nextKey = new URLSearchParams(query).toString();
+    setDraftKey(nextKey);
+    if (nextKey === appliedKey) {
+      refreshResults();
+      return;
+    }
+    navigate(`/search?${query}`);
+  };
+
   // 最近の検索の記録は補助機能のため、失敗しても検索は妨げない。
   const recordRecent = async (query: string) => {
     try {
@@ -341,7 +354,11 @@ export function ExpenseSearchPage() {
           state={applied}
           onChange={handleAppliedFilterChange}
         />
-        <SavedExpenseSearches applied={applied} isValid={appliedValidation.ok} />
+        <SavedExpenseSearches
+          applied={applied}
+          isValid={appliedValidation.ok}
+          onApply={handleApplySavedQuery}
+        />
 
         {appliedValidation.formError !== null ? (
           <Alert severity="error" variant="outlined">

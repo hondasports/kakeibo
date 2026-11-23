@@ -174,7 +174,7 @@ describe("savedExpenseSearches", () => {
     await expect(
       alice.mutation(api.savedExpenseSearches.mutations.saveExpenseSearch, {
         name: "a",
-        query: "x".repeat(501),
+        query: "x".repeat(2001),
       }),
     ).rejects.toThrow("検索条件が長すぎます");
     const list = await alice.query(api.savedExpenseSearches.queries.listSavedExpenseSearches, {});

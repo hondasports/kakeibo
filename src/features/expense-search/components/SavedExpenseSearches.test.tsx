@@ -30,11 +30,12 @@ function LocationProbe() {
 }
 
 let list: unknown;
+const onApplyMock = vi.fn();
 
 function renderComponent(applied = EMPTY_EXPENSE_SEARCH_FORM, isValid = true) {
   return render(
     <MemoryRouter initialEntries={["/search"]}>
-      <SavedExpenseSearches applied={applied} isValid={isValid} />
+      <SavedExpenseSearches applied={applied} isValid={isValid} onApply={onApplyMock} />
       <LocationProbe />
     </MemoryRouter>,
   );
@@ -142,8 +143,8 @@ describe("SavedExpenseSearches", () => {
     expect(item).toHaveTextContent("支出、カテゴリ: 食費、2026-10-01〜2026-10-31");
     expect(savedList).not.toHaveTextContent("categoryId=");
     await user.click(item);
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/search?type=expense&categoryId=cat-food&from=2026-10-01&to=2026-10-31",
+    expect(onApplyMock).toHaveBeenCalledWith(
+      "type=expense&categoryId=cat-food&from=2026-10-01&to=2026-10-31",
     );
   });
 
@@ -154,9 +155,7 @@ describe("SavedExpenseSearches", () => {
     expect(recentList).toHaveTextContent("キーワード: 北浜、金額が大きい順");
     expect(recentList).not.toHaveTextContent("sort=");
     await user.click(within(recentList).getByRole("button", { name: /キーワード: 北浜/ }));
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/search?q=%E5%8C%97%E6%B5%9C&sort=amountDesc",
-    );
+    expect(onApplyMock).toHaveBeenCalledWith("q=%E5%8C%97%E6%B5%9C&sort=amountDesc");
   });
 
   it("削除ボタンは名前を含むaria-labelを持ち、押すと削除mutationを呼ぶ", async () => {

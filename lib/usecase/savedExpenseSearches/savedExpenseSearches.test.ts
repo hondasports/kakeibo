@@ -55,6 +55,29 @@ function row(
 }
 
 describe("saveExpenseSearch", () => {
+  it("最大80文字の日本語キーワード（URLエンコードで720文字）と全条件を指定したqueryを保存できる", async () => {
+    const { repo, store } = makeRepo();
+    const query = new URLSearchParams({
+      type: "expense",
+      sort: "amountDesc",
+      q: "あ".repeat(80),
+      categoryId: "k".repeat(32),
+      min: "999999999",
+      max: "999999999",
+      from: "2026-01-01",
+      to: "2026-12-31",
+    }).toString();
+    expect(query.length).toBeGreaterThan(720);
+    expect(query.length).toBeLessThanOrEqual(2000);
+    const id = await saveExpenseSearch(
+      ctx,
+      { savedExpenseSearches: repo },
+      { name: "a", query },
+      0,
+    );
+    expect(store.get(id)?.query).toBe(query);
+  });
+
   it("名前の前後空白を除いて保存し、利用者・グループは認証済みctxから決める", async () => {
     const { repo, store } = makeRepo();
     const id = await saveExpenseSearch(
@@ -93,18 +116,18 @@ describe("saveExpenseSearch", () => {
     expect(store.size).toBe(2);
   });
 
-  it("queryは1〜500文字（空は拒否・501文字は拒否・500文字は保存）", async () => {
+  it("queryは1〜2000文字（空は拒否・2001文字は拒否・2000文字は保存）", async () => {
     const { repo, store } = makeRepo();
     const deps = { savedExpenseSearches: repo };
     await expect(saveExpenseSearch(ctx, deps, { name: "a", query: "  " }, 0)).rejects.toThrow(
       "保存する検索条件がありません",
     );
     await expect(
-      saveExpenseSearch(ctx, deps, { name: "a", query: "x".repeat(501) }, 0),
+      saveExpenseSearch(ctx, deps, { name: "a", query: "x".repeat(2001) }, 0),
     ).rejects.toThrow("検索条件が長すぎます");
     expect(store.size).toBe(0);
 
-    await saveExpenseSearch(ctx, deps, { name: "a", query: "x".repeat(500) }, 0);
+    await saveExpenseSearch(ctx, deps, { name: "a", query: "x".repeat(2000) }, 0);
     expect(store.size).toBe(1);
   });
 
@@ -140,10 +163,15 @@ describe("recordRecentExpenseSearch", () => {
     expect(store.size).toBe(0);
   });
 
-  it("500文字を超えるqueryは記録せずエラー", async () => {
+  it("2000文字を超えるqueryは記録せずエラー", async () => {
     const { repo, store } = makeRepo();
     await expect(
-      recordRecentExpenseSearch(ctx, { savedExpenseSearches: repo }, { query: "x".repeat(501) }, 1),
+      recordRecentExpenseSearch(
+        ctx,
+        { savedExpenseSearches: repo },
+        { query: "x".repeat(2001) },
+        1,
+      ),
     ).rejects.toThrow("検索条件が長すぎます");
     expect(store.size).toBe(0);
   });
@@ -214,6 +242,29 @@ describe("recordRecentExpenseSearch", () => {
     await recordRecentExpenseSearch(ctx, { savedExpenseSearches: repo }, { query: "q=6" }, 100);
     expect(store.has("o1")).toBe(true);
     expect(store.has("o2")).toBe(true);
+  });
+});
+
+describe("recordRecentExpenseSearch の並び順", () => {
+  it("同時刻（updatedAt が衝突）でも再記録した条件が先頭になる", async () => {
+    const { repo } = makeRepo([
+      row("A", { kind: "recent", name: undefined, query: "q=a", updatedAt: 100 }),
+      row("B", { kind: "recent", name: undefined, query: "q=b", updatedAt: 99 }),
+    ]);
+    const deps = { savedExpenseSearches: repo };
+    await recordRecentExpenseSearch(ctx, deps, { query: "q=b" }, 100);
+    const { recent } = await listSavedExpenseSearches(ctx, deps);
+    expect(recent.map((r) => r.id)).toEqual(["B", "A"]);
+  });
+
+  it("同時刻に新規追加した条件も先頭になる", async () => {
+    const { repo } = makeRepo([
+      row("A", { kind: "recent", name: undefined, query: "q=a", updatedAt: 100 }),
+    ]);
+    const deps = { savedExpenseSearches: repo };
+    await recordRecentExpenseSearch(ctx, deps, { query: "q=new" }, 100);
+    const { recent } = await listSavedExpenseSearches(ctx, deps);
+    expect(recent.map((r) => r.query)).toEqual(["q=new", "q=a"]);
   });
 });
 

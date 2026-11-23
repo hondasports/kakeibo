@@ -82,9 +82,11 @@ export async function recordRecentExpenseSearch(
     "recent",
   );
   const duplicate = recent.find((row) => row.query === query);
+  // 同じ時刻に並んでも今回の条件が先頭になるよう、既存の最新より後の時刻にする。
+  const stamp = Math.max(now, ...recent.map((row) => row.updatedAt + 1));
   let currentId: string;
   if (duplicate !== undefined) {
-    await deps.savedExpenseSearches.touch(duplicate.id, now);
+    await deps.savedExpenseSearches.touch(duplicate.id, stamp);
     currentId = duplicate.id;
   } else {
     currentId = await deps.savedExpenseSearches.insert({
@@ -92,8 +94,8 @@ export async function recordRecentExpenseSearch(
       groupId: ctx.groupId,
       kind: "recent",
       query,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: stamp,
+      updatedAt: stamp,
     });
   }
   // 今回の行を必ず残し、他の行を新しい順に (上限-1) 件まで残す。
