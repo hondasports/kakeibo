@@ -202,6 +202,10 @@ jobs:
     needs: [classify, e2e]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      # 最新attemptのjob一覧を読む。片方だけ再実行しても needs.e2e.result は
+      # matrix全体で1つのため、jobごとのconclusionで照合する。
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -211,8 +215,16 @@ jobs:
 
       - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
 
+      - name: Fetch latest E2E job results
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=latest" \
+            --paginate --jq '.jobs[] | {name, conclusion}' > "$RUNNER_TEMP/e2e-jobs.ndjson"
+
       - name: Evaluate E2E gate
         env:
+          E2E_JOBS_FILE: ${{ runner.temp }}/e2e-jobs.ndjson
           CLASSIFY_RESULT: ${{ needs.classify.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
         run: node scripts/e2e-gate.mjs
