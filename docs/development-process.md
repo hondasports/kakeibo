@@ -259,6 +259,10 @@ PRのE2E workflowは、まずPRのbase/head間のchanged pathを機械的に分�
 
 判定ロジックは [`scripts/classify-e2e-relevance.mjs`](../scripts/classify-e2e-relevance.mjs) とそのunit testで検証する。判定スクリプトやE2E workflow自身の変更はruntime-relevantとして扱い、E2Eの実行条件を弱めた変更を見逃しにくくする。
 
+PRのE2E workflowは、集約job `E2E gate`（`needs: [classify, e2e]`、`if: always()`）で結果をまとめる。マージ判定に使うcheckはこれ1つで、`E2E (Playwright / Chromium / …)` のmatrix checkはskip時に展開前の名前で報告されるため直接は必須にしない。gateは `classify` が `success`、かつ `e2e` が `success` または `skipped`（runtime_relevant=false、fork・Dependabot PR）のときだけ成功し、failure・cancelled・classify失敗は失敗する（判定は [`scripts/e2e-gate.mjs`](../scripts/e2e-gate.mjs)、結果と理由はsummaryへ出力）。gateを必須checkにするruleset設定はownerが手動で行う。
+
+CIのPlaywrightだけ、失敗が10件に達した時点で打ち切る（`maxFailures`）。また各matrixのjob timeoutより4分短い `globalTimeout`（public 6分・authenticated 16分、workflowから `E2E_GLOBAL_TIMEOUT_MS` で渡す）で止め、job timeoutによるcancelledではなくfailureで確定させる。どちらも `CI` が設定されたときだけ有効で、ローカル（`e2e:isolated` 等）の挙動は変えない（[`scripts/lib/e2e-ci-limits.ts`](../scripts/lib/e2e-ci-limits.ts)）。E2E jobがfailure・cancelledのときもPlaywright reportとtest-resultsをartifactとして保存する。
+
 CIで実行するbackendは共有cloud devではなく、ジョブごとの `CONVEX_AGENT_MODE=anonymous` な使い捨てlocal deployment（`scripts/start-ci-convex.mjs`）である。PR HEADの `convex/**` がpushされてからPlaywrightが走るため、「CIでこける→ローカルで確認→またCIでこける」の往復が起きにくい。共有状態を持たないのでpublic/authenticatedの直列化もなく、draft PRでもE2Eが走る。
 
 ### Convex reflection
