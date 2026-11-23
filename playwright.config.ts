@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 import dotenv from "dotenv";
 import { vercelBypassStatePath } from "./scripts/lib/vercel-protection";
+import { resolveE2ECiLimits } from "./scripts/lib/e2e-ci-limits";
 import { hasCustomE2EPorts, resolveE2EPorts } from "./scripts/lib/isolated-e2e-ports";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,8 @@ export default defineConfig({
   },
   /* flaky テストの自動リトライは local/CI ともに 1 回に統一（#958） */
   retries: 1,
+  /* CIだけ: 失敗の連鎖でjob timeoutまで走り続けず、failureとして早く確定させる（#1550） */
+  ...resolveE2ECiLimits(),
   /* 単一のClerkテストユーザーを使うため、認証・cleanup競合を避けて常に直列実行する */
   workers: 1,
   /* 失敗時のみスクリーンショット・trace を保存（認証情報が含まれる可能性があるため短期保持） */
