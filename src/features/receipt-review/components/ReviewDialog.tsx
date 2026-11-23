@@ -148,20 +148,29 @@ export function ReviewDialog(props: ReviewDialogProps) {
       (matchedButUnresolved && !isUnrelatedToAmountTaxGuidanceId(issue.id)),
   );
   const unresolvedTaxItemCount = judgment.unresolvedTaxItemCount;
-  const basisConflictItemCount = new Set([
-    ...(checks.amount.blockerCode === "basis-conflict"
-      ? (checks.amount.affectedItemIds ?? [])
-      : []),
-    ...(checks.taxRate.blockerCode === "basis-conflict"
-      ? (checks.taxRate.affectedItemIds ?? [])
-      : []),
-  ]).size;
-  const checkMismatchCount = [checks.amount, checks.taxRate].filter(
-    (check) => check.status === "mismatch",
-  ).length;
+  const evidenceOnly = judgment.status === "resolved";
+  const basisConflictItemCount = evidenceOnly
+    ? 0
+    : new Set([
+        ...(checks.amount.blockerCode === "basis-conflict"
+          ? (checks.amount.affectedItemIds ?? [])
+          : []),
+        ...(checks.taxRate.blockerCode === "basis-conflict"
+          ? (checks.taxRate.affectedItemIds ?? [])
+          : []),
+      ]).size;
+  const printedTaxMismatch = evidenceOnly && checks.taxRate.status === "mismatch";
+  const checkMismatchCount =
+    Number(checks.amount.status === "mismatch") +
+    Number(!printedTaxMismatch && checks.taxRate.status === "mismatch");
   const checkUncomparableCount = countActionableUncomparable(checks, recommendations);
   const fixCount = required.length + checkMismatchCount;
-  const recommendationCount = recommendations.length + checkUncomparableCount;
+  const recommendationCount =
+    recommendations.length +
+    checkUncomparableCount +
+    Number(
+      printedTaxMismatch && !recommendations.some((issue) => issue.taxSummaryIndex !== undefined),
+    );
   const busy = props.reviewSubmitting || props.taxUpdatingItemId != null;
   const unavailable = isReviewDraftLoading || isReviewDraftNotFound || categories.length === 0;
   const submitLabel = getReviewSubmitLabel({

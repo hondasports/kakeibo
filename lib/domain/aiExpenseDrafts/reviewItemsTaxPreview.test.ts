@@ -68,12 +68,15 @@ describe("明細から導出する画面の税計算", () => {
   });
 
   it.each(["10%対象4,373円", "10%税込4,373円", "内消費税10%999円"])(
-    "%s が本当に印字されていたら未配分を残す",
+    "%s の印字矛盾を残して税込登録額を算出する",
     (text) => {
       const input = unprovenTargetReceipt();
       input.rawObservationLines!.push(observationLine(text, text.includes("999") ? 999 : 4373, 3));
       const result = preview(input);
-      expect(result.items.some((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+      expect(result.items.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
+      expect(result.items.reduce((sum, item) => sum + (item.normalizedAmountYen ?? 0), 0)).toBe(
+        4810,
+      );
       expect(buildReviewChecks({ ...result, paidTotalYen: 4810 }).taxRate.status).not.toBe(
         "matched",
       );
@@ -82,14 +85,18 @@ describe("明細から導出する画面の税計算", () => {
 
   it.each(["payment", "change"] as const)("%s の税額らしい行を根拠にしない", (role) => {
     const input = unprovenTargetReceipt();
-    input.rawObservationLines![1].lineRoleCandidates = [role];
-    expect(preview(input).items.some((item) => item.taxAllocationStatus === "unallocated")).toBe(
-      true,
-    );
+    input.rawObservationLines![1] = {
+      ...observationLine("内消費税10% 438円", 438, 1),
+      lineRoleCandidates: [role],
+    };
+    const result = preview(input);
+    expect(result.taxSummaries[0].status).not.toBe("verified");
+    expect(result.items.reduce((sum, item) => sum + (item.allocatedTaxYen ?? 0), 0)).toBe(437);
   });
 
   it("構造分類で決済と判定された行も税額へ流用しない", () => {
     const input = unprovenTargetReceipt();
+    input.rawObservationLines![1] = observationLine("内消費税10% 438円", 438, 1);
     input.receiptLineClassifications = [
       {
         sourceLineIndex: 1,
@@ -97,9 +104,9 @@ describe("明細から導出する画面の税計算", () => {
         candidates: [{ role: "paymentMethodAmount", score: 1, evidence: [] }],
       },
     ];
-    expect(preview(input).items.some((item) => item.taxAllocationStatus === "unallocated")).toBe(
-      true,
-    );
+    const result = preview(input);
+    expect(result.taxSummaries[0].status).not.toBe("verified");
+    expect(result.items.reduce((sum, item) => sum + (item.allocatedTaxYen ?? 0), 0)).toBe(437);
   });
 
   it("金額欄が空なら過去の計算結果があっても比較不能になる", () => {

@@ -78,7 +78,7 @@ for (const width of [1280]) {
   });
 }
 
-test("@smoke Issue #1015 印字対象額の矛盾は商品確認後も保持し、内部値の編集を要求しない", async ({
+test("@smoke Issue #1548 印字税内訳に矛盾があっても、支払額と一致する明細を登録できる", async ({
   page,
 }) => {
   await gotoAuthenticated(page, "/weeks/current/input");
@@ -91,13 +91,23 @@ test("@smoke Issue #1015 印字対象額の矛盾は商品確認後も保持し�
     const dialog = page.getByRole("dialog", { name: "下書き確認" });
     await confirmProducts(page, dialog);
     await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
-    await expect(dialog.getByRole("region", { name: "確認件数" })).not.toContainText(
-      "確認推奨 0件",
-    );
+    const counts = dialog.getByRole("region", { name: "確認件数" });
+    await expect(counts).toContainText("修正必須 0件");
+    await expect(counts).toContainText(/確認推奨 [1-9]\d*件/);
     await expect(dialog.getByRole("button", { name: "税内訳を修正", exact: true })).toHaveCount(0);
     await dialog.getByText("読み取り原文（参考）").click();
     await expect(dialog.getByText("10%対象 4,373円", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "下書きを保存", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    const ready = queue
+      .getByRole("region", { name: "登録できます" })
+      .locator(".ai-expense-queue-item")
+      .filter({ hasText: "E2E対象額レビュー店" });
+    await expect(ready).toContainText("4,810円");
+    await ready.getByRole("button", { name: "登録する", exact: true }).click();
+    await expect(queue.getByRole("region", { name: "登録済み" })).toContainText("4,810円");
   } finally {
+    await cleanupTestReceipts();
     await cleanupAiExpenseQueue();
   }
 });

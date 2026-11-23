@@ -79,7 +79,7 @@ describe("#835 保存時の税再解釈で未確定を解消する", () => {
     });
 
   it.each([false, true])(
-    "注記を含む外税の保存・再保存・登録判定は印字矛盾を保護する（矛盾=%s）",
+    "注記を含む外税は印字矛盾を保持し、支払額と一致する税込額を登録する（矛盾=%s）",
     async (conflict) => {
       const { ctx, getDraft, getItems } = makeCtx({
         amountYen: 265,
@@ -122,13 +122,9 @@ describe("#835 保存時の税再解釈で未確定を解消する", () => {
           getDraft() as unknown as Doc<"aiExpenseDrafts">,
           getItems() as unknown as Doc<"aiExpenseDraftItems">[],
         );
-      if (conflict) {
-        expect(getItems().every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
-        expect(register).toThrow();
-      } else {
-        expect(getItems().map((item) => item.normalizedAmountYen)).toEqual([116, 149]);
-        expect(register().reduce((sum, item) => sum + item.amountYen, 0)).toBe(265);
-      }
+      expect(getDraft().taxSummaries[0].status).toBe(conflict ? "contradictory" : "verified");
+      expect(getItems().map((item) => item.normalizedAmountYen)).toEqual([116, 149]);
+      expect(register().reduce((sum, item) => sum + item.amountYen, 0)).toBe(265);
     },
   );
 
@@ -509,7 +505,7 @@ describe("#835 保存時の税再解釈で未確定を解消する", () => {
       userConfirmedTaxYen: 438,
       source: "user",
     });
-    expect(getItems().reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(438);
+    expect(getItems().reduce((sum, item) => sum + item.allocatedTaxYen, 0)).toBe(437);
   });
 
   it("旧下書きの初回保存前の商品・合計・基本情報を復元できる", async () => {

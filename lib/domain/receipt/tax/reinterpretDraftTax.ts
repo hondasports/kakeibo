@@ -22,7 +22,13 @@ import {
 import { ITEM_IDENTITY_CHANGED, getItemTaxConfirmedFields } from "./itemTaxConfirmation";
 import { deriveReceiptTaxSummaries } from "./deriveReceiptTaxSummaries";
 import { normalizeTaxSummary } from "./taxSummaryConsistency";
-import { taxSummaryEvidenceLines } from "./summaryEvidence";
+import {
+  independentSummaryLines,
+  taxSummaryEvidenceLines,
+  taxSummaryLineKind,
+} from "./summaryEvidence";
+import { EXPLICIT_PAYMENT_TOTAL_LABEL, isReceiptTotalLabel } from "../lineClassification";
+import { calculateReceiptRegistrationItems } from "./calculateReceiptRegistrationItems";
 import { splitCombinedSummaryLines } from "./combinedSummaryLines";
 
 export type DraftTaxOverride = {
@@ -50,10 +56,12 @@ export type ReinterpretDraftTaxInput = {
   receiptLineClassifications?: ReceiptLineClassification[];
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
+  useCalculatedRegistrationAmounts?: boolean;
 };
 
 type ReinterpretDraftTaxResult = {
   interpretation: ReceiptTaxInterpretation;
+  receiptTotalConflict: boolean;
   itemFields: (ReturnType<typeof interpretedItemToDraftFields> &
     Pick<DraftItemTaxFields, "taxConfirmedFields">)[];
 };
@@ -261,13 +269,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
     rawObservationLines,
     receiptLineClassifications: input.receiptLineClassifications,
   });
-  const interpretedItems = interpretation.items;
-  const amountsResolved =
-    interpretation.taxSummaries.length > 0 &&
-    interpretation.taxSummaries.every((summary) => summary.status === "verified") &&
-    interpretedItems.every((item) => item.taxAllocationStatus === "allocated") &&
-    interpretedItems.reduce((sum, item) => sum + item.normalizedAmountYen, 0) === input.amountYen;
-  const effectiveItems = interpretedItems.map((item, index) => {
+  const interpretedItems = interpretation.items.map((item, index) => {
     if (needsRateConfirmation[index]) {
       const rate =
         input.override?.itemIndex === index && input.override.taxRatePercent !== undefined
@@ -288,10 +290,66 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
         warnings: [...new Set([...item.warnings, "unresolved_tax_rate"])],
       };
     }
-    return amountsResolved
-      ? { ...item, warnings: item.warnings.filter((warning) => warning !== "amount_mismatch") }
-      : item;
+    return item;
   });
+  const unresolvedSettings = interpretedItems.map((item, index) => {
+    const original = input.items[index];
+    return (
+      original.taxResolutionSource !== undefined &&
+      original.taxResolutionSource !== "item_explicit" &&
+      (original.taxResolutionStatus === "unresolved" || !rawObservationLines?.length) &&
+      !itemTaxWasConfirmed(index) &&
+      !interpretation.taxSummaries.some(
+        (summary) =>
+          summary.taxRatePercent === item.taxRatePercent && summary.status === "verified",
+      )
+    );
+  });
+  const registrationItems =
+    !input.useCalculatedRegistrationAmounts || unresolvedSettings.some(Boolean)
+      ? undefined
+      : calculateReceiptRegistrationItems(interpretedItems, input.amountYen);
+  const calculatedItems = input.useCalculatedRegistrationAmounts
+    ? (registrationItems ??
+      interpretedItems.map((item) => ({
+        ...item,
+        allocatedTaxYen: 0,
+        normalizedAmountYen: item.printedAmountYen,
+        taxAllocationStatus: "unallocated" as const,
+      })))
+    : interpretedItems;
+  const amountsResolved =
+    (input.useCalculatedRegistrationAmounts ||
+      (interpretation.taxSummaries.length > 0 &&
+        interpretation.taxSummaries.every((summary) => summary.status === "verified"))) &&
+    calculatedItems.every((item) => item.taxAllocationStatus === "allocated") &&
+    calculatedItems.reduce((sum, item) => sum + item.normalizedAmountYen, 0) === input.amountYen;
+  const effectiveItems = amountsResolved
+    ? calculatedItems.map((item) => ({
+        ...item,
+        warnings: item.warnings.filter((warning) => warning !== "amount_mismatch"),
+      }))
+    : calculatedItems;
+
+  const receiptTotalConflict =
+    input.useCalculatedRegistrationAmounts === true &&
+    input.receiptTotalSource !== "user_confirmed" &&
+    (input.receiptTotalSupportingCandidates?.some(
+      (candidate) =>
+        candidate.source === "explicit_label" && candidate.amountYen !== input.amountYen,
+    ) === true ||
+      independentSummaryLines(rawObservationLines, input.receiptLineClassifications).some(
+        (line) => {
+          const label = line.rawText.normalize("NFKC").replace(/\s+/g, "");
+          return (
+            Number.isSafeInteger(line.amountYen) &&
+            line.amountYen !== input.amountYen &&
+            isReceiptTotalLabel(line.rawText, line.amountText) &&
+            taxSummaryLineKind(line.rawText) === undefined &&
+            (EXPLICIT_PAYMENT_TOTAL_LABEL.test(label) || !label.includes("税"))
+          );
+        },
+      ));
   const hasTaxReadingCorrection = taxSummaries.some((summary) =>
     summary.userEditedFields?.includes("taxYen"),
   );
@@ -331,12 +389,17 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
 
   return {
     interpretation: resolvedInterpretation,
+    receiptTotalConflict,
     itemFields: effectiveItems.map((item, index) => {
       const fields = {
         ...interpretedItemToDraftFields(item),
         taxConfirmedFields: confirmedFields[index],
       };
-      if (fields.taxAllocationStatus !== "allocated" && !itemTaxWasConfirmed(index)) {
+      if (
+        (!input.useCalculatedRegistrationAmounts || unresolvedSettings[index]) &&
+        fields.taxAllocationStatus !== "allocated" &&
+        !itemTaxWasConfirmed(index)
+      ) {
         return {
           ...fields,
           taxResolutionStatus: "unresolved" as const,

@@ -3,27 +3,15 @@ import {
   isValidSignedLineItemAmount,
   type ReceiptItemLineType,
 } from "../receipt/discountItems";
-import type { ExtractedTaxSummary, ReceiptTaxInterpretation } from "../receipt/tax/types";
-import {
-  deriveTaxReviewReasons,
-  hasReceiptTaxMetadata,
-  mapDraftItemToTaxFields,
-} from "../receipt/tax/draftTaxMapping";
-import { reinterpretDraftTax } from "../receipt/tax/reinterpretDraftTax";
-import {
-  resolveReceiptTotalSource,
-  resolveReceiptTotalSupportingCandidates,
-} from "./receiptTotalEvidence";
-import { resolveReceiptTaxCorrections } from "./receiptDataContract";
+import { hasReceiptTaxMetadata } from "../receipt/tax/draftTaxMapping";
 import { buildReviewChecks, type ReviewChecks } from "./reviewChecks";
+import { buildAmountCheck } from "./reviewAmountChecks";
 import { buildTaxContextFromReviewItem } from "./receiptItemTaxViewModel";
-import { getReviewGuidance } from "./reviewGuidance";
 import { mapDraftItemsToReviewItems, mapDraftToReviewForm } from "./reviewDraftMapping";
 import { buildReviewTaxEvidence, buildReviewTaxPreview } from "./reviewItemsTaxPreview";
-import { isUnrelatedToAmountTaxGuidanceId } from "./reviewJudgment";
 import { validateReviewInput } from "./reviewValidation";
 import { takeDraftJudgmentItems } from "./judgmentItemWindow";
-import type { AiExpenseDraftJudgmentInput } from "./reviewTypes";
+import type { AiExpenseDraftJudgmentInput, ReviewItemValues } from "./reviewTypes";
 
 type DraftAmountTaxJudgment = (
   | { status: "not_applicable"; reasons: [] }
@@ -69,12 +57,29 @@ export function analyzeRegistrationAmounts(
   };
 }
 
+function hasUnresolvedDiscountTarget(
+  items: ReviewItemValues[],
+  originalItems: ReviewItemValues[],
+): boolean {
+  const products = items.filter((item) => !isDiscountLine(item.itemName, item.lineType));
+  const productsById = new Map(products.map((item) => [item.id, item]));
+  const productCategories = new Set(products.map((item) => item.categoryId));
+  return items.some((item, index) => {
+    if (!isDiscountLine(item.itemName, item.lineType) || Number(item.amountYen) >= 0) return false;
+    const targetId = originalItems[index].discountTargetItemId;
+    if (targetId === undefined) {
+      return !item.categoryId || !productCategories.has(item.categoryId);
+    }
+    const target = productsById.get(targetId);
+    return !target || item.taxRatePercent !== target.taxRatePercent;
+  });
+}
+
 export function judgeDraftAmountAndTax(
   draft: AiExpenseDraftJudgmentInput,
   options: {
     itemScope?: "judgment_window" | "all_items";
     inputKind?: "stored" | "form";
-    interpretation?: ReceiptTaxInterpretation;
   } = {},
 ): DraftAmountTaxJudgment {
   const draftItems =
@@ -97,7 +102,8 @@ export function judgeDraftAmountAndTax(
     return { status: "unresolved", reasons: ["amount_mismatch"], checks, unresolvedTaxItemCount };
   }
   const form = mapDraftToReviewForm(draft);
-  const sourceItems = mapDraftItemsToReviewItems(draftItems).map((item, index) => ({
+  const originalItems = mapDraftItemsToReviewItems(draftItems);
+  const sourceItems = originalItems.map((item, index) => ({
     ...item,
     printedAmountYen: draftItems[index].printedAmountYen ?? draftItems[index].amountYen,
     discountTargetItemId:
@@ -119,11 +125,22 @@ export function judgeDraftAmountAndTax(
   const unresolvedTaxItemCount = preview.items.filter(
     (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
   ).length;
+  const hasTaxMetadata = hasReceiptTaxMetadata(draft, draftItems);
+  const allocated = preview.items.every((item) => item.taxAllocationStatus === "allocated");
+  if (preview.receiptTotalConflict) {
+    checks.amount = {
+      status: "uncomparable",
+      variant: "direct",
+      blockerCode: "missing-paid-total",
+      reason: "支払合計の読み取りが一致していません。レシートの支払額を確認してください",
+      focusTarget: "amountYen",
+      paidTotalYen: draft.amountYen,
+    };
+  } else if (hasTaxMetadata && allocated && checks.amount.status !== "matched") {
+    checks.amount = buildAmountCheck({ items: preview.items, paidTotalYen: draft.amountYen });
+  }
+
   const validation = validateReviewInput(form, preview.items);
-  const guidance = getReviewGuidance(form, preview.items, {
-    ...draft,
-    taxSummaries: preview.taxSummaries,
-  });
   const arithmetic = analyzeRegistrationAmounts(
     draft.amountYen,
     options.inputKind === "form"
@@ -143,59 +160,26 @@ export function judgeDraftAmountAndTax(
         : arithmetic.nonPositiveCategoryTotal
           ? ("non_positive_category_total" as const)
           : undefined;
-  const amountProblem = amountError !== undefined;
-  const hasTaxMetadata = hasReceiptTaxMetadata(draft, draftItems);
-  const taxProblem =
+  const storedTaxMismatch =
     hasTaxMetadata &&
-    (checks.amount.status === "uncomparable" ||
-      checks.taxRate.status !== "matched" ||
-      guidance.some(
-        (issue) =>
-          !isUnrelatedToAmountTaxGuidanceId(issue.id) &&
-          !issue.id.startsWith("amount-") &&
-          !issue.id.startsWith("name-") &&
-          issue.id !== "aggregate",
-      ));
-  let storedTaxMismatch = false;
-  let currentInterpretation = options.interpretation;
-  if (hasTaxMetadata && draft.amountYen !== undefined) {
-    const { interpretation, itemFields } = reinterpretDraftTax({
-      amountYen: draft.amountYen,
-      receiptTotalSource: resolveReceiptTotalSource(draft),
-      receiptTotalSupportingCandidates: resolveReceiptTotalSupportingCandidates(draft),
-      receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
-      items: draftItems.map(mapDraftItemToTaxFields),
-      rawObservationLines:
-        draft.rawObservation?.source === "ai_ocr" ? draft.rawObservation.lines : undefined,
-      taxSummaries: (draft.taxSummaries ?? []).map((summary) => ({
-        ...summary,
-        confidence: (summary as Partial<ExtractedTaxSummary>).confidence ?? {},
-      })),
-      sourceTaxSummaries: draft.receiptInterpretation?.values.taxSummaries,
-      correctedTaxSummaries: resolveReceiptTaxCorrections(
-        draft.receiptUserOverride,
-        draft.receiptInterpretation?.values.taxSummaries,
-      ),
-      markerDefinitions: draft.markerDefinitions,
-    });
-    currentInterpretation ??= interpretation;
-    storedTaxMismatch =
-      options.inputKind !== "form" &&
-      (interpretation.taxSummaries.some((summary) => summary.status !== "verified") ||
-        itemFields.some(
-          (item, index) =>
-            item.taxAllocationStatus !== "allocated" ||
-            item.normalizedAmountYen !==
-              (draftItems[index].normalizedAmountYen ?? draftItems[index].amountYen),
-        ) ||
-        itemFields.reduce((sum, item) => sum + item.normalizedAmountYen, 0) !== draft.amountYen);
-  }
+    allocated &&
+    options.inputKind !== "form" &&
+    preview.items.some(
+      (item, index) =>
+        item.normalizedAmountYen !==
+        (draftItems[index].normalizedAmountYen ?? draftItems[index].amountYen),
+    );
+  const taxProblem =
+    hasTaxMetadata && (!allocated || unresolvedTaxItemCount > 0 || preview.receiptTotalConflict);
   const reasons: Array<"amount_mismatch" | "user_confirmation_required"> = [];
-  const interpretedReasons = deriveTaxReviewReasons(currentInterpretation);
-  if (taxProblem || storedTaxMismatch || interpretedReasons.includes("user_confirmation_required"))
+  if (
+    taxProblem ||
+    storedTaxMismatch ||
+    (!amountError && hasUnresolvedDiscountTarget(preview.items, originalItems))
+  ) {
     reasons.push("user_confirmation_required");
-  if (amountProblem || interpretedReasons.includes("amount_mismatch"))
-    reasons.push("amount_mismatch");
+  }
+  if (amountError) reasons.push("amount_mismatch");
   return reasons.length
     ? {
         status: "unresolved",
@@ -203,7 +187,7 @@ export function judgeDraftAmountAndTax(
         checks,
         unresolvedTaxItemCount,
         ...(amountError ? { amountError } : {}),
-        ...(storedTaxMismatch ? { taxRegistrationBlocked: true } : {}),
+        ...(storedTaxMismatch || taxProblem ? { taxRegistrationBlocked: true } : {}),
       }
     : { status: "resolved", reasons: [], checks, unresolvedTaxItemCount };
 }
