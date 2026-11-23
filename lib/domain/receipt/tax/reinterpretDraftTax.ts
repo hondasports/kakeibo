@@ -23,7 +23,10 @@ import { ITEM_IDENTITY_CHANGED, getItemTaxConfirmedFields } from "./itemTaxConfi
 import { analyzeReceiptTaxSummaries, deriveReceiptTaxSummaries } from "./deriveReceiptTaxSummaries";
 import { normalizeTaxSummary } from "./taxSummaryConsistency";
 import { taxSummaryEvidenceLines } from "./summaryEvidence";
-import { calculateReceiptRegistrationItems } from "./calculateReceiptRegistrationItems";
+import {
+  calculateReceiptRegistrationItems,
+  type DraftItemTaxLink,
+} from "./calculateReceiptRegistrationItems";
 import { splitCombinedSummaryLines } from "./combinedSummaryLines";
 
 export type DraftTaxOverride = {
@@ -52,6 +55,7 @@ export type ReinterpretDraftTaxInput = {
   override?: DraftTaxOverride;
   bulkUnresolvedOverride?: BulkUnresolvedTaxOverride;
   useCalculatedRegistrationAmounts?: boolean;
+  itemLinks?: readonly DraftItemTaxLink[];
 };
 
 type ReinterpretDraftTaxResult = {
@@ -304,7 +308,7 @@ export function reinterpretDraftTax(input: ReinterpretDraftTaxInput): Reinterpre
   const registrationItems =
     !input.useCalculatedRegistrationAmounts || unresolvedSettings.some(Boolean)
       ? undefined
-      : calculateReceiptRegistrationItems(interpretedItems, input.amountYen);
+      : calculateReceiptRegistrationItems(interpretedItems, input.amountYen, input.itemLinks ?? []);
   const calculatedItems = input.useCalculatedRegistrationAmounts
     ? (registrationItems ??
       interpretedItems.map((item) => ({

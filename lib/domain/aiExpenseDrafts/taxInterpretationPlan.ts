@@ -116,6 +116,7 @@ export function planDraftTaxInterpretation(
 ): TaxInterpretationPlan {
   const { interpretation, itemFields } = reinterpretDraftTax({
     useCalculatedRegistrationAmounts: true,
+    itemLinks: items,
     amountYen: draft.amountYen,
     receiptTotalSource: args.receiptTotalSource ?? resolveReceiptTotalSource(draft),
     receiptTotalConfidence: draft.confidence.amountYen,

@@ -189,6 +189,44 @@ describe("印字税内訳に依存しない登録額", () => {
     ]);
   });
 
+  it.each([
+    { discount: -104, otherProduct: 107, paid: 118, foodAmount: 1, otherAmount: 117 },
+    { discount: -105, otherProduct: 105, paid: 116, foodAmount: 0, otherAmount: 116 },
+  ])(
+    "商品と割引を相殺した税込額でカテゴリを集計する（割引 $discount 円）",
+    ({ discount, otherProduct, paid, foodAmount, otherAmount }) => {
+      const { draft, items } = receipt(
+        [105, discount, otherProduct],
+        paid,
+        "tax_excluded",
+        [10, 10, 10],
+      );
+      const extracted = { ...draft, receiptDataContractVersion: RECEIPT_DATA_CONTRACT_VERSION };
+      items[1] = {
+        ...items[1],
+        itemName: "割引",
+        lineType: "discount",
+        discountTargetItemId: items[0].id,
+      };
+      items[2].categoryId = "other";
+
+      const { plan, saved, savedItems } = save(extracted, items);
+      expect(savedItems[0].normalizedAmountYen! + savedItems[1].normalizedAmountYen!).toBe(
+        foodAmount,
+      );
+      expect(savedItems[2].normalizedAmountYen).toBe(otherAmount);
+      expect(plan.listSummary.amountAndTaxResolved).toBe(foodAmount > 0);
+      if (foodAmount > 0) {
+        expect(buildDraftRegistrationItems(saved, savedItems)).toMatchObject([
+          { amountYen: foodAmount, categoryId: "food" },
+          { amountYen: otherAmount, categoryId: "other" },
+        ]);
+      } else {
+        expect(() => buildDraftRegistrationItems(saved, savedItems)).toThrow(/category total/);
+      }
+    },
+  );
+
   it("支払額が読み取れていれば、別の合計行の金額が空でも登録できる", () => {
     const { draft, items } = receipt([108], 108, "tax_included", [8]);
     draft.rawObservation.lines.push({
