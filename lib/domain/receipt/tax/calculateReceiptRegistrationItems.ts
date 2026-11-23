@@ -61,10 +61,15 @@ export function calculateReceiptRegistrationItems(
       ? sign * (externalTax.get(rate) ?? 0)
       : Math.round((absoluteTotal * rate) / (100 + rate));
     const amounts = indexes.map((index) => items[index].printedAmountYen);
+    // 丸め済みの合計税額を按分比率にすると、商品と割引の相殺時に明細の税率から外れる。
+    const rateForAdjustments = amounts.some((amount) => amount < 0)
+      ? { numerator: BigInt(rate), denominator: BigInt(external ? 100 : 100 + rate) }
+      : undefined;
     const allocation = allocateTax(
       tax,
       absoluteTotal,
       amounts.map((amount) => sign * amount),
+      rateForAdjustments,
     );
     if (!allocation) return undefined;
     for (const [index, itemIndex] of indexes.entries()) {
