@@ -22,6 +22,7 @@ describe("stages", () => {
       "expenseEntries",
       "receipts",
       "entryFavorites",
+      "savedExpenseSearches",
       "sourceDocuments",
       "recurringEntryRules",
       "weekSessions",

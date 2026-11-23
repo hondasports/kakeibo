@@ -88,6 +88,7 @@ const USER_PURGE_INDEX = {
   lineLinkAuditLogs: "by_user_id",
   lineAccountLinks: "by_user_id_and_status",
   entryFavorites: "by_user_id_and_group_id",
+  savedExpenseSearches: "by_user_id_and_group_id_and_kind",
 } as const satisfies Record<AccountDeletionUserPurgeTable, string>;
 
 export function createAccountDeletionUserDataPurgeStore(

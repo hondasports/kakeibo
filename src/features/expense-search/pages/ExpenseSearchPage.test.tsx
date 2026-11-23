@@ -21,6 +21,7 @@ vi.mock("../../../../convex/_generated/api", () => ({
   api: apiMockWith({
     "users.queries.getUserProfile": "get-user-profile",
     "categories.queries.listForSettings": "categories-list-for-settings",
+    "savedExpenseSearches.mutations.recordRecentExpenseSearch": "record-recent",
   }),
 }));
 
@@ -1326,5 +1327,102 @@ describe("ExpenseSearchPage", () => {
     await user.type(screen.getByLabelText("キーワード"), "北浜");
     await user.click(screen.getByRole("button", { name: "絞り込む" }));
     await waitFor(() => expect(screen.queryByText(/明細\d+件を選択中/)).not.toBeInTheDocument());
+  });
+
+  describe("保存した検索・最近の検索", () => {
+    const recordRecentMock = vi.fn();
+
+    beforeEach(() => {
+      recordRecentMock.mockReset();
+      recordRecentMock.mockResolvedValue("recent-id");
+      useMutationMock.mockImplementation((endpoint: unknown) =>
+        endpoint === "record-recent" ? recordRecentMock : vi.fn(),
+      );
+    });
+
+    function renderAt(path: string) {
+      return renderWithDatePickers(
+        <MemoryRouter initialEntries={[path]}>
+          <ExpenseSearchPage />
+          <LocationProbe />
+          <Routes>
+            <Route path="/search" element={<div />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    }
+
+    it("適用中の条件が無いときは保存ボタンが無効", () => {
+      renderAt("/search");
+      expect(screen.getByRole("button", { name: "この条件を保存" })).toBeDisabled();
+    });
+
+    it("条件が適用されていれば保存ボタンが有効になる", () => {
+      renderAt("/search?q=%E5%8C%97%E6%B5%9C");
+      expect(screen.getByRole("button", { name: "この条件を保存" })).toBeEnabled();
+    });
+
+    it("「絞り込む」で条件1つ以上の検索を適用すると最近の検索へ正規化したqueryを記録する", async () => {
+      const user = userEvent.setup();
+      renderAt("/search");
+
+      await user.type(screen.getByLabelText("キーワード"), "北浜");
+      await user.type(screen.getByLabelText("金額の下限"), "9000");
+      await user.click(screen.getByRole("button", { name: "絞り込む" }));
+
+      expect(screen.getByText("/search?q=%E5%8C%97%E6%B5%9C&min=9000")).toBeInTheDocument();
+      expect(recordRecentMock).toHaveBeenCalledTimes(1);
+      expect(recordRecentMock).toHaveBeenCalledWith({ query: "q=%E5%8C%97%E6%B5%9C&min=9000" });
+    });
+
+    it("条件が1つも無い検索や並び順だけの適用は記録しない", async () => {
+      const user = userEvent.setup();
+      renderAt("/search");
+
+      await user.click(screen.getByRole("button", { name: "絞り込む" }));
+      await user.click(screen.getByRole("button", { name: "金額が大きい順" }));
+      await user.click(screen.getByRole("button", { name: "絞り込む" }));
+
+      expect(screen.getByText("/search?sort=amountDesc")).toBeInTheDocument();
+      expect(recordRecentMock).not.toHaveBeenCalled();
+    });
+
+    it("チップ削除・すべてクリアでは記録しない", async () => {
+      const user = userEvent.setup();
+      renderAt("/search?q=%E5%BA%97&min=1000");
+
+      const keywordChip = screen
+        .getByText("キーワード: 店")
+        .closest(".MuiChip-root") as HTMLElement;
+      await user.click(keywordChip.querySelector(".MuiChip-deleteIcon") as Element);
+      expect(screen.getByText("/search?min=1000")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "すべてクリア" }));
+      expect(screen.getByText("/search")).toBeInTheDocument();
+      expect(recordRecentMock).not.toHaveBeenCalled();
+    });
+
+    it("記録に失敗しても検索は進む", async () => {
+      const user = userEvent.setup();
+      recordRecentMock.mockRejectedValue(new Error("down"));
+      renderAt("/search");
+
+      await user.type(screen.getByLabelText("キーワード"), "北浜");
+      await user.click(screen.getByRole("button", { name: "絞り込む" }));
+
+      expect(screen.getByText("/search?q=%E5%8C%97%E6%B5%9C")).toBeInTheDocument();
+      expect(recordRecentMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("不正な条件は適用も記録もしない", async () => {
+      const user = userEvent.setup();
+      renderAt("/search");
+
+      await user.type(screen.getByLabelText("金額の下限"), "9000");
+      await user.type(screen.getByLabelText("金額の上限"), "100");
+      await user.click(screen.getByRole("button", { name: "絞り込む" }));
+
+      expect(recordRecentMock).not.toHaveBeenCalled();
+    });
   });
 });

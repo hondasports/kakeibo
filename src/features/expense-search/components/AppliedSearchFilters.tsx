@@ -1,6 +1,6 @@
 import { Chip, Stack, Typography } from "@mui/material";
 import type { ExpenseSearchFormState } from "../lib/searchParams";
-import { formatYen } from "../../../../lib/domain/common/currency";
+import { describeSearchFilters, type SearchFilterChipKey } from "../lib/searchFilterLabels";
 
 export function AppliedSearchFilters({
   state,
@@ -11,49 +11,15 @@ export function AppliedSearchFilters({
   categoryLabel?: string;
   onChange: (state: ExpenseSearchFormState) => void;
 }) {
-  const chips: Array<{ key: string; label: string; remove: () => void }> = [];
-  if (state.entryType !== "all") {
-    chips.push({
-      key: "entryType",
-      label: state.entryType === "expense" ? "支出" : "収入",
-      remove: () => onChange({ ...state, entryType: "all" }),
-    });
-  }
-  if (state.shopQuery) {
-    chips.push({
-      key: "shopQuery",
-      label: `キーワード: ${state.shopQuery}`,
-      remove: () => onChange({ ...state, shopQuery: "" }),
-    });
-  }
-  if (state.categoryId) {
-    chips.push({
-      key: "categoryId",
-      label: `カテゴリ: ${categoryLabel ?? "指定"}`,
-      remove: () => onChange({ ...state, categoryId: "" }),
-    });
-  }
-  if (state.minAmountYen) {
-    chips.push({
-      key: "minAmountYen",
-      label: `${formatYen(Number(state.minAmountYen))}以上`,
-      remove: () => onChange({ ...state, minAmountYen: "" }),
-    });
-  }
-  if (state.maxAmountYen) {
-    chips.push({
-      key: "maxAmountYen",
-      label: `${formatYen(Number(state.maxAmountYen))}以下`,
-      remove: () => onChange({ ...state, maxAmountYen: "" }),
-    });
-  }
-  if (state.startDate || state.endDate) {
-    chips.push({
-      key: "dateRange",
-      label: `${state.startDate || "指定なし"}〜${state.endDate || "指定なし"}`,
-      remove: () => onChange({ ...state, startDate: "", endDate: "" }),
-    });
-  }
+  const removers: Record<SearchFilterChipKey, () => void> = {
+    entryType: () => onChange({ ...state, entryType: "all" }),
+    shopQuery: () => onChange({ ...state, shopQuery: "" }),
+    categoryId: () => onChange({ ...state, categoryId: "" }),
+    minAmountYen: () => onChange({ ...state, minAmountYen: "" }),
+    maxAmountYen: () => onChange({ ...state, maxAmountYen: "" }),
+    dateRange: () => onChange({ ...state, startDate: "", endDate: "" }),
+  };
+  const chips = describeSearchFilters(state, categoryLabel);
 
   if (chips.length === 0) {
     return null;
@@ -66,7 +32,7 @@ export function AppliedSearchFilters({
       </Typography>
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }} useFlexGap>
         {chips.map((chip) => (
-          <Chip key={chip.key} label={chip.label} onDelete={chip.remove} />
+          <Chip key={chip.key} label={chip.label} onDelete={removers[chip.key]} />
         ))}
       </Stack>
     </Stack>
