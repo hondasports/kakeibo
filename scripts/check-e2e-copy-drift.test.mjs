@@ -124,3 +124,73 @@ describe("findCopyDrift", () => {
     ).toEqual([]);
   });
 });
+
+describe("round 2: helper test files and quoted paths", () => {
+  const diffFor = (header, body) =>
+    [header, "--- a/x", "+++ b/x", "@@ -1,1 +1,1 @@", `-${body}`].join("\n");
+
+  it("treats test helper files as test sources", () => {
+    for (const filePath of [
+      "src/components/GroupSettingsPanelTestMocks.tsx",
+      "src/test/apiMock.ts",
+      "src/lib/testFixtures.ts",
+      "src/lib/groupFixtures.ts",
+      "src/lib/testHelpers.ts",
+    ]) {
+      expect(isTestSourcePath(filePath), filePath).toBe(true);
+    }
+  });
+
+  it("does not extract removed lines of test helper files", () => {
+    const diff = diffFor(
+      "diff --git a/src/components/GroupSettingsPanelTestMocks.tsx b/src/components/GroupSettingsPanelTestMocks.tsx",
+      "const a = '削除された文言です';",
+    );
+    expect(parseRemovedSourceLines(diff)).toEqual([]);
+    const diff2 = diffFor(
+      "diff --git a/src/test/apiMock.ts b/src/test/apiMock.ts",
+      "const a = '削除された文言です';",
+    );
+    expect(parseRemovedSourceLines(diff2)).toEqual([]);
+  });
+
+  it("extracts removed lines for plain and quoted paths", () => {
+    const body = "const a = '削除された文言です';";
+    expect(
+      parseRemovedSourceLines(
+        diffFor("diff --git a/src/pages/Group.tsx b/src/pages/Group.tsx", body),
+      ),
+    ).toEqual([body]);
+    expect(
+      parseRemovedSourceLines(
+        diffFor('diff --git "a/src/pages/家族.tsx" "b/src/pages/家族.tsx"', body),
+      ),
+    ).toEqual([body]);
+  });
+});
+
+describe("round 2: e2e titles and comments", () => {
+  const e2eLines = [
+    { file: "e2e/a.spec.ts", line: 1, text: 'test("家族グループを作成できる", async () => {' },
+    { file: "e2e/a.spec.ts", line: 2, text: '  test.describe("家族グループを作成", () => {' },
+    {
+      file: "e2e/a.spec.ts",
+      line: 3,
+      text: '  await test.step("家族グループを作成する", async () => {',
+    },
+    { file: "e2e/a.spec.ts", line: 4, text: '  test.only("家族グループを作成", async () => {' },
+    { file: "e2e/a.spec.ts", line: 5, text: "  // 家族グループを作成 を押す" },
+    { file: "e2e/a.spec.ts", line: 6, text: "  * 家族グループを作成" },
+    {
+      file: "e2e/a.spec.ts",
+      line: 7,
+      text: '  await page.getByText("家族グループを作成").click();',
+    },
+  ];
+
+  it("ignores titles and comments but reports selector lines", () => {
+    expect(
+      findCopyDrift({ removedStrings: ["家族グループを作成"], headSrcText: "", e2eLines }),
+    ).toEqual([{ file: "e2e/a.spec.ts", line: 7, copy: "家族グループを作成" }]);
+  });
+});
