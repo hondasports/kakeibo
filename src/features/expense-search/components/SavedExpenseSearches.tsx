@@ -50,10 +50,10 @@ export function SavedExpenseSearches({
   const saveSearch = useMutation(api.savedExpenseSearches.mutations.saveExpenseSearch);
   const deleteSearch = useMutation(api.savedExpenseSearches.mutations.deleteSavedExpenseSearch);
 
-  // 表示名の要約でカテゴリ名を引く。カテゴリを含む条件が無いときは購読しない。
-  const needsCategories = [...saved, ...recent].some((entry) =>
-    new URLSearchParams(entry.query).has("categoryId"),
-  );
+  // 表示名の要約（一覧と保存ダイアログ）でカテゴリ名を引く。カテゴリを含む条件が無いときは購読しない。
+  const needsCategories =
+    applied.categoryId !== "" ||
+    [...saved, ...recent].some((entry) => new URLSearchParams(entry.query).has("categoryId"));
   const categoriesQuery = useQuery(
     api.categories.queries.listForSettings,
     needsCategories ? {} : "skip",

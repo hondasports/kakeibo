@@ -174,6 +174,15 @@ describe("SavedExpenseSearches", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("保存した検索が見つかりません");
   });
 
+  it("一覧にカテゴリ条件が無くても、適用中のカテゴリ名を保存ダイアログの要約に出す", async () => {
+    const user = userEvent.setup();
+    list = { saved: [], recent: [] };
+    renderComponent({ ...EMPTY_EXPENSE_SEARCH_FORM, entryType: "expense", categoryId: "cat-food" });
+    await user.click(screen.getByRole("button", { name: "この条件を保存" }));
+    const dialog = screen.getByRole("dialog", { name: "検索条件を保存" });
+    expect(within(dialog).getByText("支出、カテゴリ: 食費")).toBeInTheDocument();
+  });
+
   it("保存も最近の検索も無いときは一覧を出さない", () => {
     list = { saved: [], recent: [] };
     renderComponent();
