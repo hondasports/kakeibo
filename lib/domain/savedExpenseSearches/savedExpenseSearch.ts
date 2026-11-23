@@ -8,7 +8,7 @@ export class SavedExpenseSearchError extends Error {}
 export type SavedExpenseSearchKind = "saved" | "recent";
 
 export const MAX_SAVED_SEARCH_NAME_LENGTH = 30;
-export const MAX_SEARCH_QUERY_LENGTH = 500;
+export const MAX_SEARCH_QUERY_LENGTH = 2000;
 export const MAX_SAVED_SEARCHES = 20;
 export const MAX_RECENT_SEARCHES = 5;
 

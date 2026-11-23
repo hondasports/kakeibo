@@ -104,6 +104,10 @@ test.describe("履歴検索（Issue #537 / #637〜#643）", () => {
     } finally {
       // 保存済みの上限（20件）を圧迫しないよう、このテストで作った保存条件を消す
       await page.goto("/search");
+      // 一覧の読込完了を待つ（このシナリオでは最近の検索が必ず記録されている）
+      await expect(page.getByRole("list", { name: "最近の検索" })).toBeVisible({
+        timeout: 10_000,
+      });
       const deleteButton = page.getByRole("button", {
         name: `${savedName}を保存した検索から削除`,
       });

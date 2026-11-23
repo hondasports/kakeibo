@@ -1,6 +1,5 @@
 import { api } from "../../../../convex/_generated/api";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import {
@@ -40,11 +39,12 @@ function readEntries(value: unknown): { saved: SearchEntry[]; recent: SearchEntr
 export function SavedExpenseSearches({
   applied,
   isValid,
+  onApply,
 }: {
   applied: ExpenseSearchFormState;
   isValid: boolean;
+  onApply: (query: string) => void;
 }) {
-  const navigate = useNavigate();
   const listQuery = useQuery(api.savedExpenseSearches.queries.listSavedExpenseSearches);
   const { saved, recent } = readEntries(listQuery);
   const saveSearch = useMutation(api.savedExpenseSearches.mutations.saveExpenseSearch);
@@ -111,7 +111,7 @@ export function SavedExpenseSearches({
     }
   };
 
-  const apply = (entry: SearchEntry) => navigate(`/search?${entry.query}`);
+  const apply = (entry: SearchEntry) => onApply(entry.query);
 
   return (
     <Stack spacing={2}>
