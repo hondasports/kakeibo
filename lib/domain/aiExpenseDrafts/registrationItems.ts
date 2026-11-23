@@ -58,8 +58,8 @@ function assertUserConfirmedReceiptTotal(draft: DraftForRegistration): void {
 
 /**
  * 下書きと明細から登録用のカテゴリ集約済み明細を構築する。
- * totalOnly の場合はユーザー確認済み合計を検証し、税内訳がある場合は全明細の
- * 税割当が確定していることを検証する。失敗時は Error を投げる。
+ * totalOnly の場合はユーザー確認済み合計を検証し、明細登録では明細から算出した
+ * 税込額と保存額が一致することを検証する。失敗時は Error を投げる。
  */
 export function buildDraftRegistrationItems(
   draft: DraftForRegistration,

@@ -1,4 +1,3 @@
-import type { ReceiptTaxInterpretation } from "../receipt/tax/types";
 import type { AiExpenseDraftFields } from "./aiExpenseDraft";
 import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
 import type { AiExpenseDraftReviewReason } from "./constants";
@@ -12,14 +11,13 @@ export function buildDraftReviewState(
   options: {
     reasons: AiExpenseDraftReviewReason[];
     preserveUserConfirmation?: boolean;
-    interpretation?: ReceiptTaxInterpretation;
     mode?: "recompute" | "migration";
   },
 ) {
   const itemScope = options.mode === "migration" ? "judgment_window" : "all_items";
   const judgment = judgeDraftAmountAndTax(
     { ...draft, items: items.map((item) => ({ ...item, _id: item.id })) },
-    { interpretation: options.interpretation, itemScope },
+    { itemScope },
   );
   const removeMismatch =
     options.mode === "migration" &&

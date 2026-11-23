@@ -21,8 +21,7 @@ function toExtractedTaxSummaries(
 
 function reviewItemToDraftFields(item: ReviewItemValues): DraftItemTaxFields {
   const printedAmountYen =
-    item.printedAmountYen ??
-    (Number.isFinite(Number(item.amountYen)) ? Number(item.amountYen) : undefined);
+    item.printedAmountYen ?? (item.amountYen.trim() === "" ? Number.NaN : Number(item.amountYen));
 
   return {
     itemName: item.itemName,
@@ -99,10 +98,12 @@ export function buildReviewTaxPreview(
 ): {
   items: ReviewItemValues[];
   taxSummaries: NonNullable<AiExpenseDraft["taxSummaries"]>;
+  receiptTotalConflict: boolean;
 } {
   const unchanged = {
     items,
     taxSummaries: args.taxSummaries ?? [],
+    receiptTotalConflict: false,
   };
   const paidTotalYen = args.paidTotalYen;
   if (paidTotalYen === undefined || !Number.isFinite(paidTotalYen) || paidTotalYen < 1) {
@@ -113,7 +114,8 @@ export function buildReviewTaxPreview(
   }
 
   const sourceSummaries = toExtractedTaxSummaries(args.taxSummaries ?? []);
-  const { itemFields, interpretation } = reinterpretDraftTax({
+  const { itemFields, interpretation, receiptTotalConflict } = reinterpretDraftTax({
+    useCalculatedRegistrationAmounts: true,
     amountYen: paidTotalYen,
     receiptTotalSource: resolveReceiptTotalSource({
       amountYen: paidTotalYen,
@@ -157,7 +159,7 @@ export function buildReviewTaxPreview(
   });
 
   const taxSummaries = interpretation.taxSummaries;
-  return { items: previewItems, taxSummaries };
+  return { items: previewItems, taxSummaries, receiptTotalConflict };
 }
 
 export function applyReviewItemsTaxPreview(

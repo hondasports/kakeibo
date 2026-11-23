@@ -101,7 +101,7 @@ it.each(["missing", "stale"])(
 );
 
 it.each(["target", "tax-mode", "subtotal", "missing-raw"])(
-  "印字矛盾・根拠不足 %s は登録ガードを通らない",
+  "印字矛盾 %s を保持して登録し、税設定不明なら登録を拒否する",
   (kind) => {
     const { draft, items } = fixture();
     if (kind === "target")
@@ -115,19 +115,25 @@ it.each(["target", "tax-mode", "subtotal", "missing-raw"])(
       items[0].taxRatePercent = null;
     }
     const plan = planDraftTaxInterpretation(draft, items, {}, 1);
-    expect(plan.draftPatch.status).toBe("needs_review");
     const savedItems = items.map((item, index) => ({ ...item, ...plan.itemPatches[index].patch }));
-    expect(() => buildDraftRegistrationItems({ ...draft, ...plan.draftPatch }, savedItems)).toThrow(
-      /税額または税込登録額が未確定/,
-    );
+    const register = () =>
+      buildDraftRegistrationItems({ ...draft, ...plan.draftPatch }, savedItems);
+    if (kind === "missing-raw") {
+      expect(plan.draftPatch.status).toBe("needs_review");
+      expect(register).toThrow(/税額または税込登録額が未確定/);
+    } else {
+      expect(plan.draftPatch.status).toBe("ready");
+      expect(plan.draftPatch.taxSummaries![0].status).not.toBe("verified");
+      expect(register()).toMatchObject([{ amountYen: 4810 }]);
+    }
   },
 );
 
 it.each(["classified", "ambiguous"] as const)(
-  "%s な決済行では保存・登録時にも税額を確定しない",
+  "%s な決済行は税額の印字証拠から除いて登録額を算出する",
   (status) => {
     const { draft, items } = fixture();
-    draft.rawObservation!.lines[1].rawText = "カード決済 消費税額437円";
+    draft.rawObservation!.lines[1] = observationLine("カード決済 消費税額438円", 438, 1);
     draft.receiptInterpretation = {
       source: "ai",
       interpretedAt: 0,
@@ -154,8 +160,9 @@ it.each(["classified", "ambiguous"] as const)(
       },
     };
     const plan = planDraftTaxInterpretation(draft, items, {}, 1);
-    expect(plan.draftPatch.status).toBe("needs_review");
-    expect(plan.draftPatch.taxSummaries![0].taxableAmountYen).toBe(4810);
-    expect(() => buildDraftRegistrationItems(draft, items)).toThrow(/税額または税込登録額が未確定/);
+    expect(plan.draftPatch.status).toBe("ready");
+    expect(plan.draftPatch.taxSummaries![0]).toMatchObject({ taxableAmountYen: 4810, taxYen: 437 });
+    expect(plan.draftPatch.taxSummaries![0].status).not.toBe("verified");
+    expect(buildDraftRegistrationItems(draft, items)).toMatchObject([{ amountYen: 4810 }]);
   },
 );

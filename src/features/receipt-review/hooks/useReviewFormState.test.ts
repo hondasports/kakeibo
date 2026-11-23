@@ -115,7 +115,11 @@ describe("明細削除後の税条件", () => {
 
 it("初期化と金額変更で構造分類の決済行を税額へ流用しない", () => {
   const input = unprovenTargetReceipt();
-  input.rawObservationLines![1].rawText = "カード決済 消費税額437円";
+  Object.assign(input.rawObservationLines![1], {
+    rawText: "カード決済 消費税額438円",
+    amountYen: 438,
+    amountText: "438円",
+  });
   const draft: AiExpenseDraft = {
     _id: "draft",
     status: "needs_review",
@@ -160,13 +164,11 @@ it("初期化と金額変更で構造分類の決済行を税額へ流用しな�
       selectedReviewDraftDetails: null,
     }),
   );
-  expect(
-    result.current.reviewItems.some((item) => item.taxAllocationStatus === "unallocated"),
-  ).toBe(true);
+  const allocatedTax = () =>
+    result.current.reviewItems.reduce((sum, item) => sum + (item.allocatedTaxYen ?? 0), 0);
+  expect(allocatedTax()).toBe(437);
   act(() => result.current.handleReviewFieldChange("amountYen", "4810"));
-  expect(
-    result.current.reviewItems.some((item) => item.taxAllocationStatus === "unallocated"),
-  ).toBe(true);
+  expect(allocatedTax()).toBe(437);
 });
 
 it("名前・行種別を変更した行だけ再確認を要求し、価格・カテゴリ変更では確認を保つ", () => {

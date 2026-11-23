@@ -121,7 +121,7 @@ describe("Issue #890: 補正プレビューと確認結果", () => {
     expect(buildReviewChecks({ items, paidTotalYen: 436, taxSummaries }).taxRate.status).not.toBe(
       "matched",
     );
-    expect(items.every((item) => item.taxAllocationStatus === "unallocated")).toBe(true);
+    expect(items.every((item) => item.taxAllocationStatus === "allocated")).toBe(true);
     expect(taxSummaries).toHaveLength(1);
     expect(input).toEqual(snapshot);
   });

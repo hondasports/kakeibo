@@ -10,6 +10,8 @@ import {
   isTaxRateDeclarationLine,
 } from "./summaryEvidence";
 
+import { findTaxRoundingCombinations } from "./normalizeAmounts";
+
 const TAX_EVIDENCE_CONFLICT = "contradictory_receipt_tax_evidence";
 const TAX_EVIDENCE_MISSING = "unresolved_receipt_tax_evidence";
 
@@ -163,18 +165,9 @@ export function deriveReceiptTaxSummaries(args: {
     .reduce((sum, bucket) => sum + (bucket.correctedTax ?? bucket.taxes[0] ?? 0), 0);
   const requiredTax =
     args.amountYen - items.reduce((sum, item) => sum + item.printedAmountYen, 0) - fixedTax;
-  const combinations = estimatedExternal.reduce<number[][]>(
-    (current, bucket) =>
-      current.flatMap((values) =>
-        [...new Set([Math.floor(bucket.exactTax), Math.ceil(bucket.exactTax)])].map((tax) => [
-          ...values,
-          tax,
-        ]),
-      ),
-    [[]],
-  );
-  const matches = combinations.filter(
-    (values) => values.reduce((sum, tax) => sum + tax, 0) === requiredTax,
+  const matches = findTaxRoundingCombinations(
+    estimatedExternal.map(({ exactTax }) => exactTax),
+    requiredTax,
   );
   const resolvedExternal = new Map<TaxRatePercent, number>(
     matches.length === 1

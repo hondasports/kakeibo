@@ -47,6 +47,18 @@ export function allocateTax(
   return allocations;
 }
 
+export function findTaxRoundingCombinations(exactTaxes: number[], target: number): number[][] {
+  return exactTaxes
+    .reduce<number[][]>(
+      (combinations, exactTax) =>
+        combinations.flatMap((amounts) =>
+          [...new Set([Math.floor(exactTax), Math.ceil(exactTax)])].map((tax) => [...amounts, tax]),
+        ),
+      [[]],
+    )
+    .filter((amounts) => amounts.reduce((sum, tax) => sum + tax, 0) === target);
+}
+
 export function normalizeAmounts(args: {
   amountYen: number;
   items: ExtractedReceiptItem[];
