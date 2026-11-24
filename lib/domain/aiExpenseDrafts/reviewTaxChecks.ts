@@ -116,7 +116,7 @@ export function buildTaxRateCheck(args: {
           reason: "税率別の対象額が読み取れていません",
           blockerCode: "missing-tax-summary",
           affectedItemIds: items.map((item) => item.id),
-          focusTarget: "reference",
+          focusTarget: args.rawObservation?.lines?.length ? "reference" : "items",
         };
 
   const rows: ReviewTaxRateRow[] = summaries.map((summary) => {
