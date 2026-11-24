@@ -62,15 +62,19 @@ export function buildTaxRateCheck(args: {
   taxSummaries?: AiExpenseDraft["taxSummaries"];
   rawObservation?: ReceiptRawObservation;
   receiptLineClassifications?: ReceiptLineClassification[];
+  taxModelActive?: boolean;
 }): ReviewTaxRateCheck {
   const summaries = args.taxSummaries ?? [];
   const items = args.items;
-  const untargetedDiscount = items.find(
-    (item) => isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId,
-  );
-  const unresolved = items.filter(
-    (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
-  );
+  const taxModelActive = args.taxModelActive ?? true;
+  const untargetedDiscount = taxModelActive
+    ? items.find(
+        (item) => isDiscountLine(item.itemName, item.lineType) && !item.discountTargetItemId,
+      )
+    : undefined;
+  const unresolved = taxModelActive
+    ? items.filter((item) => buildTaxContextFromReviewItem(item).status === "unresolved")
+    : [];
 
   const globalReason = untargetedDiscount
     ? "割引対象の商品が未確定のため、税率別に集計できません"

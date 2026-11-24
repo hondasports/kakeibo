@@ -47,6 +47,7 @@ type ReviewItemCardProps = {
   isExpanded: boolean;
   enableItemTaxEditing?: boolean;
   inlineTaxEditing?: boolean;
+  taxModelActive?: boolean;
   /** 行コンポーネント内に埋め込む場合は外枠を描画しない */
   embedded?: boolean;
   disabled?: boolean;
@@ -76,6 +77,7 @@ export function ReviewItemCard({
   isExpanded,
   enableItemTaxEditing = false,
   inlineTaxEditing = false,
+  taxModelActive = true,
   embedded = false,
   disabled = false,
   onAmountBasisChange,
@@ -93,9 +95,10 @@ export function ReviewItemCard({
   const categoryName = categoryNamesById.get(item.categoryId);
   const taxContext = buildTaxContextFromReviewItem(item);
   const taxVm = toReceiptItemTaxViewModel(item);
-  const confirmation = getReviewItemTaxConfirmation(item);
+  const confirmation = getReviewItemTaxConfirmation(item, { taxModelActive });
   const isTaxUpdating = disabled || taxUpdatingItemId === item.id;
-  const showTaxRateSelect = enableItemTaxEditing && taxContext.status === "unresolved";
+  const unresolvedTax = taxModelActive && taxContext.status === "unresolved";
+  const showTaxRateSelect = enableItemTaxEditing && unresolvedTax;
   const showRegistrationAmount =
     item.taxAllocationStatus === "allocated" &&
     taxContext.status === "resolved" &&
@@ -130,7 +133,7 @@ export function ReviewItemCard({
             {lowConfidence && (
               <Chip color="warning" label="低信頼度" size="small" variant="outlined" />
             )}
-            {taxContext.status === "unresolved" && (
+            {unresolvedTax && (
               <Chip color="warning" label="要確認" size="small" variant="outlined" />
             )}
           </Stack>

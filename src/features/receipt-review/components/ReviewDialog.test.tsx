@@ -1017,6 +1017,42 @@ describe("下書きの修正導線", () => {
     expect(screen.getByRole("combobox", { name: "ホットケーキの表示価格" })).toBeEnabled();
   });
 
+  it("税モデルのない下書きでは、商品行の税未入力を問題表示せず金額一致と判定をそろえる", async () => {
+    const user = userEvent.setup();
+    const fixture = {
+      draft: storedDraft({ amountYen: 100 }),
+      items: [storedItem({ _id: "item", itemName: "ホットケーキ", amountYen: 100 })],
+    };
+    const dialogProps = reviewDialogPropsFromStoredDraft(fixture.draft, fixture.items);
+    const judgment = expectDialogJudgment(dialogProps, {
+      status: "resolved",
+      amount: "matched",
+      taxRate: "uncomparable",
+      unresolvedTaxItemCount: 0,
+    });
+    expect(judgment.checks.taxRate.blockerCode).toBe("missing-tax-summary");
+    expect(dialogProps.selectedReviewDraft.rawObservation).toBeUndefined();
+    expect(dialogProps.selectedReviewDraft.taxSummaries).toBeUndefined();
+
+    renderStoredDialog(dialogProps);
+    expect(
+      within(screen.getByRole("region", { name: "全体の確認状態" })).getByText(
+        "金額は一致しています",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText("要確認")).not.toBeInTheDocument();
+    expect(screen.queryByText("未確定")).not.toBeInTheDocument();
+    expect(screen.queryByText(/税設定の確認が必要な明細/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/税率と税込／税抜が未設定です/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "この税設定を確認する" })).not.toBeInTheDocument();
+
+    const item = screen.getByText("ホットケーキ").closest("details")!;
+    if (!item.hasAttribute("open")) await user.click(item.querySelector("summary")!);
+    expect(screen.getByRole("combobox", { name: "ホットケーキの税率" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "ホットケーキの表示価格" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "この内容で保存" })).toBeEnabled();
+  });
+
   it("税判定が未解決の下書きで割引対象を空にしても、確認項目を残したまま下書きを保存できる", async () => {
     const user = userEvent.setup();
     const fixture = unresolvedDiscountFixture();
