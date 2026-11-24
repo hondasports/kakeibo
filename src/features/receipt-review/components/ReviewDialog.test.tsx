@@ -173,7 +173,7 @@ describe("下書きの修正導線", () => {
     ).toBeVisible();
     expect(
       within(screen.getByRole("region", { name: "全体の確認状態" })).queryByText(
-        /印字額と明細の金額が一致しています/,
+        /金額は一致しています/,
       ),
     ).not.toBeInTheDocument();
   });

@@ -113,7 +113,7 @@ describe("旧形式の税内訳5パターンの解決（Issue #1015 / #1125）",
         1782,
       );
 
-      // 「確認推奨 0件」＋「印字額と明細の金額が一致しています」の根拠
+      // 「金額は一致しています」の根拠
       const checks = buildReviewChecks({
         items: preview.items,
         paidTotalYen: 1782,
