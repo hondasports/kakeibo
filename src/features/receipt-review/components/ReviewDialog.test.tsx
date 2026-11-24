@@ -313,7 +313,13 @@ describe("下書きの修正導線", () => {
     };
     const stored = invalidateItemTaxRateConfirmation(confirmed);
     const dialogProps = reviewDialogPropsFromStoredDraft(
-      { ...props.selectedReviewDraft!, amountYen: 116 },
+      {
+        ...props.selectedReviewDraft!,
+        shopName: "ジャパン",
+        date: "2026-08-06",
+        categoryId: "food",
+        amountYen: 116,
+      },
       [stored],
     );
     // 前提: 保存済みの値と同じ入力で判定が未解決になる。
@@ -327,6 +333,9 @@ describe("下書きの修正導線", () => {
     expect(judgment.unresolvedTaxItemCount).toBe(1);
 
     render(<ReviewDialog {...props} {...dialogProps} onConfirmItemTax={onConfirmItemTax} />);
+    expect(
+      within(screen.getByRole("region", { name: "確認件数" })).getByText("修正必須 0件"),
+    ).toBeVisible();
     expect(
       within(screen.getByRole("region", { name: "確認件数" })).getByText("税の確認待ち 1件"),
     ).toBeVisible();
