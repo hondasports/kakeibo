@@ -3,10 +3,53 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import { ReviewDialog } from "./ReviewDialog";
+import { invalidateItemTaxRateConfirmation } from "../../../../lib/domain/receipt/tax/itemTaxConfirmation";
+import { judgeReviewFormAmountAndTax } from "../../../../lib/domain/aiExpenseDrafts/reviewFormJudgment";
+import {
+  mapDraftItemsToReviewItems,
+  mapDraftToReviewForm,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewDraftMapping";
+import { initializeReviewCategoryState } from "../../../../lib/domain/aiExpenseDrafts/reviewItemCategories";
+import {
+  applyReviewItemsTaxPreview,
+  buildReviewTaxEvidence,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
+import type {
+  AiExpenseDraft,
+  AiExpenseDraftItem,
+  ReviewFormValues,
+  ReviewItemValues,
+} from "../../../../lib/domain/aiExpenseDrafts/reviewTypes";
 import {
   legacyTaxSummaryVariants,
   mixedTaxReviewFixture,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewTaxPreviewTestHelpers";
+
+/** 保存済みの下書きと商品から、画面の初期化（useReviewFormState）と同じ変換で ReviewDialog の props を作る。 */
+function reviewDialogPropsFromStoredDraft(
+  draft: AiExpenseDraft,
+  items: AiExpenseDraftItem[],
+): {
+  selectedReviewDraft: AiExpenseDraft;
+  reviewForm: ReviewFormValues;
+  reviewItems: ReviewItemValues[];
+  persistedReviewItems: AiExpenseDraftItem[];
+} {
+  const mappedForm = mapDraftToReviewForm(draft);
+  const categoryState = initializeReviewCategoryState(
+    mapDraftItemsToReviewItems(items),
+    mappedForm.categoryId,
+  );
+  return {
+    selectedReviewDraft: draft,
+    reviewForm: { ...mappedForm, categoryId: categoryState.receiptCategoryId },
+    reviewItems: applyReviewItemsTaxPreview(categoryState.items, {
+      ...buildReviewTaxEvidence(draft),
+      paidTotalYen: Number(mappedForm.amountYen),
+    }),
+    persistedReviewItems: items,
+  };
+}
 
 const props: ComponentProps<typeof ReviewDialog> = {
   open: true,
@@ -249,40 +292,50 @@ describe("下書きの修正導線", () => {
       expect(onSubmit).not.toHaveBeenCalled();
     },
   );
-  it("選択済みの未確認明細は理由と確認操作を表示し、読み取り失敗と決めつけない", async () => {
+  it("税設定が未確認で登録額が決まらない下書きは、理由と確認操作を表示し、読み取り失敗と決めつけない", async () => {
     const user = userEvent.setup();
     const onConfirmItemTax = vi.fn();
-    render(
-      <ReviewDialog
-        {...props}
-        reviewForm={{
-          ...props.reviewForm,
-          amountYen: "116",
-        }}
-        reviewItems={[
-          {
-            ...props.reviewItems[0],
-            persistedItemId: "food",
-            amountBasis: "tax_included",
-            taxResolutionStatus: "unresolved",
-            taxConfirmedFields: [],
-          },
-        ]}
-        onConfirmItemTax={onConfirmItemTax}
-      />,
+    // 商品名を変えて保存したときと同じ状態（税率と税込／税抜は残り、税設定は未確認、未配分）。
+    const confirmed: AiExpenseDraftItem = {
+      _id: "food",
+      itemName: "ホットケーキ",
+      amountYen: 116,
+      printedAmountYen: 116,
+      normalizedAmountYen: 116,
+      categoryId: "food",
+      amountBasis: "tax_included",
+      taxRatePercent: 8,
+      taxResolutionStatus: "resolved",
+      taxResolutionSource: "item_explicit",
+      taxAllocationStatus: "allocated",
+      allocatedTaxYen: 8,
+      taxConfirmedFields: ["amountBasis", "taxRatePercent"],
+    };
+    const stored = invalidateItemTaxRateConfirmation(confirmed);
+    const dialogProps = reviewDialogPropsFromStoredDraft(
+      { ...props.selectedReviewDraft!, amountYen: 116 },
+      [stored],
     );
+    // 前提: 保存済みの値と同じ入力で判定が未解決になる。
+    const judgment = judgeReviewFormAmountAndTax(
+      { ...dialogProps.selectedReviewDraft, items: dialogProps.persistedReviewItems },
+      dialogProps.reviewForm,
+      dialogProps.reviewItems,
+    );
+    expect(judgment.checks.amount.status).toBe("matched");
+    expect(judgment.status).toBe("unresolved");
+    expect(judgment.unresolvedTaxItemCount).toBe(1);
+
+    render(<ReviewDialog {...props} {...dialogProps} onConfirmItemTax={onConfirmItemTax} />);
+    expect(
+      within(screen.getByRole("region", { name: "確認件数" })).getByText("税の確認待ち 1件"),
+    ).toBeVisible();
     const row = screen.getByText("ホットケーキ").closest("details")!;
     await user.click(row.querySelector("summary")!);
     expect(within(row).getByRole("combobox", { name: "ホットケーキの税率" })).toHaveTextContent(
       "8%",
     );
-    // 3条件（登録額が決まり、金額が一致し、修正必須がない）を満たすため一致時表示になり、行内の確認案内は出さない。確認操作は残す。
-    expect(screen.getByRole("region", { name: "全体の確認状態" })).toHaveTextContent(
-      "金額は一致しています",
-    );
-    expect(
-      screen.queryByText(/表示中の税率・税込／税抜はまだ確認されていません/),
-    ).not.toBeInTheDocument();
+    expect(within(row).getByText(/商品名・行の種類が変わっています/)).toBeVisible();
     expect(screen.queryByText(/税内訳を読み取れていません/)).not.toBeInTheDocument();
     await user.click(within(row).getByRole("button", { name: "この税設定を確認する" }));
     expect(onConfirmItemTax).toHaveBeenCalledExactlyOnceWith("food", 8, "tax_included");
@@ -851,35 +904,6 @@ describe("Issue #1563 金額が一致している下書きの表示", () => {
     expect(screen.getByRole("button", { name: "修正が必要な項目へ" })).toBeInTheDocument();
   });
 
-  it("F: 税設定が未確認の商品が残っても、3条件を満たせば一致時表示にし、税の確認操作は残す", () => {
-    const items = [
-      {
-        ...matchedItem("a", 183, 13),
-        taxResolutionStatus: "unresolved" as const,
-        taxConfirmedFields: [],
-      },
-      matchedItem("b", 183, 13),
-      matchedItem("c", 194, 15),
-    ];
-    render(
-      <ReviewDialog
-        {...props}
-        // 税内訳があると画面の商品の税設定は再計算されるため、税内訳なしで未確認を残す。
-        selectedReviewDraft={{ ...matchedDraft(), taxSummaries: undefined }}
-        reviewForm={matchedForm}
-        reviewItems={items}
-        onConfirmItemTax={vi.fn()}
-      />,
-    );
-    const banner = screen.getByRole("region", { name: "全体の確認状態" });
-    expect(within(banner).getByText("金額は一致しています")).toBeVisible();
-    expect(screen.queryByRole("region", { name: "確認件数" })).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/表示中の税率・税込／税抜はまだ確認されていません/),
-    ).not.toBeInTheDocument();
-    // 商品行は折りたたまれているが、税の確認操作は残る。
-    expect(screen.getByRole("button", { name: "この税設定を確認する" })).toBeInTheDocument();
-  });
   it("D: 税抜明細の一致は商品の合計を税込で示し、支払額と同額にする", () => {
     render(
       <ReviewDialog
