@@ -4,10 +4,10 @@ import { cleanupAiExpenseQueue, cleanupTestReceipts } from "./helpers/cleanup";
 import { seedTaxReviewDraftByUser } from "./helpers/seed";
 
 async function expectResolved(dialog: Locator) {
-  await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("確認推奨 0件");
+  await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "税内訳を修正" })).toHaveCount(0);
   await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
-  await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+  await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
 }
 
 async function seedLegacySummaryDraft(page: Page) {

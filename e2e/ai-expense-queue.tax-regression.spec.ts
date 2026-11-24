@@ -98,9 +98,7 @@ test.describe("Issue #672 税判定回帰の代表E2E", () => {
     ).toHaveCount(0);
     // 金額・税率別ともに一致のため検算カードは出さず、成功メッセージだけが残る
     await expect(
-      dialog
-        .getByRole("region", { name: "全体の確認状態" })
-        .getByText("印字額と明細の金額が一致しています"),
+      dialog.getByRole("region", { name: "全体の確認状態" }).getByText("金額は一致しています"),
     ).toBeVisible();
     await expect(dialog.getByRole("region", { name: "確認結果" })).toHaveCount(0);
     await dialog.getByRole("button", { name: "この内容で保存" }).click();

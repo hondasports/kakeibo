@@ -40,4 +40,15 @@ describe("ReviewDialogActions", () => {
     expect(screen.getByRole("status")).toHaveTextContent("税込・税抜の不一致 4件");
     expect(screen.getByText("税込・税抜の不一致 4件")).toBeInTheDocument();
   });
+  it("金額が一致している下書きは確認文言とスマホ用の状態チップを出さず、保存だけを示す", () => {
+    render(<ReviewDialogActions {...props} amountConfirmed />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText("確認結果：計算した金額が一致しています。")).not.toBeInTheDocument();
+    expect(screen.queryByText("金額を確認済み")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "この内容で保存" })).toBeEnabled();
+  });
+  it("金額が一致していても処理中は処理中の文言を出す", () => {
+    render(<ReviewDialogActions {...props} amountConfirmed busy />);
+    expect(screen.getByRole("status")).toHaveTextContent("処理中です。しばらくお待ちください。");
+  });
 });
