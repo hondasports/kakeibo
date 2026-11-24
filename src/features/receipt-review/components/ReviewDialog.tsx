@@ -33,7 +33,6 @@ import {
   effectiveReviewMode,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
 import { countActionableUncomparable } from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
-import { buildTaxContextFromReviewItem } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
 import { judgeReviewFormAmountAndTax } from "../../../../lib/domain/aiExpenseDrafts/reviewFormJudgment";
 import { isUnrelatedToAmountTaxGuidanceId } from "../../../../lib/domain/aiExpenseDrafts/reviewJudgment";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
@@ -149,18 +148,9 @@ export function ReviewDialog(props: ReviewDialogProps) {
       (matchedButUnresolved && !isUnrelatedToAmountTaxGuidanceId(issue.id)),
   );
   // 金額が一致し登録額も決まっていれば、確認の案内・件数・結果カードを出さず一致の表示だけにする（Issue #1563）。
-  // 税設定の確認待ちがある商品は、ユーザーが直せるため従来の表示を残す。
-  // 判定の件数は画面の商品の入力状態を反映しないため、画面の商品からも確認する。
-  const taxConfirmationPending = items.some(
-    (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
-  );
   const amountConfirmed =
-    judgment.status === "resolved" &&
-    checks.amount.status === "matched" &&
-    required.length === 0 &&
-    judgment.unresolvedTaxItemCount === 0 &&
-    !taxConfirmationPending;
-  const unresolvedTaxItemCount = judgment.unresolvedTaxItemCount;
+    judgment.status === "resolved" && checks.amount.status === "matched" && required.length === 0;
+  const unresolvedTaxItemCount = amountConfirmed ? 0 : judgment.unresolvedTaxItemCount;
   const evidenceOnly = judgment.status === "resolved";
   const basisConflictItemCount = evidenceOnly
     ? 0
