@@ -276,7 +276,13 @@ describe("下書きの修正導線", () => {
     expect(within(row).getByRole("combobox", { name: "ホットケーキの税率" })).toHaveTextContent(
       "8%",
     );
-    expect(within(row).getByText(/表示中の税率・税込／税抜はまだ確認されていません/)).toBeVisible();
+    // 3条件（登録額が決まり、金額が一致し、修正必須がない）を満たすため一致時表示になり、行内の確認案内は出さない。確認操作は残す。
+    expect(screen.getByRole("region", { name: "全体の確認状態" })).toHaveTextContent(
+      "金額は一致しています",
+    );
+    expect(
+      screen.queryByText(/表示中の税率・税込／税抜はまだ確認されていません/),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/税内訳を読み取れていません/)).not.toBeInTheDocument();
     await user.click(within(row).getByRole("button", { name: "この税設定を確認する" }));
     expect(onConfirmItemTax).toHaveBeenCalledExactlyOnceWith("food", 8, "tax_included");
@@ -845,7 +851,7 @@ describe("Issue #1563 金額が一致している下書きの表示", () => {
     expect(screen.getByRole("button", { name: "修正が必要な項目へ" })).toBeInTheDocument();
   });
 
-  it("F: 税設定が未確認の商品が残れば一致時扱いにせず、従来の確認表示を残す", () => {
+  it("F: 税設定が未確認の商品が残っても、3条件を満たせば一致時表示にし、税の確認操作は残す", () => {
     const items = [
       {
         ...matchedItem("a", 183, 13),
@@ -862,14 +868,17 @@ describe("Issue #1563 金額が一致している下書きの表示", () => {
         selectedReviewDraft={{ ...matchedDraft(), taxSummaries: undefined }}
         reviewForm={matchedForm}
         reviewItems={items}
+        onConfirmItemTax={vi.fn()}
       />,
     );
-    expect(screen.getByRole("region", { name: "確認件数" })).toBeVisible();
-    expect(screen.queryByText("金額は一致しています")).not.toBeInTheDocument();
-    // 商品行は折りたたまれているため、存在だけを確認する。
+    const banner = screen.getByRole("region", { name: "全体の確認状態" });
+    expect(within(banner).getByText("金額は一致しています")).toBeVisible();
+    expect(screen.queryByRole("region", { name: "確認件数" })).not.toBeInTheDocument();
     expect(
-      screen.getByText(/表示中の税率・税込／税抜はまだ確認されていません/),
-    ).toBeInTheDocument();
+      screen.queryByText(/表示中の税率・税込／税抜はまだ確認されていません/),
+    ).not.toBeInTheDocument();
+    // 商品行は折りたたまれているが、税の確認操作は残る。
+    expect(screen.getByRole("button", { name: "この税設定を確認する" })).toBeInTheDocument();
   });
   it("D: 税抜明細の一致は商品の合計を税込で示し、支払額と同額にする", () => {
     render(
@@ -914,5 +923,50 @@ describe("Issue #1563 金額が一致している下書きの表示", () => {
     expect(within(banner).getByText("金額は一致しています")).toBeVisible();
     expect(within(banner).getByText("商品の合計（税込・1件）")).toBeVisible();
     expect(within(banner).getAllByText("110円")).toHaveLength(2);
+  });
+  it("G: 税込と税抜が混在しても、商品の合計は税込として示す（判定が一致する場合）", () => {
+    render(
+      <ReviewDialog
+        {...props}
+        selectedReviewDraft={{ ...props.selectedReviewDraft!, amountYen: 218 }}
+        reviewForm={{ ...props.reviewForm, amountYen: "218" }}
+        reviewItems={[
+          {
+            id: "a",
+            persistedItemId: "a",
+            itemName: "商品a",
+            amountYen: "108",
+            printedAmountYen: 108,
+            normalizedAmountYen: 108,
+            categoryId: "food",
+            amountBasis: "tax_included",
+            taxRatePercent: 8,
+            taxResolutionStatus: "resolved",
+            taxResolutionSource: "item_explicit",
+            taxAllocationStatus: "allocated",
+            allocatedTaxYen: 8,
+          },
+          {
+            id: "b",
+            persistedItemId: "b",
+            itemName: "商品b",
+            amountYen: "100",
+            printedAmountYen: 100,
+            normalizedAmountYen: 110,
+            categoryId: "food",
+            amountBasis: "tax_excluded",
+            taxRatePercent: 10,
+            taxResolutionStatus: "resolved",
+            taxResolutionSource: "item_explicit",
+            taxAllocationStatus: "allocated",
+            allocatedTaxYen: 10,
+          },
+        ]}
+      />,
+    );
+    const banner = screen.getByRole("region", { name: "全体の確認状態" });
+    expect(within(banner).getByText("金額は一致しています")).toBeVisible();
+    expect(within(banner).getByText("商品の合計（税込・2件）")).toBeVisible();
+    expect(within(banner).getAllByText("218円")).toHaveLength(2);
   });
 });

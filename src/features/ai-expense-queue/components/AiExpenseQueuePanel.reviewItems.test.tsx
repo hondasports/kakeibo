@@ -359,15 +359,16 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     await user.click(screen.getByRole("button", { name: "確認する" }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByRole("region", { name: "商品一覧" })).toBeVisible();
-    expect(within(dialog).getByRole("region", { name: "確認結果" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
+    expect(within(dialog).getByText("金額は一致しています")).toBeInTheDocument();
     expect(within(dialog).queryByText(/unknown_amount_basis/)).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "下書きを保存" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "この内容で保存" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "修正して登録" })).not.toBeInTheDocument();
     expect(
       within(dialog).queryByRole("button", { name: "登録準備OKに戻す" }),
     ).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
+    await user.click(within(dialog).getByRole("button", { name: "この内容で保存" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(updateForReviewMock).toHaveBeenCalled();
     expect(registerReadyDraftsAsExpenseEntriesMock).not.toHaveBeenCalled();
@@ -448,7 +449,7 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     await user.click(screen.getByRole("option", { name: "食費" }));
     await user.click(categoryInputs[1]);
     await user.click(screen.getByRole("option", { name: "食費" }));
-    await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
+    await user.click(within(dialog).getByRole("button", { name: "この内容で保存" }));
 
     expect(updateForReviewMock).toHaveBeenCalledWith({
       draftId: "draft-review",
@@ -527,11 +528,11 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     await user.clear(amountInputs[1]);
     await user.type(amountInputs[1], "-110");
     expect(amountInputs[1]).toHaveValue("-110");
-    const amountCheck = within(dialog).getByRole("region", { name: "確認結果" });
-    expect(within(amountCheck).getByText("税率別集計")).toBeVisible();
-    expect(within(amountCheck).getByText("商品の金額と支払額が一致しています")).toBeVisible();
+    // 金額が一致し登録額が決まっているため、結果カードは出さず一致の表示だけにする（Issue #1563）。
+    expect(within(dialog).queryByRole("region", { name: "確認結果" })).not.toBeInTheDocument();
+    expect(within(dialog).getByText("金額は一致しています")).toBeVisible();
 
-    await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
+    await user.click(within(dialog).getByRole("button", { name: "この内容で保存" }));
 
     expect(updateForReviewMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -592,7 +593,7 @@ describe("AiExpenseQueuePanel（明細編集）", () => {
     const dialog = screen.getByRole("dialog");
 
     expect(within(dialog).queryByText("対象商品のカテゴリから減額します")).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "下書きを保存" }));
+    await user.click(within(dialog).getByRole("button", { name: "この内容で保存" }));
 
     expect(updateForReviewMock).toHaveBeenCalledWith(
       expect.objectContaining({

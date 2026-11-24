@@ -32,15 +32,19 @@ export function ReviewStatusBanner({
 }) {
   const { amount, taxRate } = checks;
   if (amountConfirmed) {
-    const external = amount.variant === "external";
+    // 表示する合計が商品の表示金額の合計と違えば、税込に直した合計だと分かるよう「税込・」を付ける。
+    const shownTotalYen = amount.itemsComparableTotalYen ?? amount.expectedPaidYen;
+    const taxIncluded =
+      amount.variant === "external" ||
+      (amount.itemsPrintedTotalYen !== undefined && shownTotalYen !== amount.itemsPrintedTotalYen);
     return (
       <Stack spacing={1.5} component="section" aria-label="全体の確認状態">
         <Alert severity="success">
           <Typography variant="subtitle2">金額は一致しています</Typography>
           <Stack spacing={0.5}>
             <AmountCheckLine
-              label={`商品の合計（${external ? "税込・" : ""}${itemCount}件）`}
-              value={amount.itemsComparableTotalYen ?? amount.expectedPaidYen}
+              label={`商品の合計（${taxIncluded ? "税込・" : ""}${itemCount}件）`}
+              value={shownTotalYen}
             />
             <AmountCheckLine label="支払額" value={amount.paidTotalYen} />
           </Stack>

@@ -300,6 +300,54 @@ describe("ReviewStatusBanner", () => {
       within(region).queryByText("税率別の対象額が読み取れていません"),
     ).not.toBeInTheDocument();
   });
+  it("税込と税抜が混在しても、商品の合計は税込として示す（variant が external でなくても）", () => {
+    render(
+      <ReviewStatusBanner
+        checks={{
+          amount: {
+            status: "matched",
+            variant: "direct",
+            itemsPrintedTotalYen: 208,
+            itemsComparableTotalYen: 218,
+            paidTotalYen: 218,
+          },
+          taxRate: matchedChecks.taxRate,
+        }}
+        amountConfirmed
+        itemCount={2}
+        issues={[]}
+        unresolvedTaxItemCount={0}
+        busy={false}
+        onJump={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("商品の合計（税込・2件）")).toBeVisible();
+    expect(screen.getAllByText("218円")).toHaveLength(2);
+  });
+  it("全商品が税込で表示金額の合計と税込合計が同じなら、税込とは付けない", () => {
+    render(
+      <ReviewStatusBanner
+        checks={{
+          amount: {
+            status: "matched",
+            variant: "direct",
+            itemsPrintedTotalYen: 560,
+            itemsComparableTotalYen: 560,
+            paidTotalYen: 560,
+          },
+          taxRate: matchedChecks.taxRate,
+        }}
+        amountConfirmed
+        itemCount={3}
+        issues={[]}
+        unresolvedTaxItemCount={0}
+        busy={false}
+        onJump={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("商品の合計（3件）")).toBeVisible();
+    expect(screen.queryByText(/税込・/)).not.toBeInTheDocument();
+  });
   it("税抜明細の金額一致時は商品の合計を税込として示す", () => {
     render(
       <ReviewStatusBanner
