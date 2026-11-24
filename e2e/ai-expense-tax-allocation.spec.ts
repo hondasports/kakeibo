@@ -58,9 +58,7 @@ test("@smoke #748 未配分の13明細を確認して税込合計・税額を保
     // 金額・税率別ともに一致したため検算カードは出さず、成功メッセージだけが残る
     await expect(checks).toHaveCount(0);
     await expect(
-      dialog
-        .getByRole("region", { name: "全体の確認状態" })
-        .getByText("印字額と明細の金額が一致しています"),
+      dialog.getByRole("region", { name: "全体の確認状態" }).getByText("金額は一致しています"),
     ).toBeVisible();
     await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
     await expect(dialog).toBeHidden();
@@ -68,9 +66,7 @@ test("@smoke #748 未配分の13明細を確認して税込合計・税額を保
     await row.getByRole("button", { name: "修正する" }).click();
     // 再オープン後も一致が維持され、検算カードは出ず成功メッセージだけが残る
     await expect(
-      dialog
-        .getByRole("region", { name: "全体の確認状態" })
-        .getByText("印字額と明細の金額が一致しています"),
+      dialog.getByRole("region", { name: "全体の確認状態" }).getByText("金額は一致しています"),
     ).toBeVisible();
     await expect(dialog.getByRole("region", { name: "確認結果" })).toHaveCount(0);
   } finally {

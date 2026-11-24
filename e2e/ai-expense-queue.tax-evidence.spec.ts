@@ -44,12 +44,12 @@ for (const width of [1280]) {
       await row.getByRole("button", { name: "確認する", exact: true }).click();
       const dialog = page.getByRole("dialog", { name: "下書き確認" });
       await confirmProducts(page, dialog);
-      await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("修正必須 0件");
-      await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("確認推奨 0件");
+      // 金額が一致し登録額が決まっているため、確認件数と確認結果カードは出さない（Issue #1563）。
+      await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
       await expect(dialog.getByText("金額を確認してください。", { exact: true })).toHaveCount(0);
       await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
       await expect(dialog.getByText("税内訳を確認", { exact: true })).toHaveCount(0);
-      await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+      await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
       const product = dialog.getByRole("region", { name: "商品一覧" });
       const bounds = await product.boundingBox();
       expect(bounds!.x).toBeGreaterThanOrEqual(0);
@@ -60,7 +60,7 @@ for (const width of [1280]) {
       await expect(dialog).toBeHidden();
       await row.getByRole("button", { name: /確認する|修正する/ }).click();
       await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
-      await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("確認推奨 0件");
+      await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
       await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
       await expect(dialog).toBeHidden();
       const ready = queue
@@ -70,7 +70,7 @@ for (const width of [1280]) {
       await expect(ready).toContainText("4,810円");
       await expect(ready).not.toContainText("金額・税内訳の確認が必要");
       await ready.getByRole("button", { name: "修正する", exact: true }).click();
-      await expect(dialog.getByRole("region", { name: "確認件数" })).toContainText("確認推奨 0件");
+      await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
       await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
       await expect(dialog).toBeHidden();
       await ready.getByRole("button", { name: "登録する", exact: true }).click();
@@ -95,13 +95,13 @@ test("@smoke Issue #1548 印字税内訳に矛盾があっても、支払額と�
     const dialog = page.getByRole("dialog", { name: "下書き確認" });
     await confirmProducts(page, dialog);
     await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
-    const counts = dialog.getByRole("region", { name: "確認件数" });
-    await expect(counts).toContainText("修正必須 0件");
-    await expect(counts).toContainText(/確認推奨 [1-9]\d*件/);
+    // 印字税内訳と矛盾していても、金額が一致し登録額が決まれば確認件数は出さない（Issue #1563）。
+    await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
+    await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "税内訳を修正", exact: true })).toHaveCount(0);
     await dialog.getByText("読み取り原文（参考）").click();
     await expect(dialog.getByText("10%対象 4,373円", { exact: true })).toBeVisible();
-    await dialog.getByRole("button", { name: "下書きを保存", exact: true }).click();
+    await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
     await expect(dialog).toBeHidden();
     const ready = queue
       .getByRole("region", { name: "登録できます" })
@@ -164,7 +164,7 @@ test("@smoke Issue #1015 片軸確認を保存してから残りを確認でき�
         );
       }
     }
-    await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+    await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
     await expect(dialog).toBeHidden();
     const ready = queue
@@ -172,7 +172,7 @@ test("@smoke Issue #1015 片軸確認を保存してから残りを確認でき�
       .locator(".ai-expense-queue-item")
       .filter({ hasText: "E2E税レビュー店" });
     await ready.getByRole("button", { name: "修正する", exact: true }).click();
-    await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+    await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
     await expect(dialog).toBeHidden();
     await ready.getByRole("button", { name: "登録する", exact: true }).click();
@@ -214,7 +214,7 @@ for (const saveBeforeRate of [false, true]) {
         await page.getByRole("option", { name: option, exact: true }).click();
         await expect(select).toBeEnabled();
       }
-      await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+      await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
       await product.getByRole("textbox", { name: "明細名", exact: true }).fill("変更後の商品");
       product = dialog
         .getByRole("region", { name: "商品一覧" })
@@ -249,7 +249,7 @@ for (const saveBeforeRate of [false, true]) {
         await page.getByRole("option", { name: "8%", exact: true }).click();
       }
       await expect(rate).toBeEnabled();
-      await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+      await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
       await expect(
         product.getByRole("button", { name: "この税設定を確認する", exact: true }),
       ).toHaveCount(0);
@@ -260,7 +260,7 @@ for (const saveBeforeRate of [false, true]) {
         .locator(".ai-expense-queue-item")
         .filter({ hasText: "E2E税レビュー店" });
       await ready.getByRole("button", { name: "修正する", exact: true }).click();
-      await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+      await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
       await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
       await expect(dialog).toBeHidden();
       await ready.getByRole("button", { name: "登録する", exact: true }).click();

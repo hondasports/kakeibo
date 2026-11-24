@@ -23,6 +23,12 @@ import { getPrimaryReviewReason } from "../../../../../lib/domain/aiExpenseDraft
 import { formatQueueDate } from "./queueDisplayFormatters";
 import { QueueItemActions } from "./QueueItemActions";
 
+/** 金額・税が保存時に解決済みなら一覧から外す理由（特定の誤りを示さない読み取り確認）。 */
+const RESOLVED_HIDDEN_REVIEW_REASONS: ReadonlySet<string> = new Set([
+  "low_confidence",
+  "user_confirmation_required",
+]);
+
 export function QueueItemCard({
   item,
   isSelected,
@@ -78,6 +84,8 @@ export function QueueItemCard({
       ...(item.hasUncategorizedItems ? ["ambiguous_category"] : []),
       ...(item.hasLowConfidenceItems ? ["low_confidence"] : []),
     ]),
+  ).filter(
+    (reason) => !(item.amountAndTaxResolved === true && RESOLVED_HIDDEN_REVIEW_REASONS.has(reason)),
   );
   const primaryReviewReason = getPrimaryReviewReason(reviewReasons);
 

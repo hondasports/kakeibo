@@ -452,7 +452,7 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
       .click();
     await page.getByRole("option", { name: "税込", exact: true }).click();
     await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
-    await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+    await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
     await expect(dialog).toBeHidden();
     const readyItem = queue
@@ -461,7 +461,7 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
       .filter({ hasText: "E2E税率別集計店" });
     await expect(readyItem).toContainText("1,060円");
     await readyItem.getByRole("button", { name: "修正する", exact: true }).click();
-    await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+    await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
     await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
   });
 });

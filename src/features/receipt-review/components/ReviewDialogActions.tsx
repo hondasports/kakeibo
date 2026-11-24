@@ -34,6 +34,7 @@ export function ReviewDialogActions({
   unresolvedTaxItemCount = 0,
   basisConflictItemCount = 0,
   totalOnly,
+  amountConfirmed = false,
   onClose,
   onSubmit,
   onReviewRequired,
@@ -52,10 +53,14 @@ export function ReviewDialogActions({
   /** レシートの税内訳と税込／税抜設定が一致しない明細数 */
   basisConflictItemCount?: number;
   totalOnly: boolean;
+  /** 金額が一致し登録額も決まっている。処理中でなければ状態文言を出さない（Issue #1563） */
+  amountConfirmed?: boolean;
   onClose: () => void;
   onSubmit: () => void;
   onReviewRequired: () => void;
 }) {
+  // 一致時の状態は上部の成功表示で足りるため、フッターの文言とスマホ用チップは出さない。
+  const showStatus = busy || !amountConfirmed;
   const fixCount = requiredCount + checkMismatchCount;
   const statusText = busy
     ? "処理中です。しばらくお待ちください。"
@@ -119,22 +124,26 @@ export function ReviewDialogActions({
         </Alert>
       )}
       <Box sx={{ minHeight: 28, display: "flex", alignItems: "center" }}>
-        <Typography
-          role={announcesStatus ? "status" : undefined}
-          variant="body2"
-          color={statusColor}
-          sx={{ display: { xs: "none", sm: "block" } }}
-        >
-          {statusText}
-        </Typography>
-        <Chip
-          size="small"
-          variant="outlined"
-          color={fixCount > 0 ? "error" : recommendationCount > 0 ? "warning" : "success"}
-          icon={fixCount === 0 && recommendationCount === 0 ? <CheckCircleIcon /> : undefined}
-          label={compactStatus}
-          sx={{ display: { xs: "inline-flex", sm: "none" } }}
-        />
+        {showStatus && (
+          <>
+            <Typography
+              role={announcesStatus ? "status" : undefined}
+              variant="body2"
+              color={statusColor}
+              sx={{ display: { xs: "none", sm: "block" } }}
+            >
+              {statusText}
+            </Typography>
+            <Chip
+              size="small"
+              variant="outlined"
+              color={fixCount > 0 ? "error" : recommendationCount > 0 ? "warning" : "success"}
+              icon={fixCount === 0 && recommendationCount === 0 ? <CheckCircleIcon /> : undefined}
+              label={compactStatus}
+              sx={{ display: { xs: "inline-flex", sm: "none" } }}
+            />
+          </>
+        )}
       </Box>
       <DialogActions sx={{ px: 0, py: 1, gap: 1 }}>
         <Button

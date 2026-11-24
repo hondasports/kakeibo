@@ -191,6 +191,74 @@ describe("QueueContent の一覧制御", () => {
     expect(titles).toEqual(["金額", "カテゴリ", "その他"]);
   });
 
+  it("金額と税が解決済みの下書きは一覧で信頼度・内容確認の理由を出さない（Issue #1563）", () => {
+    const { container } = renderQueueContent({
+      processing: [],
+      ready: [],
+      needs_review: [
+        {
+          ...registeredItem,
+          id: "resolved",
+          status: "needs_review",
+          title: "解決済み",
+          reviewReasons: ["low_confidence", "user_confirmation_required"],
+          hasLowConfidenceItems: true,
+          amountAndTaxResolved: true,
+        },
+      ],
+      failed: [],
+      registered: [],
+    });
+    expect(screen.queryByText("読み取り内容の信頼度が低い")).not.toBeInTheDocument();
+    expect(screen.queryByText("内容確認が必要")).not.toBeInTheDocument();
+    expect(screen.queryByText(/他\d+件/)).not.toBeInTheDocument();
+    expect(container.querySelector(".ai-expense-queue-item-title")?.textContent).toBe("解決済み");
+  });
+
+  it("解決済みでも未分類の理由は残し、除いた後の件数で他N件を数える（Issue #1563）", () => {
+    renderQueueContent({
+      processing: [],
+      ready: [],
+      needs_review: [
+        {
+          ...registeredItem,
+          id: "ambiguous",
+          status: "needs_review",
+          title: "未分類",
+          reviewReasons: ["low_confidence", "ambiguous_category", "user_confirmation_required"],
+          amountAndTaxResolved: true,
+        },
+      ],
+      failed: [],
+      registered: [],
+    });
+    expect(screen.getByText("未分類あり")).toBeInTheDocument();
+    expect(screen.queryByText(/他\d+件/)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["false", { amountAndTaxResolved: false }],
+    ["保存値なし", {}],
+  ])("金額・税が未解決（%s）なら従来どおり信頼度の理由を出す（Issue #1563）", (_label, extra) => {
+    renderQueueContent({
+      processing: [],
+      ready: [],
+      needs_review: [
+        {
+          ...registeredItem,
+          id: "unresolved",
+          status: "needs_review",
+          title: "未解決",
+          reviewReasons: ["low_confidence"],
+          ...extra,
+        },
+      ],
+      failed: [],
+      registered: [],
+    });
+    expect(screen.getByText("読み取り内容の信頼度が低い")).toBeInTheDocument();
+  });
+
   it("確認対象は初期3件に絞り、残件を明示して展開できる", async () => {
     const user = userEvent.setup();
     const needsReview = Array.from({ length: 5 }, (_, index) => ({

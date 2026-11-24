@@ -33,6 +33,7 @@ import {
   effectiveReviewMode,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
 import { countActionableUncomparable } from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
+import { buildTaxContextFromReviewItem } from "../../../../lib/domain/aiExpenseDrafts/receiptItemTaxViewModel";
 import { judgeReviewFormAmountAndTax } from "../../../../lib/domain/aiExpenseDrafts/reviewFormJudgment";
 import { isUnrelatedToAmountTaxGuidanceId } from "../../../../lib/domain/aiExpenseDrafts/reviewJudgment";
 import { isDiscountLine } from "../../../../lib/domain/receipt/discountItems";
@@ -147,6 +148,18 @@ export function ReviewDialog(props: ReviewDialogProps) {
       (issue.required && issue.target !== "items" && !itemTargets.has(issue.target)) ||
       (matchedButUnresolved && !isUnrelatedToAmountTaxGuidanceId(issue.id)),
   );
+  // 金額が一致し登録額も決まっていれば、確認の案内・件数・結果カードを出さず一致の表示だけにする（Issue #1563）。
+  // 税設定の確認待ちがある商品は、ユーザーが直せるため従来の表示を残す。
+  // 判定の件数は画面の商品の入力状態を反映しないため、画面の商品からも確認する。
+  const taxConfirmationPending = items.some(
+    (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
+  );
+  const amountConfirmed =
+    judgment.status === "resolved" &&
+    checks.amount.status === "matched" &&
+    required.length === 0 &&
+    judgment.unresolvedTaxItemCount === 0 &&
+    !taxConfirmationPending;
   const unresolvedTaxItemCount = judgment.unresolvedTaxItemCount;
   const evidenceOnly = judgment.status === "resolved";
   const basisConflictItemCount = evidenceOnly
@@ -165,12 +178,13 @@ export function ReviewDialog(props: ReviewDialogProps) {
     Number(!printedTaxMismatch && checks.taxRate.status === "mismatch");
   const checkUncomparableCount = countActionableUncomparable(checks, recommendations);
   const fixCount = required.length + checkMismatchCount;
-  const recommendationCount =
-    recommendations.length +
-    checkUncomparableCount +
-    Number(
-      printedTaxMismatch && !recommendations.some((issue) => issue.taxSummaryIndex !== undefined),
-    );
+  const recommendationCount = amountConfirmed
+    ? 0
+    : recommendations.length +
+      checkUncomparableCount +
+      Number(
+        printedTaxMismatch && !recommendations.some((issue) => issue.taxSummaryIndex !== undefined),
+      );
   const busy = props.reviewSubmitting || props.taxUpdatingItemId != null;
   const unavailable = isReviewDraftLoading || isReviewDraftNotFound || categories.length === 0;
   const submitLabel = getReviewSubmitLabel({
@@ -384,30 +398,36 @@ export function ReviewDialog(props: ReviewDialogProps) {
                   }
                   onFieldChange={onFieldChange}
                 />
-                <ReviewCheckChips
-                  fixCount={fixCount}
-                  recommendationCount={recommendationCount}
-                  basisConflictItemCount={basisConflictItemCount}
-                  unresolvedTaxItemCount={unresolvedTaxItemCount}
-                />
+                {!amountConfirmed && (
+                  <ReviewCheckChips
+                    fixCount={fixCount}
+                    recommendationCount={recommendationCount}
+                    basisConflictItemCount={basisConflictItemCount}
+                    unresolvedTaxItemCount={unresolvedTaxItemCount}
+                  />
+                )}
                 <ReviewStatusBanner
                   checks={checks}
                   amountTaxResolved={judgment.status !== "unresolved"}
-                  issues={bannerGuidance}
+                  amountConfirmed={amountConfirmed}
+                  itemCount={items.length}
+                  issues={amountConfirmed ? [] : bannerGuidance}
                   unresolvedTaxItemCount={unresolvedTaxItemCount}
-                  receiptIssues={receiptGuidance}
+                  receiptIssues={amountConfirmed ? [] : receiptGuidance}
                   busy={busy}
                   onJump={goTo}
                 />
-                <ReviewCheckCards
-                  amount={checks.amount}
-                  taxRate={checks.taxRate}
-                  evidence={sourceDraft?.receiptTaxDecision?.evidence}
-                />
+                {!amountConfirmed && (
+                  <ReviewCheckCards
+                    amount={checks.amount}
+                    taxRate={checks.taxRate}
+                    evidence={sourceDraft?.receiptTaxDecision?.evidence}
+                  />
+                )}
                 <ReviewDialogItemsSection
                   items={items}
                   products={products}
-                  guidance={guidance}
+                  guidance={amountConfirmed ? [] : guidance}
                   expanded={expanded}
                   taxDetails={taxDetails}
                   busy={busy}
@@ -459,6 +479,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
         unresolvedTaxItemCount={unresolvedTaxItemCount}
         basisConflictItemCount={basisConflictItemCount}
         totalOnly={totalOnly}
+        amountConfirmed={amountConfirmed}
         onClose={props.onClose}
         onSubmit={save}
         onReviewRequired={() => goTo(required[0]?.target ?? "basics")}
