@@ -72,8 +72,8 @@ importers:
         specifier: ^9.12.0
         version: 9.12.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react@19.2.8))(@mui/material@9.4.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@mui/system@9.4.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(dayjs@1.11.23)(luxon@3.7.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       convex:
-        specifier: ^1.44.0
-        version: 1.44.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+        specifier: ^1.51.0
+        version: 1.51.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       dayjs:
         specifier: ^1.11.23
         version: 1.11.23
@@ -140,7 +140,7 @@ importers:
         version: 4.1.0
       convex-test:
         specifier: 0.0.56
-        version: 0.0.56(convex@1.44.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8))
+        version: 0.0.56(convex@1.51.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8))
       dotenv:
         specifier: ^18.0.10
         version: 18.0.10
@@ -222,6 +222,10 @@ packages:
 
   '@babel/runtime@7.29.13':
     resolution: {integrity: sha512-v+oN26xP4YIlQsbQ/CbTH1WG5m/l/DjKKZNy/Kp3f/AFvbgt7Em/D0FeMM3O2hX0YzeN2M16W8lOpyhIkfCBcQ==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/runtime@7.29.15':
+    resolution: {integrity: sha512-304gsbbGVmQc+cNGHzwHBlqepYdWLKj3VXCQBGt/EGcV7PUPfKI7kAUNW1FZEOCwlQiLvQjg1JEaAlRQ616h+Q==}
     engines: {node: '>=6.9.0'}
 
   '@babel/runtime@7.29.7':
@@ -2515,9 +2519,9 @@ packages:
     peerDependencies:
       convex: ^1.43.0
 
-  convex@1.44.0:
-    resolution: {integrity: sha512-84bBa1ufSX4qohXdycXuQl2c2kAmfVpTCpypcmIgxpS5rUBgv5qjhArYugTkJVbljMs5SH2mW30bjJo+SQwe1w==}
-    engines: {node: '>=18.0.0', npm: '>=7.0.0'}
+  convex@1.51.0:
+    resolution: {integrity: sha512-Y5gS+JmT2JBq76S3CrQDrdL/Ijs4ZRKsvz3cu5EmHf/QxW18QrHunb5j9WC6lAbWbWc/gvmqpa5lvXzLXFQVJA==}
+    engines: {node: '>=22.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
       '@auth0/auth0-react': ^2.0.1
@@ -3508,8 +3512,8 @@ packages:
     resolution: {integrity: sha512-YUbWYCgErwnMAVkjUnYa+KlMBzGpHwiIt/DE7f0G33AuX2LH9UcTk6KgWxd3zRU+pN3u/C+Xl3EnMLM4Hea7Sg==}
     engines: {node: ^10 || ^12 || >=14}
 
-  prettier@3.9.5:
-    resolution: {integrity: sha512-/FVl766LpUfB5vXgCYOYa0MeV/441Ia99AeICQIQFTY/Nw0roZwULcXpku5i1/m5kt/baz+s4Zogspd839HSMg==}
+  prettier@3.10.1:
+    resolution: {integrity: sha512-70vp3ZUYoPlFbF9uiTdXHUUCGEIp7d4+6p+8DYbkm2jP7x/3i/paXVF6dopSI3zd/CEitrZN1rc4i85xWmmXlg==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -4128,8 +4132,8 @@ packages:
       utf-8-validate:
         optional: true
 
-  ws@8.22.0:
-    resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
+  ws@8.23.0:
+    resolution: {integrity: sha512-wCkmX8QMOrKjgO8HW2WyDbTSGeqkocxgDzS9iR79rEAexty6/2qzilx3Ag8Tqf9ykop3irLKle0MtVn5qjVnoQ==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -4236,6 +4240,8 @@ snapshots:
       '@babel/types': 7.29.11
 
   '@babel/runtime@7.29.13': {}
+
+  '@babel/runtime@7.29.15': {}
 
   '@babel/runtime@7.29.7': {}
 
@@ -5220,7 +5226,7 @@ snapshots:
       entities: 4.5.0
       html-to-text: 10.0.1
       html5parser: 3.0.0
-      prettier: 3.9.5
+      prettier: 3.10.1
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
@@ -5342,7 +5348,7 @@ snapshots:
   '@testing-library/dom@10.4.1':
     dependencies:
       '@babel/code-frame': 7.29.7
-      '@babel/runtime': 7.29.13
+      '@babel/runtime': 7.29.15
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
       dom-accessibility-api: 0.5.16
@@ -6197,14 +6203,14 @@ snapshots:
 
   convert-source-map@1.9.0: {}
 
-  convex-test@0.0.56(convex@1.44.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)):
+  convex-test@0.0.56(convex@1.51.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)):
     dependencies:
-      convex: 1.44.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      convex: 1.51.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
 
-  convex@1.44.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8):
+  convex@1.51.0(@clerk/react@6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8):
     dependencies:
       esbuild: 0.28.1
-      prettier: 3.9.5
+      prettier: 3.10.1
       ws: 8.21.0
     optionalDependencies:
       '@clerk/react': 6.17.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -7179,7 +7185,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.2
 
-  prettier@3.9.5: {}
+  prettier@3.10.1: {}
 
   pretty-format@27.5.1:
     dependencies:
@@ -7382,7 +7388,7 @@ snapshots:
       '@vercel/sandbox': 3.9.1
       async-retry: 1.3.3
       debug: 4.4.3
-      ws: 8.22.0
+      ws: 8.23.0
       zod: 4.6.7
     transitivePeerDependencies:
       - bare-abort-controller
@@ -7809,7 +7815,7 @@ snapshots:
 
   ws@8.21.3: {}
 
-  ws@8.22.0: {}
+  ws@8.23.0: {}
 
   xdg-app-paths@5.1.0:
     dependencies:
