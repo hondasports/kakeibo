@@ -45,7 +45,12 @@ test("@smoke 登録した明細が /export からCSVとしてダウンロード�
     // BOM付きUTF-8（Excelでの文字化け防止）
     expect(content.charCodeAt(0)).toBe(0xfeff);
     const body = content.slice(1);
-    const lines = body.split(/\r?\n/).filter((line) => line !== "");
+    // buildExportCsv の実際の出力（CRLF連結・末尾改行なし）どおりであることを検査する。
+    // 空行を取り除いてから検査すると先頭の空行を見逃すため、取り除かない。
+    const lines = body.split("\r\n");
+    // 区切りはCRLFのみ（行内にLFやCRが残らない）で、空行が無い（=末尾改行も無い）
+    expect(lines.every((line) => !line.includes("\n") && !line.includes("\r"))).toBe(true);
+    expect(lines.every((line) => line !== "")).toBe(true);
     expect(lines[0]).toBe("日付,種別,タイトル,カテゴリ,金額,メモ");
 
     // 店名にカンマ・引用符は含まれないので列の分割は単純でよい。
