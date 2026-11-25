@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { GROUP_ROLES } from "../../lib/domain/groups/role";
+import { GROUP_DELETION_PREVIEW_ACCURACIES } from "../../lib/domain/groupDeletion/groupDeletionWorkflow";
 
 export const groupRoleValidator = v.union(...GROUP_ROLES.map((value) => v.literal(value)));
 
@@ -19,9 +20,13 @@ export const groupPendingInvitationListItemValidator = v.object({
   createdAt: v.number(),
 });
 
+export const groupDeletionPreviewAccuracyValidator = v.union(
+  ...GROUP_DELETION_PREVIEW_ACCURACIES.map((accuracy) => v.literal(accuracy)),
+);
+
 const groupDeletionPreviewCountValidator = v.object({
   count: v.number(),
-  accuracy: v.union(v.literal("exact"), v.literal("at_least"), v.literal("unknown")),
+  accuracy: groupDeletionPreviewAccuracyValidator,
 });
 
 export const groupDeletionPreviewValidator = v.object({

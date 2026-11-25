@@ -1,5 +1,6 @@
 import { api } from "../../../../convex/_generated/api";
 import { validateMonthlyIncome } from "../../../../lib/domain/users/rules";
+import { formatYen } from "../../../../lib/domain/common/currency";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -14,10 +15,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-
-function formatIncome(value: number): string {
-  return value.toLocaleString("ja-JP");
-}
 
 export function MonthlyIncomeSettingsPanel() {
   const userProfile = useQuery(api.users.queries.getUserProfile);
@@ -65,7 +62,7 @@ export function MonthlyIncomeSettingsPanel() {
         message:
           parsed === undefined
             ? "月収入の設定を解除しました"
-            : `月収入を${formatIncome(parsed)}円に設定しました`,
+            : `月収入を${formatYen(parsed)}に設定しました`,
         severity: "success",
       });
     } catch {
@@ -91,7 +88,7 @@ export function MonthlyIncomeSettingsPanel() {
           月収入
         </Typography>
         <Typography aria-live="polite">
-          {savedIncome === null ? "未設定" : `${formatIncome(savedIncome)}円`}
+          {savedIncome === null ? "未設定" : formatYen(savedIncome)}
         </Typography>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
           <TextField

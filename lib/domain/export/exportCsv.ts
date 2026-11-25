@@ -1,6 +1,8 @@
 // /export のCSV生成。円整数・日付はYYYY-MM-DDのまま出力し、
 // 金額・件数がサマリー・履歴検索と照合できるようにする。
-export type ExportEntryKind = "expense" | "income";
+import { ENTRY_KIND_LABELS, type EntryKind } from "../common/entryKind";
+
+export type ExportEntryKind = EntryKind;
 
 export type ExportCsvRow = {
   date: string;
@@ -13,11 +15,6 @@ export type ExportCsvRow = {
 
 export const EXPORT_CSV_HEADERS = ["日付", "種別", "タイトル", "カテゴリ", "金額", "メモ"] as const;
 
-const KIND_LABELS: Record<ExportEntryKind, string> = {
-  expense: "支出",
-  income: "収入",
-};
-
 function csvEscape(value: string): string {
   // Excel等で数式として評価されないよう、式になりうる先頭文字は ' でエスケープする。
   const sanitized = /^[\t\r\n=+\-@]/.test(value) ? `'${value}` : value;
@@ -26,7 +23,14 @@ function csvEscape(value: string): string {
 
 export function buildExportCsv(rows: ExportCsvRow[]): string {
   const lines = rows.map((row) =>
-    [row.date, KIND_LABELS[row.kind], row.title, row.categoryName, String(row.amountYen), row.memo]
+    [
+      row.date,
+      ENTRY_KIND_LABELS[row.kind],
+      row.title,
+      row.categoryName,
+      String(row.amountYen),
+      row.memo,
+    ]
       .map(csvEscape)
       .join(","),
   );

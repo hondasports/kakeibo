@@ -12,11 +12,9 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
+import type { GroupDeletionPreviewCount as DomainGroupDeletionPreviewCount } from "../../../../lib/domain/groupDeletion/groupDeletionWorkflow";
 
-export type GroupDeletionPreviewCount = {
-  count: number;
-  accuracy: "exact" | "at_least" | "unknown";
-};
+export type GroupDeletionPreviewCount = DomainGroupDeletionPreviewCount;
 
 type GroupDeletionPreview = {
   groupName: string;

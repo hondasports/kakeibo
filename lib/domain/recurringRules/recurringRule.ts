@@ -1,4 +1,5 @@
 import { addDays, getMonthEndDate } from "../common/date";
+import type { EntryKind } from "../common/entryKind";
 import { calculateWeekStartDate, isValidIsoDateString } from "../week/weekDates";
 import {
   validateExpenseAmount,
@@ -10,7 +11,7 @@ export const RECURRING_FREQUENCIES = ["weekly", "monthly"] as const;
 export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number];
 
 export type RecurringRuleInput = {
-  kind: "expense" | "income";
+  kind: EntryKind;
   title: string;
   amountYen: number;
   categoryId?: string;

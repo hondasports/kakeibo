@@ -19,7 +19,7 @@ import type { AiExpenseDraftItemFields } from "./aiExpenseDraftItem";
 import { classifyAiExpenseDraft } from "./classification";
 import { buildDraftReviewState } from "./draftReviewState";
 import type { DraftListSummary } from "./reviewTypes";
-import type { AiExpenseDraftReviewReason } from "./constants";
+import type { AiExpenseDraftClassificationStatus, AiExpenseDraftReviewReason } from "./constants";
 import { filterNonInterpretationWarnings, nonTaxReviewReasons } from "./reviewReasons";
 import { mapDraftItemToTaxFields } from "../receipt/tax/draftTaxMapping";
 import {
@@ -87,7 +87,7 @@ type DraftItemTaxPatch = {
 };
 
 type DraftTaxInterpretationPatch = {
-  status: "ready" | "needs_review";
+  status: AiExpenseDraftClassificationStatus;
   receiptInterpretation: AiExpenseDraftFields["receiptInterpretation"];
   taxSummaries: AiExpenseDraftFields["taxSummaries"];
   receiptTotalResolution: AiExpenseDraftFields["receiptTotalResolution"];

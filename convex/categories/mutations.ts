@@ -10,7 +10,9 @@ import {
   createCategorySeedStore,
   createCategoryStore,
 } from "../../lib/convex/categories/convexCategoryStore";
+import type { CategoryMoveDirection } from "../../lib/domain/categories/category";
 import { CategoryDomainError } from "../../lib/domain/categories/rules";
+import { categoryMoveDirectionValidator } from "../../lib/convex/categories/validators";
 import {
   createCategory as createCategoryUsecase,
   deactivateCategory as deactivateCategoryUsecase,
@@ -106,7 +108,7 @@ export async function deactivateCategoryHandler(
 
 type MoveCategoryArgs = {
   categoryId: Id<"categories">;
-  direction: "up" | "down";
+  direction: CategoryMoveDirection;
 };
 
 /** moveCategory mutation の handler ロジック（テスト用に export） */
@@ -192,7 +194,7 @@ export const reactivateCategory = mutation({
 export const moveCategory = mutation({
   args: {
     categoryId: v.id("categories"),
-    direction: v.union(v.literal("up"), v.literal("down")),
+    direction: categoryMoveDirectionValidator,
   },
   handler: moveCategoryHandler,
 });

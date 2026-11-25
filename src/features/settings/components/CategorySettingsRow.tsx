@@ -14,7 +14,10 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { designTokens } from "../../../designTokens";
 import type { Category, CategoryFieldErrors } from "../hooks/useCategorySettings";
-import { MAX_CATEGORY_DESCRIPTION_LENGTH } from "../../../../lib/domain/categories/category";
+import {
+  MAX_CATEGORY_DESCRIPTION_LENGTH,
+  type CategoryMoveDirection,
+} from "../../../../lib/domain/categories/category";
 import { CategoryColorSwatches } from "./CategoryColorSwatches";
 
 type CategorySettingsRowProps = {
@@ -28,7 +31,7 @@ type CategorySettingsRowProps = {
   editIsDirty: boolean;
   editName: string;
   isEditing: boolean;
-  onMove: (category: Category, direction: "up" | "down") => void;
+  onMove: (category: Category, direction: CategoryMoveDirection) => void;
   onBeginEdit: (category: Category) => void;
   onCancelEdit: () => void;
   onEditColorChange: (color: string) => void;

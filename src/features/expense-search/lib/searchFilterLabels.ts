@@ -1,4 +1,5 @@
 import { formatYen } from "../../../../lib/domain/common/currency";
+import { ENTRY_KIND_LABELS } from "../../../../lib/domain/common/entryKind";
 import {
   DEFAULT_HISTORY_SORT_ORDER,
   UNCATEGORIZED_CATEGORY_ID,
@@ -31,7 +32,7 @@ export function describeSearchFilters(
 ): Array<{ key: SearchFilterChipKey; label: string }> {
   const chips: Array<{ key: SearchFilterChipKey; label: string }> = [];
   if (state.entryType !== "all") {
-    chips.push({ key: "entryType", label: state.entryType === "expense" ? "支出" : "収入" });
+    chips.push({ key: "entryType", label: ENTRY_KIND_LABELS[state.entryType] });
   }
   if (state.shopQuery) {
     chips.push({ key: "shopQuery", label: `キーワード: ${state.shopQuery}` });

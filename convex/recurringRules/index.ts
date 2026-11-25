@@ -4,6 +4,7 @@ import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { requireGroupMembership } from "../groups/membership";
 import { entryKindValidator } from "../../lib/convex/receipts/validators";
+import { recurringFrequencyValidator } from "../../lib/convex/recurringRules/validators";
 import { createRecurringRuleRepository } from "../../lib/convex/recurringRules/recurringRuleRepository";
 import { createCategoryRepository } from "../../lib/convex/categories/categoryRepository";
 import { createExpenseEntryRepository } from "../../lib/convex/expenseEntries/expenseEntryRepository";
@@ -40,7 +41,7 @@ const ruleInputFields = {
   categoryId: v.optional(v.id("categories")),
   shopName: v.optional(v.string()),
   memo: v.optional(v.string()),
-  frequency: v.union(v.literal("weekly"), v.literal("monthly")),
+  frequency: recurringFrequencyValidator,
   dayOfWeek: v.optional(v.number()),
   dayOfMonth: v.optional(v.number()),
 };

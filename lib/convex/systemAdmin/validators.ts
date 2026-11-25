@@ -4,6 +4,7 @@ import {
   SYSTEM_ADMIN_AUDIT_ACTOR_TYPES,
   SYSTEM_ADMIN_AUDIT_RESULTS,
   SYSTEM_ADMIN_AUDIT_TARGET_KINDS,
+  SYSTEM_ADMIN_AUDIT_GROUP_RELATIONS,
 } from "../../domain/systemAdmin/auditLog";
 import { SYSTEM_ADMIN_MEMBERSHIP_OPERATIONS } from "../../domain/systemAdmin/membershipOperation";
 import { SYSTEM_ADMIN_NOTIFICATION_ACTIONS } from "../../domain/systemAdmin/notificationStore";
@@ -26,6 +27,10 @@ export const systemAdminAuditTargetKindValidator = v.union(
 
 export const systemAdminAuditResultValidator = v.union(
   ...SYSTEM_ADMIN_AUDIT_RESULTS.map((result) => v.literal(result)),
+);
+
+export const systemAdminAuditGroupRelationValidator = v.union(
+  ...SYSTEM_ADMIN_AUDIT_GROUP_RELATIONS.map((relation) => v.literal(relation)),
 );
 
 export const systemAdminStatusValidator = v.union(
