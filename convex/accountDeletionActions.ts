@@ -1,10 +1,95 @@
 "use node";
 
 import { createClerkClient } from "@clerk/backend";
-import { internalAction } from "./_generated/server";
+import { reverificationError } from "@clerk/backend/internal";
+import { action, internalAction } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { classifyClerkDeletionError } from "../lib/domain/accountDeletion/clerkError";
+import { evaluateStrictReverification } from "../lib/domain/accountDeletion/reverification";
+import { createClerkSessionTokenVerifier } from "../lib/convex/accountDeletion/clerkSessionTokenVerifier";
+import type { SessionTokenVerifier } from "../lib/domain/accountDeletion/sessionTokenVerifier";
+
+const REAUTHENTICATION_FAILED_MESSAGE = "Reauthentication could not be verified";
+
+const reverificationHintValidator = v.object({
+  clerk_error: v.object({
+    type: v.literal("forbidden"),
+    reason: v.literal("reverification-error"),
+    metadata: v.object({ reverification: v.literal("strict") }),
+  }),
+});
+
+type StrictReverificationHint = {
+  clerk_error: {
+    type: "forbidden";
+    reason: "reverification-error";
+    metadata: { reverification: "strict" };
+  };
+};
+
+type RequestAccountDeletionArgs = {
+  confirmationText: string;
+  sessionToken: string;
+};
+
+function createStrictReverificationHint(): StrictReverificationHint {
+  return reverificationError("strict") as StrictReverificationHint;
+}
+
+type RequestAccountDeletionDeps = {
+  sessionTokenVerifier?: SessionTokenVerifier;
+};
+
+export async function handleRequestAccountDeletion(
+  ctx: ActionCtx,
+  args: RequestAccountDeletionArgs,
+  deps: RequestAccountDeletionDeps = {},
+) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new ConvexError("Not authenticated");
+
+  const verifier =
+    deps.sessionTokenVerifier ??
+    createClerkSessionTokenVerifier({ secretKey: process.env.CLERK_SECRET_KEY });
+  let verification;
+  try {
+    verification = await verifier.verify(args.sessionToken);
+  } catch {
+    throw new ConvexError(REAUTHENTICATION_FAILED_MESSAGE);
+  }
+  if (verification.kind !== "verified") {
+    throw new ConvexError(REAUTHENTICATION_FAILED_MESSAGE);
+  }
+  if (verification.claims.iss !== identity.issuer || verification.claims.sub !== identity.subject) {
+    throw new ConvexError(REAUTHENTICATION_FAILED_MESSAGE);
+  }
+  const reverificationEvaluation = evaluateStrictReverification(verification.claims.fva);
+  if (reverificationEvaluation === "invalid") {
+    throw new ConvexError(REAUTHENTICATION_FAILED_MESSAGE);
+  }
+  if (reverificationEvaluation === "reverification_required") {
+    return createStrictReverificationHint();
+  }
+
+  return await ctx.runMutation(internal.accountDeletion.requestAccountDeletion, {
+    confirmationText: args.confirmationText,
+    tokenIdentifier: identity.tokenIdentifier,
+    clerkUserId: identity.subject,
+  });
+}
+
+export const requestAccountDeletion = action({
+  args: {
+    confirmationText: v.string(),
+    sessionToken: v.string(),
+  },
+  returns: v.union(v.id("accountDeletionRequests"), reverificationHintValidator),
+  handler: async (ctx, args): Promise<Id<"accountDeletionRequests"> | StrictReverificationHint> =>
+    await handleRequestAccountDeletion(ctx, args),
+});
 
 export const processAccountDeletion = internalAction({
   args: { requestId: v.id("accountDeletionRequests") },

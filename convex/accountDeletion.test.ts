@@ -116,9 +116,11 @@ describe("account deletion group purge orchestration", () => {
       }
     });
 
-    const requestId = await t
-      .withIdentity({ tokenIdentifier: userId, subject: "clerk-account-delete-batch" })
-      .mutation(api.accountDeletion.requestAccountDeletion, { confirmationText: "削除" });
+    const requestId = await t.mutation(internal.accountDeletion.requestAccountDeletion, {
+      confirmationText: "削除",
+      tokenIdentifier: userId,
+      clerkUserId: "clerk-account-delete-batch",
+    });
     await t.mutation(internal.accountDeletion.prepareAccountDeletionBatch, { requestId });
     await t.mutation(internal.accountDeletion.prepareAccountDeletionBatch, { requestId });
 
@@ -552,9 +554,11 @@ describe("account deletion group purge orchestration", () => {
         });
       }
     });
-    const requestId = await t
-      .withIdentity({ tokenIdentifier: userId, subject: "clerk-account-delete-shared-batch" })
-      .mutation(api.accountDeletion.requestAccountDeletion, { confirmationText: "削除" });
+    const requestId = await t.mutation(internal.accountDeletion.requestAccountDeletion, {
+      confirmationText: "削除",
+      tokenIdentifier: userId,
+      clerkUserId: "clerk-account-delete-shared-batch",
+    });
     await t.mutation(internal.accountDeletion.prepareAccountDeletionBatch, { requestId });
     await t.mutation(internal.accountDeletion.prepareAccountDeletionBatch, { requestId });
     const remaining = await t.run(
@@ -695,14 +699,33 @@ describe("requestAccountDeletion / getAccountDeletionPreview（唯一ownerブロ
     });
   }
 
+  it("確認文言が一致しないときは拒否し、退会リクエストを作成しない", async () => {
+    const t = convexTest(schema, convexTestModules);
+
+    await expect(
+      t.mutation(internal.accountDeletion.requestAccountDeletion, {
+        confirmationText: "削除する",
+        tokenIdentifier: blockedIdentity.tokenIdentifier,
+        clerkUserId: blockedIdentity.subject,
+      }),
+    ).rejects.toThrow("確認文言が一致しません");
+
+    const requests = await t.run(
+      async (ctx) => await ctx.db.query("accountDeletionRequests").take(10),
+    );
+    expect(requests).toHaveLength(0);
+  });
+
   it("唯一ownerかつ他メンバーがいるグループがあるとき ACCOUNT_DELETION_BLOCKED で拒否し副作用を残さない", async () => {
     const t = convexTest(schema, convexTestModules);
     const { blockedGroupId, orphanMembershipId } = await seedBlockedState(t);
 
     await expect(
-      t
-        .withIdentity(blockedIdentity)
-        .mutation(api.accountDeletion.requestAccountDeletion, { confirmationText: "削除" }),
+      t.mutation(internal.accountDeletion.requestAccountDeletion, {
+        confirmationText: "削除",
+        tokenIdentifier: blockedIdentity.tokenIdentifier,
+        clerkUserId: blockedIdentity.subject,
+      }),
     ).rejects.toMatchObject({
       data: {
         code: "ACCOUNT_DELETION_BLOCKED",

@@ -32,6 +32,22 @@ Convex データへの認可とは別の仕組みです。
 例外ではなく `null` を返します（`convex/accountDeletion.test.ts`）。未認証時にユーザーや
 家計データを返すものではなく、家計データ API の認証・グループ所属確認を省略する根拠にはなりません。
 
+### 退会開始の本人再認証
+
+退会開始の公開入口は `convex/accountDeletionActions.ts` の `requestAccountDeletion` action です。
+画面は Clerk の `useReverification` でこの action を呼び、呼び出し直前に `getToken({ skipCache: true })` で
+session token を取り直します。action はサーバー側で次をすべて満たす場合だけ退会開始の internal mutation を呼びます。
+
+- Convex の認証 identity が存在する
+- 受け取った session token の署名と期限を `verifyToken` で検証できる（`CLERK_SECRET_KEY` が必要）
+- token の `iss` / `sub` が Convex identity の `issuer` / `subject` と一致する
+- token の `fva` が Clerk の `strict` 再認証要件（10 分以内）を満たす
+
+形式正しい `fva` が `strict` の要件を満たさない場合は `useReverification` が認識する `strict` の再認証ヒントを返します。
+`fva` の欠落・形式不正、署名不正・期限切れ・主体または発行者の不一致・token検証不能は再認証ヒントではなく拒否し、
+詳細理由や token 自体をクライアントへ返しません。退会開始 mutation 自体は internal であり、
+公開 mutation から退会を開始する経路は残しません。既存要求の `retryAccountDeletion` はこの開始経路とは別に維持します。
+
 ### 共通ヘルパー
 
 **認証（`convex/users/auth.ts`）**

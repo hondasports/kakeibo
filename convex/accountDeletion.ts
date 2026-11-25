@@ -4,7 +4,7 @@
  * 既存の直接 import 互換（loadAccountDeletionClassification /
  * deleteOrphanedGroupMemberships / assertAccountDeletionNotInProgress）を維持する。
  */
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -105,16 +105,18 @@ export const getMyAccountDeletionStatus = query({
   },
 });
 
-export const requestAccountDeletion = mutation({
-  args: { confirmationText: v.string() },
+export const requestAccountDeletion = internalMutation({
+  args: {
+    confirmationText: v.string(),
+    tokenIdentifier: v.string(),
+    clerkUserId: v.string(),
+  },
   returns: v.id("accountDeletionRequests"),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError("Not authenticated");
     const requestId = await requestAccountDeletionUsecase(createAccountDeletionMutationDeps(ctx), {
       confirmationText: args.confirmationText,
-      tokenIdentifier: identity.tokenIdentifier,
-      clerkUserId: identity.subject,
+      tokenIdentifier: args.tokenIdentifier,
+      clerkUserId: args.clerkUserId,
     });
     return requestId as Id<"accountDeletionRequests">;
   },
