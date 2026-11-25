@@ -15,10 +15,34 @@ import {
   Typography,
 } from "@mui/material";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import { useNavigate } from "react-router-dom";
 import { SuzumemoLoadingState } from "../../ui";
 import { LEGAL_CONTACT_EMAIL } from "../../app-shell/lib/legalDocumentMeta";
 import { AccountDeletionErrorBoundary } from "../components/AccountDeletionErrorBoundary";
+import { ACCOUNT_DELETION_REAUTHENTICATION_FAILED_CODE } from "../../../../lib/domain/accountDeletion/reverification";
+
+const REAUTHENTICATION_FAILED_MESSAGE =
+  "本人確認を完了できなかったため、アカウント削除は開始されていません。続けるには、もう一度「アカウントを削除する」を押して本人確認を完了してください。";
+
+function isStrictReverificationHint(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const clerkError = (value as { clerk_error?: unknown }).clerk_error;
+  if (typeof clerkError !== "object" || clerkError === null) return false;
+  const metadata = (clerkError as { metadata?: unknown }).metadata;
+  if (typeof metadata !== "object" || metadata === null) return false;
+  return (
+    (clerkError as { type?: unknown }).type === "forbidden" &&
+    (clerkError as { reason?: unknown }).reason === "reverification-error" &&
+    (metadata as { reverification?: unknown }).reverification === "strict"
+  );
+}
+
+function isReauthenticationFailedError(error: unknown): boolean {
+  if (!(error instanceof ConvexError)) return false;
+  if (typeof error.data !== "object" || error.data === null) return false;
+  return (error.data as { code?: unknown }).code === ACCOUNT_DELETION_REAUTHENTICATION_FAILED_CODE;
+}
 
 function BackToSettingsButton({ onClick }: { onClick: () => void }) {
   return (
@@ -199,6 +223,11 @@ function AccountDeletionPageContent() {
                 const result: unknown = await requestDeletionWithReverification({
                   confirmationText,
                 });
+                if (isStrictReverificationHint(result)) {
+                  setError(REAUTHENTICATION_FAILED_MESSAGE);
+                  setSubmitting(false);
+                  return;
+                }
                 if (typeof result !== "string") throw new Error("Account deletion did not start");
                 navigate("/settings/account/delete/status", { replace: true });
               } catch (caught) {
@@ -206,6 +235,8 @@ function AccountDeletionPageContent() {
                   setError(
                     "本人確認がキャンセルされたため、アカウント削除は開始されていません。続けるには、もう一度「アカウントを削除する」を押して本人確認を完了してください。",
                   );
+                } else if (isReauthenticationFailedError(caught)) {
+                  setError(REAUTHENTICATION_FAILED_MESSAGE);
                 } else {
                   setError(
                     "アカウント削除を開始できませんでした。内容を確認してもう一度お試しください。",
