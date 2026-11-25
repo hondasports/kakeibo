@@ -201,3 +201,184 @@ describe("registerFromRecurringRule", () => {
     expect(await countExpenseEntries(t)).toBe(0);
   });
 });
+
+describe("createRecurringRule・listRecurringRules の公開経路", () => {
+  async function seedUser(
+    t: TestT,
+    userId: string,
+    existingGroupId?: Id<"groups">,
+  ): Promise<Id<"groups">> {
+    return await t.run(async (ctx) => {
+      const groupId =
+        existingGroupId ??
+        (await ctx.db.insert("groups", {
+          name: `group-of-${userId}`,
+          status: "active",
+          createdAt: 1,
+          updatedAt: 1,
+        }));
+      await ctx.db.insert("users", {
+        userId,
+        displayName: userId,
+        activeGroupId: groupId,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.insert("groupMembers", {
+        groupId,
+        userId,
+        role: "owner",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      return groupId;
+    });
+  }
+
+  async function insertCategory(t: TestT, groupId: Id<"groups">): Promise<Id<"categories">> {
+    return await t.run(
+      async (ctx) =>
+        await ctx.db.insert("categories", {
+          groupId,
+          name: "食費",
+          color: "#000000",
+          isActive: true,
+          sortOrder: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        }),
+    );
+  }
+
+  async function countRules(t: TestT): Promise<number> {
+    return await t.run(async (ctx) => (await ctx.db.query("recurringEntryRules").collect()).length);
+  }
+
+  const validInput = (categoryId?: Id<"categories">) => ({
+    kind: "expense" as const,
+    title: "家賃",
+    amountYen: 80000,
+    categoryId,
+    frequency: "monthly" as const,
+    dayOfMonth: 25,
+  });
+
+  it("未認証は作成・一覧を拒否する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    await expect(t.query(api.recurringRules.index.listRecurringRules, {})).rejects.toThrow(
+      "Not authenticated",
+    );
+    await expect(
+      t.mutation(api.recurringRules.index.createRecurringRule, validInput()),
+    ).rejects.toThrow("Not authenticated");
+  });
+
+  it("グループ未所属の利用者は拒否され、保存されない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const stranger = t.withIdentity(identity("stranger"));
+    await expect(stranger.query(api.recurringRules.index.listRecurringRules, {})).rejects.toThrow(
+      "グループに所属していません",
+    );
+    await expect(
+      stranger.mutation(api.recurringRules.index.createRecurringRule, validInput()),
+    ).rejects.toThrow("グループに所属していません");
+    expect(await countRules(t)).toBe(0);
+  });
+
+  it("所属グループに保存され、一覧で返る", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await seedUser(t, "alice");
+    const categoryId = await insertCategory(t, groupId);
+    const alice = t.withIdentity(identity("alice"));
+
+    await alice.mutation(api.recurringRules.index.createRecurringRule, validInput(categoryId));
+    const list = await alice.query(api.recurringRules.index.listRecurringRules, {});
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({
+      groupId,
+      createdByUserId: "alice",
+      kind: "expense",
+      title: "家賃",
+      amountYen: 80000,
+      categoryId,
+      frequency: "monthly",
+      dayOfMonth: 25,
+      active: true,
+    });
+  });
+
+  it("別グループのカテゴリは拒否され、保存されない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    await seedUser(t, "alice");
+    const otherGroupId = await seedUser(t, "bob");
+    const otherCategoryId = await insertCategory(t, otherGroupId);
+
+    const alice = t.withIdentity(identity("alice"));
+    await expect(
+      alice.mutation(api.recurringRules.index.createRecurringRule, validInput(otherCategoryId)),
+    ).rejects.toThrow("Category does not belong to the current group");
+    expect(await countRules(t)).toBe(0);
+  });
+
+  it("入力エラーのとき保存されない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await seedUser(t, "alice");
+    const categoryId = await insertCategory(t, groupId);
+    const alice = t.withIdentity(identity("alice"));
+
+    await expect(
+      alice.mutation(api.recurringRules.index.createRecurringRule, {
+        ...validInput(categoryId),
+        title: " ",
+      }),
+    ).rejects.toThrow("項目名を入力してください");
+    await expect(
+      alice.mutation(api.recurringRules.index.createRecurringRule, {
+        ...validInput(categoryId),
+        amountYen: 0,
+      }),
+    ).rejects.toThrow("金額は1円以上9,999,999円以下の整数で入力してください");
+    await expect(
+      alice.mutation(api.recurringRules.index.createRecurringRule, {
+        ...validInput(),
+        categoryId: undefined,
+      }),
+    ).rejects.toThrow("支出の定期定義にはカテゴリが必要です");
+    await expect(
+      alice.mutation(api.recurringRules.index.createRecurringRule, {
+        ...validInput(categoryId),
+        frequency: "weekly",
+        dayOfMonth: undefined,
+        dayOfWeek: 7,
+      }),
+    ).rejects.toThrow("毎週の定期定義には曜日を指定してください");
+    await expect(
+      alice.mutation(api.recurringRules.index.createRecurringRule, {
+        ...validInput(categoryId),
+        dayOfMonth: 32,
+      }),
+    ).rejects.toThrow("毎月の定期定義には1〜31の日付を指定してください");
+    expect(await countRules(t)).toBe(0);
+  });
+
+  it("別グループの定義は一覧に出ない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const aliceGroupId = await seedUser(t, "alice");
+    const bobGroupId = await seedUser(t, "bob");
+    const categoryId = await insertCategory(t, aliceGroupId);
+    await insertRule(t, bobGroupId, {});
+
+    const alice = t.withIdentity(identity("alice"));
+    await alice.mutation(api.recurringRules.index.createRecurringRule, validInput(categoryId));
+
+    const aliceList = await alice.query(api.recurringRules.index.listRecurringRules, {});
+    expect(aliceList).toHaveLength(1);
+    expect(aliceList[0].groupId).toBe(aliceGroupId);
+
+    const bobList = await t
+      .withIdentity(identity("bob"))
+      .query(api.recurringRules.index.listRecurringRules, {});
+    expect(bobList).toHaveLength(1);
+    expect(bobList[0].groupId).toBe(bobGroupId);
+  });
+});
