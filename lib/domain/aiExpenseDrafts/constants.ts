@@ -12,6 +12,14 @@ export const AI_EXPENSE_DRAFT_STATUSES = [
 
 export type AiExpenseDraftStatus = (typeof AI_EXPENSE_DRAFT_STATUSES)[number];
 
+export const AI_EXPENSE_DRAFT_CLASSIFICATION_STATUSES = [
+  "ready",
+  "needs_review",
+] as const satisfies readonly AiExpenseDraftStatus[];
+
+export type AiExpenseDraftClassificationStatus =
+  (typeof AI_EXPENSE_DRAFT_CLASSIFICATION_STATUSES)[number];
+
 export const AI_EXPENSE_DRAFT_SOURCE_TYPES = ["image_upload"] as const;
 
 export type AiExpenseDraftSourceType = (typeof AI_EXPENSE_DRAFT_SOURCE_TYPES)[number];
