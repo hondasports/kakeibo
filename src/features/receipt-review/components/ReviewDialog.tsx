@@ -405,6 +405,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                   itemCount={items.length}
                   issues={amountConfirmed ? [] : bannerGuidance}
                   unresolvedTaxItemCount={unresolvedTaxItemCount}
+                  taxModelActive={taxModelActive}
                   receiptIssues={amountConfirmed ? [] : receiptGuidance}
                   busy={busy}
                   onJump={goTo}
