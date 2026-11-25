@@ -346,6 +346,47 @@ describe("日次利用上限の結合確認（永続状態）", () => {
     });
   });
 
+  it("旧2 mutation 名を順に実行しても終端バッチの件数を重複加算しない", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await seedGroup(t);
+    // デプロイ開始前に起動した旧 action を模す: job は終端済みで、旧2 mutation を順に呼ぶ
+    const { batchId } = await seedBatchWithJobs(t, groupId, [{ status: "failed" }], {
+      processedCount: 0,
+    });
+
+    await t.mutation(internal.receiptAnalysisJobs.internal.incrementBatchProcessedCount, {
+      batchId,
+    });
+    await t.mutation(internal.receiptAnalysisJobs.internal.finalizeBatchStatus, { batchId });
+
+    await t.run(async (ctx) => {
+      const batch = await ctx.db.get(batchId);
+      // 終端 job は1件なので processedCount は1のまま。2つ順に呼んでも重複しない
+      expect(batch?.processedCount).toBe(1);
+      expect(batch?.status).toBe("partially_failed");
+    });
+  });
+
+  it("旧 finalizeBatchStatus 単体でも job の実状態から進捗を再計算できる", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await seedGroup(t);
+    const { batchId } = await seedBatchWithJobs(
+      t,
+      groupId,
+      [{ status: "ready" }, { status: "running" }],
+      { processedCount: 0 },
+    );
+
+    await t.mutation(internal.receiptAnalysisJobs.internal.finalizeBatchStatus, { batchId });
+
+    await t.run(async (ctx) => {
+      const batch = await ctx.db.get(batchId);
+      // 終端1件・実行中1件なので完了せず running のまま件数だけ反映される
+      expect(batch?.processedCount).toBe(1);
+      expect(batch?.status).toBe("running");
+    });
+  });
+
   it("所属していないグループの job は開始を確定せず下書きも残さない", async () => {
     const t = convexTest(schema, convexTestModules);
     // identity のユーザーが所属しないグループ（別ユーザーだけがメンバー）

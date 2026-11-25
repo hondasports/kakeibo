@@ -213,6 +213,20 @@ export const recomputeBatchProgress = internalMutation({
   handler: recomputeBatchProgressHandler,
 });
 
+// デプロイ開始前に起動した旧 analyzeImageJob action は、処理終了時に旧2 mutation 名を
+// 別トランザクションの runMutation で呼ぶ。Convex のデプロイをまたいでも job 終端後の
+// バッチ更新が失敗しないよう、旧名と旧 {batchId} 引数を冪等な再計算へ接続して維持する。
+// 再計算は job の実状態から導くため、旧経路が2つを順に呼んでも件数を重複加算しない。
+export const incrementBatchProcessedCount = internalMutation({
+  args: { batchId: v.id("receiptAnalysisBatches") },
+  handler: recomputeBatchProgressHandler,
+});
+
+export const finalizeBatchStatus = internalMutation({
+  args: { batchId: v.id("receiptAnalysisBatches") },
+  handler: recomputeBatchProgressHandler,
+});
+
 export const getBatchById = internalQuery({
   args: { batchId: v.id("receiptAnalysisBatches") },
   handler: getBatchByIdHandler,
