@@ -15,6 +15,7 @@ import {
   RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
   resolveEffectiveDailyUsageCount,
   withDailyLimitWarningTag,
+  withoutDailyLimitWarningTag,
 } from "../../lib/domain/receiptAnalysisJobs/dailyUsage";
 import {
   deleteReceiptAnalysisDataByUserBatch as deleteUserDataBatch,
@@ -128,6 +129,20 @@ export async function updateJobStatusHandler(
             updatedAt: now,
           },
         });
+        // 上限を通過して既存下書きの再解析開始が確定したので、前回の上限タグはここで外す。
+        // 正常終了・別理由の失敗・停止回復のどの終端でも古い上限理由が残らないよう、
+        // 開始確定の入口で一律に処理する。完全一致タグだけを外し、他の警告・編集・更新時刻は維持する。
+        if (job.draftId !== undefined) {
+          const deps = createReceiptAnalysisMutationDeps(ctx);
+          const preservedDraft = await deps.store.getDraft(job.draftId);
+          // job の参照に旧データの不整合があっても、他グループの下書きの警告は更新しない
+          if (preservedDraft?.warnings && preservedDraft.groupId === job.groupId) {
+            const nextWarnings = withoutDailyLimitWarningTag(preservedDraft.warnings);
+            if (nextWarnings.length !== preservedDraft.warnings.length) {
+              await deps.store.setDraftWarnings(job.draftId, nextWarnings);
+            }
+          }
+        }
       }
     }
     return await updateReceiptAnalysisJobStatus(createReceiptAnalysisMutationDeps(ctx), args);

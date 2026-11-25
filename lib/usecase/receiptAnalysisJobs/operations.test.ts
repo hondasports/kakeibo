@@ -353,7 +353,14 @@ describe("recoverStaleReceiptAnalysisJobs", () => {
     const d = deps({
       listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValueOnce([job]).mockResolvedValue([]),
       getJob: vi.fn().mockResolvedValue(job),
-      getBatch: vi.fn().mockResolvedValue({ id: "batch-1", createdByUserId: "user-1" }),
+      getBatch: vi.fn().mockResolvedValue({
+        id: "batch-1",
+        createdByUserId: "user-1",
+        processedCount: 0,
+        totalCount: 1,
+        status: "running",
+      }),
+      listJobsByBatch: vi.fn().mockResolvedValue([]),
       insertFailedAnalysisDraft: vi.fn().mockResolvedValue("draft-fail"),
       patchJob: vi.fn(),
       patchBatch: vi.fn(),
@@ -391,7 +398,14 @@ describe("recoverStaleReceiptAnalysisJobs", () => {
     const d = deps({
       listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([job]),
       getJob: vi.fn().mockResolvedValue(job),
-      getBatch: vi.fn().mockResolvedValue({ id: "batch-1", createdByUserId: "user-1" }),
+      getBatch: vi.fn().mockResolvedValue({
+        id: "batch-1",
+        createdByUserId: "user-1",
+        processedCount: 0,
+        totalCount: 1,
+        status: "running",
+      }),
+      listJobsByBatch: vi.fn().mockResolvedValue([]),
       insertFailedAnalysisDraft: vi.fn().mockResolvedValue("draft-fail"),
       patchJob: vi.fn(),
       patchBatch: vi.fn(),
@@ -414,7 +428,13 @@ describe("recoverStaleReceiptAnalysisJobs", () => {
     const d = deps({
       listJobsByStatusUpdatedBefore: vi.fn().mockResolvedValueOnce([job]).mockResolvedValue([]),
       getJob: vi.fn().mockResolvedValue(job),
-      getBatch: vi.fn().mockResolvedValue({ id: "batch-1" }),
+      getBatch: vi.fn().mockResolvedValue({
+        id: "batch-1",
+        processedCount: 0,
+        totalCount: 1,
+        status: "running",
+      }),
+      listJobsByBatch: vi.fn().mockResolvedValue([]),
       insertFailedAnalysisDraft: vi.fn(),
       deleteDraftAndItems: vi.fn(),
       patchJob: vi.fn(),
