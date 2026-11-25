@@ -318,7 +318,7 @@ MVPでは、ユーザーが好きなタイミングで軽く支出や収入を�
 | userId                                    | string   |  yes | Convex `UserIdentity.tokenIdentifier`        |
 | displayName                               | string   |  yes | 表示名                                       |
 | email                                     | string   |   no | メールアドレス                               |
-| monthlyIncome                             | number   |   no | 月収入。現行UIからの設定導線は削除済み       |
+| monthlyIncome                             | number   |   no | 月収入。設定UIで保存できるが、集計には未使用 |
 | weeklyStartDay                            | number   |   no | 週の開始曜日（0=日曜、1=月曜）。未設定は月曜 |
 | weeklyEndDay                              | number   |   no | 週の終了曜日（0=日曜、1=月曜）。週開始日の6日後を保存。未設定は日曜 |
 | receiptImageExternalApiConsentAcceptedAt  | number   |   no | レシート画像を外部APIへ送信する同意時刻      |

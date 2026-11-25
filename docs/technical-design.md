@@ -339,8 +339,8 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 
 - **公開 API**（`query` / `mutation` / `action` / `internal*`）は、新しく作るものは `convex/<domain>/` に置く。
   既存モジュールの一部は `convex/` 直下にある（上記ツリーの `systemAdmins.ts`・`systemAdmin*.ts`・
-  `accountDeletion*.ts`・`expenseSearch.ts`・`e2ePurge.ts`・`notificationSettings.ts`・`crons.ts`・
-  migration 系など）。`convex/<domain>/` へ移すと `api.<module>.<function>` のパスが変わり
+  `accountDeletion*.ts`・`expenseSearch.ts`・`dataExport.ts`・`e2ePurge.ts`・`notificationSettings.ts`・
+  `crons.ts`）。`convex/<domain>/` へ移すと `api.<module>.<function>` のパスが変わり
   既存クライアント・`internal.*` 参照と互換しなくなるため、直下の既存モジュールは移動せず維持する。
 - **純粋ヘルパー**（バリデーション、集計、外部 API 呼び出し本体、登録ロジック等）は `lib/convex/<domain>/` に置き、`convex/` から import する。
   `convex/` 配下の `.ts` は Convex が `api.d.ts` に載せるため、ヘルパーを増やしすぎると型推論が深くなりビルドが失敗しうる。
@@ -1311,17 +1311,13 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 
 - `dataExport.listExportEntries({ startDate, endDate, entryType?, expectedGroupId? })`
 
-`listExportEntries` は、認証ユーザーのactive groupに属する期間内の支出・収入明細を返すquery。
-`entryType` を省略した場合は支出・収入の両方、`"expense"` または `"income"` を指定した場合は
-その種別だけに絞る。`expenseEntries` と旧形式 `receipts` の両方を取得し、sourceをまたぐ内容の
-重複は取り除かない。行は日付昇順で返し、支出のカテゴリIDはカテゴリ名へ解決し、解決できない場合は
-空文字にする。
+`listExportEntries` は、認証ユーザーがactive groupに所属していることを確認し、そのグループの期間内明細を返すquery。
+`startDate`・`endDate` は `YYYY-MM-DD` で、形式不正または開始日が終了日より後ならエラーにする。
+`entryType` に `"expense"` または `"income"` を指定した場合はその種別だけを返し、省略時は両方を返す。
 
-1回のqueryでは `expenseEntries`・`receipts` のそれぞれを最大10,000件まで読み、`truncated` で
-上限超過を返す。`expectedGroupId` が現在のactive groupと一致しない場合はエラーにし、分割取得中に
-別グループの明細が混ざるのを防ぐ。`/export` 画面はこのqueryを月ごとに呼び、
-`lib/domain/export/exportCsv.ts` でCSVを生成する。対象期間の分割とCSV生成の詳細は13節、
-画面の操作と表示は `docs/current-implementation.md` 4.6節を参照する。
+返り値は `rows`・`truncated`・`groupId`。`rows` の各項目は `date`・`kind`・`title`・
+`categoryName`・`amountYen`・`memo` で、日付昇順に並べる。`truncated` は1回の取得上限を
+超えたことを示す。`expectedGroupId` を指定した場合、現在のactive groupと一致しなければエラーにする。
 
 ### 10.7 receipt image consent
 
@@ -1546,11 +1542,9 @@ Issue #890の回帰例（すべて8%、対象額は税込、商品印字額は�
 
 ## 13. CSVエクスポート設計
 
-CSVは `/export` 画面からクライアント側で生成する。画面は指定期間を `splitDateRangeIntoMonths` で
-月単位に分割し、月ごとに `dataExport.listExportEntries` を呼ぶ。1回目の結果の `groupId` を
-2回目以降の `expectedGroupId` に渡し、書き出し中に利用グループが切り替わったときは中止する。
-上限超過（`truncated`）の月があるときはCSVを生成せず、期間を短くするよう案内する。画面の操作と
-エラー表示は `docs/current-implementation.md` 4.6節を参照する。
+CSVは `/export` 画面からクライアント側で生成し、CSV文字列は `lib/domain/export/exportCsv.ts` の
+`buildExportCsv` が組み立てる。画面の操作、取得時の扱い、エスケープ規則は
+`docs/current-implementation.md` 4.6節を参照する。
 
 出力列:
 
@@ -1563,9 +1557,6 @@ CSVは `/export` 画面からクライアント側で生成する。画面は指
 
 行は `buildExportCsv` がCRLFで連結し、BlobにUTF-8 BOMを付けて
 `suzumemo-export-<開始日yyyymmdd>-<終了日yyyymmdd>.csv` としてダウンロードする。
-
-CSVインジェクション対策として、セルの先頭が `=`・`+`・`-`・`@`・`\t`・`\r`・`\n` の場合は
-`'` を前置する。その後、`"`・`,`・CR・LFを含む値は `"` で囲み、内側の `"` は `""` に置き換える。
 
 ## 14. レシート画像入力PoC設計
 
@@ -1821,7 +1812,7 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 - CSVエクスポートはクライアント側で生成し、Convex側は期間内明細を返すqueryに限定する
 - オフライン入力はMVPでは扱わない
 - 初期デプロイ先はVercelにする
-- 独自ドメインは使わず、DEV/PRODともに `*.vercel.app` のURLを使う
+- 初期MVPでは独自ドメインを使わず、DEV/PRODともに `*.vercel.app` のURLを使う方針だった。現行の環境URLは15・16節を参照する
 
 ## 21. M18. 支出項目モデル再設計
 
