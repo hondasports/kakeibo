@@ -36,6 +36,8 @@ export type AiExpenseQueueItem = {
   date?: string;
   categoryName?: string;
   reviewReasons?: string[];
+  /** 保存済みの金額・税が解決しているか（listSummary）。一覧で信頼度の理由を外す判定に使う。 */
+  amountAndTaxResolved?: boolean;
   itemTotalYen?: number;
   itemDifferenceYen?: number;
   hasUncategorizedItems?: boolean;

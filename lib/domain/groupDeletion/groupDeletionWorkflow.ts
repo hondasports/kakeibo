@@ -5,10 +5,14 @@
  */
 import type { GroupDeletionJobSource } from "./groupDeletionJob";
 
+export const GROUP_DELETION_PREVIEW_ACCURACIES = ["exact", "at_least", "unknown"] as const;
+
+export type GroupDeletionPreviewAccuracy = (typeof GROUP_DELETION_PREVIEW_ACCURACIES)[number];
+
 /** 削除プレビューの件数。exact=正確、at_least=上限打ち切り、unknown=集計不能。 */
 export type GroupDeletionPreviewCount = {
   count: number;
-  accuracy: "exact" | "at_least" | "unknown";
+  accuracy: GroupDeletionPreviewAccuracy;
 };
 
 export type GroupDeletionImpactCounts = {

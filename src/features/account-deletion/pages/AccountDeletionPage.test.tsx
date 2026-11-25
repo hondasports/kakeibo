@@ -1,24 +1,45 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ConvexError } from "convex/values";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
 import { apiMockWith } from "../../../test/apiMock";
 import { AccountDeletionPage } from "./AccountDeletionPage";
 
-const { useMutationMock, useNavigateMock, useQueryMock, useUserMock } = vi.hoisted(() => ({
+const {
+  useActionMock,
+  useMutationMock,
+  useNavigateMock,
+  useQueryMock,
+  useReverificationMock,
+  useUserMock,
+  useAuthMock,
+  isReverificationCancelledErrorMock,
+} = vi.hoisted(() => ({
+  useActionMock: vi.fn(),
   useMutationMock: vi.fn(),
   useNavigateMock: vi.fn(),
   useQueryMock: vi.fn(),
+  useReverificationMock: vi.fn(),
   useUserMock: vi.fn(),
+  useAuthMock: vi.fn(),
+  isReverificationCancelledErrorMock: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
+  useAction: useActionMock,
   useMutation: useMutationMock,
   useQuery: useQueryMock,
 }));
 
 vi.mock("@clerk/react", () => ({
+  useAuth: useAuthMock,
+  useReverification: useReverificationMock,
   useUser: useUserMock,
+}));
+
+vi.mock("@clerk/react/errors", () => ({
+  isReverificationCancelledError: isReverificationCancelledErrorMock,
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -29,7 +50,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
 vi.mock("../../../../convex/_generated/api", () => ({
   api: apiMockWith({
     "accountDeletion.getAccountDeletionPreview": "account-deletion-preview",
-    "accountDeletion.requestAccountDeletion": "request-account-deletion",
+    "accountDeletionActions.requestAccountDeletion": "request-account-deletion",
     "groups.mutations.setActiveGroup": "set-active-group",
   }),
 }));
@@ -43,18 +64,37 @@ const previewWith = (overrides: Record<string, unknown>) => ({
   ...overrides,
 });
 
+const strictReverificationHint = {
+  clerk_error: {
+    type: "forbidden",
+    reason: "reverification-error",
+    metadata: { reverification: "strict" },
+  },
+};
+const reauthenticationFailedCode = "ACCOUNT_DELETION_REAUTHENTICATION_FAILED";
+const reauthenticationFailedMessage =
+  "本人確認を完了できなかったため、アカウント削除は開始されていません。続けるには、もう一度「アカウントを削除する」を押して本人確認を完了してください。";
+
+type DeletionFetcher = (args: { confirmationText: string }) => Promise<unknown>;
+
 describe("AccountDeletionPage", () => {
   const requestDeletion = vi.fn();
   const setActiveGroup = vi.fn();
   const navigate = vi.fn();
+  const getToken = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     requestDeletion.mockResolvedValue("request-id");
     setActiveGroup.mockResolvedValue(undefined);
-    useMutationMock.mockImplementation((reference: unknown) =>
-      reference === "request-account-deletion" ? requestDeletion : setActiveGroup,
+    getToken.mockResolvedValue("session-token-1");
+    useActionMock.mockImplementation((reference: unknown) =>
+      reference === "request-account-deletion" ? requestDeletion : vi.fn(),
     );
+    useMutationMock.mockReturnValue(setActiveGroup);
+    useAuthMock.mockReturnValue({ getToken });
+    useReverificationMock.mockImplementation((fetcher: DeletionFetcher) => fetcher);
+    isReverificationCancelledErrorMock.mockReturnValue(false);
     useNavigateMock.mockReturnValue(navigate);
     useUserMock.mockReturnValue({ user: null });
   });
@@ -109,7 +149,7 @@ describe("AccountDeletionPage", () => {
     expect(navigate).toHaveBeenCalledWith("/settings");
   });
 
-  it("離脱・削除対象グループの一覧を表示し、確認文言「削除」の入力後にだけ退会を開始できる", async () => {
+  it("離脱・削除対象グループの一覧を表示し、確認文言「削除」の入力後にfresh token付きで退会を開始できる", async () => {
     const user = userEvent.setup();
     useQueryMock.mockReturnValue(
       previewWith({
@@ -123,6 +163,12 @@ describe("AccountDeletionPage", () => {
     expect(screen.getByRole("heading", { name: "アカウントを削除します" })).toBeInTheDocument();
     expect(screen.getByText("・実家")).toBeInTheDocument();
     expect(screen.getByText("・自分だけ")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /本人確認の画面は英語で表示され、登録メールアドレスに届くコードの入力を求められる場合があります/,
+      ),
+    ).toBeInTheDocument();
+    expect(useReverificationMock).toHaveBeenCalled();
 
     const deleteButton = screen.getByRole("button", { name: "アカウントを削除する" });
     expect(deleteButton).toBeDisabled();
@@ -134,21 +180,135 @@ describe("AccountDeletionPage", () => {
     expect(deleteButton).toBeEnabled();
 
     await user.click(deleteButton);
-    expect(requestDeletion).toHaveBeenCalledWith({ confirmationText: "削除" });
-    expect(navigate).toHaveBeenCalledWith("/settings/account/delete/status", { replace: true });
+    await vi.waitFor(() => {
+      expect(getToken).toHaveBeenCalledWith({ skipCache: true });
+      expect(requestDeletion).toHaveBeenCalledWith({
+        confirmationText: "削除",
+        sessionToken: "session-token-1",
+      });
+      expect(navigate).toHaveBeenCalledWith("/settings/account/delete/status", { replace: true });
+    });
   });
 
-  it("退会開始が失敗したらエラーを表示して再試行できる", async () => {
+  it("再認証後の自動再送でもキャッシュ済みtokenを使い回さず新しいtokenを取り直す", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockReturnValue(previewWith({}));
+    getToken.mockResolvedValueOnce("session-token-1").mockResolvedValueOnce("session-token-2");
+    requestDeletion
+      .mockResolvedValueOnce(strictReverificationHint)
+      .mockResolvedValueOnce("request-id");
+    useReverificationMock.mockImplementation((fetcher: DeletionFetcher) => {
+      return async (args: { confirmationText: string }) => {
+        const first = await fetcher(args);
+        if (first === strictReverificationHint) return await fetcher(args);
+        return first;
+      };
+    });
+
+    renderWithProviders(<AccountDeletionPage />);
+    await user.type(screen.getByRole("textbox", { name: "確認用入力" }), "削除");
+    await user.click(screen.getByRole("button", { name: "アカウントを削除する" }));
+
+    await vi.waitFor(() => {
+      expect(getToken).toHaveBeenCalledTimes(2);
+      expect(getToken).toHaveBeenNthCalledWith(1, { skipCache: true });
+      expect(getToken).toHaveBeenNthCalledWith(2, { skipCache: true });
+      expect(requestDeletion).toHaveBeenNthCalledWith(1, {
+        confirmationText: "削除",
+        sessionToken: "session-token-1",
+      });
+      expect(requestDeletion).toHaveBeenNthCalledWith(2, {
+        confirmationText: "削除",
+        sessionToken: "session-token-2",
+      });
+    });
+  });
+
+  it("再認証後もstrict要件を満たさないときは本人確認失敗の文言を表示して成功画面へ進まない", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockReturnValue(previewWith({}));
+    requestDeletion.mockResolvedValue(strictReverificationHint);
+
+    renderWithProviders(<AccountDeletionPage />);
+    await user.type(screen.getByRole("textbox", { name: "確認用入力" }), "削除");
+    await user.click(screen.getByRole("button", { name: "アカウントを削除する" }));
+
+    expect(await screen.findByText(reauthenticationFailedMessage)).toBeInTheDocument();
+    expect(screen.queryByText(/アカウント削除を開始できませんでした/)).not.toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("本人確認を検証できない拒否では本人確認失敗の文言を表示し、その他の送信失敗と区別する", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockReturnValue(previewWith({}));
+    requestDeletion.mockRejectedValueOnce(new ConvexError({ code: reauthenticationFailedCode }));
+
+    renderWithProviders(<AccountDeletionPage />);
+    const input = screen.getByRole("textbox", { name: "確認用入力" });
+    await user.type(input, "削除");
+    await user.click(screen.getByRole("button", { name: "アカウントを削除する" }));
+
+    expect(await screen.findByText(reauthenticationFailedMessage)).toBeInTheDocument();
+    expect(screen.queryByText(/アカウント削除を開始できませんでした/)).not.toBeInTheDocument();
+    expect(input).toHaveValue("削除");
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("再認証応答でもIDでもない結果は本人確認失敗ではなく送信失敗として表示する", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockReturnValue(previewWith({}));
+    requestDeletion.mockResolvedValue({ unexpected: true });
+
+    renderWithProviders(<AccountDeletionPage />);
+    await user.type(screen.getByRole("textbox", { name: "確認用入力" }), "削除");
+    await user.click(screen.getByRole("button", { name: "アカウントを削除する" }));
+
+    expect(await screen.findByText(/アカウント削除を開始できませんでした/)).toBeInTheDocument();
+    expect(screen.queryByText(reauthenticationFailedMessage)).not.toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("本人確認をキャンセルしたときは退会開始せず、理由と次の行動を表示して入力内容を保持する", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockReturnValue(previewWith({}));
+    const cancelError = new Error("reverification cancelled");
+    isReverificationCancelledErrorMock.mockImplementation(
+      (error: unknown) => error === cancelError,
+    );
+    useReverificationMock.mockImplementation(() => async () => {
+      throw cancelError;
+    });
+
+    renderWithProviders(<AccountDeletionPage />);
+    const input = screen.getByRole("textbox", { name: "確認用入力" });
+    await user.type(input, "削除");
+    await user.click(screen.getByRole("button", { name: "アカウントを削除する" }));
+
+    expect(
+      await screen.findByText(/本人確認がキャンセルされたため、アカウント削除は開始されていません/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/もう一度「アカウントを削除する」を押して本人確認を完了してください/),
+    ).toBeInTheDocument();
+    expect(input).toHaveValue("削除");
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "アカウントを削除する" })).toBeEnabled();
+  });
+
+  it("退会開始が失敗したらキャンセルと別のエラーを表示して再試行でき、入力内容を保持する", async () => {
     const user = userEvent.setup();
     useQueryMock.mockReturnValue(previewWith({}));
     requestDeletion.mockRejectedValueOnce(new Error("server error"));
 
     renderWithProviders(<AccountDeletionPage />);
 
-    await user.type(screen.getByRole("textbox", { name: "確認用入力" }), "削除");
+    const input = screen.getByRole("textbox", { name: "確認用入力" });
+    await user.type(input, "削除");
     await user.click(screen.getByRole("button", { name: "アカウントを削除する" }));
 
     expect(await screen.findByText(/アカウント削除を開始できませんでした/)).toBeInTheDocument();
+    expect(screen.queryByText(/本人確認がキャンセルされたため/)).not.toBeInTheDocument();
+    expect(input).toHaveValue("削除");
     expect(screen.getByRole("button", { name: "アカウントを削除する" })).toBeEnabled();
   });
 
@@ -177,14 +337,18 @@ describe("AccountDeletionPage", () => {
     expect(deleteButton).toBeEnabled();
 
     await user.click(deleteButton);
-    expect(requestDeletion).toHaveBeenCalledWith({ confirmationText: "削除" });
-    expect(navigate).toHaveBeenCalledWith("/settings/account/delete/status", { replace: true });
+    await vi.waitFor(() => {
+      expect(requestDeletion).toHaveBeenCalledWith({
+        confirmationText: "削除",
+        sessionToken: "session-token-1",
+      });
+      expect(navigate).toHaveBeenCalledWith("/settings/account/delete/status", { replace: true });
+    });
   });
 
   it("確認画面から設定へ戻れる", async () => {
     const user = userEvent.setup();
     useQueryMock.mockReturnValue(previewWith({}));
-
     renderWithProviders(<AccountDeletionPage />);
 
     await user.click(screen.getByRole("button", { name: "設定に戻る" }));

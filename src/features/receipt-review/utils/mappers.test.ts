@@ -253,6 +253,24 @@ describe("mapDraftToQueueItem", () => {
     expect(item.failureHint).toContain("タイムアウト");
   });
 
+  it("保存済みの金額・税の解決状態を一覧項目へ写す（Issue #1563）", () => {
+    const base = {
+      _id: "draft-resolved",
+      status: "needs_review",
+      documentType: "receipt",
+      reviewReasons: ["low_confidence"],
+    } as const;
+    expect(
+      mapDraftToQueueItem({ ...base, listSummary: { amountAndTaxResolved: true } } as never, {})
+        .amountAndTaxResolved,
+    ).toBe(true);
+    expect(
+      mapDraftToQueueItem({ ...base, listSummary: { amountAndTaxResolved: false } } as never, {})
+        .amountAndTaxResolved,
+    ).toBe(false);
+    expect(mapDraftToQueueItem({ ...base } as never, {}).amountAndTaxResolved).toBeUndefined();
+  });
+
   it("統合済みの払込票は店名・内容を一覧タイトルに使う", () => {
     const item = mapDraftToQueueItem(
       {

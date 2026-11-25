@@ -326,10 +326,21 @@ describe("buildTaxRateCheck", () => {
       expect(check.focusTarget).toBe("u1");
     });
 
-    it("商品の税率が確定済みで集計だけ無い場合は、読み取り原文の確認へ案内する", () => {
-      const check = buildTaxRateCheck({ items: [resolvedItem({ id: "p1" })], taxSummaries: [] });
-      expect(check.blockerCode).toBe("missing-tax-summary");
-      expect(check.focusTarget).toBe("reference");
+    it("商品の税率が確定済みで集計だけ無い場合は、原文があるときだけ読み取り原文の確認へ案内する", () => {
+      const withReference = buildTaxRateCheck({
+        items: [resolvedItem({ id: "p1" })],
+        taxSummaries: [],
+        rawObservation: rawObservation([{ rawText: "合計 100", amountYen: 100 }]),
+      });
+      expect(withReference.blockerCode).toBe("missing-tax-summary");
+      expect(withReference.focusTarget).toBe("reference");
+
+      const withoutReference = buildTaxRateCheck({
+        items: [resolvedItem({ id: "p1" })],
+        taxSummaries: [],
+      });
+      expect(withoutReference.blockerCode).toBe("missing-tax-summary");
+      expect(withoutReference.focusTarget).toBe("items");
     });
 
     it("税率未確定の明細があると全体を比較不能にする", () => {

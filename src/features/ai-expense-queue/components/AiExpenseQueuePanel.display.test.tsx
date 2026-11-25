@@ -341,7 +341,8 @@ describe("AiExpenseQueuePanel（表示）", () => {
       expect(within(dialog).getByText("パン")).toBeVisible();
       expect(within(dialog).getByText("胃薬")).toBeVisible();
       expect(within(dialog).getByRole("region", { name: "商品一覧" })).toBeVisible();
-      expect(within(dialog).getByRole("button", { name: "下書きを保存" })).toBeEnabled();
+      // 金額が一致し登録額が決まっているため、保存ボタンは「この内容で保存」になる（Issue #1563）。
+      expect(within(dialog).getByRole("button", { name: "この内容で保存" })).toBeEnabled();
     });
   });
 });

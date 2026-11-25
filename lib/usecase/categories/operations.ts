@@ -8,6 +8,7 @@ import {
   DEFAULT_CATEGORIES_SEED_VERSION,
   MAX_CATEGORIES_PER_GROUP,
 } from "../../domain/categories/defaults";
+import type { CategoryMoveDirection } from "../../domain/categories/category";
 import {
   normalizeCategoryColor,
   normalizeCategoryDescription,
@@ -172,7 +173,7 @@ export async function reactivateCategory(
 
 export type MoveCategoryInput = {
   categoryId: string;
-  direction: "up" | "down";
+  direction: CategoryMoveDirection;
 };
 
 /**

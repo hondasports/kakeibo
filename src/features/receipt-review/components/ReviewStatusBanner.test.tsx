@@ -31,7 +31,7 @@ function renderBanner(
 describe("ReviewStatusBanner", () => {
   it("すべて一致なら成功メッセージを表示する", () => {
     const { banner } = renderBanner(matchedChecks);
-    expect(within(banner).getByText(/印字額と明細の金額が一致しています/)).toBeInTheDocument();
+    expect(within(banner).getByText("金額は一致しています。")).toBeInTheDocument();
   });
 
   it("金額不一致は差額と確認ボタンを表示する", async () => {
@@ -174,7 +174,7 @@ describe("ReviewStatusBanner", () => {
   it("金額と税率別集計が一致していれば成功メッセージだけを表示する", () => {
     const { banner } = renderBanner(matchedChecks);
     expect(within(banner).queryByText("レシート全体の確認")).not.toBeInTheDocument();
-    expect(within(banner).getByText(/印字額と明細の金額が一致しています/)).toBeInTheDocument();
+    expect(within(banner).getByText("金額は一致しています。")).toBeInTheDocument();
   });
 
   it("税率未確定による比較不能は1つの案内にまとめる", async () => {
@@ -254,5 +254,120 @@ describe("ReviewStatusBanner", () => {
     expect(within(banner).queryByText("税率別の明細合計を比較できません")).not.toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "該当商品を確認する" }));
     expect(onJump).toHaveBeenCalledWith("item-1");
+  });
+
+  it("金額一致時は見出しと商品合計・支払額だけを出し、他の確認案内を出さない", () => {
+    render(
+      <ReviewStatusBanner
+        checks={{
+          amount: {
+            status: "matched",
+            variant: "direct",
+            itemsComparableTotalYen: 560,
+            paidTotalYen: 560,
+          },
+          taxRate: {
+            status: "uncomparable",
+            rows: [],
+            reason: "税率別の対象額が読み取れていません",
+          },
+        }}
+        amountConfirmed
+        itemCount={3}
+        issues={[{ id: "amount-x", message: "確認メッセージ", target: "items", required: false }]}
+        receiptIssues={[
+          {
+            id: "reading",
+            message: "読み取り確認",
+            target: "items",
+            required: false,
+            scope: "receipt",
+          },
+        ]}
+        unresolvedTaxItemCount={0}
+        busy={false}
+        onJump={vi.fn()}
+      />,
+    );
+    const region = screen.getByRole("region", { name: "全体の確認状態" });
+    expect(within(region).getByText("金額は一致しています")).toBeVisible();
+    expect(within(region).getByText("商品の合計（3件）")).toBeVisible();
+    expect(within(region).getByText("支払額")).toBeVisible();
+    expect(within(region).getAllByText("560円")).toHaveLength(2);
+    expect(within(region).queryByText("確認メッセージ")).not.toBeInTheDocument();
+    expect(within(region).queryByText("レシート全体の確認")).not.toBeInTheDocument();
+    expect(
+      within(region).queryByText("税率別の対象額が読み取れていません"),
+    ).not.toBeInTheDocument();
+  });
+  it("税込と税抜が混在しても、商品の合計は税込として示す（variant が external でなくても）", () => {
+    render(
+      <ReviewStatusBanner
+        checks={{
+          amount: {
+            status: "matched",
+            variant: "direct",
+            itemsPrintedTotalYen: 208,
+            itemsComparableTotalYen: 218,
+            paidTotalYen: 218,
+          },
+          taxRate: matchedChecks.taxRate,
+        }}
+        amountConfirmed
+        itemCount={2}
+        issues={[]}
+        unresolvedTaxItemCount={0}
+        busy={false}
+        onJump={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("商品の合計（税込・2件）")).toBeVisible();
+    expect(screen.getAllByText("218円")).toHaveLength(2);
+  });
+  it("全商品が税込で表示金額の合計と税込合計が同じなら、税込とは付けない", () => {
+    render(
+      <ReviewStatusBanner
+        checks={{
+          amount: {
+            status: "matched",
+            variant: "direct",
+            itemsPrintedTotalYen: 560,
+            itemsComparableTotalYen: 560,
+            paidTotalYen: 560,
+          },
+          taxRate: matchedChecks.taxRate,
+        }}
+        amountConfirmed
+        itemCount={3}
+        issues={[]}
+        unresolvedTaxItemCount={0}
+        busy={false}
+        onJump={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("商品の合計（3件）")).toBeVisible();
+    expect(screen.queryByText(/税込・/)).not.toBeInTheDocument();
+  });
+  it("税抜明細の金額一致時は商品の合計を税込として示す", () => {
+    render(
+      <ReviewStatusBanner
+        checks={{
+          amount: {
+            status: "matched",
+            variant: "external",
+            itemsComparableTotalYen: 110,
+            paidTotalYen: 110,
+          },
+          taxRate: matchedChecks.taxRate,
+        }}
+        amountConfirmed
+        itemCount={1}
+        issues={[]}
+        unresolvedTaxItemCount={0}
+        busy={false}
+        onJump={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("商品の合計（税込・1件）")).toBeVisible();
   });
 });

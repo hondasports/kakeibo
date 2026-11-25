@@ -21,6 +21,7 @@ type ReviewDialogItemsSectionProps = {
   isCategorySplit: boolean;
   draft: AiExpenseDraft | null;
   totalOnly: boolean;
+  taxModelActive?: boolean;
   taxUpdatingItemId?: string | null;
   register: (target: string) => (node: HTMLElement | null) => void;
   onToggleItem: (itemId: string) => void;
@@ -53,6 +54,7 @@ export function ReviewDialogItemsSection({
   isCategorySplit,
   draft,
   totalOnly,
+  taxModelActive = true,
   taxUpdatingItemId,
   register,
   onToggleItem,
@@ -178,6 +180,7 @@ export function ReviewDialogItemsSection({
                 busy={busy}
                 categoryName={categoryNames.get(item.categoryId)}
                 targetName={target?.itemName}
+                taxModelActive={taxModelActive}
               >
                 <Stack spacing={1}>
                   {itemIssues.map((issue) => (
@@ -199,6 +202,7 @@ export function ReviewDialogItemsSection({
                     disabled={busy}
                     enableItemTaxEditing={!!item.persistedItemId}
                     inlineTaxEditing
+                    taxModelActive={taxModelActive}
                     onAmountBasisChange={onAmountBasisChange}
                     onItemChange={onItemChange}
                     onRemoveItem={onRemoveItem}

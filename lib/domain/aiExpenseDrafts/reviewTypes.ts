@@ -34,7 +34,7 @@ const REVIEWABLE_DRAFT_STATUSES = [
   "registered",
 ] as const satisfies readonly PersistedDraftStatus[];
 
-type ReviewableDraftStatus = (typeof REVIEWABLE_DRAFT_STATUSES)[number];
+export type ReviewableDraftStatus = (typeof REVIEWABLE_DRAFT_STATUSES)[number];
 
 export function isReviewableDraftStatus(
   status: PersistedDraftStatus,

@@ -107,6 +107,100 @@ describe("下書きの金額・税の判定", () => {
       reasons: expect.arrayContaining(["user_confirmation_required"]),
     });
   });
+
+  it("税モデルのない明細は、税未入力だけでは確認対象にしない", () => {
+    const judgment = judgeDraftAmountAndTax({
+      documentType: "receipt",
+      shopName: "店",
+      date: "2026-11-01",
+      amountYen: 100,
+      categoryId: "food",
+      reviewReasons: [],
+      items: [
+        {
+          _id: "item",
+          itemName: "商品",
+          lineType: "item",
+          amountYen: 100,
+          printedAmountYen: 100,
+          normalizedAmountYen: 100,
+          categoryId: "food",
+        },
+      ],
+    });
+
+    expect(judgment).toMatchObject({
+      status: "resolved",
+      unresolvedTaxItemCount: 0,
+      checks: {
+        amount: { status: "matched" },
+        taxRate: { status: "uncomparable", blockerCode: "missing-tax-summary" },
+      },
+    });
+  });
+
+  it.each([
+    { name: "税率だけ", tax: { taxRatePercent: 10 as const } },
+    { name: "税込／税抜だけ", tax: { amountBasis: "tax_included" as const } },
+  ])("税モデルのない明細も、$name を設定すると残る軸を確認対象にする", ({ tax }) => {
+    const judgment = judgeDraftAmountAndTax({
+      ...base,
+      taxSummaries: undefined,
+      amountYen: 100,
+      items: [
+        {
+          _id: "item",
+          itemName: "商品",
+          lineType: "item",
+          amountYen: 100,
+          printedAmountYen: 100,
+          normalizedAmountYen: 100,
+          categoryId: "food",
+          ...tax,
+        },
+      ],
+    });
+
+    expect(judgment).toMatchObject({
+      status: "unresolved",
+      unresolvedTaxItemCount: 1,
+      taxRegistrationBlocked: true,
+    });
+  });
+
+  it("税モデルのない合計のみの下書きは、税未入力と割引対象なしを税確認待ちに数えない", () => {
+    const judgment = judgeDraftAmountAndTax({
+      ...base,
+      taxSummaries: undefined,
+      registrationMode: "totalOnly",
+      items: [
+        {
+          _id: "item",
+          itemName: "商品",
+          lineType: "item",
+          amountYen: 100,
+          printedAmountYen: 100,
+          normalizedAmountYen: 100,
+          categoryId: "food",
+        },
+        {
+          _id: "discount",
+          itemName: "割引",
+          lineType: "discount",
+          amountYen: -10,
+          printedAmountYen: -10,
+          normalizedAmountYen: -10,
+          categoryId: "food",
+        },
+      ],
+    });
+
+    expect(judgment).toMatchObject({
+      status: "not_applicable",
+      unresolvedTaxItemCount: 0,
+      checks: { taxRate: { status: "uncomparable", blockerCode: "missing-tax-summary" } },
+    });
+  });
 });
 
 it("保存された割引カテゴリを正本・保存計画・登録で同じく拒否する", async () => {

@@ -32,7 +32,7 @@ for (const receipt of [
       }
       const matched = dialog
         .getByRole("region", { name: "全体の確認状態" })
-        .getByText("印字額と明細の金額が一致しています");
+        .getByText("金額は一致しています");
       await expect(matched).toBeVisible();
       await expect(dialog.getByText("比較不能", { exact: true })).toHaveCount(0);
       await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();

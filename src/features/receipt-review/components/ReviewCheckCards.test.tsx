@@ -185,7 +185,7 @@ describe("ReviewCheckCards", () => {
     const amountLives = () =>
       [...document.querySelectorAll('[role="alert"], [role="status"], [aria-live]')].filter(
         (element) =>
-          /金額が8円合いません|8円合いません|金額を比較できません|金額と支払額が一致|印字額と明細の金額が一致|計算した金額が一致/.test(
+          /金額が8円合いません|8円合いません|金額を比較できません|金額と支払額が一致|金額は一致しています|印字額と明細の金額が一致|計算した金額が一致/.test(
             element.textContent ?? "",
           ),
       );

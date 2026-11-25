@@ -2,28 +2,59 @@ import { Alert, Box, Button, Stack, Typography } from "@mui/material";
 import { formatYen } from "../../../../lib/domain/common/currency";
 import type { ReviewGuidanceItem } from "../../../../lib/domain/aiExpenseDrafts/reviewGuidance";
 import type { ReviewChecks } from "../../../../lib/domain/aiExpenseDrafts/reviewChecks";
+import { AmountCheckLine } from "./ReviewCheckCards";
 
 export function ReviewStatusBanner({
   checks,
   amountTaxResolved = true,
+  amountConfirmed = false,
+  itemCount = 0,
   issues,
   unresolvedTaxItemCount,
+  taxModelActive = true,
   receiptIssues = [],
   busy,
   onJump,
 }: {
   checks: ReviewChecks;
   amountTaxResolved?: boolean;
+  /** 金額が一致し登録額も決まっている。一致の表示だけを出す（Issue #1563） */
+  amountConfirmed?: boolean;
+  /** 商品一覧の件数（一致時の「商品の合計（N件）」に使う） */
+  itemCount?: number;
   /** 明細・基本情報など特定箇所への確認・修正項目 */
   issues: ReviewGuidanceItem[];
   /** 税率または税込／税抜が未確定の明細数 */
   unresolvedTaxItemCount: number;
+  /** 税モデルのない下書きは税確認を求めないので、税率別の比較不能を案内しない */
+  taxModelActive?: boolean;
   /** レシート全体の読み取り確認 */
   receiptIssues?: ReviewGuidanceItem[];
   busy: boolean;
   onJump: (target: string) => void;
 }) {
   const { amount, taxRate } = checks;
+  if (amountConfirmed) {
+    // 表示する合計が商品の表示金額の合計と違えば、税込に直した合計だと分かるよう「税込・」を付ける。
+    const shownTotalYen = amount.itemsComparableTotalYen ?? amount.expectedPaidYen;
+    const taxIncluded =
+      amount.variant === "external" ||
+      (amount.itemsPrintedTotalYen !== undefined && shownTotalYen !== amount.itemsPrintedTotalYen);
+    return (
+      <Stack spacing={1.5} component="section" aria-label="全体の確認状態">
+        <Alert severity="success">
+          <Typography variant="subtitle2">金額は一致しています</Typography>
+          <Stack spacing={0.5}>
+            <AmountCheckLine
+              label={`商品の合計（${taxIncluded ? "税込・" : ""}${itemCount}件）`}
+              value={shownTotalYen}
+            />
+            <AmountCheckLine label="支払額" value={amount.paidTotalYen} />
+          </Stack>
+        </Alert>
+      </Stack>
+    );
+  }
   const checksAreMatched =
     amountTaxResolved && amount.status === "matched" && taxRate.status === "matched";
   const sharedBlockerCode =
@@ -132,7 +163,7 @@ export function ReviewStatusBanner({
           </Box>
         </Alert>
       )}
-      {taxRate.status === "uncomparable" && !combineUncomparable && (
+      {taxModelActive && taxRate.status === "uncomparable" && !combineUncomparable && (
         <Alert severity="warning">
           <Typography variant="subtitle2">
             {taxRate.blockerCode === "unverified-tax-summary"
@@ -157,7 +188,7 @@ export function ReviewStatusBanner({
         </Alert>
       )}
       {checksAreMatched && issues.length === 0 && (
-        <Alert severity="success">印字額と明細の金額が一致しています。</Alert>
+        <Alert severity="success">金額は一致しています。</Alert>
       )}
       {checksAreMatched && issues.length > 0 && (
         <Box
@@ -174,7 +205,7 @@ export function ReviewStatusBanner({
             border: 0,
           }}
         >
-          印字額と明細の金額が一致しています。
+          金額は一致しています。
         </Box>
       )}
       {issues.length > 0 && (

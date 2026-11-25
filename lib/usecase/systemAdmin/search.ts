@@ -8,7 +8,7 @@ import {
   groupAuditQueryType,
   hashSearchQuery,
   isValidSearchPageSize,
-  normalizeSearchQuery,
+  normalizeSystemAdminSearchQuery,
   resolveSystemAdminSearchEnvironment,
   userAuditQueryType,
   type GroupSearchType,
@@ -35,7 +35,7 @@ function validatePagination(numItems: number) {
 }
 
 function normalizeQueryOrThrow(query: string) {
-  const { value, tooLong } = normalizeSearchQuery(query);
+  const { value, tooLong } = normalizeSystemAdminSearchQuery(query);
   if (tooLong) throw new ConvexError("検索語は200文字以内で入力してください");
   return value;
 }

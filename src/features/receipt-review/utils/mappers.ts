@@ -46,6 +46,7 @@ export function mapDraftToQueueItem(
     date: draft.date,
     categoryName,
     reviewReasons: draft.reviewReasons,
+    amountAndTaxResolved: draft.listSummary?.amountAndTaxResolved,
     itemTotalYen: draft.itemSummary?.itemTotalYen,
     itemDifferenceYen: draft.itemSummary?.itemDifferenceYen,
     hasUncategorizedItems: draft.itemSummary?.hasUncategorizedItems,

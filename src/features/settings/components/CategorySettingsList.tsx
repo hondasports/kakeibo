@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import type { CategoryMoveDirection } from "../../../../lib/domain/categories/category";
 import type { Category, CategoryFieldErrors } from "../hooks/useCategorySettings";
 import { CategorySettingsRow } from "./CategorySettingsRow";
 
@@ -16,7 +17,7 @@ type CategorySettingsListProps = {
   onEditColorChange: (color: string) => void;
   onEditDescriptionChange: (description: string) => void;
   onEditNameChange: (name: string) => void;
-  onMove: (category: Category, direction: "up" | "down") => void;
+  onMove: (category: Category, direction: CategoryMoveDirection) => void;
   onReactivate: (categoryId: Category["_id"]) => void;
   onRequestDeactivate: (category: Category) => void;
   onUpdate: () => void;

@@ -7,6 +7,7 @@ import {
   buildUserInsertFields,
   buildUserUpsertPatch,
   UserDomainError,
+  MAX_MONTHLY_INCOME_YEN,
   validateMonthlyIncome,
   type UserIdentityInput,
 } from "../../domain/users/rules";
@@ -78,7 +79,9 @@ export async function updateMonthlyIncome(
 ): Promise<void> {
   const income = args.monthlyIncome;
   if (!validateMonthlyIncome(income).success) {
-    throw new UserDomainError("月収入は0以上999999999以下の整数（円）で入力してください");
+    throw new UserDomainError(
+      `月収入は0以上${MAX_MONTHLY_INCOME_YEN}以下の整数（円）で入力してください`,
+    );
   }
 
   const user = assertUserFound(await store.findByUserId(userId));

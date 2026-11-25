@@ -3,6 +3,10 @@
  * UI / Convex の両方から利用できる純粋関数のみを含む。
  */
 
+export const CATEGORY_MOVE_DIRECTIONS = ["up", "down"] as const;
+
+export type CategoryMoveDirection = (typeof CATEGORY_MOVE_DIRECTIONS)[number];
+
 /** カテゴリ名の最大文字数。 */
 export const MAX_CATEGORY_NAME_LENGTH = 40;
 

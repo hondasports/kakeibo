@@ -23,7 +23,7 @@ export function createResendWebhookHandler(
     const rawBody = new TextDecoder().decode(bytes);
     const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
     if (!webhookSecret) {
-      return new Response("Missing webhook secret", { status: 500 });
+      return new Response("Webhook unavailable", { status: 500 });
     }
 
     const id = req.headers.get("svix-id") ?? req.headers.get("webhook-id") ?? "";

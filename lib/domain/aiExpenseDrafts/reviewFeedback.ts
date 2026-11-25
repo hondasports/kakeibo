@@ -1,4 +1,5 @@
 import { formatYen } from "../common/currency";
+import type { ReviewableDraftStatus } from "./reviewTypes";
 
 const REVIEW_REASON_LABELS: Record<string, string> = {
   amount_mismatch: "金額・税内訳の確認が必要",
@@ -46,7 +47,7 @@ export function getPrimaryReviewReason(reasons: string[]): string | undefined {
 }
 
 export function formatReviewSaveMessage(args: {
-  status: "ready" | "needs_review" | "failed" | "registered";
+  status: ReviewableDraftStatus;
   reviewReasons: string[];
   shopName?: string;
   amountYen?: number;

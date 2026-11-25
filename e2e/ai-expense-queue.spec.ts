@@ -305,7 +305,7 @@ test.describe("Issue #1123 AI下書き登録から週次サマリー", () => {
       await expect(dialog).toBeVisible();
       await expect(dialog.getByLabel("店名・内容")).toHaveValue("E2Eスーパー");
       await expect(dialog.getByLabel("合計金額", { exact: true })).toHaveValue("1500");
-      await dialog.getByRole("button", { name: "下書きを保存", exact: true }).click();
+      await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
       await expect(dialog).toBeHidden();
 
       // キューの「登録する」で支出エントリへ登録する
@@ -452,7 +452,7 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
       .click();
     await page.getByRole("option", { name: "税込", exact: true }).click();
     await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
-    await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+    await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
     await expect(dialog).toBeHidden();
     const readyItem = queue
@@ -461,7 +461,7 @@ test.describe("Issue #435 税率別集計の conflict 修正", () => {
       .filter({ hasText: "E2E税率別集計店" });
     await expect(readyItem).toContainText("1,060円");
     await readyItem.getByRole("button", { name: "修正する", exact: true }).click();
-    await expect(dialog.getByText("印字額と明細の金額が一致しています。")).toBeVisible();
+    await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
     await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
   });
 });

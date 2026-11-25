@@ -32,6 +32,39 @@ Convex データへの認可とは別の仕組みです。
 例外ではなく `null` を返します（`convex/accountDeletion.test.ts`）。未認証時にユーザーや
 家計データを返すものではなく、家計データ API の認証・グループ所属確認を省略する根拠にはなりません。
 
+### 退会開始の本人再認証
+
+退会開始の本人再認証の判定条件はこの節を正本とする。公開入口は `convex/accountDeletionActions.ts` の
+`requestAccountDeletion` action で、画面は Clerk の `useReverification` 経由で呼び、呼び出し直前に
+template無しの `getToken({ skipCache: true })` で session token を取り直す。action はサーバー側で次を
+すべて満たす場合だけ退会開始の internal mutation を呼ぶ。
+
+- Convex の認証 identity が存在する
+- 受け取った token の署名と期限を `verifyToken` で検証できる（`CLERK_SECRET_KEY` が必要）
+- token の `sid` が空でない文字列である。`sid` はsessionに紐づくclaimで、custom JWT template tokenには含められないため、template tokenを退会開始に使えないようにする
+- token の `iss` / `sub` が Convex identity の `issuer` / `subject` と一致する
+- token の `iat` が有限数で存在し、`verifyToken` の許容する未来時刻（既定5秒）を超えていない
+- token の `fva` が Clerk形式の長さ2の配列で、各要素が `-1` または0以上の有限数である
+- `fva` にtoken発行後の経過時間を足した実効値が Clerk の `strict` 再認証要件を満たす
+
+`fva` はtoken発行時点の経過分数なので、`max(0, now - iat)` を分へ換算して安全側に切り上げ、
+`-1` 以外の要素へ足す。第二要素が `-1` 以外なら第二要素、なければ第一要素を使い、実効値が
+10分未満のときだけ退会開始を許可する。10分ちょうどは許可しない。`iat` が許容範囲内の未来なら
+発行後経過時間は0として扱う。
+
+形式正しい `fva` が `strict` の要件を満たさない場合は `useReverification` が認識する `strict` の再認証ヒントを返す。
+`fva` / `iat` / `sid` の欠落・形式不正、署名不正・期限切れ・主体または発行者の不一致・token検証不能は
+再認証ヒントではなく `ConvexError` の data `{ code: "ACCOUNT_DELETION_REAUTHENTICATION_FAILED" }` で拒否し、
+詳細理由や token 自体をクライアントへ返さない。
+
+`azp` は検証しない。`azp` は元のFrontend API requestのoriginであり、local・preview・production等の有効なoriginが
+複数あるため、退会開始actionに単一の許可一覧を置かない。代わりに、Convex identityとの `iss` / `sub` 一致と、
+sessionに紐づく `sid` を持つtokenの要求で、別主体・別発行者・sessionに紐づかないcustom JWT template tokenを拒否する。
+
+退会開始 mutation 自体は internal であり、公開 mutation から退会を開始する経路は残さない。internal mutation には
+tokenではなく Convex identity の `tokenIdentifier` / `subject` を渡す。既存要求の `retryAccountDeletion` は
+この開始経路とは別に維持する。
+
 ### 共通ヘルパー
 
 **認証（`convex/users/auth.ts`）**
