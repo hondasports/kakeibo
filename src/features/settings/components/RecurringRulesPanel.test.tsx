@@ -64,12 +64,6 @@ function renderPanel() {
   return renderWithProviders(<RecurringRulesPanel />);
 }
 
-// カテゴリ・曜日の Select は labelId が InputLabel と結ばれておらず combobox が
-// accessible name を持たないため、ダイアログ内の出現順（カテゴリ→曜日）で選ぶ。
-function comboboxesIn(dialog: HTMLElement) {
-  return within(dialog).getAllByRole("combobox");
-}
-
 async function openCreateDialog(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "追加" }));
   return await screen.findByRole("dialog");
@@ -110,7 +104,7 @@ describe("RecurringRulesPanel", () => {
 
     await user.type(within(dialog).getByLabelText(/項目名/), "家賃");
     await user.type(within(dialog).getByLabelText(/金額（円）/), "80000");
-    await user.click(comboboxesIn(dialog)[0]);
+    await user.click(within(dialog).getByRole("combobox", { name: "カテゴリ" }));
     await user.click(await screen.findByRole("option", { name: "食費" }));
     const dayInput = within(dialog).getByLabelText(/日付（1〜31）/);
     await user.clear(dayInput);
@@ -137,10 +131,10 @@ describe("RecurringRulesPanel", () => {
 
     await user.type(within(dialog).getByLabelText(/項目名/), "週次の仕入れ");
     await user.type(within(dialog).getByLabelText(/金額（円）/), "1234");
-    await user.click(comboboxesIn(dialog)[0]);
+    await user.click(within(dialog).getByRole("combobox", { name: "カテゴリ" }));
     await user.click(await screen.findByRole("option", { name: "食費" }));
     await user.click(within(dialog).getByRole("button", { name: "毎週" }));
-    await user.click(comboboxesIn(dialog)[1]);
+    await user.click(within(dialog).getByRole("combobox", { name: "曜日" }));
     await user.click(await screen.findByRole("option", { name: "水曜日" }));
     await user.click(within(dialog).getByRole("button", { name: "保存" }));
 
@@ -235,7 +229,7 @@ describe("RecurringRulesPanel", () => {
     const dialog = await openCreateDialog(user);
 
     await user.type(within(dialog).getByLabelText(/金額（円）/), "80000");
-    await user.click(comboboxesIn(dialog)[0]);
+    await user.click(within(dialog).getByRole("combobox", { name: "カテゴリ" }));
     await user.click(await screen.findByRole("option", { name: "食費" }));
 
     expect(within(dialog).getByRole("button", { name: "保存" })).toBeDisabled();
@@ -262,7 +256,7 @@ describe("RecurringRulesPanel", () => {
 
     await user.type(within(dialog).getByLabelText(/項目名/), "家賃");
     await user.type(within(dialog).getByLabelText(/金額（円）/), "80000");
-    await user.click(comboboxesIn(dialog)[0]);
+    await user.click(within(dialog).getByRole("combobox", { name: "カテゴリ" }));
     await user.click(await screen.findByRole("option", { name: "食費" }));
     await user.click(within(dialog).getByRole("button", { name: "保存" }));
 
@@ -277,7 +271,7 @@ describe("RecurringRulesPanel", () => {
 
     await user.type(within(dialog).getByLabelText(/項目名/), "家賃");
     await user.type(within(dialog).getByLabelText(/金額（円）/), "80000");
-    await user.click(comboboxesIn(dialog)[0]);
+    await user.click(within(dialog).getByRole("combobox", { name: "カテゴリ" }));
     await user.click(await screen.findByRole("option", { name: "食費" }));
     await user.click(within(dialog).getByRole("button", { name: "保存" }));
 
