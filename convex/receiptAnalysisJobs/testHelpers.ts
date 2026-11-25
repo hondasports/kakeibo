@@ -27,11 +27,16 @@ export function createMutationCtx(
 ): MutationCtx {
   const insertedIds = opts.insertedIds ?? ["new-batch-id", "new-job-id-0", "new-job-id-1"];
   let insertCallCount = 0;
-  const insertMock = vi.fn().mockImplementation(async () => {
-    const nextId = insertedIds[Math.min(insertCallCount, insertedIds.length - 1)];
-    insertCallCount += 1;
-    return nextId;
-  });
+  const insertMock = vi
+    .fn()
+    .mockImplementation(async (_table: string, fields: Record<string, unknown>) => {
+      const nextId = insertedIds[Math.min(insertCallCount, insertedIds.length - 1)];
+      insertCallCount += 1;
+      if (opts.docs) {
+        opts.docs[nextId] = { _id: nextId, ...fields };
+      }
+      return nextId;
+    });
   const patchMock = vi.fn().mockResolvedValue(undefined);
   const deleteMock = vi.fn().mockResolvedValue(undefined);
   const runAfterMock = vi.fn().mockResolvedValue(undefined);
@@ -65,8 +70,29 @@ export function createMutationCtx(
           }
           return { unique: vi.fn().mockResolvedValue(groupMember) };
         }
+        // by_group_id_and_user_id は指定グループのメンバーだけを返す。
+        // GROUP_ID 以外のグループでは非所属として null を返す。
+        if (_indexName === "by_group_id_and_user_id") {
+          const eqValues: unknown[] = [];
+          if (builder) {
+            const q = {
+              eq: vi.fn().mockImplementation((_field: string, value: unknown) => {
+                eqValues.push(value);
+                return q;
+              }),
+            };
+            builder(q);
+          }
+          const matches = eqValues[0] === GROUP_ID && eqValues[1] === identity?.tokenIdentifier;
+          return { unique: vi.fn().mockResolvedValue(matches ? groupMember : null) };
+        }
         return {
           collect: vi.fn().mockResolvedValue(opts.queryResult ?? []),
+          take: vi.fn().mockResolvedValue(opts.queryResult ?? []),
+          order: vi.fn().mockImplementation(() => ({
+            collect: vi.fn().mockResolvedValue(opts.queryResult ?? []),
+            take: vi.fn().mockResolvedValue(opts.queryResult ?? []),
+          })),
           unique: vi.fn().mockResolvedValue(null),
         };
       }),

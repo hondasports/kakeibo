@@ -187,6 +187,15 @@ export default defineSchema({
   groups: defineTable({
     name: v.string(),
     clerkOrganizationId: v.optional(v.string()),
+    // Web のレシート画像解析の日次利用カウント。日本時間の暦日ごとにリセットし、
+    // グループ削除と一緒に消えるようテーブル分割せずグループへ埋め込む。
+    receiptAnalysisDailyUsage: v.optional(
+      v.object({
+        jstDate: v.string(),
+        count: v.number(),
+        updatedAt: v.number(),
+      }),
+    ),
     defaultCategoriesSeedVersion: v.optional(v.number()),
     monthlyBudgetYen: v.optional(v.number()),
     status: v.optional(v.union(...GROUP_LIFECYCLE_STATUSES.map((value) => v.literal(value)))),

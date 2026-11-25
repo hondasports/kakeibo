@@ -68,7 +68,7 @@ describe("analyzeImageJobHandler", () => {
         imageDataUrl: VALID_IMAGE_DATA_URL,
       });
 
-      expect(ctx.runMutation).toHaveBeenCalledTimes(5);
+      expect(ctx.runMutation).toHaveBeenCalledTimes(4);
       expect((ctx.runMutation as ReturnType<typeof vi.fn>).mock.calls[1]?.[1]).toEqual(
         expect.objectContaining({
           categoryId: "cat-food",
