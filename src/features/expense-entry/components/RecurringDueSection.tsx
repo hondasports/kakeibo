@@ -5,6 +5,8 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { getTodayDateStringInJapan } from "../../../../lib/domain/common/date";
+import { ENTRY_KIND_LABELS } from "../../../../lib/domain/common/entryKind";
+import { formatYen } from "../../../../lib/domain/common/currency";
 import {
   isRuleDue,
   latestOccurrenceDate,
@@ -78,10 +80,7 @@ export function RecurringDueSection() {
                 <Button
                   disabled={registeringId === rule._id}
                   onClick={() =>
-                    handleRegister(
-                      rule._id,
-                      `${rule.kind === "income" ? "収入" : "支出"}「${rule.title}」`,
-                    )
+                    handleRegister(rule._id, `${ENTRY_KIND_LABELS[rule.kind]}「${rule.title}」`)
                   }
                   size="small"
                   variant="contained"
@@ -92,8 +91,7 @@ export function RecurringDueSection() {
             >
               <Stack spacing={0.25}>
                 <Typography variant="body2">
-                  {rule.kind === "income" ? "収入" : "支出"}・{rule.title}・
-                  {rule.amountYen.toLocaleString()}円
+                  {ENTRY_KIND_LABELS[rule.kind]}・{rule.title}・{formatYen(rule.amountYen)}
                 </Typography>
                 <Typography color="text.secondary" variant="caption">
                   {recurringRuleScheduleLabel(rule)}
