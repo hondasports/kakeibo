@@ -97,12 +97,19 @@ export async function updateJobStatusHandler(
               warning: RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
             })) as Id<"aiExpenseDrafts">;
           }
-          // 保持する既存下書きにはタグを再度付けて、上限による案内がカードに残るようにする。
-          // 下書きの内容や他の警告は保持する。
+          // 保持する既存下書きが失敗表示の対象（status: failed）のときだけタグを再度付けて、
+          // 上限による案内がカードに残るようにする。下書きの内容や他の警告は保持する。
+          // 確認待ち（needs_review 等）の下書きには触れない。警告へタグを足すと
+          // 「レシート合計だけ保存」の再判定が読み取り警告とみなして low_confidence を付け、
+          // 税情報付きの下書きが登録待ちへ進めなくなるため。
           if (job.draftId !== undefined) {
             const preservedDraft = await deps.store.getDraft(job.draftId);
             // job の参照に旧データの不整合があっても、他グループの下書きの警告は更新しない
-            if (preservedDraft && preservedDraft.groupId === job.groupId) {
+            if (
+              preservedDraft &&
+              preservedDraft.groupId === job.groupId &&
+              preservedDraft.status === "failed"
+            ) {
               await deps.store.setDraftWarnings(
                 job.draftId,
                 withDailyLimitWarningTag(preservedDraft.warnings ?? []),

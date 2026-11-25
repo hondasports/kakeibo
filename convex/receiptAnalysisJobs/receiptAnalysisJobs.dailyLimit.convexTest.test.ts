@@ -467,6 +467,86 @@ describe("日次利用上限の結合確認（永続状態）", () => {
     });
   });
 
+  it("確認待ちの税情報付き下書きの再解析が上限で拒否されても警告は変わらず合計だけ保存で ready になる", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await seedGroup(t, { usageCount: 100 });
+    // 税情報を持つ確認待ちの既存下書き（警告なし）
+    const reviewDraftId = await t.run(async (ctx) => {
+      return await ctx.db.insert("aiExpenseDrafts", {
+        groupId,
+        createdByUserId: TEST_USER_ID,
+        sourceType: "image_upload",
+        status: "needs_review",
+        documentType: "receipt",
+        imageFileName: "receipt-0.jpg",
+        shopName: "テスト商店",
+        date: "2025-01-10",
+        amountYen: 1080,
+        confidence: {},
+        warnings: [],
+        reviewReasons: ["user_confirmation_required"],
+        taxSummaries: [
+          {
+            taxRatePercent: 10,
+            taxMode: "included",
+            taxableAmountYen: 1080,
+            taxableAmountBasis: "tax_included",
+            taxYen: 98,
+            roundingMethod: "floor",
+            confidence: {},
+            warnings: [],
+          },
+        ],
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    });
+    // 「レシート合計だけ保存」の保存先として、同グループのカテゴリを seed する
+    const categoryId = await t.run(async (ctx) => {
+      return await ctx.db.insert("categories", {
+        groupId,
+        name: "食費",
+        color: "#f97316",
+        isActive: true,
+        sortOrder: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    });
+    const { jobIds } = await seedBatchWithJobs(
+      t,
+      groupId,
+      [{ status: "queued", draftId: reviewDraftId as Id<"aiExpenseDrafts"> }],
+      { totalCount: 1 },
+    );
+
+    // 上限で拒否される。確認待ちの下書きの警告・税判断は書き換えられない
+    expect(await startRunning(t, jobIds[0], reviewDraftId as Id<"aiExpenseDrafts">)).toEqual({
+      applied: false,
+      denialReason: "daily_limit",
+    });
+    const draft = await t.run(async (ctx) => await ctx.db.get(reviewDraftId));
+    expect(draft?.status).toBe("needs_review");
+    expect(draft?.warnings).toEqual([]);
+    expect(draft?.warnings ?? []).not.toContain(RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG);
+
+    // 警告が変わらないので「レシート合計だけ保存」の既存フローで ready になる。
+    // タグが警告へ混入すると warnings.length > 0 で low_confidence が付き登録待ちへ進めない。
+    await t.withIdentity(identity).mutation(api.aiExpenseDrafts.mutations.updateForReview, {
+      draftId: reviewDraftId as Id<"aiExpenseDrafts">,
+      documentType: "receipt",
+      shopName: "テスト商店",
+      date: "2025-01-10",
+      amountYen: 1080,
+      registrationMode: "totalOnly",
+      priceTaxTreatment: "included",
+      taxRateComposition: "rate10",
+      categoryId,
+    });
+    const saved = await t.run(async (ctx) => await ctx.db.get(reviewDraftId));
+    expect(saved?.status).toBe("ready");
+  });
+
   it("翌日に開始できた再解析が停止回復で終端しても古い上限警告は復活せずバッチは終端する", async () => {
     const t = convexTest(schema, convexTestModules);
     const groupId = await seedGroup(t, { usageCount: 100 });
