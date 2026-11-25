@@ -222,9 +222,11 @@ export function RecurringRulesPanel() {
             />
             {form.kind === "expense" ? (
               <FormControl required>
-                <InputLabel>カテゴリ</InputLabel>
+                <InputLabel id="recurring-rule-category-label">カテゴリ</InputLabel>
                 <Select
+                  id="recurring-rule-category"
                   label="カテゴリ"
+                  labelId="recurring-rule-category-label"
                   onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
                   value={form.categoryId}
                 >
@@ -262,9 +264,11 @@ export function RecurringRulesPanel() {
             </ToggleButtonGroup>
             {form.frequency === "weekly" ? (
               <FormControl required>
-                <InputLabel>曜日</InputLabel>
+                <InputLabel id="recurring-rule-day-of-week-label">曜日</InputLabel>
                 <Select
+                  id="recurring-rule-day-of-week"
                   label="曜日"
+                  labelId="recurring-rule-day-of-week-label"
                   onChange={(e) => setForm((f) => ({ ...f, dayOfWeek: Number(e.target.value) }))}
                   value={form.dayOfWeek}
                 >
