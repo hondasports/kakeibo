@@ -9,6 +9,7 @@ import schema from "../schema";
 import { convexTestModules } from "../test.setup";
 import { getTodayDateStringInJapan } from "../../lib/domain/common/date";
 import { RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG } from "../../lib/domain/receiptAnalysisJobs/dailyUsage";
+import { RECEIPT_ANALYSIS_STALE_JOB_MS } from "../../lib/domain/receiptAnalysisJobs/rules";
 
 const TEST_USER_ID = "daily-limit-user";
 const OTHER_USER_ID = "daily-limit-other-user";
@@ -460,6 +461,79 @@ describe("日次利用上限の結合確認（永続状態）", () => {
     });
 
     await t.run(async (ctx) => {
+      const batch = await ctx.db.get(batchId);
+      expect(batch?.processedCount).toBe(2);
+      expect(batch?.status).toBe("partially_failed");
+    });
+  });
+
+  it("翌日に開始できた再解析が停止回復で終端しても古い上限警告は復活せずバッチは終端する", async () => {
+    const t = convexTest(schema, convexTestModules);
+    const groupId = await seedGroup(t, { usageCount: 100 });
+    // 初回が上限で拒否された下書き（上限タグと他の警告を持つ）
+    const taggedDraftId = await t.run(async (ctx) => {
+      return await ctx.db.insert("aiExpenseDrafts", {
+        groupId,
+        createdByUserId: TEST_USER_ID,
+        sourceType: "image_upload",
+        status: "failed",
+        documentType: "unknown",
+        imageFileName: "receipt-0.jpg",
+        confidence: {},
+        warnings: [RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG, "別の警告メモ"],
+        reviewReasons: ["parse_failed"],
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    });
+    const { batchId, jobIds } = await seedBatchWithJobs(
+      t,
+      groupId,
+      [{ status: "queued", draftId: taggedDraftId as Id<"aiExpenseDrafts"> }, { status: "queued" }],
+      { totalCount: 2 },
+    );
+
+    // 上限で1件目が拒否され failed に終端（下書きは保持）
+    expect(await startRunning(t, jobIds[0], taggedDraftId as Id<"aiExpenseDrafts">)).toEqual({
+      applied: false,
+      denialReason: "daily_limit",
+    });
+
+    // 翌日に再解析を開始できる。開始確定の時点でタグは外れる
+    await t.run(async (ctx) => {
+      await ctx.db.patch(groupId, {
+        receiptAnalysisDailyUsage: { jstDate: "2000-01-01", count: 100, updatedAt: 1 },
+      });
+    });
+    await t.withIdentity(identity).mutation(api.receiptAnalysisJobs.mutations.retryImageJob, {
+      jobId: jobIds[0],
+    });
+    expect(await startRunning(t, jobIds[0], taggedDraftId as Id<"aiExpenseDrafts">)).toEqual({
+      applied: true,
+    });
+    await t.run(async (ctx) => {
+      const draft = await ctx.db.get(taggedDraftId);
+      expect(draft?.warnings).toEqual(["別の警告メモ"]);
+    });
+
+    // 処理が止まった状態（時刻seedで古い updatedAt にする）にして停止回復を実行する
+    const staleUpdatedAt = Date.now() - RECEIPT_ANALYSIS_STALE_JOB_MS - 1000;
+    await t.run(async (ctx) => {
+      await ctx.db.patch(jobIds[0], { updatedAt: staleUpdatedAt });
+      await ctx.db.patch(jobIds[1], { updatedAt: staleUpdatedAt });
+    });
+    const recovered = await t.mutation(
+      internal.receiptAnalysisJobs.internal.recoverStaleReceiptAnalysisJobs,
+      {},
+    );
+    expect(recovered.recoveredCount).toBeGreaterThanOrEqual(1);
+
+    await t.run(async (ctx) => {
+      // 停止回復で failed になっても古い上限警告は復活しない
+      const draft = await ctx.db.get(taggedDraftId);
+      expect(draft?.warnings).not.toContain(RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG);
+      expect(draft?.warnings).toContain("別の警告メモ");
+      // 全ジョブ終端なのでバッチも終端する（回復経路で再計算される）
       const batch = await ctx.db.get(batchId);
       expect(batch?.processedCount).toBe(2);
       expect(batch?.status).toBe("partially_failed");

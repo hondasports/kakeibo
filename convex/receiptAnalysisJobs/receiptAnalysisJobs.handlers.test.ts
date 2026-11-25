@@ -942,7 +942,7 @@ describe("recoverStaleReceiptAnalysisJobsHandler", () => {
           updatedAt: 1,
         },
       ],
-      ["batch-1", { _id: "batch-1" }],
+      ["batch-1", { _id: "batch-1", processedCount: 0, totalCount: 1, status: "running" }],
       ["draft-late", { _id: "draft-late", groupId: GROUP_ID, status: "ready" }],
     ]);
     const staleRows = [docs.get("job-1")];
@@ -970,9 +970,14 @@ describe("recoverStaleReceiptAnalysisJobsHandler", () => {
               lt: vi.fn().mockImplementation(() => q),
             };
             builder?.(q);
+            const rows = tableName === "receiptAnalysisImageJobs" ? staleRows : [];
             return {
-              take: vi.fn(async () => (tableName === "receiptAnalysisImageJobs" ? staleRows : [])),
-              collect: vi.fn(async () => []),
+              take: vi.fn(async () => rows),
+              collect: vi.fn(async () => rows),
+              order: vi.fn(() => ({
+                take: vi.fn(async () => rows),
+                collect: vi.fn(async () => rows),
+              })),
               unique: vi.fn(async () => null),
             };
           }),
