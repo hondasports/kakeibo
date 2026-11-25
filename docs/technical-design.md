@@ -466,8 +466,8 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
   `assertAccountDeletionNotInProgress` の互換シムのみを持ち、
   ctx.db/ctx.scheduler の直接アクセスはゼロ。退会開始 mutation は internal で、
   公開入口は `convex/accountDeletionActions.ts` の `"use node"` action である。
-  この action は Clerk session token の署名・期限・主体・発行者と strict な
-  `fva` を検証し、不足時は `useReverification` 用の再認証ヒントを返す。
+  この action は `docs/auth-guard.md` を正本とする退会開始の本人再認証を enforced し、
+  不足時は `useReverification` 用の再認証ヒントを返す。
   token 検証は `lib/convex/accountDeletion/clerkSessionTokenVerifier.ts` の
   差し替え可能な adapter に隔離し、内部 mutation には token ではなく
   Convex identity の `tokenIdentifier` / `subject` を渡す。退会処理の

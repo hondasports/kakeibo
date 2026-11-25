@@ -1,5 +1,6 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ConvexError } from "convex/values";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
 import { apiMockWith } from "../../../test/apiMock";
@@ -70,6 +71,9 @@ const strictReverificationHint = {
     metadata: { reverification: "strict" },
   },
 };
+const reauthenticationFailedCode = "ACCOUNT_DELETION_REAUTHENTICATION_FAILED";
+const reauthenticationFailedMessage =
+  "本人確認を完了できなかったため、アカウント削除は開始されていません。続けるには、もう一度「アカウントを削除する」を押して本人確認を完了してください。";
 
 type DeletionFetcher = (args: { confirmationText: string }) => Promise<unknown>;
 
@@ -220,7 +224,7 @@ describe("AccountDeletionPage", () => {
     });
   });
 
-  it("再認証後も退会開始IDが返らなかったときは成功画面へ進まず失敗として表示する", async () => {
+  it("再認証後もstrict要件を満たさないときは本人確認失敗の文言を表示して成功画面へ進まない", async () => {
     const user = userEvent.setup();
     useQueryMock.mockReturnValue(previewWith({}));
     requestDeletion.mockResolvedValue(strictReverificationHint);
@@ -229,7 +233,38 @@ describe("AccountDeletionPage", () => {
     await user.type(screen.getByRole("textbox", { name: "確認用入力" }), "削除");
     await user.click(screen.getByRole("button", { name: "アカウントを削除する" }));
 
+    expect(await screen.findByText(reauthenticationFailedMessage)).toBeInTheDocument();
+    expect(screen.queryByText(/アカウント削除を開始できませんでした/)).not.toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("本人確認を検証できない拒否では本人確認失敗の文言を表示し、その他の送信失敗と区別する", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockReturnValue(previewWith({}));
+    requestDeletion.mockRejectedValueOnce(new ConvexError({ code: reauthenticationFailedCode }));
+
+    renderWithProviders(<AccountDeletionPage />);
+    const input = screen.getByRole("textbox", { name: "確認用入力" });
+    await user.type(input, "削除");
+    await user.click(screen.getByRole("button", { name: "アカウントを削除する" }));
+
+    expect(await screen.findByText(reauthenticationFailedMessage)).toBeInTheDocument();
+    expect(screen.queryByText(/アカウント削除を開始できませんでした/)).not.toBeInTheDocument();
+    expect(input).toHaveValue("削除");
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("再認証応答でもIDでもない結果は本人確認失敗ではなく送信失敗として表示する", async () => {
+    const user = userEvent.setup();
+    useQueryMock.mockReturnValue(previewWith({}));
+    requestDeletion.mockResolvedValue({ unexpected: true });
+
+    renderWithProviders(<AccountDeletionPage />);
+    await user.type(screen.getByRole("textbox", { name: "確認用入力" }), "削除");
+    await user.click(screen.getByRole("button", { name: "アカウントを削除する" }));
+
     expect(await screen.findByText(/アカウント削除を開始できませんでした/)).toBeInTheDocument();
+    expect(screen.queryByText(reauthenticationFailedMessage)).not.toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();
   });
 

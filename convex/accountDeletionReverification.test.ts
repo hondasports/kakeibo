@@ -1,4 +1,5 @@
 import { createSign, generateKeyPairSync } from "node:crypto";
+import { ConvexError } from "convex/values";
 import { describe, expect, it, vi } from "vitest";
 import { internal } from "./_generated/api";
 import * as accountDeletionModule from "./accountDeletion";
@@ -9,6 +10,7 @@ import { createClerkSessionTokenVerifier } from "../lib/convex/accountDeletion/c
 const ISSUER = "https://issuer.example.test";
 const SUBJECT = "user_2reverification";
 const TOKEN_IDENTIFIER = `${ISSUER}|${SUBJECT}`;
+const REAUTHENTICATION_FAILED_CODE = "ACCOUNT_DELETION_REAUTHENTICATION_FAILED";
 const STRICT_REVERIFICATION_HINT = {
   clerk_error: {
     type: "forbidden",
@@ -24,8 +26,11 @@ const { privateKey: otherPrivateKey } = generateKeyPairSync("rsa", { modulusLeng
 type JwtInput = {
   iss?: string;
   sub?: string;
+  sid?: unknown;
   fva?: unknown;
+  iat?: unknown;
   expiresInSeconds?: number;
+  issuedAtSecondsAgo?: number;
 };
 
 function base64Url(value: string | Buffer): string {
@@ -36,17 +41,18 @@ function base64Url(value: string | Buffer): string {
 
 function signJwt(input: JwtInput = {}, signingKey: typeof privateKey = privateKey): string {
   const now = Math.floor(Date.now() / 1000);
-  const { expiresInSeconds = 300, ...claimOverrides } = input;
+  const { expiresInSeconds = 300, issuedAtSecondsAgo = 0, ...claimOverrides } = input;
   const payload = {
     iss: ISSUER,
     sub: SUBJECT,
     sid: "sess_reverification_test",
-    iat: now,
+    iat: now - issuedAtSecondsAgo,
     exp: now + expiresInSeconds,
     fva: [0, -1],
     ...claimOverrides,
   };
-  const unsigned = `${base64Url(JSON.stringify({ alg: "RS256", typ: "JWT", kid: "test-key" }))}.${base64Url(JSON.stringify(payload))}`;
+  const header: Record<string, unknown> = { alg: "RS256", typ: "JWT", kid: "test-key" };
+  const unsigned = `${base64Url(JSON.stringify(header))}.${base64Url(JSON.stringify(payload))}`;
   const signature = createSign("RSA-SHA256").update(unsigned).sign(signingKey);
   return `${unsigned}.${base64Url(signature)}`;
 }
@@ -86,9 +92,18 @@ async function runHandlerWithToken(token: string) {
   return { result, runMutation };
 }
 
+function expectReauthenticationRejection(thrown: unknown, token?: string) {
+  expect(thrown).toBeInstanceOf(ConvexError);
+  expect((thrown as ConvexError<{ code: string }>).data).toEqual({
+    code: REAUTHENTICATION_FAILED_CODE,
+  });
+  expect(String(thrown)).not.toContain("sensitive verifier detail");
+  if (token !== undefined && token.length > 0) expect(String(thrown)).not.toContain(token);
+}
+
 describe("handleRequestAccountDeletion", () => {
-  it("検証済みtokenの主体・発行者がConvex identityと一致し、strictなfvaを満たすときだけ退会開始mutationを呼ぶ", async () => {
-    const token = signJwt({ fva: [9, -1] });
+  it("検証済みsession tokenの主体・発行者がConvex identityと一致し、strictなfvaを満たすときだけ退会開始mutationを呼ぶ", async () => {
+    const token = signJwt({ fva: [8, -1] });
     const { result, runMutation } = await runHandlerWithToken(token);
 
     expect(result).toBe("account-deletion-request-id");
@@ -121,6 +136,7 @@ describe("handleRequestAccountDeletion", () => {
     ["別発行者", signJwt({ iss: "https://other-issuer.example.test" })],
     ["空token", ""],
     ["不正な形式", "not-a-jwt"],
+    ["iatが許容を超える未来", signJwt({ iat: Math.floor(Date.now() / 1000) + 60 })],
   ])("%sのtokenは再認証応答ではなく拒否し、退会開始mutationを呼ばない", async (_label, token) => {
     const { ctx, runMutation } = createCtx();
     let thrown: unknown;
@@ -133,21 +149,50 @@ describe("handleRequestAccountDeletion", () => {
     } catch (error) {
       thrown = error;
     }
-    expect(thrown).toBeInstanceOf(Error);
-    expect((thrown as Error).message).toBe("Reauthentication could not be verified");
-    if (token.length > 0) expect(String(thrown)).not.toContain(token);
+    expectReauthenticationRejection(thrown, token);
     expect(runMutation).not.toHaveBeenCalled();
   });
 
   it.each([
-    [[9, -1], true, "第一要素9分"],
+    [undefined, "sid欠落"],
+    ["", "sid空文字"],
+    [123, "sid非文字列"],
+  ])("%sのtokenはsession tokenとみなさず拒否する（%s）", async (sid) => {
+    const token = signJwt({ sid });
+    const { ctx, runMutation } = createCtx();
+    let thrown: unknown;
+    try {
+      await handleRequestAccountDeletion(
+        ctx,
+        { confirmationText: "削除", sessionToken: token },
+        { sessionTokenVerifier: createVerifier() },
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    expectReauthenticationRejection(thrown, token);
+    expect(runMutation).not.toHaveBeenCalled();
+  });
+
+  it("iatが11分前の長寿命tokenは、発行時fvaが0でも再認証を求め、退会開始mutationを呼ばない", async () => {
+    const { result, runMutation } = await runHandlerWithToken(
+      signJwt({ fva: [0, -1], expiresInSeconds: 3600, issuedAtSecondsAgo: 660 }),
+    );
+
+    expect(result).toEqual(STRICT_REVERIFICATION_HINT);
+    expect(runMutation).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [[8, -1], true, "第一要素8分"],
+    [[9, -1], false, "第一要素9分に発行後経過時間が加わる"],
     [[10, -1], false, "第一要素10分ちょうど"],
     [[11, -1], false, "第一要素11分"],
     [[-1, -1], false, "第一・第二要素ともなし"],
-    [[0, 9], true, "第二要素9分"],
+    [[0, 8], true, "第二要素8分"],
+    [[0, 9], false, "第二要素9分に発行後経過時間が加わる"],
     [[0, 10], false, "第二要素10分ちょうど"],
-    [[0, 11], false, "第二要素11分"],
-    [[-1, 9], true, "第一要素なし・第二要素9分"],
+    [[-1, 8], true, "第一要素なし・第二要素8分"],
   ])("fva=%s のときstrict判定は %s（%s）", async (fva, startsDeletion) => {
     const { result, runMutation } = await runHandlerWithToken(signJwt({ fva }));
 
@@ -163,15 +208,21 @@ describe("handleRequestAccountDeletion", () => {
   it.each([
     ["fva claimなし", signJwt({ fva: undefined })],
     ["fva形式不正", signJwt({ fva: [-2, -1] })],
+    ["iat claimなし", signJwt({ iat: undefined })],
+    ["iat形式不正", signJwt({ iat: "not-a-number" })],
   ])("%sのtokenは再認証応答ではなく拒否し、退会開始mutationを呼ばない", async (_label, token) => {
     const { ctx, runMutation } = createCtx();
-    await expect(
-      handleRequestAccountDeletion(
+    let thrown: unknown;
+    try {
+      await handleRequestAccountDeletion(
         ctx,
         { confirmationText: "削除", sessionToken: token },
         { sessionTokenVerifier: createVerifier() },
-      ),
-    ).rejects.toThrow("Reauthentication could not be verified");
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    expectReauthenticationRejection(thrown, token);
     expect(runMutation).not.toHaveBeenCalled();
   });
 
@@ -188,7 +239,7 @@ describe("handleRequestAccountDeletion", () => {
         { confirmationText: "削除", sessionToken: signJwt() },
         { sessionTokenVerifier: verifier },
       ),
-    ).rejects.toThrow("Reauthentication could not be verified");
+    ).rejects.toMatchObject({ data: { code: REAUTHENTICATION_FAILED_CODE } });
     expect(runMutation).not.toHaveBeenCalled();
   });
 
@@ -212,9 +263,7 @@ describe("handleRequestAccountDeletion", () => {
       thrown = error;
     }
 
-    expect((thrown as Error).message).toBe("Reauthentication could not be verified");
-    expect(String(thrown)).not.toContain("sensitive verifier detail");
-    expect(String(thrown)).not.toContain(token);
+    expectReauthenticationRejection(thrown, token);
     expect(runMutation).not.toHaveBeenCalled();
   });
 });

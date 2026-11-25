@@ -1,6 +1,8 @@
 export type SessionTokenClaims = {
   iss?: unknown;
   sub?: unknown;
+  sid?: unknown;
+  iat?: unknown;
   fva?: unknown;
 };
 

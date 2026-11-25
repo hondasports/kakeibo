@@ -8,11 +8,12 @@ import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { ConvexError, v } from "convex/values";
 import { classifyClerkDeletionError } from "../lib/domain/accountDeletion/clerkError";
-import { evaluateStrictReverification } from "../lib/domain/accountDeletion/reverification";
+import {
+  ACCOUNT_DELETION_REAUTHENTICATION_FAILED_CODE,
+  evaluateStrictReverification,
+} from "../lib/domain/accountDeletion/reverification";
 import { createClerkSessionTokenVerifier } from "../lib/convex/accountDeletion/clerkSessionTokenVerifier";
 import type { SessionTokenVerifier } from "../lib/domain/accountDeletion/sessionTokenVerifier";
-
-const REAUTHENTICATION_FAILED_MESSAGE = "Reauthentication could not be verified";
 
 const reverificationHintValidator = v.object({
   clerk_error: v.object({
@@ -39,6 +40,10 @@ function createStrictReverificationHint(): StrictReverificationHint {
   return reverificationError("strict") as StrictReverificationHint;
 }
 
+function throwReauthenticationFailed(): never {
+  throw new ConvexError({ code: ACCOUNT_DELETION_REAUTHENTICATION_FAILED_CODE });
+}
+
 type RequestAccountDeletionDeps = {
   sessionTokenVerifier?: SessionTokenVerifier;
 };
@@ -58,17 +63,26 @@ export async function handleRequestAccountDeletion(
   try {
     verification = await verifier.verify(args.sessionToken);
   } catch {
-    throw new ConvexError(REAUTHENTICATION_FAILED_MESSAGE);
+    throwReauthenticationFailed();
   }
   if (verification.kind !== "verified") {
-    throw new ConvexError(REAUTHENTICATION_FAILED_MESSAGE);
+    throwReauthenticationFailed();
   }
-  if (verification.claims.iss !== identity.issuer || verification.claims.sub !== identity.subject) {
-    throw new ConvexError(REAUTHENTICATION_FAILED_MESSAGE);
+  if (
+    typeof verification.claims.sid !== "string" ||
+    verification.claims.sid.length === 0 ||
+    verification.claims.iss !== identity.issuer ||
+    verification.claims.sub !== identity.subject
+  ) {
+    throwReauthenticationFailed();
   }
-  const reverificationEvaluation = evaluateStrictReverification(verification.claims.fva);
+  const reverificationEvaluation = evaluateStrictReverification({
+    fva: verification.claims.fva,
+    iat: verification.claims.iat,
+    nowInSeconds: Date.now() / 1000,
+  });
   if (reverificationEvaluation === "invalid") {
-    throw new ConvexError(REAUTHENTICATION_FAILED_MESSAGE);
+    throwReauthenticationFailed();
   }
   if (reverificationEvaluation === "reverification_required") {
     return createStrictReverificationHint();
