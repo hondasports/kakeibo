@@ -15,7 +15,7 @@ export interface ReceiptAnalysisActionRunner {
   startAttempt(
     jobId: string,
     expectedDraftId: string | null,
-  ): Promise<{ applied: boolean } | undefined>;
+  ): Promise<{ applied: boolean; denialReason?: "daily_limit" } | undefined>;
   waitForMockExtractor(): Promise<void>;
   loadPreservedUserOverride(
     draftId: string,
@@ -43,8 +43,7 @@ export interface ReceiptAnalysisActionRunner {
     status: DraftResultImageJobStatus;
     error?: string;
   }): Promise<{ applied: boolean } | undefined>;
-  incrementBatchProcessedCount(batchId: string): Promise<void>;
-  finalizeBatchStatus(batchId: string): Promise<void>;
+  recomputeBatchProgress(batchId: string): Promise<void>;
   getBatch(batchId: string): Promise<{ createdByUserId?: string } | null>;
   enqueueAiReviewRequiredNotifications(args: { batchId: string; userId: string }): Promise<void>;
 }

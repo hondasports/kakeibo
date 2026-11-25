@@ -1,3 +1,7 @@
+import {
+  RECEIPT_ANALYSIS_DAILY_LIMIT_CARD_HINT,
+  RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
+} from "../receiptAnalysisJobs/dailyUsage";
 import type { AiExpenseDraftStatus } from "./constants";
 
 /**
@@ -11,6 +15,10 @@ export function getImageCaptureFailureHint(
   if (status !== "failed") return undefined;
 
   const detail = warnings.join("\n");
+  // 利用上限による終了は撮影品質の問題ではないので、再開時刻の案内を返す。
+  if (detail.includes(RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG)) {
+    return RECEIPT_ANALYSIS_DAILY_LIMIT_CARD_HINT;
+  }
   if (detail.includes("[receipt_extraction:timeout]")) {
     return "画像の送信がタイムアウトしました。通信状態を確認して、もう一度お試しください。";
   }

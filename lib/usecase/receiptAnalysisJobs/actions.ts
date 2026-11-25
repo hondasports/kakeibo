@@ -1,4 +1,5 @@
 import type { ReceiptAnalysisActionRunner } from "../../domain/receiptAnalysisJobs/actionRunner";
+import { RECEIPT_ANALYSIS_DAILY_LIMIT_ERROR } from "../../domain/receiptAnalysisJobs/dailyUsage";
 import {
   canAnalyzeReceiptAnalysisJob,
   ReceiptAnalysisJobDomainError,
@@ -20,7 +21,15 @@ export async function analyzeReceiptImageJob(
   const preserved =
     isRetry && job.draftId ? await runner.loadPreservedUserOverride(job.draftId, group.id) : null;
   const startResult = await runner.startAttempt(args.jobId, job.draftId ?? null);
-  if (startResult?.applied === false) return;
+  if (startResult?.applied === false) {
+    // 日次上限による終端は mutation 側で job を確定済み。ここで throw しても rollback せず、
+    // retry 経路では既存のエラー表示に翌日の案内が届く。upload 経路では個別の action エラーは
+    // 表示しない設計なので、失敗下書きのヒント（既存の表示モデル）が案内を担う。
+    if (startResult?.denialReason === "daily_limit") {
+      throw new ReceiptAnalysisJobDomainError(RECEIPT_ANALYSIS_DAILY_LIMIT_ERROR);
+    }
+    return;
+  }
   await runner.waitForMockExtractor();
   let draft;
   let jobFailed = false;
@@ -47,8 +56,9 @@ export async function analyzeReceiptImageJob(
     ...(jobFailed ? { error: draft.warnings?.[0] ?? "画像解析に失敗しました" } : {}),
   });
   if (finalization?.applied === false) return;
-  if (!isRetry) await runner.incrementBatchProcessedCount(job.batchId);
-  await runner.finalizeBatchStatus(job.batchId);
+  // 終端確定ごとに batch の進捗を job の実状態から再計算する。増分計上ではないので
+  // 再試行の重複計上も、停止回復を経た再試行の未計上も起きない。
+  await runner.recomputeBatchProgress(job.batchId);
 }
 
 export async function checkReceiptAiReviewRequired(

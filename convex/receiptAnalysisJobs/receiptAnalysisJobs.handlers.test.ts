@@ -7,10 +7,9 @@ import type { MutationCtx } from "../_generated/server";
 import {
   deleteReceiptAnalysisDataByUserBatchHandler,
   finalizeAnalysisAttemptHandler,
-  finalizeBatchStatusHandler,
+  recomputeBatchProgressHandler,
   getBatchByIdHandler,
   getJobByIdHandler,
-  incrementBatchProcessedCountHandler,
   recoverStaleReceiptAnalysisJobsHandler,
   scheduleAiReviewNotificationIfNeeded,
   updateJobStatusHandler,
@@ -395,6 +394,12 @@ describe("updateJobStatusHandler", () => {
           batchId: "batch-1",
           status: "queued",
         },
+        [GROUP_ID]: {
+          _id: GROUP_ID,
+          name: "group",
+          createdAt: 1,
+          updatedAt: 1,
+        },
         "batch-1": {
           _id: "batch-1",
           groupId: GROUP_ID,
@@ -704,46 +709,59 @@ describe("receipt analysis internal handlers", () => {
     });
   });
 
-  it("batch処理件数を増やし、未完了・実行中・失敗の状態を分岐する", async () => {
-    const ctx = createInternalCtx({
+  it("batch の進捗を job の実状態から再計算し、終端と単調増加を保つ", async () => {
+    // 全 job が終端（1件 failed）なら件数は終端数になり status は partially_failed
+    const failedCtx = createInternalCtx({
       docs: {
-        "batch-1": { _id: "batch-1", processedCount: 0, totalCount: 1 },
-        "batch-incomplete": { _id: "batch-incomplete", processedCount: 0, totalCount: 2 },
-        "batch-running": { _id: "batch-running", processedCount: 1, totalCount: 1 },
-        "batch-failed": { _id: "batch-failed", processedCount: 1, totalCount: 1 },
+        "batch-1": { _id: "batch-1", processedCount: 0, totalCount: 1, status: "running" },
       },
       jobs: [{ status: "failed" }],
     });
-
-    await incrementBatchProcessedCountHandler(ctx, {
+    await recomputeBatchProgressHandler(failedCtx, {
       batchId: "batch-1" as Id<"receiptAnalysisBatches">,
     });
-    expect(ctx.db.patch).toHaveBeenCalledWith(
+    expect(failedCtx.db.patch).toHaveBeenCalledWith(
       "batch-1",
+      expect.objectContaining({ processedCount: 1, status: "partially_failed" }),
+    );
+
+    // 実行中の job が残る間は終端せず running のまま
+    const runningCtx = createInternalCtx({
+      docs: {
+        "batch-2": { _id: "batch-2", processedCount: 0, totalCount: 2, status: "running" },
+      },
+      jobs: [{ status: "ready" }, { status: "running" }],
+    });
+    await recomputeBatchProgressHandler(runningCtx, {
+      batchId: "batch-2" as Id<"receiptAnalysisBatches">,
+    });
+    expect(runningCtx.db.patch).toHaveBeenCalledWith(
+      "batch-2",
       expect.objectContaining({ processedCount: 1, status: "running" }),
     );
+
+    // 再試行で job が queued に戻っても processedCount は減らさず、終端済み status を待ち状態へ戻さない
+    const retryCtx = createInternalCtx({
+      docs: {
+        "batch-3": { _id: "batch-3", processedCount: 1, totalCount: 1, status: "completed" },
+      },
+      jobs: [{ status: "queued" }],
+    });
+    await recomputeBatchProgressHandler(retryCtx, {
+      batchId: "batch-3" as Id<"receiptAnalysisBatches">,
+    });
+    expect(retryCtx.db.patch).toHaveBeenCalledWith(
+      "batch-3",
+      expect.objectContaining({ processedCount: 1, status: "completed" }),
+    );
+
+    // batch が無ければ何もしない
     await expect(
-      incrementBatchProcessedCountHandler(createInternalCtx(), {
+      recomputeBatchProgressHandler(createInternalCtx(), {
         batchId: "missing" as Id<"receiptAnalysisBatches">,
       }),
     ).resolves.toBeUndefined();
 
-    await finalizeBatchStatusHandler(ctx, {
-      batchId: "batch-incomplete" as Id<"receiptAnalysisBatches">,
-    });
-    await finalizeBatchStatusHandler(ctx, {
-      batchId: "batch-running" as Id<"receiptAnalysisBatches">,
-    });
-    await finalizeBatchStatusHandler(ctx, {
-      batchId: "batch-failed" as Id<"receiptAnalysisBatches">,
-    });
-    expect(ctx.db.patch).toHaveBeenCalledWith(
-      "batch-failed",
-      expect.objectContaining({ status: "partially_failed" }),
-    );
-    await finalizeBatchStatusHandler(ctx, {
-      batchId: "missing" as Id<"receiptAnalysisBatches">,
-    });
     await expect(
       updateJobStatusHandler(createInternalCtx(), {
         jobId: "missing" as Id<"receiptAnalysisImageJobs">,

@@ -1,3 +1,4 @@
+import { RECEIPT_ANALYSIS_DAILY_LIMIT_ERROR } from "../receiptAnalysisJobs/dailyUsage";
 import { DRAFT_JUDGMENT_ITEM_LIMIT } from "./judgmentItemWindow";
 import { getReviewItemReplaceErrorMessage } from "./reviewItemReplace";
 
@@ -20,6 +21,10 @@ export function getAiExpenseQueueReviewErrorMessage(): string {
 export function getDraftItemWindowErrorMessage(errorData: unknown): string | undefined {
   if (errorData === getReviewItemReplaceErrorMessage("existing_items_exceed_window")) {
     return `明細が${DRAFT_JUDGMENT_ITEM_LIMIT}件を超えるため、この下書きは保存・再解析できません。`;
+  }
+  // 日次上限の構造化エラーは利用者向けの案内が確定しているので、そのまま表示を許可する。
+  if (errorData === RECEIPT_ANALYSIS_DAILY_LIMIT_ERROR) {
+    return RECEIPT_ANALYSIS_DAILY_LIMIT_ERROR;
   }
   return undefined;
 }

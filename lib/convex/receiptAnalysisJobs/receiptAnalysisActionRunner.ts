@@ -115,13 +115,8 @@ export function createReceiptAnalysisActionRunner(ctx: ActionCtx): ReceiptAnalys
         status: args.status,
         ...(args.error === undefined ? {} : { error: args.error }),
       }),
-    async incrementBatchProcessedCount(batchId) {
-      await ctx.runMutation(internal.receiptAnalysisJobs.internal.incrementBatchProcessedCount, {
-        batchId: batchId as Id<"receiptAnalysisBatches">,
-      });
-    },
-    async finalizeBatchStatus(batchId) {
-      await ctx.runMutation(internal.receiptAnalysisJobs.internal.finalizeBatchStatus, {
+    async recomputeBatchProgress(batchId) {
+      await ctx.runMutation(internal.receiptAnalysisJobs.internal.recomputeBatchProgress, {
         batchId: batchId as Id<"receiptAnalysisBatches">,
       });
     },

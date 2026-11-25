@@ -16,6 +16,12 @@ describe("getImageCaptureFailureHint", () => {
     expect(getImageCaptureFailureHint("registered")).toBeUndefined();
   });
 
+  it("日次上限の失敗カードは後日読んでも正しい時間中立の案内を返す", () => {
+    expect(getImageCaptureFailureHint("failed", ["[receipt_analysis:daily_limit]"])).toBe(
+      "解析時に日次上限に達しました。上限は日本時間の毎日午前0時にリセットされます。",
+    );
+  });
+
   it.each([
     ["[receipt_extraction:timeout]", "タイムアウト"],
     ["[receipt_extraction:incomplete]", "途中で終了"],

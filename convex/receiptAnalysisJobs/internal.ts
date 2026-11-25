@@ -9,15 +9,21 @@ import {
 } from "../../lib/convex/receiptAnalysisJobs/convexReceiptAnalysisStore";
 import { createReceiptAnalysisMutationDeps } from "../../lib/convex/receiptAnalysisJobs/receiptAnalysisDeps";
 import { ReceiptAnalysisJobDomainError } from "../../lib/domain/receiptAnalysisJobs/rules";
+import { getTodayDateStringInJapan } from "../../lib/domain/common/date";
+import {
+  isReceiptAnalysisDailyLimitReached,
+  RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
+  resolveEffectiveDailyUsageCount,
+} from "../../lib/domain/receiptAnalysisJobs/dailyUsage";
 import {
   deleteReceiptAnalysisDataByUserBatch as deleteUserDataBatch,
   finalizeReceiptAnalysisAttempt,
-  finalizeReceiptAnalysisBatchStatus,
-  incrementReceiptAnalysisBatchProcessedCount,
+  recomputeReceiptAnalysisBatchProgress,
   recoverStaleReceiptAnalysisJobs as recoverStaleJobs,
   scheduleAiReviewNotificationIfNeeded as scheduleNotification,
   updateReceiptAnalysisJobStatus,
 } from "../../lib/usecase/receiptAnalysisJobs/operations";
+import { requireGroupMembershipForGroup } from "../groups/membership";
 import { toConvexEndpointError } from "../lib/errors";
 import type { DraftResultImageJobStatus } from "../../lib/domain/receiptAnalysisJobs/status";
 import { DRAFT_RESULT_IMAGE_JOB_STATUSES } from "../../lib/domain/receiptAnalysisJobs/status";
@@ -53,6 +59,64 @@ export async function updateJobStatusHandler(
   },
 ) {
   try {
+    if (args.status === "running") {
+      // 有料解析の開始確定と日次上限の消費を同一 mutation で行う。
+      // usecase 側の遷移ガード（queued かつ expectedDraftId 一致）と同じ条件のときだけ枠を消費し、
+      // 重複起動や状態遷移済みの job では消費しない。同一トランザクション内なので読み書きの間に状態は変わらない。
+      const job = await ctx.db.get(args.jobId);
+      const expectedMatches =
+        args.expectedDraftId === undefined || (job?.draftId ?? null) === args.expectedDraftId;
+      if (job && job.status === "queued" && expectedMatches) {
+        // 開始確定と同じ transaction で認証済み主体の所属を確認する。action 側の確認後に
+        // 所属が変わったケースもここで拒否でき、失敗下書きの作成者を利用者単位に保てる。
+        // 所属・グループを確認できない場合は throw して開始を確定しない（書き込み前なので
+        // rollback してよい）。
+        const membership = await requireGroupMembershipForGroup(ctx, job.groupId);
+        const group = await ctx.db.get(job.groupId);
+        if (!group) throw new ConvexError("グループが見つかりません");
+        const now = Date.now();
+        const todayJstDate = getTodayDateStringInJapan(now);
+        const effectiveCount = resolveEffectiveDailyUsageCount(
+          group.receiptAnalysisDailyUsage ?? null,
+          todayJstDate,
+        );
+        if (isReceiptAnalysisDailyLimitReached(effectiveCount)) {
+          // 上限到達時は有料解析を行わず job を failed に確定し、バッチを整合させる。
+          // 通常の解析失敗と同じく失敗下書きを作り、失敗表示・再試行・通知の既存経路に乗せる。
+          // 再試行元の下書きがある場合は新しい下書きで置き換えず、既存の下書きを保持する。
+          // ここでは throw せず戻り値で拒否理由を返す。throw すると job 確定ごと rollback する。
+          const deps = createReceiptAnalysisMutationDeps(ctx);
+          let failedDraftId = job.draftId;
+          if (failedDraftId === undefined) {
+            failedDraftId = (await deps.store.insertFailedAnalysisDraft({
+              groupId: job.groupId,
+              createdByUserId: membership.userId,
+              imageFileName: job.fileName,
+              warning: RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
+            })) as Id<"aiExpenseDrafts">;
+          }
+          await ctx.db.patch(args.jobId, {
+            status: "failed",
+            draftId: failedDraftId,
+            error: RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
+            updatedAt: now,
+          });
+          // 終端確定なので batch の進捗を job の実状態から再計算する。
+          // 停止回復を経た再試行（初回が未計上）でも終端が件数へ反映され、バッチは待ち状態に残らない。
+          await recomputeReceiptAnalysisBatchProgress(deps.store, job.batchId, now);
+          // 通常の解析失敗と同じく、確認を促す通知のスケジュール経路にも乗せる
+          await scheduleNotification(deps, job.batchId, "failed", now);
+          return { applied: false, denialReason: "daily_limit" as const };
+        }
+        await ctx.db.patch(group._id, {
+          receiptAnalysisDailyUsage: {
+            jstDate: todayJstDate,
+            count: effectiveCount + 1,
+            updatedAt: now,
+          },
+        });
+      }
+    }
     return await updateReceiptAnalysisJobStatus(createReceiptAnalysisMutationDeps(ctx), args);
   } catch (error) {
     convexError(error);
@@ -78,28 +142,18 @@ export async function finalizeAnalysisAttemptHandler(
   }
 }
 
-export async function incrementBatchProcessedCountHandler(
+export async function recomputeBatchProgressHandler(
   ctx: MutationCtx,
   args: { batchId: Id<"receiptAnalysisBatches"> },
 ) {
   try {
-    await incrementReceiptAnalysisBatchProcessedCount(
+    await recomputeReceiptAnalysisBatchProgress(
       createReceiptAnalysisMutationDeps(ctx).store,
       args.batchId,
     );
   } catch (error) {
     convexError(error);
   }
-}
-
-export async function finalizeBatchStatusHandler(
-  ctx: MutationCtx,
-  args: { batchId: Id<"receiptAnalysisBatches"> },
-) {
-  await finalizeReceiptAnalysisBatchStatus(
-    createReceiptAnalysisMutationDeps(ctx).store,
-    args.batchId,
-  );
 }
 
 export async function getJobByIdHandler(
@@ -154,14 +208,9 @@ export const finalizeAnalysisAttempt = internalMutation({
   handler: finalizeAnalysisAttemptHandler,
 });
 
-export const incrementBatchProcessedCount = internalMutation({
+export const recomputeBatchProgress = internalMutation({
   args: { batchId: v.id("receiptAnalysisBatches") },
-  handler: incrementBatchProcessedCountHandler,
-});
-
-export const finalizeBatchStatus = internalMutation({
-  args: { batchId: v.id("receiptAnalysisBatches") },
-  handler: finalizeBatchStatusHandler,
+  handler: recomputeBatchProgressHandler,
 });
 
 export const getBatchById = internalQuery({
