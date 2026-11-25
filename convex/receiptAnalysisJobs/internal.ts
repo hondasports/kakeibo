@@ -14,6 +14,7 @@ import {
   isReceiptAnalysisDailyLimitReached,
   RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
   resolveEffectiveDailyUsageCount,
+  withDailyLimitWarningTag,
 } from "../../lib/domain/receiptAnalysisJobs/dailyUsage";
 import {
   deleteReceiptAnalysisDataByUserBatch as deleteUserDataBatch,
@@ -94,6 +95,18 @@ export async function updateJobStatusHandler(
               imageFileName: job.fileName,
               warning: RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
             })) as Id<"aiExpenseDrafts">;
+          }
+          // 保持する既存下書きにはタグを再度付けて、上限による案内がカードに残るようにする。
+          // 下書きの内容や他の警告は保持する。
+          if (job.draftId !== undefined) {
+            const preservedDraft = await deps.store.getDraft(job.draftId);
+            // job の参照に旧データの不整合があっても、他グループの下書きの警告は更新しない
+            if (preservedDraft && preservedDraft.groupId === job.groupId) {
+              await deps.store.setDraftWarnings(
+                job.draftId,
+                withDailyLimitWarningTag(preservedDraft.warnings ?? []),
+              );
+            }
           }
           await ctx.db.patch(args.jobId, {
             status: "failed",

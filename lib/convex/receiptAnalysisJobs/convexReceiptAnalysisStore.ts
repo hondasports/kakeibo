@@ -241,7 +241,11 @@ export function createReceiptAnalysisStore(ctx: Pick<MutationCtx, "db">): Receip
             groupId: doc.groupId,
             status: doc.status,
             updatedAt: doc.updatedAt,
+            warnings: doc.warnings,
           };
+    },
+    async setDraftWarnings(id, warnings) {
+      await ctx.db.patch(id as Id<"aiExpenseDrafts">, { warnings });
     },
     async insertFailedAnalysisDraft({ groupId, createdByUserId, imageFileName, warning }) {
       const draft = await persistFailedDraft(

@@ -38,3 +38,18 @@ export function resolveEffectiveDailyUsageCount(
 export function isReceiptAnalysisDailyLimitReached(effectiveCount: number): boolean {
   return effectiveCount >= RECEIPT_ANALYSIS_DAILY_LIMIT;
 }
+
+/**
+ * warnings から日次上限タグだけを取り除く。完全一致で判定するので、
+ * タグを文字列の一部に含む別の警告はそのまま保持する。
+ */
+export function withoutDailyLimitWarningTag(warnings: string[]): string[] {
+  return warnings.filter((warning) => warning !== RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG);
+}
+
+/** warnings に日次上限タグが無ければ追加する。他の警告はそのまま保持する。 */
+export function withDailyLimitWarningTag(warnings: string[]): string[] {
+  if (warnings.some((warning) => warning === RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG))
+    return warnings;
+  return [...warnings, RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG];
+}
