@@ -210,6 +210,74 @@ describe("entryFavorites", () => {
     expect(await countEntryFavorites(t)).toBe(0);
   });
 
+  it("別グループに切り替えると行が一覧に出ず・削除できず残り、戻すと出る", async () => {
+    const t = convexTest(schema, convexTestModules);
+    // aliceをグループA・Bの両方に所属させ、activeGroupIdをAにする
+    const { groupAId, groupBId, aliceDocId } = await t.run(async (ctx) => {
+      const groupAId = await ctx.db.insert("groups", {
+        name: "グループA",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const groupBId = await ctx.db.insert("groups", {
+        name: "グループB",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const aliceDocId = await ctx.db.insert("users", {
+        userId: "alice",
+        displayName: "alice",
+        createdAt: 1,
+        updatedAt: 1,
+        activeGroupId: groupAId,
+      });
+      for (const groupId of [groupAId, groupBId]) {
+        await ctx.db.insert("groupMembers", {
+          groupId,
+          userId: "alice",
+          role: "owner",
+          createdAt: 1,
+          updatedAt: 1,
+        });
+      }
+      return { groupAId, groupBId, aliceDocId };
+    });
+    const categoryId = await insertCategory(t, groupAId);
+    const alice = t.withIdentity(identity("alice"));
+
+    // グループAで保存する
+    const favoriteId = await alice.mutation(api.entryFavorites.mutations.saveEntryFavorite, {
+      title: "Aのお気に入り",
+      categoryId,
+      amountYen: 3000,
+    });
+    expect(await alice.query(api.entryFavorites.queries.listEntryFavorites, {})).toHaveLength(1);
+
+    // activeGroupIdをBに替えると、userIdは同じだがグループが違う行は一覧に出ない
+    await t.run(async (ctx) => {
+      await ctx.db.patch(aliceDocId, { activeGroupId: groupBId });
+    });
+    expect(await alice.query(api.entryFavorites.queries.listEntryFavorites, {})).toEqual([]);
+    // 削除も拒否され、行は残る
+    await expect(
+      alice.mutation(api.entryFavorites.mutations.deleteEntryFavorite, {
+        entryFavoriteId: favoriteId,
+      }),
+    ).rejects.toThrow("お気に入りが見つかりません");
+    expect(await countEntryFavorites(t)).toBe(1);
+
+    // Aに戻すと再び一覧に出る
+    await t.run(async (ctx) => {
+      await ctx.db.patch(aliceDocId, { activeGroupId: groupAId });
+    });
+    const restored = await alice.query(api.entryFavorites.queries.listEntryFavorites, {});
+    expect(restored).toHaveLength(1);
+    expect(restored[0]).toMatchObject({ id: favoriteId, title: "Aのお気に入り" });
+    expect(groupBId).not.toBe(groupAId);
+  });
+
   it("入力エラーのとき保存されない", async () => {
     const t = convexTest(schema, convexTestModules);
     const groupId = await seedMember(t, "alice");

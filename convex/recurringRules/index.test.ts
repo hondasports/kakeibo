@@ -263,14 +263,18 @@ describe("createRecurringRule・listRecurringRules の公開経路", () => {
     dayOfMonth: 25,
   });
 
-  it("未認証は作成・一覧を拒否する", async () => {
+  it("未認証は作成・一覧を拒否し、保存されない", async () => {
     const t = convexTest(schema, convexTestModules);
+    // 入力自体は有効にし、認証だけが拒否の原因になるようにする
+    const groupId = await seedUser(t, "alice");
+    const categoryId = await insertCategory(t, groupId);
     await expect(t.query(api.recurringRules.index.listRecurringRules, {})).rejects.toThrow(
       "Not authenticated",
     );
     await expect(
-      t.mutation(api.recurringRules.index.createRecurringRule, validInput()),
+      t.mutation(api.recurringRules.index.createRecurringRule, validInput(categoryId)),
     ).rejects.toThrow("Not authenticated");
+    expect(await countRules(t)).toBe(0);
   });
 
   it("グループ未所属の利用者は拒否され、保存されない", async () => {
@@ -279,8 +283,11 @@ describe("createRecurringRule・listRecurringRules の公開経路", () => {
     await expect(stranger.query(api.recurringRules.index.listRecurringRules, {})).rejects.toThrow(
       "グループに所属していません",
     );
+    // 入力自体は有効にし、認可だけが拒否の原因になるようにする
+    const groupId = await seedUser(t, "alice");
+    const categoryId = await insertCategory(t, groupId);
     await expect(
-      stranger.mutation(api.recurringRules.index.createRecurringRule, validInput()),
+      stranger.mutation(api.recurringRules.index.createRecurringRule, validInput(categoryId)),
     ).rejects.toThrow("グループに所属していません");
     expect(await countRules(t)).toBe(0);
   });
