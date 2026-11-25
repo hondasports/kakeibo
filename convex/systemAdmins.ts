@@ -3,6 +3,7 @@ import {
   systemAdminAuditActionValidator,
   systemAdminAuditActorTypeValidator,
   systemAdminAuditResultValidator,
+  systemAdminAuditGroupRelationValidator,
   systemAdminStatusValidator,
 } from "../lib/convex/systemAdmin/validators";
 import { ConvexError, v } from "convex/values";
@@ -168,9 +169,7 @@ export const listSystemAdminAuditLogs = query({
     actorUserId: v.optional(v.id("users")),
     targetUserId: v.optional(v.id("users")),
     groupId: v.optional(v.id("groups")),
-    groupRelation: v.optional(
-      v.union(v.literal("source"), v.literal("target"), v.literal("direct")),
-    ),
+    groupRelation: v.optional(systemAdminAuditGroupRelationValidator),
   },
   returns: listAuditLogsResultValidator,
   handler: async (ctx, args) => {

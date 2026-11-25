@@ -1,5 +1,7 @@
 import { RECEIPT_DATA_CONTRACT_VERSION } from "../lib/domain/aiExpenseDrafts/receiptDataContract";
 import { entryKindValidator } from "../lib/convex/receipts/validators";
+import { recurringFrequencyValidator } from "../lib/convex/recurringRules/validators";
+import { savedExpenseSearchKindValidator } from "../lib/convex/savedExpenseSearches/validators";
 import { EXPENSE_ENTRY_SOURCES } from "../lib/domain/expenseEntries/expenseEntry";
 import {
   SOURCE_DOCUMENT_SOURCE_TYPES,
@@ -469,7 +471,7 @@ export default defineSchema({
     categoryId: v.optional(v.id("categories")),
     shopName: v.optional(v.string()),
     memo: v.optional(v.string()),
-    frequency: v.union(v.literal("weekly"), v.literal("monthly")),
+    frequency: recurringFrequencyValidator,
     dayOfWeek: v.optional(v.number()),
     dayOfMonth: v.optional(v.number()),
     active: v.boolean(),
@@ -497,7 +499,7 @@ export default defineSchema({
   savedExpenseSearches: defineTable({
     userId: v.string(),
     groupId: v.id("groups"),
-    kind: v.union(v.literal("saved"), v.literal("recent")),
+    kind: savedExpenseSearchKindValidator,
     name: v.optional(v.string()),
     query: v.string(),
     createdAt: v.number(),

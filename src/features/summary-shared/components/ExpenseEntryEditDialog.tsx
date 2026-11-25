@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { AiExpenseRegistrationMode } from "../../../../lib/domain/aiExpenseDrafts/receiptDataContract";
+import { ENTRY_KIND_LABELS } from "../../../../lib/domain/common/entryKind";
 import type { ReceiptItem } from "../types/types";
 import { extractAmountDigits } from "../../../utils/currency";
 import { useExpenseEntryEditDialogState } from "../hooks/useExpenseEntryEditDialogState";
@@ -74,7 +75,7 @@ export function ExpenseEntryEditDialog({
     isDraftItemsLoading,
   } = useExpenseEntryEditDialogState({ receipt, onClose, onSaved });
 
-  const entryLabel = receipt?.type === "income" ? "収入" : "支出";
+  const entryLabel = ENTRY_KIND_LABELS[receipt?.type ?? "expense"];
   const isIncome = receipt?.type === "income";
 
   return (

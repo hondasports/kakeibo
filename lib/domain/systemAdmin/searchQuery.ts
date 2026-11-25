@@ -24,7 +24,10 @@ export function isValidSearchPageSize(numItems: number): boolean {
 }
 
 /** 検索語を trim し、上限超過かどうかを返す。 */
-export function normalizeSearchQuery(query: string): { value: string; tooLong: boolean } {
+export function normalizeSystemAdminSearchQuery(query: string): {
+  value: string;
+  tooLong: boolean;
+} {
   const normalized = query.trim();
   return { value: normalized, tooLong: normalized.length > MAX_SEARCH_QUERY_LENGTH };
 }

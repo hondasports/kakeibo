@@ -5,6 +5,7 @@ import {
   type AiExpenseDraftConfidence,
   type AiExpenseDraftDocumentType,
   type AiExpenseDraftReviewReason,
+  type AiExpenseDraftClassificationStatus,
 } from "./constants";
 import { mergeReviewReasons } from "./reviewReasons";
 
@@ -112,7 +113,7 @@ function addReason(reasons: Set<AiExpenseDraftReviewReason>, reason: AiExpenseDr
 }
 
 export function classifyAiExpenseDraft(input: AiExpenseDraftClassificationInput): {
-  status: "ready" | "needs_review";
+  status: AiExpenseDraftClassificationStatus;
   reviewReasons: AiExpenseDraftReviewReason[];
 } {
   const reasons = new Set<AiExpenseDraftReviewReason>();
@@ -162,7 +163,7 @@ type CreatedDraftClassificationInput = AiExpenseDraftClassificationInput & {
  * 常に `needs_review` とする（それ以外の理由があればマージする）。
  */
 export function classifyCreatedDraft(input: CreatedDraftClassificationInput): {
-  status: "ready" | "needs_review";
+  status: AiExpenseDraftClassificationStatus;
   reviewReasons: AiExpenseDraftReviewReason[];
 } {
   const computed = classifyAiExpenseDraft(input);

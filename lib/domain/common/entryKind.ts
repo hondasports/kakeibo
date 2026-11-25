@@ -6,3 +6,8 @@
 export const ENTRY_KINDS = ["expense", "income"] as const;
 
 export type EntryKind = (typeof ENTRY_KINDS)[number];
+
+export const ENTRY_KIND_LABELS: Record<EntryKind, string> = {
+  expense: "支出",
+  income: "収入",
+};

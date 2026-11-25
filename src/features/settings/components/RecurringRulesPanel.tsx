@@ -22,8 +22,12 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Doc, Id } from "../../../../convex/_generated/dataModel";
-import type { EntryKind } from "../../../../lib/domain/common/entryKind";
-import { validateRecurringRuleInput } from "../../../../lib/domain/recurringRules/recurringRule";
+import { ENTRY_KIND_LABELS, type EntryKind } from "../../../../lib/domain/common/entryKind";
+import { formatYen } from "../../../../lib/domain/common/currency";
+import {
+  validateRecurringRuleInput,
+  type RecurringFrequency,
+} from "../../../../lib/domain/recurringRules/recurringRule";
 import { recurringRuleScheduleLabel } from "../../expense-entry/components/RecurringDueSection";
 
 type RuleForm = {
@@ -33,7 +37,7 @@ type RuleForm = {
   categoryId: string;
   shopName: string;
   memo: string;
-  frequency: "weekly" | "monthly";
+  frequency: RecurringFrequency;
   dayOfWeek: number;
   dayOfMonth: number;
 };
@@ -180,7 +184,7 @@ export function RecurringRulesPanel() {
               }
             >
               <ListItemText
-                primary={`${rule.kind === "income" ? "収入" : "支出"}・${rule.title}・${rule.amountYen.toLocaleString()}円`}
+                primary={`${ENTRY_KIND_LABELS[rule.kind]}・${rule.title}・${formatYen(rule.amountYen)}`}
                 secondary={`${recurringRuleScheduleLabel(rule)}${rule.active ? "" : "（停止中）"}`}
               />
             </ListItem>
@@ -248,7 +252,7 @@ export function RecurringRulesPanel() {
             ) : null}
             <ToggleButtonGroup
               exclusive
-              onChange={(_e, value: "weekly" | "monthly" | null) => {
+              onChange={(_e, value: RecurringFrequency | null) => {
                 if (value) setForm((f) => ({ ...f, frequency: value }));
               }}
               value={form.frequency}

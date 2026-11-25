@@ -6,7 +6,7 @@ import {
   MAX_RECENT_SEARCHES,
   MAX_SAVED_SEARCHES,
   normalizeSavedSearchName,
-  normalizeSearchQuery,
+  normalizeSavedSearchQuery,
   SavedExpenseSearchError,
   toSavedExpenseSearchView,
   type SavedExpenseSearchFields,
@@ -40,7 +40,7 @@ export async function saveExpenseSearch(
   now: number,
 ): Promise<string> {
   const name = normalizeSavedSearchName(input.name);
-  const query = normalizeSearchQuery(input.query);
+  const query = normalizeSavedSearchQuery(input.query);
   if (query.length === 0) {
     throw new SavedExpenseSearchError("保存する検索条件がありません");
   }
@@ -72,7 +72,7 @@ export async function recordRecentExpenseSearch(
   input: { query: string },
   now: number,
 ): Promise<string | null> {
-  const query = normalizeSearchQuery(input.query);
+  const query = normalizeSavedSearchQuery(input.query);
   if (query.length === 0) {
     return null;
   }

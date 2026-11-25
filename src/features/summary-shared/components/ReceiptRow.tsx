@@ -9,6 +9,7 @@ import { formatDateWithYearForDisplay } from "../../../utils/date";
 import { MemoExpandableText } from "./MemoExpandableText";
 import type { ReceiptDateFormat, ReceiptItem } from "../types/types";
 import { formatYen } from "../../../../lib/domain/common/currency";
+import { ENTRY_KIND_LABELS } from "../../../../lib/domain/common/entryKind";
 
 export type CategoryPreview = {
   _id: string;
@@ -92,7 +93,7 @@ export function ReceiptRow({
         >
           {!isDetail && (receipt.type || combinedShopName) && (
             <Chip
-              label={receipt.type === "income" ? "収入" : "支出"}
+              label={ENTRY_KIND_LABELS[receipt.type ?? "expense"]}
               size="small"
               color={receipt.type === "income" ? "warning" : "default"}
               variant="outlined"
