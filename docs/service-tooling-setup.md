@@ -217,20 +217,18 @@ MCP server設定もバージョンを固定する。`.devin/mcp_config.json`・`
 
 ## 3. 環境マッピング
 
-無料枠前提では、以下の対応にする。
+無料枠前提では、以下の対応にする。URLの値と使い分けは `docs/technical-design.md` 15・16節を参照する。
 
 | 用途       | Vercel                               | Clerk                            | Convex                                   |
 | ---------- | ------------------------------------ | -------------------------------- | ---------------------------------------- |
 | local dev  | local `.env.local`                   | Development instance `pk_test_*` | local deployment                         |
-| preview PR | Vercel Preview deployment URL        | 原則Development instance         | dev deployment                           |
-| preview branch | fixed Preview `https://preview.suzumemo.jp`（配信元はVercel Preview deployment URL） | Development instance | fixed staging deployment |
-| release candidate | `production-release.yml` が作るVercel Preview deployment URL | Development instance | fixed staging deployment |
-| production | Vercel Production deployment URL | Production instance `pk_live_*` | production deployment |
+| preview PR | Vercel Preview deployment            | 原則Development instance         | dev deployment                           |
+| preview branch | Vercel Preview deployment | Development instance | fixed staging deployment |
+| release candidate | Vercel Preview deployment | Development instance | fixed staging deployment |
+| production | Vercel Production deployment | Production instance `pk_live_*` | production deployment |
 
 注意:
 
-- fixed Previewのaliasは `preview-deploy.yml` が設定する。release candidateは固定domainではなくworkflow出力のdeployment URLでE2Eする
-- Productionの公開URLとsmoke対象は `docs/environment-variables.md`・`docs/production-release.md` を正本とする
 - Clerk Development instanceは本番用途に使わない
 - Clerk Production instanceはPreview URLでは使わない
 - Vercel Custom EnvironmentはMVPでは使わない

@@ -1038,7 +1038,7 @@ active record が確認できない場合は fail closed にする。
 | userId                                    | string            | `UserIdentity.tokenIdentifier`                 |
 | displayName                               | string            | 表示名                                         |
 | email                                     | string (optional) | メールアドレス                                 |
-| monthlyIncome                             | number (optional) | 月収入。設定UIで保存できるが、集計には未使用   |
+| monthlyIncome                             | number (optional) | 月収入。実装状況は `docs/current-implementation.md` 10節を参照する |
 | weeklyStartDay                            | number (optional) | 週の開始曜日（0=日曜、1=月曜）。未設定は月曜   |
 | weeklyEndDay                              | number (optional) | 週の終了曜日（0=日曜、1=月曜）。weeklyStartDay の6日後として自動算出・保存。未設定は weeklyStartDay 未設定時の日曜 |
 | receiptImageExternalApiConsentAcceptedAt  | number (optional) | レシート画像を外部APIへ送信することへの承認時刻 |
@@ -1786,9 +1786,7 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 24. E2E test（継続）
 25. レスポンシブ確認（継続）
 
-現行コードで未実装または未反映の項目:
-
-- 月収入の集計への反映
+現行コードでの実装状況は `docs/current-implementation.md` 10節を参照する。
 
 収入入力 UI は `ExpenseEntryForm` の `entryType` 切り替えで実装済み。
 
@@ -1809,7 +1807,7 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 
 - MUIは標準Material Design感を抑えた独自テーマにする
 - Tailwind CSSはレイアウト用途に限定して採用する
-- CSVエクスポートはクライアント側で生成し、Convex側は期間内明細を返すqueryに限定する
+- CSVエクスポートは10.6節・13節を参照する
 - オフライン入力はMVPでは扱わない
 - 初期デプロイ先はVercelにする
 - 初期MVPでは独自ドメインを使わず、DEV/PRODともに `*.vercel.app` のURLを使う方針だった。現行の環境URLは15・16節を参照する
