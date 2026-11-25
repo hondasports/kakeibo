@@ -84,7 +84,7 @@ describe("ExportPage", () => {
 
     // 3件（1か月ごとに1件の行）で完了するまで待つ
     expect(
-      await screen.findByText(/suzumemo-export-20260115-20260310\.csvとして保存しました/),
+      await screen.findByText("3件をsuzumemo-export-20260115-20260310.csvとして保存しました"),
     ).toBeInTheDocument();
     expect(queryMock).toHaveBeenCalledTimes(3);
     // entryType は「支出と収入」（all）なら undefined になる
@@ -136,8 +136,20 @@ describe("ExportPage", () => {
     expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
   });
 
-  it("取得に失敗したらエラーを表示する", async () => {
-    queryMock.mockRejectedValue(new Error("データの書き出しに失敗しました"));
+  it("Errorのmessageがある失敗ではそのmessageを表示する", async () => {
+    queryMock.mockRejectedValue(new Error("書き出し中に利用グループが変更されました"));
+    const user = userEvent.setup();
+    renderPage();
+    setRange("2026-01-05", "2026-01-20");
+
+    await user.click(screen.getByRole("button", { name: "CSVをダウンロード" }));
+
+    expect(await screen.findByText("書き出し中に利用グループが変更されました")).toBeInTheDocument();
+    expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+  });
+
+  it("messageが無い失敗では既定文言を表示する", async () => {
+    queryMock.mockRejectedValue(new Error(""));
     const user = userEvent.setup();
     renderPage();
     setRange("2026-01-05", "2026-01-20");
@@ -145,6 +157,21 @@ describe("ExportPage", () => {
     await user.click(screen.getByRole("button", { name: "CSVをダウンロード" }));
 
     expect(await screen.findByText("データの書き出しに失敗しました")).toBeInTheDocument();
+    expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+  });
+
+  it("2回目の取得だけ失敗してもダウンロードしない", async () => {
+    queryMock
+      .mockResolvedValueOnce({ groupId: "g1", rows: [sampleRow], truncated: false })
+      .mockRejectedValueOnce(new Error("2回目だけ失敗"));
+    const user = userEvent.setup();
+    renderPage();
+    setRange("2026-01-15", "2026-03-10");
+
+    await user.click(screen.getByRole("button", { name: "CSVをダウンロード" }));
+
+    expect(await screen.findByText("2回目だけ失敗")).toBeInTheDocument();
+    expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
   });
 
   it("開始日が終了日より後なら実行できない", () => {

@@ -131,8 +131,18 @@ describe("RecurringDueSection", () => {
     expect(await screen.findByText("この定期定義はすでに登録済みです")).toBeInTheDocument();
   });
 
-  it("登録に失敗したらエラーを表示する", async () => {
-    registerMock.mockRejectedValue(new Error("登録に失敗しました"));
+  it("Errorのmessageがある失敗ではそのmessageを表示する", async () => {
+    registerMock.mockRejectedValue(new Error("登録 API がタイムアウトしました"));
+    const user = userEvent.setup();
+    renderSection();
+
+    await user.click(screen.getByRole("button", { name: "2026-06-01分を登録" }));
+
+    expect(await screen.findByText("登録 API がタイムアウトしました")).toBeInTheDocument();
+  });
+
+  it("Error以外の失敗では既定文言を表示する", async () => {
+    registerMock.mockRejectedValue("plain failure");
     const user = userEvent.setup();
     renderSection();
 

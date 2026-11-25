@@ -254,8 +254,23 @@ describe("RecurringRulesPanel", () => {
     expect(createMock).not.toHaveBeenCalled();
   });
 
-  it("保存に失敗したらエラーをダイアログに表示する", async () => {
-    createMock.mockRejectedValue(new Error("保存に失敗しました"));
+  it("Errorのmessageがある失敗ではそのmessageをダイアログに表示する", async () => {
+    createMock.mockRejectedValue(new Error("定期定義の保存が混雑しています"));
+    const user = userEvent.setup();
+    renderPanel();
+    const dialog = await openCreateDialog(user);
+
+    await user.type(within(dialog).getByLabelText(/項目名/), "家賃");
+    await user.type(within(dialog).getByLabelText(/金額（円）/), "80000");
+    await user.click(comboboxesIn(dialog)[0]);
+    await user.click(await screen.findByRole("option", { name: "食費" }));
+    await user.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    expect(await within(dialog).findByText("定期定義の保存が混雑しています")).toBeInTheDocument();
+  });
+
+  it("Error以外の失敗では既定文言をダイアログに表示する", async () => {
+    createMock.mockRejectedValue("plain failure");
     const user = userEvent.setup();
     renderPanel();
     const dialog = await openCreateDialog(user);
