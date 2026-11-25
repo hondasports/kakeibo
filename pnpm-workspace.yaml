@@ -5,6 +5,12 @@ allowBuilds:
   esbuild: true
 
 overrides:
+  "@mui/core-downloads-tracker@^9.5.0": 9.5.0
+  "@mui/private-theming@^9.5.0": 9.5.0
+  "@mui/styled-engine@^9.5.0": 9.5.0
+  "@mui/system@^9.5.0": 9.5.0
+  "@mui/types@^9.5.0": 9.5.0
+  "@mui/utils@^9.5.0": 9.5.0
   "@tootallnate/once@2.0.0": 2.0.1
   "ajv@8.6.3": 8.18.0
   "brace-expansion@1.1.16": 1.1.21
