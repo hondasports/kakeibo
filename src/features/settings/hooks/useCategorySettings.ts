@@ -9,6 +9,7 @@ import {
   validateCategoryColor,
   validateCategoryDescription,
   validateCategoryName,
+  type CategoryMoveDirection,
 } from "../../../../lib/domain/categories/category";
 import { getConvexErrorMessage } from "../../auth";
 
@@ -75,7 +76,7 @@ type FailedAction =
   | {
       kind: "move";
       categoryId: Id<"categories">;
-      direction: "up" | "down";
+      direction: CategoryMoveDirection;
       groupId: Id<"groups"> | null;
     };
 
@@ -229,7 +230,7 @@ export function useCategorySettings() {
     await submitUpdate();
   };
 
-  const submitMove = async (categoryId: Id<"categories">, direction: "up" | "down") => {
+  const submitMove = async (categoryId: Id<"categories">, direction: CategoryMoveDirection) => {
     setSavingTarget(`move-${categoryId}`);
     setError("");
     try {
@@ -244,7 +245,10 @@ export function useCategorySettings() {
     }
   };
 
-  const handleMoveCategory = async (categoryId: Id<"categories">, direction: "up" | "down") => {
+  const handleMoveCategory = async (
+    categoryId: Id<"categories">,
+    direction: CategoryMoveDirection,
+  ) => {
     await submitMove(categoryId, direction);
   };
 

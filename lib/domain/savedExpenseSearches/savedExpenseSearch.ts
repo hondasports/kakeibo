@@ -5,7 +5,9 @@
 
 export class SavedExpenseSearchError extends Error {}
 
-export type SavedExpenseSearchKind = "saved" | "recent";
+export const SAVED_EXPENSE_SEARCH_KINDS = ["saved", "recent"] as const;
+
+export type SavedExpenseSearchKind = (typeof SAVED_EXPENSE_SEARCH_KINDS)[number];
 
 export const MAX_SAVED_SEARCH_NAME_LENGTH = 30;
 export const MAX_SEARCH_QUERY_LENGTH = 2000;
@@ -35,7 +37,7 @@ export type SavedExpenseSearchView = {
 };
 
 /** query の前後空白を除き、長さを検証する。空なら空文字を返す。 */
-export function normalizeSearchQuery(query: string): string {
+export function normalizeSavedSearchQuery(query: string): string {
   const normalized = query.trim();
   if (normalized.length > MAX_SEARCH_QUERY_LENGTH) {
     throw new SavedExpenseSearchError("検索条件が長すぎます");
