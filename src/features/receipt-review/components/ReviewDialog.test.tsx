@@ -1044,6 +1044,7 @@ describe("下書きの修正導線", () => {
     expect(screen.queryByText("未確定")).not.toBeInTheDocument();
 
     const item = screen.getByText("ホットケーキ").closest("details")!;
+    expect(within(item).getByText("食費 ・ 未設定・不明")).toBeInTheDocument();
     if (!item.hasAttribute("open")) await user.click(item.querySelector("summary")!);
     expect(screen.getByRole("combobox", { name: "ホットケーキの税率" })).toBeEnabled();
     expect(screen.getByRole("combobox", { name: "ホットケーキの表示価格" })).toBeEnabled();
@@ -1056,21 +1057,27 @@ describe("下書きの修正導線", () => {
       draft: storedDraft({ amountYen: 100, categoryId: undefined }),
       categoryId: undefined,
       judgment: { status: "resolved", amount: "matched" },
-      remaining: "レシート全体のカテゴリを選択してください。",
+      remaining: ["レシート全体のカテゴリを選択してください。"],
     },
     {
       name: "支払額が一致しない",
       draft: storedDraft({ amountYen: 120 }),
       categoryId: "food",
       judgment: { status: "unresolved", amount: "mismatch" },
-      remaining: "印字額と明細の金額が一致していません",
+      remaining: [
+        "印字額と明細の金額が一致していません",
+        "商品の合計と支払額が20円合いません。商品の税込／税抜・税率を確認してください。",
+      ],
     },
     {
       name: "合計だけで登録し支払額が一致しない",
       draft: storedDraft({ amountYen: 120, registrationMode: "totalOnly" }),
       categoryId: "food",
       judgment: { status: "not_applicable", amount: "mismatch" },
-      remaining: "印字額と明細の金額が一致していません",
+      remaining: [
+        "印字額と明細の金額が一致していません",
+        "商品の合計と支払額が20円合いません。商品の税込／税抜・税率を確認してください。",
+      ],
     },
   ] as const)(
     "税モデルのない下書きで $name ときは、その問題だけを案内し税確認は求めない",
@@ -1082,7 +1089,7 @@ describe("下書きの修正導線", () => {
 
       renderStoredDialog(dialogProps);
       const region = screen.getByRole("region", { name: "全体の確認状態" });
-      expect(within(region).getByText(remaining)).toBeVisible();
+      for (const text of remaining) expect(within(region).getByText(text)).toBeVisible();
       expect(within(region).queryByText("商品の税率を確認してください")).not.toBeInTheDocument();
       expect(within(region).queryByRole("button", { name: "税率を確認する" })).toBeNull();
       expect(screen.queryByText(/税率・税込／税抜が未設定です/)).not.toBeInTheDocument();
