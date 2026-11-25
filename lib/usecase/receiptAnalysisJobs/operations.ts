@@ -23,6 +23,7 @@ import {
 } from "../../domain/receiptAnalysisJobs/rules";
 import type { DraftResultImageJobStatus } from "../../domain/receiptAnalysisJobs/status";
 import { isTerminalImageJobStatus } from "../../domain/receiptAnalysisJobs/status";
+import { withoutDailyLimitWarningTag } from "../../domain/receiptAnalysisJobs/dailyUsage";
 
 export async function scheduleAiReviewNotificationIfNeeded(
   deps: { store: ReceiptAnalysisStore; scheduler: ReceiptAnalysisScheduler },
@@ -114,6 +115,9 @@ export async function cancelReceiptAnalysisJob(
     clearDraftId: true,
     updatedAt: now,
   });
+  // cancel も終端なので、同じ mutation の中でバッチの進捗を再計算する。
+  // 他の job が全て終端済みなら、ここでバッチが終端へ進む。
+  await recomputeReceiptAnalysisBatchProgress(store, job.batchId, now);
 }
 
 export async function updateReceiptAnalysisJobStatus(
@@ -234,6 +238,17 @@ export async function finalizeReceiptAnalysisAttempt(
   }
   if (args.status === "failed" && args.expectedDraftId !== null) {
     await deps.store.deleteDraftAndItems(args.newDraftId, job.groupId);
+    // 開始済みの再解析が別理由で失敗した時点で、既存下書きに残る日次上限タグだけは外す。
+    // 上限は既に解消して解析が始まっているため、古い上限理由がカードに残り続けると誤解を招く。
+    // 下書きの内容や他の警告は保持する。
+    const preservedDraft = await deps.store.getDraft(args.expectedDraftId);
+    // job の参照に旧データの不整合があっても、他グループの下書きの警告は更新しない
+    if (preservedDraft?.warnings && preservedDraft.groupId === job.groupId) {
+      const nextWarnings = withoutDailyLimitWarningTag(preservedDraft.warnings);
+      if (nextWarnings.length !== preservedDraft.warnings.length) {
+        await deps.store.setDraftWarnings(args.expectedDraftId, nextWarnings);
+      }
+    }
     await deps.store.clearJobFields(args.jobId, {
       status: args.status,
       ...(args.error === undefined ? { clearError: true } : { error: args.error }),
