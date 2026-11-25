@@ -41,6 +41,7 @@ import {
   buildReviewTaxEvidence,
   buildReviewTaxPreview,
 } from "../../../../lib/domain/aiExpenseDrafts/reviewItemsTaxPreview";
+import { hasReceiptTaxMetadata } from "../../../../lib/domain/receipt/tax/draftTaxMapping";
 
 type ReviewDialogProps = {
   open: boolean;
@@ -121,6 +122,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
     setTaxDetails({});
     setLocalError("");
   }
+  const taxModelActive = draft ? hasReceiptTaxMetadata(draft, items) : false;
   const guidance = getReviewGuidance(form, items, draft);
   const required = guidance.filter((issue) => issue.required);
   const recommendations = guidance.filter((issue) => !issue.required && issue.scope !== "receipt");
@@ -403,6 +405,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                   itemCount={items.length}
                   issues={amountConfirmed ? [] : bannerGuidance}
                   unresolvedTaxItemCount={unresolvedTaxItemCount}
+                  taxModelActive={taxModelActive}
                   receiptIssues={amountConfirmed ? [] : receiptGuidance}
                   busy={busy}
                   onJump={goTo}
@@ -426,6 +429,7 @@ export function ReviewDialog(props: ReviewDialogProps) {
                   isCategorySplit={props.isCategorySplit}
                   draft={draft}
                   totalOnly={totalOnly}
+                  taxModelActive={taxModelActive}
                   taxUpdatingItemId={props.taxUpdatingItemId}
                   register={register}
                   onToggleItem={toggleExpanded}

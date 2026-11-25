@@ -32,6 +32,7 @@ export function ReviewItemRow({
   busy,
   categoryName,
   targetName,
+  taxModelActive = true,
   children,
 }: {
   item: ReviewItemValues;
@@ -45,10 +46,11 @@ export function ReviewItemRow({
   busy: boolean;
   categoryName?: string;
   targetName?: string;
+  taxModelActive?: boolean;
   children: React.ReactNode;
 }) {
   const discount = isDiscountLine(item.itemName, item.lineType);
-  const confirmation = getReviewItemTaxConfirmation(item);
+  const confirmation = getReviewItemTaxConfirmation(item, { taxModelActive });
   const hasRequired = issues.some((issue) => issue.required);
   const issueLabel = hasRequired ? "修正必須" : undefined;
   const supplementary = [

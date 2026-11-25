@@ -66,7 +66,13 @@ export function buildTaxContextFromReviewItem(item: ReviewItemValues): TaxContex
   return buildTaxContext(item);
 }
 
-export function getReviewItemTaxConfirmation(item: ReviewItemValues) {
+export function getReviewItemTaxConfirmation(
+  item: ReviewItemValues,
+  options: { taxModelActive?: boolean } = {},
+) {
+  if (options.taxModelActive === false) {
+    return { statusLabel: undefined, message: undefined, canConfirm: false };
+  }
   const context = buildTaxContextFromReviewItem(item);
   const hasRate = item.taxRatePercent != null;
   const hasBasis = item.amountBasis === "tax_included" || item.amountBasis === "tax_excluded";

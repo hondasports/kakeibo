@@ -98,17 +98,21 @@ export function judgeDraftAmountAndTax(
       ? (draft.items ?? [])
       : takeDraftJudgmentItems(draft.items ?? []);
   if (draft.registrationMode === "totalOnly" || draftItems.length === 0) {
+    const hasTaxMetadata = hasReceiptTaxMetadata(draft, draftItems);
     const checks = buildReviewChecks({
       items: mapDraftItemsToReviewItems(draftItems),
       paidTotalYen: draft.amountYen,
       taxSummaries: draft.taxSummaries,
       rawObservation: draft.rawObservation,
       receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
+      taxModelActive: hasTaxMetadata,
     });
-    const unresolvedTaxItemCount = mapDraftItemsToReviewItems(draftItems).filter(
-      (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
-    ).length;
-    if (draft.registrationMode === "totalOnly" || !hasReceiptTaxMetadata(draft, draftItems))
+    const unresolvedTaxItemCount = hasTaxMetadata
+      ? mapDraftItemsToReviewItems(draftItems).filter(
+          (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
+        ).length
+      : 0;
+    if (draft.registrationMode === "totalOnly" || !hasTaxMetadata)
       return { status: "not_applicable", reasons: [], checks, unresolvedTaxItemCount };
     return { status: "unresolved", reasons: ["amount_mismatch"], checks, unresolvedTaxItemCount };
   }
@@ -126,17 +130,19 @@ export function judgeDraftAmountAndTax(
     ...buildReviewTaxEvidence(draft),
     paidTotalYen: draft.amountYen,
   });
+  const hasTaxMetadata = hasReceiptTaxMetadata(draft, draftItems);
   const checks = buildReviewChecks({
     items: preview.items,
     paidTotalYen: draft.amountYen,
     taxSummaries: preview.taxSummaries,
     rawObservation: draft.rawObservation,
     receiptLineClassifications: draft.receiptInterpretation?.values.receiptLineClassifications,
+    taxModelActive: hasTaxMetadata,
   });
-  const unresolvedTaxItemCount = preview.items.filter(
-    (item) => buildTaxContextFromReviewItem(item).status === "unresolved",
-  ).length;
-  const hasTaxMetadata = hasReceiptTaxMetadata(draft, draftItems);
+  const unresolvedTaxItemCount = hasTaxMetadata
+    ? preview.items.filter((item) => buildTaxContextFromReviewItem(item).status === "unresolved")
+        .length
+    : 0;
   const allocated = preview.items.every((item) => item.taxAllocationStatus === "allocated");
   if (preview.receiptTotalConflict) {
     checks.amount = {

@@ -11,6 +11,7 @@ export function ReviewStatusBanner({
   itemCount = 0,
   issues,
   unresolvedTaxItemCount,
+  taxModelActive = true,
   receiptIssues = [],
   busy,
   onJump,
@@ -25,6 +26,8 @@ export function ReviewStatusBanner({
   issues: ReviewGuidanceItem[];
   /** 税率または税込／税抜が未確定の明細数 */
   unresolvedTaxItemCount: number;
+  /** 税モデルのない下書きは税確認を求めないので、税率別の比較不能を案内しない */
+  taxModelActive?: boolean;
   /** レシート全体の読み取り確認 */
   receiptIssues?: ReviewGuidanceItem[];
   busy: boolean;
@@ -160,7 +163,7 @@ export function ReviewStatusBanner({
           </Box>
         </Alert>
       )}
-      {taxRate.status === "uncomparable" && !combineUncomparable && (
+      {taxModelActive && taxRate.status === "uncomparable" && !combineUncomparable && (
         <Alert severity="warning">
           <Typography variant="subtitle2">
             {taxRate.blockerCode === "unverified-tax-summary"

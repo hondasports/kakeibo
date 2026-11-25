@@ -10,6 +10,7 @@ import {
   getReviewItemTaxConfirmation,
 } from "./receiptItemTaxViewModel";
 import { isVerifiedTaxSummaryStatus } from "../receipt/tax/taxSummaryConsistency";
+import { hasReceiptTaxMetadata } from "../receipt/tax/draftTaxMapping";
 import { buildTaxRateCheck } from "./reviewTaxChecks";
 import { getTaxSummaryConflictLabel } from "./receiptTaxLabels";
 import { formatYen } from "../common/currency";
@@ -53,11 +54,13 @@ export function getReviewGuidance(
       add(issue.code, message, issue.field, issue.required);
   }
   if (effectiveReviewMode(form) === "detailed") {
+    const taxModelActive = draft ? hasReceiptTaxMetadata(draft, items) : true;
     const taxCheck = buildTaxRateCheck({
       items,
       taxSummaries: draft?.taxSummaries,
       rawObservation: draft?.rawObservation,
       receiptLineClassifications: draft?.receiptInterpretation?.values.receiptLineClassifications,
+      taxModelActive,
     });
     draft?.taxSummaries?.forEach((summary, index) => {
       const row = taxCheck.rows[index];
@@ -154,7 +157,7 @@ export function getReviewGuidance(
             true,
           );
       }
-      if (buildTaxContextFromReviewItem(item).status === "unresolved") {
+      if (taxModelActive && buildTaxContextFromReviewItem(item).status === "unresolved") {
         add(
           `tax-${item.id}`,
           `「${item.itemName || "名称未設定"}」：${getReviewItemTaxConfirmation(item).message}`,

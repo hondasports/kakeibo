@@ -16,6 +16,7 @@ export function buildReviewChecks(args: {
   taxSummaries?: AiExpenseDraft["taxSummaries"];
   rawObservation?: ReceiptRawObservation;
   receiptLineClassifications?: ReceiptLineClassification[];
+  taxModelActive?: boolean;
 }): ReviewChecks {
   return {
     amount: buildAmountCheck(args),
