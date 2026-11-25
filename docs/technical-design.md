@@ -115,6 +115,8 @@ src/
       hooks/                   # useExpenseSearchResults
       lib/                     # searchParams, expenseSearchItems
       pages/
+    export/                    # データ書き出しページ（CSVダウンロード）
+      pages/
     summary-shared/            # 集計系 feature で共有する表示部品・型・util（index.ts なし）
       components/              # CategoryBreakdownCard, ReceiptListCard, ReceiptRow,
                                #   ReceiptGroupRow, IncomeListCard, MonthlyMetricsPanel,
@@ -195,7 +197,7 @@ convex/
     internal.ts
   groups/
     membership.ts
-    mutations.ts
+    mutations.ts                 # createGroup/updateGroupName/setActiveGroup/setMonthlyBudget
     queries.ts
     members.ts                 # removeMember 等
     invitations.ts             # 招待API登録とハンドラへの委譲
@@ -217,6 +219,10 @@ convex/
     mutations.ts
     internal.ts
   expenseSearch.ts             # 支出検索 query（searchExpenses）
+  dataExport.ts                # データ書き出し query（listExportEntries）
+  entryFavorites/              # お気に入り支出項目 query/mutation
+  recurringRules/              # 定期定義 query/mutation（index.ts）
+  savedExpenseSearches/        # 保存検索・最近の検索 query/mutation・E2E cleanup
   weekSessions/
     mutations.ts
     internal.ts
@@ -263,12 +269,25 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   convex/
     aiExpenseDrafts/           # reviewValidation, convex*Repository, convexDraftWorkflowServices, draftUsecaseDeps, handler グルー, persistTaxInterpretation, ...（v.* validator 宣言は convex/aiExpenseDrafts/validators.ts、E2Eフィクスチャは convex/aiExpenseDrafts/e2eDraftFixtures.ts へ移動）
     expenseEntries/            # expenseEntryHandlers, expenseEntryRepository, expenseEntryValidation
-    groups/
+    groups/                    # groupUsecaseDeps, convex*Repository, clerkInvitationLib, invitationHandlers
       clerkInvitationLib/
       invitationHandlers/
     receiptImageExtraction/    # analyzeReceiptImageCore, openaiClient, parse, validators, ...
     receipts/                  # receiptRepository, update, delete, summaryLib, spendingEntries.ts
+    dataExport/                # exportEntries（期間内明細の取得・group切替検知）
+    entryFavorites/            # entryFavoriteHandlers, convexEntryFavoriteRepository
+    recurringRules/            # recurringRuleRepository
+    savedExpenseSearches/      # savedExpenseSearchHandlers, convexSavedExpenseSearchRepository
+  domain/export/               # buildExportCsv, splitDateRangeIntoMonths
+  domain/entryFavorites/       # お気に入り支出項目ルール・repository port
+  domain/groups/monthlyBudget.ts # 月予算検証・進捗計算
+  domain/recurringRules/       # 定期定義ルール・repository port
+  domain/savedExpenseSearches/ # 保存検索ルール・repository port
   domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
+  usecase/entryFavorites/      # お気に入り保存・一覧・削除
+  usecase/groups/setMonthlyBudget.ts # 月予算設定・解除
+  usecase/recurringRules/      # 定期定義の作成・更新・停止・期日到来分の実績登録
+  usecase/savedExpenseSearches/ # 保存検索・最近の検索
   email/                       # メール provider・template 定義（convex/email から利用）
 
 tests/
@@ -983,6 +1002,7 @@ active record が確認できない場合は fail closed にする。
 | `/search` | 履歴検索 | 支出・収入を条件で検索し、集計・比較する |
 | `/settings/line/callback` | LINE連携コールバック | WebユーザーとLINEアカウントの連携を完了する |
 | `/settings`                    | 設定               | 設定画面。構成の正本は `docs/ui-ux-design.md` 5.4 節 |
+| `/export` | データの書き出し | 期間と種別を指定して支出・収入をCSVでダウンロードする |
 | `/categories`                  | 設定               | `/settings` と同じ設定画面への互換ルート   |
 | `/group/setup`                 | グループ作成       | グループ未所属ユーザーが家族グループを作成する |
 | `/group/select`                | グループ選択       | 複数所属ユーザーが表示対象グループを選ぶ     |
@@ -1001,7 +1021,7 @@ active record が確認できない場合は fail closed にする。
 | `/settings/account/delete/status` | アカウント削除状況 | 非同期アカウント削除の状況を確認する |
 | `/admin` | システム管理者画面 | ユーザー・グループ検索、詳細、監査ログ、権限管理、削除失敗復旧など（`SystemAdminRouteGuard`） |
 
-現行コードには `/sign-in`、`/weeks/:weekStartDate/review`、`/export` の個別ルートはない。
+現行コードには `/sign-in`、`/weeks/:weekStartDate/review` の個別ルートはない。
 サインイン画面は `App.tsx` の未認証表示で扱う。振り返りメモとセッション完了UIは表示せず、
 既存データ互換のためバックエンドのフィールドとmutationだけを維持する。
 
@@ -1018,7 +1038,7 @@ active record が確認できない場合は fail closed にする。
 | userId                                    | string            | `UserIdentity.tokenIdentifier`                 |
 | displayName                               | string            | 表示名                                         |
 | email                                     | string (optional) | メールアドレス                                 |
-| monthlyIncome                             | number (optional) | 月収入。現行UIからの設定導線は削除済み         |
+| monthlyIncome                             | number (optional) | 月収入。設定UIで保存できるが、集計には未使用   |
 | weeklyStartDay                            | number (optional) | 週の開始曜日（0=日曜、1=月曜）。未設定は月曜   |
 | weeklyEndDay                              | number (optional) | 週の終了曜日（0=日曜、1=月曜）。weeklyStartDay の6日後として自動算出・保存。未設定は weeklyStartDay 未設定時の日曜 |
 | receiptImageExternalApiConsentAcceptedAt  | number (optional) | レシート画像を外部APIへ送信することへの承認時刻 |
@@ -1280,6 +1300,7 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 - `users.queries.getReceiptImageConsent()`
 - `users.mutations.acceptReceiptImageExternalApiConsent()`
 - `users.mutations.updateWeeklyDays(weeklyStartDay, weeklyEndDay)`
+- `users.mutations.updateMonthlyIncome(monthlyIncome?)`
 - `users.internal.clearUserMonthlyIncome(userId)`（internal）
 
 週の開始・終了曜日は `users` に保存する。`weeklyEndDay` は `weeklyStartDay` から
@@ -1288,8 +1309,19 @@ Convex API は `api.<module>.<queries|mutations|actions>.<functionName>` 形式�
 
 ### 10.6 export
 
-現行コードには `convex/export.ts`、CSV生成関数、`/export` 画面はない。CSVは将来の
-バックアップ導線として残すが、実装済み機能として扱わない。
+- `dataExport.listExportEntries({ startDate, endDate, entryType?, expectedGroupId? })`
+
+`listExportEntries` は、認証ユーザーのactive groupに属する期間内の支出・収入明細を返すquery。
+`entryType` を省略した場合は支出・収入の両方、`"expense"` または `"income"` を指定した場合は
+その種別だけに絞る。`expenseEntries` と旧形式 `receipts` の両方を取得し、sourceをまたぐ内容の
+重複は取り除かない。行は日付昇順で返し、支出のカテゴリIDはカテゴリ名へ解決し、解決できない場合は
+空文字にする。
+
+1回のqueryでは `expenseEntries`・`receipts` のそれぞれを最大10,000件まで読み、`truncated` で
+上限超過を返す。`expectedGroupId` が現在のactive groupと一致しない場合はエラーにし、分割取得中に
+別グループの明細が混ざるのを防ぐ。`/export` 画面はこのqueryを月ごとに呼び、
+`lib/domain/export/exportCsv.ts` でCSVを生成する。対象期間の分割とCSV生成の詳細は13節、
+画面の操作と表示は `docs/current-implementation.md` 4.6節を参照する。
 
 ### 10.7 receipt image consent
 
@@ -1514,27 +1546,26 @@ Issue #890の回帰例（すべて8%、対象額は税込、商品印字額は�
 
 ## 13. CSVエクスポート設計
 
-CSVは指定週または全期間の支出を対象に生成する将来拡張とする。現行コードでは `/export` 画面、
-CSV生成関数、CSVダウンロード処理はいずれも未実装である。
+CSVは `/export` 画面からクライアント側で生成する。画面は指定期間を `splitDateRangeIntoMonths` で
+月単位に分割し、月ごとに `dataExport.listExportEntries` を呼ぶ。1回目の結果の `groupId` を
+2回目以降の `expectedGroupId` に渡し、書き出し中に利用グループが切り替わったときは中止する。
+上限超過（`truncated`）の月があるときはCSVを生成せず、期間を短くするよう案内する。画面の操作と
+エラー表示は `docs/current-implementation.md` 4.6節を参照する。
 
 出力列:
 
 - 日付
-- 店名
-- 金額
+- 種別（支出/収入）
+- タイトル
 - カテゴリ
+- 金額（円整数）
 - メモ
-- 週開始日
-- 週終了日
 
-表計算ソフトで扱いやすいよう、UTF-8 BOM付きCSVを第一候補にする。
+行は `buildExportCsv` がCRLFで連結し、BlobにUTF-8 BOMを付けて
+`suzumemo-export-<開始日yyyymmdd>-<終了日yyyymmdd>.csv` としてダウンロードする。
 
-店名やメモなどのユーザー入力値が以下の文字で始まる場合、CSV出力時にエスケープする。
-
-- `=`
-- `+`
-- `-`
-- `@`
+CSVインジェクション対策として、セルの先頭が `=`・`+`・`-`・`@`・`\t`・`\r`・`\n` の場合は
+`'` を前置する。その後、`"`・`,`・CR・LFを含む値は `"` で囲み、内側の `"` は `""` に置き換える。
 
 ## 14. レシート画像入力PoC設計
 
@@ -1702,8 +1733,8 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 - 金額バリデーション
 - カテゴリ別集計
 - 前週比計算
-- CSV生成（将来実装時）
-- CSVインジェクション対策（将来実装時）
+- CSV生成とCSVインジェクション対策
+- 書き出し期間の月分割
 
 ### 17.2 Component test
 
@@ -1721,6 +1752,7 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 - レシート画像外部API送信の同意状態取得と承認保存
 - AI支出下書きの状態・確認理由・`receipts.shopName` 変換方針
 - AI支出下書きと明細のグループ境界確認、登録済み下書きの重複登録防止
+- データ書き出しの種別絞り込み・新旧source併合・グループ切替検知
 
 ### 17.4 E2E test
 
@@ -1765,8 +1797,7 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 
 現行コードで未実装または未反映の項目:
 
-- CSVエクスポート画面とCSV生成処理
-- 月収入設定UI
+- 月収入の集計への反映
 
 収入入力 UI は `ExpenseEntryForm` の `entryType` 切り替えで実装済み。
 
@@ -1787,7 +1818,7 @@ MVPでは自動migrationを最小限にする。Convex schema変更時は、以�
 
 - MUIは標準Material Design感を抑えた独自テーマにする
 - Tailwind CSSはレイアウト用途に限定して採用する
-- CSVエクスポートは現行コードでは未実装であり、実装時にクライアント生成またはConvex側生成を再確認する
+- CSVエクスポートはクライアント側で生成し、Convex側は期間内明細を返すqueryに限定する
 - オフライン入力はMVPでは扱わない
 - 初期デプロイ先はVercelにする
 - 独自ドメインは使わず、DEV/PRODともに `*.vercel.app` のURLを使う
