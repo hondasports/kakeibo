@@ -77,14 +77,8 @@ describe("createResendWebhookHandler", () => {
 
   it("returns 500 when webhook secret is missing", async () => {
     delete process.env.RESEND_WEBHOOK_SECRET;
-    const handler = createResendWebhookHandler(
-      () =>
-        asAny({
-          type: "email.delivered",
-          created_at: "2026-07-10T12:00:00Z",
-          data: {},
-        }) as WebhookEventPayload,
-    );
+    const verifier = vi.fn();
+    const handler = createResendWebhookHandler(verifier);
     const ctx = createActionCtx();
     const req = createRequest({
       body: "{}",
@@ -98,6 +92,9 @@ describe("createResendWebhookHandler", () => {
     const response = (await asAny(handler)(ctx, req as any)) as MockResponse;
 
     expect(response.status).toBe(500);
+    expect(response.body).toBe("Webhook unavailable");
+    expect(verifier).not.toHaveBeenCalled();
+    expect(ctx.runMutation).not.toHaveBeenCalled();
   });
 
   it("returns 200 and processes email webhook events", async () => {

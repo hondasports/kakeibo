@@ -124,6 +124,12 @@ describe("Vercel security headers", () => {
       "https://*.protect.clerk.com",
     );
     expect(getDirectiveSources(productionCsp, "form-action")).toEqual(["'self'"]);
+    expect(getDirectiveSources(productionCsp, "img-src")).toEqual([
+      "'self'",
+      "data:",
+      "blob:",
+      "https://img.clerk.com",
+    ]);
 
     for (const domain of CLERK_DEVELOPMENT_DOMAINS) {
       expect(productionCsp).not.toContain(domain);
