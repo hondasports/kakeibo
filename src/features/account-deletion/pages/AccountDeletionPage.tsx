@@ -1,6 +1,7 @@
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
-import { useUser } from "@clerk/react";
+import { useAuth, useReverification, useUser } from "@clerk/react";
+import { isReverificationCancelledError } from "@clerk/react/errors";
 import {
   Alert,
   Box,
@@ -13,7 +14,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useNavigate } from "react-router-dom";
 import { SuzumemoLoadingState } from "../../ui";
 import { LEGAL_CONTACT_EMAIL } from "../../app-shell/lib/legalDocumentMeta";
@@ -37,8 +38,16 @@ export function AccountDeletionPage() {
 
 function AccountDeletionPageContent() {
   const preview = useQuery(api.accountDeletion.getAccountDeletionPreview);
-  const requestDeletion = useMutation(api.accountDeletion.requestAccountDeletion);
+  const requestDeletion = useAction(api.accountDeletionActions.requestAccountDeletion);
   const setActiveGroup = useMutation(api.groups.mutations.setActiveGroup);
+  const { getToken } = useAuth();
+  const requestDeletionWithReverification = useReverification(
+    async ({ confirmationText }: { confirmationText: string }) => {
+      const sessionToken = await getToken({ skipCache: true });
+      if (!sessionToken) throw new Error("Session token unavailable");
+      return await requestDeletion({ confirmationText, sessionToken });
+    },
+  );
   const { user } = useUser();
   const accountEmail = user?.primaryEmailAddress?.emailAddress ?? "";
   const navigate = useNavigate();
@@ -176,6 +185,9 @@ function AccountDeletionPageContent() {
               value={confirmationEmail}
             />
           ) : null}
+          <Typography color="text.secondary" variant="body2">
+            本人確認の画面は英語で表示され、登録メールアドレスに届くコードの入力を求められる場合があります。
+          </Typography>
           {error ? <Alert severity="error">{error}</Alert> : null}
           <Button
             color="error"
@@ -184,12 +196,21 @@ function AccountDeletionPageContent() {
               setSubmitting(true);
               setError("");
               try {
-                await requestDeletion({ confirmationText });
+                const result: unknown = await requestDeletionWithReverification({
+                  confirmationText,
+                });
+                if (typeof result !== "string") throw new Error("Account deletion did not start");
                 navigate("/settings/account/delete/status", { replace: true });
-              } catch {
-                setError(
-                  "アカウント削除を開始できませんでした。内容を確認してもう一度お試しください。",
-                );
+              } catch (caught) {
+                if (isReverificationCancelledError(caught)) {
+                  setError(
+                    "本人確認がキャンセルされたため、アカウント削除は開始されていません。続けるには、もう一度「アカウントを削除する」を押して本人確認を完了してください。",
+                  );
+                } else {
+                  setError(
+                    "アカウント削除を開始できませんでした。内容を確認してもう一度お試しください。",
+                  );
+                }
                 setSubmitting(false);
               }
             }}

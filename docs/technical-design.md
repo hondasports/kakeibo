@@ -426,11 +426,13 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 
 - **既存純粋関数の維持**: `classification`・`confirmation`・`errorCategory`・
   `resume`・`status` は既に `lib/domain/accountDeletion/` に存在するため
-  そのまま利用し、Clerk 削除エラー分類（`clerkError`）を追加した。
+  そのまま利用し、Clerk 削除エラー分類（`clerkError`）と退会開始前の
+  strict 再認証判定（`reverification`）を追加した。
   リトライ計画の純粋関数は `lib/domain/common/`（`retry`）に集約する。
 - **ポート**: `AccountDeletionRequestStore`（Reader 分離）・
   `AccountDeletionGroupPurgeStore`・`AccountDeletionUserDataPurgeStore`・
-  `AccountDeletionScheduler`、および汎用 `TransactionalEmailQueue`
+  `AccountDeletionScheduler`・退会開始前のtoken検証 `SessionTokenVerifier`、
+  および汎用 `TransactionalEmailQueue`
   （`lib/domain/email/`）を定義。グループ側の既存ポート
   （`GroupMembershipRepository`・`GroupReadRepository`・`UserDirectory`・
   `GroupDeletionJobStore`・`GroupDeletionWorkflowService`・
@@ -443,9 +445,14 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 - **プレゼンテーション**: `convex/accountDeletion.ts` は endpoint 定義と
   `loadAccountDeletionClassification` / `deleteOrphanedGroupMemberships` /
   `assertAccountDeletionNotInProgress` の互換シムのみを持ち、
-  ctx.db/ctx.scheduler の直接アクセスはゼロ。`convex/accountDeletionActions.ts` は
-  `"use node"` の Clerk 連携 action として骨格を維持し、エラー分類のみ
-  ドメイン関数へ置き換えた。
+  ctx.db/ctx.scheduler の直接アクセスはゼロ。退会開始 mutation は internal で、
+  公開入口は `convex/accountDeletionActions.ts` の `"use node"` action である。
+  この action は Clerk session token の署名・期限・主体・発行者と strict な
+  `fva` を検証し、不足時は `useReverification` 用の再認証ヒントを返す。
+  token 検証は `lib/convex/accountDeletion/clerkSessionTokenVerifier.ts` の
+  差し替え可能な adapter に隔離し、内部 mutation には token ではなく
+  Convex identity の `tokenIdentifier` / `subject` を渡す。退会処理の
+  Clerk 削除 action は従来どおり同じファイルに置く。
 - **failed の自動復旧**: Clerk ユーザー削除後（`identityDeletedAt` あり）に finalize が
   上限回数まで失敗して `failed` になると、本人は認証できず `retryAccountDeletion` を呼べない。
   そのため cron（6 時間毎、`recoverStrandedRequests`）が `failed` かつ `identityDeletedAt` ありの
