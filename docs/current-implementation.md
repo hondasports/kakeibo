@@ -37,6 +37,7 @@
 - `dashboard`
 - `expense-entry`
 - `expense-search`
+- `export`
 - `group-admin`
 - `monthly-summary`
 - `receipt-review`
@@ -65,6 +66,7 @@
 | `/years/:year` | 年次サマリー | lazy load |
 | `/search` | 履歴検索（支出・収入） | lazy load |
 | `/settings` | 設定 | 設定画面。構成の正本は `docs/ui-ux-design.md` 5.4 節 |
+| `/export` | データの書き出し | lazy load。期間・種別を指定したCSVダウンロード |
 | `/settings/line/callback` | LINE Login callback | Web側連携完了導線 |
 | `/settings/account/delete` | アカウント削除 | グループ認可配下 |
 | `/settings/account/delete/status` | アカウント削除状況 | 認可ガード外の専用状態画面 |
@@ -163,7 +165,7 @@
 
 ### 4.6 データの書き出し
 
-- `/export` で期間・種別（支出/収入/両方）を指定し、利用中グループの全明細を BOM 付き UTF-8 の CSV で出力する（`listExportEntries`）。値は CSV インジェクション対策として先頭が `= + - @ \t \r` の場合 `'` を前置し、`" , 改行` を含む値はクォートする。
+- `/export` で期間・種別（支出/収入/両方）を指定し、利用中グループの全明細を BOM 付き UTF-8 の CSV で出力する（`listExportEntries`）。値は CSV インジェクション対策として先頭が `= + - @ \t \r \n` の場合 `'` を前置し、`" , 改行` を含む値はクォートする。
 - 明細単位: `expenseEntries` は明細ごとに1行、旧形式 `receipts` はレシート1件ごとに1行。レシート合計の調整額は別行にしない。未分類（カテゴリ未設定）の明細はカテゴリ欄が空になる。
 - 新旧データ: `expenseEntries` と `receipts` の両方を結合して出力する。重複除去は source-qualified ID（recordType + ドキュメントID）単位のみで、移行期間に同じ実績が両 source に存在する場合は両方が出力される（履歴検索と同じルール）。
 - 取得上限: 1か月・1つの source あたり最大10,000件。期間は月ごとに分割して取得し、超過した月はエラーとして期間を短くするよう案内する。
@@ -214,6 +216,16 @@
 主なフィールド: `kind`（expense/income）、`title`、`amountYen`、`categoryId`（支出必須）、`shopName`、`memo`、`frequency`（weekly/monthly）、`dayOfWeek`/`dayOfMonth`、`active`、`registeredForDates`（登録済みの発生日の履歴。最新90件まで保持）。
 
 入力画面には期日が到来した定義が一覧され、「登録」1タップで直近の発生日（JST基準・当日含む）の支出・収入として記録される。登録できるのは直近の1回分だけで、それより前の発生日は自動では登録しない（しばらくアプリを開かなかった場合に飛ばされた分は手動で記録する）。二重登録は `registeredForDates` の期間キー（monthlyは `YYYY-MM`、weeklyは発生日を含む週の開始日）で判定するため、繰り返し条件を変更しても同じ期間には1回しか登録できない。期日を使わないテンプレ呼び出しはお気に入り（#1522）が担当し、期日にサーバー側で自動生成する方式は現行に無い。
+
+### 5.5 `entryFavorites`
+
+入力画面で支出の単一明細を再利用するためのお気に入り。利用者ごと・所属グループごとの個人データで、グループ内の他メンバーには共有されない。
+
+主なフィールド: `userId`、`groupId`、`title`、`categoryId`、`amountYen`、`memo`（optional）、`createdAt`、`updatedAt`。
+
+保存・一覧・削除は認証済みユーザーのactive groupをサーバー側で解決する。一覧は `userId` + `groupId` で絞り、保存時はカテゴリが同じグループの有効なものか検証し、削除時も本人・現在グループのレコードだけを対象にする。一覧は作成日時の新しい順で返し、件数上限やページネーションは現行では持たない。
+
+グループ削除では `entryFavorites` がpurgeステージに含まれ、`by_group_id` で物理削除される。退会処理でもuserId紐付きデータとしてpurge対象に含まれる。
 
 ## 6. AIレシート入力
 

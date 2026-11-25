@@ -27,60 +27,56 @@ async function confirmProducts(page: Page, dialog: Locator) {
   }
 }
 
-for (const width of [1280]) {
-  test(`${width === 1280 ? "@smoke " : ""}Issue #1015 ${width}px 商品確認→自動計算→即時保存→再表示→登録が一致する`, async ({
-    page,
-  }, testInfo) => {
-    await page.setViewportSize({ width, height: 900 });
-    await gotoAuthenticated(page, "/weeks/current/input");
+test(`@smoke Issue #1015 1280px 商品確認→自動計算→即時保存→再表示→登録が一致する`, async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await gotoAuthenticated(page, "/weeks/current/input");
+  await cleanupAiExpenseQueue();
+  try {
+    await seedTaxReviewDraftByUser(await getCurrentClerkTokenIdentifier(page), "unproven1003");
+    await page.reload();
+    const queue = page.locator(".input-workbench--expense");
+    const row = queue.locator(".ai-expense-queue-item").filter({ hasText: "E2E対象額レビュー店" });
+    await row.getByRole("button", { name: "確認する", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "下書き確認" });
+    await confirmProducts(page, dialog);
+    // 金額が一致し登録額が決まっているため、確認件数と確認結果カードは出さない（Issue #1563）。
+    await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
+    await expect(dialog.getByText("金額を確認してください。", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("税内訳を確認", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
+    const product = dialog.getByRole("region", { name: "商品一覧" });
+    const bounds = await product.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1280);
+    await dialog.screenshot({ path: testInfo.outputPath("tax-evidence-resolved.png") });
+    // 最終保存前に閉じても商品の税設定と再計算結果は即時保存されている。
+    await dialog.getByLabel("閉じる", { exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await row.getByRole("button", { name: /確認する|修正する/ }).click();
+    await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
+    await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    const ready = queue
+      .getByRole("region", { name: "登録できます" })
+      .locator(".ai-expense-queue-item")
+      .filter({ hasText: "E2E対象額レビュー店" });
+    await expect(ready).toContainText("4,810円");
+    await expect(ready).not.toContainText("金額・税内訳の確認が必要");
+    await ready.getByRole("button", { name: "修正する", exact: true }).click();
+    await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
+    await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await ready.getByRole("button", { name: "登録する", exact: true }).click();
+    await expect(queue.getByRole("region", { name: "登録済み" })).toContainText("4,810円");
+  } finally {
+    await cleanupTestReceipts();
     await cleanupAiExpenseQueue();
-    try {
-      await seedTaxReviewDraftByUser(await getCurrentClerkTokenIdentifier(page), "unproven1003");
-      await page.reload();
-      const queue = page.locator(".input-workbench--expense");
-      const row = queue
-        .locator(".ai-expense-queue-item")
-        .filter({ hasText: "E2E対象額レビュー店" });
-      await row.getByRole("button", { name: "確認する", exact: true }).click();
-      const dialog = page.getByRole("dialog", { name: "下書き確認" });
-      await confirmProducts(page, dialog);
-      // 金額が一致し登録額が決まっているため、確認件数と確認結果カードは出さない（Issue #1563）。
-      await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
-      await expect(dialog.getByText("金額を確認してください。", { exact: true })).toHaveCount(0);
-      await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
-      await expect(dialog.getByText("税内訳を確認", { exact: true })).toHaveCount(0);
-      await expect(dialog.getByText("金額は一致しています", { exact: true })).toBeVisible();
-      const product = dialog.getByRole("region", { name: "商品一覧" });
-      const bounds = await product.boundingBox();
-      expect(bounds!.x).toBeGreaterThanOrEqual(0);
-      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
-      await dialog.screenshot({ path: testInfo.outputPath("tax-evidence-resolved.png") });
-      // 最終保存前に閉じても商品の税設定と再計算結果は即時保存されている。
-      await dialog.getByLabel("閉じる", { exact: true }).click();
-      await expect(dialog).toBeHidden();
-      await row.getByRole("button", { name: /確認する|修正する/ }).click();
-      await expect(dialog.getByRole("spinbutton", { name: "対象額", exact: true })).toHaveCount(0);
-      await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
-      await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
-      await expect(dialog).toBeHidden();
-      const ready = queue
-        .getByRole("region", { name: "登録できます" })
-        .locator(".ai-expense-queue-item")
-        .filter({ hasText: "E2E対象額レビュー店" });
-      await expect(ready).toContainText("4,810円");
-      await expect(ready).not.toContainText("金額・税内訳の確認が必要");
-      await ready.getByRole("button", { name: "修正する", exact: true }).click();
-      await expect(dialog.getByRole("region", { name: "確認件数" })).toHaveCount(0);
-      await dialog.getByRole("button", { name: "この内容で保存", exact: true }).click();
-      await expect(dialog).toBeHidden();
-      await ready.getByRole("button", { name: "登録する", exact: true }).click();
-      await expect(queue.getByRole("region", { name: "登録済み" })).toContainText("4,810円");
-    } finally {
-      await cleanupTestReceipts();
-      await cleanupAiExpenseQueue();
-    }
-  });
-}
+  }
+});
 
 test("@smoke Issue #1548 印字税内訳に矛盾があっても、支払額と一致する明細を登録できる", async ({
   page,
