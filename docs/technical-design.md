@@ -283,7 +283,7 @@ lib/                           # Convex 外の純粋ヘルパー（api.d.ts 肥�
   domain/groups/monthlyBudget.ts # 月予算検証・進捗計算
   domain/recurringRules/       # 定期定義ルール・repository port
   domain/savedExpenseSearches/ # 保存検索ルール・repository port
-  domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, calculateTax, ...
+  domain/receipt/tax/          # interpretReceiptTax, normalizeTaxSummaries, resolveTaxContext, ...
   usecase/entryFavorites/      # お気に入り保存・一覧・削除
   usecase/groups/setMonthlyBudget.ts # 月予算設定・解除
   usecase/recurringRules/      # 定期定義の作成・更新・停止・期日到来分の実績登録
