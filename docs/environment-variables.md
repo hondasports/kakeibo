@@ -174,6 +174,14 @@ publishable keyから得たissuerとユーザーIDを組み合わせて`E2E_CLER
 `VITE_ENABLE_E2E_ROUTES` は CI 専用の内部変数で、`.env.example` にはコメントのみ記載し
 `.env.local` の設定対象にしない（リリース候補ビルドでだけ必要になるため）。
 
+### 開発用スクリプト関連
+
+| 変数名 | 用途 | Local | CI | Secret扱い | 設定場所 |
+| --- | --- | --- | --- | --- | --- |
+| `COVERAGE_MAX_WORKERS` | `pnpm test:coverage`（`scripts/run-coverage.mjs`）が起動する Vitest の worker 数。未設定なら `4` | 任意 | ❌（workflow では設定しない） | ❌ | 実行時の shell（例 `COVERAGE_MAX_WORKERS=2 pnpm test:coverage`） |
+
+`scripts/run-coverage.mjs` は `process.env.COVERAGE_MAX_WORKERS` を直接読み、dotenv を読み込まない。そのため `.env.local` に書いても反映されない。
+
 ## 環境ごとの設定方針
 
 ### Local開発環境
