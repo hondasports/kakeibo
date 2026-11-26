@@ -22,8 +22,7 @@ const productionFiles = (readdirSync(sourceRoot, { recursive: true, encoding: "u
 
 type ModuleReference = { specifier: string | null; source: string; dynamic: boolean };
 
-function moduleReferences(file: string): ModuleReference[] {
-  const code = readFileSync(file, "utf8");
+function moduleReferences(file: string, code = readFileSync(file, "utf8")): ModuleReference[] {
   const { module } = parseSync(file, code);
   const references: ModuleReference[] = [];
   for (const item of module.staticImports) {
@@ -117,6 +116,31 @@ describe("feature 間の import 方針（docs/technical-design.md §5.1）", () 
       expect(existsSync(join(featuresRoot, feature))).toBe(true);
       expect(existsSync(join(featuresRoot, feature, "index.ts"))).toBe(false);
     }
+  });
+
+  it("import の参照先を構文から取り出す（コメントは無視し、括弧・テンプレートリテラルで囲んだ文字列は値を取り、式の動的 import は解決不能とする）", () => {
+    const code = [
+      '// import { commented } from "../../auth/hooks/signOutState";',
+      'import { a } from "../../auth";',
+      'export { b } from "./b";',
+      'const c = () => import(("../../auth/hooks/signOutState"));',
+      "const d = () => import(('react-router-dom'));",
+      "const e = () => import(`../../week`);",
+      "const f = (name: string) => import(`../../${name}`);",
+    ].join("\n");
+    expect(
+      moduleReferences("sample.tsx", code).map(({ specifier, dynamic }) => ({
+        specifier,
+        dynamic,
+      })),
+    ).toEqual([
+      { specifier: "../../auth", dynamic: false },
+      { specifier: "./b", dynamic: false },
+      { specifier: "../../auth/hooks/signOutState", dynamic: true },
+      { specifier: "react-router-dom", dynamic: true },
+      { specifier: "../../week", dynamic: true },
+      { specifier: null, dynamic: true },
+    ]);
   });
 
   it("feature 外・別 feature からは barrel 経由で import し、同一 feature 内では自分の barrel を使わない（共有 feature と、router.tsx が lazy load する page・barrel に無い page は除く）", () => {
