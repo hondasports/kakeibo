@@ -67,13 +67,31 @@ function featureOf(file: string): string | null {
 
 const stripExtension = (file: string) => file.replace(/\.tsx?$/, "");
 
+function reexportedSpecifiers(file: string, code = readFileSync(file, "utf8")): Set<string> {
+  const { module } = parseSync(file, code);
+  const specifiers = new Set<string>();
+  const exportedLocalNames = new Set<string>();
+  for (const item of module.staticExports) {
+    for (const entry of item.entries) {
+      if (entry.moduleRequest) specifiers.add(entry.moduleRequest.value);
+      else if (entry.localName.name) exportedLocalNames.add(entry.localName.name);
+    }
+  }
+  for (const item of module.staticImports) {
+    if (item.entries.some((entry) => exportedLocalNames.has(entry.localName.value))) {
+      specifiers.add(item.moduleRequest.value);
+    }
+  }
+  return specifiers;
+}
+
 function barrelExportedFiles(feature: string): Set<string> {
   const barrel = join(featuresRoot, feature, "index.ts");
   if (!existsSync(barrel)) return new Set();
   return new Set(
-    moduleReferences(barrel)
-      .filter((reference) => reference.specifier?.startsWith("."))
-      .map((reference) => stripExtension(resolve(dirname(barrel), reference.specifier as string))),
+    [...reexportedSpecifiers(barrel)]
+      .filter((specifier) => specifier.startsWith("."))
+      .map((specifier) => stripExtension(resolve(dirname(barrel), specifier))),
   );
 }
 
@@ -140,6 +158,23 @@ describe("feature 間の import 方針（docs/technical-design.md §5.1）", () 
       { specifier: "react-router-dom", dynamic: true },
       { specifier: "../../week", dynamic: true },
       { specifier: null, dynamic: true },
+    ]);
+  });
+
+  it("barrel が公開するファイルは export から数え、副作用 import や export しない import は数えない", () => {
+    const barrel = [
+      'import "./pages/SideEffectPage";',
+      'import { HiddenPage } from "./pages/HiddenPage";',
+      'import { LocalPage } from "./pages/LocalPage";',
+      "export { LocalPage };",
+      'export { ReexportedPage } from "./pages/ReexportedPage";',
+      'export * from "./lib/all";',
+      "void HiddenPage;",
+    ].join("\n");
+    expect([...reexportedSpecifiers("index.ts", barrel)].sort()).toEqual([
+      "./lib/all",
+      "./pages/LocalPage",
+      "./pages/ReexportedPage",
     ]);
   });
 
