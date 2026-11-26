@@ -655,7 +655,7 @@ export async function createE2eTaxSummaryConflictDraftForUserHandler(
       },
     ],
     warnings: ["tax_summary_amount_mismatch"],
-    reviewReasons: ["user_confirmation_required", "amount_mismatch"],
+    reviewReasons: ["user_confirmation_required"],
     createdAt: now,
     updatedAt: now,
   });
@@ -701,7 +701,7 @@ export async function createE2eUnallocatedTaxDraftForUserHandler(
     registrationMode: "detailed",
     taxSummaries: fixture.taxSummaries,
     confidence: { documentType: 1, shopName: 1, date: 1, amountYen: 1, categoryId: 1 },
-    reviewReasons: ["amount_mismatch"],
+    reviewReasons: ["user_confirmation_required", "amount_mismatch"],
     createdAt: now,
     updatedAt: now,
   });
@@ -748,7 +748,7 @@ async function createE2eUnprovenTargetDraft(
     taxSummaries: fixture.taxSummaries,
     rawObservation: { source: "ai_ocr", observedAt: now, lines: fixture.rawObservationLines! },
     warnings: [],
-    reviewReasons: ["amount_mismatch", "user_confirmation_required"],
+    reviewReasons: ["user_confirmation_required"],
     createdAt: now,
     updatedAt: now,
   });
