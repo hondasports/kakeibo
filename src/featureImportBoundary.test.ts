@@ -46,7 +46,15 @@ function moduleReferences(file: string): ModuleReference[] {
   }
   for (const item of module.dynamicImports) {
     const source = code.slice(item.moduleRequest.start, item.moduleRequest.end);
-    const literal = /^(["'`])([^"'`$]*)\1$/.exec(source);
+    let expression = source.trim();
+    for (
+      let inner = /^\(([\s\S]*)\)$/.exec(expression);
+      inner;
+      inner = /^\(([\s\S]*)\)$/.exec(expression)
+    ) {
+      expression = inner[1].trim();
+    }
+    const literal = /^(["'`])([^"'`$]*)\1$/.exec(expression);
     references.push({ specifier: literal ? literal[2] : null, source, dynamic: true });
   }
   return references;
