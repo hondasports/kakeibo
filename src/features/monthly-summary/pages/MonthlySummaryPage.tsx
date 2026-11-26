@@ -11,7 +11,7 @@ import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";
 import { ReceiptListCard } from "../../summary-shared/components/ReceiptListCard";
 import { incomeItemToReceiptItem, type ReceiptItem } from "../../summary-shared/types/types";
 import { receiptItemToEntryPrefill } from "../../summary-shared/lib/receiptToEntryPrefill";
-import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
+import { HistoryNavigation } from "../../app-shell";
 import { SummarySectionErrorBoundary } from "../../summary-shared/components/SummarySectionErrorBoundary";
 import { getCurrentWeekStartDate } from "../../week";
 import { formatJapaneseDate } from "../../../utils/date";

@@ -7,7 +7,7 @@ import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { formatYearLabel } from "../../../../lib/domain/common/year";
 import { WeekNavigator } from "../../week";
-import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
+import { HistoryNavigation } from "../../app-shell";
 import { SummarySectionErrorBoundary } from "../../summary-shared/components/SummarySectionErrorBoundary";
 import { WeeklySummaryPanel } from "../components/WeeklySummaryPanel";
 import { receiptItemToEntryPrefill } from "../../summary-shared/lib/receiptToEntryPrefill";

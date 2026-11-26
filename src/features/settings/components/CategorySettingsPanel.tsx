@@ -12,7 +12,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useState } from "react";
-import { ConfirmDangerousActionDialog } from "../../group-admin/components/ConfirmDangerousActionDialog";
+import { ConfirmDangerousActionDialog } from "../../group-admin";
 import { type Category, useCategorySettings } from "../hooks/useCategorySettings";
 import { CategorySettingsList } from "./CategorySettingsList";
 import { CategoryColorSwatches } from "./CategoryColorSwatches";
