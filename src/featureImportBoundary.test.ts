@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { parseSync } from "vite";
 import { describe, expect, it } from "vitest";
 
-// docs/technical-design.md §5.1「feature 間の import 方針」を本番コード（テスト以外）で検査する。
 const sourceRoot = resolve(process.cwd(), "src");
 const featuresRoot = join(sourceRoot, "features");
 const BARREL_LESS_SHARED_FEATURES = new Set(["summary-shared", "receipt-review"]);
@@ -20,7 +20,37 @@ const productionFiles = (readdirSync(sourceRoot, { recursive: true, encoding: "u
   .filter(isProductionSource)
   .map((file) => join(sourceRoot, file));
 
-const RELATIVE_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'](\.{1,2}\/[^"']*)["']/g;
+type ModuleReference = { specifier: string | null; source: string; dynamic: boolean };
+
+function moduleReferences(file: string): ModuleReference[] {
+  const code = readFileSync(file, "utf8");
+  const { module } = parseSync(file, code);
+  const references: ModuleReference[] = [];
+  for (const item of module.staticImports) {
+    references.push({
+      specifier: item.moduleRequest.value,
+      source: item.moduleRequest.value,
+      dynamic: false,
+    });
+  }
+  for (const item of module.staticExports) {
+    for (const entry of item.entries) {
+      if (entry.moduleRequest) {
+        references.push({
+          specifier: entry.moduleRequest.value,
+          source: entry.moduleRequest.value,
+          dynamic: false,
+        });
+      }
+    }
+  }
+  for (const item of module.dynamicImports) {
+    const source = code.slice(item.moduleRequest.start, item.moduleRequest.end);
+    const literal = /^(["'`])([^"'`$]*)\1$/.exec(source);
+    references.push({ specifier: literal ? literal[2] : null, source, dynamic: true });
+  }
+  return references;
+}
 
 function featureOf(file: string): string | null {
   const fromFeatures = relative(featuresRoot, file);
@@ -28,28 +58,45 @@ function featureOf(file: string): string | null {
   return fromFeatures.split(sep)[0] ?? null;
 }
 
-type Violation = string;
+const stripExtension = (file: string) => file.replace(/\.tsx?$/, "");
 
-function findViolations(): Violation[] {
-  const violations: Violation[] = [];
+function barrelExportedFiles(feature: string): Set<string> {
+  const barrel = join(featuresRoot, feature, "index.ts");
+  if (!existsSync(barrel)) return new Set();
+  return new Set(
+    moduleReferences(barrel)
+      .filter((reference) => reference.specifier?.startsWith("."))
+      .map((reference) => stripExtension(resolve(dirname(barrel), reference.specifier as string))),
+  );
+}
+
+function findViolations(): string[] {
+  const violations: string[] = [];
   for (const file of productionFiles) {
-    const source = readFileSync(file, "utf8");
     const importer = featureOf(file);
-    for (const match of source.matchAll(RELATIVE_SPECIFIER)) {
-      const specifier = match[1];
-      const target = resolve(dirname(file), specifier);
+    for (const { specifier, source, dynamic } of moduleReferences(file)) {
+      const at = `${relative(sourceRoot, file)} -> ${source}`;
+      if (specifier === null) {
+        violations.push(`静的に解決できない動的 import: ${at}`);
+        continue;
+      }
+      if (!specifier.startsWith(".")) continue;
+      const target = stripExtension(resolve(dirname(file), specifier));
       const targetFeature = featureOf(target);
       if (targetFeature === null) continue;
       const insideTarget = relative(join(featuresRoot, targetFeature), target);
-      const isBarrel = insideTarget === "" || /^index(\.tsx?)?$/.test(insideTarget);
-      const at = `${relative(sourceRoot, file)} -> ${specifier}`;
+      const isBarrel = insideTarget === "" || insideTarget === "index";
 
       if (importer === targetFeature) {
         if (isBarrel) violations.push(`同一 feature 内で自分の barrel を import: ${at}`);
         continue;
       }
       if (isBarrel || BARREL_LESS_SHARED_FEATURES.has(targetFeature)) continue;
-      if (file === ROUTER_FILE && insideTarget.split(sep)[0] === "pages") continue;
+      if (file === ROUTER_FILE && insideTarget.split(sep)[0] === "pages") {
+        if (dynamic || !barrelExportedFiles(targetFeature).has(target)) continue;
+        violations.push(`barrel で公開済みの page を router が静的に直接 import: ${at}`);
+        continue;
+      }
       violations.push(`barrel を迂回した import: ${at}`);
     }
   }
@@ -64,7 +111,7 @@ describe("feature 間の import 方針（docs/technical-design.md §5.1）", () 
     }
   });
 
-  it("feature 外・別 feature からは barrel 経由で import し、同一 feature 内では自分の barrel を使わない（router.tsx の pages/ と共有 feature は除く）", () => {
+  it("feature 外・別 feature からは barrel 経由で import し、同一 feature 内では自分の barrel を使わない（共有 feature と、router.tsx が lazy load する page・barrel に無い page は除く）", () => {
     expect(findViolations()).toEqual([]);
   });
 });
