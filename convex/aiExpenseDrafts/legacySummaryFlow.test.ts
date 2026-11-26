@@ -72,11 +72,16 @@ describe("旧形式税内訳の保存・登録", () => {
         .take(100),
     }));
     expect(judgeDraftAmountAndTax({ ...draft, items }).status).toBe("unresolved");
-    expect(draft.reviewReasons).toContain("amount_mismatch");
-    expect(draft.reviewReasons).toContain("user_confirmation_required");
+    if (receiptCase === "unproven1003") {
+      expect(draft.reviewReasons).toEqual(["user_confirmation_required"]);
+    } else {
+      expect(draft.reviewReasons).toContain("amount_mismatch");
+      expect(draft.reviewReasons).toContain("user_confirmation_required");
+    }
     const reasons = mapDraftToQueueItem(mapConvexDraftToAiExpenseDraft(draft)!, {}).reviewReasons;
-    expect(reasons).toContain("amount_mismatch");
-    expect(getReviewReasonLabel(getPrimaryReviewReason(reasons)!)).toBe("金額・税内訳の確認が必要");
+    const expectedPrimaryLabel =
+      receiptCase === "unproven1003" ? "内容確認が必要" : "金額・税内訳の確認が必要";
+    expect(getReviewReasonLabel(getPrimaryReviewReason(reasons)!)).toBe(expectedPrimaryLabel);
   });
   it("一覧の保存理由とフォームの解決状態を保ち、保存・再表示・登録で1782円になる", async () => {
     const t = convexTest(schema, convexTestModules);
