@@ -7,7 +7,7 @@ import { formatMonthLabel, getCurrentMonth } from "../../../../lib/domain/common
 import { formatYen } from "../../../../lib/domain/common/currency";
 import { CategoryBreakdownCard } from "../../summary-shared/components/CategoryBreakdownCard";
 import { MonthlyMetricsPanel } from "../../summary-shared/components/MonthlyMetricsPanel";
-import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
+import { HistoryNavigation } from "../../app-shell";
 import { SummarySectionErrorBoundary } from "../../summary-shared/components/SummarySectionErrorBoundary";
 import { getCurrentWeekStartDate } from "../../week";
 import { YearNavigator } from "../components/YearNavigator";

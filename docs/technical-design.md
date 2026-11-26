@@ -322,6 +322,8 @@ feature（例: `summary-shared`、`receipt-review`）へ分離し、特定の表
 - **feature 内**では相対パス（`../components/`、`../hooks/` 等）を使う。
 - **同一 feature 内**で barrel（`index.ts`）を経由して自分自身を import しない。
   共有 lib は `../lib/<module>` のように直接 import する（循環参照防止）。
+- テスト以外のファイルがこの方針に沿うことは `src/featureImportBoundary.test.ts` が検査する。
+  barrel に無いものを別 feature から使うときは、直接 import せず barrel に export を足す。
 
 現行の feature 間依存（例）:
 

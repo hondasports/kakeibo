@@ -6,7 +6,7 @@ import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { getCurrentMonth } from "../../../../lib/domain/common/month";
 import { UNCATEGORIZED_CATEGORY_ID } from "../../../../lib/domain/expenseSearch/filter";
-import { HistoryNavigation } from "../../app-shell/components/HistoryNavigation";
+import { HistoryNavigation } from "../../app-shell";
 import { SuzumemoLoadingState } from "../../ui";
 import { getCurrentWeekStartDate, normalizeWeekStartDate } from "../../week";
 import { IncomeListCard } from "../../summary-shared/components/IncomeListCard";

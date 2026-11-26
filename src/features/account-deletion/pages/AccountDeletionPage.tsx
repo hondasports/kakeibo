@@ -18,7 +18,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { useNavigate } from "react-router-dom";
 import { SuzumemoLoadingState } from "../../ui";
-import { LEGAL_CONTACT_EMAIL } from "../../app-shell/lib/legalDocumentMeta";
+import { LEGAL_CONTACT_EMAIL } from "../../app-shell";
 import { AccountDeletionErrorBoundary } from "../components/AccountDeletionErrorBoundary";
 import { ACCOUNT_DELETION_REAUTHENTICATION_FAILED_CODE } from "../../../../lib/domain/accountDeletion/reverification";
 
