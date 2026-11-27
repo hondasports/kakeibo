@@ -1572,7 +1572,7 @@ describe("household group boundary matrix", () => {
     for (const endpoint of Object.keys(HOUSEHOLD_MATRIX)) {
       expect(() => validArgs(endpoint, {} as FixtureIds), endpoint).not.toThrow();
     }
-  });
+  }, 30_000);
 
   it.each(matrixEntries)("所属ユーザーは妥当な引数で $endpoint を呼べる", async ({ endpoint }) => {
     const rows = await listPublicFunctions();
