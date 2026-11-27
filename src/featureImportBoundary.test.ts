@@ -189,6 +189,7 @@ describe("feature 間の import 方針（docs/technical-design.md §5.1）", () 
 
   it("相対指定子に加えてルート相対の指定子（/src/...）も参照先を解決し、barrel を迂回すれば違反にする", () => {
     const importer = join(featuresRoot, "settings", "pages", "SettingsPage.tsx");
+    const from = relative(sourceRoot, importer);
     const reference = (specifier: string): ModuleReference => ({
       specifier,
       source: specifier,
@@ -202,8 +203,8 @@ describe("feature 間の import 方針（docs/technical-design.md §5.1）", () 
         reference("react-router-dom"),
       ]),
     ).toEqual([
-      "barrel を迂回した import: features/settings/pages/SettingsPage.tsx -> /src/features/auth/hooks/signOutState",
-      "barrel を迂回した import: features/settings/pages/SettingsPage.tsx -> ../../auth/hooks/signOutState",
+      `barrel を迂回した import: ${from} -> /src/features/auth/hooks/signOutState`,
+      `barrel を迂回した import: ${from} -> ../../auth/hooks/signOutState`,
     ]);
   });
 
