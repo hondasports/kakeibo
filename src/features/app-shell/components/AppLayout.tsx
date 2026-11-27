@@ -11,7 +11,7 @@ import { AppDrawer } from "./AppDrawer";
 import { NavigationPendingOutlet } from "./NavigationPendingOutlet";
 import { UserMenu } from "./UserMenu";
 import { createNavItems, isNavItemSelected } from "../lib/navigationConfig";
-import { ExpenseSearchBox } from "../../expense-search/components/ExpenseSearchBox";
+import { ExpenseSearchBox } from "../../expense-search";
 export function AppLayout() {
   const theme = useTheme();
   const isPC = useMediaQuery(theme.breakpoints.up("md"));

@@ -53,9 +53,15 @@ export interface ReceiptAnalysisStore extends ReceiptAnalysisReader {
     },
   ): Promise<void>;
   deleteJob(id: string): Promise<void>;
-  getDraft(
-    id: string,
-  ): Promise<{ id: string; groupId: string; status: string; updatedAt: number } | null>;
+  getDraft(id: string): Promise<{
+    id: string;
+    groupId: string;
+    status: string;
+    updatedAt: number;
+    warnings?: string[];
+  } | null>;
+  /** 下書きの warnings を置き換える。内容や他の項目は維持し、呼び出し側が既存値を読んで差し替える。 */
+  setDraftWarnings(id: string, warnings: string[]): Promise<void>;
   insertFailedAnalysisDraft(args: {
     groupId: string;
     createdByUserId?: string;

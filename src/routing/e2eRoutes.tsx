@@ -11,7 +11,7 @@ import {
   QueuePanelDialogs,
   QueuePanelHeader,
   QueuePanelRegistered,
-} from "../features/ai-expense-queue/components/QueuePanelSlots";
+} from "../features/ai-expense-queue";
 import {
   devAiExpenseQueueCategories,
   devAiExpenseQueueItems,

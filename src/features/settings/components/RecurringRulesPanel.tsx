@@ -28,7 +28,7 @@ import {
   validateRecurringRuleInput,
   type RecurringFrequency,
 } from "../../../../lib/domain/recurringRules/recurringRule";
-import { recurringRuleScheduleLabel } from "../../expense-entry/components/RecurringDueSection";
+import { recurringRuleScheduleLabel } from "../../expense-entry";
 
 type RuleForm = {
   kind: EntryKind;

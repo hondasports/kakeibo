@@ -22,6 +22,7 @@ import {
   shouldScheduleAiReviewNotification,
 } from "../../domain/receiptAnalysisJobs/rules";
 import type { DraftResultImageJobStatus } from "../../domain/receiptAnalysisJobs/status";
+import { isTerminalImageJobStatus } from "../../domain/receiptAnalysisJobs/status";
 
 export async function scheduleAiReviewNotificationIfNeeded(
   deps: { store: ReceiptAnalysisStore; scheduler: ReceiptAnalysisScheduler },
@@ -113,6 +114,9 @@ export async function cancelReceiptAnalysisJob(
     clearDraftId: true,
     updatedAt: now,
   });
+  // cancel も終端なので、同じ mutation の中でバッチの進捗を再計算する。
+  // 他の job が全て終端済みなら、ここでバッチが終端へ進む。
+  await recomputeReceiptAnalysisBatchProgress(store, job.batchId, now);
 }
 
 export async function updateReceiptAnalysisJobStatus(
@@ -257,30 +261,34 @@ export async function finalizeReceiptAnalysisAttempt(
   return { applied: true };
 }
 
-export async function incrementReceiptAnalysisBatchProcessedCount(
+/**
+ * job の終端確定後に batch の processedCount と status を job の実状態から再計算する。
+ * 増分計上ではなく終端 job の件数を数え直す方式にすることで、計上済みかどうかを
+ * ジョブへ記録せずに済み、デプロイ前の既存データ（計上済みだが記録を持たない job）でも
+ * 2重計上しない。batch 内の job は作成上限で束縛されているため読み出しは bounded。
+ * processedCount は既存の表示契約に合わせて単調増加だけを許し、
+ * 終端済みの batch status は再試行中の再計算で待ち状態へ戻さない。
+ */
+export async function recomputeReceiptAnalysisBatchProgress(
   store: ReceiptAnalysisStore,
   batchId: string,
   now = Date.now(),
 ): Promise<void> {
   const batch = await store.getBatch(batchId);
   if (!batch) return;
+  const jobs = await store.listJobsByBatch(batchId);
+  const terminalCount = jobs.filter((job) => isTerminalImageJobStatus(job.status)).length;
+  const processedCount = Math.max(terminalCount, batch.processedCount);
+  const finalStatus = resolveReceiptAnalysisBatchStatus(processedCount, batch.totalCount, jobs);
+  const batchFinished =
+    batch.status === "completed" ||
+    batch.status === "partially_failed" ||
+    batch.status === "failed";
   await store.patchBatch(batchId, {
-    processedCount: batch.processedCount + 1,
-    status: "running",
+    processedCount,
+    status: finalStatus ?? (batchFinished ? batch.status : "running"),
     updatedAt: now,
   });
-}
-
-export async function finalizeReceiptAnalysisBatchStatus(
-  store: ReceiptAnalysisStore,
-  batchId: string,
-  now = Date.now(),
-): Promise<void> {
-  const batch = await store.getBatch(batchId);
-  if (!batch) return;
-  const jobs = batch.processedCount < batch.totalCount ? [] : await store.listJobsByBatch(batchId);
-  const status = resolveReceiptAnalysisBatchStatus(batch.processedCount, batch.totalCount, jobs);
-  if (status) await store.patchBatch(batchId, { status, updatedAt: now });
 }
 
 export async function recoverStaleReceiptAnalysisJobs(
@@ -302,6 +310,7 @@ export async function recoverStaleReceiptAnalysisJobs(
     .sort((a, b) => a.updatedAt - b.updatedAt)
     .slice(0, RECEIPT_ANALYSIS_STALE_RECOVERY_BATCH_SIZE);
   let recoveredCount = 0;
+  const recoveredBatchIds = new Set<string>();
   for (const job of staleJobs) {
     if ((job.status !== "running" && job.status !== "queued") || job.updatedAt >= cutoff) continue;
     // 通常の解析失敗と同じ最終状態にする。初回解析（draftId なし）は失敗 draft を作って
@@ -334,6 +343,12 @@ export async function recoverStaleReceiptAnalysisJobs(
       continue;
     }
     recoveredCount += 1;
+    recoveredBatchIds.add(job.batchId);
+  }
+  // 回復で終端が適用されたバッチを、同じ mutation の中でバッチごと1回だけ再計算する。
+  // 上限拒否や cancel と混在するバッチが running に残らないようにする。
+  for (const batchId of recoveredBatchIds) {
+    await recomputeReceiptAnalysisBatchProgress(deps.store, batchId, now);
   }
   return { recoveredCount };
 }

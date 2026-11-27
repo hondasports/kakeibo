@@ -1,11 +1,10 @@
-import { useSignOutState } from "./features/auth/hooks/signOutState";
 import { useEffect, useState } from "react";
 import { AuthenticateWithRedirectCallback, useAuth, useClerk } from "@clerk/react";
 import { useSignIn } from "@clerk/react/legacy";
 import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
 import { RouterProvider } from "react-router-dom";
 import { useConvexAuth } from "convex/react";
-import { getClerkErrorMessage, useInitializeUser } from "./features/auth";
+import { getClerkErrorMessage, useInitializeUser, useSignOutState } from "./features/auth";
 import { SiteCreditsFooter } from "./features/app-shell";
 import { SuzumemoLoadingLogo, SuzumemoLoadingState } from "./features/ui";
 import { router } from "./router";

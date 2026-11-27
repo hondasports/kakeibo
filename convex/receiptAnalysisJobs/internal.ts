@@ -9,15 +9,23 @@ import {
 } from "../../lib/convex/receiptAnalysisJobs/convexReceiptAnalysisStore";
 import { createReceiptAnalysisMutationDeps } from "../../lib/convex/receiptAnalysisJobs/receiptAnalysisDeps";
 import { ReceiptAnalysisJobDomainError } from "../../lib/domain/receiptAnalysisJobs/rules";
+import { getTodayDateStringInJapan } from "../../lib/domain/common/date";
+import {
+  isReceiptAnalysisDailyLimitReached,
+  RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
+  resolveEffectiveDailyUsageCount,
+  withDailyLimitWarningTag,
+  withoutDailyLimitWarningTag,
+} from "../../lib/domain/receiptAnalysisJobs/dailyUsage";
 import {
   deleteReceiptAnalysisDataByUserBatch as deleteUserDataBatch,
   finalizeReceiptAnalysisAttempt,
-  finalizeReceiptAnalysisBatchStatus,
-  incrementReceiptAnalysisBatchProcessedCount,
+  recomputeReceiptAnalysisBatchProgress,
   recoverStaleReceiptAnalysisJobs as recoverStaleJobs,
   scheduleAiReviewNotificationIfNeeded as scheduleNotification,
   updateReceiptAnalysisJobStatus,
 } from "../../lib/usecase/receiptAnalysisJobs/operations";
+import { requireGroupMembershipForGroup } from "../groups/membership";
 import { toConvexEndpointError } from "../lib/errors";
 import type { DraftResultImageJobStatus } from "../../lib/domain/receiptAnalysisJobs/status";
 import { DRAFT_RESULT_IMAGE_JOB_STATUSES } from "../../lib/domain/receiptAnalysisJobs/status";
@@ -53,6 +61,97 @@ export async function updateJobStatusHandler(
   },
 ) {
   try {
+    if (args.status === "running") {
+      // 有料解析の開始確定と日次上限の消費を同一 mutation で行う。
+      // usecase 側の遷移ガード（queued かつ expectedDraftId 一致）と同じ条件のときだけ枠を消費し、
+      // 重複起動や状態遷移済みの job では消費しない。同一トランザクション内なので読み書きの間に状態は変わらない。
+      const job = await ctx.db.get(args.jobId);
+      const expectedMatches =
+        args.expectedDraftId === undefined || (job?.draftId ?? null) === args.expectedDraftId;
+      if (job && job.status === "queued" && expectedMatches) {
+        // 開始確定と同じ transaction で認証済み主体の所属を確認する。action 側の確認後に
+        // 所属が変わったケースもここで拒否でき、失敗下書きの作成者を利用者単位に保てる。
+        // 所属・グループを確認できない場合は throw して開始を確定しない（書き込み前なので
+        // rollback してよい）。
+        const membership = await requireGroupMembershipForGroup(ctx, job.groupId);
+        const group = await ctx.db.get(job.groupId);
+        if (!group) throw new ConvexError("グループが見つかりません");
+        const now = Date.now();
+        const todayJstDate = getTodayDateStringInJapan(now);
+        const effectiveCount = resolveEffectiveDailyUsageCount(
+          group.receiptAnalysisDailyUsage ?? null,
+          todayJstDate,
+        );
+        if (isReceiptAnalysisDailyLimitReached(effectiveCount)) {
+          // 上限到達時は有料解析を行わず job を failed に確定し、バッチを整合させる。
+          // 通常の解析失敗と同じく失敗下書きを作り、失敗表示・再試行・通知の既存経路に乗せる。
+          // 再試行元の下書きがある場合は新しい下書きで置き換えず、既存の下書きを保持する。
+          // ここでは throw せず戻り値で拒否理由を返す。throw すると job 確定ごと rollback する。
+          const deps = createReceiptAnalysisMutationDeps(ctx);
+          let failedDraftId = job.draftId;
+          if (failedDraftId === undefined) {
+            failedDraftId = (await deps.store.insertFailedAnalysisDraft({
+              groupId: job.groupId,
+              createdByUserId: membership.userId,
+              imageFileName: job.fileName,
+              warning: RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
+            })) as Id<"aiExpenseDrafts">;
+          }
+          // 保持する既存下書きが失敗表示の対象（status: failed）のときだけタグを再度付けて、
+          // 上限による案内がカードに残るようにする。下書きの内容や他の警告は保持する。
+          // 確認待ち（needs_review 等）の下書きには触れない。警告へタグを足すと
+          // 「レシート合計だけ保存」の再判定が読み取り警告とみなして low_confidence を付け、
+          // 税情報付きの下書きが登録待ちへ進めなくなるため。
+          if (job.draftId !== undefined) {
+            const preservedDraft = await deps.store.getDraft(job.draftId);
+            // job の参照に旧データの不整合があっても、他グループの下書きの警告は更新しない
+            if (
+              preservedDraft &&
+              preservedDraft.groupId === job.groupId &&
+              preservedDraft.status === "failed"
+            ) {
+              await deps.store.setDraftWarnings(
+                job.draftId,
+                withDailyLimitWarningTag(preservedDraft.warnings ?? []),
+              );
+            }
+          }
+          await ctx.db.patch(args.jobId, {
+            status: "failed",
+            draftId: failedDraftId,
+            error: RECEIPT_ANALYSIS_DAILY_LIMIT_WARNING_TAG,
+            updatedAt: now,
+          });
+          // 終端確定なので batch の進捗を job の実状態から再計算する。
+          // 停止回復を経た再試行（初回が未計上）でも終端が件数へ反映され、バッチは待ち状態に残らない。
+          await recomputeReceiptAnalysisBatchProgress(deps.store, job.batchId, now);
+          // 通常の解析失敗と同じく、確認を促す通知のスケジュール経路にも乗せる
+          await scheduleNotification(deps, job.batchId, "failed", now);
+          return { applied: false, denialReason: "daily_limit" as const };
+        }
+        await ctx.db.patch(group._id, {
+          receiptAnalysisDailyUsage: {
+            jstDate: todayJstDate,
+            count: effectiveCount + 1,
+            updatedAt: now,
+          },
+        });
+        // 上限を通過して既存下書きの再解析開始が確定したので、前回の上限タグはここで外す。
+        // 正常終了・別理由の失敗・停止回復のどの終端でも古い上限理由が残らないよう、
+        // 開始確定の入口で一律に処理する。完全一致タグだけを外し、他の警告・編集・更新時刻は維持する。
+        if (job.draftId !== undefined) {
+          const deps = createReceiptAnalysisMutationDeps(ctx);
+          const preservedDraft = await deps.store.getDraft(job.draftId);
+          // job の参照に旧データの不整合があっても、他グループの下書きの警告は更新しない
+          if (preservedDraft?.warnings && preservedDraft.groupId === job.groupId) {
+            const nextWarnings = withoutDailyLimitWarningTag(preservedDraft.warnings);
+            if (nextWarnings.length !== preservedDraft.warnings.length) {
+              await deps.store.setDraftWarnings(job.draftId, nextWarnings);
+            }
+          }
+        }
+      }
+    }
     return await updateReceiptAnalysisJobStatus(createReceiptAnalysisMutationDeps(ctx), args);
   } catch (error) {
     convexError(error);
@@ -78,28 +177,18 @@ export async function finalizeAnalysisAttemptHandler(
   }
 }
 
-export async function incrementBatchProcessedCountHandler(
+export async function recomputeBatchProgressHandler(
   ctx: MutationCtx,
   args: { batchId: Id<"receiptAnalysisBatches"> },
 ) {
   try {
-    await incrementReceiptAnalysisBatchProcessedCount(
+    await recomputeReceiptAnalysisBatchProgress(
       createReceiptAnalysisMutationDeps(ctx).store,
       args.batchId,
     );
   } catch (error) {
     convexError(error);
   }
-}
-
-export async function finalizeBatchStatusHandler(
-  ctx: MutationCtx,
-  args: { batchId: Id<"receiptAnalysisBatches"> },
-) {
-  await finalizeReceiptAnalysisBatchStatus(
-    createReceiptAnalysisMutationDeps(ctx).store,
-    args.batchId,
-  );
 }
 
 export async function getJobByIdHandler(
@@ -154,14 +243,23 @@ export const finalizeAnalysisAttempt = internalMutation({
   handler: finalizeAnalysisAttemptHandler,
 });
 
+export const recomputeBatchProgress = internalMutation({
+  args: { batchId: v.id("receiptAnalysisBatches") },
+  handler: recomputeBatchProgressHandler,
+});
+
+// デプロイ開始前に起動した旧 analyzeImageJob action は、処理終了時に旧2 mutation 名を
+// 別トランザクションの runMutation で呼ぶ。Convex のデプロイをまたいでも job 終端後の
+// バッチ更新が失敗しないよう、旧名と旧 {batchId} 引数を冪等な再計算へ接続して維持する。
+// 再計算は job の実状態から導くため、旧経路が2つを順に呼んでも件数を重複加算しない。
 export const incrementBatchProcessedCount = internalMutation({
   args: { batchId: v.id("receiptAnalysisBatches") },
-  handler: incrementBatchProcessedCountHandler,
+  handler: recomputeBatchProgressHandler,
 });
 
 export const finalizeBatchStatus = internalMutation({
   args: { batchId: v.id("receiptAnalysisBatches") },
-  handler: finalizeBatchStatusHandler,
+  handler: recomputeBatchProgressHandler,
 });
 
 export const getBatchById = internalQuery({

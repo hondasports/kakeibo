@@ -23,3 +23,4 @@ export {
   shouldUseRouterBeforeAuth,
 } from "./lib/publicPaths";
 export { shouldShowMaintenancePage } from "./lib/maintenanceMode";
+export { LEGAL_CONTACT_EMAIL } from "./lib/legalDocumentMeta";

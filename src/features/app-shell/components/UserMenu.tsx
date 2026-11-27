@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useClerk, useUser } from "@clerk/react";
 import { Alert, Avatar, Button, Menu, MenuItem } from "@mui/material";
-import { setSignOutState, useSignOutState } from "../../auth/hooks/signOutState";
+import { setSignOutState, useSignOutState } from "../../auth";
 import { getClerkErrorMessage, getClerkUserFriendlyDisplayName } from "../../auth";
 
 export function UserMenu() {
