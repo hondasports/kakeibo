@@ -53,4 +53,4 @@ pre-commitの `--staged` checkは最後の安全網で、編集前preflightの�
 
 ## 後片付け
 
-マージ済みworktreeの削除条件と手順は [references/cleanup.md](references/cleanup.md) が正本。ユーザーが片付け・削除を依頼したときだけ読む。
+マージ済みworktreeの削除候補の判定条件と削除手順は [references/cleanup.md](references/cleanup.md) が正本。ユーザーが削除候補の調査・片付け・削除を依頼したときだけ読む。
