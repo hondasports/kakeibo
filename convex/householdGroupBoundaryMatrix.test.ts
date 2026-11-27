@@ -546,6 +546,7 @@ const MEMBER_USER_ID = "matrix-member";
 const NO_GROUP_USER_ID = "matrix-no-group";
 const OTHER_USER_ID = "matrix-other-user";
 const HOME_MEMBER_USER_ID = "matrix-home-member";
+const OTHER_MEMBER_USER_ID = "matrix-other-member";
 const VALID_IMAGE_DATA_URL = "data:image/jpeg;base64," + "A".repeat(100);
 const identity = (userId: string) => ({
   tokenIdentifier: userId,
@@ -648,10 +649,18 @@ async function seedBoundaryFixture(t: TestT) {
       createdAt: 1,
       updatedAt: 1,
     });
+    await ctx.db.insert("users", {
+      userId: OTHER_MEMBER_USER_ID,
+      displayName: "other member",
+      activeGroupId: otherGroupId,
+      createdAt: 1,
+      updatedAt: 1,
+    });
     for (const [groupId, userId, role] of [
       [homeGroupId, MEMBER_USER_ID, "owner"],
       [homeGroupId, HOME_MEMBER_USER_ID, "member"],
       [otherGroupId, OTHER_USER_ID, "owner"],
+      [otherGroupId, OTHER_MEMBER_USER_ID, "member"],
     ] as const) {
       await ctx.db.insert("groupMembers", {
         groupId,
@@ -1251,7 +1260,7 @@ function validArgs(endpoint: string, ids: FixtureIds): Record<string, unknown> {
     "groups/members:transferGroupOwnership": { targetUserId: HOME_MEMBER_USER_ID },
     "groups/mutations:setActiveGroup": { groupId: ids.homeGroupId },
     "groups/mutations:setMonthlyBudget": { monthlyBudgetYen: 10000 },
-    "groups/mutations:updateGroupName": { name: "matrix home" },
+    "groups/mutations:updateGroupName": { name: "matrix home updated" },
     "groups/queries:getGroupMembers": {},
     "groups/queries:getMyGroup": {},
     "groups/queries:listMyGroups": {},
@@ -1396,23 +1405,66 @@ function reference(endpoint: string, kind: Kind) {
 
 function isEmptyResult(value: unknown): boolean {
   if (value === null || value === undefined) return true;
-  if (Array.isArray(value)) return value.length === 0;
+  if (Array.isArray(value)) return value.every(isEmptyResult);
   if (typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
-  if (Array.isArray(record.page)) return record.page.length === 0;
-  if (Array.isArray(record.items)) return record.items.length === 0;
   if (Object.keys(record).length === 1 && record.deleted === false) return true;
-  return Object.keys(record).length === 0;
+  return Object.values(record).every(isEmptyResult);
 }
 
-async function tableCounts(t: TestT) {
+async function tableSnapshot(t: TestT) {
   const rows = await Promise.all(
     Object.keys(schema.tables).map(async (table) => [
       table,
-      (await t.run(async (ctx) => (await ctx.db.query(table as never).collect()).length)) as number,
+      await t.run(async (ctx) => await ctx.db.query(table as never).collect()),
     ]),
   );
-  return Object.fromEntries(rows) as Record<string, number>;
+  return Object.fromEntries(rows) as Record<string, unknown[]>;
+}
+
+function collectStrings(value: unknown, output: string[] = []): string[] {
+  if (typeof value === "string") output.push(value);
+  else if (Array.isArray(value)) for (const item of value) collectStrings(item, output);
+  else if (value !== null && typeof value === "object") {
+    for (const item of Object.values(value as Record<string, unknown>))
+      collectStrings(item, output);
+  }
+  return output;
+}
+
+function collectComparablePrimitives(value: unknown, output: Array<string | number> = []) {
+  if (typeof value === "string" || typeof value === "number") output.push(value);
+  else if (Array.isArray(value))
+    for (const item of value) collectComparablePrimitives(item, output);
+  else if (value !== null && typeof value === "object") {
+    for (const item of Object.values(value as Record<string, unknown>))
+      collectComparablePrimitives(item, output);
+  }
+  return output;
+}
+
+function expectNoOtherGroupSeed(value: unknown, ids: FixtureIds, endpoint: string) {
+  const strings = collectStrings(value);
+  const leaked = strings.filter((item) => new Set(replacementIds(ids).values()).has(item));
+  expect(leaked, `${endpoint} returned other-group seed ids`).toEqual([]);
+}
+
+function changedDocuments(
+  before: Record<string, unknown[]>,
+  after: Record<string, unknown[]>,
+): unknown[] {
+  const changed: unknown[] = [];
+  for (const table of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    const beforeText = new Set((before[table] ?? []).map((doc) => JSON.stringify(doc)));
+    const afterText = new Set((after[table] ?? []).map((doc) => JSON.stringify(doc)));
+    for (const doc of after[table] ?? []) {
+      if (!beforeText.has(JSON.stringify(doc))) changed.push(doc);
+    }
+    for (const doc of before[table] ?? []) {
+      if (!afterText.has(JSON.stringify(doc))) changed.push(doc);
+    }
+  }
+  return changed;
 }
 
 function rejectionText(error: unknown): string {
@@ -1438,7 +1490,7 @@ function isBoundaryRejection(error: unknown): boolean {
     /not found/i,
     /見つかりません/,
     /削除ジョブが見つかりません/,
-    /does not belong to the current group/i,
+    /does not belong to the current (group|draft)/i,
     /現在選択中のグループでのみ実行できます/,
     /利用グループが変更されました/,
   ].some((pattern) => pattern.test(text));
@@ -1450,7 +1502,7 @@ async function expectRejected(
   args: Record<string, unknown>,
   caller: Pick<TestT, Kind>,
 ) {
-  const before = row.kind === "query" ? null : await tableCounts(t);
+  const before = row.kind === "query" ? null : await tableSnapshot(t);
   let value: unknown;
   let resolved = false;
   let boundaryRejected = false;
@@ -1474,11 +1526,8 @@ async function expectRejected(
       `${row.endpoint} resolved with non-empty value: ${JSON.stringify(value)}`,
     ).toBe(true);
   if (before !== null) {
-    const after = await tableCounts(t);
-    expect(
-      Object.entries(after).filter(([table, count]) => count !== before[table]),
-      `${row.endpoint} wrote to the database`,
-    ).toEqual([]);
+    const after = await tableSnapshot(t);
+    expect(changedDocuments(before, after), `${row.endpoint} wrote to the database`).toEqual([]);
   }
 }
 
@@ -1529,12 +1578,48 @@ describe("household group boundary matrix", () => {
     const ids = await seedBoundaryFixture(t);
     const args = validArgs(endpoint, ids);
     const caller = t.withIdentity(identity(MEMBER_USER_ID));
+    const before = row.kind === "query" ? null : await tableSnapshot(t);
     const value = await caller[row!.kind](reference(endpoint, row!.kind) as never, args);
+    expectNoOtherGroupSeed(value, ids, endpoint);
     if (row!.kind === "query") {
       expect(
         isEmptyResult(value),
         `${endpoint} returned no household seed data: ${JSON.stringify(value)}`,
       ).toBe(false);
+      const resultStrings = collectStrings(value);
+      const projectedSeedProofs: Record<string, boolean> = {
+        "groups/auditLogs:listManagementAuditLogs": resultStrings.includes("matrix home"),
+        "groups/deletion:getGroupDeletionPreview": resultStrings.includes("matrix home"),
+        "groups/queries:getGroupMembers": resultStrings.includes(MEMBER_USER_ID),
+        "receipts/summaries:getWeekSummary":
+          (value as { totalAmountYen?: number; count?: number }).totalAmountYen === 100 &&
+          (value as { totalAmountYen?: number; count?: number }).count === 1,
+      };
+      const hasOwnSeedProof =
+        projectedSeedProofs[endpoint] ?? resultStrings.some((item) => homeIdSet(ids).has(item));
+      expect(
+        hasOwnSeedProof,
+        `${endpoint} did not return own-group seed data: ${JSON.stringify(value)}`,
+      ).toBe(true);
+    } else if (before !== null) {
+      const after = await tableSnapshot(t);
+      const changed = changedDocuments(before, after);
+      expect(changed, `${endpoint} did not create or update a record`).not.toEqual([]);
+      expectNoOtherGroupSeed(changed, ids, endpoint);
+      const changedText = JSON.stringify(changed);
+      const argumentPrimitives = collectComparablePrimitives(args).filter(
+        (item) => typeof item === "number" || item.length > 0,
+      );
+      const fixturePrimitives: Array<string | number> = [
+        ids.homeGroupId,
+        MEMBER_USER_ID,
+        HOME_MEMBER_USER_ID,
+      ];
+      const expectedValues = [...argumentPrimitives, ...fixturePrimitives];
+      expect(
+        expectedValues.some((item) => changedText.includes(String(item))),
+        `${endpoint} changed records do not contain an expected argument or own-group value`,
+      ).toBe(true);
     }
   });
 
@@ -1565,7 +1650,30 @@ describe("household group boundary matrix", () => {
       const ownArgs = validArgs(endpoint, ids);
       if (!containsId(row!.argsValidator) || !includesHomeId(ownArgs, homeIdSet(ids))) return;
       const args = otherGroupArgs(ownArgs, ids);
-      await expectRejected(t, row!, args, t.withIdentity(identity(MEMBER_USER_ID)));
+      const memberCaller = t.withIdentity(identity(MEMBER_USER_ID));
+      await expectRejected(t, row!, args, memberCaller);
+      for (const [homeId, otherId] of replacementIds(ids)) {
+        if (!collectStrings(ownArgs).includes(homeId)) continue;
+        const individuallySwapped = replaceIds(ownArgs, new Map([[homeId, otherId]])) as Record<
+          string,
+          unknown
+        >;
+        await expectRejected(t, row!, individuallySwapped, memberCaller);
+      }
     },
   );
+
+  it.each([
+    "groups/members:changeMemberRole",
+    "groups/members:removeMember",
+    "groups/members:transferGroupOwnership",
+  ])("別グループの対象ユーザー ID は %s で受け入れない", async (endpoint) => {
+    const rows = await listPublicFunctions();
+    const row = rows.find((candidate) => candidate.endpoint === endpoint);
+    expect(row, `missing public function: ${endpoint}`).toBeDefined();
+    const t = convexTest(schema, convexTestModules);
+    const ids = await seedBoundaryFixture(t);
+    const args = { ...validArgs(endpoint, ids), targetUserId: OTHER_MEMBER_USER_ID };
+    await expectRejected(t, row!, args, t.withIdentity(identity(MEMBER_USER_ID)));
+  });
 });
