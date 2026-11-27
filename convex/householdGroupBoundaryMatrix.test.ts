@@ -3,9 +3,25 @@
 
 import { convexTest } from "convex-test";
 import { makeFunctionReference } from "convex/server";
-import { describe, expect, it } from "vitest";
+import { ConvexError } from "convex/values";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "./schema";
 import { convexTestModules } from "./test.setup";
+
+const { clerkCreateInvitation, clerkRevokeInvitation, clerkGetUser } = vi.hoisted(() => ({
+  clerkCreateInvitation: vi.fn(),
+  clerkRevokeInvitation: vi.fn(),
+  clerkGetUser: vi.fn(),
+}));
+vi.mock("@clerk/backend", () => ({
+  createClerkClient: () => ({
+    invitations: {
+      createInvitation: clerkCreateInvitation,
+      revokeInvitation: clerkRevokeInvitation,
+    },
+    users: { getUser: clerkGetUser },
+  }),
+}));
 
 type Classification = "household" | "system_admin" | "self" | "public";
 type Kind = "query" | "mutation" | "action";
@@ -529,6 +545,8 @@ const HOUSEHOLD_MATRIX: Record<string, Record<string, never>> = {
 const MEMBER_USER_ID = "matrix-member";
 const NO_GROUP_USER_ID = "matrix-no-group";
 const OTHER_USER_ID = "matrix-other-user";
+const HOME_MEMBER_USER_ID = "matrix-home-member";
+const VALID_IMAGE_DATA_URL = "data:image/jpeg;base64," + "A".repeat(100);
 const identity = (userId: string) => ({
   tokenIdentifier: userId,
   subject: `clerk-${userId}`,
@@ -589,9 +607,29 @@ async function seedBoundaryFixture(t: TestT) {
       createdAt: 1,
       updatedAt: 1,
     });
+    const homeDeletingGroupId = await ctx.db.insert("groups", {
+      name: "matrix home deleting",
+      status: "deleting",
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    const otherDeletingGroupId = await ctx.db.insert("groups", {
+      name: "matrix other deleting",
+      status: "deleting",
+      createdAt: 1,
+      updatedAt: 1,
+    });
     const memberUserDocId = await ctx.db.insert("users", {
       userId: MEMBER_USER_ID,
       displayName: "member",
+      activeGroupId: homeGroupId,
+      receiptImageExternalApiConsentAcceptedAt: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    const homeMemberUserDocId = await ctx.db.insert("users", {
+      userId: HOME_MEMBER_USER_ID,
+      displayName: "home member",
       activeGroupId: homeGroupId,
       createdAt: 1,
       updatedAt: 1,
@@ -599,6 +637,7 @@ async function seedBoundaryFixture(t: TestT) {
     const noGroupUserDocId = await ctx.db.insert("users", {
       userId: NO_GROUP_USER_ID,
       displayName: "no group",
+      receiptImageExternalApiConsentAcceptedAt: 1,
       createdAt: 1,
       updatedAt: 1,
     });
@@ -609,18 +648,20 @@ async function seedBoundaryFixture(t: TestT) {
       createdAt: 1,
       updatedAt: 1,
     });
-    for (const [groupId, userId] of [
-      [homeGroupId, MEMBER_USER_ID],
-      [otherGroupId, OTHER_USER_ID],
+    for (const [groupId, userId, role] of [
+      [homeGroupId, MEMBER_USER_ID, "owner"],
+      [homeGroupId, HOME_MEMBER_USER_ID, "member"],
+      [otherGroupId, OTHER_USER_ID, "owner"],
     ] as const) {
       await ctx.db.insert("groupMembers", {
         groupId,
         userId,
-        role: "owner",
+        role,
         createdAt: 1,
         updatedAt: 1,
       });
     }
+
     const categoryBase = { color: "#000000", isActive: true, createdAt: 1, updatedAt: 1 };
     const homeCategoryId = await ctx.db.insert("categories", {
       ...categoryBase,
@@ -628,190 +669,708 @@ async function seedBoundaryFixture(t: TestT) {
       name: "home category",
       sortOrder: 0,
     });
+    const homeSecondCategoryId = await ctx.db.insert("categories", {
+      ...categoryBase,
+      groupId: homeGroupId,
+      name: "home second category",
+      sortOrder: 1,
+    });
+    const homeInactiveCategoryId = await ctx.db.insert("categories", {
+      ...categoryBase,
+      groupId: homeGroupId,
+      name: "home inactive category",
+      sortOrder: 2,
+      isActive: false,
+    });
     const otherCategoryId = await ctx.db.insert("categories", {
       ...categoryBase,
       groupId: otherGroupId,
       name: "other category",
       sortOrder: 0,
     });
-    const otherSourceDocumentId = await ctx.db.insert("sourceDocuments", {
-      groupId: otherGroupId,
-      sourceType: "receipt",
-      status: "ready",
-      createdAt: 1,
-      updatedAt: 1,
-    });
-    const otherExpenseEntryId = await ctx.db.insert("expenseEntries", {
-      groupId: otherGroupId,
-      categoryId: otherCategoryId,
+
+    const insertSourceDocument = (groupId: typeof homeGroupId | typeof otherGroupId) =>
+      ctx.db.insert("sourceDocuments", {
+        groupId,
+        sourceType: "receipt",
+        status: "ready",
+        date: "2026-01-01",
+        totalAmount: 100,
+        shopName: "shop",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeSourceDocumentId = await insertSourceDocument(homeGroupId);
+    const otherSourceDocumentId = await insertSourceDocument(otherGroupId);
+
+    const insertExpenseEntry = (
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      categoryId: typeof homeCategoryId | typeof otherCategoryId,
+      title: string,
+    ) =>
+      ctx.db.insert("expenseEntries", {
+        groupId,
+        categoryId,
+        date: "2026-01-01",
+        amount: 100,
+        title,
+        entryType: "expense",
+        source: "manual",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeExpenseEntryId = await insertExpenseEntry(
+      homeGroupId,
+      homeCategoryId,
+      "home expense",
+    );
+    const otherExpenseEntryId = await insertExpenseEntry(
+      otherGroupId,
+      otherCategoryId,
+      "other expense",
+    );
+
+    const insertRecurringRule = (
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      categoryId: typeof homeCategoryId | typeof otherCategoryId,
+      title: string,
+    ) =>
+      ctx.db.insert("recurringEntryRules", {
+        groupId,
+        kind: "expense",
+        title,
+        amountYen: 100,
+        categoryId,
+        frequency: "weekly",
+        dayOfWeek: 1,
+        active: true,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeRecurringRuleId = await insertRecurringRule(
+      homeGroupId,
+      homeCategoryId,
+      "home recurring",
+    );
+    const otherRecurringRuleId = await insertRecurringRule(
+      otherGroupId,
+      otherCategoryId,
+      "other recurring",
+    );
+
+    const insertEntryFavorite = (
+      userId: string,
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      categoryId: typeof homeCategoryId | typeof otherCategoryId,
+      title: string,
+    ) =>
+      ctx.db.insert("entryFavorites", {
+        userId,
+        groupId,
+        title,
+        categoryId,
+        amountYen: 100,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeEntryFavoriteId = await insertEntryFavorite(
+      MEMBER_USER_ID,
+      homeGroupId,
+      homeCategoryId,
+      "home favorite",
+    );
+    const otherEntryFavoriteId = await insertEntryFavorite(
+      OTHER_USER_ID,
+      otherGroupId,
+      otherCategoryId,
+      "other favorite",
+    );
+
+    const insertSavedSearch = (
+      userId: string,
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      name: string,
+    ) =>
+      ctx.db.insert("savedExpenseSearches", {
+        userId,
+        groupId,
+        kind: "saved",
+        name,
+        query: "query",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeSavedExpenseSearchId = await insertSavedSearch(
+      MEMBER_USER_ID,
+      homeGroupId,
+      "home search",
+    );
+    const otherSavedExpenseSearchId = await insertSavedSearch(
+      OTHER_USER_ID,
+      otherGroupId,
+      "other search",
+    );
+
+    const insertReceipt = (
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      categoryId: typeof homeCategoryId | typeof otherCategoryId,
+      shopName: string,
+    ) =>
+      ctx.db.insert("receipts", {
+        groupId,
+        date: "2026-01-01",
+        type: "expense",
+        shopName,
+        amountYen: 100,
+        categoryId,
+        weekStartDate: "2025-12-29",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeReceiptId = await insertReceipt(homeGroupId, homeCategoryId, "home shop");
+    const otherReceiptId = await insertReceipt(otherGroupId, otherCategoryId, "other shop");
+
+    const confidence = { documentType: 1, shopName: 1, date: 1, amountYen: 1, categoryId: 1 };
+    const itemConfidence = { itemName: 1, amountYen: 1, categoryId: 1 };
+    const draftSnapshotValues = (
+      groupCategoryId: typeof homeCategoryId | typeof otherCategoryId,
+      status: "ready" | "needs_review",
+    ) => ({
+      status,
+      documentType: "receipt" as const,
+      shopName: "shop",
       date: "2026-01-01",
-      amount: 100,
-      title: "other expense",
-      entryType: "expense",
-      source: "manual",
-      createdAt: 1,
-      updatedAt: 1,
-    });
-    const otherRecurringRuleId = await ctx.db.insert("recurringEntryRules", {
-      groupId: otherGroupId,
-      kind: "expense",
-      title: "other recurring",
       amountYen: 100,
-      categoryId: otherCategoryId,
-      frequency: "weekly",
-      dayOfWeek: 1,
-      active: true,
-      createdAt: 1,
-      updatedAt: 1,
-    });
-    const otherEntryFavoriteId = await ctx.db.insert("entryFavorites", {
-      userId: OTHER_USER_ID,
-      groupId: otherGroupId,
-      title: "other favorite",
-      categoryId: otherCategoryId,
-      amountYen: 100,
-      createdAt: 1,
-      updatedAt: 1,
-    });
-    const otherSavedExpenseSearchId = await ctx.db.insert("savedExpenseSearches", {
-      userId: OTHER_USER_ID,
-      groupId: otherGroupId,
-      kind: "saved",
-      name: "other search",
-      query: "other",
-      createdAt: 1,
-      updatedAt: 1,
-    });
-    const otherReceiptId = await ctx.db.insert("receipts", {
-      groupId: otherGroupId,
-      date: "2026-01-01",
-      type: "expense",
-      shopName: "other shop",
-      amountYen: 100,
-      categoryId: otherCategoryId,
-      weekStartDate: "2025-12-29",
-      createdAt: 1,
-      updatedAt: 1,
-    });
-    const otherDraftId = await ctx.db.insert("aiExpenseDrafts", {
-      groupId: otherGroupId,
-      createdByUserId: OTHER_USER_ID,
-      sourceType: "image_upload",
-      status: "ready",
-      documentType: "receipt",
-      categoryId: otherCategoryId,
-      confidence: {},
+      registrationMode: "totalOnly" as const,
+      categoryId: groupCategoryId,
+      confidence,
+      warnings: [],
       reviewReasons: [],
-      createdAt: 1,
-      updatedAt: 1,
+      items: [
+        {
+          itemName: "item",
+          amountYen: 100,
+          categoryId: groupCategoryId,
+          confidence: itemConfidence,
+        },
+      ],
     });
-    const otherDraftItemId = await ctx.db.insert("aiExpenseDraftItems", {
-      groupId: otherGroupId,
-      draftId: otherDraftId,
-      itemName: "other item",
-      amountYen: 100,
-      categoryId: otherCategoryId,
-      confidence: {},
+    const insertDraft = (
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      categoryId: typeof homeCategoryId | typeof otherCategoryId,
+      createdByUserId: string,
+      status: "ready" | "needs_review" | "registered",
+    ) =>
+      ctx.db.insert("aiExpenseDrafts", {
+        groupId,
+        createdByUserId,
+        sourceType: "image_upload",
+        status,
+        documentType: "receipt",
+        shopName: "shop",
+        date: "2026-01-01",
+        amountYen: 100,
+        receiptTotalResolution: {
+          status: "verified",
+          protectedAmountYen: 100,
+          candidates: [{ amountYen: 100, source: "user_confirmed", evidence: "fixture" }],
+          reasons: [],
+        },
+        taxSummaries: [
+          {
+            taxRatePercent: 10,
+            taxMode: "included",
+            taxableAmountYen: 100,
+            taxableAmountBasis: "tax_included",
+            taxYen: 9,
+            roundingMethod: "floor",
+            confidence: {},
+            warnings: [],
+          },
+        ],
+        registrationMode: "totalOnly",
+        categoryId,
+        confidence,
+        warnings: [],
+        reviewReasons: [],
+        listSummary: { amountAndTaxResolved: true },
+        receiptInterpretation: {
+          source: "ai",
+          interpretedAt: 1,
+          values: draftSnapshotValues(categoryId, status === "registered" ? "ready" : status),
+        },
+        ...(status === "registered"
+          ? {
+              registeredAt: 1,
+              derivedRegistration: {
+                source: "derived" as const,
+                destination: "expense_entries" as const,
+                registrationMode: "totalOnly" as const,
+                amountYen: 100,
+                date: "2026-01-01",
+                categoryIds: [categoryId],
+                registeredAt: 1,
+              },
+            }
+          : {}),
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeReadyDraftId = await insertDraft(
+      homeGroupId,
+      homeCategoryId,
+      MEMBER_USER_ID,
+      "ready",
+    );
+    const homeRegisteredDraftId = await insertDraft(
+      homeGroupId,
+      homeCategoryId,
+      MEMBER_USER_ID,
+      "registered",
+    );
+    const otherDraftId = await insertDraft(otherGroupId, otherCategoryId, OTHER_USER_ID, "ready");
+
+    const insertDraftItem = (
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      draftId: typeof homeReadyDraftId,
+      categoryId: typeof homeCategoryId | typeof otherCategoryId,
+    ) =>
+      ctx.db.insert("aiExpenseDraftItems", {
+        groupId,
+        draftId,
+        itemName: "item",
+        amountYen: 100,
+        categoryId,
+        confidence: itemConfidence,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeReadyDraftItemId = await insertDraftItem(
+      homeGroupId,
+      homeReadyDraftId,
+      homeCategoryId,
+    );
+    const homeRegisteredDraftItemId = await insertDraftItem(
+      homeGroupId,
+      homeRegisteredDraftId,
+      homeCategoryId,
+    );
+    const otherDraftItemId = await insertDraftItem(otherGroupId, otherDraftId, otherCategoryId);
+
+    const insertBatch = (
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      createdByUserId: string,
+    ) =>
+      ctx.db.insert("receiptAnalysisBatches", {
+        groupId,
+        createdByUserId,
+        totalCount: 1,
+        processedCount: 0,
+        status: "running",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeBatchId = await insertBatch(homeGroupId, MEMBER_USER_ID);
+    const otherBatchId = await insertBatch(otherGroupId, OTHER_USER_ID);
+
+    const insertImageJob = (
+      batchId: typeof homeBatchId,
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      draftId?: typeof homeReadyDraftId,
+      status: "queued" | "failed" = "queued",
+    ) =>
+      ctx.db.insert("receiptAnalysisImageJobs", {
+        batchId,
+        groupId,
+        imageIndex: 0,
+        fileName: "receipt.jpg",
+        status,
+        ...(draftId === undefined ? {} : { draftId }),
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeImageJobId = await insertImageJob(homeBatchId, homeGroupId);
+    const homeRetryImageJobId = await insertImageJob(
+      homeBatchId,
+      homeGroupId,
+      homeReadyDraftId,
+      "failed",
+    );
+    const otherImageJobId = await insertImageJob(otherBatchId, otherGroupId, otherDraftId);
+
+    const insertInvitation = (
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      invitedByUserId: string,
+      email: string,
+    ) =>
+      ctx.db.insert("groupInvitations", {
+        groupId,
+        email,
+        token: `${email}-token`,
+        status: "pending",
+        invitedByUserId,
+        clerkInvitationId: `${email}-clerk`,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeInvitationId = await insertInvitation(
+      homeGroupId,
+      MEMBER_USER_ID,
+      "home-invite@example.test",
+    );
+    const otherInvitationId = await insertInvitation(
+      otherGroupId,
+      OTHER_USER_ID,
+      "other-invite@example.test",
+    );
+
+    const deletedCounts = {
+      receiptAnalysisImageJobs: 0,
+      aiExpenseDraftItems: 0,
+      aiExpenseDrafts: 0,
+      receiptAnalysisBatches: 0,
+      expenseEntries: 0,
+      receipts: 0,
+      entryFavorites: 0,
+      sourceDocuments: 0,
+      storageFiles: 0,
+      weekSessions: 0,
+      categories: 0,
+      groupInvitations: 0,
+      managementAuditLogs: 0,
+      groupMembers: 0,
+      groups: 0,
+      recurringEntryRules: 0,
+      savedExpenseSearches: 0,
+    };
+    const insertDeletionJob = (
+      groupId: typeof homeGroupId | typeof otherGroupId,
+      groupName: string,
+      actorUserIdSnapshot: string,
+    ) =>
+      ctx.db.insert("groupDeletionJobs", {
+        targetGroupIdSnapshot: groupId,
+        targetGroupNameSnapshot: groupName,
+        source: "owner",
+        actorUserIdSnapshot,
+        status: "failed",
+        stage: "categories",
+        isActive: false,
+        attemptCount: 6,
+        maxAttempts: 6,
+        lastErrorCategory: "batch_processing_failed",
+        deletedCounts,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    const homeGroupDeletionJobId = await insertDeletionJob(
+      homeDeletingGroupId,
+      "matrix home deleting",
+      MEMBER_USER_ID,
+    );
+    const otherGroupDeletionJobId = await insertDeletionJob(
+      otherDeletingGroupId,
+      "matrix other deleting",
+      OTHER_USER_ID,
+    );
+
+    await ctx.db.insert("managementAuditLogs", {
+      groupId: homeGroupId,
+      actorUserId: MEMBER_USER_ID,
+      action: "group_name_changed",
+      targetKind: "group",
+      targetId: homeGroupId,
+      targetLabel: "matrix home",
+      beforeValue: "before",
+      afterValue: "after",
       createdAt: 1,
-      updatedAt: 1,
     });
-    const otherBatchId = await ctx.db.insert("receiptAnalysisBatches", {
-      groupId: otherGroupId,
-      createdByUserId: OTHER_USER_ID,
-      totalCount: 1,
-      processedCount: 0,
-      status: "running",
-      createdAt: 1,
-      updatedAt: 1,
-    });
-    const otherImageJobId = await ctx.db.insert("receiptAnalysisImageJobs", {
-      batchId: otherBatchId,
-      groupId: otherGroupId,
-      imageIndex: 0,
-      fileName: "other.png",
-      status: "queued",
-      createdAt: 1,
-      updatedAt: 1,
-    });
-    const otherInvitationId = await ctx.db.insert("groupInvitations", {
-      groupId: otherGroupId,
-      email: "invite@example.test",
-      token: "invite-token",
-      status: "pending",
-      invitedByUserId: OTHER_USER_ID,
-      createdAt: 1,
-      updatedAt: 1,
-    });
-    const otherGroupDeletionJobId = await ctx.db.insert("groupDeletionJobs", {
-      targetGroupIdSnapshot: otherGroupId,
-      targetGroupNameSnapshot: "matrix other",
-      source: "owner",
-      status: "requested",
-      stage: "recipientSnapshot",
-      isActive: true,
-      attemptCount: 0,
-      maxAttempts: 3,
-      deletedCounts: {
-        receiptAnalysisImageJobs: 0,
-        aiExpenseDraftItems: 0,
-        aiExpenseDrafts: 0,
-        receiptAnalysisBatches: 0,
-        expenseEntries: 0,
-        receipts: 0,
-        sourceDocuments: 0,
-        storageFiles: 0,
-        weekSessions: 0,
-        categories: 0,
-        groupInvitations: 0,
-        managementAuditLogs: 0,
-        groupMembers: 0,
-        groups: 0,
-      },
-      createdAt: 1,
-      updatedAt: 1,
-    });
+
     return {
       homeGroupId,
       otherGroupId,
       memberUserDocId,
+      homeMemberUserDocId,
       noGroupUserDocId,
       otherUserDocId,
       homeCategoryId,
+      homeSecondCategoryId,
+      homeInactiveCategoryId,
       otherCategoryId,
+      homeSourceDocumentId,
       otherSourceDocumentId,
+      homeExpenseEntryId,
       otherExpenseEntryId,
+      homeRecurringRuleId,
       otherRecurringRuleId,
+      homeEntryFavoriteId,
       otherEntryFavoriteId,
+      homeSavedExpenseSearchId,
       otherSavedExpenseSearchId,
+      homeReceiptId,
       otherReceiptId,
+      homeReadyDraftId,
+      homeRegisteredDraftId,
       otherDraftId,
+      homeReadyDraftItemId,
+      homeRegisteredDraftItemId,
       otherDraftItemId,
+      homeBatchId,
       otherBatchId,
+      homeImageJobId,
+      homeRetryImageJobId,
       otherImageJobId,
+      homeInvitationId,
       otherInvitationId,
+      homeGroupDeletionJobId,
       otherGroupDeletionJobId,
     };
   });
 }
 
-function idMap(ids: FixtureIds): Record<string, string> {
-  return {
-    groups: ids.otherGroupId,
-    users: ids.otherUserDocId,
-    categories: ids.otherCategoryId,
-    sourceDocuments: ids.otherSourceDocumentId,
-    expenseEntries: ids.otherExpenseEntryId,
-    recurringEntryRules: ids.otherRecurringRuleId,
-    entryFavorites: ids.otherEntryFavoriteId,
-    savedExpenseSearches: ids.otherSavedExpenseSearchId,
-    receipts: ids.otherReceiptId,
-    aiExpenseDrafts: ids.otherDraftId,
-    aiExpenseDraftItems: ids.otherDraftItemId,
-    receiptAnalysisBatches: ids.otherBatchId,
-    receiptAnalysisImageJobs: ids.otherImageJobId,
-    groupInvitations: ids.otherInvitationId,
-    groupDeletionJobs: ids.otherGroupDeletionJobId,
+function validArgs(endpoint: string, ids: FixtureIds): Record<string, unknown> {
+  const paginationOpts = { numItems: 10, cursor: null };
+  const reviewItem = {
+    itemId: ids.homeReadyDraftItemId,
+    itemName: "item",
+    lineType: "item",
+    amountYen: 100,
+    categoryId: ids.homeCategoryId,
+    confidence: { itemName: 1, amountYen: 1, categoryId: 1 },
   };
+  const registeredItem = { ...reviewItem, itemId: ids.homeRegisteredDraftItemId };
+  const args: Record<string, Record<string, unknown>> = {
+    "aiExpenseDrafts/mutations:applyReceiptTaxSettings": {
+      draftId: ids.homeReadyDraftId,
+      taxRatePercent: 10,
+      amountBasis: "tax_included",
+    },
+    "aiExpenseDrafts/mutations:deleteDraft": { draftId: ids.homeReadyDraftId },
+    "aiExpenseDrafts/mutations:registerReadyDraftsAsExpenseEntries": {
+      draftIds: [ids.homeReadyDraftId],
+    },
+    "aiExpenseDrafts/mutations:resetReceiptToAiInterpretation": { draftId: ids.homeReadyDraftId },
+    "aiExpenseDrafts/mutations:updateDraftItemTaxOverrides": {
+      draftId: ids.homeReadyDraftId,
+      itemId: ids.homeReadyDraftItemId,
+      taxRatePercent: 10,
+      amountBasis: "tax_included",
+    },
+    "aiExpenseDrafts/mutations:updateForReview": {
+      draftId: ids.homeReadyDraftId,
+      documentType: "receipt",
+      shopName: "shop",
+      date: "2026-01-01",
+      amountYen: 100,
+      registrationMode: "totalOnly",
+      priceTaxTreatment: "included",
+      taxRateComposition: "rate10",
+      categoryId: ids.homeCategoryId,
+      items: [reviewItem],
+    },
+    "aiExpenseDrafts/mutations:updateRegisteredDraft": {
+      draftId: ids.homeRegisteredDraftId,
+      date: "2026-01-01",
+      amountYen: 100,
+      categoryId: ids.homeCategoryId,
+      shopName: "shop",
+      registrationMode: "totalOnly",
+      items: [registeredItem],
+    },
+    "aiExpenseDrafts/queries:getWithItems": { draftId: ids.homeReadyDraftId },
+    "aiExpenseDrafts/queries:listByStatus": { status: "ready" },
+    "aiExpenseDrafts/queries:listByStatusPaginated": { status: "ready", paginationOpts },
+    "categories/mutations:createCategory": { name: "new category", color: "#123456" },
+    "categories/mutations:deactivateCategory": { categoryId: ids.homeCategoryId },
+    "categories/mutations:moveCategory": { categoryId: ids.homeSecondCategoryId, direction: "up" },
+    "categories/mutations:reactivateCategory": { categoryId: ids.homeInactiveCategoryId },
+    "categories/mutations:seedDefaultCategories": {},
+    "categories/mutations:updateCategory": {
+      categoryId: ids.homeCategoryId,
+      name: "updated category",
+      color: "#123456",
+    },
+    "categories/queries:listActive": {},
+    "categories/queries:listForSettings": {},
+    "dataExport:listExportEntries": {
+      startDate: "2026-01-01",
+      endDate: "2026-01-31",
+      entryType: "expense",
+    },
+    "entryFavorites/mutations:deleteEntryFavorite": { entryFavoriteId: ids.homeEntryFavoriteId },
+    "entryFavorites/mutations:saveEntryFavorite": {
+      title: "favorite",
+      categoryId: ids.homeCategoryId,
+      amountYen: 100,
+    },
+    "entryFavorites/queries:listEntryFavorites": {},
+    "expenseEntries/mutations:bulkDeleteSpendingRecords": {
+      expenseEntryIds: [ids.homeExpenseEntryId],
+      receiptIds: [ids.homeReceiptId],
+    },
+    "expenseEntries/mutations:bulkUpdateSpendingCategories": {
+      expenseEntryIds: [ids.homeExpenseEntryId],
+      receiptIds: [ids.homeReceiptId],
+      categoryId: ids.homeCategoryId,
+    },
+    "expenseEntries/mutations:createExpenseEntries": {
+      date: "2026-01-01",
+      shopName: "shop",
+      sourceAmountYen: 100,
+      sourceDocumentId: ids.homeSourceDocumentId,
+      items: [{ categoryId: ids.homeCategoryId, amountYen: 100, title: "item" }],
+    },
+    "expenseEntries/mutations:createIncomeEntry": {
+      date: "2026-01-01",
+      amountYen: 100,
+      title: "income",
+    },
+    "expenseEntries/mutations:deleteExpenseEntry": { expenseEntryId: ids.homeExpenseEntryId },
+    "expenseEntries/mutations:updateExpenseEntry": {
+      expenseEntryId: ids.homeExpenseEntryId,
+      date: "2026-01-02",
+      amountYen: 120,
+      categoryId: ids.homeCategoryId,
+      title: "updated expense",
+    },
+    "expenseSearch:searchExpenses": { paginationOpts },
+    "groups/auditLogs:listManagementAuditLogs": {},
+    "groups/clerkInvitations:cancelPendingGroupInvitation": { invitationId: ids.homeInvitationId },
+    "groups/clerkInvitations:inviteMember": {
+      email: "new-member@example.test",
+      redirectUrl: "http://localhost:5173/group/invitations/accept",
+    },
+    "groups/deletion:getGroupDeletionPreview": {},
+    "groups/deletion:getGroupDeletionStatus": { jobId: ids.homeGroupDeletionJobId },
+    "groups/deletion:requestGroupDeletion": {
+      confirmationGroupName: "matrix home",
+    },
+    "groups/deletion:resumeGroupDeletion": { jobId: ids.homeGroupDeletionJobId },
+    "groups/members:changeMemberRole": { targetUserId: HOME_MEMBER_USER_ID, newRole: "owner" },
+    "groups/members:removeMember": { targetUserId: HOME_MEMBER_USER_ID },
+    "groups/members:transferGroupOwnership": { targetUserId: HOME_MEMBER_USER_ID },
+    "groups/mutations:setActiveGroup": { groupId: ids.homeGroupId },
+    "groups/mutations:setMonthlyBudget": { monthlyBudgetYen: 10000 },
+    "groups/mutations:updateGroupName": { name: "matrix home" },
+    "groups/queries:getGroupMembers": {},
+    "groups/queries:getMyGroup": {},
+    "groups/queries:listMyGroups": {},
+    "groups/queries:listPendingGroupInvitations": {},
+    "receiptAnalysisJobs/actions:analyzeImageJob": {
+      jobId: ids.homeImageJobId,
+      imageDataUrl: VALID_IMAGE_DATA_URL,
+    },
+    "receiptAnalysisJobs/mutations:cancelImageJob": { jobId: ids.homeImageJobId },
+    "receiptAnalysisJobs/mutations:createBatch": { fileNames: ["receipt.jpg"] },
+    "receiptAnalysisJobs/mutations:retryImageJob": { jobId: ids.homeRetryImageJobId },
+    "receiptAnalysisJobs/queries:listActiveJobs": {},
+    "receiptAnalysisJobs/queries:listJobsByBatch": { batchId: ids.homeBatchId },
+    "receiptAnalysisJobs/queries:listJobsByDraftIds": { draftIds: [ids.homeReadyDraftId] },
+    "receipts/crud:deleteReceipt": { receiptId: ids.homeReceiptId },
+    "receipts/crud:updateReceipt": {
+      receiptId: ids.homeReceiptId,
+      date: "2026-01-02",
+      shopName: "updated shop",
+      amountYen: 120,
+      categoryId: ids.homeCategoryId,
+    },
+    "receipts/summaries:getFourWeeksSummary": { weekStartDate: "2025-12-29" },
+    "receipts/summaries:getMonthSummaryWithCategories": { month: "2026-01" },
+    "receipts/summaries:getWeekSummary": { weekStartDate: "2025-12-29" },
+    "receipts/summaries:getWeekSummaryWithCategories": { weekStartDate: "2025-12-29" },
+    "receipts/summaries:getYearSummary": { year: "2026" },
+    "recurringRules/index:createRecurringRule": {
+      kind: "expense",
+      title: "recurring",
+      amountYen: 100,
+      categoryId: ids.homeCategoryId,
+      frequency: "weekly",
+      dayOfWeek: 1,
+    },
+    "recurringRules/index:listRecurringRules": {},
+    "recurringRules/index:registerFromRecurringRule": { ruleId: ids.homeRecurringRuleId },
+    "recurringRules/index:setRecurringRuleActive": {
+      ruleId: ids.homeRecurringRuleId,
+      active: false,
+    },
+    "recurringRules/index:updateRecurringRule": {
+      ruleId: ids.homeRecurringRuleId,
+      kind: "expense",
+      title: "updated recurring",
+      amountYen: 120,
+      categoryId: ids.homeCategoryId,
+      frequency: "weekly",
+      dayOfWeek: 1,
+    },
+    "savedExpenseSearches/mutations:deleteSavedExpenseSearch": {
+      savedExpenseSearchId: ids.homeSavedExpenseSearchId,
+    },
+    "savedExpenseSearches/mutations:recordRecentExpenseSearch": { query: "recent" },
+    "savedExpenseSearches/mutations:saveExpenseSearch": { name: "saved", query: "query" },
+    "savedExpenseSearches/queries:listSavedExpenseSearches": {},
+    "weekSessions/mutations:getOrCreateCurrentWeekSession": {},
+    "weekSessions/mutations:getOrCreateWeekSession": { weekStartDate: "2026-01-05" },
+  };
+  const result = args[endpoint];
+  if (result === undefined) throw new Error(`missing valid args: ${endpoint}`);
+  return result;
+}
+
+function replacementIds(ids: FixtureIds): Map<string, string> {
+  return new Map([
+    [ids.homeGroupId, ids.otherGroupId],
+    [ids.homeCategoryId, ids.otherCategoryId],
+    [ids.homeSecondCategoryId, ids.otherCategoryId],
+    [ids.homeInactiveCategoryId, ids.otherCategoryId],
+    [ids.homeSourceDocumentId, ids.otherSourceDocumentId],
+    [ids.homeExpenseEntryId, ids.otherExpenseEntryId],
+    [ids.homeRecurringRuleId, ids.otherRecurringRuleId],
+    [ids.homeEntryFavoriteId, ids.otherEntryFavoriteId],
+    [ids.homeSavedExpenseSearchId, ids.otherSavedExpenseSearchId],
+    [ids.homeReceiptId, ids.otherReceiptId],
+    [ids.homeReadyDraftId, ids.otherDraftId],
+    [ids.homeRegisteredDraftId, ids.otherDraftId],
+    [ids.homeReadyDraftItemId, ids.otherDraftItemId],
+    [ids.homeRegisteredDraftItemId, ids.otherDraftItemId],
+    [ids.homeBatchId, ids.otherBatchId],
+    [ids.homeImageJobId, ids.otherImageJobId],
+    [ids.homeRetryImageJobId, ids.otherImageJobId],
+    [ids.homeInvitationId, ids.otherInvitationId],
+    [ids.homeGroupDeletionJobId, ids.otherGroupDeletionJobId],
+  ]);
+}
+
+function replaceIds(value: unknown, replacements: Map<string, string>): unknown {
+  if (typeof value === "string") return replacements.get(value) ?? value;
+  if (Array.isArray(value)) return value.map((item) => replaceIds(item, replacements));
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        replaceIds(item, replacements),
+      ]),
+    );
+  }
+  return value;
+}
+
+function homeIdSet(ids: FixtureIds): Set<string> {
+  return new Set(replacementIds(ids).keys());
+}
+
+function includesHomeId(value: unknown, homeIds: Set<string>): boolean {
+  if (typeof value === "string") return homeIds.has(value);
+  if (Array.isArray(value)) return value.some((item) => includesHomeId(item, homeIds));
+  if (value !== null && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).some((item) =>
+      includesHomeId(item, homeIds),
+    );
+  }
+  return false;
+}
+
+function otherGroupArgs(args: Record<string, unknown>, ids: FixtureIds) {
+  return replaceIds(args, replacementIds(ids)) as Record<string, unknown>;
 }
 
 function containsId(validator: ValidatorJson): boolean {
@@ -825,61 +1384,6 @@ function containsId(validator: ValidatorJson): boolean {
       ? validator.value.some((item) => containsId(item as ValidatorJson))
       : containsId(validator.value as ValidatorJson);
   return false;
-}
-
-function valueFromValidator(
-  validator: ValidatorJson,
-  ids: Record<string, string>,
-  includeIds: boolean,
-): unknown {
-  switch (validator.type) {
-    case "string":
-      return "test";
-    case "number":
-      return 1;
-    case "boolean":
-      return true;
-    case "literal":
-      return validator.value;
-    case "null":
-      return null;
-    case "id": {
-      const id = ids[validator.tableName ?? ""];
-      if (!id) throw new Error(`missing fixture id: ${validator.tableName}`);
-      return id;
-    }
-    case "array": {
-      const item = (validator.value ?? {}) as ValidatorJson;
-      return includeIds && containsId(item) ? [valueFromValidator(item, ids, includeIds)] : [];
-    }
-    case "object": {
-      const result: Record<string, unknown> = {};
-      for (const [key, field] of Object.entries(
-        (validator.value ?? {}) as Record<string, { optional?: boolean; fieldType: ValidatorJson }>,
-      )) {
-        if (field.optional && !(includeIds && containsId(field.fieldType))) continue;
-        result[key] = valueFromValidator(field.fieldType, ids, includeIds);
-      }
-      return result;
-    }
-    case "union": {
-      const choices = (validator.value ?? []) as ValidatorJson[];
-      const nullChoice = choices.find((choice) => choice.type === "null");
-      return valueFromValidator(nullChoice ?? choices[0] ?? {}, ids, includeIds);
-    }
-    case "record":
-      return {};
-    case "bytes":
-      return new ArrayBuffer(0);
-    case "int64":
-      return 1n;
-    default:
-      return {};
-  }
-}
-
-function generateArgs(row: PublicRow, ids: FixtureIds, includeIds: boolean) {
-  return valueFromValidator(row.argsValidator, idMap(ids), includeIds) as Record<string, unknown>;
 }
 
 function reference(endpoint: string, kind: Kind) {
@@ -911,6 +1415,35 @@ async function tableCounts(t: TestT) {
   return Object.fromEntries(rows) as Record<string, number>;
 }
 
+function rejectionText(error: unknown): string {
+  if (error instanceof ConvexError) {
+    return typeof error.data === "string" ? error.data : JSON.stringify(error.data);
+  }
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function isBoundaryRejection(error: unknown): boolean {
+  const text = rejectionText(error);
+  if (/argument validation|validator validation|value validation/i.test(text)) return false;
+  return [
+    /not authenticated/i,
+    /認証/,
+    /ログイン/,
+    /グループに所属していません/,
+    /グループを選択してください/,
+    /権限/,
+    /オーナー/,
+    /owner/i,
+    /not found/i,
+    /見つかりません/,
+    /削除ジョブが見つかりません/,
+    /does not belong to the current group/i,
+    /現在選択中のグループでのみ実行できます/,
+    /利用グループが変更されました/,
+  ].some((pattern) => pattern.test(text));
+}
+
 async function expectRejected(
   t: TestT,
   row: PublicRow,
@@ -920,11 +1453,20 @@ async function expectRejected(
   const before = row.kind === "query" ? null : await tableCounts(t);
   let value: unknown;
   let resolved = false;
+  let boundaryRejected = false;
+  let caught: unknown;
   try {
     value = await caller[row.kind](reference(row.endpoint, row.kind) as never, args);
     resolved = true;
-  } catch {
-    resolved = false;
+  } catch (error) {
+    caught = error;
+    boundaryRejected = isBoundaryRejection(error);
+  }
+  if (!resolved) {
+    expect(
+      boundaryRejected,
+      `${row.endpoint} rejected with a non-boundary error: ${rejectionText(caught)}`,
+    ).toBe(true);
   }
   if (resolved)
     expect(
@@ -943,7 +1485,22 @@ async function expectRejected(
 const matrixEntries = Object.keys(HOUSEHOLD_MATRIX).map((endpoint) => ({ endpoint }));
 
 describe("household group boundary matrix", () => {
-  it("公開関数をすべて分類表に載せ、household 区分をマトリクスに入れる", async () => {
+  beforeEach(() => {
+    vi.stubEnv("APP_ENV", "development");
+    vi.stubEnv("RECEIPT_IMAGE_EXTRACTOR_MODE", "mock");
+    vi.stubEnv("CLERK_SECRET_KEY", "test-secret");
+    clerkCreateInvitation.mockReset();
+    clerkCreateInvitation.mockResolvedValue({ id: "clerk-invitation-id" });
+    clerkRevokeInvitation.mockReset();
+    clerkRevokeInvitation.mockResolvedValue({});
+    clerkGetUser.mockReset();
+    clerkGetUser.mockResolvedValue({ emailAddresses: [] });
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("公開関数をすべて分類表に載せ、household 区分をマトリクスと positive control に入れる", async () => {
     const rows = await listPublicFunctions();
     const actual = rows.map((row) => row.endpoint);
     expect(actual.filter((endpoint) => !(endpoint in PUBLIC_FUNCTION_COVERAGE))).toEqual([]);
@@ -959,6 +1516,26 @@ describe("household group boundary matrix", () => {
         (endpoint) => PUBLIC_FUNCTION_COVERAGE[endpoint]?.classification !== "household",
       ),
     ).toEqual([]);
+    for (const endpoint of Object.keys(HOUSEHOLD_MATRIX)) {
+      expect(() => validArgs(endpoint, {} as FixtureIds), endpoint).not.toThrow();
+    }
+  });
+
+  it.each(matrixEntries)("所属ユーザーは妥当な引数で $endpoint を呼べる", async ({ endpoint }) => {
+    const rows = await listPublicFunctions();
+    const row = rows.find((candidate) => candidate.endpoint === endpoint);
+    expect(row, `missing public function: ${endpoint}`).toBeDefined();
+    const t = convexTest(schema, convexTestModules);
+    const ids = await seedBoundaryFixture(t);
+    const args = validArgs(endpoint, ids);
+    const caller = t.withIdentity(identity(MEMBER_USER_ID));
+    const value = await caller[row!.kind](reference(endpoint, row!.kind) as never, args);
+    if (row!.kind === "query") {
+      expect(
+        isEmptyResult(value),
+        `${endpoint} returned no household seed data: ${JSON.stringify(value)}`,
+      ).toBe(false);
+    }
   });
 
   for (const mode of ["unauthenticated", "no_group"] as const) {
@@ -970,7 +1547,7 @@ describe("household group boundary matrix", () => {
         expect(row, `missing public function: ${endpoint}`).toBeDefined();
         const t = convexTest(schema, convexTestModules);
         const ids = await seedBoundaryFixture(t);
-        const args = generateArgs(row!, ids, false);
+        const args = validArgs(endpoint, ids);
         const caller = mode === "no_group" ? t.withIdentity(identity(NO_GROUP_USER_ID)) : t;
         await expectRejected(t, row!, args, caller);
       },
@@ -983,10 +1560,11 @@ describe("household group boundary matrix", () => {
       const rows = await listPublicFunctions();
       const row = rows.find((candidate) => candidate.endpoint === endpoint);
       expect(row, `missing public function: ${endpoint}`).toBeDefined();
-      if (!containsId(row!.argsValidator)) return;
       const t = convexTest(schema, convexTestModules);
       const ids = await seedBoundaryFixture(t);
-      const args = generateArgs(row!, ids, true);
+      const ownArgs = validArgs(endpoint, ids);
+      if (!containsId(row!.argsValidator) || !includesHomeId(ownArgs, homeIdSet(ids))) return;
+      const args = otherGroupArgs(ownArgs, ids);
       await expectRejected(t, row!, args, t.withIdentity(identity(MEMBER_USER_ID)));
     },
   );
