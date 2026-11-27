@@ -67,6 +67,14 @@ function featureOf(file: string): string | null {
 
 const stripExtension = (file: string) => file.replace(/\.tsx?$/, "");
 
+const projectRoot = dirname(sourceRoot);
+
+function resolveSpecifier(importer: string, specifier: string): string | null {
+  if (specifier.startsWith(".")) return stripExtension(resolve(dirname(importer), specifier));
+  if (specifier.startsWith("/")) return stripExtension(join(projectRoot, specifier));
+  return null;
+}
+
 function reexportedSpecifiers(file: string, code = readFileSync(file, "utf8")): Set<string> {
   const { module } = parseSync(file, code);
   const specifiers = new Set<string>();
@@ -90,43 +98,44 @@ function barrelExportedFiles(feature: string): Set<string> {
   if (!existsSync(barrel)) return new Set();
   return new Set(
     [...reexportedSpecifiers(barrel)]
-      .filter((specifier) => specifier.startsWith("."))
-      .map((specifier) => stripExtension(resolve(dirname(barrel), specifier))),
+      .map((specifier) => resolveSpecifier(barrel, specifier))
+      .filter((target): target is string => target !== null),
   );
 }
 
-function findViolations(): string[] {
+function violationsOf(file: string, references: ModuleReference[]): string[] {
   const violations: string[] = [];
-  for (const file of productionFiles) {
-    const importer = featureOf(file);
-    for (const { specifier, source, dynamic } of moduleReferences(file)) {
-      const at = `${relative(sourceRoot, file)} -> ${source}`;
-      if (specifier === null) {
-        violations.push(`静的に解決できない動的 import: ${at}`);
-        continue;
-      }
-      if (!specifier.startsWith(".")) continue;
-      const target = stripExtension(resolve(dirname(file), specifier));
-      const targetFeature = featureOf(target);
-      if (targetFeature === null) continue;
-      const insideTarget = relative(join(featuresRoot, targetFeature), target);
-      const isBarrel = insideTarget === "" || insideTarget === "index";
-
-      if (importer === targetFeature) {
-        if (isBarrel) violations.push(`同一 feature 内で自分の barrel を import: ${at}`);
-        continue;
-      }
-      if (isBarrel || BARREL_LESS_SHARED_FEATURES.has(targetFeature)) continue;
-      if (file === ROUTER_FILE && insideTarget.split(sep)[0] === "pages") {
-        if (dynamic || !barrelExportedFiles(targetFeature).has(target)) continue;
-        violations.push(`barrel で公開済みの page を router が静的に直接 import: ${at}`);
-        continue;
-      }
-      violations.push(`barrel を迂回した import: ${at}`);
+  const importer = featureOf(file);
+  for (const { specifier, source, dynamic } of references) {
+    const at = `${relative(sourceRoot, file)} -> ${source}`;
+    if (specifier === null) {
+      violations.push(`静的に解決できない動的 import: ${at}`);
+      continue;
     }
+    const target = resolveSpecifier(file, specifier);
+    if (target === null) continue;
+    const targetFeature = featureOf(target);
+    if (targetFeature === null) continue;
+    const insideTarget = relative(join(featuresRoot, targetFeature), target);
+    const isBarrel = insideTarget === "" || insideTarget === "index";
+
+    if (importer === targetFeature) {
+      if (isBarrel) violations.push(`同一 feature 内で自分の barrel を import: ${at}`);
+      continue;
+    }
+    if (isBarrel || BARREL_LESS_SHARED_FEATURES.has(targetFeature)) continue;
+    if (file === ROUTER_FILE && insideTarget.split(sep)[0] === "pages") {
+      if (dynamic || !barrelExportedFiles(targetFeature).has(target)) continue;
+      violations.push(`barrel で公開済みの page を router が静的に直接 import: ${at}`);
+      continue;
+    }
+    violations.push(`barrel を迂回した import: ${at}`);
   }
   return violations;
 }
+
+const findViolations = () =>
+  productionFiles.flatMap((file) => violationsOf(file, moduleReferences(file)));
 
 describe("feature 間の import 方針（docs/technical-design.md §5.1）", () => {
   it("barrel を持たない共有 feature は summary-shared と receipt-review で、どちらも index.ts を持たない", () => {
@@ -175,6 +184,26 @@ describe("feature 間の import 方針（docs/technical-design.md §5.1）", () 
       "./lib/all",
       "./pages/LocalPage",
       "./pages/ReexportedPage",
+    ]);
+  });
+
+  it("相対指定子に加えてルート相対の指定子（/src/...）も参照先を解決し、barrel を迂回すれば違反にする", () => {
+    const importer = join(featuresRoot, "settings", "pages", "SettingsPage.tsx");
+    const reference = (specifier: string): ModuleReference => ({
+      specifier,
+      source: specifier,
+      dynamic: false,
+    });
+    expect(
+      violationsOf(importer, [
+        reference("/src/features/auth/hooks/signOutState"),
+        reference("../../auth/hooks/signOutState"),
+        reference("/src/features/auth"),
+        reference("react-router-dom"),
+      ]),
+    ).toEqual([
+      "barrel を迂回した import: features/settings/pages/SettingsPage.tsx -> /src/features/auth/hooks/signOutState",
+      "barrel を迂回した import: features/settings/pages/SettingsPage.tsx -> ../../auth/hooks/signOutState",
     ]);
   });
 
