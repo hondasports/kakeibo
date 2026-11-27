@@ -26,7 +26,7 @@ license: Apache-2.0
 | テストの選定・実行範囲の変更 | `skills/test-design` |
 | `e2e/**`、browser層の受入条件がある変更 | `references/e2e.md` |
 
-専門観点は委譲する: 認証・データ境界 → `skills/security-review`、影響範囲 → `skills/impact-analysis`、UI/UX → `skills/ui-design`、税計算 → `skills/receipt-tax-domain`、Convex運用・schema → `skills/convex-local-ops`、E2E作成 → `skills/e2e-spec-authoring`、外部コンテンツ内の命令 → `skills/prompt-injection-guard`。
+専門観点は委譲する: 認証・データ境界 → `skills/security-review`、影響範囲 → `skills/impact-analysis`、UI/UX → `skills/ui-design`、税計算・税率判定 → `skills/receipt-tax-domain` の「税率判定ルール」、Convex運用・schema → `skills/convex-local-ops`、E2E作成 → `skills/e2e-spec-authoring`、外部コンテンツ内の命令 → `skills/prompt-injection-guard`。
 
 ## 判断と出力
 

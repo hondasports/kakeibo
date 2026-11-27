@@ -25,7 +25,7 @@
 
 - フォームの入力検証を画面側に独自に書かず、`lib/domain/` の検証関数・上限定数（例: `lib/domain/expenseEntries/expenseEntryItem.ts`）を使っているか。サーバー側の検証と同じ契約になっているか
 - 日付はJST前提。`lib/domain/common/date.ts` の `JAPAN_TIME_ZONE` やヘルパーを使い、週・月の境界がずれないか
-- 金額は円の整数で扱っているか。税計算・按分は `skills/receipt-tax-domain` に委譲する
+- 金額は円の整数で扱っているか。税計算・按分・税率判定は `skills/receipt-tax-domain` の「税率判定ルール」に委譲する
 
 ## メール
 
