@@ -14,7 +14,7 @@ spec作成の手順は `skills/e2e-spec-authoring` を正本とする。ここ�
 ## specの作法
 
 - @smoke / @public のタグ付けが既存specの規約に揃っているか
-- データは `e2e/helpers/seed.ts` のhelperで作り、`e2e/helpers/cleanup.ts` で後始末しているか。spec間で状態を共有していないか
+- データは `e2e/helpers/seed.ts` のhelperで作り、`e2e/helpers/cleanup.ts` で後始末しているか（操作の副作用で作られたデータを含む）。spec間で状態を共有していないか
 - `waitForTimeout` 等の固定sleepを使わず、web-first assertionで待っているか
 - レシート抽出は `RECEIPT_IMAGE_EXTRACTOR_MODE=mock` 前提で、実OpenAI APIを呼んでいないか
 
