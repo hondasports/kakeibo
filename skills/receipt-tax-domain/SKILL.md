@@ -19,6 +19,7 @@ license: Apache-2.0
 - 税サマリが片方だけ確定（modeまたはbasisがunknown）でも補完するフォールバックは、表示・保存・登録で同一規則を維持する
 - 按分は `allocateTax` を通す。算術的矛盾（印刷額合計と課税対象額の不一致等）は完全一致照合で `unallocated` のまま残し、誤確定しない
 - 混在税率・割引・明細置換・片側欠損の負例を確認する
+- 登録額・税配分（`calculateReceiptRegistrationItems.ts`・`reinterpretDraftTax.ts`）を変えるときは、レビューの指摘が集中した次の組合せを固定ケースか生成で確かめる: 割引の金額基準（税込/税抜）と対象商品の基準の違い、対象付き・対象なし・別カテゴリの商品への割引、内税の端数処理（切り捨て・四捨五入・切り上げ）、合計行のラベル（「税込合計」等）と金額を読めない合計行
 - 回帰資産: `receiptTaxInvariants.test.ts`（不変条件）、`receiptTaxGoldenCases.test.ts`（golden）、`receiptTaxCorruptionMatrix.test.ts`（破損パターン）、`ai-expense-queue.tax-regression.spec.ts`・`ai-expense-tax-allocation.spec.ts`（E2E）
 
 ## 税率判定ルール（正本）

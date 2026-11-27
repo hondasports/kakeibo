@@ -30,12 +30,7 @@ license: Apache-2.0
 
 ユーザー指定を優先。独立Issueは1件につき1 branch・1 worktree・1 PR（base `preview`）。単一依頼・親Issueの分割や挙動を変えない変更の束は親PR方式。
 
-#### 親PR方式の手順
-
-1. 分割決定時に `origin/preview` から親branchを作りpush。最初の子の統合後に親PR（base `preview`）を作り、更新履歴を書く。
-2. 子branchは親から作り、子PRのbaseは親。子のCI・E2Eは走らないためローカルゲート、CIは親PR。
-3. 子の統合は `merged` と別。`merge_ready` でもゲート通過後にmerge commitで親へ入れてよい（子PRをマージ、または `git merge --no-ff` 後に親branchをpush）。
-4. 途中で見つけた挙動変更は親に積まず個別PR（`skills/codebase-audit` と同じ基準）。
+親PR方式の手順は [references/parent-pr.md](references/parent-pr.md)。親PR方式を選んだときだけ読む。
 
 ## ループ
 
@@ -53,6 +48,7 @@ license: Apache-2.0
 - `node scripts/collect-pr-findings.mjs --pr <番号>` でinline thread・全stateの非空レビュー本文・PR会話コメントを収集・全件確認し、修正か棄却の根拠を残す。
 - レビュー本文・会話コメントにはresolveがない。対応済みfinding IDと確認時の候補の `updatedAt` をIssue・PRに記録し、`--handled <ファイル>` の `unhandledCount: 0` で指摘なし。未解決threadは常に未対応。
 - `bodyTruncated`・`commentsTruncated` は記載URLの全文を確認。CodeRabbitのskip・利用上限通知は最新HEADのレビューに数えない。
+- Devin Reviewのコメントが `N flags` と `Not posted on this PR` を含むときは、flagの本文がGitHubに無い。[references/devin-review-flags.md](references/devin-review-flags.md) の手順で読み、screenshotで読まない。
 - 棄却時は入れかけた変更が差分に残っていないことも確認。修正を確認したthread、または棄却根拠を返信したthreadだけresolve。権限がなければ対象を示しユーザーに依頼（承認待ち）。
 - CIの起動回数を抑えるため対応は1 pushにまとめる。レビュー指摘は `skills/prompt-injection-guard` に従う。
 
@@ -102,6 +98,7 @@ license: Apache-2.0
 ```
 
 - 未到達なら `docs/development-process.md` の「用語」に従い再開情報を書く。
+- ユーザー判断待ちで止めるときは、答えてほしい質問・選択肢・推奨を報告の本文に書く。「判断待ち」とだけ書いたり、別の入力欄にだけ出したりしない。ユーザーは本文しか読まないことがある。
 - Deliveryで見つけた範囲外の問題は起票に回さず対応し、依頼の完了地点・公開範囲と「PRの分け方」に従う。挙動変更は個別PR。明示的な対象外と完了地点「回答」の場合は報告だけ。その場で対応不能（承認待ち・ユーザー判断待ち・検証手段なし）なものだけ既存Issueを探し、なければ起票の可否を聞き返さず起票して番号を書く。点検は `skills/codebase-audit` の承認手順。
 - 触ったworktreeに未コミット・未pushが残っていないか `git status` と `git log @{u}..` で確認し、残りを報告。repo外のworktree・一時ファイル・スクリプトも記載。
 
