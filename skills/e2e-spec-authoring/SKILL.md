@@ -22,3 +22,7 @@ E2Eを選ぶ判断は `skills/test-design` を正本とし、このskillはE2E s
 - PR上のE2E要否は `scripts/classify-e2e-relevance.mjs` が機械判定するので、手動でskip判断しない
 
 実行手順は `skills/local-dev-env`、PR CIの差分判定の背景は `docs/development-process.md#pr-ci-e2eの差分判定` を参照する。
+
+## レシート税のspec
+
+税率判定・税配分のE2E seedや画面期待を作るときは、`skills/receipt-tax-domain` の「税率判定ルール」を正本にし、UIの表示文言とドメイン判定を混同しない。
