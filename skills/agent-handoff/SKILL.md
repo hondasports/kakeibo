@@ -47,7 +47,7 @@ Issueの内容は転記せず参照する。見出しと記載事項は次のと
   ```bash
   R=<report.mdの絶対path>; N=<round>; SURF=<cmux surface。cmux以外なら空>
   for i in $(seq 1 720); do
-    if [ -f "$R" ] && head -n1 "$R" | grep -qx "round: $N" && tail -n 3 "$R" | grep -qE '^(STATUS|VERDICT): '; then echo REPORT_READY; tail -n 40 "$R"; exit 0; fi
+    if [ -f "$R" ] && head -n1 "$R" | grep -qx "round: $N" && grep -v '^[[:space:]]*$' "$R" | tail -n 1 | grep -qxE 'STATUS: (DONE|BLOCKED)|VERDICT: (CLEAN|NEEDS_FIX)'; then echo REPORT_READY; tail -n 40 "$R"; exit 0; fi
     if [ -n "$SURF" ] && cmux read-screen --surface "$SURF" --lines 15 2>/dev/null | grep -q '❭ Allow'; then echo WAITING_APPROVAL; exit 2; fi
     sleep 30
   done; echo TIMEOUT; exit 1
