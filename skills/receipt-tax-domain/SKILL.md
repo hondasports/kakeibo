@@ -41,7 +41,7 @@ license: Apache-2.0
 1. 商品自身に明示税率と既知の価格区分がある: `item_explicit`
 2. 明示税率はあるが価格区分が unknown で、同率サマリが一意に basis を示す: `summary_reconciliation`
 3. マーカー凡例の税率と、対象商品の印字額合計・サマリ対象額が一致する: `marker_reconciled`
-4. 処理可能なサマリが1件だけで、全明細合計と対象額が一致する: `single_summary`
+4. 処理可能なサマリから同じ税率のサマリが複数あるものを除いた推定用サマリが1件だけで、未解決の各商品の税率・価格区分がそのサマリと矛盾せず、確定済みを含む全明細合計と対象額が一致する: `single_summary`
 5. 未解決明細の部分集合がサマリ残額へ一意に対応する: `summary_reconciliation`
 6. 未解決明細すべてが残り1件のサマリへ一意に対応する: `remaining_summary`
 
@@ -53,9 +53,9 @@ license: Apache-2.0
 
 ### `unknown`・確認対象のまま残す条件
 
-- 軸の既知証拠がない場合は、その軸を `unknown` にする。競合する既知証拠がある場合でも最上位 source の値は選ぶが、status は verified にしない。
+- 軸の既知証拠がない場合は、その軸を `unknown` にする。選んだ source と同位または上位の source に unknown でない異なる値がある場合（`user` を選んだ場合を除く）も最上位 source の値は選ぶが、status は verified にしない。下位 source だけが異なる場合は競合として扱わない。
 - サマリが contradictory、支払合計・明細・サマリの照合が不一致、印字税額行が矛盾する場合は `contradictory`。
-- 片方または両方の軸が unknown、主要証拠（user/explicitLabel/marker/position/reconciliation）が両軸に不足、競合 evidence がある、推定税額の端数処理が unknown、未検証サマリに依存する場合は `ambiguous`。
+- 片方または両方の軸が unknown、主要証拠（user/explicitLabel/marker/position/reconciliation）が両軸に不足、上の同位・上位 source の競合がある、推定税額の端数処理が unknown、未検証サマリに依存する場合は `ambiguous`。
 - 商品の税率が null なら `unresolved_tax_rate`、価格区分が unknown なら `unresolved_amount_basis` を残す。一意な照合がない限り確定しない。
 - サマリの `taxableAmountBasis` が unknown でも、`taxMode` が external/included ならそれぞれ税抜/税込へ補完する。両方不明なら unresolved のままにする。
 
