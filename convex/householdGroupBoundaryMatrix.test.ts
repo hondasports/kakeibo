@@ -716,12 +716,13 @@ async function seedBoundaryFixture(t: TestT) {
       groupId: typeof homeGroupId | typeof otherGroupId,
       categoryId: typeof homeCategoryId | typeof otherCategoryId,
       title: string,
+      amount: number,
     ) =>
       ctx.db.insert("expenseEntries", {
         groupId,
         categoryId,
         date: "2026-01-01",
-        amount: 100,
+        amount,
         title,
         entryType: "expense",
         source: "manual",
@@ -732,11 +733,13 @@ async function seedBoundaryFixture(t: TestT) {
       homeGroupId,
       homeCategoryId,
       "home expense",
+      100,
     );
     const otherExpenseEntryId = await insertExpenseEntry(
       otherGroupId,
       otherCategoryId,
       "other expense",
+      300,
     );
 
     const insertRecurringRule = (
@@ -824,20 +827,21 @@ async function seedBoundaryFixture(t: TestT) {
       groupId: typeof homeGroupId | typeof otherGroupId,
       categoryId: typeof homeCategoryId | typeof otherCategoryId,
       shopName: string,
+      amountYen: number,
     ) =>
       ctx.db.insert("receipts", {
         groupId,
         date: "2026-01-01",
         type: "expense",
         shopName,
-        amountYen: 100,
+        amountYen,
         categoryId,
         weekStartDate: "2025-12-29",
         createdAt: 1,
         updatedAt: 1,
       });
-    const homeReceiptId = await insertReceipt(homeGroupId, homeCategoryId, "home shop");
-    const otherReceiptId = await insertReceipt(otherGroupId, otherCategoryId, "other shop");
+    const homeReceiptId = await insertReceipt(homeGroupId, homeCategoryId, "home shop", 100);
+    const otherReceiptId = await insertReceipt(otherGroupId, otherCategoryId, "other shop", 300);
 
     const confidence = { documentType: 1, shopName: 1, date: 1, amountYen: 1, categoryId: 1 };
     const itemConfidence = { itemName: 1, amountYen: 1, categoryId: 1 };
