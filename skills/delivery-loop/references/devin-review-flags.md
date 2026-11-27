@@ -6,7 +6,7 @@
 
 1. Claude in Chromeで新しいタブを開き、上のURLへ移動する。
 2. 次のJSを `javascript_tool` で1回だけ実行し、返ったJSONで全flagを読む（読み込み待ち6秒を含む）。screenshot・zoom・flagごとのclickはしない。flagを画像で読むと1 PRで数十万文字分の文脈を使い、過去2週間のClaude Codeセッションではツール出力の約4割を占めた。このJSなら約2千文字で済む。
-3. タブを閉じる。
+3. 下の確認で読み直しが要るflagがあれば同じタブで読み直し、全件の本文を読んでからタブを閉じる。
 
 ```js
 await new Promise(r=>setTimeout(r,6000)); const sel=()=>[...document.querySelectorAll('button')].filter(b=>/(調査|参考情報|バグ)\s*·/.test(b.innerText)); const heads=[...document.querySelectorAll('button')].map(b=>b.innerText.replace(/\s+/g,' ').trim()).filter(t=>/^(要対応|修正済み|無効化済み)/.test(t)); const out=[]; const n=sel().length; for(let i=0;i<n;i++){ const b=sel()[i]; if(!b) break; b.click(); await new Promise(r=>setTimeout(r,900)); let c=b; for(let k=0;k<4&&c.parentElement&&c.innerText.length<120;k++) c=c.parentElement; out.push(c.innerText.replace(/\n+/g,' ')); } JSON.stringify({heads,out})
